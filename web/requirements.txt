@@ -1,0 +1,7 @@
+# AbstractFlow Visual Editor Backend Dependencies
+fastapi>=0.100.0
+uvicorn>=0.22.0
+websockets>=11.0
+pydantic>=2.0.0
+RestrictedPython>=6.0
+aiosqlite>=0.19.0

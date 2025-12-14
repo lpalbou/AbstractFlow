@@ -1,0 +1,28 @@
+# Include important files in the distribution
+include README.md
+include LICENSE
+include CHANGELOG.md
+include pyproject.toml
+include setup.py
+
+# Include package data
+recursive-include abstractflow *.py
+recursive-include abstractflow *.typed
+recursive-include abstractflow *.json
+recursive-include abstractflow *.yaml
+recursive-include abstractflow *.yml
+
+# Exclude development and build files
+exclude .gitignore
+exclude .pre-commit-config.yaml
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
+recursive-exclude * *.so
+recursive-exclude * .DS_Store
+exclude .coverage
+exclude .pytest_cache
+exclude build
+exclude dist
+exclude *.egg-info
+
+
