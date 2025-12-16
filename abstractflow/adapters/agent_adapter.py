@@ -63,6 +63,10 @@ def create_agent_node_handler(
             task = f"Execute {node_id} step"
 
         # Build initial vars for the agent subworkflow
+        max_iterations = getattr(agent, "_max_iterations", 25)
+        max_history_messages = getattr(agent, "_max_history_messages", -1)
+        max_tokens = getattr(agent, "_max_tokens", 32768)
+
         agent_vars = {
             "context": {
                 "task": task,
@@ -70,10 +74,21 @@ def create_agent_node_handler(
             },
             "scratchpad": {
                 "iteration": 0,
-                "max_iterations": getattr(agent, "_max_iterations", 20),
+                "max_iterations": max_iterations,
+                "max_history_messages": max_history_messages,
             },
             "_runtime": {"inbox": []},
             "_temp": {},
+            # Canonical _limits namespace for runtime awareness
+            "_limits": {
+                "max_iterations": max_iterations,
+                "current_iteration": 0,
+                "max_tokens": max_tokens,
+                "max_history_messages": max_history_messages,
+                "estimated_tokens_used": 0,
+                "warn_iterations_pct": 80,
+                "warn_tokens_pct": 80,
+            },
         }
 
         # Inject any additional context from the flow
