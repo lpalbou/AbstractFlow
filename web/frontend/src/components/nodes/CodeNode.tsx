@@ -45,7 +45,7 @@ export const CodeNode = memo(function CodeNode({
         className="node-header"
         style={{ backgroundColor: '#9B59B6' }}
       >
-        <span className="node-icon">&#x1F40D;</span>
+        <span className="node-icon">🐍</span>
         <span className="node-title">{data.label || 'Python Code'}</span>
       </div>
 

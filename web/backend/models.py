@@ -24,6 +24,11 @@ class PinType(str, Enum):
 class NodeType(str, Enum):
     """Types of nodes in the visual editor."""
 
+    # Event/Trigger nodes (entry points)
+    ON_USER_REQUEST = "on_user_request"
+    ON_AGENT_MESSAGE = "on_agent_message"
+    ON_SCHEDULE = "on_schedule"
+    # Core execution nodes
     AGENT = "agent"
     FUNCTION = "function"
     CODE = "code"

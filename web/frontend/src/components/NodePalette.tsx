@@ -78,7 +78,7 @@ export function NodePalette() {
                 />
                 <span className="category-label">{category.label}</span>
                 <span className="category-toggle">
-                  {expandedCategories[key] || searchTerm ? '&#x25BC;' : '&#x25B6;'}
+                  {expandedCategories[key] || searchTerm ? '▼' : '▶'}
                 </span>
               </div>
 

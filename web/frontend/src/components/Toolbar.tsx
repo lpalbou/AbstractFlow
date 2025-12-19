@@ -260,7 +260,7 @@ export function Toolbar() {
           onClick={handleNew}
           title="New Flow"
         >
-          &#x1F4C4; New
+          📄 New
         </button>
 
         <button
@@ -268,7 +268,7 @@ export function Toolbar() {
           onClick={() => setShowLoadModal(true)}
           title="Load Flow"
         >
-          &#x1F4C2; Load
+          📂 Load
         </button>
 
         <button
@@ -277,7 +277,7 @@ export function Toolbar() {
           disabled={saveMutation.isPending}
           title="Save Flow"
         >
-          &#x1F4BE; Save
+          💾 Save
         </button>
 
         <button
@@ -286,7 +286,7 @@ export function Toolbar() {
           disabled={isRunning || !flowId}
           title="Run Flow"
         >
-          {isRunning ? '&#x23F3; Running...' : '&#x25B6; Run'}
+          {isRunning ? '⏳ Running...' : '▶ Run'}
         </button>
 
         <div className="toolbar-divider" />
@@ -296,7 +296,7 @@ export function Toolbar() {
           onClick={handleExport}
           title="Export Flow"
         >
-          &#x1F4E4; Export
+          📤 Export
         </button>
 
         <button
@@ -304,7 +304,7 @@ export function Toolbar() {
           onClick={handleImport}
           title="Import Flow"
         >
-          &#x1F4E5; Import
+          📥 Import
         </button>
 
         {/* Status indicator */}
