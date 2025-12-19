@@ -34,17 +34,22 @@ export interface Pin {
 
 // Node types
 export type NodeType =
+  // Event/Trigger nodes (only exec OUT - entry points for flow)
+  | 'on_user_request'    // Triggered by user input
+  | 'on_agent_message'   // Triggered by inter-agent communication
+  | 'on_schedule'        // Triggered by scheduled events
+  // Core execution nodes (exec IN and OUT)
   | 'agent'
   | 'function'
   | 'code'
   | 'subflow'
-  // Math
+  // Math - Pure functions (no exec pins)
   | 'add' | 'subtract' | 'multiply' | 'divide' | 'modulo' | 'power' | 'abs' | 'round'
-  // String
+  // String - Pure functions (no exec pins)
   | 'concat' | 'split' | 'join' | 'format' | 'uppercase' | 'lowercase' | 'trim' | 'substring' | 'length'
-  // Control
+  // Control - if/loop have exec, logic gates are pure
   | 'if' | 'switch' | 'loop' | 'compare' | 'not' | 'and' | 'or'
-  // Data
+  // Data - Pure functions (no exec pins)
   | 'get' | 'set' | 'merge' | 'array_map' | 'array_filter';
 
 // Node data stored in React Flow nodes

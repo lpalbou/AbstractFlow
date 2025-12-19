@@ -231,7 +231,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               </option>
               {providers.map((p) => (
                 <option key={p.name} value={p.name}>
-                  {p.display_name} ({p.model_count} models)
+                  {p.display_name}
                 </option>
               ))}
             </select>

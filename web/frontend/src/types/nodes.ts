@@ -22,6 +22,50 @@ export interface NodeCategory {
   nodes: NodeTemplate[];
 }
 
+// Event/Trigger nodes - Only have execution OUT (entry points for flow)
+// Like UE4 Blueprint Event nodes (red title bar, white arrow on right)
+const EVENT_NODES: NodeTemplate[] = [
+  {
+    type: 'on_user_request',
+    icon: '&#x1F4AC;', // Speech bubble
+    label: 'On User Request',
+    headerColor: '#C0392B', // Red for events (like UE4)
+    inputs: [], // No inputs - this is the entry point
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'message', label: 'message', type: 'string' },
+      { id: 'context', label: 'context', type: 'object' },
+    ],
+    category: 'events',
+  },
+  {
+    type: 'on_agent_message',
+    icon: '&#x1F4E8;', // Incoming envelope
+    label: 'On Agent Message',
+    headerColor: '#C0392B',
+    inputs: [], // No inputs - triggered by external event
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'sender', label: 'sender', type: 'agent' },
+      { id: 'message', label: 'message', type: 'string' },
+      { id: 'channel', label: 'channel', type: 'string' },
+    ],
+    category: 'events',
+  },
+  {
+    type: 'on_schedule',
+    icon: '&#x23F0;', // Alarm clock
+    label: 'On Schedule',
+    headerColor: '#C0392B',
+    inputs: [], // No inputs - triggered by timer/schedule
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'timestamp', label: 'timestamp', type: 'string' },
+    ],
+    category: 'events',
+  },
+];
+
 // Core nodes
 const CORE_NODES: NodeTemplate[] = [
   {
@@ -72,47 +116,56 @@ const CORE_NODES: NodeTemplate[] = [
   },
 ];
 
-// Math nodes
+// Math nodes - Pure functions (no execution pins, just data in/out)
 const MATH_NODES: NodeTemplate[] = [
-  { type: 'add', icon: '+', label: 'Add', headerColor: '#27AE60', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'a', label: 'a', type: 'number' }, { id: 'b', label: 'b', type: 'number' }], outputs: [{ id: 'exec-out', label: '', type: 'execution' }, { id: 'result', label: 'result', type: 'number' }], category: 'math' },
-  { type: 'subtract', icon: '-', label: 'Subtract', headerColor: '#27AE60', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'a', label: 'a', type: 'number' }, { id: 'b', label: 'b', type: 'number' }], outputs: [{ id: 'exec-out', label: '', type: 'execution' }, { id: 'result', label: 'result', type: 'number' }], category: 'math' },
-  { type: 'multiply', icon: '&#xD7;', label: 'Multiply', headerColor: '#27AE60', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'a', label: 'a', type: 'number' }, { id: 'b', label: 'b', type: 'number' }], outputs: [{ id: 'exec-out', label: '', type: 'execution' }, { id: 'result', label: 'result', type: 'number' }], category: 'math' },
-  { type: 'divide', icon: '&#xF7;', label: 'Divide', headerColor: '#27AE60', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'a', label: 'a', type: 'number' }, { id: 'b', label: 'b', type: 'number' }], outputs: [{ id: 'exec-out', label: '', type: 'execution' }, { id: 'result', label: 'result', type: 'number' }], category: 'math' },
-  { type: 'abs', icon: '|x|', label: 'Absolute', headerColor: '#27AE60', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'value', label: 'value', type: 'number' }], outputs: [{ id: 'exec-out', label: '', type: 'execution' }, { id: 'result', label: 'result', type: 'number' }], category: 'math' },
-  { type: 'round', icon: '&#x223C;', label: 'Round', headerColor: '#27AE60', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'value', label: 'value', type: 'number' }, { id: 'decimals', label: 'decimals', type: 'number' }], outputs: [{ id: 'exec-out', label: '', type: 'execution' }, { id: 'result', label: 'result', type: 'number' }], category: 'math' },
+  { type: 'add', icon: '+', label: 'Add', headerColor: '#27AE60', inputs: [{ id: 'a', label: 'a', type: 'number' }, { id: 'b', label: 'b', type: 'number' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'math' },
+  { type: 'subtract', icon: '-', label: 'Subtract', headerColor: '#27AE60', inputs: [{ id: 'a', label: 'a', type: 'number' }, { id: 'b', label: 'b', type: 'number' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'math' },
+  { type: 'multiply', icon: '&#xD7;', label: 'Multiply', headerColor: '#27AE60', inputs: [{ id: 'a', label: 'a', type: 'number' }, { id: 'b', label: 'b', type: 'number' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'math' },
+  { type: 'divide', icon: '&#xF7;', label: 'Divide', headerColor: '#27AE60', inputs: [{ id: 'a', label: 'a', type: 'number' }, { id: 'b', label: 'b', type: 'number' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'math' },
+  { type: 'abs', icon: '|x|', label: 'Absolute', headerColor: '#27AE60', inputs: [{ id: 'value', label: 'value', type: 'number' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'math' },
+  { type: 'round', icon: '&#x223C;', label: 'Round', headerColor: '#27AE60', inputs: [{ id: 'value', label: 'value', type: 'number' }, { id: 'decimals', label: 'decimals', type: 'number' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'math' },
 ];
 
-// String nodes
+// String nodes - Pure functions (no execution pins, just data in/out)
 const STRING_NODES: NodeTemplate[] = [
-  { type: 'concat', icon: '&#x2795;', label: 'Concat', headerColor: '#E74C3C', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'a', label: 'a', type: 'string' }, { id: 'b', label: 'b', type: 'string' }], outputs: [{ id: 'exec-out', label: '', type: 'execution' }, { id: 'result', label: 'result', type: 'string' }], category: 'string' },
-  { type: 'split', icon: '&#x2702;', label: 'Split', headerColor: '#E74C3C', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'text', label: 'text', type: 'string' }, { id: 'delimiter', label: 'delimiter', type: 'string' }], outputs: [{ id: 'exec-out', label: '', type: 'execution' }, { id: 'result', label: 'result', type: 'array' }], category: 'string' },
-  { type: 'join', icon: '&#x1F517;', label: 'Join', headerColor: '#E74C3C', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'items', label: 'items', type: 'array' }, { id: 'delimiter', label: 'delimiter', type: 'string' }], outputs: [{ id: 'exec-out', label: '', type: 'execution' }, { id: 'result', label: 'result', type: 'string' }], category: 'string' },
-  { type: 'uppercase', icon: 'AA', label: 'Uppercase', headerColor: '#E74C3C', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'text', label: 'text', type: 'string' }], outputs: [{ id: 'exec-out', label: '', type: 'execution' }, { id: 'result', label: 'result', type: 'string' }], category: 'string' },
-  { type: 'lowercase', icon: 'aa', label: 'Lowercase', headerColor: '#E74C3C', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'text', label: 'text', type: 'string' }], outputs: [{ id: 'exec-out', label: '', type: 'execution' }, { id: 'result', label: 'result', type: 'string' }], category: 'string' },
-  { type: 'length', icon: '#', label: 'Length', headerColor: '#E74C3C', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'text', label: 'text', type: 'string' }], outputs: [{ id: 'exec-out', label: '', type: 'execution' }, { id: 'result', label: 'result', type: 'number' }], category: 'string' },
+  { type: 'concat', icon: '&#x2795;', label: 'Concat', headerColor: '#E74C3C', inputs: [{ id: 'a', label: 'a', type: 'string' }, { id: 'b', label: 'b', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
+  { type: 'split', icon: '&#x2702;', label: 'Split', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }, { id: 'delimiter', label: 'delimiter', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'string' },
+  { type: 'join', icon: '&#x1F517;', label: 'Join', headerColor: '#E74C3C', inputs: [{ id: 'items', label: 'items', type: 'array' }, { id: 'delimiter', label: 'delimiter', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
+  { type: 'uppercase', icon: 'AA', label: 'Uppercase', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
+  { type: 'lowercase', icon: 'aa', label: 'Lowercase', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
+  { type: 'length', icon: '#', label: 'Length', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'string' },
 ];
 
 // Control flow nodes
+// If/Else and ForEach need execution pins (they control flow)
+// Compare and logic gates (NOT, AND, OR) are pure functions (no execution pins)
 const CONTROL_NODES: NodeTemplate[] = [
+  // Execution nodes - control the flow
   { type: 'if', icon: '&#x2753;', label: 'If/Else', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'condition', label: 'condition', type: 'boolean' }], outputs: [{ id: 'true', label: 'true', type: 'execution' }, { id: 'false', label: 'false', type: 'execution' }], category: 'control' },
-  { type: 'compare', icon: '=?', label: 'Compare', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'a', label: 'a', type: 'any' }, { id: 'b', label: 'b', type: 'any' }], outputs: [{ id: 'exec-out', label: '', type: 'execution' }, { id: 'result', label: 'result', type: 'boolean' }], category: 'control' },
-  { type: 'not', icon: '!', label: 'NOT', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'value', label: 'value', type: 'boolean' }], outputs: [{ id: 'exec-out', label: '', type: 'execution' }, { id: 'result', label: 'result', type: 'boolean' }], category: 'control' },
-  { type: 'and', icon: '&&', label: 'AND', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'a', label: 'a', type: 'boolean' }, { id: 'b', label: 'b', type: 'boolean' }], outputs: [{ id: 'exec-out', label: '', type: 'execution' }, { id: 'result', label: 'result', type: 'boolean' }], category: 'control' },
-  { type: 'or', icon: '||', label: 'OR', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'a', label: 'a', type: 'boolean' }, { id: 'b', label: 'b', type: 'boolean' }], outputs: [{ id: 'exec-out', label: '', type: 'execution' }, { id: 'result', label: 'result', type: 'boolean' }], category: 'control' },
   { type: 'loop', icon: '&#x1F501;', label: 'ForEach', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'items', label: 'items', type: 'array' }], outputs: [{ id: 'loop', label: 'loop', type: 'execution' }, { id: 'done', label: 'done', type: 'execution' }, { id: 'item', label: 'item', type: 'any' }, { id: 'index', label: 'index', type: 'number' }], category: 'control' },
+  // Pure functions - just produce data
+  { type: 'compare', icon: '=?', label: 'Compare', headerColor: '#F39C12', inputs: [{ id: 'a', label: 'a', type: 'any' }, { id: 'b', label: 'b', type: 'any' }], outputs: [{ id: 'result', label: 'result', type: 'boolean' }], category: 'control' },
+  { type: 'not', icon: '!', label: 'NOT', headerColor: '#F39C12', inputs: [{ id: 'value', label: 'value', type: 'boolean' }], outputs: [{ id: 'result', label: 'result', type: 'boolean' }], category: 'control' },
+  { type: 'and', icon: '&&', label: 'AND', headerColor: '#F39C12', inputs: [{ id: 'a', label: 'a', type: 'boolean' }, { id: 'b', label: 'b', type: 'boolean' }], outputs: [{ id: 'result', label: 'result', type: 'boolean' }], category: 'control' },
+  { type: 'or', icon: '||', label: 'OR', headerColor: '#F39C12', inputs: [{ id: 'a', label: 'a', type: 'boolean' }, { id: 'b', label: 'b', type: 'boolean' }], outputs: [{ id: 'result', label: 'result', type: 'boolean' }], category: 'control' },
 ];
 
-// Data nodes
+// Data nodes - Pure functions (no execution pins, just data in/out)
 const DATA_NODES: NodeTemplate[] = [
-  { type: 'get', icon: '&#x1F4E5;', label: 'Get Property', headerColor: '#3498DB', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'object', label: 'object', type: 'object' }, { id: 'key', label: 'key', type: 'string' }], outputs: [{ id: 'exec-out', label: '', type: 'execution' }, { id: 'value', label: 'value', type: 'any' }], category: 'data' },
-  { type: 'set', icon: '&#x1F4E4;', label: 'Set Property', headerColor: '#3498DB', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'object', label: 'object', type: 'object' }, { id: 'key', label: 'key', type: 'string' }, { id: 'value', label: 'value', type: 'any' }], outputs: [{ id: 'exec-out', label: '', type: 'execution' }, { id: 'result', label: 'result', type: 'object' }], category: 'data' },
-  { type: 'merge', icon: '&#x1F517;', label: 'Merge Objects', headerColor: '#3498DB', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'a', label: 'a', type: 'object' }, { id: 'b', label: 'b', type: 'object' }], outputs: [{ id: 'exec-out', label: '', type: 'execution' }, { id: 'result', label: 'result', type: 'object' }], category: 'data' },
-  { type: 'array_map', icon: '&#x1F5FA;', label: 'Map Array', headerColor: '#3498DB', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'items', label: 'items', type: 'array' }, { id: 'key', label: 'key', type: 'string' }], outputs: [{ id: 'exec-out', label: '', type: 'execution' }, { id: 'result', label: 'result', type: 'array' }], category: 'data' },
-  { type: 'array_filter', icon: '&#x1F50D;', label: 'Filter Array', headerColor: '#3498DB', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'items', label: 'items', type: 'array' }, { id: 'key', label: 'key', type: 'string' }, { id: 'value', label: 'value', type: 'any' }], outputs: [{ id: 'exec-out', label: '', type: 'execution' }, { id: 'result', label: 'result', type: 'array' }], category: 'data' },
+  { type: 'get', icon: '&#x1F4E5;', label: 'Get Property', headerColor: '#3498DB', inputs: [{ id: 'object', label: 'object', type: 'object' }, { id: 'key', label: 'key', type: 'string' }], outputs: [{ id: 'value', label: 'value', type: 'any' }], category: 'data' },
+  { type: 'set', icon: '&#x1F4E4;', label: 'Set Property', headerColor: '#3498DB', inputs: [{ id: 'object', label: 'object', type: 'object' }, { id: 'key', label: 'key', type: 'string' }, { id: 'value', label: 'value', type: 'any' }], outputs: [{ id: 'result', label: 'result', type: 'object' }], category: 'data' },
+  { type: 'merge', icon: '&#x1F517;', label: 'Merge Objects', headerColor: '#3498DB', inputs: [{ id: 'a', label: 'a', type: 'object' }, { id: 'b', label: 'b', type: 'object' }], outputs: [{ id: 'result', label: 'result', type: 'object' }], category: 'data' },
+  { type: 'array_map', icon: '&#x1F5FA;', label: 'Map Array', headerColor: '#3498DB', inputs: [{ id: 'items', label: 'items', type: 'array' }, { id: 'key', label: 'key', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'data' },
+  { type: 'array_filter', icon: '&#x1F50D;', label: 'Filter Array', headerColor: '#3498DB', inputs: [{ id: 'items', label: 'items', type: 'array' }, { id: 'key', label: 'key', type: 'string' }, { id: 'value', label: 'value', type: 'any' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'data' },
 ];
 
 // All categories
 export const NODE_CATEGORIES: Record<string, NodeCategory> = {
+  events: {
+    label: 'Events',
+    icon: '&#x1F514;', // Bell - for events/triggers
+    nodes: EVENT_NODES,
+  },
   core: {
     label: 'Core',
     icon: '&#x26A1;', // Lightning
