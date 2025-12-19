@@ -2,10 +2,11 @@
  * Properties panel for editing selected node configuration.
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import type { Node } from 'reactflow';
-import type { FlowNodeData } from '../types/flow';
+import type { FlowNodeData, ProviderInfo, Pin } from '../types/flow';
 import { useFlowStore } from '../hooks/useFlow';
+import { PinEditor } from './PinEditor';
 
 interface PropertiesPanelProps {
   node: Node<FlowNodeData> | null;
@@ -13,6 +14,67 @@ interface PropertiesPanelProps {
 
 export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const { updateNodeData, deleteNode } = useFlowStore();
+
+  // Provider/model state for agent nodes
+  const [providers, setProviders] = useState<ProviderInfo[]>([]);
+  const [models, setModels] = useState<string[]>([]);
+  const [loadingProviders, setLoadingProviders] = useState(false);
+  const [loadingModels, setLoadingModels] = useState(false);
+
+  // Fetch available providers on mount
+  useEffect(() => {
+    setLoadingProviders(true);
+    fetch('/api/providers')
+      .then((res) => res.json())
+      .then((data) => setProviders(data))
+      .catch((err) => console.error('Failed to fetch providers:', err))
+      .finally(() => setLoadingProviders(false));
+  }, []);
+
+  // Fetch models when provider changes
+  const selectedProvider = node?.data.agentConfig?.provider;
+  useEffect(() => {
+    if (selectedProvider) {
+      setLoadingModels(true);
+      setModels([]);
+      fetch(`/api/providers/${selectedProvider}/models`)
+        .then((res) => res.json())
+        .then((data) => setModels(data))
+        .catch((err) => console.error('Failed to fetch models:', err))
+        .finally(() => setLoadingModels(false));
+    } else {
+      setModels([]);
+    }
+  }, [selectedProvider]);
+
+  const handleProviderChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      if (node) {
+        updateNodeData(node.id, {
+          agentConfig: {
+            ...node.data.agentConfig,
+            provider: e.target.value || undefined,
+            model: undefined, // Reset model when provider changes
+          },
+        });
+      }
+    },
+    [node, updateNodeData]
+  );
+
+  const handleModelChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      if (node) {
+        updateNodeData(node.id, {
+          agentConfig: {
+            ...node.data.agentConfig,
+            model: e.target.value || undefined,
+          },
+        });
+      }
+    },
+    [node, updateNodeData]
+  );
 
   const handleLabelChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -46,6 +108,24 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       deleteNode(node.id);
     }
   }, [node, deleteNode]);
+
+  const handleInputsChange = useCallback(
+    (pins: Pin[]) => {
+      if (node) {
+        updateNodeData(node.id, { inputs: pins });
+      }
+    },
+    [node, updateNodeData]
+  );
+
+  const handleOutputsChange = useCallback(
+    (pins: Pin[]) => {
+      if (node) {
+        updateNodeData(node.id, { outputs: pins });
+      }
+    },
+    [node, updateNodeData]
+  );
 
   if (!node) {
     return (
@@ -123,33 +203,21 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         </span>
       </div>
 
-      {/* Pins info */}
+      {/* Editable Pins */}
       <div className="property-section">
-        <label className="property-label">Inputs</label>
-        <ul className="pins-list">
-          {data.inputs
-            .filter((p) => p.type !== 'execution')
-            .map((pin) => (
-              <li key={pin.id} className="pin-info">
-                <span className="pin-name">{pin.label}</span>
-                <span className="pin-type">{pin.type}</span>
-              </li>
-            ))}
-        </ul>
+        <PinEditor
+          pins={data.inputs || []}
+          direction="input"
+          onUpdate={handleInputsChange}
+        />
       </div>
 
       <div className="property-section">
-        <label className="property-label">Outputs</label>
-        <ul className="pins-list">
-          {data.outputs
-            .filter((p) => p.type !== 'execution')
-            .map((pin) => (
-              <li key={pin.id} className="pin-info">
-                <span className="pin-name">{pin.label}</span>
-                <span className="pin-type">{pin.type}</span>
-              </li>
-            ))}
-        </ul>
+        <PinEditor
+          pins={data.outputs || []}
+          direction="output"
+          onUpdate={handleOutputsChange}
+        />
       </div>
 
       {/* Agent-specific properties */}
@@ -158,19 +226,39 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           <label className="property-label">Agent Configuration</label>
           <div className="property-group">
             <label className="property-sublabel">Provider</label>
-            <select className="property-select">
-              <option value="ollama">Ollama</option>
-              <option value="openai">OpenAI</option>
-              <option value="anthropic">Anthropic</option>
+            <select
+              className="property-select"
+              value={data.agentConfig?.provider || ''}
+              onChange={handleProviderChange}
+              disabled={loadingProviders}
+            >
+              <option value="">
+                {loadingProviders ? 'Loading...' : 'Select provider...'}
+              </option>
+              {providers.map((p) => (
+                <option key={p.name} value={p.name}>
+                  {p.display_name} ({p.model_count} models)
+                </option>
+              ))}
             </select>
           </div>
           <div className="property-group">
             <label className="property-sublabel">Model</label>
-            <input
-              type="text"
-              className="property-input"
-              placeholder="e.g., qwen3:4b"
-            />
+            <select
+              className="property-select"
+              value={data.agentConfig?.model || ''}
+              onChange={handleModelChange}
+              disabled={!data.agentConfig?.provider || loadingModels}
+            >
+              <option value="">
+                {loadingModels ? 'Loading...' : 'Select model...'}
+              </option>
+              {models.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       )}

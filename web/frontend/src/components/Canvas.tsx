@@ -20,6 +20,7 @@ import { validateConnection } from '../utils/validation';
 import { NodeTemplate } from '../types/nodes';
 import type { FlowNodeData, PinType } from '../types/flow';
 import { PIN_COLORS } from '../types/flow';
+import { PinLegend } from './PinLegend';
 
 export function Canvas() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
@@ -169,6 +170,7 @@ export function Canvas() {
           maskColor="rgba(0, 0, 0, 0.7)"
         />
       </ReactFlow>
+      <PinLegend />
     </div>
   );
 }

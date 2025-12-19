@@ -110,3 +110,14 @@ export interface FlowRunResult {
   error?: string;
   run_id?: string;
 }
+
+// Provider information from AbstractCore
+export interface ProviderInfo {
+  name: string;
+  display_name: string;
+  status: string;
+  model_count: number;
+  description?: string;
+  local_provider?: boolean;
+  models?: string[];
+}

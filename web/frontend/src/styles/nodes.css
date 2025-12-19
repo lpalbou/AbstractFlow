@@ -66,6 +66,26 @@
   position: relative;
 }
 
+/* Position handles relative to pin rows, not with absolute top */
+.pin-row {
+  position: relative;
+}
+
+/* Data pin handles should be positioned at the edge of the pin row */
+.pin-row .react-flow__handle {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.pin-row.input .react-flow__handle {
+  left: -12px;
+}
+
+.pin-row.output .react-flow__handle {
+  right: -12px;
+}
+
 .code-body {
   padding: 8px;
 }
@@ -109,17 +129,21 @@
 }
 
 /* React Flow Handles (Pins) */
+/* Data pin handles - invisible, only for connection */
 .react-flow__handle {
   width: 12px;
   height: 12px;
-  border: 2px solid currentColor;
+  border: none;
   background: transparent !important;
-  transition: transform 0.2s, background 0.2s;
+  opacity: 0;
+  transition: transform 0.2s, opacity 0.2s;
 }
 
-.react-flow__handle:hover {
-  transform: scale(1.3);
-  background: currentColor !important;
+/* Show handles on hover for connection */
+.react-flow__handle:hover,
+.flow-node:hover .react-flow__handle {
+  opacity: 1;
+  border: 2px solid currentColor;
 }
 
 .react-flow__handle.execution {
@@ -129,6 +153,7 @@
   clip-path: polygon(0 0, 100% 50%, 0 100%);
   border: none;
   background: var(--pin-execution) !important;
+  opacity: 1; /* Always visible */
 }
 
 /* Execution pins (triangles) */

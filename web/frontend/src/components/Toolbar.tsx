@@ -10,18 +10,36 @@ import { useWebSocket } from '../hooks/useWebSocket';
 import type { FlowRunResult, VisualFlow } from '../types/flow';
 
 // API functions
-async function saveFlow(flow: VisualFlow): Promise<VisualFlow> {
-  const method = flow.id ? 'PUT' : 'POST';
-  const url = flow.id ? `/api/flows/${flow.id}` : '/api/flows';
+async function saveFlow(
+  flow: VisualFlow,
+  existingFlowId: string | null
+): Promise<VisualFlow> {
+  // Use existingFlowId to determine if this is an update or create
+  // flow.id may have a generated value even for new flows
+  const method = existingFlowId ? 'PUT' : 'POST';
+  const url = existingFlowId ? `/api/flows/${existingFlowId}` : '/api/flows';
 
   const response = await fetch(url, {
     method,
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(flow),
+    body: JSON.stringify({
+      name: flow.name,
+      description: flow.description,
+      nodes: flow.nodes,
+      edges: flow.edges,
+      entryNode: flow.entryNode,
+    }),
   });
 
   if (!response.ok) {
-    throw new Error('Failed to save flow');
+    // Get detailed error from backend
+    const error = await response.json().catch(() => ({}));
+    const message = error.detail
+      ? (Array.isArray(error.detail)
+        ? error.detail.map((e: { msg: string }) => e.msg).join(', ')
+        : error.detail)
+      : `HTTP ${response.status}`;
+    throw new Error(message);
   }
 
   return response.json();
@@ -53,7 +71,8 @@ export function Toolbar() {
 
   // Save mutation
   const saveMutation = useMutation({
-    mutationFn: saveFlow,
+    mutationFn: ({ flow, existingFlowId }: { flow: VisualFlow; existingFlowId: string | null }) =>
+      saveFlow(flow, existingFlowId),
     onSuccess: (savedFlow) => {
       loadFlow(savedFlow);
       toast.success('Flow saved!');
@@ -105,8 +124,8 @@ export function Toolbar() {
       toast.error('Please enter a flow name');
       return;
     }
-    saveMutation.mutate(flow);
-  }, [getFlow, saveMutation]);
+    saveMutation.mutate({ flow, existingFlowId: flowId });
+  }, [getFlow, saveMutation, flowId]);
 
   // Handle run
   const handleRun = useCallback(() => {

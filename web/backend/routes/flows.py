@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import json
+import logging
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, List
 import uuid
 
@@ -17,10 +20,45 @@ from ..models import (
 )
 from ..services.executor import visual_to_flow, execute_flow
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/flows", tags=["flows"])
 
-# In-memory storage (replace with database in production)
-_flows: Dict[str, VisualFlow] = {}
+# File-based persistence
+FLOWS_DIR = Path("./flows")
+FLOWS_DIR.mkdir(exist_ok=True)
+
+
+def _load_flows_from_disk() -> Dict[str, VisualFlow]:
+    """Load all flows from disk on startup."""
+    flows: Dict[str, VisualFlow] = {}
+    for path in FLOWS_DIR.glob("*.json"):
+        try:
+            data = json.loads(path.read_text())
+            flow = VisualFlow(**data)
+            flows[flow.id] = flow
+            logger.info(f"Loaded flow '{flow.name}' ({flow.id}) from {path}")
+        except Exception as e:
+            logger.warning(f"Failed to load flow from {path}: {e}")
+    return flows
+
+
+def _save_flow_to_disk(flow: VisualFlow) -> None:
+    """Persist a single flow to disk."""
+    path = FLOWS_DIR / f"{flow.id}.json"
+    path.write_text(flow.model_dump_json(indent=2))
+    logger.info(f"Saved flow '{flow.name}' ({flow.id}) to {path}")
+
+
+def _delete_flow_from_disk(flow_id: str) -> None:
+    """Remove a flow file from disk."""
+    path = FLOWS_DIR / f"{flow_id}.json"
+    if path.exists():
+        path.unlink()
+        logger.info(f"Deleted flow file {path}")
+
+
+# Load existing flows from disk on module import
+_flows: Dict[str, VisualFlow] = _load_flows_from_disk()
 
 
 @router.get("", response_model=List[VisualFlow])
@@ -43,6 +81,7 @@ async def create_flow(request: FlowCreateRequest):
         updated_at=now,
     )
     _flows[flow.id] = flow
+    _save_flow_to_disk(flow)  # Persist to disk
     return flow
 
 
@@ -76,6 +115,7 @@ async def update_flow(flow_id: str, request: FlowUpdateRequest):
 
     flow.updated_at = datetime.utcnow().isoformat()
     _flows[flow_id] = flow
+    _save_flow_to_disk(flow)  # Persist to disk
     return flow
 
 
@@ -85,6 +125,7 @@ async def delete_flow(flow_id: str):
     if flow_id not in _flows:
         raise HTTPException(status_code=404, detail=f"Flow '{flow_id}' not found")
     del _flows[flow_id]
+    _delete_flow_from_disk(flow_id)  # Remove from disk
     return {"status": "deleted", "id": flow_id}
 
 

@@ -61,6 +61,7 @@ export const BaseNode = memo(function BaseNode({
             position={Position.Left}
             id={inputExec.id}
             className="pin execution"
+            title="Execution: Flow control input"
             style={{
               top: getPinOffset(0, true),
               background: PIN_COLORS.execution,
@@ -75,6 +76,7 @@ export const BaseNode = memo(function BaseNode({
             position={Position.Right}
             id={outputExec.id}
             className="pin execution"
+            title="Execution: Flow control output"
             style={{
               top: getPinOffset(0, true),
               background: PIN_COLORS.execution,
@@ -84,21 +86,20 @@ export const BaseNode = memo(function BaseNode({
 
         {/* Data input pins */}
         <div className="pins-left">
-          {inputData.map((pin, index) => (
+          {inputData.map((pin) => (
             <div key={pin.id} className="pin-row input">
               <Handle
                 type="target"
                 position={Position.Left}
                 id={pin.id}
                 className={`pin ${pin.type}`}
-                style={{
-                  top: getPinOffset(index, false),
-                  background: PIN_COLORS[pin.type],
-                }}
+                title={`${pin.label} (${pin.type})`}
+                style={{ background: PIN_COLORS[pin.type] }}
               />
               <span
                 className="pin-shape"
                 style={{ color: PIN_COLORS[pin.type] }}
+                title={`Type: ${pin.type}`}
               >
                 <PinShape type={pin.type} size={10} />
               </span>
@@ -109,12 +110,13 @@ export const BaseNode = memo(function BaseNode({
 
         {/* Data output pins */}
         <div className="pins-right">
-          {outputData.map((pin, index) => (
+          {outputData.map((pin) => (
             <div key={pin.id} className="pin-row output">
               <span className="pin-label">{pin.label}</span>
               <span
                 className="pin-shape"
                 style={{ color: PIN_COLORS[pin.type] }}
+                title={`Type: ${pin.type}`}
               >
                 <PinShape type={pin.type} size={10} />
               </span>
@@ -123,10 +125,8 @@ export const BaseNode = memo(function BaseNode({
                 position={Position.Right}
                 id={pin.id}
                 className={`pin ${pin.type}`}
-                style={{
-                  top: getPinOffset(index, false),
-                  background: PIN_COLORS[pin.type],
-                }}
+                title={`${pin.label} (${pin.type})`}
+                style={{ background: PIN_COLORS[pin.type] }}
               />
             </div>
           ))}

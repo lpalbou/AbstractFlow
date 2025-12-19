@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from .routes import flows_router, ws_router
+from .routes import flows_router, providers_router, ws_router
 
 # Create FastAPI app
 app = FastAPI(
@@ -30,9 +30,17 @@ app.add_middleware(
 
 # Include routers
 app.include_router(flows_router, prefix="/api")
+app.include_router(providers_router, prefix="/api")
 app.include_router(ws_router, prefix="/api")
 
+@app.get("/api/health")
+async def health_check():
+    """Health check endpoint."""
+    return {"status": "healthy", "service": "abstractflow-visual-editor"}
+
+
 # Serve static frontend files (in production)
+# IMPORTANT: These routes must be defined AFTER all /api/* routes
 FRONTEND_DIR = Path(__file__).parent.parent / "frontend" / "dist"
 if FRONTEND_DIR.exists():
     app.mount("/assets", StaticFiles(directory=FRONTEND_DIR / "assets"), name="assets")
@@ -44,17 +52,15 @@ if FRONTEND_DIR.exists():
 
     @app.get("/{path:path}")
     async def serve_frontend_fallback(path: str):
-        """Fallback to index.html for SPA routing."""
+        """Fallback to index.html for SPA routing (excluding API routes)."""
+        # API routes are handled by the routers above
+        if path.startswith("api/"):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="API endpoint not found")
         file_path = FRONTEND_DIR / path
         if file_path.exists() and file_path.is_file():
             return FileResponse(file_path)
         return FileResponse(FRONTEND_DIR / "index.html")
-
-
-@app.get("/api/health")
-async def health_check():
-    """Health check endpoint."""
-    return {"status": "healthy", "service": "abstractflow-visual-editor"}
 
 
 if __name__ == "__main__":

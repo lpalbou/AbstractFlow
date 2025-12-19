@@ -317,3 +317,186 @@
   font-size: 11px;
   color: var(--text-muted);
 }
+
+/* Pin Editor */
+.pin-editor {
+  background: var(--bg-primary);
+  border-radius: 4px;
+  padding: 8px;
+}
+
+.pin-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+.add-pin-btn {
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  width: 20px;
+  height: 20px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.add-pin-btn:hover {
+  background: #d63c52;
+}
+
+.pin-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.pin-color {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.pin-label-input {
+  flex: 1;
+  min-width: 60px;
+  padding: 4px 6px;
+  font-size: 11px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--bg-tertiary);
+  border-radius: 3px;
+  color: var(--text-primary);
+}
+
+.pin-label-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.pin-type-select {
+  padding: 4px 6px;
+  font-size: 11px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--bg-tertiary);
+  border-radius: 3px;
+  color: var(--text-primary);
+}
+
+.pin-type-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.remove-pin-btn {
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 4px;
+}
+
+.remove-pin-btn:hover {
+  color: var(--error);
+}
+
+.no-pins {
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 11px;
+  text-align: center;
+  padding: 8px;
+}
+
+/* Pin Legend */
+.pin-legend {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  z-index: 100;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--bg-tertiary);
+}
+
+.pin-legend-toggle {
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pin-legend-toggle:hover {
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+}
+
+.pin-legend-content {
+  padding: 16px;
+  max-width: 280px;
+  border-top: 1px solid var(--bg-tertiary);
+}
+
+.pin-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.pin-legend-shape {
+  font-size: 14px;
+  width: 20px;
+  text-align: center;
+}
+
+.pin-legend-label {
+  font-weight: 500;
+  font-size: 12px;
+  min-width: 60px;
+  color: var(--text-primary);
+}
+
+.pin-legend-desc {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.pin-legend-rules {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--bg-tertiary);
+  font-size: 11px;
+}
+
+.pin-legend-rules strong {
+  color: var(--text-primary);
+}
+
+.pin-legend-rules ul {
+  margin: 6px 0 0 16px;
+  padding: 0;
+  list-style: disc;
+}
+
+.pin-legend-rules li {
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
