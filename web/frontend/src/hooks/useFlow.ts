@@ -114,12 +114,22 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   // Update node data
   updateNodeData: (nodeId, data) => {
+    const state = get();
+    const updatedNodes = state.nodes.map((node) =>
+      node.id === nodeId
+        ? { ...node, data: { ...node.data, ...data } }
+        : node
+    );
+
+    // Also update selectedNode if it's the one being updated
+    const updatedSelectedNode =
+      state.selectedNode?.id === nodeId
+        ? updatedNodes.find((n) => n.id === nodeId) || null
+        : state.selectedNode;
+
     set({
-      nodes: get().nodes.map((node) =>
-        node.id === nodeId
-          ? { ...node, data: { ...node.data, ...data } }
-          : node
-      ),
+      nodes: updatedNodes,
+      selectedNode: updatedSelectedNode,
     });
   },
 
