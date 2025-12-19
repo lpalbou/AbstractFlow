@@ -4,9 +4,8 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import type { Node } from 'reactflow';
-import type { FlowNodeData, ProviderInfo, Pin } from '../types/flow';
+import type { FlowNodeData, ProviderInfo } from '../types/flow';
 import { useFlowStore } from '../hooks/useFlow';
-import { PinEditor } from './PinEditor';
 
 interface PropertiesPanelProps {
   node: Node<FlowNodeData> | null;
@@ -109,23 +108,6 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     }
   }, [node, deleteNode]);
 
-  const handleInputsChange = useCallback(
-    (pins: Pin[]) => {
-      if (node) {
-        updateNodeData(node.id, { inputs: pins });
-      }
-    },
-    [node, updateNodeData]
-  );
-
-  const handleOutputsChange = useCallback(
-    (pins: Pin[]) => {
-      if (node) {
-        updateNodeData(node.id, { outputs: pins });
-      }
-    },
-    [node, updateNodeData]
-  );
 
   if (!node) {
     return (
@@ -203,21 +185,33 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         </span>
       </div>
 
-      {/* Editable Pins */}
+      {/* Pins info */}
       <div className="property-section">
-        <PinEditor
-          pins={data.inputs || []}
-          direction="input"
-          onUpdate={handleInputsChange}
-        />
+        <label className="property-label">Inputs</label>
+        <ul className="pins-list">
+          {data.inputs
+            .filter((p) => p.type !== 'execution')
+            .map((pin) => (
+              <li key={pin.id} className="pin-info">
+                <span className="pin-name">{pin.label}</span>
+                <span className="pin-type">{pin.type}</span>
+              </li>
+            ))}
+        </ul>
       </div>
 
       <div className="property-section">
-        <PinEditor
-          pins={data.outputs || []}
-          direction="output"
-          onUpdate={handleOutputsChange}
-        />
+        <label className="property-label">Outputs</label>
+        <ul className="pins-list">
+          {data.outputs
+            .filter((p) => p.type !== 'execution')
+            .map((pin) => (
+              <li key={pin.id} className="pin-info">
+                <span className="pin-name">{pin.label}</span>
+                <span className="pin-type">{pin.type}</span>
+              </li>
+            ))}
+        </ul>
       </div>
 
       {/* Agent-specific properties */}

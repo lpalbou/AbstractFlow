@@ -41,11 +41,18 @@ async def list_providers(include_models: bool = False) -> List[Dict[str, Any]]:
         )
 
     # Filter to only available providers
-    # Note: model_count may be 'unknown' for API providers without model enumeration
-    available = [
-        p for p in providers
-        if p.get("status") == "available"
-    ]
+    # Convert model_count to number (may be 'unknown' string from AbstractCore)
+    available = []
+    for p in providers:
+        if p.get("status") == "available":
+            # Ensure model_count is always a number, not "unknown" string
+            model_count = p.get("model_count")
+            if not isinstance(model_count, int):
+                model_count = 0
+            available.append({
+                **p,
+                "model_count": model_count
+            })
 
     return available
 
