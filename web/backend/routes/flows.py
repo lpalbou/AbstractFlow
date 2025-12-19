@@ -69,14 +69,15 @@ async def list_flows():
 
 @router.post("", response_model=VisualFlow)
 async def create_flow(request: FlowCreateRequest):
-    """Create a new flow."""
+    """Create a new flow with nodes and edges."""
     now = datetime.utcnow().isoformat()
     flow = VisualFlow(
         id=str(uuid.uuid4())[:8],
         name=request.name,
         description=request.description,
-        nodes=[],
-        edges=[],
+        nodes=request.nodes,
+        edges=request.edges,
+        entryNode=request.entryNode,
         created_at=now,
         updated_at=now,
     )

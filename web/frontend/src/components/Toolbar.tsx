@@ -3,11 +3,29 @@
  */
 
 import { useCallback, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { useFlowStore } from '../hooks/useFlow';
 import { useWebSocket } from '../hooks/useWebSocket';
 import type { FlowRunResult, VisualFlow } from '../types/flow';
+
+// Fetch list of saved flows
+async function listFlows(): Promise<VisualFlow[]> {
+  const response = await fetch('/api/flows');
+  if (!response.ok) {
+    throw new Error('Failed to fetch flows');
+  }
+  return response.json();
+}
+
+// Load a specific flow
+async function fetchFlow(flowId: string): Promise<VisualFlow> {
+  const response = await fetch(`/api/flows/${flowId}`);
+  if (!response.ok) {
+    throw new Error('Failed to load flow');
+  }
+  return response.json();
+}
 
 // API functions
 async function saveFlow(
@@ -67,7 +85,30 @@ export function Toolbar() {
     useFlowStore();
 
   const [showInputModal, setShowInputModal] = useState(false);
+  const [showLoadModal, setShowLoadModal] = useState(false);
   const [runInput, setRunInput] = useState('{}');
+
+  // Query for listing saved flows
+  const flowsQuery = useQuery({
+    queryKey: ['flows'],
+    queryFn: listFlows,
+    enabled: showLoadModal, // Only fetch when modal is open
+  });
+
+  // Handle loading a flow
+  const handleLoadFlow = useCallback(
+    async (selectedFlowId: string) => {
+      try {
+        const flow = await fetchFlow(selectedFlowId);
+        loadFlow(flow);
+        setShowLoadModal(false);
+        toast.success(`Loaded "${flow.name}"`);
+      } catch (error) {
+        toast.error('Failed to load flow');
+      }
+    },
+    [loadFlow]
+  );
 
   // Save mutation
   const saveMutation = useMutation({
@@ -224,6 +265,14 @@ export function Toolbar() {
 
         <button
           className="toolbar-button"
+          onClick={() => setShowLoadModal(true)}
+          title="Load Flow"
+        >
+          &#x1F4C2; Load
+        </button>
+
+        <button
+          className="toolbar-button"
           onClick={handleSave}
           disabled={saveMutation.isPending}
           title="Save Flow"
@@ -300,6 +349,46 @@ export function Toolbar() {
                 onClick={handleRunConfirm}
               >
                 Run
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Load flows modal */}
+      {showLoadModal && (
+        <div className="modal-overlay" onClick={() => setShowLoadModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Load Flow</h3>
+            {flowsQuery.isLoading ? (
+              <p>Loading saved flows...</p>
+            ) : flowsQuery.error ? (
+              <p className="error-text">Failed to load flows</p>
+            ) : flowsQuery.data?.length === 0 ? (
+              <p>No saved flows found.</p>
+            ) : (
+              <ul className="flow-list">
+                {flowsQuery.data?.map((flow) => (
+                  <li key={flow.id} className="flow-list-item">
+                    <button
+                      className="flow-list-button"
+                      onClick={() => handleLoadFlow(flow.id)}
+                    >
+                      <span className="flow-list-name">{flow.name}</span>
+                      <span className="flow-list-meta">
+                        {flow.nodes.length} nodes &bull; {flow.edges.length} edges
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="modal-actions">
+              <button
+                className="modal-button cancel"
+                onClick={() => setShowLoadModal(false)}
+              >
+                Cancel
               </button>
             </div>
           </div>

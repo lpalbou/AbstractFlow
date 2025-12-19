@@ -257,3 +257,49 @@ button.primary:hover:not(:disabled) {
 .modal-button.cancel {
   background: var(--bg-primary);
 }
+
+/* Flow list in Load modal */
+.flow-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.flow-list-item {
+  margin-bottom: 4px;
+}
+
+.flow-list-button {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--bg-tertiary);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.flow-list-button:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--accent);
+}
+
+.flow-list-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.flow-list-meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.error-text {
+  color: var(--danger);
+}

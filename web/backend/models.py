@@ -122,6 +122,9 @@ class FlowCreateRequest(BaseModel):
 
     name: str
     description: str = ""
+    nodes: List[VisualNode] = Field(default_factory=list)
+    edges: List[VisualEdge] = Field(default_factory=list)
+    entryNode: Optional[str] = None
 
 
 class FlowUpdateRequest(BaseModel):
