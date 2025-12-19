@@ -225,22 +225,34 @@ AbstractFlow includes a state-of-the-art web-based visual editor inspired by Unr
 ### Running the Visual Editor
 
 ```bash
-# 1. Create virtual environment and install backend dependencies
+# 1. Create virtual environment and install dependencies
 cd abstractflow
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r web/requirements.txt
+pip install -e .  # Install abstractflow
+pip install -r web/requirements.txt  # Install FastAPI, uvicorn, websockets
 
-# 2. Start backend server
-PYTHONPATH=.:../abstractruntime/src:../abstractcore uvicorn web.backend.main:app --port 8080
+# 2. Start backend server (from abstractflow root)
+PYTHONPATH=web:../abstractruntime/src:../abstractcore uvicorn backend.main:app --port 8080 --reload
 
-# 3. In a new terminal, install and start frontend
-cd web/frontend
+# 3. In a new terminal, start frontend dev server
+cd abstractflow/web/frontend
 npm install
 npm run dev
 ```
 
 Then open http://localhost:5173 in your browser.
+
+**Production mode** (serve frontend from backend):
+```bash
+# Build frontend
+cd web/frontend && npm run build && cd ../..
+
+# Run backend only (serves frontend from dist/)
+PYTHONPATH=web:../abstractruntime/src:../abstractcore uvicorn backend.main:app --port 8080
+
+# Open http://localhost:8080
+```
 
 ### Project Structure
 
