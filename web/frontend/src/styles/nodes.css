@@ -46,6 +46,82 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: #fff;
+  position: relative;
+}
+
+/* Execution pins in header (UE4 Blueprint style) */
+.exec-pin {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.exec-pin-in {
+  margin-right: 4px;
+}
+
+.exec-pin-out {
+  margin-left: auto;
+}
+
+.exec-shape {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.exec-shape:hover {
+  transform: scale(1.2);
+}
+
+/* Execution handle - invisible, overlays the shape for connection */
+.exec-handle {
+  width: 16px !important;
+  height: 16px !important;
+  background: transparent !important;
+  border: none !important;
+  opacity: 0 !important;
+  position: absolute;
+  pointer-events: all;
+}
+
+.exec-pin-in .exec-handle {
+  left: -8px;
+}
+
+.exec-pin-out .exec-handle {
+  right: -8px;
+}
+
+/* Execution branches in body (for If/Else True/False) */
+.exec-branches {
+  margin-bottom: 8px;
+}
+
+.exec-branch {
+  gap: 6px;
+  position: relative;
+}
+
+.exec-branch .pin-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: capitalize;
+}
+
+.exec-branch .exec-handle {
+  right: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.exec-branch .pin-shape {
+  cursor: pointer;
+}
+
+.exec-branch .pin-shape:hover {
+  transform: scale(1.2);
 }
 
 .node-icon {
@@ -130,28 +206,8 @@
   opacity: 0 !important;  /* Keep hidden */
 }
 
-.react-flow__handle.execution {
-  width: 14px;
-  height: 14px;
-  border-radius: 0;
-  clip-path: polygon(0 0, 100% 50%, 0 100%);
-  border: none;
-  background: var(--pin-execution) !important;
-  opacity: 1; /* Always visible */
-}
-
-/* Execution pins (triangles) */
-.react-flow__handle.execution.react-flow__handle-left {
-  transform: rotate(180deg);
-}
-
-.react-flow__handle.execution:hover {
-  transform: scale(1.2);
-}
-
-.react-flow__handle.execution.react-flow__handle-left:hover {
-  transform: rotate(180deg) scale(1.2);
-}
+/* Execution handles now use SVG PinShape, not CSS clip-path */
+/* Keep handles for execution pins transparent - they overlay the SVG shapes */
 
 /* Code Editor Wrapper */
 .code-editor-wrapper {

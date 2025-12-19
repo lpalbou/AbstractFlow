@@ -2,7 +2,7 @@
  * Properties panel for editing selected node configuration.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import type { Node } from 'reactflow';
 import type { FlowNodeData, ProviderInfo } from '../types/flow';
 import { useFlowStore } from '../hooks/useFlow';
@@ -20,6 +20,9 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const [loadingProviders, setLoadingProviders] = useState(false);
   const [loadingModels, setLoadingModels] = useState(false);
 
+  // Track last fetched provider to prevent duplicate fetches
+  const lastFetchedProvider = useRef<string | null>(null);
+
   // Fetch available providers on mount
   useEffect(() => {
     setLoadingProviders(true);
@@ -33,7 +36,13 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   // Fetch models when provider changes
   const selectedProvider = node?.data.agentConfig?.provider;
   useEffect(() => {
+    // Skip if already fetched for this provider
+    if (selectedProvider === lastFetchedProvider.current) {
+      return;
+    }
+
     if (selectedProvider) {
+      lastFetchedProvider.current = selectedProvider;
       setLoadingModels(true);
       setModels([]);
       fetch(`/api/providers/${selectedProvider}/models`)
@@ -42,6 +51,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         .catch((err) => console.error('Failed to fetch models:', err))
         .finally(() => setLoadingModels(false));
     } else {
+      lastFetchedProvider.current = null;
       setModels([]);
     }
   }, [selectedProvider]);
@@ -272,6 +282,107 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           <span className="property-hint">
             Name of the function to call in your code
           </span>
+        </div>
+      )}
+
+      {/* Event node properties - On User Request */}
+      {data.nodeType === 'on_user_request' && (
+        <div className="property-section">
+          <label className="property-label">Event Configuration</label>
+          <div className="property-group">
+            <label className="property-sublabel">Description</label>
+            <input
+              type="text"
+              className="property-input"
+              value={data.eventConfig?.description || ''}
+              onChange={(e) =>
+                updateNodeData(node.id, {
+                  eventConfig: {
+                    ...data.eventConfig,
+                    description: e.target.value,
+                  },
+                })
+              }
+              placeholder="e.g., User sends a chat message"
+            />
+            <span className="property-hint">
+              Describes what triggers this event
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Event node properties - On Agent Message */}
+      {data.nodeType === 'on_agent_message' && (
+        <div className="property-section">
+          <label className="property-label">Event Configuration</label>
+          <div className="property-group">
+            <label className="property-sublabel">Channel</label>
+            <input
+              type="text"
+              className="property-input"
+              value={data.eventConfig?.channel || ''}
+              onChange={(e) =>
+                updateNodeData(node.id, {
+                  eventConfig: {
+                    ...data.eventConfig,
+                    channel: e.target.value,
+                  },
+                })
+              }
+              placeholder="e.g., broadcast, private"
+            />
+            <span className="property-hint">
+              Channel to listen for messages (empty = all)
+            </span>
+          </div>
+          <div className="property-group">
+            <label className="property-sublabel">Agent Filter</label>
+            <input
+              type="text"
+              className="property-input"
+              value={data.eventConfig?.agentFilter || ''}
+              onChange={(e) =>
+                updateNodeData(node.id, {
+                  eventConfig: {
+                    ...data.eventConfig,
+                    agentFilter: e.target.value,
+                  },
+                })
+              }
+              placeholder="e.g., agent-123"
+            />
+            <span className="property-hint">
+              Only receive from specific agent (empty = any)
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Event node properties - On Schedule */}
+      {data.nodeType === 'on_schedule' && (
+        <div className="property-section">
+          <label className="property-label">Event Configuration</label>
+          <div className="property-group">
+            <label className="property-sublabel">Schedule</label>
+            <input
+              type="text"
+              className="property-input"
+              value={data.eventConfig?.schedule || ''}
+              onChange={(e) =>
+                updateNodeData(node.id, {
+                  eventConfig: {
+                    ...data.eventConfig,
+                    schedule: e.target.value,
+                  },
+                })
+              }
+              placeholder="e.g., */5 * * * * (every 5 min)"
+            />
+            <span className="property-hint">
+              Cron expression or interval (e.g., "30s", "5m", "1h")
+            </span>
+          </div>
         </div>
       )}
 
