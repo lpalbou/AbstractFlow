@@ -349,6 +349,8 @@ def create_llm_call_handler(
             type=EffectType.LLM_CALL,
             payload={
                 "messages": messages,
+                "provider": provider,
+                "model": model,
                 "params": {
                     "temperature": temperature,
                 },

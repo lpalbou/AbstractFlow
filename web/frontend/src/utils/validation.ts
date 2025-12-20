@@ -2,7 +2,7 @@
  * Connection validation for Blueprint-style type checking.
  */
 
-import type { Node, Connection } from 'reactflow';
+import type { Node, Connection, Edge } from 'reactflow';
 import type { FlowNodeData, PinType } from '../types/flow';
 
 /**
@@ -11,6 +11,7 @@ import type { FlowNodeData, PinType } from '../types/flow';
  */
 export function validateConnection(
   nodes: Node<FlowNodeData>[],
+  edges: Edge[],
   connection: Connection
 ): boolean {
   if (!connection.source || !connection.target) return false;
@@ -33,6 +34,20 @@ export function validateConnection(
   );
 
   if (!sourcePin || !targetPin) return false;
+
+  // Inputs accept at most one connection (Blueprint-style).
+  const targetAlreadyConnected = edges.some(
+    (e) => e.target === connection.target && e.targetHandle === connection.targetHandle
+  );
+  if (targetAlreadyConnected) return false;
+
+  // Execution outputs are 1:1 (use Sequence nodes for fan-out).
+  if (sourcePin.type === 'execution' && targetPin.type === 'execution') {
+    const sourceAlreadyConnected = edges.some(
+      (e) => e.source === connection.source && e.sourceHandle === connection.sourceHandle
+    );
+    if (sourceAlreadyConnected) return false;
+  }
 
   return areTypesCompatible(sourcePin.type, targetPin.type);
 }
@@ -83,6 +98,7 @@ export function areTypesCompatible(
  */
 export function getConnectionError(
   nodes: Node<FlowNodeData>[],
+  edges: Edge[],
   connection: Connection
 ): string | null {
   if (!connection.source || !connection.target) {
@@ -113,6 +129,22 @@ export function getConnectionError(
 
   if (!targetPin) {
     return `Input pin '${connection.targetHandle}' not found`;
+  }
+
+  const targetAlreadyConnected = edges.some(
+    (e) => e.target === connection.target && e.targetHandle === connection.targetHandle
+  );
+  if (targetAlreadyConnected) {
+    return `Input pin '${connection.targetHandle}' already connected`;
+  }
+
+  if (sourcePin.type === 'execution' && targetPin.type === 'execution') {
+    const sourceAlreadyConnected = edges.some(
+      (e) => e.source === connection.source && e.sourceHandle === connection.sourceHandle
+    );
+    if (sourceAlreadyConnected) {
+      return `Execution output pin '${connection.sourceHandle}' already connected`;
+    }
   }
 
   if (!areTypesCompatible(sourcePin.type, targetPin.type)) {

@@ -195,7 +195,7 @@ export const BaseNode = memo(function BaseNode({
                 position={Position.Right}
                 id={pin.id}
                 className={`pin ${pin.type}`}
-                onMouseDownCapture={(e) => handlePinClick(e, pin.id, false)}
+                onClick={(e) => handlePinClick(e, pin.id, false)}
               />
             </div>
           ))}

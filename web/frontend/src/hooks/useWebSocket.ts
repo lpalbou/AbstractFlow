@@ -30,50 +30,13 @@ export interface WaitingInfo {
 
 export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions) {
   const wsRef = useRef<WebSocket | null>(null);
+  const wsFlowIdRef = useRef<string>(flowId);
   const [connected, setConnected] = useState(false);
   const [isWaiting, setIsWaiting] = useState(false);
   const [waitingInfo, setWaitingInfo] = useState<WaitingInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const { setExecutingNodeId, setIsRunning } = useFlowStore();
-
-  // Connect to WebSocket
-  const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
-
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/api/ws/${flowId}`;
-
-    try {
-      wsRef.current = new WebSocket(wsUrl);
-
-      wsRef.current.onopen = () => {
-        setConnected(true);
-        setError(null);
-      };
-
-      wsRef.current.onclose = () => {
-        setConnected(false);
-      };
-
-      wsRef.current.onerror = () => {
-        setError('WebSocket connection failed');
-        setConnected(false);
-      };
-
-      wsRef.current.onmessage = (event) => {
-        try {
-          const data: ExecutionEvent = JSON.parse(event.data);
-          handleEvent(data);
-          onEvent?.(data);
-        } catch (e) {
-          console.error('Failed to parse WebSocket message:', e);
-        }
-      };
-    } catch (e) {
-      setError('Failed to create WebSocket connection');
-    }
-  }, [flowId, onEvent]);
 
   // Handle execution events
   const handleEvent = useCallback(
@@ -116,9 +79,95 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
     [setExecutingNodeId, setIsRunning, onWaiting]
   );
 
+  // Ensure strict isolation: when switching flows, disconnect the old socket and
+  // clear transient execution/waiting state so previous workflows can't leak UI.
+  useEffect(() => {
+    if (wsFlowIdRef.current !== flowId) {
+      if (wsRef.current) {
+        wsRef.current.onopen = null;
+        wsRef.current.onclose = null;
+        wsRef.current.onerror = null;
+        wsRef.current.onmessage = null;
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      setConnected(false);
+      setError(null);
+      setIsWaiting(false);
+      setWaitingInfo(null);
+      setExecutingNodeId(null);
+      setIsRunning(false);
+      wsFlowIdRef.current = flowId;
+    }
+  }, [flowId, setExecutingNodeId, setIsRunning]);
+
+  // Connect to WebSocket
+  const connect = useCallback(() => {
+    if (!flowId) {
+      setError('Missing flow id');
+      return;
+    }
+
+    // If an existing socket is open but tied to a different flow, close it.
+    if (wsRef.current && wsFlowIdRef.current !== flowId) {
+      wsRef.current.onopen = null;
+      wsRef.current.onclose = null;
+      wsRef.current.onerror = null;
+      wsRef.current.onmessage = null;
+      wsRef.current.close();
+      wsRef.current = null;
+      setConnected(false);
+    }
+
+    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/api/ws/${flowId}`;
+
+    try {
+      const socket = new WebSocket(wsUrl);
+      wsRef.current = socket;
+      wsFlowIdRef.current = flowId;
+
+      socket.onopen = () => {
+        if (wsRef.current !== socket) return;
+        setConnected(true);
+        setError(null);
+      };
+
+      socket.onclose = () => {
+        if (wsRef.current !== socket) return;
+        setConnected(false);
+      };
+
+      socket.onerror = () => {
+        if (wsRef.current !== socket) return;
+        setError('WebSocket connection failed');
+        setConnected(false);
+      };
+
+      socket.onmessage = (event) => {
+        if (wsRef.current !== socket) return;
+        try {
+          const data: ExecutionEvent = JSON.parse(event.data);
+          handleEvent(data);
+          onEvent?.(data);
+        } catch (e) {
+          console.error('Failed to parse WebSocket message:', e);
+        }
+      };
+    } catch (e) {
+      setError('Failed to create WebSocket connection');
+    }
+  }, [flowId, handleEvent, onEvent]);
+
   // Disconnect from WebSocket
   const disconnect = useCallback(() => {
     if (wsRef.current) {
+      wsRef.current.onopen = null;
+      wsRef.current.onclose = null;
+      wsRef.current.onerror = null;
+      wsRef.current.onmessage = null;
       wsRef.current.close();
       wsRef.current = null;
     }

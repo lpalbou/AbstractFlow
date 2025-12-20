@@ -74,7 +74,7 @@ def create_visual_runner(visual_flow: VisualFlow, *, flows: Dict[str, VisualFlow
     - Build a WorkflowRegistry containing the root flow and any referenced subflows.
     - Create a runtime with an ArtifactStore (required for MEMORY_* effects).
     - If any LLM_CALL nodes exist in the flow tree, wire AbstractCore-backed
-      effect handlers and validate provider/model consistency.
+      effect handlers.
     """
     # Be resilient to different AbstractRuntime install layouts: not all exports
     # are guaranteed to be re-exported from `abstractruntime.__init__`.
@@ -135,8 +135,11 @@ def create_visual_runner(visual_flow: VisualFlow, *, flows: Dict[str, VisualFlow
 
     _dfs(visual_flow)
 
-    # Validate LLM_CALL config consistency across the flow tree.
+    # Validate LLM_CALL config across the flow tree and choose a default runtime model.
+    # NOTE: Each LLM_CALL node may use its own provider/model; the runtime supports
+    # per-effect routing using effect payload fields.
     llm_configs: set[tuple[str, str]] = set()
+    default_llm: tuple[str, str] | None = None
     for vf in ordered:
         for n in vf.nodes:
             if _node_type(n) != "llm_call":
@@ -148,17 +151,16 @@ def create_visual_runner(visual_flow: VisualFlow, *, flows: Dict[str, VisualFlow
                 raise ValueError(f"LLM_CALL node '{n.id}' in flow '{vf.id}' missing provider")
             if not isinstance(model, str) or not model.strip():
                 raise ValueError(f"LLM_CALL node '{n.id}' in flow '{vf.id}' missing model")
-            llm_configs.add((provider.strip().lower(), model.strip()))
-
-    if len(llm_configs) > 1:
-        rendered = ", ".join(f"{p}/{m}" for (p, m) in sorted(llm_configs))
-        raise ValueError(f"All LLM_CALL nodes must share the same provider/model (found: {rendered})")
+            pair = (provider.strip().lower(), model.strip())
+            llm_configs.add(pair)
+            if default_llm is None:
+                default_llm = pair
 
     # Create a runtime:
     # - Always include an ArtifactStore for MEMORY_* effects
     # - Add AbstractCore LLM handlers only when needed.
     if llm_configs:
-        provider, model = next(iter(llm_configs))
+        provider, model = default_llm or next(iter(llm_configs))
         runtime = create_local_runtime(provider=provider, model=model)
     else:
         runtime = Runtime(
@@ -458,6 +460,9 @@ def _create_handler(node_type: NodeType, data: Dict[str, Any]) -> Any:
     """Create a handler function for a node type."""
     type_str = node_type.value if isinstance(node_type, NodeType) else str(node_type)
 
+    if type_str == "concat":
+        return _create_concat_handler(data)
+
     # Check for built-in handler
     builtin = get_builtin_handler(type_str)
     if builtin:
@@ -509,6 +514,48 @@ def _create_handler(node_type: NodeType, data: Dict[str, Any]) -> Any:
 
     # Unknown type - return identity
     return lambda x: x
+
+
+def _decode_separator(value: str) -> str:
+    return value.replace("\\n", "\n").replace("\\t", "\t").replace("\\r", "\r")
+
+
+def _create_concat_handler(data: Dict[str, Any]):
+    config = data.get("concatConfig", {}) if isinstance(data, dict) else {}
+    separator = " "
+    if isinstance(config, dict):
+        sep_raw = config.get("separator")
+        if isinstance(sep_raw, str):
+            separator = sep_raw
+    separator = _decode_separator(separator)
+
+    pin_order: list[str] = []
+    pins = data.get("inputs") if isinstance(data, dict) else None
+    if isinstance(pins, list):
+        for p in pins:
+            if not isinstance(p, dict):
+                continue
+            if p.get("type") == "execution":
+                continue
+            pid = p.get("id")
+            if isinstance(pid, str) and pid:
+                pin_order.append(pid)
+
+    if not pin_order:
+        pin_order = ["a", "b"]
+
+    def handler(input_data: Any) -> str:
+        if not isinstance(input_data, dict):
+            return str(input_data or "")
+
+        parts: list[str] = []
+        for pid in pin_order:
+            if pid in input_data:
+                v = input_data.get(pid)
+                parts.append("" if v is None else str(v))
+        return separator.join(parts)
+
+    return handler
 
 
 def _create_break_object_handler(data: Dict[str, Any]):

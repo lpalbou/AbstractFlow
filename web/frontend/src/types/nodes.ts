@@ -401,5 +401,6 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
     ...(template.type === 'literal_json' && { literalValue: {} }),
     ...(template.type === 'literal_array' && { literalValue: [] }),
     ...(template.type === 'break_object' && { breakConfig: { selectedPaths: [] } }),
+    ...(template.type === 'concat' && { concatConfig: { separator: ' ' } }),
   };
 }

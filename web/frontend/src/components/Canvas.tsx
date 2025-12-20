@@ -16,7 +16,7 @@ import ReactFlow, {
 import toast from 'react-hot-toast';
 import { nodeTypes } from './nodes';
 import { useFlowStore } from '../hooks/useFlow';
-import { validateConnection } from '../utils/validation';
+import { getConnectionError, validateConnection } from '../utils/validation';
 import { NodeTemplate } from '../types/nodes';
 import type { FlowNodeData, PinType } from '../types/flow';
 import { PIN_COLORS } from '../types/flow';
@@ -40,13 +40,13 @@ export function Canvas() {
   // Handle connection with validation
   const handleConnect = useCallback(
     (connection: Connection) => {
-      if (!validateConnection(nodes, connection)) {
-        toast.error('Incompatible pin types');
+      if (!validateConnection(nodes, edges, connection)) {
+        toast.error(getConnectionError(nodes, edges, connection) || 'Invalid connection');
         return;
       }
       onConnect(connection);
     },
-    [nodes, onConnect]
+    [nodes, edges, onConnect]
   );
 
   // Handle node selection

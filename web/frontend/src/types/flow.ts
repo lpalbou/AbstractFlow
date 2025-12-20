@@ -88,6 +88,10 @@ export interface FlowNodeData {
   breakConfig?: {
     selectedPaths?: string[];
   };
+  // Concat node configuration
+  concatConfig?: {
+    separator?: string; // Default: " "
+  };
   // Effect node configuration
   effectConfig?: {
     provider?: string;     // For llm_call

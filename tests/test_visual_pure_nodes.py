@@ -105,3 +105,166 @@ def test_visual_break_object_extracts_nested_fields() -> None:
     assert result.get("success") is True
     assert result.get("result") == {"task": "hello", "total": 123}
 
+
+def test_visual_concat_supports_dynamic_inputs_and_separator() -> None:
+    flow_id = "test-visual-concat-dynamic"
+    visual = VisualFlow(
+        id=flow_id,
+        name="concat dynamic",
+        entryNode="code",
+        nodes=[
+            VisualNode(
+                id="a",
+                type=NodeType.LITERAL_STRING,
+                position=Position(x=0, y=0),
+                data={"literalValue": "hello"},
+            ),
+            VisualNode(
+                id="b",
+                type=NodeType.LITERAL_STRING,
+                position=Position(x=0, y=0),
+                data={"literalValue": "world"},
+            ),
+            VisualNode(
+                id="c",
+                type=NodeType.LITERAL_STRING,
+                position=Position(x=0, y=0),
+                data={"literalValue": "!"},
+            ),
+            VisualNode(
+                id="concat",
+                type=NodeType.CONCAT,
+                position=Position(x=0, y=0),
+                data={
+                    "inputs": [
+                        {"id": "a", "label": "a", "type": "string"},
+                        {"id": "b", "label": "b", "type": "string"},
+                        {"id": "c", "label": "c", "type": "string"},
+                    ],
+                    "outputs": [{"id": "result", "label": "result", "type": "string"}],
+                    "concatConfig": {"separator": " | "},
+                },
+            ),
+            VisualNode(
+                id="code",
+                type=NodeType.CODE,
+                position=Position(x=0, y=0),
+                data={
+                    "code": "def transform(input):\n    return input.get('input')\n",
+                    "functionName": "transform",
+                },
+            ),
+        ],
+        edges=[
+            VisualEdge(id="d1", source="a", sourceHandle="value", target="concat", targetHandle="a"),
+            VisualEdge(id="d2", source="b", sourceHandle="value", target="concat", targetHandle="b"),
+            VisualEdge(id="d3", source="c", sourceHandle="value", target="concat", targetHandle="c"),
+            VisualEdge(id="d4", source="concat", sourceHandle="result", target="code", targetHandle="input"),
+        ],
+    )
+
+    runner = create_visual_runner(visual, flows={flow_id: visual})
+    result = runner.run({})
+    assert result.get("success") is True
+    assert result.get("result") == "hello | world | !"
+
+
+def test_visual_data_pin_fanout_from_single_output() -> None:
+    """Regression: a single data output can feed multiple downstream nodes (1:N)."""
+    flow_id = "test-visual-data-fanout"
+    visual = VisualFlow(
+        id=flow_id,
+        name="data fanout",
+        entryNode="code",
+        nodes=[
+            VisualNode(
+                id="n",
+                type=NodeType.LITERAL_NUMBER,
+                position=Position(x=0, y=0),
+                data={"literalValue": 2},
+            ),
+            VisualNode(
+                id="one",
+                type=NodeType.LITERAL_NUMBER,
+                position=Position(x=0, y=0),
+                data={"literalValue": 1},
+            ),
+            VisualNode(
+                id="ten",
+                type=NodeType.LITERAL_NUMBER,
+                position=Position(x=0, y=0),
+                data={"literalValue": 10},
+            ),
+            VisualNode(
+                id="add1",
+                type=NodeType.ADD,
+                position=Position(x=0, y=0),
+                data={},
+            ),
+            VisualNode(
+                id="add2",
+                type=NodeType.ADD,
+                position=Position(x=0, y=0),
+                data={},
+            ),
+            VisualNode(
+                id="base",
+                type=NodeType.LITERAL_JSON,
+                position=Position(x=0, y=0),
+                data={"literalValue": {}},
+            ),
+            VisualNode(
+                id="k1",
+                type=NodeType.LITERAL_STRING,
+                position=Position(x=0, y=0),
+                data={"literalValue": "first"},
+            ),
+            VisualNode(
+                id="k2",
+                type=NodeType.LITERAL_STRING,
+                position=Position(x=0, y=0),
+                data={"literalValue": "second"},
+            ),
+            VisualNode(
+                id="set1",
+                type=NodeType.SET,
+                position=Position(x=0, y=0),
+                data={},
+            ),
+            VisualNode(
+                id="set2",
+                type=NodeType.SET,
+                position=Position(x=0, y=0),
+                data={},
+            ),
+            VisualNode(
+                id="code",
+                type=NodeType.CODE,
+                position=Position(x=0, y=0),
+                data={
+                    "code": "def transform(input):\n    return input.get('input')\n",
+                    "functionName": "transform",
+                },
+            ),
+        ],
+        edges=[
+            # Fan-out: n.value is used by multiple downstream nodes.
+            VisualEdge(id="d1", source="n", sourceHandle="value", target="add1", targetHandle="a"),
+            VisualEdge(id="d2", source="one", sourceHandle="value", target="add1", targetHandle="b"),
+            VisualEdge(id="d3", source="n", sourceHandle="value", target="add2", targetHandle="a"),
+            VisualEdge(id="d4", source="ten", sourceHandle="value", target="add2", targetHandle="b"),
+            # Build output object with both results.
+            VisualEdge(id="d5", source="base", sourceHandle="value", target="set1", targetHandle="object"),
+            VisualEdge(id="d6", source="k1", sourceHandle="value", target="set1", targetHandle="key"),
+            VisualEdge(id="d7", source="add1", sourceHandle="result", target="set1", targetHandle="value"),
+            VisualEdge(id="d8", source="set1", sourceHandle="result", target="set2", targetHandle="object"),
+            VisualEdge(id="d9", source="k2", sourceHandle="value", target="set2", targetHandle="key"),
+            VisualEdge(id="d10", source="add2", sourceHandle="result", target="set2", targetHandle="value"),
+            VisualEdge(id="d11", source="set2", sourceHandle="result", target="code", targetHandle="input"),
+        ],
+    )
+
+    runner = create_visual_runner(visual, flows={flow_id: visual})
+    result = runner.run({})
+    assert result.get("success") is True
+    assert result.get("result") == {"first": 3.0, "second": 12.0}
