@@ -118,17 +118,12 @@ def _create_effect_node_handler(
             pending = resolved["_pending_effect"]
             effect_type_str = pending.get("type", "")
 
-            # Map string to EffectType enum
-            effect_type_map = {
-                "ask_user": EffectType.ASK_USER,
-                "llm_call": EffectType.LLM_CALL,
-                "wait_until": EffectType.WAIT_UNTIL,
-                "wait_event": EffectType.WAIT_EVENT,
-                "memory_note": EffectType.MEMORY_NOTE,
-                "memory_query": EffectType.MEMORY_QUERY,
-            }
-
-            eff_type = effect_type_map.get(effect_type_str)
+            # Get the EffectType enum value by name (avoid building dict with all members)
+            eff_type = None
+            try:
+                eff_type = EffectType(effect_type_str)
+            except ValueError:
+                pass  # Unknown effect type
             if eff_type:
                 # Build the Effect with resolved values from data edges
                 effect = Effect(
