@@ -201,6 +201,15 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   // Get flow for saving
   getFlow: (): VisualFlow => {
     const state = get();
+
+    // Find entry node: node with no incoming execution edges
+    const execTargets = new Set(
+      state.edges
+        .filter((e) => e.targetHandle === 'exec-in')
+        .map((e) => e.target)
+    );
+    const entryNode = state.nodes.find((n) => !execTargets.has(n.id))?.id;
+
     return {
       id: state.flowId || `flow-${Date.now()}`,
       name: state.flowName,
@@ -218,7 +227,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         targetHandle: e.targetHandle || '',
         animated: e.animated,
       })),
-      entryNode: state.nodes.length > 0 ? state.nodes[0].id : undefined,
+      entryNode,
     };
   },
 
