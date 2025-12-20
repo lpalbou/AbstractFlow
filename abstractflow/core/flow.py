@@ -25,11 +25,15 @@ class FlowNode:
         handler: The handler for this node - can be an agent, function, or nested flow
         input_key: Key in run.vars to read input from (optional)
         output_key: Key in run.vars to write output to (optional)
+        effect_type: Effect type for effect nodes (ask_user, wait_until, etc.)
+        effect_config: Additional configuration for effect nodes
     """
     id: str
     handler: Any  # Union[BaseAgent, Callable, Flow] - Any to avoid circular imports
     input_key: Optional[str] = None
     output_key: Optional[str] = None
+    effect_type: Optional[str] = None  # e.g., "ask_user", "wait_until", etc.
+    effect_config: Optional[Dict[str, Any]] = None  # Effect-specific configuration
 
 
 @dataclass
@@ -80,6 +84,8 @@ class Flow:
         *,
         input_key: Optional[str] = None,
         output_key: Optional[str] = None,
+        effect_type: Optional[str] = None,
+        effect_config: Optional[Dict[str, Any]] = None,
     ) -> "Flow":
         """Add a node to the flow.
 
@@ -88,6 +94,8 @@ class Flow:
             handler: The handler - an agent, callable function, or nested Flow
             input_key: Key in run.vars to read input from
             output_key: Key in run.vars to write output to
+            effect_type: Effect type for effect nodes (ask_user, wait_until, etc.)
+            effect_config: Additional configuration for effect nodes
 
         Returns:
             Self for method chaining
@@ -100,6 +108,8 @@ class Flow:
             handler=handler,
             input_key=input_key,
             output_key=output_key,
+            effect_type=effect_type,
+            effect_config=effect_config,
         )
         return self
 

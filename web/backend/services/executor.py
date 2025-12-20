@@ -79,8 +79,12 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
     flow._node_outputs: Dict[str, Dict[str, Any]] = {}
     flow._data_edge_map = data_edge_map
 
+    # Effect node types that need special handling by the compiler
+    EFFECT_NODE_TYPES = {"ask_user", "llm_call", "wait_until", "wait_event", "memory_note", "memory_query"}
+
     # Add nodes with wrapped handlers that resolve data edges
     for node in visual.nodes:
+        type_str = node.type.value if hasattr(node.type, "value") else str(node.type)
         base_handler = _create_handler(node.type, node.data)
 
         # Wrap the handler to resolve data edges
@@ -95,11 +99,20 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
         input_key = node.data.get("inputKey")
         output_key = node.data.get("outputKey")
 
+        # Check if this is an effect node - set effect_type for compiler
+        effect_type = None
+        effect_config = None
+        if type_str in EFFECT_NODE_TYPES:
+            effect_type = type_str
+            effect_config = node.data.get("effectConfig", {})
+
         flow.add_node(
             node_id=node.id,
             handler=wrapped_handler,
             input_key=input_key,
             output_key=output_key,
+            effect_type=effect_type,
+            effect_config=effect_config,
         )
 
     # Only add execution edges - these control the flow execution order

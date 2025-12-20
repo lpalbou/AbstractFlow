@@ -198,6 +198,15 @@ const LITERAL_NODES: NodeTemplate[] = [
     outputs: [{ id: 'value', label: 'value', type: 'object' }],
     category: 'literals',
   },
+  {
+    type: 'literal_array',
+    icon: '[]',
+    label: 'Array',
+    headerColor: '#FF8800', // Orange - matches array pin color
+    inputs: [],
+    outputs: [{ id: 'value', label: 'value', type: 'array' }],
+    category: 'literals',
+  },
 ];
 
 // Effect nodes - Side effects that integrate with AbstractRuntime
@@ -370,5 +379,6 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
     ...(template.type === 'literal_number' && { literalValue: 0 }),
     ...(template.type === 'literal_boolean' && { literalValue: false }),
     ...(template.type === 'literal_json' && { literalValue: {} }),
+    ...(template.type === 'literal_array' && { literalValue: [] }),
   };
 }

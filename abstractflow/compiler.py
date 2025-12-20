@@ -8,6 +8,14 @@ from .core.flow import Flow
 from .adapters.function_adapter import create_function_node_handler
 from .adapters.agent_adapter import create_agent_node_handler
 from .adapters.subflow_adapter import create_subflow_node_handler
+from .adapters.effect_adapter import (
+    create_ask_user_handler,
+    create_wait_until_handler,
+    create_wait_event_handler,
+    create_memory_note_handler,
+    create_memory_query_handler,
+    create_llm_call_handler,
+)
 
 if TYPE_CHECKING:
     from abstractruntime.core.spec import WorkflowSpec
@@ -21,6 +29,70 @@ def _is_agent(obj: Any) -> bool:
 def _is_flow(obj: Any) -> bool:
     """Check if object is a Flow."""
     return isinstance(obj, Flow)
+
+
+def _create_effect_node_handler(
+    node_id: str,
+    effect_type: str,
+    effect_config: Dict[str, Any],
+    next_node: Optional[str],
+    input_key: Optional[str],
+    output_key: Optional[str],
+) -> Callable:
+    """Create a node handler for effect nodes.
+
+    Effect nodes produce AbstractRuntime Effects that can pause execution
+    and wait for external input.
+    """
+    if effect_type == "ask_user":
+        return create_ask_user_handler(
+            node_id=node_id,
+            next_node=next_node,
+            input_key=input_key,
+            output_key=output_key,
+            allow_free_text=effect_config.get("allowFreeText", True),
+        )
+    elif effect_type == "wait_until":
+        return create_wait_until_handler(
+            node_id=node_id,
+            next_node=next_node,
+            input_key=input_key,
+            output_key=output_key,
+            duration_type=effect_config.get("durationType", "seconds"),
+        )
+    elif effect_type == "wait_event":
+        return create_wait_event_handler(
+            node_id=node_id,
+            next_node=next_node,
+            input_key=input_key,
+            output_key=output_key,
+        )
+    elif effect_type == "memory_note":
+        return create_memory_note_handler(
+            node_id=node_id,
+            next_node=next_node,
+            input_key=input_key,
+            output_key=output_key,
+        )
+    elif effect_type == "memory_query":
+        return create_memory_query_handler(
+            node_id=node_id,
+            next_node=next_node,
+            input_key=input_key,
+            output_key=output_key,
+        )
+    elif effect_type == "llm_call":
+        return create_llm_call_handler(
+            node_id=node_id,
+            next_node=next_node,
+            input_key=input_key,
+            output_key=output_key,
+            provider=effect_config.get("provider"),
+            model=effect_config.get("model"),
+            temperature=effect_config.get("temperature", 0.7),
+        )
+    else:
+        raise ValueError(f"Unknown effect type: {effect_type}")
 
 
 def compile_flow(flow: Flow) -> "WorkflowSpec":
@@ -85,8 +157,20 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
     for node_id, flow_node in flow.nodes.items():
         next_node = next_node_map.get(node_id)
         handler_obj = flow_node.handler
+        effect_type = flow_node.effect_type
+        effect_config = flow_node.effect_config or {}
 
-        if _is_agent(handler_obj):
+        # Check for effect nodes first
+        if effect_type:
+            handlers[node_id] = _create_effect_node_handler(
+                node_id=node_id,
+                effect_type=effect_type,
+                effect_config=effect_config,
+                next_node=next_node,
+                input_key=flow_node.input_key,
+                output_key=flow_node.output_key,
+            )
+        elif _is_agent(handler_obj):
             handlers[node_id] = create_agent_node_handler(
                 node_id=node_id,
                 agent=handler_obj,

@@ -259,6 +259,14 @@ def literal_json(inputs: Dict[str, Any]) -> Dict[str, Any]:
     return {}
 
 
+def literal_array(inputs: Dict[str, Any]) -> List[Any]:
+    """Return array literal value."""
+    value = inputs.get("_literalValue", [])
+    if isinstance(value, list):
+        return value
+    return []
+
+
 # Handler registry
 BUILTIN_HANDLERS: Dict[str, Callable[[Dict[str, Any]], Any]] = {
     # Math
@@ -296,4 +304,5 @@ BUILTIN_HANDLERS: Dict[str, Callable[[Dict[str, Any]], Any]] = {
     "literal_number": literal_number,
     "literal_boolean": literal_boolean,
     "literal_json": literal_json,
+    "literal_array": literal_array,
 }

@@ -467,6 +467,34 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         </div>
       )}
 
+      {/* Array literal value */}
+      {data.nodeType === 'literal_array' && (
+        <div className="property-section">
+          <label className="property-label">Value (Array)</label>
+          <textarea
+            className="property-input property-textarea code"
+            value={
+              Array.isArray(data.literalValue)
+                ? JSON.stringify(data.literalValue, null, 2)
+                : String(data.literalValue ?? '[]')
+            }
+            onChange={(e) => {
+              try {
+                const parsed = JSON.parse(e.target.value);
+                if (Array.isArray(parsed)) {
+                  updateNodeData(node.id, { literalValue: parsed });
+                }
+              } catch {
+                // Keep invalid JSON in the textarea but don't update state
+              }
+            }}
+            placeholder='["option1", "option2"]'
+            rows={4}
+          />
+          <span className="property-hint">Enter JSON array (e.g., ["a", "b", "c"])</span>
+        </div>
+      )}
+
       {/* Ask User effect properties */}
       {data.nodeType === 'ask_user' && (
         <div className="property-section">

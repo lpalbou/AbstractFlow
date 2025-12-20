@@ -6,14 +6,33 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ExecutionEvent } from '../types/flow';
 import { useFlowStore } from './useFlow';
 
+// Extended event type for waiting state
+interface WaitingEvent extends ExecutionEvent {
+  prompt?: string;
+  choices?: string[];
+  allow_free_text?: boolean;
+  wait_key?: string;
+  effect_type?: string;
+}
+
 interface UseWebSocketOptions {
   flowId: string;
   onEvent?: (event: ExecutionEvent) => void;
+  onWaiting?: (info: WaitingInfo) => void;
 }
 
-export function useWebSocket({ flowId, onEvent }: UseWebSocketOptions) {
+export interface WaitingInfo {
+  prompt: string;
+  choices: string[];
+  allowFreeText: boolean;
+  nodeId: string | null;
+}
+
+export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions) {
   const wsRef = useRef<WebSocket | null>(null);
   const [connected, setConnected] = useState(false);
+  const [isWaiting, setIsWaiting] = useState(false);
+  const [waitingInfo, setWaitingInfo] = useState<WaitingInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const { setExecutingNodeId, setIsRunning } = useFlowStore();
@@ -59,9 +78,12 @@ export function useWebSocket({ flowId, onEvent }: UseWebSocketOptions) {
   // Handle execution events
   const handleEvent = useCallback(
     (event: ExecutionEvent) => {
+      const waitEvent = event as WaitingEvent;
       switch (event.type) {
         case 'flow_start':
           setIsRunning(true);
+          setIsWaiting(false);
+          setWaitingInfo(null);
           break;
         case 'node_start':
           setExecutingNodeId(event.nodeId || null);
@@ -69,14 +91,28 @@ export function useWebSocket({ flowId, onEvent }: UseWebSocketOptions) {
         case 'node_complete':
           setExecutingNodeId(null);
           break;
+        case 'flow_waiting':
+          // Flow is paused waiting for user input
+          setIsWaiting(true);
+          const info: WaitingInfo = {
+            prompt: waitEvent.prompt || 'Please respond:',
+            choices: waitEvent.choices || [],
+            allowFreeText: waitEvent.allow_free_text !== false,
+            nodeId: waitEvent.nodeId || null,
+          };
+          setWaitingInfo(info);
+          onWaiting?.(info);
+          break;
         case 'flow_complete':
         case 'flow_error':
           setIsRunning(false);
+          setIsWaiting(false);
+          setWaitingInfo(null);
           setExecutingNodeId(null);
           break;
       }
     },
-    [setExecutingNodeId, setIsRunning]
+    [setExecutingNodeId, setIsRunning, onWaiting]
   );
 
   // Disconnect from WebSocket
@@ -112,6 +148,18 @@ export function useWebSocket({ flowId, onEvent }: UseWebSocketOptions) {
     [connect, send]
   );
 
+  // Resume a waiting flow with user response
+  const resumeFlow = useCallback(
+    (response: string) => {
+      if (wsRef.current?.readyState === WebSocket.OPEN && isWaiting) {
+        send({ type: 'resume', response });
+        setIsWaiting(false);
+        setWaitingInfo(null);
+      }
+    },
+    [send, isWaiting]
+  );
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -126,5 +174,8 @@ export function useWebSocket({ flowId, onEvent }: UseWebSocketOptions) {
     disconnect,
     send,
     runFlow,
+    resumeFlow,
+    isWaiting,
+    waitingInfo,
   };
 }

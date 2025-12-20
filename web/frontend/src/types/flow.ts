@@ -52,7 +52,7 @@ export type NodeType =
   // Data - Pure functions (no exec pins)
   | 'get' | 'set' | 'merge' | 'array_map' | 'array_filter'
   // Literals - Pure value nodes (no exec pins, no inputs)
-  | 'literal_string' | 'literal_number' | 'literal_boolean' | 'literal_json'
+  | 'literal_string' | 'literal_number' | 'literal_boolean' | 'literal_json' | 'literal_array'
   // Effects - Side-effect nodes (require execution pins)
   | 'ask_user' | 'llm_call' | 'wait_until' | 'wait_event' | 'memory_note' | 'memory_query';
 

@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 import { useFlowStore } from '../hooks/useFlow';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { RunFlowModal } from './RunFlowModal';
+import { UserPromptModal } from './UserPromptModal';
 import type { FlowRunResult, VisualFlow } from '../types/flow';
 
 // Fetch list of saved flows
@@ -158,12 +159,36 @@ export function Toolbar() {
   });
 
   // WebSocket for real-time execution (if flow is saved)
-  useWebSocket({
+  const { isWaiting, waitingInfo, resumeFlow } = useWebSocket({
     flowId: flowId || '',
     onEvent: (event) => {
       console.log('Execution event:', event);
+      // Update run result when flow completes via WebSocket
+      if (event.type === 'flow_complete') {
+        setRunResult({
+          success: true,
+          result: event.result,
+        });
+      } else if (event.type === 'flow_error') {
+        setRunResult({
+          success: false,
+          error: event.error || 'Unknown error',
+        });
+      }
+    },
+    onWaiting: (info) => {
+      console.log('Flow waiting for user input:', info);
+      toast('Flow is waiting for your response');
     },
   });
+
+  // Handle user prompt response
+  const handlePromptSubmit = useCallback(
+    (response: string) => {
+      resumeFlow(response);
+    },
+    [resumeFlow]
+  );
 
   // Handle save
   const handleSave = useCallback(() => {
@@ -382,6 +407,15 @@ export function Toolbar() {
           </div>
         </div>
       )}
+
+      {/* User Prompt Modal (for Ask User effect) */}
+      <UserPromptModal
+        isOpen={isWaiting}
+        prompt={waitingInfo?.prompt || 'Please respond:'}
+        choices={waitingInfo?.choices || []}
+        allowFreeText={waitingInfo?.allowFreeText ?? true}
+        onSubmit={handlePromptSubmit}
+      />
     </>
   );
 }

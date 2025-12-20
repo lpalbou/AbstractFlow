@@ -71,6 +71,7 @@ class NodeType(str, Enum):
     LITERAL_NUMBER = "literal_number"
     LITERAL_BOOLEAN = "literal_boolean"
     LITERAL_JSON = "literal_json"
+    LITERAL_ARRAY = "literal_array"
     # Effects
     ASK_USER = "ask_user"
     LLM_CALL = "llm_call"
