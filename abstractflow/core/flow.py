@@ -44,10 +44,12 @@ class FlowEdge:
         source: ID of the source node
         target: ID of the target node
         condition: Optional condition function for conditional routing (future)
+        source_handle: Optional execution output handle id (visual flows).
     """
     source: str
     target: str
     condition: Optional[Callable[[Dict[str, Any]], bool]] = None
+    source_handle: Optional[str] = None
 
 
 class Flow:
@@ -119,6 +121,7 @@ class Flow:
         target: str,
         *,
         condition: Optional[Callable[[Dict[str, Any]], bool]] = None,
+        source_handle: Optional[str] = None,
     ) -> "Flow":
         """Add an edge between nodes.
 
@@ -130,7 +133,14 @@ class Flow:
         Returns:
             Self for method chaining
         """
-        self.edges.append(FlowEdge(source=source, target=target, condition=condition))
+        self.edges.append(
+            FlowEdge(
+                source=source,
+                target=target,
+                condition=condition,
+                source_handle=source_handle,
+            )
+        )
         return self
 
     def set_entry(self, node_id: str) -> "Flow":

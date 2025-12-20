@@ -168,6 +168,15 @@ const DATA_NODES: NodeTemplate[] = [
   { type: 'merge', icon: '&#x1F517;', label: 'Merge Objects', headerColor: '#3498DB', inputs: [{ id: 'a', label: 'a', type: 'object' }, { id: 'b', label: 'b', type: 'object' }], outputs: [{ id: 'result', label: 'result', type: 'object' }], category: 'data' },
   { type: 'array_map', icon: '&#x1F5FA;', label: 'Map Array', headerColor: '#3498DB', inputs: [{ id: 'items', label: 'items', type: 'array' }, { id: 'key', label: 'key', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'data' },
   { type: 'array_filter', icon: '&#x1F50D;', label: 'Filter Array', headerColor: '#3498DB', inputs: [{ id: 'items', label: 'items', type: 'array' }, { id: 'key', label: 'key', type: 'string' }, { id: 'value', label: 'value', type: 'any' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'data' },
+  {
+    type: 'break_object',
+    icon: '&#x1F9E9;', // Puzzle piece
+    label: 'Break Object',
+    headerColor: '#3498DB',
+    inputs: [{ id: 'object', label: 'object', type: 'object' }],
+    outputs: [], // Dynamic pins based on selected paths
+    category: 'data',
+  },
 ];
 
 // Literal/Value nodes - Output constant values (no execution pins, no inputs)
@@ -391,5 +400,6 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
     ...(template.type === 'literal_boolean' && { literalValue: false }),
     ...(template.type === 'literal_json' && { literalValue: {} }),
     ...(template.type === 'literal_array' && { literalValue: [] }),
+    ...(template.type === 'break_object' && { breakConfig: { selectedPaths: [] } }),
   };
 }

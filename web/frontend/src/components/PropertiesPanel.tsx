@@ -12,7 +12,7 @@ interface PropertiesPanelProps {
 }
 
 export function PropertiesPanel({ node }: PropertiesPanelProps) {
-  const { updateNodeData, deleteNode, flowId } = useFlowStore();
+  const { updateNodeData, deleteNode, flowId, nodes, edges } = useFlowStore();
 
   // Provider/model state for agent nodes
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
@@ -154,6 +154,76 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     [node, updateNodeData]
   );
 
+  const inferPinType = useCallback((value: unknown): FlowNodeData['inputs'][number]['type'] => {
+    if (Array.isArray(value)) return 'array';
+    if (value === null || value === undefined) return 'any';
+    switch (typeof value) {
+      case 'string':
+        return 'string';
+      case 'number':
+        return 'number';
+      case 'boolean':
+        return 'boolean';
+      case 'object':
+        return 'object';
+      default:
+        return 'any';
+    }
+  }, []);
+
+  const getByPath = useCallback((value: unknown, path: string): unknown => {
+    if (!path) return undefined;
+    const parts = path.split('.');
+    let current: unknown = value;
+    for (const part of parts) {
+      if (current === null || current === undefined) return undefined;
+      if (Array.isArray(current)) {
+        if (!/^\d+$/.test(part)) return undefined;
+        const idx = Number(part);
+        current = idx >= 0 && idx < current.length ? current[idx] : undefined;
+        continue;
+      }
+      if (typeof current === 'object') {
+        const obj = current as Record<string, unknown>;
+        current = obj[part];
+        continue;
+      }
+      return undefined;
+    }
+    return current;
+  }, []);
+
+  const flattenPaths = useCallback((value: unknown): string[] => {
+    const out: string[] = [];
+    const seen = new Set<string>();
+    const maxDepth = 5;
+    const maxPaths = 200;
+
+    const walk = (cur: unknown, prefix: string, depth: number) => {
+      if (out.length >= maxPaths) return;
+      if (depth > maxDepth) return;
+      if (!cur || typeof cur !== 'object') return;
+      if (Array.isArray(cur)) return;
+
+      const obj = cur as Record<string, unknown>;
+      for (const key of Object.keys(obj)) {
+        if (out.length >= maxPaths) return;
+        const path = prefix ? `${prefix}.${key}` : key;
+        if (!seen.has(path)) {
+          seen.add(path);
+          out.push(path);
+        }
+        const next = obj[key];
+        if (next && typeof next === 'object' && !Array.isArray(next)) {
+          walk(next, path, depth + 1);
+        }
+      }
+    };
+
+    walk(value, '', 0);
+    return out;
+  }, []);
+
 
   if (!node) {
     return (
@@ -259,6 +329,102 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
             ))}
         </ul>
       </div>
+
+      {/* Break Object node properties */}
+      {data.nodeType === 'break_object' && (
+        <div className="property-section">
+          <label className="property-label">Break Object</label>
+
+          {(() => {
+            const inputEdge = edges.find(
+              (e) => e.target === node.id && e.targetHandle === 'object'
+            );
+            const sourceNode = inputEdge
+              ? nodes.find((n) => n.id === inputEdge.source)
+              : undefined;
+            let sample: unknown = undefined;
+
+            if (sourceNode?.data.nodeType === 'literal_json') {
+              sample = sourceNode.data.literalValue;
+            } else if (sourceNode?.data.nodeType === 'literal_array') {
+              sample = sourceNode.data.literalValue;
+            } else if (sourceNode?.data.nodeType === 'agent') {
+              // Best-effort schema for Agent result payload.
+              sample = {
+                result: '',
+                task: '',
+                context: {},
+                success: true,
+                provider: '',
+                model: '',
+                usage: {
+                  input_tokens: 0,
+                  output_tokens: 0,
+                  total_tokens: 0,
+                  prompt_tokens: 0,
+                  completion_tokens: 0,
+                },
+              };
+            }
+
+            const available = sample ? flattenPaths(sample).sort() : [];
+            const selected = data.breakConfig?.selectedPaths || [];
+
+            const togglePath = (path: string) => {
+              const nextSelected = selected.includes(path)
+                ? selected.filter((p) => p !== path)
+                : [...selected, path];
+
+              const nextOutputs = nextSelected.map((p) => ({
+                id: p,
+                label: p.split('.').slice(-1)[0] || p,
+                type: inferPinType(getByPath(sample, p)),
+              }));
+
+              updateNodeData(node.id, {
+                breakConfig: { ...data.breakConfig, selectedPaths: nextSelected },
+                outputs: nextOutputs,
+              });
+            };
+
+            if (!inputEdge) {
+              return (
+                <span className="property-hint">
+                  Connect an object to the <code>object</code> input to discover fields.
+                </span>
+              );
+            }
+
+            if (available.length === 0) {
+              return (
+                <span className="property-hint">
+                  No fields discovered for this input.
+                </span>
+              );
+            }
+
+            return (
+              <div className="property-group">
+                <div className="checkbox-list">
+                  {available.map((path) => (
+                    <label key={path} className="checkbox-item">
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(path)}
+                        onChange={() => togglePath(path)}
+                      />
+                      <span className="checkbox-label">{path}</span>
+                    </label>
+                  ))}
+                </div>
+                <span className="property-hint">
+                  Select fields to expose as output pins.
+                </span>
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       {/* Agent-specific properties */}
       {data.nodeType === 'agent' && (
@@ -509,27 +675,209 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       {/* JSON literal value */}
       {data.nodeType === 'literal_json' && (
         <div className="property-section">
-          <label className="property-label">Value (JSON)</label>
-          <textarea
-            className="property-input property-textarea code"
-            value={
-              typeof data.literalValue === 'object'
-                ? JSON.stringify(data.literalValue, null, 2)
-                : String(data.literalValue ?? '{}')
-            }
-            onChange={(e) => {
-              try {
-                const parsed = JSON.parse(e.target.value);
-                updateNodeData(node.id, { literalValue: parsed });
-              } catch {
-                // Keep invalid JSON in the textarea but don't update state
-                // User will see validation error naturally (parse fails silently)
+          <label className="property-label">Fields (Object)</label>
+
+          {(() => {
+            const current = data.literalValue;
+            const isObject =
+              current !== null &&
+              typeof current === 'object' &&
+              !Array.isArray(current);
+
+            const obj: Record<string, unknown> = isObject
+              ? (current as Record<string, unknown>)
+              : {};
+
+            const valueType = (value: unknown) => {
+              if (Array.isArray(value)) return 'array';
+              if (value === null) return 'null';
+              switch (typeof value) {
+                case 'string':
+                  return 'string';
+                case 'number':
+                  return 'number';
+                case 'boolean':
+                  return 'boolean';
+                case 'object':
+                  return 'object';
+                default:
+                  return 'string';
               }
-            }}
-            placeholder="{}"
-            rows={6}
-          />
-          <span className="property-hint">Enter valid JSON object or array</span>
+            };
+
+            const setKey = (oldKey: string, newKeyRaw: string): boolean => {
+              const newKey = newKeyRaw.trim();
+              if (!newKey || newKey === oldKey) return false;
+              if (Object.prototype.hasOwnProperty.call(obj, newKey)) return false;
+              const next: Record<string, unknown> = {};
+              for (const [k, v] of Object.entries(obj)) {
+                next[k === oldKey ? newKey : k] = v;
+              }
+              updateNodeData(node.id, { literalValue: next });
+              return true;
+            };
+
+            const setValue = (key: string, value: unknown) => {
+              updateNodeData(node.id, { literalValue: { ...obj, [key]: value } });
+            };
+
+            const removeKey = (key: string) => {
+              const next: Record<string, unknown> = {};
+              for (const [k, v] of Object.entries(obj)) {
+                if (k !== key) next[k] = v;
+              }
+              updateNodeData(node.id, { literalValue: next });
+            };
+
+            const addKey = () => {
+              let i = 1;
+              let key = `field_${i}`;
+              while (Object.prototype.hasOwnProperty.call(obj, key)) {
+                i += 1;
+                key = `field_${i}`;
+              }
+              updateNodeData(node.id, { literalValue: { ...obj, [key]: '' } });
+            };
+
+            const setType = (key: string, t: string) => {
+              if (t === 'string') return setValue(key, '');
+              if (t === 'number') return setValue(key, 0);
+              if (t === 'boolean') return setValue(key, false);
+              if (t === 'null') return setValue(key, null);
+              if (t === 'array') return setValue(key, []);
+              if (t === 'object') return setValue(key, {});
+            };
+
+            return (
+              <>
+                {!isObject && (
+                  <span className="property-hint">
+                    Visual editing supports JSON objects. Use Raw JSON below for arrays or advanced values.
+                  </span>
+                )}
+
+                <div className="object-editor">
+                  {Object.entries(obj).map(([key, value]) => {
+                    const t = valueType(value);
+                    return (
+                      <div key={key} className="object-field">
+                        <input
+                          type="text"
+                          className="property-input object-key"
+                          defaultValue={key}
+                          onBlur={(e) => {
+                            const ok = setKey(key, e.target.value);
+                            if (!ok) {
+                              e.currentTarget.value = key;
+                            }
+                          }}
+                          placeholder="key"
+                        />
+                        <select
+                          className="property-select object-type"
+                          value={t}
+                          onChange={(e) => setType(key, e.target.value)}
+                        >
+                          <option value="string">string</option>
+                          <option value="number">number</option>
+                          <option value="boolean">boolean</option>
+                          <option value="null">null</option>
+                          <option value="object">object</option>
+                          <option value="array">array</option>
+                        </select>
+
+                        {t === 'string' && (
+                          <input
+                            type="text"
+                            className="property-input object-value"
+                            value={String(value ?? '')}
+                            onChange={(e) => setValue(key, e.target.value)}
+                            placeholder="value"
+                          />
+                        )}
+
+                        {t === 'number' && (
+                          <input
+                            type="number"
+                            className="property-input object-value"
+                            value={typeof value === 'number' ? value : Number(value ?? 0)}
+                            onChange={(e) => setValue(key, Number(e.target.value))}
+                            step="any"
+                          />
+                        )}
+
+                        {t === 'boolean' && (
+                          <label className="toggle-container object-value">
+                            <input
+                              type="checkbox"
+                              className="toggle-checkbox"
+                              checked={Boolean(value)}
+                              onChange={(e) => setValue(key, e.target.checked)}
+                            />
+                            <span className="toggle-label">{value ? 'True' : 'False'}</span>
+                          </label>
+                        )}
+
+                        {t === 'null' && (
+                          <div className="object-null object-value">null</div>
+                        )}
+
+                        {(t === 'object' || t === 'array') && (
+                          <textarea
+                            className="property-input property-textarea code object-value"
+                            value={JSON.stringify(value, null, 2)}
+                            onChange={(e) => {
+                              try {
+                                const parsed = JSON.parse(e.target.value);
+                                setValue(key, parsed);
+                              } catch {
+                                // keep editing; don't update until valid
+                              }
+                            }}
+                            rows={3}
+                          />
+                        )}
+
+                        <button
+                          className="array-item-remove"
+                          onClick={() => removeKey(key)}
+                          title="Remove field"
+                        >
+                          &times;
+                        </button>
+                      </div>
+                    );
+                  })}
+
+                  <button className="array-add-button" onClick={addKey}>
+                    + Add Field
+                  </button>
+                </div>
+
+                <details className="raw-json-details">
+                  <summary>Raw JSON (advanced)</summary>
+                  <textarea
+                    className="property-input property-textarea code"
+                    value={
+                      typeof data.literalValue === 'object'
+                        ? JSON.stringify(data.literalValue, null, 2)
+                        : String(data.literalValue ?? '{}')
+                    }
+                    onChange={(e) => {
+                      try {
+                        const parsed = JSON.parse(e.target.value);
+                        updateNodeData(node.id, { literalValue: parsed });
+                      } catch {
+                        // Keep invalid JSON in the textarea but don't update state.
+                      }
+                    }}
+                    placeholder="{}"
+                    rows={6}
+                  />
+                </details>
+              </>
+            );
+          })()}
         </div>
       )}
 

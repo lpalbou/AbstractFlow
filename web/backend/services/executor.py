@@ -228,25 +228,95 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
     flow._node_outputs: Dict[str, Dict[str, Any]] = {}
     flow._data_edge_map = data_edge_map
 
-    # Literal node types - these are pure data nodes, not execution nodes
-    # They should NOT be added to the flow graph
+    # Literal node types - these are pure data nodes, not execution nodes.
+    # They are evaluated up-front and should NOT be added to the execution graph.
     LITERAL_NODE_TYPES = {
         "literal_string", "literal_number", "literal_boolean",
         "literal_json", "literal_array"
     }
 
-    # Pure function node types that also don't have execution pins
-    # These are evaluated inline when their output is read
-    PURE_FUNCTION_TYPES = {
-        # Math
-        "add", "subtract", "multiply", "divide", "modulo", "power", "abs", "round",
-        # String
-        "concat", "split", "join", "format", "uppercase", "lowercase", "trim", "substring", "length",
-        # Control (logic gates only - if/loop have exec pins)
-        "compare", "not", "and", "or",
-        # Data
-        "get", "set", "merge", "array_map", "array_filter",
-    }
+    # ------------------------------------------------------------------
+    # Pure (no-exec) data nodes
+    # ------------------------------------------------------------------
+    #
+    # Blueprint-like UX expects "pure" nodes (no exec pins) to evaluate via
+    # data edges when their outputs are requested by an executing node.
+    #
+    # We support this by:
+    # - excluding pure nodes from the execution graph (avoids unreachable errors)
+    # - evaluating them on-demand and caching their outputs in flow._node_outputs
+    #
+    # Pure nodes are detected structurally (no execution pins), not by type.
+    pure_base_handlers: Dict[str, Any] = {}
+
+    def _has_execution_pins(type_str: str, node_data: Dict[str, Any]) -> bool:
+        """Return True if a node should be treated as an execution node.
+
+        Frontend-saved flows include `inputs`/`outputs` in node.data; some tests
+        construct VisualNode objects without these pin lists. In that case, fall
+        back to treating builtins and known pure nodes as pure, and everything
+        else as execution.
+        """
+        pins: list[Any] = []
+        inputs = node_data.get("inputs")
+        outputs = node_data.get("outputs")
+        if isinstance(inputs, list):
+            pins.extend(inputs)
+        if isinstance(outputs, list):
+            pins.extend(outputs)
+
+        if pins:
+            for p in pins:
+                if isinstance(p, dict) and p.get("type") == "execution":
+                    return True
+            return False
+
+        # Fallback when pin metadata is missing.
+        if type_str in LITERAL_NODE_TYPES:
+            return False
+        if type_str == "break_object":
+            return False
+        if get_builtin_handler(type_str) is not None:
+            return False
+        return True
+
+    evaluating: set[str] = set()
+
+    def _ensure_node_output(node_id: str) -> None:
+        """Ensure node_outputs contains the node_id output.
+
+        Only evaluates pure nodes (no exec pins). Execution nodes are populated
+        when they run; literal nodes are pre-populated.
+        """
+        if node_id in flow._node_outputs:
+            return
+
+        handler = pure_base_handlers.get(node_id)
+        if handler is None:
+            return
+
+        if node_id in evaluating:
+            raise ValueError(f"Data edge cycle detected at '{node_id}'")
+
+        evaluating.add(node_id)
+        resolved_input: Dict[str, Any] = {}
+
+        # Resolve this node's inputs via connected data edges.
+        for target_pin, (source_node, source_pin) in data_edge_map.get(node_id, {}).items():
+            _ensure_node_output(source_node)
+            if source_node not in flow._node_outputs:
+                continue
+            source_output = flow._node_outputs[source_node]
+            if isinstance(source_output, dict) and source_pin in source_output:
+                resolved_input[target_pin] = source_output[source_pin]
+            elif source_pin == "result":
+                # Convention: primitive-returning nodes expose their value on a
+                # virtual "result" pin.
+                resolved_input[target_pin] = source_output
+
+        result = handler(resolved_input if resolved_input else {})
+        flow._node_outputs[node_id] = result
+        evaluating.remove(node_id)
 
     # Effect node types that need special handling by the compiler.
     # Note: `subflow` is compiled as `start_subworkflow` (see below).
@@ -261,8 +331,8 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
             literal_value = node.data.get("literalValue")
             flow._node_outputs[node.id] = {"value": literal_value}
 
-    # Add nodes with wrapped handlers that resolve data edges
-    # Skip literal nodes - they're already evaluated above
+    # Add nodes with wrapped handlers that resolve data edges.
+    # Skip literal nodes (pre-evaluated) and pure nodes (evaluated on-demand).
     for node in visual.nodes:
         type_str = node.type.value if hasattr(node.type, "value") else str(node.type)
 
@@ -272,12 +342,18 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
 
         base_handler = _create_handler(node.type, node.data)
 
+        # Pure nodes: no exec pins → evaluate via data edges, don't add to execution graph.
+        if not _has_execution_pins(type_str, node.data):
+            pure_base_handlers[node.id] = base_handler
+            continue
+
         # Wrap the handler to resolve data edges
         wrapped_handler = _create_data_aware_handler(
             node_id=node.id,
             base_handler=base_handler,
             data_edges=data_edge_map.get(node.id, {}),
             node_outputs=flow._node_outputs,
+            ensure_node_output=_ensure_node_output,
         )
 
         # Determine input/output keys from node data
@@ -304,10 +380,13 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
             effect_config=effect_config,
         )
 
-    # Only add execution edges - these control the flow execution order
+    # Add execution edges (control flow).
+    # Execution edges are identified by targeting the `exec-in` pin; the source
+    # handle can be `exec-out` or a branch handle like `true`/`false`.
     for edge in visual.edges:
-        if edge.sourceHandle == "exec-out" and edge.targetHandle == "exec-in":
-            flow.add_edge(edge.source, edge.target)
+        if edge.targetHandle == "exec-in":
+            if edge.source in flow.nodes and edge.target in flow.nodes:
+                flow.add_edge(edge.source, edge.target, source_handle=edge.sourceHandle)
 
     # Set entry node - only consider nodes that are actually in the flow
     # (excludes literal nodes which were skipped above)
@@ -332,6 +411,8 @@ def _create_data_aware_handler(
     base_handler,
     data_edges: Dict[str, tuple],
     node_outputs: Dict[str, Dict[str, Any]],
+    *,
+    ensure_node_output=None,
 ):
     """Wrap a handler to resolve data edge inputs before execution.
 
@@ -352,6 +433,8 @@ def _create_data_aware_handler(
 
         # Override with values from connected data edges
         for target_pin, (source_node, source_pin) in data_edges.items():
+            if ensure_node_output is not None and source_node not in node_outputs:
+                ensure_node_output(source_node)
             if source_node in node_outputs:
                 source_output = node_outputs[source_node]
                 if isinstance(source_output, dict) and source_pin in source_output:
@@ -395,6 +478,9 @@ def _create_handler(node_type: NodeType, data: Dict[str, Any]) -> Any:
         # Subflow node - would need the nested flow to be compiled
         return _create_subflow_effect_builder(data)
 
+    if type_str == "break_object":
+        return _create_break_object_handler(data)
+
     if type_str == "function":
         # Generic function - check for inline code or expression
         if "code" in data:
@@ -423,6 +509,46 @@ def _create_handler(node_type: NodeType, data: Dict[str, Any]) -> Any:
 
     # Unknown type - return identity
     return lambda x: x
+
+
+def _create_break_object_handler(data: Dict[str, Any]):
+    """Create a handler that extracts selected dotted paths from an object.
+
+    The node is "pure" (no exec pins) and returns a dict keyed by output pin IDs
+    (which are the selected paths).
+    """
+    config = data.get("breakConfig", {}) if isinstance(data, dict) else {}
+    selected = config.get("selectedPaths", []) if isinstance(config, dict) else []
+    selected_paths = [p.strip() for p in selected if isinstance(p, str) and p.strip()]
+
+    def _get_path(value: Any, path: str) -> Any:
+        current = value
+        for part in path.split("."):
+            if current is None:
+                return None
+            if isinstance(current, dict):
+                current = current.get(part)
+                continue
+            if isinstance(current, list) and part.isdigit():
+                idx = int(part)
+                if idx < 0 or idx >= len(current):
+                    return None
+                current = current[idx]
+                continue
+            return None
+        return current
+
+    def handler(input_data):
+        src_obj = None
+        if isinstance(input_data, dict):
+            src_obj = input_data.get("object")
+
+        out: Dict[str, Any] = {}
+        for path in selected_paths:
+            out[path] = _get_path(src_obj, path)
+        return out
+
+    return handler
 
 
 def _wrap_builtin(handler, data: Dict[str, Any]):
@@ -465,7 +591,8 @@ def _create_agent_handler(data: Dict[str, Any]):
 
     def handler(input_data):
         task = input_data.get("task") if isinstance(input_data, dict) else str(input_data)
-        context = input_data.get("context", {}) if isinstance(input_data, dict) else {}
+        context_raw = input_data.get("context", {}) if isinstance(input_data, dict) else {}
+        context = context_raw if isinstance(context_raw, dict) else {}
 
         try:
             # Import AbstractCore's create_llm
@@ -485,33 +612,43 @@ def _create_agent_handler(data: Dict[str, Any]):
             logger.info(f"Generating response for task: {task[:100]}...")
             response = llm.generate(prompt)
 
+            # Visual nodes expect handler outputs to be a dict keyed by output pin
+            # IDs. The Agent node has a single output pin named `result` that is
+            # typed as an object, so we wrap the full response object under that
+            # key (Blueprint-style).
             return {
-                "result": response.content,
-                "task": task,
-                "context": context,
-                "success": True,
-                "provider": provider,
-                "model": model,
-                "usage": response.usage if hasattr(response, 'usage') else None,
+                "result": {
+                    "result": response.content,
+                    "task": task,
+                    "context": context,
+                    "success": True,
+                    "provider": provider,
+                    "model": model,
+                    "usage": response.usage if hasattr(response, "usage") else None,
+                }
             }
 
         except ImportError as e:
             logger.error(f"Failed to import AbstractCore: {e}")
             return {
-                "result": f"Error: AbstractCore not available - {e}",
-                "task": task,
-                "context": context,
-                "success": False,
-                "error": str(e),
+                "result": {
+                    "result": f"Error: AbstractCore not available - {e}",
+                    "task": task,
+                    "context": context,
+                    "success": False,
+                    "error": str(e),
+                }
             }
         except Exception as e:
             logger.error(f"Agent execution failed: {e}", exc_info=True)
             return {
-                "result": f"Error: {e}",
-                "task": task,
-                "context": context,
-                "success": False,
-                "error": str(e),
+                "result": {
+                    "result": f"Error: {e}",
+                    "task": task,
+                    "context": context,
+                    "success": False,
+                    "error": str(e),
+                }
             }
 
     return handler
@@ -524,14 +661,17 @@ def _create_agent_fallback(data: Dict[str, Any], reason: str):
 
     def fallback(input_data):
         task = input_data.get("task") if isinstance(input_data, dict) else str(input_data)
-        context = input_data.get("context", {}) if isinstance(input_data, dict) else {}
+        context_raw = input_data.get("context", {}) if isinstance(input_data, dict) else {}
+        context = context_raw if isinstance(context_raw, dict) else {}
         return {
-            "result": f"Agent configuration error: {reason}",
-            "task": task,
-            "context": context,
-            "success": False,
-            "error": reason,
-            "note": f"Provider: {provider}, Model: {model}",
+            "result": {
+                "result": f"Agent configuration error: {reason}",
+                "task": task,
+                "context": context,
+                "success": False,
+                "error": reason,
+                "note": f"Provider: {provider}, Model: {model}",
+            }
         }
 
     return fallback

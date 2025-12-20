@@ -67,6 +67,7 @@ class NodeType(str, Enum):
     MERGE = "merge"
     ARRAY_MAP = "array_map"
     ARRAY_FILTER = "array_filter"
+    BREAK_OBJECT = "break_object"
     # Literals
     LITERAL_STRING = "literal_string"
     LITERAL_NUMBER = "literal_number"

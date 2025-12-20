@@ -51,7 +51,7 @@ export type NodeType =
   // Control - if/loop have exec, logic gates are pure
   | 'if' | 'switch' | 'loop' | 'compare' | 'not' | 'and' | 'or'
   // Data - Pure functions (no exec pins)
-  | 'get' | 'set' | 'merge' | 'array_map' | 'array_filter'
+  | 'get' | 'set' | 'merge' | 'array_map' | 'array_filter' | 'break_object'
   // Literals - Pure value nodes (no exec pins, no inputs)
   | 'literal_string' | 'literal_number' | 'literal_boolean' | 'literal_json' | 'literal_array'
   // Effects - Side-effect nodes (require execution pins)
@@ -84,6 +84,10 @@ export interface FlowNodeData {
   };
   // Literal node value
   literalValue?: string | number | boolean | object;
+  // Break Object node configuration
+  breakConfig?: {
+    selectedPaths?: string[];
+  };
   // Effect node configuration
   effectConfig?: {
     provider?: string;     // For llm_call

@@ -1,14 +1,14 @@
 {
-  "id": "d6cdcc10",
-  "name": "first-conditional",
+  "id": "176d21ed",
+  "name": "second-condition",
   "description": "",
   "nodes": [
     {
       "id": "node-1",
       "type": "on_flow_start",
       "position": {
-        "x": -368.0,
-        "y": 48.0
+        "x": -688.0,
+        "y": -240.0
       },
       "data": {
         "nodeType": "on_flow_start",
@@ -31,11 +31,11 @@
       "outputs": []
     },
     {
-      "id": "node-3",
+      "id": "node-2",
       "type": "ask_user",
       "position": {
-        "x": 128.0,
-        "y": 48.0
+        "x": -288.0,
+        "y": -240.0
       },
       "data": {
         "nodeType": "ask_user",
@@ -70,7 +70,10 @@
             "label": "response",
             "type": "string"
           }
-        ]
+        ],
+        "effectConfig": {
+          "allowFreeText": true
+        }
       },
       "label": null,
       "icon": null,
@@ -79,11 +82,11 @@
       "outputs": []
     },
     {
-      "id": "node-6",
+      "id": "node-3",
       "type": "literal_array",
       "position": {
-        "x": -160.0,
-        "y": 240.0
+        "x": -672.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "literal_array",
@@ -110,11 +113,39 @@
       "outputs": []
     },
     {
-      "id": "node-10",
+      "id": "node-4",
+      "type": "literal_string",
+      "position": {
+        "x": -688.0,
+        "y": -112.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "String",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "do you agree ?"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-5",
       "type": "compare",
       "position": {
-        "x": 432.0,
-        "y": 96.0
+        "x": 96.0,
+        "y": -160.0
       },
       "data": {
         "nodeType": "compare",
@@ -148,11 +179,11 @@
       "outputs": []
     },
     {
-      "id": "node-11",
+      "id": "node-6",
       "type": "literal_string",
       "position": {
-        "x": 128.0,
-        "y": 256.0
+        "x": -256.0,
+        "y": 0.0
       },
       "data": {
         "nodeType": "literal_string",
@@ -167,7 +198,7 @@
             "type": "string"
           }
         ],
-        "literalValue": ""
+        "literalValue": "yes"
       },
       "label": null,
       "icon": null,
@@ -176,39 +207,11 @@
       "outputs": []
     },
     {
-      "id": "node-12",
-      "type": "literal_string",
-      "position": {
-        "x": -176.0,
-        "y": 144.0
-      },
-      "data": {
-        "nodeType": "literal_string",
-        "label": "String",
-        "icon": "\"",
-        "headerColor": "#FF00FF",
-        "inputs": [],
-        "outputs": [
-          {
-            "id": "value",
-            "label": "value",
-            "type": "string"
-          }
-        ],
-        "literalValue": "Do you want to continue ?"
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
-      "id": "node-13",
+      "id": "node-7",
       "type": "if",
       "position": {
-        "x": 736.0,
-        "y": 48.0
+        "x": 336.0,
+        "y": -240.0
       },
       "data": {
         "nodeType": "if",
@@ -247,11 +250,11 @@
       "outputs": []
     },
     {
-      "id": "node-14",
+      "id": "node-8",
       "type": "llm_call",
       "position": {
-        "x": 1232.0,
-        "y": -176.0
+        "x": 704.0,
+        "y": -384.0
       },
       "data": {
         "nodeType": "llm_call",
@@ -299,39 +302,11 @@
       "outputs": []
     },
     {
-      "id": "node-16",
-      "type": "literal_string",
-      "position": {
-        "x": 1232.0,
-        "y": -48.0
-      },
-      "data": {
-        "nodeType": "literal_string",
-        "label": "String",
-        "icon": "\"",
-        "headerColor": "#FF00FF",
-        "inputs": [],
-        "outputs": [
-          {
-            "id": "value",
-            "label": "value",
-            "type": "string"
-          }
-        ],
-        "literalValue": "just acknowledge the user want to continue with a task"
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
-      "id": "node-17",
+      "id": "node-9",
       "type": "llm_call",
       "position": {
-        "x": 1232.0,
-        "y": 128.0
+        "x": 704.0,
+        "y": -144.0
       },
       "data": {
         "nodeType": "llm_call",
@@ -379,11 +354,11 @@
       "outputs": []
     },
     {
-      "id": "node-18",
+      "id": "node-10",
       "type": "literal_string",
       "position": {
-        "x": 1232.0,
-        "y": 256.0
+        "x": 704.0,
+        "y": -256.0
       },
       "data": {
         "nodeType": "literal_string",
@@ -398,7 +373,35 @@
             "type": "string"
           }
         ],
-        "literalValue": "just acknowledge the user DOES NOT want to continue with a task"
+        "literalValue": "acknowledge yes and that it was a good idea"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-11",
+      "type": "literal_string",
+      "position": {
+        "x": 704.0,
+        "y": -16.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "String",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "acknowledge no with verbosity. ask if the user want something else"
       },
       "label": null,
       "icon": null,
@@ -409,95 +412,95 @@
   ],
   "edges": [
     {
-      "id": "edge-1766251147230",
+      "id": "edge-1766254883590",
       "source": "node-1",
       "sourceHandle": "exec-out",
-      "target": "node-3",
+      "target": "node-2",
       "targetHandle": "exec-in",
       "animated": true
     },
     {
-      "id": "edge-1766251265371",
-      "source": "node-6",
+      "id": "edge-1766254894983",
+      "source": "node-3",
       "sourceHandle": "value",
-      "target": "node-3",
+      "target": "node-2",
       "targetHandle": "choices",
       "animated": false
     },
     {
-      "id": "edge-1766252170041",
-      "source": "node-3",
+      "id": "edge-1766254918040",
+      "source": "node-4",
+      "sourceHandle": "value",
+      "target": "node-2",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "edge-1766254958664",
+      "source": "node-2",
       "sourceHandle": "response",
-      "target": "node-10",
+      "target": "node-5",
       "targetHandle": "a",
       "animated": false
     },
     {
-      "id": "edge-1766252182889",
-      "source": "node-11",
+      "id": "edge-1766254969656",
+      "source": "node-6",
       "sourceHandle": "value",
-      "target": "node-10",
+      "target": "node-5",
       "targetHandle": "b",
       "animated": false
     },
     {
-      "id": "edge-1766252213706",
-      "source": "node-12",
-      "sourceHandle": "value",
-      "target": "node-3",
-      "targetHandle": "prompt",
-      "animated": false
-    },
-    {
-      "id": "edge-1766252244872",
-      "source": "node-10",
-      "sourceHandle": "result",
-      "target": "node-13",
-      "targetHandle": "condition",
-      "animated": false
-    },
-    {
-      "id": "edge-1766252248922",
-      "source": "node-3",
+      "id": "edge-1766254981981",
+      "source": "node-2",
       "sourceHandle": "exec-out",
-      "target": "node-13",
+      "target": "node-7",
       "targetHandle": "exec-in",
       "animated": true
     },
     {
-      "id": "edge-1766252758697",
-      "source": "node-13",
+      "id": "edge-1766254985632",
+      "source": "node-5",
+      "sourceHandle": "result",
+      "target": "node-7",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "edge-1766255002759",
+      "source": "node-7",
       "sourceHandle": "true",
-      "target": "node-14",
+      "target": "node-8",
       "targetHandle": "exec-in",
       "animated": false
     },
     {
-      "id": "edge-1766252792197",
-      "source": "node-16",
+      "id": "edge-1766255011827",
+      "source": "node-7",
+      "sourceHandle": "false",
+      "target": "node-9",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "edge-1766255022682",
+      "source": "node-10",
       "sourceHandle": "value",
-      "target": "node-14",
+      "target": "node-8",
       "targetHandle": "prompt",
       "animated": false
     },
     {
-      "id": "edge-1766252851107",
-      "source": "node-13",
-      "sourceHandle": "false",
-      "target": "node-17",
-      "targetHandle": "exec-in",
-      "animated": false
-    },
-    {
-      "id": "edge-1766252865596",
-      "source": "node-18",
+      "id": "edge-1766255035983",
+      "source": "node-11",
       "sourceHandle": "value",
-      "target": "node-17",
+      "target": "node-9",
       "targetHandle": "prompt",
       "animated": false
     }
   ],
   "entryNode": "node-1",
-  "created_at": "2025-12-20T17:19:58.269354",
-  "updated_at": "2025-12-20T17:48:47.898100"
+  "created_at": "2025-12-20T18:24:09.666401",
+  "updated_at": "2025-12-20T19:04:19.533124"
 }

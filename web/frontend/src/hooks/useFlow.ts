@@ -74,14 +74,64 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   // React Flow change handlers
   onNodesChange: (changes) => {
+    const state = get();
+    const removedNodeIds = changes
+      .filter((c) => c.type === 'remove')
+      .map((c) => c.id);
+
+    const updatedNodes = applyNodeChanges(changes, state.nodes);
+
+    if (removedNodeIds.length === 0) {
+      set({ nodes: updatedNodes });
+      return;
+    }
+
+    const removed = new Set(removedNodeIds);
+    const remainingEdges = state.edges.filter(
+      (e) => !removed.has(e.source) && !removed.has(e.target)
+    );
+
+    const selectedNode =
+      state.selectedNode && removed.has(state.selectedNode.id)
+        ? null
+        : state.selectedNode;
+
+    const selectedEdge =
+      state.selectedEdge &&
+      !remainingEdges.some((e) => e.id === state.selectedEdge?.id)
+        ? null
+        : state.selectedEdge;
+
     set({
-      nodes: applyNodeChanges(changes, get().nodes),
+      nodes: updatedNodes,
+      edges: remainingEdges,
+      selectedNode,
+      selectedEdge,
     });
   },
 
   onEdgesChange: (changes) => {
+    const state = get();
+    const removedEdgeIds = changes
+      .filter((c) => c.type === 'remove')
+      .map((c) => c.id);
+
+    const updatedEdges = applyEdgeChanges(changes, state.edges);
+
+    if (removedEdgeIds.length === 0) {
+      set({ edges: updatedEdges });
+      return;
+    }
+
+    const removed = new Set(removedEdgeIds);
+    const selectedEdge =
+      state.selectedEdge && removed.has(state.selectedEdge.id)
+        ? null
+        : state.selectedEdge;
+
     set({
-      edges: applyEdgeChanges(changes, get().edges),
+      edges: updatedEdges,
+      selectedEdge,
     });
   },
 
@@ -116,11 +166,47 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   // Update node data
   updateNodeData: (nodeId, data) => {
     const state = get();
+    const existingNode = state.nodes.find((n) => n.id === nodeId);
+    const nextData = existingNode ? { ...existingNode.data, ...data } : undefined;
+
+    const removedInputHandles = new Set<string>();
+    const removedOutputHandles = new Set<string>();
+
+    if (existingNode && nextData) {
+      if (data.inputs) {
+        const prev = existingNode.data.inputs.map((p) => p.id);
+        const next = nextData.inputs.map((p) => p.id);
+        for (const id of prev) {
+          if (!next.includes(id)) removedInputHandles.add(id);
+        }
+      }
+      if (data.outputs) {
+        const prev = existingNode.data.outputs.map((p) => p.id);
+        const next = nextData.outputs.map((p) => p.id);
+        for (const id of prev) {
+          if (!next.includes(id)) removedOutputHandles.add(id);
+        }
+      }
+    }
+
     const updatedNodes = state.nodes.map((node) =>
       node.id === nodeId
         ? { ...node, data: { ...node.data, ...data } }
         : node
     );
+
+    const removedEdges = state.edges.filter((e) => {
+      if (removedInputHandles.size > 0 && e.target === nodeId && removedInputHandles.has(e.targetHandle || '')) {
+        return true;
+      }
+      if (removedOutputHandles.size > 0 && e.source === nodeId && removedOutputHandles.has(e.sourceHandle || '')) {
+        return true;
+      }
+      return false;
+    });
+
+    const remainingEdges =
+      removedEdges.length > 0 ? state.edges.filter((e) => !removedEdges.includes(e)) : state.edges;
 
     // Also update selectedNode if it's the one being updated
     const updatedSelectedNode =
@@ -130,7 +216,12 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
     set({
       nodes: updatedNodes,
+      edges: remainingEdges,
       selectedNode: updatedSelectedNode,
+      selectedEdge:
+        removedEdges.length > 0 && state.selectedEdge && removedEdges.some((e) => e.id === state.selectedEdge?.id)
+          ? null
+          : state.selectedEdge,
     });
   },
 
@@ -210,6 +301,18 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       targetHandle: ve.targetHandle,
       animated: ve.animated ?? ve.sourceHandle === 'exec-out',
     }));
+
+    // Ensure newly added nodes get unique ids after load/import.
+    // Node ids are generated as `node-{n}`.
+    let maxNodeId = 0;
+    for (const vn of flow.nodes) {
+      const m = /^node-(\d+)$/.exec(vn.id);
+      if (m) {
+        const n = Number(m[1]);
+        if (Number.isFinite(n) && n > maxNodeId) maxNodeId = n;
+      }
+    }
+    nodeIdCounter = maxNodeId;
 
     set({
       flowId: flow.id,

@@ -169,6 +169,7 @@ def _create_visual_function_handler(
     input_key: Optional[str],
     output_key: Optional[str],
     flow: Flow,
+    branch_map: Optional[Dict[str, str]] = None,
 ) -> Callable:
     """Create a handler for visual flow function nodes.
 
@@ -211,14 +212,40 @@ def _create_visual_function_handler(
         if output_key:
             _set_nested(run.vars, output_key, result)
 
+        if branch_map is not None:
+            branch = result.get("branch") if isinstance(result, dict) else None
+            if not isinstance(branch, str) or not branch:
+                run.vars["_flow_error"] = "Branching node did not return a string 'branch' value"
+                run.vars["_flow_error_node"] = node_id
+                return StepPlan(
+                    node_id=node_id,
+                    complete_output={
+                        "error": "Branching node did not return a string 'branch' value",
+                        "success": False,
+                        "node": node_id,
+                    },
+                )
+            chosen = branch_map.get(branch)
+            if not isinstance(chosen, str) or not chosen:
+                run.vars["_flow_error"] = f"Unknown branch '{branch}'"
+                run.vars["_flow_error_node"] = node_id
+                return StepPlan(
+                    node_id=node_id,
+                    complete_output={
+                        "error": f"Unknown branch '{branch}'",
+                        "success": False,
+                        "node": node_id,
+                    },
+                )
+            return StepPlan(node_id=node_id, next_node=chosen)
+
         # Continue to next node or complete
         if next_node:
             return StepPlan(node_id=node_id, next_node=next_node)
-        else:
-            return StepPlan(
-                node_id=node_id,
-                complete_output={"result": result, "success": True},
-            )
+        return StepPlan(
+            node_id=node_id,
+            complete_output={"result": result, "success": True},
+        )
 
     return handler
 
@@ -376,16 +403,48 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
     if errors:
         raise ValueError(f"Invalid flow: {'; '.join(errors)}")
 
-    # Build adjacency map for determining next nodes
-    next_node_map: Dict[str, Optional[str]] = {}
+    outgoing: Dict[str, list] = {}
     for edge in flow.edges:
-        # For now, only support single next node (no branching)
-        if edge.source in next_node_map:
+        outgoing.setdefault(edge.source, []).append(edge)
+
+    # Build next-node map (linear) and branch maps (If/Else).
+    next_node_map: Dict[str, Optional[str]] = {}
+    branch_maps: Dict[str, Dict[str, str]] = {}
+
+    for node_id in flow.nodes:
+        outs = outgoing.get(node_id, [])
+        if not outs:
+            next_node_map[node_id] = None
+            continue
+
+        if len(outs) == 1:
+            next_node_map[node_id] = outs[0].target
+            continue
+
+        handles: list[str] = []
+        for e in outs:
+            h = getattr(e, "source_handle", None)
+            if not isinstance(h, str) or not h:
+                handles = []
+                break
+            handles.append(h)
+
+        if len(handles) != len(outs) or len(set(handles)) != len(handles):
             raise ValueError(
-                f"Node '{edge.source}' has multiple outgoing edges. "
+                f"Node '{node_id}' has multiple outgoing edges. "
                 "Branching is not yet supported."
             )
-        next_node_map[edge.source] = edge.target
+
+        # Minimal branching support: If/Else uses `true` / `false` execution outputs.
+        if set(handles) <= {"true", "false"}:
+            branch_maps[node_id] = {e.source_handle: e.target for e in outs}  # type: ignore[arg-type]
+            next_node_map[node_id] = None
+            continue
+
+        raise ValueError(
+            f"Node '{node_id}' has multiple outgoing edges. "
+            "Branching is not yet supported."
+        )
 
     # Determine exit node if not set
     exit_node = flow.exit_node
@@ -402,6 +461,7 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
 
     for node_id, flow_node in flow.nodes.items():
         next_node = next_node_map.get(node_id)
+        branch_map = branch_maps.get(node_id)
         handler_obj = getattr(flow_node, "handler", None)
         effect_type = getattr(flow_node, "effect_type", None)
         effect_config = getattr(flow_node, "effect_config", None) or {}
@@ -448,6 +508,7 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
                 next_node=next_node,
                 input_key=getattr(flow_node, "input_key", None),
                 output_key=getattr(flow_node, "output_key", None),
+                branch_map=branch_map,
                 flow=flow,
             )
         else:
