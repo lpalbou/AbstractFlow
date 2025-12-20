@@ -12,11 +12,19 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 import datetime
+import logging
 
 # Add abstractflow to path for imports
 abstractflow_path = Path(__file__).parent.parent.parent.parent
 if str(abstractflow_path) not in sys.path:
     sys.path.insert(0, str(abstractflow_path))
+
+# Add abstractcore to path for LLM access
+abstractcore_path = Path(__file__).parent.parent.parent.parent.parent / "abstractcore"
+if str(abstractcore_path) not in sys.path:
+    sys.path.insert(0, str(abstractcore_path))
+
+logger = logging.getLogger(__name__)
 
 from abstractflow import Flow, FlowRunner
 from ..models import VisualFlow, VisualEdge, NodeType
@@ -177,9 +185,8 @@ def _create_handler(node_type: NodeType, data: Dict[str, Any]) -> Any:
         return create_code_handler(code, function_name)
 
     if type_str == "agent":
-        # Agent node - return placeholder that will be replaced
-        # In production, this would create an actual agent
-        return _create_agent_placeholder(data)
+        # Agent node - use AbstractCore to create real LLM handler
+        return _create_agent_handler(data)
 
     if type_str == "subflow":
         # Subflow node - would need the nested flow to be compiled
@@ -224,26 +231,93 @@ def _wrap_builtin(handler, data: Dict[str, Any]):
     return wrapped
 
 
-def _create_agent_placeholder(data: Dict[str, Any]):
-    """Create a placeholder for agent nodes.
+def _create_agent_handler(data: Dict[str, Any]):
+    """Create a real agent handler using AbstractCore providers.
 
-    In a full implementation, this would create an actual agent instance.
+    Uses the configured provider (lmstudio, ollama, openai, anthropic, etc.)
+    and model to make actual LLM calls.
     """
+    agent_config = data.get("agentConfig", {})
+    provider = agent_config.get("provider", "").lower()
+    model = agent_config.get("model", "")
+
+    # Validate configuration
+    if not provider or not model:
+        logger.warning(f"Agent node missing provider or model configuration: {agent_config}")
+        return _create_agent_fallback(data, "Missing provider or model configuration")
+
+    def handler(input_data):
+        task = input_data.get("task") if isinstance(input_data, dict) else str(input_data)
+        context = input_data.get("context", {}) if isinstance(input_data, dict) else {}
+
+        try:
+            # Import AbstractCore's create_llm
+            from abstractcore import create_llm
+
+            # Create LLM instance with the configured provider and model
+            logger.info(f"Creating LLM: provider={provider}, model={model}")
+            llm = create_llm(provider, model=model)
+
+            # Build the prompt from task and context
+            prompt = task
+            if context:
+                context_str = "\n".join(f"{k}: {v}" for k, v in context.items())
+                prompt = f"Context:\n{context_str}\n\nTask: {task}"
+
+            # Generate response
+            logger.info(f"Generating response for task: {task[:100]}...")
+            response = llm.generate(prompt)
+
+            return {
+                "result": response.content,
+                "task": task,
+                "context": context,
+                "success": True,
+                "provider": provider,
+                "model": model,
+                "usage": response.usage if hasattr(response, 'usage') else None,
+            }
+
+        except ImportError as e:
+            logger.error(f"Failed to import AbstractCore: {e}")
+            return {
+                "result": f"Error: AbstractCore not available - {e}",
+                "task": task,
+                "context": context,
+                "success": False,
+                "error": str(e),
+            }
+        except Exception as e:
+            logger.error(f"Agent execution failed: {e}", exc_info=True)
+            return {
+                "result": f"Error: {e}",
+                "task": task,
+                "context": context,
+                "success": False,
+                "error": str(e),
+            }
+
+    return handler
+
+
+def _create_agent_fallback(data: Dict[str, Any], reason: str):
+    """Create a fallback handler when agent configuration is invalid."""
     provider = data.get("agentConfig", {}).get("provider", "unknown")
     model = data.get("agentConfig", {}).get("model", "unknown")
 
-    def placeholder(input_data):
+    def fallback(input_data):
         task = input_data.get("task") if isinstance(input_data, dict) else str(input_data)
         context = input_data.get("context", {}) if isinstance(input_data, dict) else {}
         return {
-            "result": f"[Agent ({provider}/{model}) would process: {task}]",
+            "result": f"Agent configuration error: {reason}",
             "task": task,
             "context": context,
-            "success": True,
-            "note": "This is a placeholder. Configure agent provider to enable real execution.",
+            "success": False,
+            "error": reason,
+            "note": f"Provider: {provider}, Model: {model}",
         }
 
-    return placeholder
+    return fallback
 
 
 def _create_subflow_placeholder(data: Dict[str, Any]):
