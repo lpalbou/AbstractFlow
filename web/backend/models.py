@@ -25,6 +25,7 @@ class NodeType(str, Enum):
     """Types of nodes in the visual editor."""
 
     # Event/Trigger nodes (entry points)
+    ON_FLOW_START = "on_flow_start"
     ON_USER_REQUEST = "on_user_request"
     ON_AGENT_MESSAGE = "on_agent_message"
     ON_SCHEDULE = "on_schedule"

@@ -1,21 +1,37 @@
 {
-  "id": "753d9513",
-  "name": "BUG",
+  "id": "4bcd0ab9",
+  "name": "simple-call",
   "description": "",
   "nodes": [
     {
-      "id": "node-2",
-      "type": "on_user_request",
+      "id": "node-1",
+      "type": "llm_call",
       "position": {
-        "x": 208.0,
-        "y": 208.0
+        "x": -48.0,
+        "y": 256.0
       },
       "data": {
-        "nodeType": "on_user_request",
-        "label": "On User Request",
-        "icon": "&#x1F4AC;",
-        "headerColor": "#C0392B",
-        "inputs": [],
+        "nodeType": "llm_call",
+        "label": "LLM Call",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          }
+        ],
         "outputs": [
           {
             "id": "exec-out",
@@ -23,16 +39,15 @@
             "type": "execution"
           },
           {
-            "id": "message",
-            "label": "message",
+            "id": "response",
+            "label": "response",
             "type": "string"
-          },
-          {
-            "id": "context",
-            "label": "context",
-            "type": "object"
           }
-        ]
+        ],
+        "effectConfig": {
+          "provider": "lmstudio",
+          "model": "zai-org/glm-4.6v-flash"
+        }
       },
       "label": null,
       "icon": null,
@@ -41,11 +56,11 @@
       "outputs": []
     },
     {
-      "id": "node-3",
+      "id": "node-2",
       "type": "ask_user",
       "position": {
-        "x": -48.0,
-        "y": 208.0
+        "x": -464.0,
+        "y": 256.0
       },
       "data": {
         "nodeType": "ask_user",
@@ -89,11 +104,11 @@
       "outputs": []
     },
     {
-      "id": "node-5",
+      "id": "node-3",
       "type": "literal_string",
       "position": {
-        "x": -304.0,
-        "y": 352.0
+        "x": -848.0,
+        "y": 432.0
       },
       "data": {
         "nodeType": "literal_string",
@@ -108,7 +123,7 @@
             "type": "string"
           }
         ],
-        "literalValue": "This is the prompt i can put in the ask user"
+        "literalValue": "type any question"
       },
       "label": null,
       "icon": null,
@@ -117,44 +132,23 @@
       "outputs": []
     },
     {
-      "id": "node-2",
-      "type": "llm_call",
+      "id": "node-4",
+      "type": "on_flow_start",
       "position": {
-        "x": 208.0,
-        "y": 208.0
+        "x": -928.0,
+        "y": 272.0
       },
       "data": {
-        "nodeType": "llm_call",
-        "label": "LLM Call",
-        "icon": "&#x1F4AD;",
-        "headerColor": "#3498DB",
-        "inputs": [
-          {
-            "id": "exec-in",
-            "label": "",
-            "type": "execution"
-          },
-          {
-            "id": "prompt",
-            "label": "prompt",
-            "type": "string"
-          },
-          {
-            "id": "system",
-            "label": "system",
-            "type": "string"
-          }
-        ],
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x25B6;",
+        "headerColor": "#C0392B",
+        "inputs": [],
         "outputs": [
           {
             "id": "exec-out",
             "label": "",
             "type": "execution"
-          },
-          {
-            "id": "response",
-            "label": "response",
-            "type": "string"
           }
         ]
       },
@@ -167,15 +161,39 @@
   ],
   "edges": [
     {
-      "id": "edge-1766203550022",
-      "source": "node-5",
+      "id": "edge-1766250165814",
+      "source": "node-4",
+      "sourceHandle": "exec-out",
+      "target": "node-2",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1766250168180",
+      "source": "node-3",
       "sourceHandle": "value",
-      "target": "node-3",
+      "target": "node-2",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "edge-1766250177055",
+      "source": "node-2",
+      "sourceHandle": "exec-out",
+      "target": "node-1",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1766250179380",
+      "source": "node-2",
+      "sourceHandle": "response",
+      "target": "node-1",
       "targetHandle": "prompt",
       "animated": false
     }
   ],
-  "entryNode": "node-2",
-  "created_at": "2025-12-20T04:06:56.769208",
-  "updated_at": "2025-12-20T17:01:36.354415"
+  "entryNode": "node-3",
+  "created_at": "2025-12-20T17:03:16.916638",
+  "updated_at": "2025-12-20T17:03:16.916638"
 }

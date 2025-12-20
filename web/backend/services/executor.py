@@ -406,7 +406,7 @@ def _create_handler(node_type: NodeType, data: Dict[str, Any]) -> Any:
             return lambda x: x
 
     # Event/Trigger nodes - entry points
-    if type_str in ("on_user_request", "on_agent_message", "on_schedule"):
+    if type_str in ("on_flow_start", "on_user_request", "on_agent_message", "on_schedule"):
         return _create_event_handler(type_str, data)
 
     # Control flow nodes
@@ -583,7 +583,12 @@ def _create_event_handler(event_type: str, data: Dict[str, Any]):
     """
 
     def handler(input_data):
-        if event_type == "on_user_request":
+        if event_type == "on_flow_start":
+            # No parameters; pass through initial vars for downstream nodes.
+            if isinstance(input_data, dict):
+                return dict(input_data)
+            return {"input": input_data}
+        elif event_type == "on_user_request":
             # Extract message and context from input
             message = input_data.get("message", "") if isinstance(input_data, dict) else str(input_data)
             context = input_data.get("context", {}) if isinstance(input_data, dict) else {}

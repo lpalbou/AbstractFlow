@@ -111,3 +111,70 @@ def test_visual_llm_call_executes_and_is_ledgered() -> None:
         for rec in ledger
     )
 
+
+@pytest.mark.integration
+def test_visual_llm_call_can_be_terminal_node() -> None:
+    """Regression: terminal effect nodes must be allowed (LLM_CALL at end)."""
+    provider = (os.getenv("ABSTRACTFLOW_TEST_LLM_PROVIDER") or "lmstudio").strip().lower()
+    model = (os.getenv("ABSTRACTFLOW_TEST_LLM_MODEL") or "zai-org/glm-4.6v-flash").strip()
+
+    if provider != "lmstudio":
+        pytest.skip("Only lmstudio provider is supported by this integration test for now")
+
+    base_url = _lmstudio_base_url()
+    try:
+        available = _lmstudio_models(base_url)
+    except Exception as e:
+        pytest.skip(f"LMStudio not reachable at {base_url} ({e})")
+
+    if model not in set(available):
+        pytest.skip(f"LMStudio model '{model}' not available (have: {available[:10]})")
+
+    flow_id = "test-visual-llm-call-terminal"
+    visual = VisualFlow(
+        id=flow_id,
+        name="test visual llm_call terminal",
+        entryNode="n1",
+        nodes=[
+            VisualNode(
+                id="n1",
+                type=NodeType.ON_USER_REQUEST,
+                position=Position(x=0, y=0),
+                data={},
+            ),
+            VisualNode(
+                id="prompt",
+                type=NodeType.LITERAL_STRING,
+                position=Position(x=0, y=0),
+                data={"literalValue": "Reply with a single word: pong"},
+            ),
+            VisualNode(
+                id="n2",
+                type=NodeType.LLM_CALL,
+                position=Position(x=0, y=0),
+                data={"effectConfig": {"provider": provider, "model": model, "temperature": 0.0}},
+            ),
+        ],
+        edges=[
+            VisualEdge(id="e1", source="n1", sourceHandle="exec-out", target="n2", targetHandle="exec-in"),
+            VisualEdge(id="d1", source="prompt", sourceHandle="value", target="n2", targetHandle="prompt"),
+        ],
+    )
+
+    runner = create_visual_runner(visual, flows={flow_id: visual})
+    result = runner.run({})
+    assert result.get("success") is True
+
+    payload = result.get("result")
+    assert isinstance(payload, dict)
+    content = payload.get("content")
+    assert isinstance(content, str)
+    assert content.strip()
+
+    ledger = runner.get_ledger()
+    assert any(
+        rec.get("status") == "completed"
+        and isinstance(rec.get("effect"), dict)
+        and rec["effect"].get("type") == "llm_call"
+        for rec in ledger
+    )

@@ -43,6 +43,7 @@ interface FlowState {
   updateNodeData: (nodeId: string, data: Partial<FlowNodeData>) => void;
   deleteNode: (nodeId: string) => void;
   deleteEdge: (edgeId: string) => void;
+  disconnectPin: (nodeId: string, handleId: string, isInput: boolean) => void;
   setSelectedNode: (node: Node<FlowNodeData> | null) => void;
   setSelectedEdge: (edge: Edge | null) => void;
   setExecutingNodeId: (nodeId: string | null) => void;
@@ -151,6 +152,28 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       edges: get().edges.filter((e) => e.id !== edgeId),
       selectedEdge:
         get().selectedEdge?.id === edgeId ? null : get().selectedEdge,
+    });
+  },
+
+  // Disconnect edges attached to a specific pin (handle)
+  disconnectPin: (nodeId, handleId, isInput) => {
+    const state = get();
+    const matches = (e: Edge) =>
+      isInput
+        ? e.target === nodeId && e.targetHandle === handleId
+        : e.source === nodeId && e.sourceHandle === handleId;
+
+    const removed = state.edges.filter(matches);
+    if (removed.length === 0) return;
+
+    const remaining = state.edges.filter((e) => !matches(e));
+    const selectedEdgeId = state.selectedEdge?.id || null;
+    const clearedSelectedEdge =
+      selectedEdgeId && removed.some((e) => e.id === selectedEdgeId) ? null : state.selectedEdge;
+
+    set({
+      edges: remaining,
+      selectedEdge: clearedSelectedEdge,
     });
   },
 

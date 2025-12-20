@@ -26,6 +26,17 @@ export interface NodeCategory {
 // Like UE4 Blueprint Event nodes (red title bar, white arrow on right)
 const EVENT_NODES: NodeTemplate[] = [
   {
+    type: 'on_flow_start',
+    icon: '&#x1F3C1;', // Checkered flag
+    label: 'On Flow Start',
+    headerColor: '#C0392B', // Red for events (like UE4)
+    inputs: [], // No inputs - this is the entry point
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+    ],
+    category: 'events',
+  },
+  {
     type: 'on_user_request',
     icon: '&#x1F4AC;', // Speech bubble
     label: 'On User Request',

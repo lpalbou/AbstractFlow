@@ -35,6 +35,7 @@ export interface Pin {
 // Node types
 export type NodeType =
   // Event/Trigger nodes (only exec OUT - entry points for flow)
+  | 'on_flow_start'      // Triggered when a flow starts running
   | 'on_user_request'    // Triggered by user input
   | 'on_agent_message'   // Triggered by inter-agent communication
   | 'on_schedule'        // Triggered by scheduled events

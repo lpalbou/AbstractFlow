@@ -6,7 +6,7 @@
  * - Empty shapes = not connected, Filled = connected
  */
 
-import { memo } from 'react';
+import { memo, type MouseEvent } from 'react';
 import { Handle, Position, NodeProps, useEdges } from 'reactflow';
 import { clsx } from 'clsx';
 import type { FlowNodeData } from '../../types/flow';
@@ -19,9 +19,11 @@ export const BaseNode = memo(function BaseNode({
   data,
   selected,
 }: NodeProps<FlowNodeData>) {
-  const { executingNodeId } = useFlowStore();
+  const { executingNodeId, disconnectPin } = useFlowStore();
   const isExecuting = executingNodeId === id;
   const edges = useEdges();
+
+  const isTriggerNode = data.nodeType.startsWith('on_');
 
   // Check if a pin is connected
   const isPinConnected = (pinId: string, isInput: boolean): boolean => {
@@ -31,8 +33,15 @@ export const BaseNode = memo(function BaseNode({
     return edges.some((e) => e.source === id && e.sourceHandle === pinId);
   };
 
+  const handlePinClick = (e: MouseEvent, pinId: string, isInput: boolean) => {
+    if (!isPinConnected(pinId, isInput)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    disconnectPin(id, pinId, isInput);
+  };
+
   // Separate execution pins from data pins
-  const inputExec = data.inputs.find((p) => p.type === 'execution');
+  const inputExec = isTriggerNode ? undefined : data.inputs.find((p) => p.type === 'execution');
   const outputExecs = data.outputs.filter((p) => p.type === 'execution');
   const inputData = data.inputs.filter((p) => p.type !== 'execution');
   const outputData = data.outputs.filter((p) => p.type !== 'execution');
@@ -58,10 +67,12 @@ export const BaseNode = memo(function BaseNode({
               position={Position.Left}
               id={inputExec.id}
               className="exec-handle"
+              onMouseDownCapture={(e) => handlePinClick(e, inputExec.id, true)}
             />
             <span
               className="exec-shape"
               style={{ color: PIN_COLORS.execution }}
+              onClick={(e) => handlePinClick(e, inputExec.id, true)}
             >
               <PinShape
                 type="execution"
@@ -84,6 +95,7 @@ export const BaseNode = memo(function BaseNode({
             <span
               className="exec-shape"
               style={{ color: PIN_COLORS.execution }}
+              onClick={(e) => handlePinClick(e, outputExecs[0].id, false)}
             >
               <PinShape
                 type="execution"
@@ -96,6 +108,7 @@ export const BaseNode = memo(function BaseNode({
               position={Position.Right}
               id={outputExecs[0].id}
               className="exec-handle"
+              onMouseDownCapture={(e) => handlePinClick(e, outputExecs[0].id, false)}
             />
           </div>
         )}
@@ -112,6 +125,7 @@ export const BaseNode = memo(function BaseNode({
                 <span
                   className="pin-shape"
                   style={{ color: PIN_COLORS.execution }}
+                  onClick={(e) => handlePinClick(e, pin.id, false)}
                 >
                   <PinShape
                     type="execution"
@@ -124,6 +138,7 @@ export const BaseNode = memo(function BaseNode({
                   position={Position.Right}
                   id={pin.id}
                   className="exec-handle"
+                  onMouseDownCapture={(e) => handlePinClick(e, pin.id, false)}
                 />
               </div>
             ))}
@@ -139,11 +154,13 @@ export const BaseNode = memo(function BaseNode({
                 position={Position.Left}
                 id={pin.id}
                 className={`pin ${pin.type}`}
+                onMouseDownCapture={(e) => handlePinClick(e, pin.id, true)}
               />
               <span
                 className="pin-shape"
                 style={{ color: PIN_COLORS[pin.type] }}
                 title={`Type: ${pin.type}`}
+                onClick={(e) => handlePinClick(e, pin.id, true)}
               >
                 <PinShape
                   type={pin.type}
@@ -165,6 +182,7 @@ export const BaseNode = memo(function BaseNode({
                 className="pin-shape"
                 style={{ color: PIN_COLORS[pin.type] }}
                 title={`Type: ${pin.type}`}
+                onClick={(e) => handlePinClick(e, pin.id, false)}
               >
                 <PinShape
                   type={pin.type}
@@ -177,6 +195,7 @@ export const BaseNode = memo(function BaseNode({
                 position={Position.Right}
                 id={pin.id}
                 className={`pin ${pin.type}`}
+                onMouseDownCapture={(e) => handlePinClick(e, pin.id, false)}
               />
             </div>
           ))}
