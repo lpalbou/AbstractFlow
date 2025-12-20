@@ -89,7 +89,8 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
           setExecutingNodeId(event.nodeId || null);
           break;
         case 'node_complete':
-          setExecutingNodeId(null);
+          // Keep the last executed node highlighted until the next node_start.
+          // This makes fast-running flows observable (Blueprint-style).
           break;
         case 'flow_waiting':
           // Flow is paused waiting for user input

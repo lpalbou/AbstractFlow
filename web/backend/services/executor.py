@@ -9,6 +9,7 @@ to executable AbstractFlow objects, with proper handling of:
 from __future__ import annotations
 
 import sys
+import importlib
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 import datetime
@@ -16,13 +17,42 @@ import logging
 
 # Add abstractflow to path for imports
 abstractflow_path = Path(__file__).parent.parent.parent.parent
-if str(abstractflow_path) not in sys.path:
-    sys.path.insert(0, str(abstractflow_path))
+abstractflow_path_str = str(abstractflow_path)
+while abstractflow_path_str in sys.path:
+    sys.path.remove(abstractflow_path_str)
+sys.path.insert(0, abstractflow_path_str)
 
 # Add abstractcore to path for LLM access
 abstractcore_path = Path(__file__).parent.parent.parent.parent.parent / "abstractcore"
-if str(abstractcore_path) not in sys.path:
-    sys.path.insert(0, str(abstractcore_path))
+abstractcore_path_str = str(abstractcore_path)
+while abstractcore_path_str in sys.path:
+    sys.path.remove(abstractcore_path_str)
+sys.path.insert(0, abstractcore_path_str)
+
+# Add abstractruntime to path for durable execution (avoid picking up a different checkout)
+abstractruntime_path = Path(__file__).parent.parent.parent.parent.parent / "abstractruntime" / "src"
+if abstractruntime_path.exists():
+    abstractruntime_path_str = str(abstractruntime_path)
+    while abstractruntime_path_str in sys.path:
+        sys.path.remove(abstractruntime_path_str)
+    sys.path.insert(0, abstractruntime_path_str)
+
+    # If another checkout of `abstractruntime` was already imported (common when a
+    # different repo is installed editable), purge it so imports resolve to this
+    # monorepo's runtime.
+    loaded = sys.modules.get("abstractruntime")
+    loaded_file = getattr(loaded, "__file__", None) if loaded is not None else None
+    try:
+        loaded_path = str(Path(str(loaded_file)).resolve()) if loaded_file else None
+    except Exception:
+        loaded_path = None
+
+    expected_prefix = str(abstractruntime_path.resolve())
+    if loaded_path and not loaded_path.startswith(expected_prefix):
+        for name in list(sys.modules.keys()):
+            if name == "abstractruntime" or name.startswith("abstractruntime."):
+                sys.modules.pop(name, None)
+        importlib.invalidate_caches()
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +65,120 @@ from .code_executor import create_code_handler
 # Type alias for data edge mapping
 # Maps target_node_id -> { target_pin -> (source_node_id, source_pin) }
 DataEdgeMap = Dict[str, Dict[str, tuple]]
+
+
+def create_visual_runner(visual_flow: VisualFlow, *, flows: Dict[str, VisualFlow]) -> FlowRunner:
+    """Create a FlowRunner for a visual run with a correctly wired runtime.
+
+    Responsibilities:
+    - Build a WorkflowRegistry containing the root flow and any referenced subflows.
+    - Create a runtime with an ArtifactStore (required for MEMORY_* effects).
+    - If any LLM_CALL nodes exist in the flow tree, wire AbstractCore-backed
+      effect handlers and validate provider/model consistency.
+    """
+    # Be resilient to different AbstractRuntime install layouts: not all exports
+    # are guaranteed to be re-exported from `abstractruntime.__init__`.
+    try:
+        from abstractruntime import Runtime  # type: ignore
+    except Exception:  # pragma: no cover
+        from abstractruntime.core.runtime import Runtime  # type: ignore
+
+    try:
+        from abstractruntime import InMemoryRunStore, InMemoryLedgerStore  # type: ignore
+    except Exception:  # pragma: no cover
+        from abstractruntime.storage.in_memory import InMemoryRunStore, InMemoryLedgerStore  # type: ignore
+
+    try:
+        from abstractruntime import WorkflowRegistry  # type: ignore
+    except Exception:  # pragma: no cover
+        from abstractruntime.scheduler.registry import WorkflowRegistry  # type: ignore
+
+    try:
+        from abstractruntime import InMemoryArtifactStore  # type: ignore
+    except Exception:  # pragma: no cover
+        from abstractruntime.storage.artifacts import InMemoryArtifactStore  # type: ignore
+    from abstractruntime.integrations.abstractcore.factory import create_local_runtime
+    from abstractflow import compile_flow
+
+    def _node_type(node: Any) -> str:
+        t = getattr(node, "type", None)
+        return t.value if hasattr(t, "value") else str(t)
+
+    # Collect all reachable flows (root + transitive subflows), with cycle detection.
+    ordered: list[VisualFlow] = []
+    visited: set[str] = set()
+    visiting: set[str] = set()
+
+    def _dfs(vf: VisualFlow) -> None:
+        if vf.id in visited:
+            return
+        if vf.id in visiting:
+            raise ValueError(f"Subflow cycle detected at '{vf.id}'")
+
+        visiting.add(vf.id)
+        ordered.append(vf)
+        visited.add(vf.id)
+
+        for n in vf.nodes:
+            if _node_type(n) != "subflow":
+                continue
+            subflow_id = n.data.get("subflowId") or n.data.get("flowId")  # legacy
+            if not isinstance(subflow_id, str) or not subflow_id.strip():
+                raise ValueError(f"Subflow node '{n.id}' missing subflowId")
+            subflow_id = subflow_id.strip()
+            child = flows.get(subflow_id)
+            if child is None:
+                raise ValueError(f"Referenced subflow '{subflow_id}' not found")
+            _dfs(child)
+
+        visiting.remove(vf.id)
+
+    _dfs(visual_flow)
+
+    # Validate LLM_CALL config consistency across the flow tree.
+    llm_configs: set[tuple[str, str]] = set()
+    for vf in ordered:
+        for n in vf.nodes:
+            if _node_type(n) != "llm_call":
+                continue
+            cfg = n.data.get("effectConfig", {})
+            provider = cfg.get("provider")
+            model = cfg.get("model")
+            if not isinstance(provider, str) or not provider.strip():
+                raise ValueError(f"LLM_CALL node '{n.id}' in flow '{vf.id}' missing provider")
+            if not isinstance(model, str) or not model.strip():
+                raise ValueError(f"LLM_CALL node '{n.id}' in flow '{vf.id}' missing model")
+            llm_configs.add((provider.strip().lower(), model.strip()))
+
+    if len(llm_configs) > 1:
+        rendered = ", ".join(f"{p}/{m}" for (p, m) in sorted(llm_configs))
+        raise ValueError(f"All LLM_CALL nodes must share the same provider/model (found: {rendered})")
+
+    # Create a runtime:
+    # - Always include an ArtifactStore for MEMORY_* effects
+    # - Add AbstractCore LLM handlers only when needed.
+    if llm_configs:
+        provider, model = next(iter(llm_configs))
+        runtime = create_local_runtime(provider=provider, model=model)
+    else:
+        runtime = Runtime(
+            run_store=InMemoryRunStore(),
+            ledger_store=InMemoryLedgerStore(),
+            artifact_store=InMemoryArtifactStore(),
+        )
+
+    flow = visual_to_flow(visual_flow)
+    runner = FlowRunner(flow, runtime=runtime)
+
+    registry = WorkflowRegistry()
+    registry.register(runner.workflow)
+    for vf in ordered[1:]:
+        child_flow = visual_to_flow(vf)
+        child_spec = compile_flow(child_flow)
+        registry.register(child_spec)
+    runtime.set_workflow_registry(registry)
+
+    return runner
 
 
 def _build_data_edge_map(edges: List[VisualEdge]) -> DataEdgeMap:
@@ -104,7 +248,8 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
         "get", "set", "merge", "array_map", "array_filter",
     }
 
-    # Effect node types that need special handling by the compiler
+    # Effect node types that need special handling by the compiler.
+    # Note: `subflow` is compiled as `start_subworkflow` (see below).
     EFFECT_NODE_TYPES = {"ask_user", "llm_call", "wait_until", "wait_event", "memory_note", "memory_query"}
 
     # Pre-evaluate literal nodes and store their values
@@ -145,6 +290,10 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
         if type_str in EFFECT_NODE_TYPES:
             effect_type = type_str
             effect_config = node.data.get("effectConfig", {})
+        elif type_str == "subflow":
+            effect_type = "start_subworkflow"
+            subflow_id = node.data.get("subflowId") or node.data.get("flowId")  # legacy
+            effect_config = {"workflow_id": subflow_id}
 
         flow.add_node(
             node_id=node.id,
@@ -244,7 +393,7 @@ def _create_handler(node_type: NodeType, data: Dict[str, Any]) -> Any:
 
     if type_str == "subflow":
         # Subflow node - would need the nested flow to be compiled
-        return _create_subflow_placeholder(data)
+        return _create_subflow_effect_builder(data)
 
     if type_str == "function":
         # Generic function - check for inline code or expression
@@ -388,17 +537,42 @@ def _create_agent_fallback(data: Dict[str, Any], reason: str):
     return fallback
 
 
-def _create_subflow_placeholder(data: Dict[str, Any]):
-    """Create a placeholder for subflow nodes."""
+def _create_subflow_effect_builder(data: Dict[str, Any]):
+    """Create an effect-builder handler for subflow nodes.
 
-    def placeholder(input_data):
-        flow_id = data.get("flowId", "unknown")
+    The visual compiler detects `_pending_effect` and turns it into a durable
+    START_SUBWORKFLOW effect executed by AbstractRuntime.
+    """
+
+    def handler(input_data):
+        subflow_id = (
+            data.get("subflowId")
+            or data.get("flowId")  # legacy
+            or data.get("workflowId")
+            or data.get("workflow_id")
+        )
+
+        # Subflow vars come from the `input` pin by convention.
+        if isinstance(input_data, dict):
+            sub_vars = input_data.get("input")
+            if isinstance(sub_vars, dict):
+                sub_vars_dict: Dict[str, Any] = dict(sub_vars)
+            else:
+                sub_vars_dict = {"input": sub_vars}
+        else:
+            sub_vars_dict = {"input": input_data}
+
         return {
-            "result": f"[Subflow '{flow_id}' would execute here]",
-            "success": True,
+            "output": None,
+            "_pending_effect": {
+                "type": "start_subworkflow",
+                "workflow_id": subflow_id,
+                "vars": sub_vars_dict,
+                "async": False,
+            },
         }
 
-    return placeholder
+    return handler
 
 
 def _create_event_handler(event_type: str, data: Dict[str, Any]):
@@ -494,8 +668,7 @@ def _create_loop_handler(data: Dict[str, Any]):
     return handler
 
 
-# Effect handlers - these return results directly for now
-# Full AbstractRuntime integration is handled in the FlowRunner
+# Effect handlers - visual compiler turns `_pending_effect` into durable effects.
 def _create_effect_handler(effect_type: str, data: Dict[str, Any]):
     """Create handlers for effect nodes.
 
@@ -530,28 +703,30 @@ def _create_ask_user_handler(data: Dict[str, Any], config: Dict[str, Any]):
     def handler(input_data):
         prompt = input_data.get("prompt", "Please respond:") if isinstance(input_data, dict) else str(input_data)
         choices = input_data.get("choices", []) if isinstance(input_data, dict) else []
+        allow_free_text = config.get("allowFreeText", True)
 
         # Return placeholder - real implementation needs pause/resume
         return {
             "response": f"[User prompt: {prompt}]",
             "prompt": prompt,
             "choices": choices,
-            "allow_free_text": config.get("allowFreeText", True),
+            "allow_free_text": allow_free_text,
             "_pending_effect": {
                 "type": "ask_user",
                 "prompt": prompt,
                 "choices": choices,
+                "allow_free_text": allow_free_text,
             },
         }
     return handler
 
 
 def _create_llm_call_handler(data: Dict[str, Any], config: Dict[str, Any]):
-    """Create LLM_CALL effect handler.
+    """Create LLM_CALL effect builder (no direct execution).
 
-    Uses AbstractCore to make LLM calls.
+    The actual LLM call is executed by AbstractRuntime's LLM_CALL handler.
     """
-    provider = config.get("provider", "").lower()
+    provider = config.get("provider", "")
     model = config.get("model", "")
     temperature = config.get("temperature", 0.7)
 
@@ -560,55 +735,36 @@ def _create_llm_call_handler(data: Dict[str, Any], config: Dict[str, Any]):
         system = input_data.get("system", "") if isinstance(input_data, dict) else ""
 
         if not provider or not model:
+            # Validation is performed before execution, but keep a safe fallback.
             return {
-                "response": "[LLM Call: No provider/model configured]",
+                "response": "[LLM Call: missing provider/model]",
+                "_pending_effect": {
+                    "type": "llm_call",
+                    "prompt": prompt,
+                    "system_prompt": system,
+                    "params": {"temperature": temperature},
+                },
                 "error": "Missing provider or model configuration",
             }
 
-        try:
-            from abstractcore import create_llm
-
-            logger.info(f"LLM Call: provider={provider}, model={model}")
-            llm = create_llm(provider, model=model)
-
-            # Build messages or use simple prompt
-            full_prompt = prompt
-            if system:
-                full_prompt = f"System: {system}\n\n{prompt}"
-
-            response = llm.generate(full_prompt)
-
-            return {
-                "response": response.content,
+        return {
+            "response": None,
+            "_pending_effect": {
+                "type": "llm_call",
                 "prompt": prompt,
-                "system": system,
+                "system_prompt": system,
+                "params": {"temperature": temperature},
                 "provider": provider,
                 "model": model,
-            }
-
-        except ImportError as e:
-            logger.error(f"Failed to import AbstractCore: {e}")
-            return {
-                "response": f"[Error: AbstractCore not available - {e}]",
-                "error": str(e),
-            }
-        except Exception as e:
-            logger.error(f"LLM Call failed: {e}", exc_info=True)
-            return {
-                "response": f"[Error: {e}]",
-                "error": str(e),
-            }
+            },
+        }
 
     return handler
 
 
 def _create_wait_until_handler(data: Dict[str, Any], config: Dict[str, Any]):
-    """Create WAIT_UNTIL effect handler.
-
-    For simple delays, can use time.sleep.
-    Full durable implementation requires AbstractRuntime.
-    """
-    import time
+    """Create WAIT_UNTIL effect builder (no direct sleeping)."""
+    from datetime import datetime, timedelta, timezone
 
     duration_type = config.get("durationType", "seconds")
 
@@ -620,38 +776,28 @@ def _create_wait_until_handler(data: Dict[str, Any], config: Dict[str, Any]):
         except (TypeError, ValueError):
             amount = 0
 
-        # Convert to seconds
-        if duration_type == "minutes":
-            seconds = amount * 60
+        now = datetime.now(timezone.utc)
+        if duration_type == "timestamp":
+            until = str(duration or "")
+        elif duration_type == "minutes":
+            until = (now + timedelta(minutes=amount)).isoformat()
         elif duration_type == "hours":
-            seconds = amount * 3600
-        elif duration_type == "timestamp":
-            # For timestamps, calculate delta from now
-            # For now, just return immediately
-            return {"waited": True, "duration_type": "timestamp"}
+            until = (now + timedelta(hours=amount)).isoformat()
         else:
-            seconds = amount
-
-        # For short delays (< 10 seconds), actually wait
-        # For longer delays, return a pending effect marker
-        if seconds > 0 and seconds <= 10:
-            time.sleep(seconds)
+            until = (now + timedelta(seconds=amount)).isoformat()
 
         return {
-            "waited": True,
-            "duration": duration,
-            "duration_type": duration_type,
-            "seconds": seconds,
+            "_pending_effect": {
+                "type": "wait_until",
+                "until": until,
+            }
         }
 
     return handler
 
 
 def _create_wait_event_handler(data: Dict[str, Any], config: Dict[str, Any]):
-    """Create WAIT_EVENT effect handler.
-
-    Returns a placeholder - full implementation requires AbstractRuntime.
-    """
+    """Create WAIT_EVENT effect builder."""
     def handler(input_data):
         event_key = input_data.get("event_key", "default") if isinstance(input_data, dict) else str(input_data)
 
@@ -660,7 +806,7 @@ def _create_wait_event_handler(data: Dict[str, Any], config: Dict[str, Any]):
             "event_key": event_key,
             "_pending_effect": {
                 "type": "wait_event",
-                "event_key": event_key,
+                "wait_key": event_key,
             },
         }
 
@@ -668,41 +814,39 @@ def _create_wait_event_handler(data: Dict[str, Any], config: Dict[str, Any]):
 
 
 def _create_memory_note_handler(data: Dict[str, Any], config: Dict[str, Any]):
-    """Create MEMORY_NOTE effect handler.
-
-    Returns a placeholder - full implementation requires AbstractRuntime with memory store.
-    """
+    """Create MEMORY_NOTE effect builder (no direct storage)."""
     def handler(input_data):
         content = input_data.get("content", "") if isinstance(input_data, dict) else str(input_data)
 
-        # Placeholder - would use AbstractRuntime memory effect
-        import uuid
-        note_id = f"note-{str(uuid.uuid4())[:8]}"
-
         return {
-            "note_id": note_id,
-            "content": content,
-            "stored": True,
+            "note_id": None,
+            "_pending_effect": {
+                "type": "memory_note",
+                "note": content,
+                "tags": {},
+            },
         }
 
     return handler
 
 
 def _create_memory_query_handler(data: Dict[str, Any], config: Dict[str, Any]):
-    """Create MEMORY_QUERY effect handler.
-
-    Returns a placeholder - full implementation requires AbstractRuntime with memory store.
-    """
+    """Create MEMORY_QUERY effect builder (no direct storage)."""
     def handler(input_data):
         query = input_data.get("query", "") if isinstance(input_data, dict) else str(input_data)
         limit = input_data.get("limit", 10) if isinstance(input_data, dict) else 10
+        try:
+            limit_int = int(limit) if limit is not None else 10
+        except Exception:
+            limit_int = 10
 
-        # Placeholder - would use AbstractRuntime memory effect
         return {
             "results": [],
-            "query": query,
-            "limit": limit,
-            "note": "Memory query requires AbstractRuntime integration",
+            "_pending_effect": {
+                "type": "memory_query",
+                "query": query,
+                "limit_spans": limit_int,
+            },
         }
 
     return handler
@@ -724,8 +868,71 @@ def execute_flow(flow: Flow, input_data: Dict[str, Any]) -> Dict[str, Any]:
 
     runner = FlowRunner(flow)
     result = runner.run(input_data)
+
+    # If the flow is waiting (e.g. ASK_USER), return explicit waiting info.
+    if isinstance(result, dict) and result.get("waiting"):
+        state = runner.get_state()
+        wait = state.waiting if state else None
+        return {
+            "success": False,
+            "waiting": True,
+            "error": "Flow is waiting for input. Use WebSocket (/api/ws/{flow_id}) to resume.",
+            "run_id": runner.run_id,
+            "wait_key": wait.wait_key if wait else None,
+            "prompt": wait.prompt if wait else None,
+            "choices": list(wait.choices) if wait and isinstance(wait.choices, list) else [],
+            "allow_free_text": bool(wait.allow_free_text) if wait else None,
+        }
+
+    # Completed (or completed with an error payload).
+    if isinstance(result, dict):
+        return {
+            "success": bool(result.get("success", True)),
+            "waiting": False,
+            "result": result.get("result"),
+            "error": result.get("error"),
+            "run_id": runner.run_id,
+        }
+
     return {
-        "result": result.get("result") if isinstance(result, dict) else result,
-        "success": result.get("success", True) if isinstance(result, dict) else True,
+        "success": True,
+        "waiting": False,
+        "result": result,
+        "run_id": runner.run_id,
+    }
+
+
+def execute_visual_flow(visual_flow: VisualFlow, input_data: Dict[str, Any], *, flows: Dict[str, VisualFlow]) -> Dict[str, Any]:
+    """Execute a visual flow with a correctly wired runtime (LLM/MEMORY/SUBFLOW)."""
+    runner = create_visual_runner(visual_flow, flows=flows)
+    result = runner.run(input_data)
+
+    if isinstance(result, dict) and result.get("waiting"):
+        state = runner.get_state()
+        wait = state.waiting if state else None
+        return {
+            "success": False,
+            "waiting": True,
+            "error": "Flow is waiting for input. Use WebSocket (/api/ws/{flow_id}) to resume.",
+            "run_id": runner.run_id,
+            "wait_key": wait.wait_key if wait else None,
+            "prompt": wait.prompt if wait else None,
+            "choices": list(wait.choices) if wait and isinstance(wait.choices, list) else [],
+            "allow_free_text": bool(wait.allow_free_text) if wait else None,
+        }
+
+    if isinstance(result, dict):
+        return {
+            "success": bool(result.get("success", True)),
+            "waiting": False,
+            "result": result.get("result"),
+            "error": result.get("error"),
+            "run_id": runner.run_id,
+        }
+
+    return {
+        "success": True,
+        "waiting": False,
+        "result": result,
         "run_id": runner.run_id,
     }

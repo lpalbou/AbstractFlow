@@ -363,3 +363,61 @@ def create_llm_call_handler(
         )
 
     return handler
+
+
+def create_start_subworkflow_handler(
+    node_id: str,
+    next_node: Optional[str],
+    input_key: Optional[str] = None,
+    output_key: Optional[str] = None,
+    workflow_id: Optional[str] = None,
+) -> Callable:
+    """Create a node handler that starts a subworkflow by workflow id.
+
+    This is the effect-level equivalent of `create_subflow_node_handler`, but it
+    defers lookup/execution to the runtime's workflow registry.
+    """
+    from abstractruntime.core.models import StepPlan, Effect, EffectType
+
+    def handler(run: "RunState", ctx: Any) -> "StepPlan":
+        if not workflow_id:
+            return StepPlan(
+                node_id=node_id,
+                complete_output={
+                    "success": False,
+                    "error": "start_subworkflow requires workflow_id (node config missing)",
+                },
+            )
+
+        if input_key:
+            input_data = run.vars.get(input_key, {})
+        else:
+            input_data = run.vars
+
+        sub_vars: Dict[str, Any] = {}
+        if isinstance(input_data, dict):
+            # Prefer explicit "vars" field, else pass through common "input" field.
+            if isinstance(input_data.get("vars"), dict):
+                sub_vars = dict(input_data["vars"])
+            elif isinstance(input_data.get("input"), dict):
+                sub_vars = dict(input_data["input"])
+            else:
+                sub_vars = dict(input_data)
+        else:
+            sub_vars = {"input": input_data}
+
+        return StepPlan(
+            node_id=node_id,
+            effect=Effect(
+                type=EffectType.START_SUBWORKFLOW,
+                payload={
+                    "workflow_id": workflow_id,
+                    "vars": sub_vars,
+                    "async": False,
+                },
+                result_key=output_key or f"_temp.effects.{node_id}",
+            ),
+            next_node=next_node,
+        )
+
+    return handler

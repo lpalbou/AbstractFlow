@@ -241,7 +241,7 @@ npm install
 npm run dev
 ```
 
-Then open http://localhost:5173 in your browser.
+Then open http://localhost:3000 in your browser.
 
 **Production mode** (serve frontend from backend):
 ```bash
@@ -348,6 +348,5 @@ For early access, partnerships, or questions about AbstractFlow:
 
 **AbstractFlow** - Visualize, Create, Execute. The future of AI workflow development is here.
 
-> Built with ❤️ on top of [AbstractCore](https://github.com/lpalbou/AbstractCore)
-
+> Built on top of [AbstractCore](https://github.com/lpalbou/AbstractCore)
 

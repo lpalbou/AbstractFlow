@@ -12,13 +12,17 @@ interface PropertiesPanelProps {
 }
 
 export function PropertiesPanel({ node }: PropertiesPanelProps) {
-  const { updateNodeData, deleteNode } = useFlowStore();
+  const { updateNodeData, deleteNode, flowId } = useFlowStore();
 
   // Provider/model state for agent nodes
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [models, setModels] = useState<string[]>([]);
   const [loadingProviders, setLoadingProviders] = useState(false);
   const [loadingModels, setLoadingModels] = useState(false);
+
+  // Saved flows list (for subflow nodes)
+  const [savedFlows, setSavedFlows] = useState<Array<{ id: string; name: string }>>([]);
+  const [loadingFlows, setLoadingFlows] = useState(false);
 
   // Track last fetched provider to prevent duplicate fetches
   const lastFetchedProvider = useRef<string | null>(null);
@@ -55,6 +59,30 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       setModels([]);
     }
   }, [selectedProvider]);
+
+  // Fetch saved flows when editing a subflow node
+  useEffect(() => {
+    if (!node || node.data.nodeType !== 'subflow') return;
+    setLoadingFlows(true);
+    fetch('/api/flows')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setSavedFlows(
+            data
+              .filter((f) => f && typeof f.id === 'string' && typeof f.name === 'string')
+              .map((f) => ({ id: f.id, name: f.name }))
+          );
+        } else {
+          setSavedFlows([]);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to fetch flows:', err);
+        setSavedFlows([]);
+      })
+      .finally(() => setLoadingFlows(false));
+  }, [node]);
 
   const handleProviderChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -117,6 +145,14 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       deleteNode(node.id);
     }
   }, [node, deleteNode]);
+
+  const handleSubflowChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      if (!node) return;
+      updateNodeData(node.id, { subflowId: e.target.value || undefined });
+    },
+    [node, updateNodeData]
+  );
 
 
   if (!node) {
@@ -282,6 +318,36 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           <span className="property-hint">
             Name of the function to call in your code
           </span>
+        </div>
+      )}
+
+      {/* Subflow-specific properties */}
+      {data.nodeType === 'subflow' && (
+        <div className="property-section">
+          <label className="property-label">Subflow Configuration</label>
+          <div className="property-group">
+            <label className="property-sublabel">Saved Flow</label>
+            <select
+              className="property-select"
+              value={data.subflowId || ''}
+              onChange={handleSubflowChange}
+              disabled={loadingFlows}
+            >
+              <option value="">
+                {loadingFlows ? 'Loading...' : 'Select flow...'}
+              </option>
+              {savedFlows
+                .filter((f) => !flowId || f.id !== flowId)
+                .map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name} ({f.id})
+                  </option>
+                ))}
+            </select>
+            <span className="property-hint">
+              Select an existing saved flow to execute as a subworkflow
+            </span>
+          </div>
         </div>
       )}
 

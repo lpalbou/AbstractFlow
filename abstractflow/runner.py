@@ -50,7 +50,11 @@ class FlowRunner:
 
     def _create_default_runtime(self) -> "Runtime":
         """Create a default in-memory runtime."""
-        from abstractruntime import Runtime, InMemoryRunStore, InMemoryLedgerStore
+        try:
+            from abstractruntime import Runtime, InMemoryRunStore, InMemoryLedgerStore  # type: ignore
+        except Exception:  # pragma: no cover
+            from abstractruntime.core.runtime import Runtime  # type: ignore
+            from abstractruntime.storage.in_memory import InMemoryLedgerStore, InMemoryRunStore  # type: ignore
 
         return Runtime(
             run_store=InMemoryRunStore(),
@@ -143,6 +147,8 @@ class FlowRunner:
         self,
         wait_key: Optional[str] = None,
         payload: Optional[Dict[str, Any]] = None,
+        *,
+        max_steps: int = 100,
     ) -> "RunState":
         """Resume a waiting flow.
 
@@ -161,6 +167,7 @@ class FlowRunner:
             run_id=self._current_run_id,
             wait_key=wait_key,
             payload=payload or {},
+            max_steps=max_steps,
         )
 
     def get_state(self) -> Optional["RunState"]:

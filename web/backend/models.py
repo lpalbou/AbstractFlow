@@ -168,6 +168,11 @@ class FlowRunResult(BaseModel):
     result: Optional[Any] = None
     error: Optional[str] = None
     run_id: Optional[str] = None
+    waiting: bool = False
+    wait_key: Optional[str] = None
+    prompt: Optional[str] = None
+    choices: Optional[List[str]] = None
+    allow_free_text: Optional[bool] = None
 
 
 class ExecutionEvent(BaseModel):

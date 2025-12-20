@@ -7,7 +7,7 @@
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useFlowStore } from '../hooks/useFlow';
-import type { Pin, FlowRunResult } from '../types/flow';
+import type { ExecutionEvent, Pin, FlowRunResult } from '../types/flow';
 
 interface RunFlowModalProps {
   isOpen: boolean;
@@ -15,6 +15,7 @@ interface RunFlowModalProps {
   onRun: (inputData: Record<string, unknown>) => void;
   isRunning: boolean;
   result: FlowRunResult | null;
+  events?: ExecutionEvent[];
 }
 
 // Map pin types to input field types
@@ -48,7 +49,14 @@ function getPlaceholderForPin(pin: Pin): string {
   }
 }
 
-export function RunFlowModal({ isOpen, onClose, onRun, isRunning, result }: RunFlowModalProps) {
+export function RunFlowModal({
+  isOpen,
+  onClose,
+  onRun,
+  isRunning,
+  result,
+  events = [],
+}: RunFlowModalProps) {
   const { nodes, flowName } = useFlowStore();
 
   // Find the entry node (node with no incoming execution edges, typically event nodes)
@@ -149,6 +157,48 @@ export function RunFlowModal({ isOpen, onClose, onRun, isRunning, result }: RunF
                   {JSON.stringify(result.result, null, 2)}
                 </pre>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Execution timeline */}
+        {events.length > 0 && (
+          <div className="run-execution">
+            <h4 className="run-execution-title">Execution</h4>
+            <div className="run-execution-events">
+              {events.map((ev, idx) => {
+                const label =
+                  ev.type === 'node_start'
+                    ? `node_start · ${ev.nodeId || ''}`
+                    : ev.type === 'node_complete'
+                      ? `node_complete · ${ev.nodeId || ''}`
+                      : ev.type === 'flow_waiting'
+                        ? `flow_waiting · ${ev.nodeId || ''}`
+                        : ev.type === 'flow_error'
+                          ? 'flow_error'
+                          : ev.type;
+
+                const hasResult = ev.type === 'node_complete' && ev.result != null;
+
+                return (
+                  <div key={`${idx}-${ev.type}-${ev.nodeId || ''}`} className="run-execution-event">
+                    <div className="run-execution-event-header">
+                      <span className="run-execution-event-type">{label}</span>
+                      {ev.type === 'flow_error' && ev.error && (
+                        <span className="run-execution-event-error">{ev.error}</span>
+                      )}
+                    </div>
+                    {hasResult && (
+                      <details className="run-execution-event-details">
+                        <summary>output</summary>
+                        <pre className="run-execution-event-output">
+                          {JSON.stringify(ev.result, null, 2)}
+                        </pre>
+                      </details>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

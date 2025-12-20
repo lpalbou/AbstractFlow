@@ -18,7 +18,7 @@ from ..models import (
     FlowRunRequest,
     FlowRunResult,
 )
-from ..services.executor import visual_to_flow, execute_flow
+from ..services.executor import execute_visual_flow, visual_to_flow
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/flows", tags=["flows"])
@@ -139,16 +139,18 @@ async def run_flow(flow_id: str, request: FlowRunRequest):
     visual_flow = _flows[flow_id]
 
     try:
-        # Convert visual flow to AbstractFlow
-        flow = visual_to_flow(visual_flow)
-
-        # Execute the flow
-        result = execute_flow(flow, request.input_data)
+        result = execute_visual_flow(visual_flow, request.input_data, flows=_flows)
 
         return FlowRunResult(
-            success=True,
+            success=bool(result.get("success", False)),
             result=result.get("result"),
+            error=result.get("error"),
             run_id=result.get("run_id"),
+            waiting=bool(result.get("waiting", False)),
+            wait_key=result.get("wait_key"),
+            prompt=result.get("prompt"),
+            choices=result.get("choices"),
+            allow_free_text=result.get("allow_free_text"),
         )
     except Exception as e:
         return FlowRunResult(

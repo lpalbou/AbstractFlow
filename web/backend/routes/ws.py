@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from ..models import ExecutionEvent, VisualFlow
-from ..services.executor import visual_to_flow
+from ..services.executor import create_visual_runner
 
 router = APIRouter(tags=["websocket"])
 
@@ -82,14 +82,7 @@ async def execute_with_updates(
     visual_flow = _flows[flow_id]
 
     try:
-        # Import here to avoid circular imports
-        from abstractflow import FlowRunner
-
-        # Convert visual flow to AbstractFlow
-        flow = visual_to_flow(visual_flow)
-
-        # Create runner
-        runner = FlowRunner(flow)
+        runner = create_visual_runner(visual_flow, flows=_flows)
 
         # Send flow start event
         await websocket.send_json(
@@ -119,61 +112,149 @@ async def _execute_runner_loop(
     connection_id: str,
 ) -> None:
     """Execute the runner loop with waiting support."""
-    last_node = None
+    def _preview(value: Any, *, depth: int = 0) -> Any:
+        """Best-effort JSON-safe preview (size-bounded)."""
+        if depth > 4:
+            return "…"
+        if value is None:
+            return None
+        if isinstance(value, (bool, int, float)):
+            return value
+        if isinstance(value, str):
+            if len(value) <= 2000:
+                return value
+            return value[:2000] + "…"
+        if isinstance(value, dict):
+            out: Dict[str, Any] = {}
+            for i, (k, v) in enumerate(value.items()):
+                if i >= 50:
+                    out["…"] = f"+{max(0, len(value) - 50)} more"
+                    break
+                out[str(k)] = _preview(v, depth=depth + 1)
+            return out
+        if isinstance(value, list):
+            items = value[:50]
+            out_list = [_preview(v, depth=depth + 1) for v in items]
+            if len(value) > 50:
+                out_list.append(f"… +{len(value) - 50} more")
+            return out_list
+        return str(value)
+
+    def _node_output(node_id: str) -> Any:
+        if hasattr(runner, "flow") and hasattr(runner.flow, "_node_outputs"):
+            outputs = getattr(runner.flow, "_node_outputs")
+            if isinstance(outputs, dict) and node_id in outputs:
+                return _preview(outputs.get(node_id))
+        # Fallback for non-visual flows
+        state = runner.get_state() if hasattr(runner, "get_state") else None
+        if state and hasattr(state, "vars") and isinstance(state.vars, dict):
+            return _preview(state.vars.get("_last_output"))
+        return None
+
+    def _extract_sub_run_id(wait: Any) -> Optional[str]:
+        details = getattr(wait, "details", None)
+        if isinstance(details, dict):
+            sub_run_id = details.get("sub_run_id")
+            if isinstance(sub_run_id, str) and sub_run_id:
+                return sub_run_id
+        wait_key = getattr(wait, "wait_key", None)
+        if isinstance(wait_key, str) and wait_key.startswith("subworkflow:"):
+            return wait_key.split("subworkflow:", 1)[1] or None
+        return None
+
+    def _resolve_waiting_info(state: Any) -> Tuple[str, list, bool, Optional[str], Optional[str]]:
+        """Return (prompt, choices, allow_free_text, wait_key, reason)."""
+        wait = getattr(state, "waiting", None)
+        if wait is None:
+            return ("Please respond:", [], True, None, None)
+
+        reason = getattr(wait, "reason", None)
+        reason_value = reason.value if hasattr(reason, "value") else str(reason) if reason else None
+
+        if reason_value != "subworkflow":
+            prompt = getattr(wait, "prompt", None) or "Please respond:"
+            choices = list(getattr(wait, "choices", []) or [])
+            allow_free_text = bool(getattr(wait, "allow_free_text", True))
+            wait_key = getattr(wait, "wait_key", None)
+            return (prompt, choices, allow_free_text, wait_key, reason_value)
+
+        # Bubble up the deepest waiting child so the UI can render ASK_USER prompts.
+        runtime = getattr(runner, "runtime", None)
+        if runtime is None:
+            return ("Waiting for subworkflow…", [], True, getattr(wait, "wait_key", None), reason_value)
+
+        sub_run_id = _extract_sub_run_id(wait)
+        if not sub_run_id:
+            return ("Waiting for subworkflow…", [], True, getattr(wait, "wait_key", None), reason_value)
+
+        current_run_id = sub_run_id
+        for _ in range(25):
+            sub_state = runtime.get_state(current_run_id)
+            sub_wait = getattr(sub_state, "waiting", None)
+            if sub_wait is None:
+                break
+            sub_reason = getattr(sub_wait, "reason", None)
+            sub_reason_value = (
+                sub_reason.value if hasattr(sub_reason, "value") else str(sub_reason) if sub_reason else None
+            )
+            if sub_reason_value == "subworkflow":
+                next_id = _extract_sub_run_id(sub_wait)
+                if not next_id:
+                    break
+                current_run_id = next_id
+                continue
+
+            prompt = getattr(sub_wait, "prompt", None) or "Please respond:"
+            choices = list(getattr(sub_wait, "choices", []) or [])
+            allow_free_text = bool(getattr(sub_wait, "allow_free_text", True))
+            wait_key = getattr(sub_wait, "wait_key", None)
+            return (prompt, choices, allow_free_text, wait_key, sub_reason_value)
+
+        return ("Waiting for subworkflow…", [], True, getattr(wait, "wait_key", None), reason_value)
 
     while True:
-        state = runner.step()
+        # Capture node BEFORE stepping so events refer to the node being executed.
+        before = runner.get_state()
+        node_before = before.current_node if before else None
 
-        # Send node complete for previous node
-        if last_node and state.current_node != last_node:
-            await websocket.send_json(
-                ExecutionEvent(
-                    type="node_complete",
-                    nodeId=last_node,
-                ).model_dump()
-            )
-
-        # Send node start for current node
-        if state.current_node and state.current_node != last_node:
+        if node_before:
             await websocket.send_json(
                 ExecutionEvent(
                     type="node_start",
-                    nodeId=state.current_node,
+                    nodeId=node_before,
                 ).model_dump()
             )
 
-        last_node = state.current_node
+        state = runner.step()
 
         # Check if waiting
         if runner.is_waiting():
             # Store the runner for resumption
             _waiting_runners[connection_id] = runner
 
-            # Extract waiting info from state
-            wait_info = {}
-            if state.waiting:
-                wait_info = {
-                    "wait_key": state.waiting.wait_key if hasattr(state.waiting, "wait_key") else None,
-                    "effect_type": state.waiting.effect_type.value if hasattr(state.waiting, "effect_type") else None,
+            prompt, choices, allow_free_text, wait_key, reason = _resolve_waiting_info(state)
+            await websocket.send_json(
+                {
+                    "type": "flow_waiting",
+                    "nodeId": node_before or state.current_node,
+                    "wait_key": wait_key,
+                    "reason": reason,
+                    "prompt": prompt,
+                    "choices": choices,
+                    "allow_free_text": allow_free_text,
                 }
-
-            # Try to get prompt info from the effect
-            prompt_info = {}
-            if hasattr(state, "pending_effect") and state.pending_effect:
-                payload = state.pending_effect.payload if hasattr(state.pending_effect, "payload") else {}
-                prompt_info = {
-                    "prompt": payload.get("prompt", "Please respond:"),
-                    "choices": payload.get("choices", []),
-                    "allow_free_text": payload.get("allow_free_text", True),
-                }
-
-            await websocket.send_json({
-                "type": "flow_waiting",
-                "nodeId": state.current_node,
-                **wait_info,
-                **prompt_info,
-            })
+            )
             break
+
+        # Completed step: emit node_complete for the node we just executed.
+        if node_before:
+            await websocket.send_json(
+                ExecutionEvent(
+                    type="node_complete",
+                    nodeId=node_before,
+                    result=_node_output(node_before),
+                ).model_dump()
+            )
 
         # Check if complete
         if runner.is_complete():
@@ -181,14 +262,6 @@ async def _execute_runner_loop(
             if connection_id in _waiting_runners:
                 del _waiting_runners[connection_id]
 
-            # Send node_complete for last node
-            if last_node:
-                await websocket.send_json(
-                    ExecutionEvent(
-                        type="node_complete",
-                        nodeId=last_node,
-                    ).model_dump()
-                )
             await websocket.send_json(
                 ExecutionEvent(
                     type="flow_complete",
@@ -203,17 +276,13 @@ async def _execute_runner_loop(
             if connection_id in _waiting_runners:
                 del _waiting_runners[connection_id]
 
-            # Send node_complete for last node
-            if last_node:
-                await websocket.send_json(
-                    ExecutionEvent(
-                        type="node_complete",
-                        nodeId=last_node,
-                    ).model_dump()
-                )
+            error_node = None
+            if hasattr(state, "vars") and isinstance(state.vars, dict):
+                error_node = state.vars.get("_flow_error_node")
             await websocket.send_json(
                 ExecutionEvent(
                     type="flow_error",
+                    nodeId=error_node,
                     error=state.error,
                 ).model_dump()
             )
@@ -241,10 +310,159 @@ async def resume_waiting_flow(
     runner = _waiting_runners[connection_id]
 
     try:
-        # Resume with the user's response
-        runner.resume(payload={"response": response})
+        state = runner.get_state()
+        wait = state.waiting if state else None
+        reason = wait.reason.value if wait and hasattr(wait, "reason") else None
 
-        # Continue execution
+        if reason != "subworkflow":
+            # Resume with the user's response
+            runner.resume(payload={"response": response}, max_steps=0)
+            await _execute_runner_loop(websocket, runner, connection_id)
+            return
+
+        runtime = getattr(runner, "runtime", None)
+        registry = getattr(runtime, "workflow_registry", None) if runtime else None
+        if runtime is None or registry is None:
+            await websocket.send_json(
+                ExecutionEvent(
+                    type="flow_error",
+                    error="Subworkflow resume requires runner runtime + workflow registry",
+                ).model_dump()
+            )
+            return
+
+        # Resume the deepest waiting child, then bubble completion back up to the parent.
+        from abstractruntime.core.models import RunStatus, WaitReason
+
+        def _spec_for(run_state: Any):
+            spec = registry.get(run_state.workflow_id)
+            if spec is None:
+                raise RuntimeError(f"Workflow '{run_state.workflow_id}' not found in registry")
+            return spec
+
+        def _extract_sub_run_id_from_wait(wait_state: Any) -> Optional[str]:
+            details = getattr(wait_state, "details", None)
+            if isinstance(details, dict):
+                sub_run_id = details.get("sub_run_id")
+                if isinstance(sub_run_id, str) and sub_run_id:
+                    return sub_run_id
+            wait_key = getattr(wait_state, "wait_key", None)
+            if isinstance(wait_key, str) and wait_key.startswith("subworkflow:"):
+                return wait_key.split("subworkflow:", 1)[1] or None
+            return None
+
+        top_run_id = runner.run_id
+        if not top_run_id:
+            raise RuntimeError("No active run_id for runner")
+
+        # Find deepest waiting run in subworkflow chain.
+        target_run_id = top_run_id
+        for _ in range(25):
+            current = runtime.get_state(target_run_id)
+            if current.status != RunStatus.WAITING or current.waiting is None:
+                break
+            if current.waiting.reason != WaitReason.SUBWORKFLOW:
+                break
+            next_id = _extract_sub_run_id_from_wait(current.waiting)
+            if not next_id:
+                break
+            target_run_id = next_id
+
+        target_state = runtime.get_state(target_run_id)
+        runtime.resume(
+            workflow=_spec_for(target_state),
+            run_id=target_run_id,
+            wait_key=None,
+            payload={"response": response},
+            max_steps=0,
+        )
+
+        # Drive child runs until they wait again or complete, bubbling completion up.
+        current_run_id = target_run_id
+        for _ in range(50):
+            current_state = runtime.get_state(current_run_id)
+            if current_state.status == RunStatus.RUNNING:
+                current_state = runtime.tick(workflow=_spec_for(current_state), run_id=current_run_id, max_steps=100)
+
+            if current_state.status == RunStatus.WAITING:
+                break
+
+            if current_state.status == RunStatus.FAILED:
+                raise RuntimeError(current_state.error or "Subworkflow failed")
+
+            if current_state.status != RunStatus.COMPLETED:
+                raise RuntimeError(f"Unexpected subworkflow status: {current_state.status.value}")
+
+            parent_id = current_state.parent_run_id
+            if not parent_id:
+                break
+
+            parent_state = runtime.get_state(parent_id)
+            if parent_state.status != RunStatus.WAITING or parent_state.waiting is None:
+                break
+            if parent_state.waiting.reason != WaitReason.SUBWORKFLOW:
+                break
+
+            runtime.resume(
+                workflow=_spec_for(parent_state),
+                run_id=parent_id,
+                wait_key=None,
+                payload={"sub_run_id": current_state.run_id, "output": current_state.output},
+                max_steps=0,
+            )
+
+            if parent_id == top_run_id:
+                break
+            current_run_id = parent_id
+
+        # Top-level may still be waiting (child asked again) or ready to run.
+        if runner.is_waiting():
+            top_state = runner.get_state()
+            top_wait = top_state.waiting if top_state else None
+
+            prompt = "Please respond:"
+            choices: list = []
+            allow_free_text = True
+            wait_key = top_wait.wait_key if top_wait else None
+            reason = top_wait.reason.value if top_wait and hasattr(top_wait, "reason") else None
+
+            if top_wait and top_wait.reason == WaitReason.SUBWORKFLOW:
+                sub_run_id = _extract_sub_run_id_from_wait(top_wait)
+                current_run_id = sub_run_id
+                for _ in range(25):
+                    if not current_run_id:
+                        break
+                    sub_state = runtime.get_state(current_run_id)
+                    sub_wait = sub_state.waiting
+                    if sub_wait is None:
+                        break
+                    if sub_wait.reason == WaitReason.SUBWORKFLOW:
+                        current_run_id = _extract_sub_run_id_from_wait(sub_wait)
+                        continue
+                    prompt = sub_wait.prompt or "Please respond:"
+                    choices = list(sub_wait.choices) if isinstance(sub_wait.choices, list) else []
+                    allow_free_text = bool(sub_wait.allow_free_text)
+                    wait_key = sub_wait.wait_key
+                    reason = sub_wait.reason.value
+                    break
+            elif top_wait is not None:
+                prompt = top_wait.prompt or "Please respond:"
+                choices = list(top_wait.choices) if isinstance(top_wait.choices, list) else []
+                allow_free_text = bool(top_wait.allow_free_text)
+
+            await websocket.send_json(
+                {
+                    "type": "flow_waiting",
+                    "nodeId": top_state.current_node if top_state else None,
+                    "wait_key": wait_key,
+                    "reason": reason,
+                    "prompt": prompt,
+                    "choices": choices,
+                    "allow_free_text": allow_free_text,
+                }
+            )
+            return
+
         await _execute_runner_loop(websocket, runner, connection_id)
 
     except Exception as e:

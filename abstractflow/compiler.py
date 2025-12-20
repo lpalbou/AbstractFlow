@@ -15,6 +15,7 @@ from .adapters.effect_adapter import (
     create_memory_note_handler,
     create_memory_query_handler,
     create_llm_call_handler,
+    create_start_subworkflow_handler,
 )
 
 if TYPE_CHECKING:
@@ -39,6 +40,8 @@ def _create_effect_node_handler(
     input_key: Optional[str],
     output_key: Optional[str],
     data_aware_handler: Optional[Callable] = None,
+    *,
+    flow: Optional[Flow] = None,
 ) -> Callable:
     """Create a node handler for effect nodes.
 
@@ -98,6 +101,14 @@ def _create_effect_node_handler(
             model=effect_config.get("model"),
             temperature=effect_config.get("temperature", 0.7),
         )
+    elif effect_type == "start_subworkflow":
+        base_handler = create_start_subworkflow_handler(
+            node_id=node_id,
+            next_node=next_node,
+            input_key=input_key,
+            output_key=output_key,
+            workflow_id=effect_config.get("workflow_id"),
+        )
     else:
         raise ValueError(f"Unknown effect type: {effect_type}")
 
@@ -108,6 +119,9 @@ def _create_effect_node_handler(
     # Wrap to resolve data edges before creating the effect
     def wrapped_effect_handler(run: Any, ctx: Any) -> "StepPlan":
         """Resolve data edges via executor handler, then create the proper Effect."""
+        if flow is not None and hasattr(flow, "_node_outputs") and hasattr(flow, "_data_edge_map"):
+            _sync_effect_results_to_node_outputs(run, flow)
+
         # Call the data-aware handler to resolve data edge inputs
         # This reads from flow._node_outputs which has literal values
         last_output = run.vars.get("_last_output", {})
@@ -132,7 +146,8 @@ def _create_effect_node_handler(
                         **pending,
                         "resume_to_node": next_node,
                     },
-                    result_key=output_key or f"_temp.{effect_type_str}_response",
+                    # Always store effect outcomes per-node; visual syncing can optionally copy to output_key.
+                    result_key=f"_temp.effects.{node_id}",
                 )
 
                 return StepPlan(
@@ -176,7 +191,7 @@ def _create_visual_function_handler(
         if input_key:
             input_data = run.vars.get(input_key)
         else:
-            input_data = run.vars.get("_last_output", {})
+            input_data = run.vars.get("_last_output") if "_last_output" in run.vars else run.vars
 
         # Execute function (which is the data-aware wrapped handler)
         try:
@@ -216,32 +231,101 @@ def _sync_effect_results_to_node_outputs(run: Any, flow: Flow) -> None:
     This function syncs those results so data edges resolve correctly.
     """
     node_outputs = flow._node_outputs
-    data_edge_map = flow._data_edge_map
-
-    # Check common effect result locations
     temp_data = run.vars.get("_temp", {})
     if not isinstance(temp_data, dict):
         return
 
-    # Map effect result keys to their node IDs
-    # We need to figure out which node produced each effect result
-    for target_node, edges in data_edge_map.items():
-        for target_pin, (source_node, source_pin) in edges.items():
-            # Check if source node is an effect node by looking for its result in _temp
-            # Effect nodes typically store results in _temp.<effect_type>_response
-            for effect_type in ["ask_user", "llm_call", "wait_until", "wait_event", "memory_note", "memory_query"]:
-                result_key = f"{effect_type}_response"
-                if result_key in temp_data:
-                    result = temp_data[result_key]
-                    # If the source node's output doesn't have this pin, update it
-                    if source_node in node_outputs:
-                        current = node_outputs[source_node]
-                        if isinstance(current, dict) and isinstance(result, dict):
-                            # Merge the effect result into node outputs
-                            # This allows data edges to pick up the new values
-                            for key, value in result.items():
-                                if key not in current or current.get(key) == f"[User prompt: {current.get('prompt', '')}]":
-                                    current[key] = value
+    effects = temp_data.get("effects")
+    if not isinstance(effects, dict):
+        effects = {}
+
+    def _get_span_id(raw: Any) -> Optional[str]:
+        if not isinstance(raw, dict):
+            return None
+        results = raw.get("results")
+        if not isinstance(results, list) or not results:
+            return None
+        first = results[0]
+        if not isinstance(first, dict):
+            return None
+        meta = first.get("meta")
+        if not isinstance(meta, dict):
+            return None
+        span_id = meta.get("span_id")
+        if isinstance(span_id, str) and span_id.strip():
+            return span_id.strip()
+        return None
+
+    for node_id, flow_node in flow.nodes.items():
+        effect_type = flow_node.effect_type
+        if not effect_type:
+            continue
+
+        raw = effects.get(node_id)
+        if raw is None:
+            # Backward-compat for older runs/tests that stored by effect type.
+            legacy_key = f"{effect_type}_response"
+            raw = temp_data.get(legacy_key)
+        if raw is None:
+            continue
+
+        current = node_outputs.get(node_id)
+        if not isinstance(current, dict):
+            current = {}
+            node_outputs[node_id] = current
+
+        mapped_value: Any = None
+
+        if effect_type == "ask_user":
+            if isinstance(raw, dict):
+                # raw is usually {"response": "..."} (resume payload)
+                current.update(raw)
+                mapped_value = raw.get("response")
+        elif effect_type == "llm_call":
+            if isinstance(raw, dict):
+                current["response"] = raw.get("content")
+                current["raw"] = raw
+                mapped_value = current["response"]
+        elif effect_type == "wait_event":
+            current["event_data"] = raw
+            mapped_value = raw
+        elif effect_type == "wait_until":
+            if isinstance(raw, dict):
+                current.update(raw)
+            else:
+                current["result"] = raw
+            mapped_value = raw
+        elif effect_type == "memory_note":
+            span_id = _get_span_id(raw)
+            current["note_id"] = span_id
+            current["raw"] = raw
+            mapped_value = span_id
+        elif effect_type == "memory_query":
+            if isinstance(raw, dict) and isinstance(raw.get("results"), list):
+                current["results"] = raw.get("results")
+            else:
+                current["results"] = []
+            current["raw"] = raw
+            mapped_value = current["results"]
+        elif effect_type == "start_subworkflow":
+            if isinstance(raw, dict):
+                current["sub_run_id"] = raw.get("sub_run_id")
+                out = raw.get("output")
+                if isinstance(out, dict) and "result" in out:
+                    current["output"] = out.get("result")
+                    current["child_output"] = out
+                else:
+                    current["output"] = out
+                    if isinstance(out, dict):
+                        current["child_output"] = out
+                mapped_value = current.get("output")
+            else:
+                current["output"] = raw
+                mapped_value = raw
+
+        # Optional: also write the mapped output to run.vars if configured.
+        if flow_node.output_key and mapped_value is not None:
+            _set_nested(run.vars, flow_node.output_key, mapped_value)
 
 
 def _set_nested(target: Dict[str, Any], dotted_key: str, value: Any) -> None:
@@ -318,9 +402,9 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
 
     for node_id, flow_node in flow.nodes.items():
         next_node = next_node_map.get(node_id)
-        handler_obj = flow_node.handler
-        effect_type = flow_node.effect_type
-        effect_config = flow_node.effect_config or {}
+        handler_obj = getattr(flow_node, "handler", None)
+        effect_type = getattr(flow_node, "effect_type", None)
+        effect_config = getattr(flow_node, "effect_config", None) or {}
 
         # Check for effect nodes first
         if effect_type:
@@ -332,17 +416,18 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
                 effect_type=effect_type,
                 effect_config=effect_config,
                 next_node=next_node,
-                input_key=flow_node.input_key,
-                output_key=flow_node.output_key,
+                input_key=getattr(flow_node, "input_key", None),
+                output_key=getattr(flow_node, "output_key", None),
                 data_aware_handler=data_aware_handler,
+                flow=flow,
             )
         elif _is_agent(handler_obj):
             handlers[node_id] = create_agent_node_handler(
                 node_id=node_id,
                 agent=handler_obj,
                 next_node=next_node,
-                input_key=flow_node.input_key,
-                output_key=flow_node.output_key,
+                input_key=getattr(flow_node, "input_key", None),
+                output_key=getattr(flow_node, "output_key", None),
             )
         elif _is_flow(handler_obj):
             # Nested flow - compile recursively
@@ -351,8 +436,8 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
                 node_id=node_id,
                 nested_workflow=nested_spec,
                 next_node=next_node,
-                input_key=flow_node.input_key,
-                output_key=flow_node.output_key,
+                input_key=getattr(flow_node, "input_key", None),
+                output_key=getattr(flow_node, "output_key", None),
             )
         elif callable(handler_obj):
             # Check if this is a visual flow handler (has closure access to node_outputs)
@@ -361,8 +446,8 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
                 node_id=node_id,
                 func=handler_obj,
                 next_node=next_node,
-                input_key=flow_node.input_key,
-                output_key=flow_node.output_key,
+                input_key=getattr(flow_node, "input_key", None),
+                output_key=getattr(flow_node, "output_key", None),
                 flow=flow,
             )
         else:

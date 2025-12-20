@@ -9,7 +9,7 @@ import { useFlowStore } from '../hooks/useFlow';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { RunFlowModal } from './RunFlowModal';
 import { UserPromptModal } from './UserPromptModal';
-import type { FlowRunResult, VisualFlow } from '../types/flow';
+import type { ExecutionEvent, FlowRunResult, VisualFlow } from '../types/flow';
 
 // Fetch list of saved flows
 async function listFlows(): Promise<VisualFlow[]> {
@@ -65,23 +65,6 @@ async function saveFlow(
   return response.json();
 }
 
-async function runFlow(
-  flowId: string,
-  inputData: Record<string, unknown>
-): Promise<FlowRunResult> {
-  const response = await fetch(`/api/flows/${flowId}/run`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ input_data: inputData }),
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to run flow');
-  }
-
-  return response.json();
-}
-
 export function Toolbar() {
   const { flowId, flowName, setFlowName, getFlow, loadFlow, clearFlow, isRunning, setIsRunning } =
     useFlowStore();
@@ -89,6 +72,7 @@ export function Toolbar() {
   const [showRunModal, setShowRunModal] = useState(false);
   const [showLoadModal, setShowLoadModal] = useState(false);
   const [runResult, setRunResult] = useState<FlowRunResult | null>(null);
+  const [executionEvents, setExecutionEvents] = useState<ExecutionEvent[]>([]);
 
   // Query for listing saved flows
   const flowsQuery = useQuery({
@@ -125,55 +109,52 @@ export function Toolbar() {
     },
   });
 
-  // Run mutation
-  const runMutation = useMutation({
-    mutationFn: ({
-      flowId,
-      inputData,
-    }: {
-      flowId: string;
-      inputData: Record<string, unknown>;
-    }) => runFlow(flowId, inputData),
-    onMutate: () => {
-      setIsRunning(true);
-      setRunResult(null); // Clear previous result
-    },
-    onSuccess: (result) => {
-      setIsRunning(false);
-      setRunResult(result); // Store result for display
-      if (result.success) {
-        toast.success('Flow completed!');
-      } else {
-        toast.error(`Flow failed: ${result.error}`);
-      }
-    },
-    onError: (error) => {
-      setIsRunning(false);
-      setRunResult({
-        success: false,
-        error: error.message,
-        result: null,
-      });
-      toast.error(`Run failed: ${error.message}`);
-    },
-  });
-
   // WebSocket for real-time execution (if flow is saved)
-  const { isWaiting, waitingInfo, resumeFlow } = useWebSocket({
+  const { isWaiting, waitingInfo, resumeFlow, runFlow } = useWebSocket({
     flowId: flowId || '',
     onEvent: (event) => {
       console.log('Execution event:', event);
+      if (event.type === 'flow_start') {
+        setRunResult(null);
+        setExecutionEvents([event]);
+        return;
+      }
+      setExecutionEvents((prev) => [...prev, event]);
+
       // Update run result when flow completes via WebSocket
       if (event.type === 'flow_complete') {
-        setRunResult({
-          success: true,
-          result: event.result,
-        });
+        const payload = event.result as unknown;
+        const payloadObj = payload as Record<string, unknown> | null;
+        const reportedSuccess =
+          payloadObj &&
+          typeof payloadObj === 'object' &&
+          'success' in payloadObj &&
+          payloadObj.success === false
+            ? false
+            : true;
+
+        if (!reportedSuccess) {
+          setRunResult({
+            success: false,
+            error:
+              (payloadObj && typeof payloadObj.error === 'string' ? payloadObj.error : null) ||
+              'Flow failed',
+            result: payloadObj?.result ?? null,
+          });
+          toast.error('Flow failed');
+        } else {
+          setRunResult({
+            success: true,
+            result: payload,
+          });
+          toast.success('Flow completed!');
+        }
       } else if (event.type === 'flow_error') {
         setRunResult({
           success: false,
           error: event.error || 'Unknown error',
         });
+        toast.error(`Flow failed: ${event.error || 'Unknown error'}`);
       }
     },
     onWaiting: (info) => {
@@ -213,14 +194,18 @@ export function Toolbar() {
   // Handle run from modal
   const handleRunExecute = useCallback((inputData: Record<string, unknown>) => {
     if (!flowId) return;
-    runMutation.mutate({ flowId, inputData });
-  }, [flowId, runMutation]);
+    setIsRunning(true);
+    setRunResult(null);
+    setExecutionEvents([]);
+    runFlow(inputData);
+  }, [flowId, runFlow, setIsRunning]);
 
   // Handle modal close
   const handleRunModalClose = useCallback(() => {
     if (!isRunning) {
       setShowRunModal(false);
       setRunResult(null);
+      setExecutionEvents([]);
     }
   }, [isRunning]);
 
@@ -366,6 +351,7 @@ export function Toolbar() {
         onRun={handleRunExecute}
         isRunning={isRunning}
         result={runResult}
+        events={executionEvents}
       />
 
       {/* Load flows modal */}
