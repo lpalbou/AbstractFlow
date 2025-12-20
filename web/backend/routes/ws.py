@@ -86,17 +86,29 @@ async def execute_with_updates(
         run_id = runner.start(input_data)
 
         # Execute step by step with updates
+        last_node = None
         while True:
             state = runner.step()
 
-            # Send node update
-            if state.current_node:
+            # Send node complete for previous node
+            if last_node and state.current_node != last_node:
+                await websocket.send_json(
+                    ExecutionEvent(
+                        type="node_complete",
+                        nodeId=last_node,
+                    ).model_dump()
+                )
+
+            # Send node start for current node
+            if state.current_node and state.current_node != last_node:
                 await websocket.send_json(
                     ExecutionEvent(
                         type="node_start",
                         nodeId=state.current_node,
                     ).model_dump()
                 )
+
+            last_node = state.current_node
 
             # Check if waiting
             if runner.is_waiting():
@@ -110,6 +122,14 @@ async def execute_with_updates(
 
             # Check if complete
             if runner.is_complete():
+                # Send node_complete for last node
+                if last_node:
+                    await websocket.send_json(
+                        ExecutionEvent(
+                            type="node_complete",
+                            nodeId=last_node,
+                        ).model_dump()
+                    )
                 await websocket.send_json(
                     ExecutionEvent(
                         type="flow_complete",
@@ -120,6 +140,14 @@ async def execute_with_updates(
 
             # Check if failed
             if runner.is_failed():
+                # Send node_complete for last node
+                if last_node:
+                    await websocket.send_json(
+                        ExecutionEvent(
+                            type="node_complete",
+                            nodeId=last_node,
+                        ).model_dump()
+                    )
                 await websocket.send_json(
                     ExecutionEvent(
                         type="flow_error",

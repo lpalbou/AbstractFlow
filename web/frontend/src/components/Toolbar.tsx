@@ -7,6 +7,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { useFlowStore } from '../hooks/useFlow';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { RunFlowModal } from './RunFlowModal';
 import type { FlowRunResult, VisualFlow } from '../types/flow';
 
 // Fetch list of saved flows
@@ -84,9 +85,9 @@ export function Toolbar() {
   const { flowId, flowName, setFlowName, getFlow, loadFlow, clearFlow, isRunning, setIsRunning } =
     useFlowStore();
 
-  const [showInputModal, setShowInputModal] = useState(false);
+  const [showRunModal, setShowRunModal] = useState(false);
   const [showLoadModal, setShowLoadModal] = useState(false);
-  const [runInput, setRunInput] = useState('{}');
+  const [runResult, setRunResult] = useState<FlowRunResult | null>(null);
 
   // Query for listing saved flows
   const flowsQuery = useQuery({
@@ -134,18 +135,24 @@ export function Toolbar() {
     }) => runFlow(flowId, inputData),
     onMutate: () => {
       setIsRunning(true);
+      setRunResult(null); // Clear previous result
     },
     onSuccess: (result) => {
       setIsRunning(false);
+      setRunResult(result); // Store result for display
       if (result.success) {
         toast.success('Flow completed!');
-        console.log('Flow result:', result.result);
       } else {
         toast.error(`Flow failed: ${result.error}`);
       }
     },
     onError: (error) => {
       setIsRunning(false);
+      setRunResult({
+        success: false,
+        error: error.message,
+        result: null,
+      });
       toast.error(`Run failed: ${error.message}`);
     },
   });
@@ -168,26 +175,29 @@ export function Toolbar() {
     saveMutation.mutate({ flow, existingFlowId: flowId });
   }, [getFlow, saveMutation, flowId]);
 
-  // Handle run
+  // Handle run - open modal
   const handleRun = useCallback(() => {
     if (!flowId) {
       toast.error('Please save the flow first');
       return;
     }
-    setShowInputModal(true);
+    setRunResult(null); // Clear previous result
+    setShowRunModal(true);
   }, [flowId]);
 
-  const handleRunConfirm = useCallback(() => {
+  // Handle run from modal
+  const handleRunExecute = useCallback((inputData: Record<string, unknown>) => {
     if (!flowId) return;
+    runMutation.mutate({ flowId, inputData });
+  }, [flowId, runMutation]);
 
-    try {
-      const inputData = JSON.parse(runInput);
-      runMutation.mutate({ flowId, inputData });
-      setShowInputModal(false);
-    } catch (e) {
-      toast.error('Invalid JSON input');
+  // Handle modal close
+  const handleRunModalClose = useCallback(() => {
+    if (!isRunning) {
+      setShowRunModal(false);
+      setRunResult(null);
     }
-  }, [flowId, runInput, runMutation]);
+  }, [isRunning]);
 
   // Handle export
   const handleExport = useCallback(() => {
@@ -324,36 +334,14 @@ export function Toolbar() {
         </div>
       </div>
 
-      {/* Run input modal */}
-      {showInputModal && (
-        <div className="modal-overlay" onClick={() => setShowInputModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Run Flow</h3>
-            <p>Enter input data (JSON):</p>
-            <textarea
-              className="modal-textarea"
-              value={runInput}
-              onChange={(e) => setRunInput(e.target.value)}
-              rows={6}
-              placeholder='{"key": "value"}'
-            />
-            <div className="modal-actions">
-              <button
-                className="modal-button cancel"
-                onClick={() => setShowInputModal(false)}
-              >
-                Cancel
-              </button>
-              <button
-                className="modal-button primary"
-                onClick={handleRunConfirm}
-              >
-                Run
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Smart Run Modal */}
+      <RunFlowModal
+        isOpen={showRunModal}
+        onClose={handleRunModalClose}
+        onRun={handleRunExecute}
+        isRunning={isRunning}
+        result={runResult}
+      />
 
       {/* Load flows modal */}
       {showLoadModal && (

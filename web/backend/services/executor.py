@@ -1,10 +1,17 @@
-"""Flow execution service - converts visual flows to AbstractFlow."""
+"""Flow execution service - converts visual flows to AbstractFlow.
+
+This module handles the conversion from visual flow definitions (from the editor)
+to executable AbstractFlow objects, with proper handling of:
+- Execution edges: Control the order of node execution
+- Data edges: Map outputs from one node to inputs of another
+"""
 
 from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
+import datetime
 
 # Add abstractflow to path for imports
 abstractflow_path = Path(__file__).parent.parent.parent.parent
@@ -12,9 +19,37 @@ if str(abstractflow_path) not in sys.path:
     sys.path.insert(0, str(abstractflow_path))
 
 from abstractflow import Flow, FlowRunner
-from ..models import VisualFlow, NodeType
+from ..models import VisualFlow, VisualEdge, NodeType
 from .builtins import get_builtin_handler
 from .code_executor import create_code_handler
+
+
+# Type alias for data edge mapping
+# Maps target_node_id -> { target_pin -> (source_node_id, source_pin) }
+DataEdgeMap = Dict[str, Dict[str, tuple]]
+
+
+def _build_data_edge_map(edges: List[VisualEdge]) -> DataEdgeMap:
+    """Build a mapping of data edges for input resolution.
+
+    Returns a dict where:
+    - Key: target node ID
+    - Value: dict mapping target pin ID -> (source node ID, source pin ID)
+    """
+    data_edges: DataEdgeMap = {}
+
+    for edge in edges:
+        # Skip execution edges
+        if edge.sourceHandle == "exec-out" or edge.targetHandle == "exec-in":
+            continue
+
+        # This is a data edge
+        if edge.target not in data_edges:
+            data_edges[edge.target] = {}
+
+        data_edges[edge.target][edge.targetHandle] = (edge.source, edge.sourceHandle)
+
+    return data_edges
 
 
 def visual_to_flow(visual: VisualFlow) -> Flow:
@@ -28,16 +63,25 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
     """
     flow = Flow(visual.id)
 
-    # Track which edge goes where for determining next nodes
-    edge_map: Dict[str, str] = {}  # source -> target
-    for edge in visual.edges:
-        # Only consider execution flow edges (exec-in/exec-out handles)
-        if edge.sourceHandle == "exec-out" and edge.targetHandle == "exec-in":
-            edge_map[edge.source] = edge.target
+    # Build data edge map for input resolution
+    data_edge_map = _build_data_edge_map(visual.edges)
 
-    # Add nodes
+    # Store node outputs during execution
+    # This will be populated during runtime
+    flow._node_outputs: Dict[str, Dict[str, Any]] = {}
+    flow._data_edge_map = data_edge_map
+
+    # Add nodes with wrapped handlers that resolve data edges
     for node in visual.nodes:
-        handler = _create_handler(node.type, node.data)
+        base_handler = _create_handler(node.type, node.data)
+
+        # Wrap the handler to resolve data edges
+        wrapped_handler = _create_data_aware_handler(
+            node_id=node.id,
+            base_handler=base_handler,
+            data_edges=data_edge_map.get(node.id, {}),
+            node_outputs=flow._node_outputs,
+        )
 
         # Determine input/output keys from node data
         input_key = node.data.get("inputKey")
@@ -45,21 +89,12 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
 
         flow.add_node(
             node_id=node.id,
-            handler=handler,
+            handler=wrapped_handler,
             input_key=input_key,
             output_key=output_key,
         )
 
-    # Add edges (data flow edges, not execution flow)
-    for edge in visual.edges:
-        # Skip execution edges - they're handled by the runtime
-        if edge.sourceHandle == "exec-out" or edge.targetHandle == "exec-in":
-            continue
-
-        # For data edges, we add an edge between nodes
-        flow.add_edge(edge.source, edge.target)
-
-    # Also add execution edges
+    # Only add execution edges - these control the flow execution order
     for edge in visual.edges:
         if edge.sourceHandle == "exec-out" and edge.targetHandle == "exec-in":
             flow.add_edge(edge.source, edge.target)
@@ -79,6 +114,50 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
             flow.set_entry(visual.nodes[0].id)
 
     return flow
+
+
+def _create_data_aware_handler(
+    node_id: str,
+    base_handler,
+    data_edges: Dict[str, tuple],
+    node_outputs: Dict[str, Dict[str, Any]],
+):
+    """Wrap a handler to resolve data edge inputs before execution.
+
+    Args:
+        node_id: ID of this node
+        base_handler: The original handler function
+        data_edges: Mapping of input pin -> (source_node, source_pin)
+        node_outputs: Shared dict storing outputs from executed nodes
+    """
+
+    def wrapped_handler(input_data):
+        # Build the resolved input by mapping data edges
+        resolved_input = {}
+
+        # Start with any input data passed through execution flow
+        if isinstance(input_data, dict):
+            resolved_input.update(input_data)
+
+        # Override with values from connected data edges
+        for target_pin, (source_node, source_pin) in data_edges.items():
+            if source_node in node_outputs:
+                source_output = node_outputs[source_node]
+                if isinstance(source_output, dict) and source_pin in source_output:
+                    resolved_input[target_pin] = source_output[source_pin]
+                elif source_pin == "result":
+                    # If looking for 'result' but output isn't a dict, use the whole output
+                    resolved_input[target_pin] = source_output
+
+        # Execute the base handler with resolved input
+        result = base_handler(resolved_input if resolved_input else input_data)
+
+        # Store this node's output for downstream nodes
+        node_outputs[node_id] = result
+
+        return result
+
+    return wrapped_handler
 
 
 def _create_handler(node_type: NodeType, data: Dict[str, Any]) -> Any:
@@ -116,6 +195,10 @@ def _create_handler(node_type: NodeType, data: Dict[str, Any]) -> Any:
             # Identity function
             return lambda x: x
 
+    # Event/Trigger nodes - entry points
+    if type_str in ("on_user_request", "on_agent_message", "on_schedule"):
+        return _create_event_handler(type_str, data)
+
     # Control flow nodes
     if type_str == "if":
         return _create_if_handler(data)
@@ -146,11 +229,16 @@ def _create_agent_placeholder(data: Dict[str, Any]):
 
     In a full implementation, this would create an actual agent instance.
     """
+    provider = data.get("agentConfig", {}).get("provider", "unknown")
+    model = data.get("agentConfig", {}).get("model", "unknown")
 
     def placeholder(input_data):
         task = input_data.get("task") if isinstance(input_data, dict) else str(input_data)
+        context = input_data.get("context", {}) if isinstance(input_data, dict) else {}
         return {
-            "result": f"[Agent would process: {task}]",
+            "result": f"[Agent ({provider}/{model}) would process: {task}]",
+            "task": task,
+            "context": context,
             "success": True,
             "note": "This is a placeholder. Configure agent provider to enable real execution.",
         }
@@ -169,6 +257,44 @@ def _create_subflow_placeholder(data: Dict[str, Any]):
         }
 
     return placeholder
+
+
+def _create_event_handler(event_type: str, data: Dict[str, Any]):
+    """Create a handler for event/trigger nodes.
+
+    Event nodes are entry points that pass through input data
+    with the appropriate output structure.
+    """
+
+    def handler(input_data):
+        if event_type == "on_user_request":
+            # Extract message and context from input
+            message = input_data.get("message", "") if isinstance(input_data, dict) else str(input_data)
+            context = input_data.get("context", {}) if isinstance(input_data, dict) else {}
+            return {
+                "message": message,
+                "context": context,
+            }
+        elif event_type == "on_agent_message":
+            # Agent message event
+            sender = input_data.get("sender", "unknown") if isinstance(input_data, dict) else "unknown"
+            message = input_data.get("message", "") if isinstance(input_data, dict) else str(input_data)
+            channel = data.get("eventConfig", {}).get("channel", "")
+            return {
+                "sender": sender,
+                "message": message,
+                "channel": channel,
+            }
+        elif event_type == "on_schedule":
+            # Scheduled event
+            return {
+                "timestamp": datetime.datetime.utcnow().isoformat(),
+            }
+        else:
+            # Unknown event type - pass through
+            return input_data
+
+    return handler
 
 
 def _create_expression_handler(expression: str):
@@ -236,10 +362,14 @@ def execute_flow(flow: Flow, input_data: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         The flow's output dictionary
     """
+    # Clear any previous outputs
+    if hasattr(flow, '_node_outputs'):
+        flow._node_outputs.clear()
+
     runner = FlowRunner(flow)
     result = runner.run(input_data)
     return {
-        "result": result.get("result"),
-        "success": result.get("success", True),
+        "result": result.get("result") if isinstance(result, dict) else result,
+        "success": result.get("success", True) if isinstance(result, dict) else True,
         "run_id": runner.run_id,
     }
