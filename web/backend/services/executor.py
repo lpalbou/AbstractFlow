@@ -68,6 +68,11 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
 
     Returns:
         A Flow object ready for compilation and execution
+
+    Note:
+        Literal nodes (string, number, boolean, json, array) are NOT added to
+        the execution flow. They are pure data nodes that are evaluated when
+        their output is read via data edges.
     """
     flow = Flow(visual.id)
 
@@ -79,12 +84,47 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
     flow._node_outputs: Dict[str, Dict[str, Any]] = {}
     flow._data_edge_map = data_edge_map
 
+    # Literal node types - these are pure data nodes, not execution nodes
+    # They should NOT be added to the flow graph
+    LITERAL_NODE_TYPES = {
+        "literal_string", "literal_number", "literal_boolean",
+        "literal_json", "literal_array"
+    }
+
+    # Pure function node types that also don't have execution pins
+    # These are evaluated inline when their output is read
+    PURE_FUNCTION_TYPES = {
+        # Math
+        "add", "subtract", "multiply", "divide", "modulo", "power", "abs", "round",
+        # String
+        "concat", "split", "join", "format", "uppercase", "lowercase", "trim", "substring", "length",
+        # Control (logic gates only - if/loop have exec pins)
+        "compare", "not", "and", "or",
+        # Data
+        "get", "set", "merge", "array_map", "array_filter",
+    }
+
     # Effect node types that need special handling by the compiler
     EFFECT_NODE_TYPES = {"ask_user", "llm_call", "wait_until", "wait_event", "memory_note", "memory_query"}
 
-    # Add nodes with wrapped handlers that resolve data edges
+    # Pre-evaluate literal nodes and store their values
+    # This allows data edges from literals to resolve correctly
     for node in visual.nodes:
         type_str = node.type.value if hasattr(node.type, "value") else str(node.type)
+        if type_str in LITERAL_NODE_TYPES:
+            # Evaluate the literal and store in node_outputs
+            literal_value = node.data.get("literalValue")
+            flow._node_outputs[node.id] = {"value": literal_value}
+
+    # Add nodes with wrapped handlers that resolve data edges
+    # Skip literal nodes - they're already evaluated above
+    for node in visual.nodes:
+        type_str = node.type.value if hasattr(node.type, "value") else str(node.type)
+
+        # Skip literal nodes - they're pure data providers, not execution nodes
+        if type_str in LITERAL_NODE_TYPES:
+            continue
+
         base_handler = _create_handler(node.type, node.data)
 
         # Wrap the handler to resolve data edges
@@ -120,19 +160,20 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
         if edge.sourceHandle == "exec-out" and edge.targetHandle == "exec-in":
             flow.add_edge(edge.source, edge.target)
 
-    # Set entry node
-    if visual.entryNode:
+    # Set entry node - only consider nodes that are actually in the flow
+    # (excludes literal nodes which were skipped above)
+    if visual.entryNode and visual.entryNode in flow.nodes:
         flow.set_entry(visual.entryNode)
-    elif visual.nodes:
+    else:
         # Try to find a node with no incoming execution edges
         targets = {e.target for e in visual.edges if e.targetHandle == "exec-in"}
-        for node in visual.nodes:
-            if node.id not in targets:
-                flow.set_entry(node.id)
+        for node_id in flow.nodes:
+            if node_id not in targets:
+                flow.set_entry(node_id)
                 break
-        # Fallback to first node
-        if not flow.entry_node:
-            flow.set_entry(visual.nodes[0].id)
+        # Fallback to first node in the flow
+        if not flow.entry_node and flow.nodes:
+            flow.set_entry(next(iter(flow.nodes)))
 
     return flow
 

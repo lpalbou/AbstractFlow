@@ -467,31 +467,57 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         </div>
       )}
 
-      {/* Array literal value */}
+      {/* Array literal value - item-based editor */}
       {data.nodeType === 'literal_array' && (
         <div className="property-section">
-          <label className="property-label">Value (Array)</label>
-          <textarea
-            className="property-input property-textarea code"
-            value={
-              Array.isArray(data.literalValue)
-                ? JSON.stringify(data.literalValue, null, 2)
-                : String(data.literalValue ?? '[]')
-            }
-            onChange={(e) => {
-              try {
-                const parsed = JSON.parse(e.target.value);
-                if (Array.isArray(parsed)) {
-                  updateNodeData(node.id, { literalValue: parsed });
-                }
-              } catch {
-                // Keep invalid JSON in the textarea but don't update state
-              }
-            }}
-            placeholder='["option1", "option2"]'
-            rows={4}
-          />
-          <span className="property-hint">Enter JSON array (e.g., ["a", "b", "c"])</span>
+          <label className="property-label">Items</label>
+          <div className="array-editor">
+            {(Array.isArray(data.literalValue) ? data.literalValue : []).map(
+              (item: string, index: number) => (
+                <div key={index} className="array-item">
+                  <input
+                    type="text"
+                    className="property-input array-item-input"
+                    value={String(item)}
+                    onChange={(e) => {
+                      const newArray = [...(data.literalValue as string[])];
+                      newArray[index] = e.target.value;
+                      updateNodeData(node.id, { literalValue: newArray });
+                    }}
+                    placeholder={`Item ${index + 1}`}
+                  />
+                  <button
+                    className="array-item-remove"
+                    onClick={() => {
+                      const newArray = (data.literalValue as string[]).filter(
+                        (_, i) => i !== index
+                      );
+                      updateNodeData(node.id, { literalValue: newArray });
+                    }}
+                    title="Remove item"
+                  >
+                    &times;
+                  </button>
+                </div>
+              )
+            )}
+            <button
+              className="array-add-button"
+              onClick={() => {
+                const currentArray = Array.isArray(data.literalValue)
+                  ? data.literalValue
+                  : [];
+                updateNodeData(node.id, {
+                  literalValue: [...currentArray, ''],
+                });
+              }}
+            >
+              + Add Item
+            </button>
+          </div>
+          <span className="property-hint">
+            {(Array.isArray(data.literalValue) ? data.literalValue : []).length} items
+          </span>
         </div>
       )}
 
