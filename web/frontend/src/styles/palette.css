@@ -399,3 +399,45 @@
   color: var(--text-muted);
   margin-bottom: 2px;
 }
+
+/* Textarea for multi-line inputs */
+.property-textarea {
+  min-height: 80px;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.4;
+}
+
+.property-textarea.code {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 11px;
+  tab-size: 2;
+}
+
+/* Toggle container for boolean values */
+.toggle-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  padding: 8px 12px;
+  background: var(--bg-primary);
+  border-radius: 4px;
+}
+
+.toggle-container:hover {
+  background: var(--bg-tertiary);
+}
+
+.toggle-checkbox {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+.toggle-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}

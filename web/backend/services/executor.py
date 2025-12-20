@@ -214,19 +214,33 @@ def _create_handler(node_type: NodeType, data: Dict[str, Any]) -> Any:
     if type_str == "loop":
         return _create_loop_handler(data)
 
+    # Effect nodes
+    if type_str in ("ask_user", "llm_call", "wait_until", "wait_event", "memory_note", "memory_query"):
+        return _create_effect_handler(type_str, data)
+
     # Unknown type - return identity
     return lambda x: x
 
 
 def _wrap_builtin(handler, data: Dict[str, Any]):
-    """Wrap a builtin handler to handle input mapping."""
+    """Wrap a builtin handler to handle input mapping.
+
+    For literal nodes, injects the configured literalValue from node data.
+    """
+    literal_value = data.get("literalValue")
 
     def wrapped(input_data):
-        # If input is already a dict with the expected keys, use directly
+        # Build inputs dict
         if isinstance(input_data, dict):
-            return handler(input_data)
-        # Otherwise, use the input as the first argument
-        return handler({"value": input_data, "a": input_data, "text": input_data})
+            inputs = input_data.copy()
+        else:
+            inputs = {"value": input_data, "a": input_data, "text": input_data}
+
+        # Inject literal value if present (for literal_* nodes)
+        if literal_value is not None:
+            inputs["_literalValue"] = literal_value
+
+        return handler(inputs)
 
     return wrapped
 
@@ -422,6 +436,220 @@ def _create_loop_handler(data: Dict[str, Any]):
         if not isinstance(items, (list, tuple)):
             items = [items]
         return {"items": items, "count": len(items)}
+
+    return handler
+
+
+# Effect handlers - these return results directly for now
+# Full AbstractRuntime integration is handled in the FlowRunner
+def _create_effect_handler(effect_type: str, data: Dict[str, Any]):
+    """Create handlers for effect nodes.
+
+    These handlers execute effects directly for now.
+    Full durable execution with pause/resume requires FlowRunner integration.
+    """
+    effect_config = data.get("effectConfig", {})
+
+    if effect_type == "ask_user":
+        return _create_ask_user_handler(data, effect_config)
+    elif effect_type == "llm_call":
+        return _create_llm_call_handler(data, effect_config)
+    elif effect_type == "wait_until":
+        return _create_wait_until_handler(data, effect_config)
+    elif effect_type == "wait_event":
+        return _create_wait_event_handler(data, effect_config)
+    elif effect_type == "memory_note":
+        return _create_memory_note_handler(data, effect_config)
+    elif effect_type == "memory_query":
+        return _create_memory_query_handler(data, effect_config)
+
+    # Fallback - identity
+    return lambda x: x
+
+
+def _create_ask_user_handler(data: Dict[str, Any], config: Dict[str, Any]):
+    """Create ASK_USER effect handler.
+
+    For now, returns a placeholder. Full implementation requires
+    WebSocket integration for user prompts.
+    """
+    def handler(input_data):
+        prompt = input_data.get("prompt", "Please respond:") if isinstance(input_data, dict) else str(input_data)
+        choices = input_data.get("choices", []) if isinstance(input_data, dict) else []
+
+        # Return placeholder - real implementation needs pause/resume
+        return {
+            "response": f"[User prompt: {prompt}]",
+            "prompt": prompt,
+            "choices": choices,
+            "allow_free_text": config.get("allowFreeText", True),
+            "_pending_effect": {
+                "type": "ask_user",
+                "prompt": prompt,
+                "choices": choices,
+            },
+        }
+    return handler
+
+
+def _create_llm_call_handler(data: Dict[str, Any], config: Dict[str, Any]):
+    """Create LLM_CALL effect handler.
+
+    Uses AbstractCore to make LLM calls.
+    """
+    provider = config.get("provider", "").lower()
+    model = config.get("model", "")
+    temperature = config.get("temperature", 0.7)
+
+    def handler(input_data):
+        prompt = input_data.get("prompt", "") if isinstance(input_data, dict) else str(input_data)
+        system = input_data.get("system", "") if isinstance(input_data, dict) else ""
+
+        if not provider or not model:
+            return {
+                "response": "[LLM Call: No provider/model configured]",
+                "error": "Missing provider or model configuration",
+            }
+
+        try:
+            from abstractcore import create_llm
+
+            logger.info(f"LLM Call: provider={provider}, model={model}")
+            llm = create_llm(provider, model=model)
+
+            # Build messages or use simple prompt
+            full_prompt = prompt
+            if system:
+                full_prompt = f"System: {system}\n\n{prompt}"
+
+            response = llm.generate(full_prompt)
+
+            return {
+                "response": response.content,
+                "prompt": prompt,
+                "system": system,
+                "provider": provider,
+                "model": model,
+            }
+
+        except ImportError as e:
+            logger.error(f"Failed to import AbstractCore: {e}")
+            return {
+                "response": f"[Error: AbstractCore not available - {e}]",
+                "error": str(e),
+            }
+        except Exception as e:
+            logger.error(f"LLM Call failed: {e}", exc_info=True)
+            return {
+                "response": f"[Error: {e}]",
+                "error": str(e),
+            }
+
+    return handler
+
+
+def _create_wait_until_handler(data: Dict[str, Any], config: Dict[str, Any]):
+    """Create WAIT_UNTIL effect handler.
+
+    For simple delays, can use time.sleep.
+    Full durable implementation requires AbstractRuntime.
+    """
+    import time
+
+    duration_type = config.get("durationType", "seconds")
+
+    def handler(input_data):
+        duration = input_data.get("duration", 0) if isinstance(input_data, dict) else 0
+
+        try:
+            amount = float(duration)
+        except (TypeError, ValueError):
+            amount = 0
+
+        # Convert to seconds
+        if duration_type == "minutes":
+            seconds = amount * 60
+        elif duration_type == "hours":
+            seconds = amount * 3600
+        elif duration_type == "timestamp":
+            # For timestamps, calculate delta from now
+            # For now, just return immediately
+            return {"waited": True, "duration_type": "timestamp"}
+        else:
+            seconds = amount
+
+        # For short delays (< 10 seconds), actually wait
+        # For longer delays, return a pending effect marker
+        if seconds > 0 and seconds <= 10:
+            time.sleep(seconds)
+
+        return {
+            "waited": True,
+            "duration": duration,
+            "duration_type": duration_type,
+            "seconds": seconds,
+        }
+
+    return handler
+
+
+def _create_wait_event_handler(data: Dict[str, Any], config: Dict[str, Any]):
+    """Create WAIT_EVENT effect handler.
+
+    Returns a placeholder - full implementation requires AbstractRuntime.
+    """
+    def handler(input_data):
+        event_key = input_data.get("event_key", "default") if isinstance(input_data, dict) else str(input_data)
+
+        return {
+            "event_data": {},
+            "event_key": event_key,
+            "_pending_effect": {
+                "type": "wait_event",
+                "event_key": event_key,
+            },
+        }
+
+    return handler
+
+
+def _create_memory_note_handler(data: Dict[str, Any], config: Dict[str, Any]):
+    """Create MEMORY_NOTE effect handler.
+
+    Returns a placeholder - full implementation requires AbstractRuntime with memory store.
+    """
+    def handler(input_data):
+        content = input_data.get("content", "") if isinstance(input_data, dict) else str(input_data)
+
+        # Placeholder - would use AbstractRuntime memory effect
+        import uuid
+        note_id = f"note-{str(uuid.uuid4())[:8]}"
+
+        return {
+            "note_id": note_id,
+            "content": content,
+            "stored": True,
+        }
+
+    return handler
+
+
+def _create_memory_query_handler(data: Dict[str, Any], config: Dict[str, Any]):
+    """Create MEMORY_QUERY effect handler.
+
+    Returns a placeholder - full implementation requires AbstractRuntime with memory store.
+    """
+    def handler(input_data):
+        query = input_data.get("query", "") if isinstance(input_data, dict) else str(input_data)
+        limit = input_data.get("limit", 10) if isinstance(input_data, dict) else 10
+
+        # Placeholder - would use AbstractRuntime memory effect
+        return {
+            "results": [],
+            "query": query,
+            "limit": limit,
+            "note": "Memory query requires AbstractRuntime integration",
+        }
 
     return handler
 

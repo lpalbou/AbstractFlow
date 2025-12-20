@@ -50,7 +50,11 @@ export type NodeType =
   // Control - if/loop have exec, logic gates are pure
   | 'if' | 'switch' | 'loop' | 'compare' | 'not' | 'and' | 'or'
   // Data - Pure functions (no exec pins)
-  | 'get' | 'set' | 'merge' | 'array_map' | 'array_filter';
+  | 'get' | 'set' | 'merge' | 'array_map' | 'array_filter'
+  // Literals - Pure value nodes (no exec pins, no inputs)
+  | 'literal_string' | 'literal_number' | 'literal_boolean' | 'literal_json'
+  // Effects - Side-effect nodes (require execution pins)
+  | 'ask_user' | 'llm_call' | 'wait_until' | 'wait_event' | 'memory_note' | 'memory_query';
 
 // Node data stored in React Flow nodes
 export interface FlowNodeData {
@@ -76,6 +80,16 @@ export interface FlowNodeData {
     agentFilter?: string;    // For on_agent_message: specific agent to listen to
     schedule?: string;       // For on_schedule: cron expression or interval
     description?: string;    // Description of what triggers this event
+  };
+  // Literal node value
+  literalValue?: string | number | boolean | object;
+  // Effect node configuration
+  effectConfig?: {
+    provider?: string;     // For llm_call
+    model?: string;        // For llm_call
+    temperature?: number;  // For llm_call
+    allowFreeText?: boolean; // For ask_user
+    durationType?: 'seconds' | 'minutes' | 'hours' | 'timestamp'; // For wait_until
   };
 }
 

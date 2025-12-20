@@ -159,6 +159,144 @@ const DATA_NODES: NodeTemplate[] = [
   { type: 'array_filter', icon: '&#x1F50D;', label: 'Filter Array', headerColor: '#3498DB', inputs: [{ id: 'items', label: 'items', type: 'array' }, { id: 'key', label: 'key', type: 'string' }, { id: 'value', label: 'value', type: 'any' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'data' },
 ];
 
+// Literal/Value nodes - Output constant values (no execution pins, no inputs)
+// Colors match the output type for visual consistency
+const LITERAL_NODES: NodeTemplate[] = [
+  {
+    type: 'literal_string',
+    icon: '"',
+    label: 'String',
+    headerColor: '#FF00FF', // Magenta - matches string pin color
+    inputs: [],
+    outputs: [{ id: 'value', label: 'value', type: 'string' }],
+    category: 'literals',
+  },
+  {
+    type: 'literal_number',
+    icon: '#',
+    label: 'Number',
+    headerColor: '#00FF00', // Green - matches number pin color
+    inputs: [],
+    outputs: [{ id: 'value', label: 'value', type: 'number' }],
+    category: 'literals',
+  },
+  {
+    type: 'literal_boolean',
+    icon: '?',
+    label: 'Boolean',
+    headerColor: '#FF0000', // Red - matches boolean pin color
+    inputs: [],
+    outputs: [{ id: 'value', label: 'value', type: 'boolean' }],
+    category: 'literals',
+  },
+  {
+    type: 'literal_json',
+    icon: '{}',
+    label: 'JSON',
+    headerColor: '#00FFFF', // Cyan - matches object pin color
+    inputs: [],
+    outputs: [{ id: 'value', label: 'value', type: 'object' }],
+    category: 'literals',
+  },
+];
+
+// Effect nodes - Side effects that integrate with AbstractRuntime
+// These nodes have execution pins and can pause/resume flows
+const EFFECT_NODES: NodeTemplate[] = [
+  {
+    type: 'ask_user',
+    icon: '&#x2753;', // Question mark
+    label: 'Ask User',
+    headerColor: '#9B59B6', // Purple - human interaction
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'prompt', label: 'prompt', type: 'string' },
+      { id: 'choices', label: 'choices', type: 'array' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'response', label: 'response', type: 'string' },
+    ],
+    category: 'effects',
+  },
+  {
+    type: 'llm_call',
+    icon: '&#x1F4AD;', // Thought bubble
+    label: 'LLM Call',
+    headerColor: '#3498DB', // Blue - AI
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'prompt', label: 'prompt', type: 'string' },
+      { id: 'system', label: 'system', type: 'string' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'response', label: 'response', type: 'string' },
+    ],
+    category: 'effects',
+  },
+  {
+    type: 'wait_until',
+    icon: '&#x23F3;', // Hourglass
+    label: 'Delay',
+    headerColor: '#F39C12', // Orange - timing
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'duration', label: 'duration', type: 'number' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+    ],
+    category: 'effects',
+  },
+  {
+    type: 'wait_event',
+    icon: '&#x1F514;', // Bell
+    label: 'Wait Event',
+    headerColor: '#E74C3C', // Red - waiting
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'event_key', label: 'event_key', type: 'string' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'event_data', label: 'event_data', type: 'object' },
+    ],
+    category: 'effects',
+  },
+  {
+    type: 'memory_note',
+    icon: '&#x1F4DD;', // Memo
+    label: 'Add Note',
+    headerColor: '#2ECC71', // Green - memory
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'content', label: 'content', type: 'string' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'note_id', label: 'note_id', type: 'string' },
+    ],
+    category: 'effects',
+  },
+  {
+    type: 'memory_query',
+    icon: '&#x1F50D;', // Magnifying glass
+    label: 'Query Memory',
+    headerColor: '#2ECC71', // Green - memory
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'query', label: 'query', type: 'string' },
+      { id: 'limit', label: 'limit', type: 'number' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'results', label: 'results', type: 'array' },
+    ],
+    category: 'effects',
+  },
+];
+
 // All categories
 export const NODE_CATEGORIES: Record<string, NodeCategory> = {
   events: {
@@ -191,6 +329,16 @@ export const NODE_CATEGORIES: Record<string, NodeCategory> = {
     icon: '&#x1F4CA;', // Chart
     nodes: DATA_NODES,
   },
+  literals: {
+    label: 'Literals',
+    icon: '&#x270F;', // Pencil - for constants/values
+    nodes: LITERAL_NODES,
+  },
+  effects: {
+    label: 'Effects',
+    icon: '&#x26A1;', // Lightning bolt - side effects
+    nodes: EFFECT_NODES,
+  },
 };
 
 // Get all node templates flattened
@@ -217,5 +365,10 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
       code: 'def transform(input):\n    return input',
       functionName: 'transform',
     }),
+    // Default literal values
+    ...(template.type === 'literal_string' && { literalValue: '' }),
+    ...(template.type === 'literal_number' && { literalValue: 0 }),
+    ...(template.type === 'literal_boolean' && { literalValue: false }),
+    ...(template.type === 'literal_json' && { literalValue: {} }),
   };
 }

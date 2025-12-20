@@ -231,6 +231,34 @@ def data_array_filter(inputs: Dict[str, Any]) -> List[Any]:
     return result
 
 
+# Literal value handlers - return configured constant values
+def literal_string(inputs: Dict[str, Any]) -> str:
+    """Return string literal value."""
+    return str(inputs.get("_literalValue", ""))
+
+
+def literal_number(inputs: Dict[str, Any]) -> float:
+    """Return number literal value."""
+    value = inputs.get("_literalValue", 0)
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def literal_boolean(inputs: Dict[str, Any]) -> bool:
+    """Return boolean literal value."""
+    return bool(inputs.get("_literalValue", False))
+
+
+def literal_json(inputs: Dict[str, Any]) -> Dict[str, Any]:
+    """Return JSON literal value."""
+    value = inputs.get("_literalValue", {})
+    if isinstance(value, (dict, list)):
+        return value
+    return {}
+
+
 # Handler registry
 BUILTIN_HANDLERS: Dict[str, Callable[[Dict[str, Any]], Any]] = {
     # Math
@@ -263,4 +291,9 @@ BUILTIN_HANDLERS: Dict[str, Callable[[Dict[str, Any]], Any]] = {
     "merge": data_merge,
     "array_map": data_array_map,
     "array_filter": data_array_filter,
+    # Literals
+    "literal_string": literal_string,
+    "literal_number": literal_number,
+    "literal_boolean": literal_boolean,
+    "literal_json": literal_json,
 }

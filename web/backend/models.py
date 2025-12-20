@@ -66,6 +66,18 @@ class NodeType(str, Enum):
     MERGE = "merge"
     ARRAY_MAP = "array_map"
     ARRAY_FILTER = "array_filter"
+    # Literals
+    LITERAL_STRING = "literal_string"
+    LITERAL_NUMBER = "literal_number"
+    LITERAL_BOOLEAN = "literal_boolean"
+    LITERAL_JSON = "literal_json"
+    # Effects
+    ASK_USER = "ask_user"
+    LLM_CALL = "llm_call"
+    WAIT_UNTIL = "wait_until"
+    WAIT_EVENT = "wait_event"
+    MEMORY_NOTE = "memory_note"
+    MEMORY_QUERY = "memory_query"
 
 
 class Pin(BaseModel):

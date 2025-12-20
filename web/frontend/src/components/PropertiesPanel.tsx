@@ -33,8 +33,8 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       .finally(() => setLoadingProviders(false));
   }, []);
 
-  // Fetch models when provider changes
-  const selectedProvider = node?.data.agentConfig?.provider;
+  // Fetch models when provider changes (for both agent and llm_call nodes)
+  const selectedProvider = node?.data.agentConfig?.provider || node?.data.effectConfig?.provider;
   useEffect(() => {
     // Skip if already fetched for this provider
     if (selectedProvider === lastFetchedProvider.current) {
@@ -383,6 +383,218 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               Cron expression or interval (e.g., "30s", "5m", "1h")
             </span>
           </div>
+        </div>
+      )}
+
+      {/* String literal value */}
+      {data.nodeType === 'literal_string' && (
+        <div className="property-section">
+          <label className="property-label">Value</label>
+          <textarea
+            className="property-input property-textarea"
+            value={String(data.literalValue ?? '')}
+            onChange={(e) =>
+              updateNodeData(node.id, { literalValue: e.target.value })
+            }
+            placeholder="Enter text value..."
+            rows={4}
+          />
+        </div>
+      )}
+
+      {/* Number literal value */}
+      {data.nodeType === 'literal_number' && (
+        <div className="property-section">
+          <label className="property-label">Value</label>
+          <input
+            type="number"
+            className="property-input"
+            value={Number(data.literalValue ?? 0)}
+            onChange={(e) =>
+              updateNodeData(node.id, {
+                literalValue: parseFloat(e.target.value) || 0,
+              })
+            }
+            step="any"
+          />
+        </div>
+      )}
+
+      {/* Boolean literal value */}
+      {data.nodeType === 'literal_boolean' && (
+        <div className="property-section">
+          <label className="property-label">Value</label>
+          <label className="toggle-container">
+            <input
+              type="checkbox"
+              className="toggle-checkbox"
+              checked={Boolean(data.literalValue)}
+              onChange={(e) =>
+                updateNodeData(node.id, { literalValue: e.target.checked })
+              }
+            />
+            <span className="toggle-label">
+              {data.literalValue ? 'True' : 'False'}
+            </span>
+          </label>
+        </div>
+      )}
+
+      {/* JSON literal value */}
+      {data.nodeType === 'literal_json' && (
+        <div className="property-section">
+          <label className="property-label">Value (JSON)</label>
+          <textarea
+            className="property-input property-textarea code"
+            value={
+              typeof data.literalValue === 'object'
+                ? JSON.stringify(data.literalValue, null, 2)
+                : String(data.literalValue ?? '{}')
+            }
+            onChange={(e) => {
+              try {
+                const parsed = JSON.parse(e.target.value);
+                updateNodeData(node.id, { literalValue: parsed });
+              } catch {
+                // Keep invalid JSON in the textarea but don't update state
+                // User will see validation error naturally (parse fails silently)
+              }
+            }}
+            placeholder="{}"
+            rows={6}
+          />
+          <span className="property-hint">Enter valid JSON object or array</span>
+        </div>
+      )}
+
+      {/* Ask User effect properties */}
+      {data.nodeType === 'ask_user' && (
+        <div className="property-section">
+          <label className="property-label">User Prompt Settings</label>
+          <label className="toggle-container">
+            <input
+              type="checkbox"
+              className="toggle-checkbox"
+              checked={data.effectConfig?.allowFreeText ?? true}
+              onChange={(e) =>
+                updateNodeData(node.id, {
+                  effectConfig: {
+                    ...data.effectConfig,
+                    allowFreeText: e.target.checked,
+                  },
+                })
+              }
+            />
+            <span className="toggle-label">Allow free text response</span>
+          </label>
+          <span className="property-hint">
+            If disabled, user must choose from provided choices
+          </span>
+        </div>
+      )}
+
+      {/* LLM Call effect properties */}
+      {data.nodeType === 'llm_call' && (
+        <div className="property-section">
+          <label className="property-label">LLM Configuration</label>
+          <div className="property-group">
+            <label className="property-sublabel">Provider</label>
+            <select
+              className="property-select"
+              value={data.effectConfig?.provider || ''}
+              onChange={(e) =>
+                updateNodeData(node.id, {
+                  effectConfig: {
+                    ...data.effectConfig,
+                    provider: e.target.value || undefined,
+                    model: undefined, // Reset model when provider changes
+                  },
+                })
+              }
+              disabled={loadingProviders}
+            >
+              <option value="">
+                {loadingProviders ? 'Loading...' : 'Select provider...'}
+              </option>
+              {providers.map((p) => (
+                <option key={p.name} value={p.name}>
+                  {p.display_name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="property-group">
+            <label className="property-sublabel">Model</label>
+            <select
+              className="property-select"
+              value={data.effectConfig?.model || ''}
+              onChange={(e) =>
+                updateNodeData(node.id, {
+                  effectConfig: {
+                    ...data.effectConfig,
+                    model: e.target.value || undefined,
+                  },
+                })
+              }
+              disabled={!data.effectConfig?.provider || loadingModels}
+            >
+              <option value="">
+                {loadingModels ? 'Loading...' : 'Select model...'}
+              </option>
+              {models.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="property-group">
+            <label className="property-sublabel">Temperature</label>
+            <input
+              type="number"
+              className="property-input"
+              value={data.effectConfig?.temperature ?? 0.7}
+              onChange={(e) =>
+                updateNodeData(node.id, {
+                  effectConfig: {
+                    ...data.effectConfig,
+                    temperature: parseFloat(e.target.value) || 0.7,
+                  },
+                })
+              }
+              min={0}
+              max={2}
+              step={0.1}
+            />
+            <span className="property-hint">0 = deterministic, 2 = creative</span>
+          </div>
+        </div>
+      )}
+
+      {/* Wait Until (Delay) effect properties */}
+      {data.nodeType === 'wait_until' && (
+        <div className="property-section">
+          <label className="property-label">Duration Type</label>
+          <select
+            className="property-select"
+            value={data.effectConfig?.durationType ?? 'seconds'}
+            onChange={(e) =>
+              updateNodeData(node.id, {
+                effectConfig: {
+                  ...data.effectConfig,
+                  durationType: e.target.value as 'seconds' | 'minutes' | 'hours' | 'timestamp',
+                },
+              })
+            }
+          >
+            <option value="seconds">Seconds</option>
+            <option value="minutes">Minutes</option>
+            <option value="hours">Hours</option>
+            <option value="timestamp">ISO Timestamp</option>
+          </select>
+          <span className="property-hint">
+            How to interpret the duration input
+          </span>
         </div>
       )}
 
