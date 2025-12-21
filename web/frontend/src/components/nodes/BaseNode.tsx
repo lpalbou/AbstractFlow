@@ -46,6 +46,14 @@ export const BaseNode = memo(function BaseNode({
   const inputData = data.inputs.filter((p) => p.type !== 'execution');
   const outputData = data.outputs.filter((p) => p.type !== 'execution');
 
+  const overlayHandleStyle = {
+    position: 'absolute' as const,
+    inset: 0,
+    width: '100%',
+    height: '100%',
+    transform: 'none',
+  };
+
   return (
     <div
       className={clsx(
@@ -149,23 +157,26 @@ export const BaseNode = memo(function BaseNode({
         <div className="pins-left">
           {inputData.map((pin) => (
             <div key={pin.id} className="pin-row input">
-              <Handle
-                type="target"
-                position={Position.Left}
-                id={pin.id}
-                className={`pin ${pin.type}`}
-                onMouseDownCapture={(e) => handlePinClick(e, pin.id, true)}
-              />
               <span
                 className="pin-shape"
                 style={{ color: PIN_COLORS[pin.type] }}
                 title={`Type: ${pin.type}`}
                 onClick={(e) => handlePinClick(e, pin.id, true)}
+                onMouseDownCapture={(e) => handlePinClick(e, pin.id, true)}
               >
                 <PinShape
                   type={pin.type}
                   size={10}
                   filled={isPinConnected(pin.id, true)}
+                />
+                <Handle
+                  type="target"
+                  position={Position.Left}
+                  id={pin.id}
+                  className={`pin ${pin.type}`}
+                  style={overlayHandleStyle}
+                  onMouseDownCapture={(e) => handlePinClick(e, pin.id, true)}
+                  onClick={(e) => handlePinClick(e, pin.id, true)}
                 />
               </span>
               <span className="pin-label">{pin.label}</span>
@@ -189,14 +200,15 @@ export const BaseNode = memo(function BaseNode({
                   size={10}
                   filled={isPinConnected(pin.id, false)}
                 />
+                <Handle
+                  type="source"
+                  position={Position.Right}
+                  id={pin.id}
+                  className={`pin ${pin.type}`}
+                  style={overlayHandleStyle}
+                  onClick={(e) => handlePinClick(e, pin.id, false)}
+                />
               </span>
-              <Handle
-                type="source"
-                position={Position.Right}
-                id={pin.id}
-                className={`pin ${pin.type}`}
-                onClick={(e) => handlePinClick(e, pin.id, false)}
-              />
             </div>
           ))}
         </div>

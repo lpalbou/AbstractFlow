@@ -124,35 +124,6 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     const syncKey = `${node.id}:${subflowId}`;
     if (lastSyncedSubflowPins.current === syncKey) return;
 
-    const mergePins = (existingPins: Pin[], derivedPins: Pin[], kind: 'inputs' | 'outputs'): Pin[] => {
-      const existingExec = existingPins.filter((p) => p.type === 'execution');
-      const existingData = existingPins.filter((p) => p.type !== 'execution');
-
-      const existingDataById = new Map(existingData.map((p) => [p.id, p]));
-      const existingDataIds = new Set(existingData.map((p) => p.id));
-      const reservedIds = new Set<string>(['exec-in', 'exec-out']);
-
-      const derivedFiltered = derivedPins.filter((p) => {
-        if (p.type === 'execution') return false;
-        if (reservedIds.has(p.id)) return false;
-        if (existingDataIds.has(p.id) && (p.id === 'input' || p.id === 'output')) return false;
-        return true;
-      });
-
-      const derivedIds = new Set(derivedFiltered.map((p) => p.id));
-      const mergedDerived = derivedFiltered.map((p) => {
-        const existing = existingDataById.get(p.id);
-        if (!existing) return p;
-        return { ...existing, label: p.label, type: p.type };
-      });
-
-      const tail = existingData.filter((p) => !derivedIds.has(p.id));
-
-      return kind === 'inputs'
-        ? [...existingExec, ...mergedDerived, ...tail]
-        : [...existingExec, ...mergedDerived, ...tail];
-    };
-
     const findEntryNode = (flow: VisualFlow) => {
       const entryId = flow.entryNode;
       if (entryId) {
@@ -174,22 +145,33 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       return candidate;
     };
 
+    const findFlowStartNode = (flow: VisualFlow) =>
+      flow.nodes.find((n) => n.type === 'on_flow_start') ?? findEntryNode(flow);
+
     const findFlowEndNode = (flow: VisualFlow) => flow.nodes.find((n) => n.type === 'on_flow_end');
 
     fetch(`/api/flows/${subflowId}`)
       .then((res) => res.json())
       .then((flow: VisualFlow) => {
-        const entry = findEntryNode(flow);
+        const start = findFlowStartNode(flow);
         const end = findFlowEndNode(flow);
 
-        const entryPins = entry?.data?.outputs?.filter((p) => p.type !== 'execution') ?? [];
+        const entryPins = start?.data?.outputs?.filter((p) => p.type !== 'execution') ?? [];
         const endPins = end?.data?.inputs?.filter((p) => p.type !== 'execution') ?? [];
 
         const desiredInputs: Pin[] = entryPins.map((p) => ({ ...p }));
         const desiredOutputs: Pin[] = endPins.map((p) => ({ ...p }));
 
-        const nextInputs = mergePins(node.data.inputs, desiredInputs, 'inputs');
-        const nextOutputs = mergePins(node.data.outputs, desiredOutputs, 'outputs');
+        const execIn =
+          node.data.inputs.find((p) => p.type === 'execution') ?? { id: 'exec-in', label: '', type: 'execution' };
+        const execOut =
+          node.data.outputs.find((p) => p.type === 'execution') ?? { id: 'exec-out', label: '', type: 'execution' };
+
+        const filterData = (pins: Pin[]) =>
+          pins.filter((p) => p.type !== 'execution' && p.id !== 'exec-in' && p.id !== 'exec-out');
+
+        const nextInputs: Pin[] = [execIn, ...filterData(desiredInputs)];
+        const nextOutputs: Pin[] = [execOut, ...filterData(desiredOutputs)];
 
         const samePins = (a: Pin[], b: Pin[]) =>
           a.length === b.length &&
