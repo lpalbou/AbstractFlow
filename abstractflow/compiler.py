@@ -170,6 +170,347 @@ def _create_effect_node_handler(
     return wrapped_effect_handler
 
 
+def _create_visual_agent_effect_handler(
+    *,
+    node_id: str,
+    next_node: Optional[str],
+    agent_config: Dict[str, Any],
+    data_aware_handler: Optional[Callable[[Any], Any]],
+    flow: Flow,
+) -> Callable:
+    """Create a handler for the visual Agent node.
+
+    The Agent node is implemented as a small state machine that:
+    - resolves inputs via data edges (task/context)
+    - runs an LLM_CALL effect (optionally with tools)
+    - executes TOOL_CALLS effects when tool calls are returned
+    - optionally performs a final structured-output LLM_CALL
+    """
+    import json
+    from abstractruntime.core.models import StepPlan, Effect, EffectType
+
+    def _ensure_temp_dict(run: Any) -> Dict[str, Any]:
+        temp = run.vars.get("_temp")
+        if not isinstance(temp, dict):
+            temp = {}
+            run.vars["_temp"] = temp
+        return temp
+
+    def _get_agent_bucket(run: Any) -> Dict[str, Any]:
+        temp = _ensure_temp_dict(run)
+        agent = temp.get("agent")
+        if not isinstance(agent, dict):
+            agent = {}
+            temp["agent"] = agent
+        bucket = agent.get(node_id)
+        if not isinstance(bucket, dict):
+            bucket = {}
+            agent[node_id] = bucket
+        return bucket
+
+    def _normalize_tools(raw: Any) -> list[str]:
+        if not isinstance(raw, list):
+            return []
+        out: list[str] = []
+        for t in raw:
+            if isinstance(t, str) and t.strip():
+                out.append(t.strip())
+        return out
+
+    def _build_prompt(*, task: str, context: Dict[str, Any]) -> str:
+        if not context:
+            return task
+        context_str = "\n".join(f"{k}: {v}" for k, v in context.items())
+        return f"Context:\n{context_str}\n\nTask: {task}"
+
+    def _resolve_inputs(run: Any) -> Dict[str, Any]:
+        if hasattr(flow, "_node_outputs") and hasattr(flow, "_data_edge_map"):
+            _sync_effect_results_to_node_outputs(run, flow)
+
+        if not callable(data_aware_handler):
+            return {}
+        last_output = run.vars.get("_last_output", {})
+        try:
+            resolved = data_aware_handler(last_output)
+        except Exception:
+            resolved = {}
+        return resolved if isinstance(resolved, dict) else {}
+
+    def handler(run: Any, ctx: Any) -> "StepPlan":
+        del ctx
+
+        provider_raw = agent_config.get("provider")
+        model_raw = agent_config.get("model")
+        provider = str(provider_raw or "").strip().lower() if isinstance(provider_raw, str) else ""
+        model = str(model_raw or "").strip() if isinstance(model_raw, str) else ""
+
+        tools_selected = _normalize_tools(agent_config.get("tools"))
+
+        output_schema_cfg = agent_config.get("outputSchema") if isinstance(agent_config.get("outputSchema"), dict) else {}
+        schema_enabled = bool(output_schema_cfg.get("enabled"))
+        schema = output_schema_cfg.get("jsonSchema") if isinstance(output_schema_cfg.get("jsonSchema"), dict) else None
+
+        bucket = _get_agent_bucket(run)
+        phase = str(bucket.get("phase") or "init")
+        tool_round = int(bucket.get("tool_round") or 0)
+        max_tool_rounds = int(bucket.get("max_tool_rounds") or 8)
+
+        resolved_inputs = _resolve_inputs(run)
+        task = str(resolved_inputs.get("task") or "")
+        context_raw = resolved_inputs.get("context")
+        context = context_raw if isinstance(context_raw, dict) else {}
+
+        if phase == "init":
+            if not provider or not model:
+                run.vars["_flow_error"] = "Agent node missing provider/model configuration"
+                run.vars["_flow_error_node"] = node_id
+                out = {
+                    "result": "Agent configuration error: missing provider/model",
+                    "task": task,
+                    "context": context,
+                    "success": False,
+                    "error": "missing provider/model",
+                    "provider": provider or "unknown",
+                    "model": model or "unknown",
+                }
+                _set_nested(run.vars, f"_temp.effects.{node_id}", out)
+                flow._node_outputs[node_id] = {"result": out}
+                run.vars["_last_output"] = {"result": out}
+                if next_node:
+                    return StepPlan(node_id=node_id, next_node=next_node)
+                return StepPlan(node_id=node_id, complete_output={"result": out, "success": False})
+
+            bucket["messages"] = [{"role": "user", "content": _build_prompt(task=task, context=context)}]
+            bucket["phase"] = "llm"
+            bucket["tool_round"] = 0
+
+            tools_payload = None
+            if tools_selected:
+                from abstractruntime.integrations.abstractcore.default_tools import filter_tool_specs
+
+                tools_payload = filter_tool_specs(tools_selected)
+
+            return StepPlan(
+                node_id=node_id,
+                effect=Effect(
+                    type=EffectType.LLM_CALL,
+                    payload={
+                        "messages": bucket["messages"],
+                        "provider": provider,
+                        "model": model,
+                        "tools": tools_payload,
+                        "params": {"temperature": 0.7},
+                    },
+                    result_key=f"_temp.agent.{node_id}.llm",
+                ),
+                next_node=node_id,
+            )
+
+        if phase == "llm":
+            llm_resp = bucket.get("llm")
+            if llm_resp is None:
+                temp = _ensure_temp_dict(run)
+                agent_bucket = temp.get("agent", {}).get(node_id, {}) if isinstance(temp.get("agent"), dict) else {}
+                llm_resp = agent_bucket.get("llm") if isinstance(agent_bucket, dict) else None
+
+            # In normal execution, the LLM_CALL effect stores under _temp.agent.{node_id}.llm
+            # which is the same dict bucket we use; keep defensive reads anyway.
+            if isinstance(llm_resp, dict):
+                tool_calls = llm_resp.get("tool_calls")
+                if isinstance(tool_calls, list) and tool_calls and tools_selected:
+                    # Preserve any assistant content as context for the next turn.
+                    content = llm_resp.get("content")
+                    messages = bucket.get("messages")
+                    if not isinstance(messages, list):
+                        messages = []
+                    if content:
+                        messages.append({"role": "assistant", "content": str(content)})
+                    bucket["messages"] = messages
+
+                    bucket["phase"] = "tool_calls"
+                    bucket["last_tool_calls"] = tool_calls
+                    return StepPlan(
+                        node_id=node_id,
+                        effect=Effect(
+                            type=EffectType.TOOL_CALLS,
+                            payload={
+                                "tool_calls": tool_calls,
+                                "allowed_tools": tools_selected,
+                            },
+                            result_key=f"_temp.agent.{node_id}.tool_results",
+                        ),
+                        next_node=node_id,
+                    )
+
+                content = llm_resp.get("content")
+                usage = llm_resp.get("usage")
+                result_obj = {
+                    "result": str(content or ""),
+                    "task": task,
+                    "context": context,
+                    "success": True,
+                    "provider": provider,
+                    "model": model,
+                    "usage": usage,
+                }
+
+                if schema_enabled and schema:
+                    bucket["phase"] = "structured"
+                    messages = bucket.get("messages")
+                    if not isinstance(messages, list):
+                        messages = []
+                    # Append the previous assistant response as context.
+                    if content:
+                        messages.append({"role": "assistant", "content": str(content)})
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": "Return a JSON object that matches the required schema. Return JSON only.",
+                        }
+                    )
+                    bucket["messages"] = messages
+
+                    return StepPlan(
+                        node_id=node_id,
+                        effect=Effect(
+                            type=EffectType.LLM_CALL,
+                            payload={
+                                "messages": messages,
+                                "provider": provider,
+                                "model": model,
+                                "response_schema": schema,
+                                "response_schema_name": f"Agent_{node_id}",
+                                "params": {"temperature": 0.2},
+                            },
+                            result_key=f"_temp.agent.{node_id}.structured",
+                        ),
+                        next_node=node_id,
+                    )
+
+                _set_nested(run.vars, f"_temp.effects.{node_id}", result_obj)
+                flow._node_outputs[node_id] = {"result": result_obj}
+                run.vars["_last_output"] = {"result": result_obj}
+                bucket["phase"] = "done"
+                if next_node:
+                    return StepPlan(node_id=node_id, next_node=next_node)
+                return StepPlan(node_id=node_id, complete_output={"result": result_obj, "success": True})
+
+            # No llm result; fail fast.
+            run.vars["_flow_error"] = "Agent node missing llm result"
+            run.vars["_flow_error_node"] = node_id
+            return StepPlan(
+                node_id=node_id,
+                complete_output={"error": "Agent node missing llm result", "success": False, "node": node_id},
+            )
+
+        if phase == "tool_calls":
+            tool_results = bucket.get("tool_results")
+            if tool_results is None:
+                temp = _ensure_temp_dict(run)
+                agent_bucket = temp.get("agent", {}).get(node_id, {}) if isinstance(temp.get("agent"), dict) else {}
+                tool_results = agent_bucket.get("tool_results") if isinstance(agent_bucket, dict) else None
+
+            results_list = tool_results.get("results") if isinstance(tool_results, dict) else None
+            results = results_list if isinstance(results_list, list) else []
+
+            messages = bucket.get("messages")
+            if not isinstance(messages, list):
+                messages = []
+
+            # Feed tool results back into the model in a provider-agnostic way.
+            try:
+                results_json = json.dumps({"results": results}, ensure_ascii=False)
+            except Exception:
+                results_json = str({"results": results})
+            messages.append(
+                {
+                    "role": "user",
+                    "content": f"Tool execution results (JSON):\n{results_json}\n\nContinue the task using these results.",
+                }
+            )
+
+            bucket["messages"] = messages
+            tool_round += 1
+            bucket["tool_round"] = tool_round
+
+            if tool_round >= max_tool_rounds:
+                out = {
+                    "result": "Agent exceeded max tool iterations",
+                    "task": task,
+                    "context": context,
+                    "success": False,
+                    "error": "max_tool_iterations",
+                    "provider": provider,
+                    "model": model,
+                    "tool_results": results,
+                }
+                _set_nested(run.vars, f"_temp.effects.{node_id}", out)
+                flow._node_outputs[node_id] = {"result": out}
+                run.vars["_last_output"] = {"result": out}
+                bucket["phase"] = "done"
+                if next_node:
+                    return StepPlan(node_id=node_id, next_node=next_node)
+                return StepPlan(node_id=node_id, complete_output={"result": out, "success": False})
+
+            tools_payload = None
+            if tools_selected:
+                from abstractruntime.integrations.abstractcore.default_tools import filter_tool_specs
+
+                tools_payload = filter_tool_specs(tools_selected)
+
+            bucket["phase"] = "llm"
+            return StepPlan(
+                node_id=node_id,
+                effect=Effect(
+                    type=EffectType.LLM_CALL,
+                    payload={
+                        "messages": messages,
+                        "provider": provider,
+                        "model": model,
+                        "tools": tools_payload,
+                        "params": {"temperature": 0.7},
+                    },
+                    result_key=f"_temp.agent.{node_id}.llm",
+                ),
+                next_node=node_id,
+            )
+
+        if phase == "structured":
+            structured_resp = bucket.get("structured")
+            if structured_resp is None:
+                temp = _ensure_temp_dict(run)
+                agent_bucket = temp.get("agent", {}).get(node_id, {}) if isinstance(temp.get("agent"), dict) else {}
+                structured_resp = agent_bucket.get("structured") if isinstance(agent_bucket, dict) else None
+
+            data = structured_resp.get("data") if isinstance(structured_resp, dict) else None
+            if data is None and isinstance(structured_resp, dict):
+                # Best-effort parse: some providers may return JSON in content.
+                content = structured_resp.get("content")
+                if isinstance(content, str) and content.strip():
+                    try:
+                        data = json.loads(content)
+                    except Exception:
+                        data = None
+
+            if not isinstance(data, dict):
+                data = {}
+
+            _set_nested(run.vars, f"_temp.effects.{node_id}", data)
+            flow._node_outputs[node_id] = {"result": data}
+            run.vars["_last_output"] = {"result": data}
+            bucket["phase"] = "done"
+            if next_node:
+                return StepPlan(node_id=node_id, next_node=next_node)
+            return StepPlan(node_id=node_id, complete_output={"result": data, "success": True})
+
+        # done / unknown phase
+        if next_node:
+            return StepPlan(node_id=node_id, next_node=next_node)
+        return StepPlan(node_id=node_id, complete_output={"result": run.vars.get("_last_output"), "success": True})
+
+    return handler
+
+
 def _create_visual_function_handler(
     node_id: str,
     func: Callable,
@@ -336,6 +677,9 @@ def _sync_effect_results_to_node_outputs(run: Any, flow: Flow) -> None:
                 current["response"] = raw.get("content")
                 current["raw"] = raw
                 mapped_value = current["response"]
+        elif effect_type == "agent":
+            current["result"] = raw
+            mapped_value = raw
         elif effect_type == "wait_event":
             current["event_data"] = raw
             mapped_value = raw
@@ -523,7 +867,16 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
         effect_config = getattr(flow_node, "effect_config", None) or {}
 
         # Check for effect nodes first
-        if effect_type:
+        if effect_type == "agent":
+            data_aware_handler = handler_obj if callable(handler_obj) else None
+            handlers[node_id] = _create_visual_agent_effect_handler(
+                node_id=node_id,
+                next_node=next_node,
+                agent_config=effect_config if isinstance(effect_config, dict) else {},
+                data_aware_handler=data_aware_handler,
+                flow=flow,
+            )
+        elif effect_type:
             # Pass the handler_obj as data_aware_handler if it's callable
             # This allows visual flows to resolve data edges before creating effects
             data_aware_handler = handler_obj if callable(handler_obj) else None

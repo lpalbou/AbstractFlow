@@ -87,6 +87,12 @@ export interface FlowNodeData {
   agentConfig?: {          // For agent nodes
     provider?: string;
     model?: string;
+    tools?: string[];      // Allowlisted tool names (0..N)
+    outputSchema?: {       // Optional structured output schema
+      enabled?: boolean;
+      mode?: 'fields' | 'json';
+      jsonSchema?: Record<string, any>; // JSON Schema object (subset)
+    };
   };
   subflowId?: string;      // For subflow nodes
   // Event node configuration

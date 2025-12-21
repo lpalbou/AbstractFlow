@@ -14,6 +14,26 @@ interface PropertiesPanelProps {
   node: Node<FlowNodeData> | null;
 }
 
+interface ToolSpec {
+  name: string;
+  description?: string;
+  parameters?: Record<string, any>;
+  toolset?: string;
+  tags?: string[];
+  when_to_use?: string;
+  examples?: unknown[];
+}
+
+type AgentSchemaFieldType = 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' | 'any';
+
+interface AgentSchemaField {
+  id: string;
+  name: string;
+  type: AgentSchemaFieldType;
+  required: boolean;
+  itemsType?: Exclude<AgentSchemaFieldType, 'any'>;
+}
+
 type DataPinType = Exclude<FlowNodeData['inputs'][number]['type'], 'execution'>;
 
 const DATA_PIN_TYPES: DataPinType[] = [
@@ -41,6 +61,92 @@ function uniquePinId(base: string, used: Set<string>): string {
   return `${candidateBase}_${idx}`;
 }
 
+function newOpaqueId(prefix = 'id'): string {
+  return `${prefix}-${Math.random().toString(16).slice(2)}`;
+}
+
+function schemaFieldsFromJsonSchema(schema: unknown): AgentSchemaField[] {
+  if (!schema || typeof schema !== 'object') return [];
+  const root = schema as Record<string, any>;
+  if (root.type !== 'object') return [];
+  const props = root.properties;
+  if (!props || typeof props !== 'object') return [];
+
+  const required = new Set<string>(
+    Array.isArray(root.required) ? root.required.filter((x): x is string => typeof x === 'string') : []
+  );
+
+  const out: AgentSchemaField[] = [];
+  for (const [name, spec] of Object.entries(props as Record<string, any>)) {
+    if (!name) continue;
+    const specObj = spec && typeof spec === 'object' ? (spec as Record<string, any>) : {};
+    const rawType = typeof specObj.type === 'string' ? specObj.type : undefined;
+    const type: AgentSchemaFieldType =
+      rawType === 'string' || rawType === 'number' || rawType === 'integer' || rawType === 'boolean' || rawType === 'object' || rawType === 'array'
+        ? rawType
+        : 'any';
+
+    let itemsType: Exclude<AgentSchemaFieldType, 'any'> | undefined = undefined;
+    if (type === 'array') {
+      const items = specObj.items;
+      if (items && typeof items === 'object') {
+        const itemsTypeRaw = (items as Record<string, any>).type;
+        if (
+          itemsTypeRaw === 'string' ||
+          itemsTypeRaw === 'number' ||
+          itemsTypeRaw === 'integer' ||
+          itemsTypeRaw === 'boolean' ||
+          itemsTypeRaw === 'object' ||
+          itemsTypeRaw === 'array'
+        ) {
+          itemsType = itemsTypeRaw;
+        }
+      }
+    }
+
+    out.push({
+      id: newOpaqueId('field'),
+      name,
+      type,
+      required: required.has(name),
+      itemsType,
+    });
+  }
+  return out;
+}
+
+function jsonSchemaFromAgentFields(fields: AgentSchemaField[]): Record<string, any> {
+  const properties: Record<string, any> = {};
+  const required: string[] = [];
+
+  for (const field of fields) {
+    const name = field.name.trim();
+    if (!name) continue;
+
+    const t = field.type;
+    if (t === 'any') {
+      properties[name] = {};
+    } else if (t === 'array') {
+      const itemsType = field.itemsType;
+      properties[name] = {
+        type: 'array',
+        items: itemsType ? { type: itemsType } : {},
+      };
+    } else {
+      properties[name] = { type: t };
+    }
+
+    if (field.required) required.push(name);
+  }
+
+  const schema: Record<string, any> = {
+    type: 'object',
+    properties,
+  };
+  if (required.length > 0) schema.required = required;
+  return schema;
+}
+
 export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const { updateNodeData, deleteNode, setEdges, flowId, nodes, edges } = useFlowStore();
   const [showCodeEditor, setShowCodeEditor] = useState(false);
@@ -51,6 +157,12 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const [loadingProviders, setLoadingProviders] = useState(false);
   const [loadingModels, setLoadingModels] = useState(false);
 
+  // Tool discovery for agent nodes
+  const [toolSpecs, setToolSpecs] = useState<ToolSpec[]>([]);
+  const [loadingTools, setLoadingTools] = useState(false);
+  const [toolsError, setToolsError] = useState<string | null>(null);
+  const [toolSearch, setToolSearch] = useState('');
+
   // Saved flows list (for subflow nodes)
   const [savedFlows, setSavedFlows] = useState<Array<{ id: string; name: string }>>([]);
   const [loadingFlows, setLoadingFlows] = useState(false);
@@ -58,11 +170,50 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
   const [ioPinNameDrafts, setIoPinNameDrafts] = useState<Record<string, string>>({});
 
+  const [agentSchemaEnabled, setAgentSchemaEnabled] = useState(false);
+  const [agentSchemaMode, setAgentSchemaMode] = useState<'fields' | 'json'>('fields');
+  const [agentSchemaFields, setAgentSchemaFields] = useState<AgentSchemaField[]>([]);
+  const [agentSchemaJsonDraft, setAgentSchemaJsonDraft] = useState('');
+  const [agentSchemaJsonDirty, setAgentSchemaJsonDirty] = useState(false);
+  const [agentSchemaJsonError, setAgentSchemaJsonError] = useState<string | null>(null);
+
   // Track last fetched provider to prevent duplicate fetches
   const lastFetchedProvider = useRef<string | null>(null);
 
   useEffect(() => {
     setShowCodeEditor(false);
+  }, [node?.id]);
+
+  useEffect(() => {
+    if (!node || node.data.nodeType !== 'agent') return;
+
+    const outputSchema = node.data.agentConfig?.outputSchema;
+    const enabled = Boolean(outputSchema?.enabled);
+    const schema = outputSchema?.jsonSchema;
+    const mode = outputSchema?.mode === 'json' ? 'json' : 'fields';
+
+    setAgentSchemaEnabled(enabled);
+    setAgentSchemaMode(mode);
+
+    const parsed = schemaFieldsFromJsonSchema(schema);
+    const nextFields =
+      parsed.length > 0
+        ? parsed
+        : [
+            {
+              id: newOpaqueId('field'),
+              name: 'output',
+              type: 'string' as const,
+              required: true,
+            },
+          ];
+    setAgentSchemaFields(nextFields);
+
+    const effectiveSchema =
+      schema && typeof schema === 'object' ? (schema as Record<string, any>) : jsonSchemaFromAgentFields(nextFields);
+    setAgentSchemaJsonDraft(JSON.stringify(effectiveSchema, null, 2));
+    setAgentSchemaJsonDirty(false);
+    setAgentSchemaJsonError(null);
   }, [node?.id]);
 
   // Fetch available providers on mount
@@ -73,6 +224,38 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       .then((data) => setProviders(data))
       .catch((err) => console.error('Failed to fetch providers:', err))
       .finally(() => setLoadingProviders(false));
+  }, []);
+
+  // Fetch available tools for Agent nodes
+  useEffect(() => {
+    setLoadingTools(true);
+    setToolsError(null);
+    fetch('/api/tools')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          const normalized: ToolSpec[] = data
+            .filter((t) => t && typeof t.name === 'string' && t.name.trim())
+            .map((t) => ({
+              name: String(t.name),
+              description: typeof t.description === 'string' ? t.description : undefined,
+              parameters: t.parameters && typeof t.parameters === 'object' ? t.parameters : undefined,
+              toolset: typeof t.toolset === 'string' ? t.toolset : undefined,
+              tags: Array.isArray(t.tags) ? t.tags.filter((x: unknown): x is string => typeof x === 'string') : undefined,
+              when_to_use: typeof t.when_to_use === 'string' ? t.when_to_use : undefined,
+              examples: Array.isArray(t.examples) ? t.examples : undefined,
+            }));
+          setToolSpecs(normalized);
+        } else {
+          setToolSpecs([]);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to fetch tools:', err);
+        setToolsError(String(err));
+        setToolSpecs([]);
+      })
+      .finally(() => setLoadingTools(false));
   }, []);
 
   // Fetch models when provider changes (for both agent and llm_call nodes)
@@ -335,6 +518,100 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     return out;
   }, []);
 
+  const inferPinTypeFromSchema = useCallback(
+    (schema: unknown): FlowNodeData['inputs'][number]['type'] => {
+      if (!schema || typeof schema !== 'object') return 'any';
+      const t = (schema as Record<string, unknown>).type;
+      switch (t) {
+        case 'string':
+          return 'string';
+        case 'integer':
+        case 'number':
+          return 'number';
+        case 'boolean':
+          return 'boolean';
+        case 'object':
+          return 'object';
+        case 'array':
+          return 'array';
+        default:
+          return 'any';
+      }
+    },
+    []
+  );
+
+  const getSchemaByPath = useCallback((schema: unknown, path: string): unknown => {
+    if (!path || !schema || typeof schema !== 'object') return undefined;
+    const parts = path.split('.');
+
+    let current: unknown = schema;
+    for (const part of parts) {
+      if (!current || typeof current !== 'object') return undefined;
+      const cur = current as Record<string, unknown>;
+      const type = cur.type;
+
+      if (type === 'object') {
+        const props = cur.properties;
+        if (!props || typeof props !== 'object') return undefined;
+        current = (props as Record<string, unknown>)[part];
+        continue;
+      }
+
+      if (type === 'array') {
+        if (!/^\d+$/.test(part)) return undefined;
+        current = cur.items;
+        continue;
+      }
+
+      return undefined;
+    }
+    return current;
+  }, []);
+
+  const flattenSchemaPaths = useCallback((schema: unknown): string[] => {
+    const out: string[] = [];
+    const seen = new Set<string>();
+    const maxDepth = 5;
+    const maxPaths = 250;
+
+    const walk = (cur: unknown, prefix: string, depth: number) => {
+      if (out.length >= maxPaths) return;
+      if (depth > maxDepth) return;
+      if (!cur || typeof cur !== 'object') return;
+
+      const obj = cur as Record<string, unknown>;
+      const type = obj.type;
+
+      if (type === 'object') {
+        const props = obj.properties;
+        if (!props || typeof props !== 'object') return;
+        for (const key of Object.keys(props as Record<string, unknown>)) {
+          if (out.length >= maxPaths) return;
+          const path = prefix ? `${prefix}.${key}` : key;
+          if (!seen.has(path)) {
+            seen.add(path);
+            out.push(path);
+          }
+          walk((props as Record<string, unknown>)[key], path, depth + 1);
+        }
+        return;
+      }
+
+      if (type === 'array') {
+        const idxPath = prefix ? `${prefix}.0` : '0';
+        if (!seen.has(idxPath)) {
+          seen.add(idxPath);
+          out.push(idxPath);
+        }
+        walk(obj.items, idxPath, depth + 1);
+      }
+    };
+
+    walk(schema, '', 0);
+    return out;
+  }, []);
+
 
   if (!node) {
     return (
@@ -348,6 +625,60 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   }
 
   const { data } = node;
+
+  const updateAgentConfig = (patch: Partial<NonNullable<FlowNodeData['agentConfig']>>) => {
+    updateNodeData(node.id, {
+      agentConfig: {
+        ...(data.agentConfig || {}),
+        ...patch,
+      },
+    });
+  };
+
+  const selectedTools = Array.isArray(data.agentConfig?.tools)
+    ? data.agentConfig?.tools.filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
+    : [];
+
+  const filteredToolSpecs = (() => {
+    const q = toolSearch.trim().toLowerCase();
+    const matches = (t: ToolSpec) => {
+      if (!q) return true;
+      const hay = `${t.name} ${t.description || ''} ${(t.toolset || '')}`.toLowerCase();
+      return hay.includes(q);
+    };
+    return toolSpecs.filter(matches);
+  })();
+
+  const toolSpecsByToolset = (() => {
+    const out: Record<string, ToolSpec[]> = {};
+    for (const t of filteredToolSpecs) {
+      const key = t.toolset || 'other';
+      if (!out[key]) out[key] = [];
+      out[key].push(t);
+    }
+    return out;
+  })();
+
+  const commitAgentSchema = (
+    nextEnabled: boolean,
+    nextFields: AgentSchemaField[],
+    nextMode: 'fields' | 'json' = agentSchemaMode
+  ) => {
+    const schema = jsonSchemaFromAgentFields(nextFields);
+    updateAgentConfig({
+      outputSchema: {
+        ...(data.agentConfig?.outputSchema || {}),
+        enabled: nextEnabled,
+        mode: nextMode,
+        jsonSchema: schema,
+      },
+    });
+
+    if (nextMode === 'fields' && !agentSchemaJsonDirty) {
+      setAgentSchemaJsonDraft(JSON.stringify(schema, null, 2));
+      setAgentSchemaJsonError(null);
+    }
+  };
 
   return (
     <div className="properties-panel">
@@ -623,31 +954,41 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               ? nodes.find((n) => n.id === inputEdge.source)
               : undefined;
             let sample: unknown = undefined;
+            let schema: unknown = undefined;
 
             if (sourceNode?.data.nodeType === 'literal_json') {
               sample = sourceNode.data.literalValue;
             } else if (sourceNode?.data.nodeType === 'literal_array') {
               sample = sourceNode.data.literalValue;
             } else if (sourceNode?.data.nodeType === 'agent') {
-              // Best-effort schema for Agent result payload.
-              sample = {
-                result: '',
-                task: '',
-                context: {},
-                success: true,
-                provider: '',
-                model: '',
-                usage: {
-                  input_tokens: 0,
-                  output_tokens: 0,
-                  total_tokens: 0,
-                  prompt_tokens: 0,
-                  completion_tokens: 0,
-                },
-              };
+              const outputSchema = sourceNode.data.agentConfig?.outputSchema;
+              if (outputSchema?.enabled && outputSchema.jsonSchema && typeof outputSchema.jsonSchema === 'object') {
+                schema = outputSchema.jsonSchema;
+              } else {
+                // Best-effort schema for legacy Agent result payload.
+                sample = {
+                  result: '',
+                  task: '',
+                  context: {},
+                  success: true,
+                  provider: '',
+                  model: '',
+                  usage: {
+                    input_tokens: 0,
+                    output_tokens: 0,
+                    total_tokens: 0,
+                    prompt_tokens: 0,
+                    completion_tokens: 0,
+                  },
+                };
+              }
             }
 
-            const available = sample ? flattenPaths(sample).sort() : [];
+            const available = schema
+              ? flattenSchemaPaths(schema).sort()
+              : sample
+                ? flattenPaths(sample).sort()
+                : [];
             const selected = data.breakConfig?.selectedPaths || [];
 
             const togglePath = (path: string) => {
@@ -658,7 +999,9 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               const nextOutputs = nextSelected.map((p) => ({
                 id: p,
                 label: p.split('.').slice(-1)[0] || p,
-                type: inferPinType(getByPath(sample, p)),
+                type: schema
+                  ? inferPinTypeFromSchema(getSchemaByPath(schema, p))
+                  : inferPinType(getByPath(sample, p)),
               }));
 
               updateNodeData(node.id, {
@@ -745,6 +1088,402 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 </option>
               ))}
             </select>
+          </div>
+
+          <div className="property-group">
+            <label className="property-sublabel">Tools (optional)</label>
+            <input
+              className="property-input"
+              value={toolSearch}
+              onChange={(e) => setToolSearch(e.target.value)}
+              placeholder={loadingTools ? 'Loading tools…' : 'Search tools…'}
+              disabled={loadingTools}
+            />
+
+            {selectedTools.length > 0 && (
+              <div className="tool-chips">
+                {selectedTools.map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    className="tool-chip"
+                    onClick={() => {
+                      const next = selectedTools.filter((t) => t !== name);
+                      updateAgentConfig({ tools: next.length > 0 ? next : undefined });
+                    }}
+                    title="Remove tool"
+                  >
+                    {name}
+                    <span className="tool-chip-x">×</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {toolsError && (
+              <span className="property-error">
+                Failed to load tools: {toolsError}
+              </span>
+            )}
+
+            {!loadingTools && !toolsError && toolSpecs.length === 0 && (
+              <span className="property-hint">
+                No tools available from the runtime.
+              </span>
+            )}
+
+            {!loadingTools && toolSpecs.length > 0 && (
+              <div className="toolset-list">
+                {Object.entries(toolSpecsByToolset).map(([toolset, tools]) => {
+                  const names = tools.map((t) => t.name);
+                  const allSelected = names.length > 0 && names.every((n) => selectedTools.includes(n));
+
+                  const toggleAll = () => {
+                    const next = new Set(selectedTools);
+                    if (!allSelected) {
+                      for (const n of names) next.add(n);
+                    } else {
+                      for (const n of names) next.delete(n);
+                    }
+                    const asList = Array.from(next);
+                    updateAgentConfig({ tools: asList.length > 0 ? asList : undefined });
+                  };
+
+                  return (
+                    <div key={toolset} className="toolset-group">
+                      <div className="toolset-header">
+                        <span className="toolset-title">{toolset}</span>
+                        <button
+                          type="button"
+                          className="toolset-toggle"
+                          onClick={toggleAll}
+                          disabled={names.length === 0}
+                          title={allSelected ? 'Deselect all' : 'Select all'}
+                        >
+                          {allSelected ? 'None' : 'All'}
+                        </button>
+                      </div>
+                      <div className="checkbox-list tool-checkboxes">
+                        {tools.map((t) => (
+                          <label key={t.name} className="checkbox-item tool-item">
+                            <input
+                              type="checkbox"
+                              checked={selectedTools.includes(t.name)}
+                              onChange={() => {
+                                const next = selectedTools.includes(t.name)
+                                  ? selectedTools.filter((x) => x !== t.name)
+                                  : [...selectedTools, t.name];
+                                updateAgentConfig({ tools: next.length > 0 ? next : undefined });
+                              }}
+                            />
+                            <span className="checkbox-label">{t.name}</span>
+                            {t.description && <span className="tool-desc">{t.description}</span>}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <span className="property-hint">
+              Selected tools are the only tools this node may execute at runtime.
+            </span>
+          </div>
+
+          <div className="property-group">
+            <label className="property-sublabel">Structured Output</label>
+            <label className="toggle-container">
+              <input
+                type="checkbox"
+                className="toggle-checkbox"
+                checked={agentSchemaEnabled}
+                onChange={(e) => {
+                  const enabled = e.target.checked;
+                  setAgentSchemaEnabled(enabled);
+                  if (agentSchemaMode === 'fields') {
+                    commitAgentSchema(enabled, agentSchemaFields, 'fields');
+                    return;
+                  }
+
+                  let schema: unknown = data.agentConfig?.outputSchema?.jsonSchema;
+                  if (!schema && agentSchemaJsonDraft.trim()) {
+                    try {
+                      const parsed = JSON.parse(agentSchemaJsonDraft);
+                      if (parsed && typeof parsed === 'object') schema = parsed;
+                    } catch {
+                      // Ignore parse errors here; user can fix in JSON editor.
+                    }
+                  }
+
+                  updateAgentConfig({
+                    outputSchema: {
+                      ...(data.agentConfig?.outputSchema || {}),
+                      enabled,
+                      mode: 'json',
+                      jsonSchema:
+                        schema && typeof schema === 'object'
+                          ? (schema as Record<string, any>)
+                          : jsonSchemaFromAgentFields(agentSchemaFields),
+                    },
+                  });
+                }}
+              />
+              <span className="toggle-label">
+                Return JSON result
+              </span>
+            </label>
+
+            {agentSchemaEnabled && (
+              <>
+                <div className="property-group schema-mode">
+                  <label className="property-sublabel">Schema Editor</label>
+                  <select
+                    className="property-select"
+                    value={agentSchemaMode}
+                    onChange={(e) => {
+                      const mode = e.target.value === 'json' ? 'json' : 'fields';
+                      const existingSchema =
+                        data.agentConfig?.outputSchema?.jsonSchema ?? jsonSchemaFromAgentFields(agentSchemaFields);
+
+                      setAgentSchemaMode(mode);
+                      updateAgentConfig({
+                        outputSchema: {
+                          ...(data.agentConfig?.outputSchema || {}),
+                          enabled: agentSchemaEnabled,
+                          mode,
+                          jsonSchema: existingSchema,
+                        },
+                      });
+
+                      if (mode === 'json') {
+                        setAgentSchemaJsonDraft(JSON.stringify(existingSchema, null, 2));
+                        setAgentSchemaJsonDirty(false);
+                        setAgentSchemaJsonError(null);
+                      } else {
+                        const parsedFields = schemaFieldsFromJsonSchema(existingSchema);
+                        if (parsedFields.length > 0) setAgentSchemaFields(parsedFields);
+                        setAgentSchemaJsonDirty(false);
+                        setAgentSchemaJsonError(null);
+                      }
+                    }}
+                  >
+                    <option value="fields">Fields (recommended)</option>
+                    <option value="json">JSON Schema (advanced)</option>
+                  </select>
+                </div>
+
+                {agentSchemaMode === 'fields' && (
+                  <div className="schema-fields">
+                    {agentSchemaFields.map((field) => (
+                      <div key={field.id} className="schema-field-row">
+                        <div className="schema-field-top">
+                          <input
+                            className="property-input schema-field-name"
+                            value={field.name}
+                            placeholder="field_name"
+                            onChange={(e) => {
+                              const next = agentSchemaFields.map((f) =>
+                                f.id === field.id ? { ...f, name: e.target.value } : f
+                              );
+                              setAgentSchemaFields(next);
+                              commitAgentSchema(agentSchemaEnabled, next, 'fields');
+                            }}
+                            onBlur={() => {
+                              const used = new Set(agentSchemaFields.filter((f) => f.id !== field.id).map((f) => f.name));
+                              const sanitized = uniquePinId(sanitizePythonIdentifier(field.name), used);
+                              if (sanitized === field.name) return;
+                              const next = agentSchemaFields.map((f) =>
+                                f.id === field.id ? { ...f, name: sanitized } : f
+                              );
+                              setAgentSchemaFields(next);
+                              commitAgentSchema(agentSchemaEnabled, next, 'fields');
+                            }}
+                          />
+
+                          <button
+                            type="button"
+                            className="array-item-remove"
+                            onClick={() => {
+                              const next = agentSchemaFields.filter((f) => f.id !== field.id);
+                              setAgentSchemaFields(next);
+                              commitAgentSchema(agentSchemaEnabled, next, 'fields');
+                            }}
+                            title="Remove field"
+                          >
+                            ×
+                          </button>
+                        </div>
+
+                        <div className="schema-field-bottom">
+                          <select
+                            className="property-select schema-field-type"
+                            value={field.type}
+                            onChange={(e) => {
+                              const nextType = (e.target.value || 'string') as AgentSchemaFieldType;
+                              const next = agentSchemaFields.map((f) => {
+                                if (f.id !== field.id) return f;
+                                if (nextType === 'array') {
+                                  return { ...f, type: 'array', itemsType: f.itemsType ?? 'string' } as AgentSchemaField;
+                                }
+                                return { ...f, type: nextType, itemsType: undefined } as AgentSchemaField;
+                              });
+                              setAgentSchemaFields(next);
+                              setAgentSchemaMode('fields');
+                              commitAgentSchema(agentSchemaEnabled, next, 'fields');
+                            }}
+                          >
+                            <option value="string">string</option>
+                            <option value="number">number</option>
+                            <option value="integer">integer</option>
+                            <option value="boolean">boolean</option>
+                            <option value="object">object</option>
+                            <option value="array">array</option>
+                            <option value="any">any</option>
+                          </select>
+
+                          {field.type === 'array' && (
+                            <select
+                              className="property-select schema-field-items"
+                              value={field.itemsType ?? 'string'}
+                              onChange={(e) => {
+                                const itemsType = (e.target.value || 'string') as Exclude<AgentSchemaFieldType, 'any'>;
+                                const next = agentSchemaFields.map((f) =>
+                                  f.id === field.id ? { ...f, itemsType } : f
+                                );
+                                setAgentSchemaFields(next);
+                                commitAgentSchema(agentSchemaEnabled, next, 'fields');
+                              }}
+                            >
+                              <option value="string">items: string</option>
+                              <option value="number">items: number</option>
+                              <option value="integer">items: integer</option>
+                              <option value="boolean">items: boolean</option>
+                              <option value="object">items: object</option>
+                              <option value="array">items: array</option>
+                            </select>
+                          )}
+
+                          <label className="schema-optional" title="When enabled, this field may be omitted from the result.">
+                            <input
+                              type="checkbox"
+                              checked={!field.required}
+                              onChange={(e) => {
+                                const optional = e.target.checked;
+                                const next = agentSchemaFields.map((f) =>
+                                  f.id === field.id ? { ...f, required: !optional } : f
+                                );
+                                setAgentSchemaFields(next);
+                                commitAgentSchema(agentSchemaEnabled, next, 'fields');
+                              }}
+                            />
+                            <span>optional</span>
+                          </label>
+                        </div>
+                      </div>
+                    ))}
+
+                    <button
+                      type="button"
+                      className="array-add-button"
+                      onClick={() => {
+                        const used = new Set(agentSchemaFields.map((f) => f.name));
+                        const nextName = uniquePinId('field', used);
+                        const next = [
+                          ...agentSchemaFields,
+                          {
+                            id: newOpaqueId('field'),
+                            name: nextName,
+                            type: 'string' as const,
+                            required: true,
+                          },
+                        ];
+                        setAgentSchemaFields(next);
+                        setAgentSchemaMode('fields');
+                        commitAgentSchema(agentSchemaEnabled, next, 'fields');
+                      }}
+                    >
+                      + Add field
+                    </button>
+                  </div>
+                )}
+
+                {agentSchemaMode === 'json' && (
+                  <div className="schema-json">
+                    <textarea
+                      className="property-input property-textarea code"
+                      value={agentSchemaJsonDraft}
+                      onChange={(e) => {
+                        setAgentSchemaJsonDraft(e.target.value);
+                        setAgentSchemaJsonDirty(true);
+                      }}
+                      rows={10}
+                      placeholder='{"type":"object","properties":{...}}'
+                    />
+
+                    {agentSchemaJsonError && <span className="property-error">{agentSchemaJsonError}</span>}
+
+                    <div className="schema-actions">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          try {
+                            const parsed = JSON.parse(agentSchemaJsonDraft);
+                            if (!parsed || typeof parsed !== 'object') {
+                              setAgentSchemaJsonError('Schema must be a JSON object.');
+                              return;
+                            }
+                            updateAgentConfig({
+                              outputSchema: {
+                                ...(data.agentConfig?.outputSchema || {}),
+                                enabled: agentSchemaEnabled,
+                                mode: 'json',
+                                jsonSchema: parsed,
+                              },
+                            });
+                            setAgentSchemaJsonError(null);
+                            setAgentSchemaJsonDirty(false);
+                            setAgentSchemaFields(schemaFieldsFromJsonSchema(parsed));
+                          } catch (e) {
+                            setAgentSchemaJsonError(String(e));
+                          }
+                        }}
+                        disabled={!agentSchemaJsonDirty}
+                      >
+                        Apply JSON Schema
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const schema = data.agentConfig?.outputSchema?.jsonSchema ?? jsonSchemaFromAgentFields(agentSchemaFields);
+                          setAgentSchemaJsonDraft(JSON.stringify(schema, null, 2));
+                          setAgentSchemaJsonDirty(false);
+                          setAgentSchemaJsonError(null);
+                        }}
+                      >
+                        Reset
+                      </button>
+                    </div>
+
+                    <span className="property-hint">
+                      Property names must be identifier-style (<code>snake_case</code>) for structured output validation.
+                    </span>
+                  </div>
+                )}
+
+                <span className="property-hint">
+                  When enabled, the Agent&apos;s <code>result</code> output is a JSON object matching this schema.
+                </span>
+              </>
+            )}
+
+            {!agentSchemaEnabled && (
+              <span className="property-hint">
+                Disabled: the Agent returns a free-form result object (still on the <code>result</code> pin).
+              </span>
+            )}
           </div>
         </div>
       )}

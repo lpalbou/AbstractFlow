@@ -211,6 +211,14 @@
   margin-bottom: 12px;
 }
 
+.property-error {
+  display: block;
+  font-size: 10px;
+  color: var(--error);
+  margin-top: 6px;
+  line-height: 1.35;
+}
+
 /* Pins List */
 .pins-list {
   list-style: none;
@@ -655,4 +663,147 @@
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
   font-size: 11px;
   color: var(--text-primary);
+}
+
+/* Agent tools */
+.tool-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.tool-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border: 1px solid var(--bg-tertiary);
+  border-radius: 999px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 11px;
+}
+
+.tool-chip:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+}
+
+.tool-chip-x {
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.75;
+}
+
+.toolset-group {
+  margin-top: 10px;
+}
+
+.toolset-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 8px 0 6px;
+}
+
+.toolset-title {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
+}
+
+.toolset-toggle {
+  padding: 4px 8px;
+  font-size: 11px;
+  background: var(--bg-tertiary);
+}
+
+.tool-checkboxes {
+  max-height: 180px;
+}
+
+.tool-item {
+  align-items: flex-start;
+}
+
+.tool-desc {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-left: 10px;
+  line-height: 1.3;
+}
+
+/* Agent schema */
+.schema-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.schema-field-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--bg-tertiary);
+  border-radius: 6px;
+}
+
+.schema-field-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.schema-field-bottom {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.schema-field-name {
+  flex: 1;
+  min-width: 0;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 11px;
+}
+
+.schema-field-type {
+  flex: 1 1 140px;
+  min-width: 120px;
+}
+
+.schema-field-items {
+  flex: 1 1 170px;
+  min-width: 140px;
+}
+
+.schema-optional {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding: 0 6px;
+}
+
+.schema-optional input {
+  accent-color: var(--accent);
+}
+
+.schema-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.schema-actions button {
+  padding: 6px 10px;
+  font-size: 12px;
 }

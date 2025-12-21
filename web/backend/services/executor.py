@@ -135,22 +135,34 @@ def create_visual_runner(visual_flow: VisualFlow, *, flows: Dict[str, VisualFlow
 
     _dfs(visual_flow)
 
-    # Validate LLM_CALL config across the flow tree and choose a default runtime model.
+    # Validate LLM config across the flow tree and choose a default runtime model.
     # NOTE: Each LLM_CALL node may use its own provider/model; the runtime supports
     # per-effect routing using effect payload fields.
     llm_configs: set[tuple[str, str]] = set()
     default_llm: tuple[str, str] | None = None
     for vf in ordered:
         for n in vf.nodes:
-            if _node_type(n) != "llm_call":
+            node_type = _node_type(n)
+            if node_type not in {"llm_call", "agent"}:
                 continue
-            cfg = n.data.get("effectConfig", {})
-            provider = cfg.get("provider")
-            model = cfg.get("model")
-            if not isinstance(provider, str) or not provider.strip():
-                raise ValueError(f"LLM_CALL node '{n.id}' in flow '{vf.id}' missing provider")
-            if not isinstance(model, str) or not model.strip():
-                raise ValueError(f"LLM_CALL node '{n.id}' in flow '{vf.id}' missing model")
+
+            if node_type == "llm_call":
+                cfg = n.data.get("effectConfig", {})
+                provider = cfg.get("provider")
+                model = cfg.get("model")
+                if not isinstance(provider, str) or not provider.strip():
+                    raise ValueError(f"LLM_CALL node '{n.id}' in flow '{vf.id}' missing provider")
+                if not isinstance(model, str) or not model.strip():
+                    raise ValueError(f"LLM_CALL node '{n.id}' in flow '{vf.id}' missing model")
+            else:
+                cfg = n.data.get("agentConfig", {})
+                provider = cfg.get("provider")
+                model = cfg.get("model")
+                if not isinstance(provider, str) or not provider.strip():
+                    continue
+                if not isinstance(model, str) or not model.strip():
+                    continue
+
             pair = (provider.strip().lower(), model.strip())
             llm_configs.add(pair)
             if default_llm is None:
@@ -161,7 +173,14 @@ def create_visual_runner(visual_flow: VisualFlow, *, flows: Dict[str, VisualFlow
     # - Add AbstractCore LLM handlers only when needed.
     if llm_configs:
         provider, model = default_llm or next(iter(llm_configs))
-        runtime = create_local_runtime(provider=provider, model=model)
+        from abstractruntime.integrations.abstractcore import MappingToolExecutor
+        from abstractruntime.integrations.abstractcore.default_tools import get_default_tools
+
+        runtime = create_local_runtime(
+            provider=provider,
+            model=model,
+            tool_executor=MappingToolExecutor.from_tools(get_default_tools()),
+        )
     else:
         runtime = Runtime(
             run_store=InMemoryRunStore(),
@@ -368,6 +387,9 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
         if type_str in EFFECT_NODE_TYPES:
             effect_type = type_str
             effect_config = node.data.get("effectConfig", {})
+        elif type_str == "agent":
+            effect_type = "agent"
+            effect_config = node.data.get("agentConfig", {})
         elif type_str == "subflow":
             effect_type = "start_subworkflow"
             subflow_id = node.data.get("subflowId") or node.data.get("flowId")  # legacy
@@ -490,8 +512,7 @@ def _create_handler(node_type: NodeType, data: Dict[str, Any]) -> Any:
         return create_code_handler(code, function_name)
 
     if type_str == "agent":
-        # Agent node - use AbstractCore to create real LLM handler
-        return _create_agent_handler(data)
+        return _create_agent_input_handler(data)
 
     if type_str == "subflow":
         # Subflow node - would need the nested flow to be compiled
@@ -714,6 +735,22 @@ def _create_agent_handler(data: Dict[str, Any]):
                     "error": str(e),
                 }
             }
+
+    return handler
+
+
+def _create_agent_input_handler(data: Dict[str, Any]):
+    """Resolve Agent node inputs (task/context) but do not execute the LLM.
+
+    The visual Agent node is executed via AbstractRuntime effects in the compiler
+    so tool execution and structured output can remain durable.
+    """
+
+    def handler(input_data):
+        task = input_data.get("task") if isinstance(input_data, dict) else str(input_data)
+        context_raw = input_data.get("context", {}) if isinstance(input_data, dict) else {}
+        context = context_raw if isinstance(context_raw, dict) else {}
+        return {"task": task, "context": context}
 
     return handler
 
