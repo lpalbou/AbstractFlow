@@ -1,0 +1,132 @@
+{
+  "id": "acae64b6",
+  "name": "test-subflow",
+  "description": "",
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": {
+        "x": 48.0,
+        "y": 224.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "usr",
+            "label": "usr",
+            "type": "string"
+          },
+          {
+            "id": "msg",
+            "label": "msg",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-2",
+      "type": "subflow",
+      "position": {
+        "x": 384.0,
+        "y": 224.0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Subflow",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "user",
+            "label": "user",
+            "type": "string"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "answer",
+            "label": "answer",
+            "type": "string"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          }
+        ],
+        "subflowId": "74940e15"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1766294503265",
+      "source": "node-1",
+      "sourceHandle": "usr",
+      "target": "node-2",
+      "targetHandle": "user",
+      "animated": false
+    },
+    {
+      "id": "edge-1766294505312",
+      "source": "node-1",
+      "sourceHandle": "msg",
+      "target": "node-2",
+      "targetHandle": "message",
+      "animated": false
+    },
+    {
+      "id": "edge-1766294537018",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-2",
+      "targetHandle": "exec-in",
+      "animated": true
+    }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2025-12-21T05:22:59.747702",
+  "updated_at": "2025-12-21T05:24:33.453185"
+}

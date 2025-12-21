@@ -1,0 +1,377 @@
+{
+  "id": "7c4ebf35",
+  "name": "testing-condition",
+  "description": "",
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": {
+        "x": -688.0,
+        "y": 96.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "qparam1",
+            "label": "qparam1",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-8",
+      "type": "compare",
+      "position": {
+        "x": -400.0,
+        "y": 160.0
+      },
+      "data": {
+        "nodeType": "compare",
+        "label": "Compare",
+        "icon": "=?",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "any"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "boolean"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-9",
+      "type": "literal_string",
+      "position": {
+        "x": -672.0,
+        "y": 256.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "String",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "yes"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-10",
+      "type": "if",
+      "position": {
+        "x": -160.0,
+        "y": 96.0
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "If/Else",
+        "icon": "&#x2753;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-11",
+      "type": "agent",
+      "position": {
+        "x": 112.0,
+        "y": 64.0
+      },
+      "data": {
+        "nodeType": "agent",
+        "label": "Agent",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "task",
+            "label": "task",
+            "type": "string"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "agentConfig": {
+          "provider": "lmstudio",
+          "model": "google_gemma-3-1b-it"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-12",
+      "type": "literal_string",
+      "position": {
+        "x": 112.0,
+        "y": -32.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "String",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "acknowledge this is a good idea"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-13",
+      "type": "agent",
+      "position": {
+        "x": 112.0,
+        "y": 304.0
+      },
+      "data": {
+        "nodeType": "agent",
+        "label": "Agent",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "task",
+            "label": "task",
+            "type": "string"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "agentConfig": {
+          "provider": "lmstudio",
+          "model": "google_gemma-3-1b-it"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-14",
+      "type": "literal_string",
+      "position": {
+        "x": 112.0,
+        "y": 432.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "String",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "acknowledge this is NOT a good idea"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1766293367137",
+      "source": "node-1",
+      "sourceHandle": "qparam1",
+      "target": "node-8",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-1766293374938",
+      "source": "node-9",
+      "sourceHandle": "value",
+      "target": "node-8",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-1766293389812",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-10",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1766293392986",
+      "source": "node-8",
+      "sourceHandle": "result",
+      "target": "node-10",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "edge-1766293408267",
+      "source": "node-10",
+      "sourceHandle": "true",
+      "target": "node-11",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "edge-1766293424185",
+      "source": "node-12",
+      "sourceHandle": "value",
+      "target": "node-11",
+      "targetHandle": "task",
+      "animated": false
+    },
+    {
+      "id": "edge-1766293449526",
+      "source": "node-10",
+      "sourceHandle": "false",
+      "target": "node-13",
+      "targetHandle": "exec-in",
+      "animated": false
+    },
+    {
+      "id": "edge-1766293460282",
+      "source": "node-14",
+      "sourceHandle": "value",
+      "target": "node-13",
+      "targetHandle": "task",
+      "animated": false
+    }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2025-12-21T05:04:40.516484",
+  "updated_at": "2025-12-21T05:11:32.849412"
+}

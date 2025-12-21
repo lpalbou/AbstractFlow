@@ -40,7 +40,7 @@ function uniquePinId(base: string, used: Set<string>): string {
 }
 
 export function PropertiesPanel({ node }: PropertiesPanelProps) {
-  const { updateNodeData, deleteNode, flowId, nodes, edges } = useFlowStore();
+  const { updateNodeData, deleteNode, setEdges, flowId, nodes, edges } = useFlowStore();
 
   // Provider/model state for agent nodes
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
@@ -52,6 +52,8 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const [savedFlows, setSavedFlows] = useState<Array<{ id: string; name: string }>>([]);
   const [loadingFlows, setLoadingFlows] = useState(false);
   const lastSyncedSubflowPins = useRef<string | null>(null);
+
+  const [ioPinNameDrafts, setIoPinNameDrafts] = useState<Record<string, string>>({});
 
   // Track last fetched provider to prevent duplicate fetches
   const lastFetchedProvider = useRef<string | null>(null);
@@ -851,15 +853,39 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               updateNodeData(node.id, { outputs: next });
             };
 
-            const renameParam = (pinId: string, nextName: string) => {
-              const nextLabel = nextName.trim();
-              if (!nextLabel) return;
+            const commitRenameParam = (pinId: string) => {
+              const draft = ioPinNameDrafts[pinId];
+              if (draft === undefined) return;
+              const nextLabel = draft.trim();
+              if (!nextLabel) {
+                setIoPinNameDrafts((prev) => {
+                  const { [pinId]: _removed, ...rest } = prev;
+                  return rest;
+                });
+                return;
+              }
+
               const usedWithoutSelf = new Set(data.outputs.filter((p) => p.id !== pinId).map((p) => p.id));
               const nextId = uniquePinId(nextLabel, usedWithoutSelf);
-              const next = data.outputs.map((p) =>
-                p.id === pinId ? { ...p, id: nextId, label: nextLabel } : p
+
+              // Update edges first so store doesn't interpret this as a removal.
+              const nextEdges = edges.map((e) => {
+                if (e.source === node.id && e.sourceHandle === pinId) {
+                  return { ...e, sourceHandle: nextId };
+                }
+                return e;
+              });
+              setEdges(nextEdges);
+
+              const nextPins = data.outputs.map((p) =>
+                p.id === pinId ? { ...p, id: nextId, label: nextId } : p
               );
-              updateNodeData(node.id, { outputs: next });
+              updateNodeData(node.id, { outputs: nextPins });
+
+              setIoPinNameDrafts((prev) => {
+                const { [pinId]: _removed, ...rest } = prev;
+                return nextId === pinId ? rest : { ...rest, [nextId]: nextId };
+              });
             };
 
             return (
@@ -869,13 +895,21 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                     <div key={pin.id} className="array-item">
                       <input
                         type="text"
-                        className="property-input array-item-input"
-                        value={pin.label}
-                        onChange={(e) => renameParam(pin.id, e.target.value)}
-                        placeholder="param"
+                        className="property-input array-item-input io-pin-name"
+                        value={ioPinNameDrafts[pin.id] ?? pin.id}
+                        onChange={(e) =>
+                          setIoPinNameDrafts((prev) => ({ ...prev, [pin.id]: e.target.value }))
+                        }
+                        onBlur={() => commitRenameParam(pin.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.currentTarget.blur();
+                          }
+                        }}
+                        placeholder="name"
                       />
                       <select
-                        className="property-select"
+                        className="property-select io-pin-type"
                         value={pin.type}
                         onChange={(e) =>
                           updateParam(pin.id, { type: e.target.value as DataPinType })
@@ -938,15 +972,38 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               updateNodeData(node.id, { inputs: next });
             };
 
-            const renameOut = (pinId: string, nextName: string) => {
-              const nextLabel = nextName.trim();
-              if (!nextLabel) return;
+            const commitRenameOut = (pinId: string) => {
+              const draft = ioPinNameDrafts[pinId];
+              if (draft === undefined) return;
+              const nextLabel = draft.trim();
+              if (!nextLabel) {
+                setIoPinNameDrafts((prev) => {
+                  const { [pinId]: _removed, ...rest } = prev;
+                  return rest;
+                });
+                return;
+              }
+
               const usedWithoutSelf = new Set(data.inputs.filter((p) => p.id !== pinId).map((p) => p.id));
               const nextId = uniquePinId(nextLabel, usedWithoutSelf);
-              const next = data.inputs.map((p) =>
-                p.id === pinId ? { ...p, id: nextId, label: nextLabel } : p
+
+              const nextEdges = edges.map((e) => {
+                if (e.target === node.id && e.targetHandle === pinId) {
+                  return { ...e, targetHandle: nextId };
+                }
+                return e;
+              });
+              setEdges(nextEdges);
+
+              const nextPins = data.inputs.map((p) =>
+                p.id === pinId ? { ...p, id: nextId, label: nextId } : p
               );
-              updateNodeData(node.id, { inputs: next });
+              updateNodeData(node.id, { inputs: nextPins });
+
+              setIoPinNameDrafts((prev) => {
+                const { [pinId]: _removed, ...rest } = prev;
+                return nextId === pinId ? rest : { ...rest, [nextId]: nextId };
+              });
             };
 
             return (
@@ -956,13 +1013,21 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                     <div key={pin.id} className="array-item">
                       <input
                         type="text"
-                        className="property-input array-item-input"
-                        value={pin.label}
-                        onChange={(e) => renameOut(pin.id, e.target.value)}
-                        placeholder="output"
+                        className="property-input array-item-input io-pin-name"
+                        value={ioPinNameDrafts[pin.id] ?? pin.id}
+                        onChange={(e) =>
+                          setIoPinNameDrafts((prev) => ({ ...prev, [pin.id]: e.target.value }))
+                        }
+                        onBlur={() => commitRenameOut(pin.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.currentTarget.blur();
+                          }
+                        }}
+                        placeholder="name"
                       />
                       <select
-                        className="property-select"
+                        className="property-select io-pin-type"
                         value={pin.type}
                         onChange={(e) =>
                           updateOut(pin.id, { type: e.target.value as DataPinType })

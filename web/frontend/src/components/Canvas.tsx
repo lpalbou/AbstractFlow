@@ -26,6 +26,18 @@ export function Canvas() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
 
+  // React Flow uses a multiplicative zoom factor of 1.2 per zoom step.
+  // We define our own "zoom positions" relative to max zoom:
+  // - Default: 2 zoom-out steps from max
+  // - Min: 10 zoom-out steps from max
+  const ZOOM_STEP = 1.2;
+  const MAX_ZOOM = 2;
+  const DEFAULT_ZOOM_OUT_STEPS = 2;
+  const MIN_ZOOM_OUT_STEPS = 10;
+
+  const DEFAULT_ZOOM = MAX_ZOOM / (ZOOM_STEP ** DEFAULT_ZOOM_OUT_STEPS);
+  const MIN_ZOOM = MAX_ZOOM / (ZOOM_STEP ** MIN_ZOOM_OUT_STEPS);
+
   const {
     nodes,
     edges,
@@ -145,12 +157,16 @@ export function Canvas() {
         onPaneClick={handlePaneClick}
         onInit={handleInit}
         nodeTypes={nodeTypes}
+        minZoom={MIN_ZOOM}
+        maxZoom={MAX_ZOOM}
+        defaultViewport={{ x: 0, y: 0, zoom: DEFAULT_ZOOM }}
         defaultEdgeOptions={{
           type: 'smoothstep',
           animated: false,
         }}
         connectionLineStyle={{ stroke: '#888', strokeWidth: 2 }}
         fitView
+        fitViewOptions={{ maxZoom: DEFAULT_ZOOM }}
         snapToGrid
         snapGrid={[16, 16]}
         deleteKeyCode={['Backspace', 'Delete']}

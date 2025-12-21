@@ -577,6 +577,15 @@
   flex: 1;
 }
 
+.io-pin-name {
+  min-width: 0;
+}
+
+.io-pin-type {
+  flex: 0 0 120px;
+  width: 120px;
+}
+
 .array-item-remove {
   width: 24px;
   height: 24px;
