@@ -15,6 +15,7 @@ import {
 } from 'reactflow';
 import type { FlowNodeData, VisualFlow } from '../types/flow';
 import { createNodeData, getNodeTemplate, NodeTemplate } from '../types/nodes';
+import { validateConnection } from '../utils/validation';
 
 interface FlowState {
   // Flow data
@@ -136,13 +137,21 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   },
 
   onConnect: (connection) => {
+    const state = get();
+    if (!validateConnection(state.nodes, state.edges, connection)) return;
+
+    const sourceNode = state.nodes.find((n) => n.id === connection.source);
+    const sourcePin = sourceNode?.data.outputs.find((p) => p.id === connection.sourceHandle);
+    const animated = sourcePin?.type === 'execution';
+
     const newEdge = {
       ...connection,
       id: `edge-${Date.now()}`,
-      animated: connection.sourceHandle === 'exec-out',
+      animated,
     };
+
     set({
-      edges: addEdge(newEdge, get().edges),
+      edges: addEdge(newEdge, state.edges),
     });
   },
 

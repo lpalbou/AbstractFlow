@@ -311,7 +311,7 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
             source_output = flow._node_outputs[source_node]
             if isinstance(source_output, dict) and source_pin in source_output:
                 resolved_input[target_pin] = source_output[source_pin]
-            elif source_pin == "result":
+            elif source_pin in ("result", "output"):
                 # Convention: primitive-returning nodes expose their value on a
                 # virtual "result" pin.
                 resolved_input[target_pin] = source_output
@@ -322,7 +322,7 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
 
     # Effect node types that need special handling by the compiler.
     # Note: `subflow` is compiled as `start_subworkflow` (see below).
-    EFFECT_NODE_TYPES = {"ask_user", "llm_call", "wait_until", "wait_event", "memory_note", "memory_query"}
+    EFFECT_NODE_TYPES = {"ask_user", "answer_user", "llm_call", "wait_until", "wait_event", "memory_note", "memory_query"}
 
     # Pre-evaluate literal nodes and store their values
     # This allows data edges from literals to resolve correctly
@@ -455,7 +455,7 @@ def _create_data_aware_handler(
                 source_output = node_outputs[source_node]
                 if isinstance(source_output, dict) and source_pin in source_output:
                     resolved_input[target_pin] = source_output[source_pin]
-                elif source_pin == "result":
+                elif source_pin in ("result", "output"):
                     # If looking for 'result' but output isn't a dict, use the whole output
                     resolved_input[target_pin] = source_output
 
@@ -526,7 +526,7 @@ def _create_handler(node_type: NodeType, data: Dict[str, Any]) -> Any:
         return _create_loop_handler(data)
 
     # Effect nodes
-    if type_str in ("ask_user", "llm_call", "wait_until", "wait_event", "memory_note", "memory_query"):
+    if type_str in ("ask_user", "answer_user", "llm_call", "wait_until", "wait_event", "memory_note", "memory_query"):
         return _create_effect_handler(type_str, data)
 
     # Unknown type - return identity
@@ -923,9 +923,29 @@ def _create_switch_handler(data: Dict[str, Any]):
 
     def handler(input_data):
         value = input_data.get("value") if isinstance(input_data, dict) else input_data
-        cases = data.get("cases", {})
-        matched = cases.get(str(value), "default")
-        return {"branch": matched, "value": value}
+
+        config = data.get("switchConfig", {}) if isinstance(data, dict) else {}
+        raw_cases = config.get("cases", []) if isinstance(config, dict) else []
+
+        value_str = "" if value is None else str(value)
+        if isinstance(raw_cases, list):
+            for case in raw_cases:
+                if not isinstance(case, dict):
+                    continue
+                case_id = case.get("id")
+                case_value = case.get("value")
+                if not isinstance(case_id, str) or not case_id:
+                    continue
+                if case_value is None:
+                    continue
+                if value_str == str(case_value):
+                    return {
+                        "branch": f"case:{case_id}",
+                        "value": value,
+                        "matched": str(case_value),
+                    }
+
+        return {"branch": "default", "value": value}
 
     return handler
 
@@ -953,6 +973,8 @@ def _create_effect_handler(effect_type: str, data: Dict[str, Any]):
 
     if effect_type == "ask_user":
         return _create_ask_user_handler(data, effect_config)
+    elif effect_type == "answer_user":
+        return _create_answer_user_handler(data, effect_config)
     elif effect_type == "llm_call":
         return _create_llm_call_handler(data, effect_config)
     elif effect_type == "wait_until":
@@ -992,6 +1014,27 @@ def _create_ask_user_handler(data: Dict[str, Any], config: Dict[str, Any]):
                 "allow_free_text": allow_free_text,
             },
         }
+    return handler
+
+
+def _create_answer_user_handler(data: Dict[str, Any], config: Dict[str, Any]):
+    """Create ANSWER_USER effect builder.
+
+    This effect is non-blocking; the runtime completes it immediately.
+    The UI is responsible for rendering the message.
+    """
+
+    def handler(input_data):
+        message = input_data.get("message", "") if isinstance(input_data, dict) else str(input_data or "")
+
+        return {
+            "message": message,
+            "_pending_effect": {
+                "type": "answer_user",
+                "message": message,
+            },
+        }
+
     return handler
 
 

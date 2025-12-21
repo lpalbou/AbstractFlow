@@ -60,6 +60,12 @@ export function RunFlowModal({
 }: RunFlowModalProps) {
   const { nodes, flowName } = useFlowStore();
 
+  const nodeById = useMemo(() => {
+    const map = new Map<string, (typeof nodes)[number]>();
+    nodes.forEach((n) => map.set(n.id, n));
+    return map;
+  }, [nodes]);
+
   // Find the entry node (node with no incoming execution edges, typically event nodes)
   const entryNode = useMemo(() => {
     // Look for event nodes first
@@ -165,6 +171,9 @@ export function RunFlowModal({
             <h4 className="run-execution-title">Execution</h4>
             <div className="run-execution-events">
               {events.map((ev, idx) => {
+                const nodeType =
+                  ev.nodeId && nodeById.has(ev.nodeId) ? nodeById.get(ev.nodeId)?.data.nodeType : null;
+
                 const label =
                   ev.type === 'node_start'
                     ? `node_start · ${ev.nodeId || ''}`
@@ -177,6 +186,15 @@ export function RunFlowModal({
                           : ev.type;
 
                 const hasResult = ev.type === 'node_complete' && ev.result != null;
+                const isAnswerUser = ev.type === 'node_complete' && nodeType === 'answer_user';
+                const answerMessage =
+                  isAnswerUser && ev.result != null
+                    ? typeof ev.result === 'string'
+                      ? ev.result
+                      : ev.result && typeof ev.result === 'object' && 'message' in (ev.result as Record<string, unknown>)
+                        ? String((ev.result as Record<string, unknown>).message ?? '')
+                        : ''
+                    : '';
 
                 return (
                   <div key={`${idx}-${ev.type}-${ev.nodeId || ''}`} className="run-execution-event">
@@ -186,14 +204,16 @@ export function RunFlowModal({
                         <span className="run-execution-event-error">{ev.error}</span>
                       )}
                     </div>
-                    {hasResult && (
+                    {isAnswerUser && answerMessage.trim() ? (
+                      <div className="run-execution-user-message">{answerMessage.trim()}</div>
+                    ) : hasResult ? (
                       <details className="run-execution-event-details">
                         <summary>output</summary>
                         <pre className="run-execution-event-output">
                           {JSON.stringify(ev.result, null, 2)}
                         </pre>
                       </details>
-                    )}
+                    ) : null}
                   </div>
                 );
               })}

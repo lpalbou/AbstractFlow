@@ -12,6 +12,7 @@ import ReactFlow, {
   BackgroundVariant,
   Node,
   Edge,
+  ConnectionMode,
 } from 'reactflow';
 import toast from 'react-hot-toast';
 import { nodeTypes } from './nodes';
@@ -152,6 +153,8 @@ export function Canvas() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={handleConnect}
+        isValidConnection={(connection) => validateConnection(nodes, edges, connection)}
+        connectionMode={ConnectionMode.Strict}
         onNodeClick={handleNodeClick}
         onEdgeClick={handleEdgeClick}
         onPaneClick={handlePaneClick}

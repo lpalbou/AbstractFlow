@@ -66,7 +66,7 @@ async function saveFlow(
 }
 
 export function Toolbar() {
-  const { flowId, flowName, setFlowName, getFlow, loadFlow, clearFlow, isRunning, setIsRunning } =
+  const { flowId, flowName, nodes, setFlowName, getFlow, loadFlow, clearFlow, isRunning, setIsRunning } =
     useFlowStore();
 
   const [showRunModal, setShowRunModal] = useState(false);
@@ -120,6 +120,20 @@ export function Toolbar() {
         return;
       }
       setExecutionEvents((prev) => [...prev, event]);
+
+      if (event.type === 'node_complete' && event.nodeId) {
+        const node = nodes.find((n) => n.id === event.nodeId);
+        if (node?.data.nodeType === 'answer_user') {
+          const payload = event.result as unknown;
+          const message =
+            typeof payload === 'string'
+              ? payload
+              : payload && typeof payload === 'object' && 'message' in (payload as Record<string, unknown>)
+                ? String((payload as Record<string, unknown>).message ?? '')
+                : '';
+          if (message.trim()) toast(message.trim());
+        }
+      }
 
       // Update run result when flow completes via WebSocket
       if (event.type === 'flow_complete') {

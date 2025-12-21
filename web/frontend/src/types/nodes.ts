@@ -3,6 +3,7 @@
  */
 
 import type { NodeType, FlowNodeData, Pin } from './flow';
+import { generatePythonTransformCode } from '../utils/codegen';
 
 // Node template used in the palette
 export interface NodeTemplate {
@@ -164,6 +165,21 @@ const STRING_NODES: NodeTemplate[] = [
 const CONTROL_NODES: NodeTemplate[] = [
   // Execution nodes - control the flow
   { type: 'if', icon: '&#x2753;', label: 'If/Else', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'condition', label: 'condition', type: 'boolean' }], outputs: [{ id: 'true', label: 'true', type: 'execution' }, { id: 'false', label: 'false', type: 'execution' }], category: 'control' },
+  {
+    type: 'switch',
+    icon: '&#x1F500;', // Shuffle
+    label: 'Switch',
+    headerColor: '#F39C12',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'value', label: 'value', type: 'string' },
+    ],
+    outputs: [
+      { id: 'default', label: 'default', type: 'execution' },
+      { id: 'value', label: 'value', type: 'string' },
+    ],
+    category: 'control',
+  },
   { type: 'loop', icon: '&#x1F501;', label: 'ForEach', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'items', label: 'items', type: 'array' }], outputs: [{ id: 'loop', label: 'loop', type: 'execution' }, { id: 'done', label: 'done', type: 'execution' }, { id: 'item', label: 'item', type: 'any' }, { id: 'index', label: 'index', type: 'number' }], category: 'control' },
   // Pure functions - just produce data
   { type: 'compare', icon: '=?', label: 'Compare', headerColor: '#F39C12', inputs: [{ id: 'a', label: 'a', type: 'any' }, { id: 'b', label: 'b', type: 'any' }], outputs: [{ id: 'result', label: 'result', type: 'boolean' }], category: 'control' },
@@ -179,6 +195,20 @@ const DATA_NODES: NodeTemplate[] = [
   { type: 'merge', icon: '&#x1F517;', label: 'Merge Objects', headerColor: '#3498DB', inputs: [{ id: 'a', label: 'a', type: 'object' }, { id: 'b', label: 'b', type: 'object' }], outputs: [{ id: 'result', label: 'result', type: 'object' }], category: 'data' },
   { type: 'array_map', icon: '&#x1F5FA;', label: 'Map Array', headerColor: '#3498DB', inputs: [{ id: 'items', label: 'items', type: 'array' }, { id: 'key', label: 'key', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'data' },
   { type: 'array_filter', icon: '&#x1F50D;', label: 'Filter Array', headerColor: '#3498DB', inputs: [{ id: 'items', label: 'items', type: 'array' }, { id: 'key', label: 'key', type: 'string' }, { id: 'value', label: 'value', type: 'any' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'data' },
+  {
+    type: 'system_datetime',
+    icon: '&#x1F552;', // Clock
+    label: 'System Date/Time',
+    headerColor: '#3498DB',
+    inputs: [],
+    outputs: [
+      { id: 'iso', label: 'iso', type: 'string' },
+      { id: 'timezone', label: 'timezone', type: 'string' },
+      { id: 'utc_offset_minutes', label: 'utc_offset_minutes', type: 'number' },
+      { id: 'locale', label: 'locale', type: 'string' },
+    ],
+    category: 'data',
+  },
   {
     type: 'break_object',
     icon: '&#x1F9E9;', // Puzzle piece
@@ -256,6 +286,21 @@ const EFFECT_NODES: NodeTemplate[] = [
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
       { id: 'response', label: 'response', type: 'string' },
+    ],
+    category: 'effects',
+  },
+  {
+    type: 'answer_user',
+    icon: '&#x1F4AC;', // Speech bubble
+    label: 'Answer User',
+    headerColor: '#9B59B6', // Purple - human interaction
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'message', label: 'message', type: 'string' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'message', label: 'message', type: 'string' },
     ],
     category: 'effects',
   },
@@ -393,6 +438,8 @@ export function getNodeTemplate(type: NodeType): NodeTemplate | undefined {
 
 // Create default node data from template
 export function createNodeData(template: NodeTemplate): FlowNodeData {
+  const defaultCodeBody = 'return input';
+
   return {
     nodeType: template.type,
     label: template.label,
@@ -402,7 +449,8 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
     outputs: [...template.outputs],
     // Default code for code nodes
     ...(template.type === 'code' && {
-      code: 'def transform(input):\n    return input',
+      codeBody: defaultCodeBody,
+      code: generatePythonTransformCode(template.inputs, defaultCodeBody),
       functionName: 'transform',
     }),
     // Default literal values
@@ -413,5 +461,6 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
     ...(template.type === 'literal_array' && { literalValue: [] }),
     ...(template.type === 'break_object' && { breakConfig: { selectedPaths: [] } }),
     ...(template.type === 'concat' && { concatConfig: { separator: ' ' } }),
+    ...(template.type === 'switch' && { switchConfig: { cases: [] } }),
   };
 }

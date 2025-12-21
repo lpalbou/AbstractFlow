@@ -461,3 +461,27 @@ button.primary:hover:not(:disabled) {
   color: var(--error);
   margin: 0;
 }
+
+/* Inline messages emitted by Answer User effect */
+.run-execution-user-message {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--bg-tertiary);
+  background: rgba(155, 89, 182, 0.12);
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Code editor modal */
+.code-editor-modal {
+  width: 900px;
+  max-width: 95vw;
+}
+
+.code-editor-container {
+  border: 1px solid var(--bg-tertiary);
+  border-radius: 8px;
+  overflow: hidden;
+}

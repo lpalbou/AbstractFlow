@@ -77,6 +77,44 @@ def create_ask_user_handler(
     return handler
 
 
+def create_answer_user_handler(
+    node_id: str,
+    next_node: Optional[str],
+    input_key: Optional[str] = None,
+    output_key: Optional[str] = None,
+) -> Callable:
+    """Create a node handler that requests the host UI to display a message.
+
+    This handler produces an ANSWER_USER effect that completes immediately.
+    """
+    from abstractruntime.core.models import StepPlan, Effect, EffectType
+
+    def handler(run: "RunState", ctx: Any) -> "StepPlan":
+        if input_key:
+            input_data = run.vars.get(input_key, {})
+        else:
+            input_data = run.vars
+
+        if isinstance(input_data, dict):
+            message = input_data.get("message") or input_data.get("text") or ""
+        else:
+            message = str(input_data) if input_data is not None else ""
+
+        effect = Effect(
+            type=EffectType.ANSWER_USER,
+            payload={"message": str(message)},
+            result_key=output_key or "_temp.answer_user",
+        )
+
+        return StepPlan(
+            node_id=node_id,
+            effect=effect,
+            next_node=next_node,
+        )
+
+    return handler
+
+
 def create_wait_until_handler(
     node_id: str,
     next_node: Optional[str],

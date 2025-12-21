@@ -7,6 +7,8 @@ import type { Node } from 'reactflow';
 import type { FlowNodeData, ProviderInfo, VisualFlow, Pin } from '../types/flow';
 import { isEntryNodeType } from '../types/flow';
 import { useFlowStore } from '../hooks/useFlow';
+import { CodeEditorModal } from './CodeEditorModal';
+import { extractFunctionBody, generatePythonTransformCode, sanitizePythonIdentifier } from '../utils/codegen';
 
 interface PropertiesPanelProps {
   node: Node<FlowNodeData> | null;
@@ -41,6 +43,7 @@ function uniquePinId(base: string, used: Set<string>): string {
 
 export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const { updateNodeData, deleteNode, setEdges, flowId, nodes, edges } = useFlowStore();
+  const [showCodeEditor, setShowCodeEditor] = useState(false);
 
   // Provider/model state for agent nodes
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
@@ -57,6 +60,10 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
   // Track last fetched provider to prevent duplicate fetches
   const lastFetchedProvider = useRef<string | null>(null);
+
+  useEffect(() => {
+    setShowCodeEditor(false);
+  }, [node?.id]);
 
   // Fetch available providers on mount
   useEffect(() => {
@@ -517,6 +524,101 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         </div>
       )}
 
+      {/* Switch node properties */}
+      {data.nodeType === 'switch' && (
+        <div className="property-section">
+          <label className="property-label">Switch</label>
+
+          <div className="property-group">
+            <label className="property-sublabel">Cases</label>
+            {(() => {
+              const cases = data.switchConfig?.cases ?? [];
+
+              const buildOutputs = (nextCases: { id: string; value: string }[]) => {
+                const execPins = [
+                  ...nextCases.map((c) => ({
+                    id: `case:${c.id}`,
+                    label: c.value || 'case',
+                    type: 'execution' as const,
+                  })),
+                  { id: 'default', label: 'default', type: 'execution' as const },
+                ];
+
+                const existingDataPins = data.outputs.filter((p) => p.type !== 'execution');
+                const hasValue = existingDataPins.some((p) => p.id === 'value');
+                const dataPins = hasValue
+                  ? existingDataPins.map((p) =>
+                      p.id === 'value' ? { ...p, label: 'value', type: 'string' as const } : p
+                    )
+                  : [...existingDataPins, { id: 'value', label: 'value', type: 'string' as const }];
+
+                return [...execPins, ...dataPins];
+              };
+
+              const addCase = () => {
+                const id =
+                  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+                    ? (crypto.randomUUID() as string).slice(0, 8)
+                    : `c${Date.now().toString(16)}${Math.random().toString(16).slice(2, 6)}`;
+
+                const nextCases = [...cases, { id, value: '' }];
+                updateNodeData(node.id, {
+                  switchConfig: { cases: nextCases },
+                  outputs: buildOutputs(nextCases),
+                });
+              };
+
+              const updateCaseValue = (caseId: string, value: string) => {
+                const nextCases = cases.map((c) => (c.id === caseId ? { ...c, value } : c));
+                updateNodeData(node.id, {
+                  switchConfig: { cases: nextCases },
+                  outputs: buildOutputs(nextCases),
+                });
+              };
+
+              const removeCase = (caseId: string) => {
+                const nextCases = cases.filter((c) => c.id !== caseId);
+                updateNodeData(node.id, {
+                  switchConfig: { cases: nextCases },
+                  outputs: buildOutputs(nextCases),
+                });
+              };
+
+              return (
+                <div className="array-editor">
+                  {cases.map((c) => (
+                    <div key={c.id} className="array-item">
+                      <input
+                        className="array-item-input"
+                        value={c.value}
+                        onChange={(e) => updateCaseValue(c.id, e.target.value)}
+                        placeholder="match value (string)"
+                      />
+                      <button
+                        type="button"
+                        className="array-item-remove"
+                        title="Remove case"
+                        onClick={() => removeCase(c.id)}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+
+                  <button type="button" className="array-add-button" onClick={addCase}>
+                    + Add Case
+                  </button>
+                </div>
+              );
+            })()}
+            <span className="property-hint">
+              Each case adds an execution output pin; values are matched as strings. The <code>default</code> output is
+              used when no case matches.
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Break Object node properties */}
       {data.nodeType === 'break_object' && (
         <div className="property-section">
@@ -659,18 +761,165 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       {/* Code-specific properties */}
       {data.nodeType === 'code' && (
         <div className="property-section">
-          <label className="property-label">Function Name</label>
-          <input
-            type="text"
-            className="property-input"
-            value={data.functionName || 'transform'}
-            onChange={(e) =>
-              updateNodeData(node.id, { functionName: e.target.value })
-            }
-          />
-          <span className="property-hint">
-            Name of the function to call in your code
-          </span>
+          <label className="property-label">Python Code</label>
+
+          {(() => {
+            const params = data.inputs.filter((p) => p.type !== 'execution');
+            const used = new Set(data.inputs.map((p) => p.id));
+
+            const currentBody =
+              data.codeBody ??
+              (typeof data.code === 'string'
+                ? extractFunctionBody(data.code, data.functionName || 'transform') ?? ''
+                : '');
+
+            const commitRenameParam = (pinId: string) => {
+              const draft = ioPinNameDrafts[pinId];
+              if (draft === undefined) return;
+              const nextLabel = draft.trim();
+              if (!nextLabel) {
+                setIoPinNameDrafts((prev) => {
+                  const { [pinId]: _removed, ...rest } = prev;
+                  return rest;
+                });
+                return;
+              }
+
+              const usedWithoutSelf = new Set(data.inputs.filter((p) => p.id !== pinId).map((p) => p.id));
+              const nextId = uniquePinId(sanitizePythonIdentifier(nextLabel), usedWithoutSelf);
+
+              // Update edges first so store doesn't interpret this as a removal.
+              const nextEdges = edges.map((e) => {
+                if (e.target === node.id && e.targetHandle === pinId) {
+                  return { ...e, targetHandle: nextId };
+                }
+                return e;
+              });
+              setEdges(nextEdges);
+
+              const nextPins = data.inputs.map((p) =>
+                p.id === pinId ? { ...p, id: nextId, label: nextId } : p
+              );
+              updateNodeData(node.id, {
+                inputs: nextPins,
+                codeBody: currentBody,
+                code: generatePythonTransformCode(nextPins, currentBody),
+                functionName: 'transform',
+              });
+
+              setIoPinNameDrafts((prev) => {
+                const { [pinId]: _removed, ...rest } = prev;
+                return nextId === pinId ? rest : { ...rest, [nextId]: nextId };
+              });
+            };
+
+            const updateParam = (pinId: string, patch: Partial<typeof params[number]>) => {
+              const nextPins = data.inputs.map((p) => (p.id === pinId ? { ...p, ...patch } : p));
+              updateNodeData(node.id, {
+                inputs: nextPins,
+                codeBody: currentBody,
+                code: generatePythonTransformCode(nextPins, currentBody),
+                functionName: 'transform',
+              });
+            };
+
+            const addParam = () => {
+              let n = 1;
+              while (used.has(`param${n}`)) n++;
+              const id = `param${n}`;
+              const nextPins = [...data.inputs, { id, label: id, type: 'string' as DataPinType }];
+              updateNodeData(node.id, {
+                inputs: nextPins,
+                codeBody: currentBody,
+                code: generatePythonTransformCode(nextPins, currentBody),
+                functionName: 'transform',
+              });
+            };
+
+            const removeParam = (pinId: string) => {
+              const nextPins = data.inputs.filter((p) => p.id !== pinId);
+              updateNodeData(node.id, {
+                inputs: nextPins,
+                codeBody: currentBody,
+                code: generatePythonTransformCode(nextPins, currentBody),
+                functionName: 'transform',
+              });
+            };
+
+            return (
+              <>
+                <div className="property-group">
+                  <label className="property-sublabel">Parameters</label>
+                  <div className="array-editor">
+                    {params.map((pin) => (
+                      <div key={pin.id} className="array-item">
+                        <input
+                          type="text"
+                          className="property-input array-item-input io-pin-name"
+                          value={ioPinNameDrafts[pin.id] ?? pin.id}
+                          onChange={(e) =>
+                            setIoPinNameDrafts((prev) => ({ ...prev, [pin.id]: e.target.value }))
+                          }
+                          onBlur={() => commitRenameParam(pin.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') e.currentTarget.blur();
+                          }}
+                          placeholder="name"
+                        />
+                        <select
+                          className="property-select io-pin-type"
+                          value={pin.type}
+                          onChange={(e) => updateParam(pin.id, { type: e.target.value as DataPinType })}
+                        >
+                          {DATA_PIN_TYPES.map((t) => (
+                            <option key={t} value={t}>
+                              {t}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          className="array-item-remove"
+                          onClick={() => removeParam(pin.id)}
+                          title="Remove parameter"
+                        >
+                          &times;
+                        </button>
+                      </div>
+                    ))}
+                    <button className="array-add-button" onClick={addParam}>
+                      + Add Parameter
+                    </button>
+                  </div>
+                </div>
+
+                <div className="property-group">
+                  <label className="property-sublabel">Code</label>
+                  <button type="button" className="toolbar-button" onClick={() => setShowCodeEditor(true)}>
+                    ✍️ Edit Code
+                  </button>
+                  <span className="property-hint">
+                    Edit the body of <code>transform(_input)</code>. Generated code is executed in a sandbox (no imports).
+                  </span>
+                </div>
+
+                <CodeEditorModal
+                  isOpen={showCodeEditor}
+                  title="Python Code"
+                  body={currentBody}
+                  params={params.map((p) => p.id)}
+                  onClose={() => setShowCodeEditor(false)}
+                  onSave={(nextBody) => {
+                    updateNodeData(node.id, {
+                      codeBody: nextBody,
+                      code: generatePythonTransformCode(data.inputs, nextBody),
+                      functionName: 'transform',
+                    });
+                    setShowCodeEditor(false);
+                  }}
+                />
+              </>
+            );
+          })()}
         </div>
       )}
 

@@ -70,6 +70,7 @@ class NodeType(str, Enum):
     ARRAY_MAP = "array_map"
     ARRAY_FILTER = "array_filter"
     BREAK_OBJECT = "break_object"
+    SYSTEM_DATETIME = "system_datetime"
     # Literals
     LITERAL_STRING = "literal_string"
     LITERAL_NUMBER = "literal_number"
@@ -78,6 +79,7 @@ class NodeType(str, Enum):
     LITERAL_ARRAY = "literal_array"
     # Effects
     ASK_USER = "ask_user"
+    ANSWER_USER = "answer_user"
     LLM_CALL = "llm_call"
     WAIT_UNTIL = "wait_until"
     WAIT_EVENT = "wait_event"

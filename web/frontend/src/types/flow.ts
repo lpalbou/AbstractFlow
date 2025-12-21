@@ -53,11 +53,11 @@ export type NodeType =
   // Control - if/loop have exec, logic gates are pure
   | 'if' | 'switch' | 'loop' | 'compare' | 'not' | 'and' | 'or'
   // Data - Pure functions (no exec pins)
-  | 'get' | 'set' | 'merge' | 'array_map' | 'array_filter' | 'break_object'
+  | 'get' | 'set' | 'merge' | 'array_map' | 'array_filter' | 'break_object' | 'system_datetime'
   // Literals - Pure value nodes (no exec pins, no inputs)
   | 'literal_string' | 'literal_number' | 'literal_boolean' | 'literal_json' | 'literal_array'
   // Effects - Side-effect nodes (require execution pins)
-  | 'ask_user' | 'llm_call' | 'wait_until' | 'wait_event' | 'memory_note' | 'memory_query';
+  | 'ask_user' | 'answer_user' | 'llm_call' | 'wait_until' | 'wait_event' | 'memory_note' | 'memory_query';
 
 export const ENTRY_NODE_TYPES: NodeType[] = [
   'on_flow_start',
@@ -80,6 +80,7 @@ export interface FlowNodeData {
   outputs: Pin[];
   // Node-specific config
   code?: string;           // For code nodes
+  codeBody?: string;       // For code nodes (body-only editor)
   functionName?: string;   // For code nodes
   inputKey?: string;       // Input key mapping
   outputKey?: string;      // Output key mapping
@@ -104,6 +105,10 @@ export interface FlowNodeData {
   // Concat node configuration
   concatConfig?: {
     separator?: string; // Default: " "
+  };
+  // Switch node configuration
+  switchConfig?: {
+    cases?: { id: string; value: string }[];
   };
   // Effect node configuration
   effectConfig?: {

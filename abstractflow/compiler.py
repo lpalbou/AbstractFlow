@@ -10,6 +10,7 @@ from .adapters.agent_adapter import create_agent_node_handler
 from .adapters.subflow_adapter import create_subflow_node_handler
 from .adapters.effect_adapter import (
     create_ask_user_handler,
+    create_answer_user_handler,
     create_wait_until_handler,
     create_wait_event_handler,
     create_memory_note_handler,
@@ -61,6 +62,13 @@ def _create_effect_node_handler(
             input_key=input_key,
             output_key=output_key,
             allow_free_text=effect_config.get("allowFreeText", True),
+        )
+    elif effect_type == "answer_user":
+        base_handler = create_answer_user_handler(
+            node_id=node_id,
+            next_node=next_node,
+            input_key=input_key,
+            output_key=output_key,
         )
     elif effect_type == "wait_until":
         base_handler = create_wait_until_handler(
@@ -227,6 +235,14 @@ def _create_visual_function_handler(
                 )
             chosen = branch_map.get(branch)
             if not isinstance(chosen, str) or not chosen:
+                # Blueprint-style behavior: if the chosen execution pin isn't connected,
+                # treat it as a clean completion instead of an error.
+                if branch in {"true", "false", "default"} or branch.startswith("case:"):
+                    return StepPlan(
+                        node_id=node_id,
+                        complete_output={"result": result, "success": True},
+                    )
+
                 run.vars["_flow_error"] = f"Unknown branch '{branch}'"
                 run.vars["_flow_error_node"] = node_id
                 return StepPlan(
@@ -308,6 +324,13 @@ def _sync_effect_results_to_node_outputs(run: Any, flow: Flow) -> None:
                 # raw is usually {"response": "..."} (resume payload)
                 current.update(raw)
                 mapped_value = raw.get("response")
+        elif effect_type == "answer_user":
+            if isinstance(raw, dict):
+                current.update(raw)
+                mapped_value = raw.get("message")
+            else:
+                current["message"] = raw
+                mapped_value = raw
         elif effect_type == "llm_call":
             if isinstance(raw, dict):
                 current["response"] = raw.get("content")
@@ -425,6 +448,9 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
     next_node_map: Dict[str, Optional[str]] = {}
     branch_maps: Dict[str, Dict[str, str]] = {}
 
+    def _is_supported_branch_handle(handle: str) -> bool:
+        return handle in {"true", "false", "default"} or handle.startswith("case:")
+
     for node_id in flow.nodes:
         outs = outgoing.get(node_id, [])
         if not outs:
@@ -432,7 +458,17 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
             continue
 
         if len(outs) == 1:
-            next_node_map[node_id] = outs[0].target
+            h = getattr(outs[0], "source_handle", None)
+            if isinstance(h, str) and h and h != "exec-out":
+                if not _is_supported_branch_handle(h):
+                    raise ValueError(
+                        f"Node '{node_id}' has unsupported branching output '{h}'. "
+                        "Branching is not yet supported."
+                    )
+                branch_maps[node_id] = {h: outs[0].target}  # type: ignore[arg-type]
+                next_node_map[node_id] = None
+            else:
+                next_node_map[node_id] = outs[0].target
             continue
 
         handles: list[str] = []
@@ -451,6 +487,12 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
 
         # Minimal branching support: If/Else uses `true` / `false` execution outputs.
         if set(handles) <= {"true", "false"}:
+            branch_maps[node_id] = {e.source_handle: e.target for e in outs}  # type: ignore[arg-type]
+            next_node_map[node_id] = None
+            continue
+
+        # Switch branching: stable case handles + optional default.
+        if all(h == "default" or h.startswith("case:") for h in handles):
             branch_maps[node_id] = {e.source_handle: e.target for e in outs}  # type: ignore[arg-type]
             next_node_map[node_id] = None
             continue

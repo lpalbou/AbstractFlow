@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from typing import Any, Callable, Dict, List, Optional
+from datetime import datetime
+import locale
+import os
 import math
 import re
 
@@ -231,6 +234,31 @@ def data_array_filter(inputs: Dict[str, Any]) -> List[Any]:
     return result
 
 
+def system_datetime(_: Dict[str, Any]) -> Dict[str, Any]:
+    """Return current system date/time and best-effort locale metadata.
+
+    All values are JSON-serializable and stable-keyed.
+    """
+    now = datetime.now().astimezone()
+    offset = now.utcoffset()
+    offset_minutes = int(offset.total_seconds() // 60) if offset is not None else 0
+
+    tzname = now.tzname() or ""
+
+    # Avoid deprecated locale.getdefaultlocale() in Python 3.12+.
+    lang = os.environ.get("LC_ALL") or os.environ.get("LANG") or os.environ.get("LC_CTYPE") or ""
+    env_locale = lang.split(".", 1)[0] if lang else ""
+
+    loc = locale.getlocale()[0] or env_locale
+
+    return {
+        "iso": now.isoformat(),
+        "timezone": tzname,
+        "utc_offset_minutes": offset_minutes,
+        "locale": loc or "",
+    }
+
+
 # Literal value handlers - return configured constant values
 def literal_string(inputs: Dict[str, Any]) -> str:
     """Return string literal value."""
@@ -299,6 +327,7 @@ BUILTIN_HANDLERS: Dict[str, Callable[[Dict[str, Any]], Any]] = {
     "merge": data_merge,
     "array_map": data_array_map,
     "array_filter": data_array_filter,
+    "system_datetime": system_datetime,
     # Literals
     "literal_string": literal_string,
     "literal_number": literal_number,
