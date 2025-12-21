@@ -6,15 +6,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ExecutionEvent } from '../types/flow';
 import { useFlowStore } from './useFlow';
 
-// Extended event type for waiting state
-interface WaitingEvent extends ExecutionEvent {
-  prompt?: string;
-  choices?: string[];
-  allow_free_text?: boolean;
-  wait_key?: string;
-  effect_type?: string;
-}
-
 interface UseWebSocketOptions {
   flowId: string;
   onEvent?: (event: ExecutionEvent) => void;
@@ -41,7 +32,6 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
   // Handle execution events
   const handleEvent = useCallback(
     (event: ExecutionEvent) => {
-      const waitEvent = event as WaitingEvent;
       switch (event.type) {
         case 'flow_start':
           setIsRunning(true);
@@ -59,10 +49,10 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
           // Flow is paused waiting for user input
           setIsWaiting(true);
           const info: WaitingInfo = {
-            prompt: waitEvent.prompt || 'Please respond:',
-            choices: waitEvent.choices || [],
-            allowFreeText: waitEvent.allow_free_text !== false,
-            nodeId: waitEvent.nodeId || null,
+            prompt: event.prompt || 'Please respond:',
+            choices: event.choices || [],
+            allowFreeText: event.allow_free_text !== false,
+            nodeId: event.nodeId || null,
           };
           setWaitingInfo(info);
           onWaiting?.(info);

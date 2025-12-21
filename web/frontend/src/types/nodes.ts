@@ -195,6 +195,7 @@ const DATA_NODES: NodeTemplate[] = [
   { type: 'merge', icon: '&#x1F517;', label: 'Merge Objects', headerColor: '#3498DB', inputs: [{ id: 'a', label: 'a', type: 'object' }, { id: 'b', label: 'b', type: 'object' }], outputs: [{ id: 'result', label: 'result', type: 'object' }], category: 'data' },
   { type: 'array_map', icon: '&#x1F5FA;', label: 'Map Array', headerColor: '#3498DB', inputs: [{ id: 'items', label: 'items', type: 'array' }, { id: 'key', label: 'key', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'data' },
   { type: 'array_filter', icon: '&#x1F50D;', label: 'Filter Array', headerColor: '#3498DB', inputs: [{ id: 'items', label: 'items', type: 'array' }, { id: 'key', label: 'key', type: 'string' }, { id: 'value', label: 'value', type: 'any' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'data' },
+  { type: 'array_concat', icon: '&#x2795;', label: 'Array Concat', headerColor: '#3498DB', inputs: [{ id: 'a', label: 'a', type: 'array' }, { id: 'b', label: 'b', type: 'array' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'data' },
   {
     type: 'system_datetime',
     icon: '&#x1F552;', // Clock

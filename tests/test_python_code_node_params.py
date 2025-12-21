@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from web.backend.models import NodeType, Position, VisualEdge, VisualFlow, VisualNode
-from web.backend.services.executor import execute_visual_flow
+from abstractflow.visual import execute_visual_flow
+from abstractflow.visual.models import NodeType, Position, VisualEdge, VisualFlow, VisualNode
 
 
 def test_python_code_node_executes_with_multiple_params() -> None:
@@ -71,4 +71,3 @@ def test_python_code_node_executes_with_multiple_params() -> None:
     result = execute_visual_flow(flow, {}, flows={flow.id: flow})
     assert result["success"] is True
     assert result["result"] == {"sum": 5.0}
-

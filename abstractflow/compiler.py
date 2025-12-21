@@ -53,7 +53,6 @@ def _create_effect_node_handler(
     be called first to resolve data edge inputs before creating the effect.
     """
     from abstractruntime.core.models import StepPlan, Effect, EffectType
-    from abstractruntime.core.vars import get_node_trace as _get_node_trace
 
     # Build the base effect handler
     if effect_type == "ask_user":
@@ -576,6 +575,22 @@ def _create_visual_function_handler(
         # Store result in _last_output for downstream nodes
         run.vars["_last_output"] = result
 
+        # Persist per-node outputs for data-edge rehydration across pause/resume.
+        #
+        # Visual data edges read from `flow._node_outputs`, which is an in-memory
+        # cache. When a run pauses (ASK_USER / TOOL passthrough) and is resumed
+        # in a different process, we must be able to reconstruct upstream node
+        # outputs from persisted `RunState.vars`.
+        temp = run.vars.get("_temp")
+        if not isinstance(temp, dict):
+            temp = {}
+            run.vars["_temp"] = temp
+        persisted_outputs = temp.get("node_outputs")
+        if not isinstance(persisted_outputs, dict):
+            persisted_outputs = {}
+            temp["node_outputs"] = persisted_outputs
+        persisted_outputs[node_id] = result
+
         # Also store in output_key if specified
         if output_key:
             _set_nested(run.vars, output_key, result)
@@ -637,6 +652,13 @@ def _sync_effect_results_to_node_outputs(run: Any, flow: Flow) -> None:
     temp_data = run.vars.get("_temp", {})
     if not isinstance(temp_data, dict):
         return
+
+    # Restore persisted outputs for executed (non-effect) nodes.
+    persisted = temp_data.get("node_outputs")
+    if isinstance(persisted, dict):
+        for nid, out in persisted.items():
+            if isinstance(nid, str) and nid:
+                node_outputs[nid] = out
 
     effects = temp_data.get("effects")
     if not isinstance(effects, dict):

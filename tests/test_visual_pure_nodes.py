@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from web.backend.models import NodeType, Position, VisualEdge, VisualFlow, VisualNode
-from web.backend.services.executor import create_visual_runner
+from abstractflow.visual import create_visual_runner
+from abstractflow.visual.models import NodeType, Position, VisualEdge, VisualFlow, VisualNode
 
 
 def test_visual_pure_builtin_node_evaluates_via_data_edges() -> None:
@@ -167,6 +167,68 @@ def test_visual_concat_supports_dynamic_inputs_and_separator() -> None:
     result = runner.run({})
     assert result.get("success") is True
     assert result.get("result") == "hello | world | !"
+
+
+def test_visual_array_concat_flattens_arrays_in_pin_order() -> None:
+    flow_id = "test-visual-array-concat"
+    visual = VisualFlow(
+        id=flow_id,
+        name="array concat",
+        entryNode="code",
+        nodes=[
+            VisualNode(
+                id="a",
+                type=NodeType.LITERAL_ARRAY,
+                position=Position(x=0, y=0),
+                data={"literalValue": ["hello"]},
+            ),
+            VisualNode(
+                id="b",
+                type=NodeType.LITERAL_ARRAY,
+                position=Position(x=0, y=0),
+                data={"literalValue": ["world", "!"]},
+            ),
+            VisualNode(
+                id="c",
+                type=NodeType.LITERAL_ARRAY,
+                position=Position(x=0, y=0),
+                data={"literalValue": []},
+            ),
+            VisualNode(
+                id="concat",
+                type=NodeType.ARRAY_CONCAT,
+                position=Position(x=0, y=0),
+                data={
+                    "inputs": [
+                        {"id": "a", "label": "a", "type": "array"},
+                        {"id": "b", "label": "b", "type": "array"},
+                        {"id": "c", "label": "c", "type": "array"},
+                    ],
+                    "outputs": [{"id": "result", "label": "result", "type": "array"}],
+                },
+            ),
+            VisualNode(
+                id="code",
+                type=NodeType.CODE,
+                position=Position(x=0, y=0),
+                data={
+                    "code": "def transform(input):\n    return input.get('input')\n",
+                    "functionName": "transform",
+                },
+            ),
+        ],
+        edges=[
+            VisualEdge(id="d1", source="a", sourceHandle="value", target="concat", targetHandle="a"),
+            VisualEdge(id="d2", source="b", sourceHandle="value", target="concat", targetHandle="b"),
+            VisualEdge(id="d3", source="c", sourceHandle="value", target="concat", targetHandle="c"),
+            VisualEdge(id="d4", source="concat", sourceHandle="result", target="code", targetHandle="input"),
+        ],
+    )
+
+    runner = create_visual_runner(visual, flows={flow_id: visual})
+    result = runner.run({})
+    assert result.get("success") is True
+    assert result.get("result") == ["hello", "world", "!"]
 
 
 def test_visual_data_pin_fanout_from_single_output() -> None:

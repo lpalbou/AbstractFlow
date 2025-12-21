@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from web.backend.models import NodeType, Position, VisualEdge, VisualFlow, VisualNode
-from web.backend.services.executor import create_visual_runner
+from abstractflow.visual import create_visual_runner
+from abstractflow.visual.models import NodeType, Position, VisualEdge, VisualFlow, VisualNode
 
 
 def _make_if_flow(flow_id: str, condition_value: bool) -> VisualFlow:
@@ -74,4 +74,3 @@ def test_visual_if_branching_false_path() -> None:
     result = runner.run({"message": "hi", "context": {}})
     assert result.get("success") is True
     assert result.get("result") == {"path": "false"}
-

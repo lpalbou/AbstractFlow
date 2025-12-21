@@ -11,8 +11,8 @@ import os
 
 import pytest
 
-from web.backend.models import NodeType, Position, VisualEdge, VisualFlow, VisualNode
-from web.backend.services.executor import create_visual_runner
+from abstractflow.visual import create_visual_runner
+from abstractflow.visual.models import NodeType, Position, VisualEdge, VisualFlow, VisualNode
 
 
 def _lmstudio_base_url() -> str:

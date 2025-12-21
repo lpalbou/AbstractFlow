@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from web.backend.models import NodeType, Position, VisualEdge, VisualFlow, VisualNode
-from web.backend.services.executor import execute_visual_flow
+from abstractflow.visual import execute_visual_flow
+from abstractflow.visual.models import NodeType, Position, VisualEdge, VisualFlow, VisualNode
 
 
 def test_system_datetime_node_outputs_stable_keys() -> None:
@@ -92,4 +92,3 @@ def test_system_datetime_node_outputs_stable_keys() -> None:
 
     # Should be parseable ISO-8601 (best-effort; timezone may be included).
     datetime.fromisoformat(out["iso"])
-

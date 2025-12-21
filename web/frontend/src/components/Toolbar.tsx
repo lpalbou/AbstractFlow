@@ -177,13 +177,10 @@ export function Toolbar() {
     },
   });
 
-  // Handle user prompt response
-  const handlePromptSubmit = useCallback(
-    (response: string) => {
-      resumeFlow(response);
-    },
-    [resumeFlow]
-  );
+  // Handle user prompt response (legacy/fallback modal)
+  const handlePromptSubmit = useCallback((response: string) => {
+    resumeFlow(response);
+  }, [resumeFlow]);
 
   // Handle save
   const handleSave = useCallback(() => {
@@ -373,6 +370,9 @@ export function Toolbar() {
         isRunning={isRunning}
         result={runResult}
         events={executionEvents}
+        isWaiting={isWaiting}
+        waitingInfo={waitingInfo}
+        onResume={resumeFlow}
       />
 
       {/* Load flows modal */}
@@ -415,9 +415,9 @@ export function Toolbar() {
         </div>
       )}
 
-      {/* User Prompt Modal (for Ask User effect) */}
+      {/* User Prompt Modal (fallback) */}
       <UserPromptModal
-        isOpen={isWaiting}
+        isOpen={isWaiting && !showRunModal}
         prompt={waitingInfo?.prompt || 'Please respond:'}
         choices={waitingInfo?.choices || []}
         allowFreeText={waitingInfo?.allowFreeText ?? true}

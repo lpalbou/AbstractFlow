@@ -855,6 +855,74 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         </div>
       )}
 
+      {/* Array Concat node properties */}
+      {data.nodeType === 'array_concat' && (
+        <div className="property-section">
+          <label className="property-label">Array Concat</label>
+
+          <div className="property-group">
+            <label className="property-sublabel">Inputs</label>
+            {(() => {
+              const pins = data.inputs.filter((p) => p.type !== 'execution');
+              const addInput = () => {
+                const ids = new Set(pins.map((p) => p.id));
+                let nextId: string | null = null;
+                for (let code = 97; code <= 122; code++) {
+                  const candidate = String.fromCharCode(code);
+                  if (!ids.has(candidate)) {
+                    nextId = candidate;
+                    break;
+                  }
+                }
+                if (!nextId) {
+                  let idx = pins.length + 1;
+                  while (ids.has(`p${idx}`)) idx++;
+                  nextId = `p${idx}`;
+                }
+
+                updateNodeData(node.id, {
+                  inputs: [...data.inputs, { id: nextId, label: nextId, type: 'array' }],
+                });
+              };
+
+              const removeInput = (pinId: string) => {
+                if (pins.length <= 2) return;
+                updateNodeData(node.id, {
+                  inputs: data.inputs.filter((p) => p.id !== pinId),
+                });
+              };
+
+              return (
+                <div className="array-editor">
+                  {pins.map((pin, idx) => (
+                    <div key={pin.id} className="array-item">
+                      <input className="array-item-input" value={pin.label} disabled />
+                      {idx >= 2 && (
+                        <button
+                          type="button"
+                          className="array-item-remove"
+                          title="Remove input"
+                          onClick={() => removeInput(pin.id)}
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  ))}
+
+                  <button type="button" className="array-add-button" onClick={addInput}>
+                    + Add Input
+                  </button>
+                </div>
+              );
+            })()}
+            <span className="property-hint">
+              Concatenates arrays in input-pin order.
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Switch node properties */}
       {data.nodeType === 'switch' && (
         <div className="property-section">

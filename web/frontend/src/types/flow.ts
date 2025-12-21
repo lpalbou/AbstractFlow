@@ -53,7 +53,7 @@ export type NodeType =
   // Control - if/loop have exec, logic gates are pure
   | 'if' | 'switch' | 'loop' | 'compare' | 'not' | 'and' | 'or'
   // Data - Pure functions (no exec pins)
-  | 'get' | 'set' | 'merge' | 'array_map' | 'array_filter' | 'break_object' | 'system_datetime'
+  | 'get' | 'set' | 'merge' | 'array_map' | 'array_filter' | 'array_concat' | 'break_object' | 'system_datetime'
   // Literals - Pure value nodes (no exec pins, no inputs)
   | 'literal_string' | 'literal_number' | 'literal_boolean' | 'literal_json' | 'literal_array'
   // Effects - Side-effect nodes (require execution pins)
@@ -160,6 +160,12 @@ export interface ExecutionEvent {
   nodeId?: string;
   result?: unknown;
   error?: string;
+  // Waiting payload (for ASK_USER / WAIT_EVENT / subworkflow bubbling)
+  prompt?: string;
+  choices?: string[];
+  allow_free_text?: boolean;
+  wait_key?: string;
+  reason?: string;
 }
 
 // Flow run result

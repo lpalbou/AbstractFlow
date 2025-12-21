@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from web.backend.models import NodeType, Position, VisualEdge, VisualFlow, VisualNode
-from web.backend.services.executor import execute_visual_flow
+from abstractflow.visual import execute_visual_flow
+from abstractflow.visual.models import NodeType, Position, VisualEdge, VisualFlow, VisualNode
 
 
 def test_on_flow_start_params_and_on_flow_end_outputs() -> None:
@@ -216,4 +216,3 @@ def test_subflow_maps_entry_params_and_exposed_outputs() -> None:
     result = execute_visual_flow(parent, {"question": "hello"}, flows=flows)
     assert result["success"] is True
     assert result["result"] == {"answer": "HELLO"}
-

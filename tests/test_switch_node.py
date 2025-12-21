@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from web.backend.models import NodeType, Position, VisualEdge, VisualFlow, VisualNode
-from web.backend.services.executor import execute_visual_flow
+from abstractflow.visual import execute_visual_flow
+from abstractflow.visual.models import NodeType, Position, VisualEdge, VisualFlow, VisualNode
 
 
 def test_switch_routes_to_matching_case_or_default() -> None:
@@ -154,4 +154,3 @@ def test_switch_default_unconnected_completes_cleanly() -> None:
     result = execute_visual_flow(flow, {"value": "nope"}, flows={flow.id: flow})
     assert result["success"] is True
     assert result["result"]["branch"] == "default"
-
