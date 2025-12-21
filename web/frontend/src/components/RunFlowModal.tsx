@@ -14,6 +14,7 @@ interface RunFlowModalProps {
   isOpen: boolean;
   onClose: () => void;
   onRun: (inputData: Record<string, unknown>) => void;
+  onRunAgain: () => void;
   isRunning: boolean;
   result: FlowRunResult | null;
   events?: ExecutionEvent[];
@@ -54,6 +55,7 @@ export function RunFlowModal({
   isOpen,
   onClose,
   onRun,
+  onRunAgain,
   isRunning,
   result,
   events = [],
@@ -313,9 +315,7 @@ export function RunFlowModal({
             <button
               className="modal-button primary"
               onClick={() => {
-                // Reset to run again
-                setFormValues({});
-                onClose();
+                onRunAgain();
               }}
             >
               Run Again

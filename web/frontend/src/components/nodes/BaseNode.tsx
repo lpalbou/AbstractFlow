@@ -6,8 +6,8 @@
  * - Empty shapes = not connected, Filled = connected
  */
 
-import { memo, type MouseEvent } from 'react';
-import { Handle, Position, NodeProps, useEdges } from 'reactflow';
+import { memo, type MouseEvent, useEffect, useMemo } from 'react';
+import { Handle, Position, NodeProps, useEdges, useUpdateNodeInternals } from 'reactflow';
 import { clsx } from 'clsx';
 import type { FlowNodeData } from '../../types/flow';
 import { PIN_COLORS, isEntryNodeType } from '../../types/flow';
@@ -22,8 +22,21 @@ export const BaseNode = memo(function BaseNode({
   const { executingNodeId, disconnectPin } = useFlowStore();
   const isExecuting = executingNodeId === id;
   const edges = useEdges();
+  const updateNodeInternals = useUpdateNodeInternals();
 
   const isTriggerNode = isEntryNodeType(data.nodeType);
+
+  // ReactFlow needs an explicit nudge when handles change (dynamic pins),
+  // otherwise newly created edges can exist in state but fail to render.
+  const handlesKey = useMemo(() => {
+    const inputs = data.inputs.map((p) => p.id).join('|');
+    const outputs = data.outputs.map((p) => p.id).join('|');
+    return `${inputs}__${outputs}`;
+  }, [data.inputs, data.outputs]);
+
+  useEffect(() => {
+    updateNodeInternals(id);
+  }, [id, handlesKey, updateNodeInternals]);
 
   // Check if a pin is connected
   const isPinConnected = (pinId: string, isInput: boolean): boolean => {

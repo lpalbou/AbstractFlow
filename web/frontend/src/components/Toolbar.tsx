@@ -223,6 +223,12 @@ export function Toolbar() {
     }
   }, [isRunning]);
 
+  const handleRunAgain = useCallback(() => {
+    if (isRunning) return;
+    setRunResult(null);
+    setExecutionEvents([]);
+  }, [isRunning]);
+
   // Handle export
   const handleExport = useCallback(() => {
     const flow = getFlow();
@@ -363,6 +369,7 @@ export function Toolbar() {
         isOpen={showRunModal}
         onClose={handleRunModalClose}
         onRun={handleRunExecute}
+        onRunAgain={handleRunAgain}
         isRunning={isRunning}
         result={runResult}
         events={executionEvents}

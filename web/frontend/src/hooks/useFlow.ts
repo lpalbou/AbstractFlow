@@ -290,9 +290,45 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   loadFlow: (flow) => {
     const nodes: Node<FlowNodeData>[] = flow.nodes.map((vn) => {
       const template = getNodeTemplate(vn.type);
-      const data: FlowNodeData = template
+      let data: FlowNodeData = template
         ? { ...createNodeData(template), ...vn.data }
         : (vn.data as FlowNodeData);
+
+      // Normalize Switch nodes: execution outputs only (cases + default).
+      if (data.nodeType === 'switch') {
+        const existingExecPins = data.outputs.filter((p) => p.type === 'execution');
+        const existingById = new Map(existingExecPins.map((p) => [p.id, p]));
+
+        const cases = data.switchConfig?.cases ?? [];
+        const nextCasePins = cases
+          .filter((c): c is { id: string; value: string } => !!c && typeof c.id === 'string')
+          .map((c) => {
+            const id = `case:${c.id}`;
+            const existing = existingById.get(id);
+            return {
+              id,
+              label: c.value || existing?.label || 'case',
+              type: 'execution' as const,
+            };
+          });
+
+        const defaultPin = existingById.get('default');
+        const nextDefaultPin = {
+          id: 'default',
+          label: defaultPin?.label || 'default',
+          type: 'execution' as const,
+        };
+
+        // Preserve any extra execution pins to avoid silently dropping edges,
+        // but strip all non-execution outputs (e.g. legacy `value`).
+        const reserved = new Set<string>([...nextCasePins.map((p) => p.id), 'default']);
+        const extraExecPins = existingExecPins.filter((p) => !reserved.has(p.id));
+
+        data = {
+          ...data,
+          outputs: [...nextCasePins, nextDefaultPin, ...extraExecPins],
+        };
+      }
 
       return {
         id: vn.id,
@@ -311,6 +347,18 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       animated: ve.animated ?? ve.sourceHandle === 'exec-out',
     }));
 
+    // Drop edges that reference missing pins (prevents invisible edges).
+    const nodeById = new Map(nodes.map((n) => [n.id, n]));
+    const validEdges = edges.filter((e) => {
+      const source = nodeById.get(e.source);
+      const target = nodeById.get(e.target);
+      if (!source || !target) return false;
+      if (!e.sourceHandle || !e.targetHandle) return false;
+      const sourceHasHandle = source.data.outputs.some((p) => p.id === e.sourceHandle);
+      const targetHasHandle = target.data.inputs.some((p) => p.id === e.targetHandle);
+      return sourceHasHandle && targetHasHandle;
+    });
+
     // Ensure newly added nodes get unique ids after load/import.
     // Node ids are generated as `node-{n}`.
     let maxNodeId = 0;
@@ -327,7 +375,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       flowId: flow.id,
       flowName: flow.name,
       nodes,
-      edges,
+      edges: validEdges,
       selectedNode: null,
       selectedEdge: null,
     });

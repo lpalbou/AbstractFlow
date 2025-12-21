@@ -165,21 +165,20 @@ const STRING_NODES: NodeTemplate[] = [
 const CONTROL_NODES: NodeTemplate[] = [
   // Execution nodes - control the flow
   { type: 'if', icon: '&#x2753;', label: 'If/Else', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'condition', label: 'condition', type: 'boolean' }], outputs: [{ id: 'true', label: 'true', type: 'execution' }, { id: 'false', label: 'false', type: 'execution' }], category: 'control' },
-  {
-    type: 'switch',
-    icon: '&#x1F500;', // Shuffle
-    label: 'Switch',
-    headerColor: '#F39C12',
-    inputs: [
-      { id: 'exec-in', label: '', type: 'execution' },
-      { id: 'value', label: 'value', type: 'string' },
-    ],
-    outputs: [
-      { id: 'default', label: 'default', type: 'execution' },
-      { id: 'value', label: 'value', type: 'string' },
-    ],
-    category: 'control',
-  },
+	  {
+	    type: 'switch',
+	    icon: '&#x1F500;', // Shuffle
+	    label: 'Switch',
+	    headerColor: '#F39C12',
+	    inputs: [
+	      { id: 'exec-in', label: '', type: 'execution' },
+	      { id: 'value', label: 'value', type: 'string' },
+	    ],
+	    outputs: [
+	      { id: 'default', label: 'default', type: 'execution' },
+	    ],
+	    category: 'control',
+	  },
   { type: 'loop', icon: '&#x1F501;', label: 'ForEach', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'items', label: 'items', type: 'array' }], outputs: [{ id: 'loop', label: 'loop', type: 'execution' }, { id: 'done', label: 'done', type: 'execution' }, { id: 'item', label: 'item', type: 'any' }, { id: 'index', label: 'index', type: 'number' }], category: 'control' },
   // Pure functions - just produce data
   { type: 'compare', icon: '=?', label: 'Compare', headerColor: '#F39C12', inputs: [{ id: 'a', label: 'a', type: 'any' }, { id: 'b', label: 'b', type: 'any' }], outputs: [{ id: 'result', label: 'result', type: 'boolean' }], category: 'control' },

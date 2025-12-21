@@ -543,16 +543,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                   })),
                   { id: 'default', label: 'default', type: 'execution' as const },
                 ];
-
-                const existingDataPins = data.outputs.filter((p) => p.type !== 'execution');
-                const hasValue = existingDataPins.some((p) => p.id === 'value');
-                const dataPins = hasValue
-                  ? existingDataPins.map((p) =>
-                      p.id === 'value' ? { ...p, label: 'value', type: 'string' as const } : p
-                    )
-                  : [...existingDataPins, { id: 'value', label: 'value', type: 'string' as const }];
-
-                return [...execPins, ...dataPins];
+                return execPins;
               };
 
               const addCase = () => {
