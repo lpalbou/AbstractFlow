@@ -339,13 +339,27 @@ def _sync_effect_results_to_node_outputs(run: Any, flow: Flow) -> None:
                 current["sub_run_id"] = raw.get("sub_run_id")
                 out = raw.get("output")
                 if isinstance(out, dict) and "result" in out:
-                    current["output"] = out.get("result")
+                    result_value = out.get("result")
+                    current["output"] = result_value
                     current["child_output"] = out
                 else:
-                    current["output"] = out
+                    result_value = out
+                    current["output"] = result_value
                     if isinstance(out, dict):
                         current["child_output"] = out
                 mapped_value = current.get("output")
+
+                cfg = flow_node.effect_config or {}
+                out_pins = cfg.get("output_pins")
+                if isinstance(out_pins, list) and out_pins:
+                    if isinstance(result_value, dict):
+                        for pid in out_pins:
+                            if isinstance(pid, str) and pid:
+                                if pid == "output":
+                                    continue
+                                current[pid] = result_value.get(pid)
+                    elif len(out_pins) == 1 and isinstance(out_pins[0], str) and out_pins[0]:
+                        current[out_pins[0]] = result_value
             else:
                 current["output"] = raw
                 mapped_value = raw

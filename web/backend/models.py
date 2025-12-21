@@ -29,6 +29,8 @@ class NodeType(str, Enum):
     ON_USER_REQUEST = "on_user_request"
     ON_AGENT_MESSAGE = "on_agent_message"
     ON_SCHEDULE = "on_schedule"
+    # Flow IO nodes
+    ON_FLOW_END = "on_flow_end"
     # Core execution nodes
     AGENT = "agent"
     FUNCTION = "function"

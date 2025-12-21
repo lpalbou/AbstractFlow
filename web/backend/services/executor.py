@@ -371,7 +371,21 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
         elif type_str == "subflow":
             effect_type = "start_subworkflow"
             subflow_id = node.data.get("subflowId") or node.data.get("flowId")  # legacy
-            effect_config = {"workflow_id": subflow_id}
+            output_pin_ids: list[str] = []
+            outs = node.data.get("outputs")
+            if isinstance(outs, list):
+                for p in outs:
+                    if not isinstance(p, dict):
+                        continue
+                    if p.get("type") == "execution":
+                        continue
+                    pid = p.get("id")
+                    if isinstance(pid, str) and pid:
+                        if pid == "output":
+                            continue
+                        output_pin_ids.append(pid)
+
+            effect_config = {"workflow_id": subflow_id, "output_pins": output_pin_ids}
 
         flow.add_node(
             node_id=node.id,
@@ -495,6 +509,9 @@ def _create_handler(node_type: NodeType, data: Dict[str, Any]) -> Any:
         else:
             # Identity function
             return lambda x: x
+
+    if type_str == "on_flow_end":
+        return _create_flow_end_handler(data)
 
     # Event/Trigger nodes - entry points
     if type_str in ("on_flow_start", "on_user_request", "on_agent_message", "on_schedule"):
@@ -731,6 +748,18 @@ def _create_subflow_effect_builder(data: Dict[str, Any]):
     START_SUBWORKFLOW effect executed by AbstractRuntime.
     """
 
+    input_pin_ids: list[str] = []
+    pins = data.get("inputs") if isinstance(data, dict) else None
+    if isinstance(pins, list):
+        for p in pins:
+            if not isinstance(p, dict):
+                continue
+            if p.get("type") == "execution":
+                continue
+            pid = p.get("id")
+            if isinstance(pid, str) and pid:
+                input_pin_ids.append(pid)
+
     def handler(input_data):
         subflow_id = (
             data.get("subflowId")
@@ -739,15 +768,32 @@ def _create_subflow_effect_builder(data: Dict[str, Any]):
             or data.get("workflow_id")
         )
 
-        # Subflow vars come from the `input` pin by convention.
+        # Subflow vars come from the node's data input pins.
+        sub_vars_dict: Dict[str, Any] = {}
         if isinstance(input_data, dict):
-            sub_vars = input_data.get("input")
-            if isinstance(sub_vars, dict):
-                sub_vars_dict: Dict[str, Any] = dict(sub_vars)
+            base: Dict[str, Any] = {}
+            if isinstance(input_data.get("vars"), dict):
+                base.update(dict(input_data["vars"]))
+            elif isinstance(input_data.get("input"), dict):
+                base.update(dict(input_data["input"]))
+
+            if input_pin_ids:
+                for pid in input_pin_ids:
+                    if pid in ("vars", "input") and isinstance(input_data.get(pid), dict):
+                        continue
+                    if pid in input_data:
+                        base[pid] = input_data.get(pid)
+                sub_vars_dict = base
             else:
-                sub_vars_dict = {"input": sub_vars}
+                if base:
+                    sub_vars_dict = base
+                else:
+                    sub_vars_dict = dict(input_data)
         else:
-            sub_vars_dict = {"input": input_data}
+            if input_pin_ids and len(input_pin_ids) == 1:
+                sub_vars_dict = {input_pin_ids[0]: input_data}
+            else:
+                sub_vars_dict = {"input": input_data}
 
         return {
             "output": None,
@@ -801,6 +847,42 @@ def _create_event_handler(event_type: str, data: Dict[str, Any]):
         else:
             # Unknown event type - pass through
             return input_data
+
+    return handler
+
+
+def _create_flow_end_handler(data: Dict[str, Any]):
+    """Create a handler for the On Flow End node.
+
+    This node is a terminal node that exposes selected values as the workflow
+    output. The exposed values are defined by the node's non-execution input
+    pins.
+    """
+
+    pin_ids: list[str] = []
+    pins = data.get("inputs") if isinstance(data, dict) else None
+    if isinstance(pins, list):
+        for p in pins:
+            if not isinstance(p, dict):
+                continue
+            if p.get("type") == "execution":
+                continue
+            pid = p.get("id")
+            if isinstance(pid, str) and pid:
+                pin_ids.append(pid)
+
+    def handler(input_data: Any):
+        if not pin_ids:
+            if isinstance(input_data, dict):
+                return dict(input_data)
+            return {"result": input_data}
+
+        if not isinstance(input_data, dict):
+            if len(pin_ids) == 1:
+                return {pin_ids[0]: input_data}
+            return {"result": input_data}
+
+        return {pid: input_data.get(pid) for pid in pin_ids}
 
     return handler
 

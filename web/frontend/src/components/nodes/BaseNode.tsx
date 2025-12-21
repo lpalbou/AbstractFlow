@@ -10,7 +10,7 @@ import { memo, type MouseEvent } from 'react';
 import { Handle, Position, NodeProps, useEdges } from 'reactflow';
 import { clsx } from 'clsx';
 import type { FlowNodeData } from '../../types/flow';
-import { PIN_COLORS } from '../../types/flow';
+import { PIN_COLORS, isEntryNodeType } from '../../types/flow';
 import { PinShape } from '../pins/PinShape';
 import { useFlowStore } from '../../hooks/useFlow';
 
@@ -23,7 +23,7 @@ export const BaseNode = memo(function BaseNode({
   const isExecuting = executingNodeId === id;
   const edges = useEdges();
 
-  const isTriggerNode = data.nodeType.startsWith('on_');
+  const isTriggerNode = isEntryNodeType(data.nodeType);
 
   // Check if a pin is connected
   const isPinConnected = (pinId: string, isInput: boolean): boolean => {

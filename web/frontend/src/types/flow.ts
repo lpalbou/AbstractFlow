@@ -39,6 +39,8 @@ export type NodeType =
   | 'on_user_request'    // Triggered by user input
   | 'on_agent_message'   // Triggered by inter-agent communication
   | 'on_schedule'        // Triggered by scheduled events
+  // Flow IO nodes
+  | 'on_flow_end'        // Terminal node to expose flow outputs
   // Core execution nodes (exec IN and OUT)
   | 'agent'
   | 'function'
@@ -56,6 +58,17 @@ export type NodeType =
   | 'literal_string' | 'literal_number' | 'literal_boolean' | 'literal_json' | 'literal_array'
   // Effects - Side-effect nodes (require execution pins)
   | 'ask_user' | 'llm_call' | 'wait_until' | 'wait_event' | 'memory_note' | 'memory_query';
+
+export const ENTRY_NODE_TYPES: NodeType[] = [
+  'on_flow_start',
+  'on_user_request',
+  'on_agent_message',
+  'on_schedule',
+];
+
+export function isEntryNodeType(nodeType: NodeType): boolean {
+  return ENTRY_NODE_TYPES.includes(nodeType);
+}
 
 // Node data stored in React Flow nodes
 export interface FlowNodeData {

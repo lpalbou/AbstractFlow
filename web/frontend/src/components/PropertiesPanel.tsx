@@ -4,11 +4,39 @@
 
 import React, { useCallback, useEffect, useState, useRef } from 'react';
 import type { Node } from 'reactflow';
-import type { FlowNodeData, ProviderInfo } from '../types/flow';
+import type { FlowNodeData, ProviderInfo, VisualFlow, Pin } from '../types/flow';
+import { isEntryNodeType } from '../types/flow';
 import { useFlowStore } from '../hooks/useFlow';
 
 interface PropertiesPanelProps {
   node: Node<FlowNodeData> | null;
+}
+
+type DataPinType = Exclude<FlowNodeData['inputs'][number]['type'], 'execution'>;
+
+const DATA_PIN_TYPES: DataPinType[] = [
+  'string',
+  'number',
+  'boolean',
+  'object',
+  'array',
+  'agent',
+  'any',
+];
+
+function normalizePinId(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return '';
+  return trimmed.replace(/\s+/g, '_');
+}
+
+function uniquePinId(base: string, used: Set<string>): string {
+  const normalized = normalizePinId(base);
+  const candidateBase = normalized || 'param';
+  if (!used.has(candidateBase)) return candidateBase;
+  let idx = 2;
+  while (used.has(`${candidateBase}_${idx}`)) idx++;
+  return `${candidateBase}_${idx}`;
 }
 
 export function PropertiesPanel({ node }: PropertiesPanelProps) {
@@ -23,6 +51,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   // Saved flows list (for subflow nodes)
   const [savedFlows, setSavedFlows] = useState<Array<{ id: string; name: string }>>([]);
   const [loadingFlows, setLoadingFlows] = useState(false);
+  const lastSyncedSubflowPins = useRef<string | null>(null);
 
   // Track last fetched provider to prevent duplicate fetches
   const lastFetchedProvider = useRef<string | null>(null);
@@ -83,6 +112,97 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       })
       .finally(() => setLoadingFlows(false));
   }, [node]);
+
+  // Sync Subflow pins to match the selected child workflow IO
+  useEffect(() => {
+    if (!node || node.data.nodeType !== 'subflow') return;
+    const subflowId = node.data.subflowId;
+    if (!subflowId || (flowId && subflowId === flowId)) return;
+
+    const syncKey = `${node.id}:${subflowId}`;
+    if (lastSyncedSubflowPins.current === syncKey) return;
+
+    const mergePins = (existingPins: Pin[], derivedPins: Pin[], kind: 'inputs' | 'outputs'): Pin[] => {
+      const existingExec = existingPins.filter((p) => p.type === 'execution');
+      const existingData = existingPins.filter((p) => p.type !== 'execution');
+
+      const existingDataById = new Map(existingData.map((p) => [p.id, p]));
+      const existingDataIds = new Set(existingData.map((p) => p.id));
+      const reservedIds = new Set<string>(['exec-in', 'exec-out']);
+
+      const derivedFiltered = derivedPins.filter((p) => {
+        if (p.type === 'execution') return false;
+        if (reservedIds.has(p.id)) return false;
+        if (existingDataIds.has(p.id) && (p.id === 'input' || p.id === 'output')) return false;
+        return true;
+      });
+
+      const derivedIds = new Set(derivedFiltered.map((p) => p.id));
+      const mergedDerived = derivedFiltered.map((p) => {
+        const existing = existingDataById.get(p.id);
+        if (!existing) return p;
+        return { ...existing, label: p.label, type: p.type };
+      });
+
+      const tail = existingData.filter((p) => !derivedIds.has(p.id));
+
+      return kind === 'inputs'
+        ? [...existingExec, ...mergedDerived, ...tail]
+        : [...existingExec, ...mergedDerived, ...tail];
+    };
+
+    const findEntryNode = (flow: VisualFlow) => {
+      const entryId = flow.entryNode;
+      if (entryId) {
+        const direct = flow.nodes.find((n) => n.id === entryId);
+        if (direct) return direct;
+      }
+
+      const execTargets = new Set(
+        flow.edges
+          .filter((e) => e.targetHandle === 'exec-in')
+          .map((e) => e.target)
+      );
+
+      const candidate =
+        flow.nodes.find((n) => isEntryNodeType(n.type) && !execTargets.has(n.id)) ||
+        flow.nodes.find((n) => isEntryNodeType(n.type)) ||
+        flow.nodes[0];
+
+      return candidate;
+    };
+
+    const findFlowEndNode = (flow: VisualFlow) => flow.nodes.find((n) => n.type === 'on_flow_end');
+
+    fetch(`/api/flows/${subflowId}`)
+      .then((res) => res.json())
+      .then((flow: VisualFlow) => {
+        const entry = findEntryNode(flow);
+        const end = findFlowEndNode(flow);
+
+        const entryPins = entry?.data?.outputs?.filter((p) => p.type !== 'execution') ?? [];
+        const endPins = end?.data?.inputs?.filter((p) => p.type !== 'execution') ?? [];
+
+        const desiredInputs: Pin[] = entryPins.map((p) => ({ ...p }));
+        const desiredOutputs: Pin[] = endPins.map((p) => ({ ...p }));
+
+        const nextInputs = mergePins(node.data.inputs, desiredInputs, 'inputs');
+        const nextOutputs = mergePins(node.data.outputs, desiredOutputs, 'outputs');
+
+        const samePins = (a: Pin[], b: Pin[]) =>
+          a.length === b.length &&
+          a.every((p, idx) => p.id === b[idx]?.id && p.label === b[idx]?.label && p.type === b[idx]?.type);
+
+        if (!samePins(node.data.inputs, nextInputs) || !samePins(node.data.outputs, nextOutputs)) {
+          updateNodeData(node.id, { inputs: nextInputs, outputs: nextOutputs });
+        }
+
+        lastSyncedSubflowPins.current = syncKey;
+      })
+      .catch((err) => {
+        console.error('Failed to sync subflow pins:', err);
+      });
+  }, [node?.id, node?.data.subflowId, flowId, updateNodeData]);
 
   const handleProviderChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -698,6 +818,181 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               Cron expression or interval (e.g., "30s", "5m", "1h")
             </span>
           </div>
+        </div>
+      )}
+
+      {/* On Flow Start dynamic parameters (output pins) */}
+      {data.nodeType === 'on_flow_start' && (
+        <div className="property-section">
+          <label className="property-label">Flow Start Parameters</label>
+
+          {(() => {
+            const params = data.outputs.filter((p) => p.type !== 'execution');
+
+            const used = new Set(data.outputs.map((p) => p.id));
+
+            const addParam = () => {
+              let n = 1;
+              while (used.has(`param${n}`)) n++;
+              const id = `param${n}`;
+              updateNodeData(node.id, {
+                outputs: [...data.outputs, { id, label: id, type: 'string' }],
+              });
+            };
+
+            const removeParam = (pinId: string) => {
+              updateNodeData(node.id, {
+                outputs: data.outputs.filter((p) => p.id !== pinId),
+              });
+            };
+
+            const updateParam = (pinId: string, patch: Partial<typeof params[number]>) => {
+              const next = data.outputs.map((p) => (p.id === pinId ? { ...p, ...patch } : p));
+              updateNodeData(node.id, { outputs: next });
+            };
+
+            const renameParam = (pinId: string, nextName: string) => {
+              const nextLabel = nextName.trim();
+              if (!nextLabel) return;
+              const usedWithoutSelf = new Set(data.outputs.filter((p) => p.id !== pinId).map((p) => p.id));
+              const nextId = uniquePinId(nextLabel, usedWithoutSelf);
+              const next = data.outputs.map((p) =>
+                p.id === pinId ? { ...p, id: nextId, label: nextLabel } : p
+              );
+              updateNodeData(node.id, { outputs: next });
+            };
+
+            return (
+              <>
+                <div className="array-editor">
+                  {params.map((pin) => (
+                    <div key={pin.id} className="array-item">
+                      <input
+                        type="text"
+                        className="property-input array-item-input"
+                        value={pin.label}
+                        onChange={(e) => renameParam(pin.id, e.target.value)}
+                        placeholder="param"
+                      />
+                      <select
+                        className="property-select"
+                        value={pin.type}
+                        onChange={(e) =>
+                          updateParam(pin.id, { type: e.target.value as DataPinType })
+                        }
+                      >
+                        {DATA_PIN_TYPES.map((t) => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        className="array-item-remove"
+                        onClick={() => removeParam(pin.id)}
+                        title="Remove parameter"
+                      >
+                        &times;
+                      </button>
+                    </div>
+                  ))}
+                  <button className="array-add-button" onClick={addParam}>
+                    + Add Parameter
+                  </button>
+                </div>
+                <span className="property-hint">
+                  Parameters become initial vars and show up in the Run Flow form.
+                </span>
+              </>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* On Flow End exposed outputs (input pins) */}
+      {data.nodeType === 'on_flow_end' && (
+        <div className="property-section">
+          <label className="property-label">Flow Outputs</label>
+
+          {(() => {
+            const outs = data.inputs.filter((p) => p.type !== 'execution');
+            const used = new Set(data.inputs.map((p) => p.id));
+
+            const addOut = () => {
+              let n = 1;
+              while (used.has(`output${n}`)) n++;
+              const id = `output${n}`;
+              updateNodeData(node.id, {
+                inputs: [...data.inputs, { id, label: id, type: 'string' }],
+              });
+            };
+
+            const removeOut = (pinId: string) => {
+              updateNodeData(node.id, {
+                inputs: data.inputs.filter((p) => p.id !== pinId),
+              });
+            };
+
+            const updateOut = (pinId: string, patch: Partial<typeof outs[number]>) => {
+              const next = data.inputs.map((p) => (p.id === pinId ? { ...p, ...patch } : p));
+              updateNodeData(node.id, { inputs: next });
+            };
+
+            const renameOut = (pinId: string, nextName: string) => {
+              const nextLabel = nextName.trim();
+              if (!nextLabel) return;
+              const usedWithoutSelf = new Set(data.inputs.filter((p) => p.id !== pinId).map((p) => p.id));
+              const nextId = uniquePinId(nextLabel, usedWithoutSelf);
+              const next = data.inputs.map((p) =>
+                p.id === pinId ? { ...p, id: nextId, label: nextLabel } : p
+              );
+              updateNodeData(node.id, { inputs: next });
+            };
+
+            return (
+              <>
+                <div className="array-editor">
+                  {outs.map((pin) => (
+                    <div key={pin.id} className="array-item">
+                      <input
+                        type="text"
+                        className="property-input array-item-input"
+                        value={pin.label}
+                        onChange={(e) => renameOut(pin.id, e.target.value)}
+                        placeholder="output"
+                      />
+                      <select
+                        className="property-select"
+                        value={pin.type}
+                        onChange={(e) =>
+                          updateOut(pin.id, { type: e.target.value as DataPinType })
+                        }
+                      >
+                        {DATA_PIN_TYPES.map((t) => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        className="array-item-remove"
+                        onClick={() => removeOut(pin.id)}
+                        title="Remove output"
+                      >
+                        &times;
+                      </button>
+                    </div>
+                  ))}
+                  <button className="array-add-button" onClick={addOut}>
+                    + Add Output
+                  </button>
+                </div>
+                <span className="property-hint">
+                  These pins are exposed as the workflow result (and to parent subflows).
+                </span>
+              </>
+            );
+          })()}
         </div>
       )}
 

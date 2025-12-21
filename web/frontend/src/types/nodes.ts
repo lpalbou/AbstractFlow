@@ -75,6 +75,17 @@ const EVENT_NODES: NodeTemplate[] = [
     ],
     category: 'events',
   },
+  {
+    type: 'on_flow_end',
+    icon: '&#x23F9;', // Stop button
+    label: 'On Flow End',
+    headerColor: '#C0392B',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+    ],
+    outputs: [],
+    category: 'events',
+  },
 ];
 
 // Core nodes

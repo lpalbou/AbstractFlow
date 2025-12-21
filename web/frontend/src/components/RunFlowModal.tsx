@@ -8,6 +8,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useFlowStore } from '../hooks/useFlow';
 import type { ExecutionEvent, Pin, FlowRunResult } from '../types/flow';
+import { isEntryNodeType } from '../types/flow';
 
 interface RunFlowModalProps {
   isOpen: boolean;
@@ -62,10 +63,7 @@ export function RunFlowModal({
   // Find the entry node (node with no incoming execution edges, typically event nodes)
   const entryNode = useMemo(() => {
     // Look for event nodes first
-    const eventNode = nodes.find(n =>
-      n.data.nodeType.startsWith('on_') ||
-      ['on_user_request', 'on_agent_message', 'on_schedule'].includes(n.data.nodeType)
-    );
+    const eventNode = nodes.find((n) => isEntryNodeType(n.data.nodeType));
     if (eventNode) return eventNode;
 
     // Fallback to first node
