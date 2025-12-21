@@ -53,6 +53,7 @@ def _create_effect_node_handler(
     be called first to resolve data edge inputs before creating the effect.
     """
     from abstractruntime.core.models import StepPlan, Effect, EffectType
+    from abstractruntime.core.vars import get_node_trace as _get_node_trace
 
     # Build the base effect handler
     if effect_type == "ask_user":
@@ -188,6 +189,10 @@ def _create_visual_agent_effect_handler(
     """
     import json
     from abstractruntime.core.models import StepPlan, Effect, EffectType
+    try:
+        from abstractruntime.core.vars import get_node_trace as _get_node_trace
+    except Exception:  # pragma: no cover
+        _get_node_trace = None  # type: ignore[assignment]
 
     def _ensure_temp_dict(run: Any) -> Dict[str, Any]:
         temp = run.vars.get("_temp")
@@ -236,6 +241,11 @@ def _create_visual_agent_effect_handler(
             resolved = {}
         return resolved if isinstance(resolved, dict) else {}
 
+    def _runtime_node_trace(run: Any) -> Dict[str, Any]:
+        if callable(_get_node_trace):
+            return _get_node_trace(run.vars, node_id)
+        return {"node_id": node_id, "steps": []}
+
     def handler(run: Any, ctx: Any) -> "StepPlan":
         del ctx
 
@@ -252,8 +262,16 @@ def _create_visual_agent_effect_handler(
 
         bucket = _get_agent_bucket(run)
         phase = str(bucket.get("phase") or "init")
-        tool_round = int(bucket.get("tool_round") or 0)
-        max_tool_rounds = int(bucket.get("max_tool_rounds") or 8)
+        try:
+            tool_round = int(bucket.get("tool_round") or 0)
+        except (TypeError, ValueError):
+            tool_round = 0
+        try:
+            max_tool_rounds = int(bucket.get("max_tool_rounds") or 8)
+        except (TypeError, ValueError):
+            max_tool_rounds = 8
+        if max_tool_rounds < 1:
+            max_tool_rounds = 1
 
         resolved_inputs = _resolve_inputs(run)
         task = str(resolved_inputs.get("task") or "")
@@ -274,7 +292,8 @@ def _create_visual_agent_effect_handler(
                     "model": model or "unknown",
                 }
                 _set_nested(run.vars, f"_temp.effects.{node_id}", out)
-                flow._node_outputs[node_id] = {"result": out}
+                bucket["phase"] = "done"
+                flow._node_outputs[node_id] = {"result": out, "scratchpad": _runtime_node_trace(run)}
                 run.vars["_last_output"] = {"result": out}
                 if next_node:
                     return StepPlan(node_id=node_id, next_node=next_node)
@@ -388,9 +407,9 @@ def _create_visual_agent_effect_handler(
                     )
 
                 _set_nested(run.vars, f"_temp.effects.{node_id}", result_obj)
-                flow._node_outputs[node_id] = {"result": result_obj}
-                run.vars["_last_output"] = {"result": result_obj}
                 bucket["phase"] = "done"
+                flow._node_outputs[node_id] = {"result": result_obj, "scratchpad": _runtime_node_trace(run)}
+                run.vars["_last_output"] = {"result": result_obj}
                 if next_node:
                     return StepPlan(node_id=node_id, next_node=next_node)
                 return StepPlan(node_id=node_id, complete_output={"result": result_obj, "success": True})
@@ -445,9 +464,9 @@ def _create_visual_agent_effect_handler(
                     "tool_results": results,
                 }
                 _set_nested(run.vars, f"_temp.effects.{node_id}", out)
-                flow._node_outputs[node_id] = {"result": out}
-                run.vars["_last_output"] = {"result": out}
                 bucket["phase"] = "done"
+                flow._node_outputs[node_id] = {"result": out, "scratchpad": _runtime_node_trace(run)}
+                run.vars["_last_output"] = {"result": out}
                 if next_node:
                     return StepPlan(node_id=node_id, next_node=next_node)
                 return StepPlan(node_id=node_id, complete_output={"result": out, "success": False})
@@ -496,9 +515,9 @@ def _create_visual_agent_effect_handler(
                 data = {}
 
             _set_nested(run.vars, f"_temp.effects.{node_id}", data)
-            flow._node_outputs[node_id] = {"result": data}
-            run.vars["_last_output"] = {"result": data}
             bucket["phase"] = "done"
+            flow._node_outputs[node_id] = {"result": data, "scratchpad": _runtime_node_trace(run)}
+            run.vars["_last_output"] = {"result": data}
             if next_node:
                 return StepPlan(node_id=node_id, next_node=next_node)
             return StepPlan(node_id=node_id, complete_output={"result": data, "success": True})
@@ -679,6 +698,13 @@ def _sync_effect_results_to_node_outputs(run: Any, flow: Flow) -> None:
                 mapped_value = current["response"]
         elif effect_type == "agent":
             current["result"] = raw
+            try:
+                from abstractruntime.core.vars import get_node_trace as _get_node_trace
+            except Exception:  # pragma: no cover
+                _get_node_trace = None  # type: ignore[assignment]
+
+            if callable(_get_node_trace):
+                current["scratchpad"] = _get_node_trace(run.vars, node_id)
             mapped_value = raw
         elif effect_type == "wait_event":
             current["event_data"] = raw

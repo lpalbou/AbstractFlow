@@ -104,6 +104,7 @@ const CORE_NODES: NodeTemplate[] = [
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
       { id: 'result', label: 'result', type: 'object' },
+      { id: 'scratchpad', label: 'scratchpad', type: 'object' },
     ],
     category: 'core',
   },
