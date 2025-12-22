@@ -32,6 +32,7 @@ function getInputTypeForPin(pinType: string): 'text' | 'number' | 'checkbox' | '
       return 'number';
     case 'boolean':
       return 'checkbox';
+    case 'string':
     case 'object':
     case 'array':
       return 'textarea';
@@ -891,7 +892,7 @@ export function RunFlowModal({
                               value={formValues[pin.id] || ''}
                               onChange={(e) => handleFieldChange(pin.id, e.target.value)}
                               placeholder={getPlaceholderForPin(pin)}
-                              rows={3}
+                              rows={pin.type === 'string' ? 4 : 5}
                               disabled={isRunning}
                             />
                           ) : inputType === 'checkbox' ? (
