@@ -32,6 +32,10 @@ interface FlowState {
   executingNodeId: string | null;
   isRunning: boolean;
 
+  // Editor clipboard (nodes only; edges are intentionally excluded)
+  clipboard: NodeClipboard | null;
+  clipboardPasteCount: number;
+
   // Actions
   setFlowId: (id: string | null) => void;
   setFlowName: (name: string) => void;
@@ -47,6 +51,9 @@ interface FlowState {
   disconnectPin: (nodeId: string, handleId: string, isInput: boolean) => void;
   setSelectedNode: (node: Node<FlowNodeData> | null) => void;
   setSelectedEdge: (edge: Edge | null) => void;
+  copySelectionToClipboard: () => number;
+  pasteClipboard: () => number;
+  duplicateSelection: () => number;
   setExecutingNodeId: (nodeId: string | null) => void;
   setIsRunning: (running: boolean) => void;
   loadFlow: (flow: VisualFlow) => void;
@@ -55,6 +62,60 @@ interface FlowState {
 }
 
 let nodeIdCounter = 0;
+
+type Point = { x: number; y: number };
+
+interface NodeClipboardItem {
+  type: string;
+  data: FlowNodeData;
+  relPosition: Point;
+}
+
+interface NodeClipboard {
+  origin: Point;
+  items: NodeClipboardItem[];
+  ts: number;
+}
+
+const DEFAULT_CLONE_OFFSET: Point = { x: 40, y: 40 };
+
+function deepClone<T>(value: T): T {
+  // Flow node data is expected to be JSON-serializable. Prefer structuredClone if available.
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sc = (globalThis as any).structuredClone as ((v: unknown) => unknown) | undefined;
+    if (typeof sc === 'function') return sc(value) as T;
+  } catch {
+    // fall through
+  }
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function isNodeSelected(node: Node<FlowNodeData>): boolean {
+  return Boolean(node.selected);
+}
+
+function getSelection(state: Pick<FlowState, 'nodes' | 'selectedNode'>): Node<FlowNodeData>[] {
+  const selected = state.nodes.filter(isNodeSelected);
+  if (selected.length > 0) return selected;
+  if (state.selectedNode) {
+    const byId = state.nodes.find((n) => n.id === state.selectedNode?.id);
+    return byId ? [byId] : [state.selectedNode];
+  }
+  return [];
+}
+
+function getBounds(nodes: Node<FlowNodeData>[]): { minX: number; minY: number } {
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  for (const n of nodes) {
+    minX = Math.min(minX, n.position.x);
+    minY = Math.min(minY, n.position.y);
+  }
+  if (!Number.isFinite(minX)) minX = 0;
+  if (!Number.isFinite(minY)) minY = 0;
+  return { minX, minY };
+}
 
 export const useFlowStore = create<FlowState>((set, get) => ({
   // Initial state
@@ -66,6 +127,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   selectedEdge: null,
   executingNodeId: null,
   isRunning: false,
+  clipboard: null,
+  clipboardPasteCount: 0,
 
   // Setters
   setFlowId: (id) => set({ flowId: id }),
@@ -281,6 +344,89 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   setSelectedNode: (node) => set({ selectedNode: node, selectedEdge: null }),
   setSelectedEdge: (edge) => set({ selectedEdge: edge, selectedNode: null }),
 
+  copySelectionToClipboard: () => {
+    const state = get();
+    const selected = getSelection(state);
+    if (selected.length === 0) return 0;
+
+    const { minX, minY } = getBounds(selected);
+    const items: NodeClipboardItem[] = selected.map((n) => ({
+      type: n.type || 'custom',
+      data: deepClone(n.data),
+      relPosition: { x: n.position.x - minX, y: n.position.y - minY },
+    }));
+
+    set({
+      clipboard: {
+        origin: { x: minX, y: minY },
+        items,
+        ts: Date.now(),
+      },
+      clipboardPasteCount: 0,
+    });
+    return items.length;
+  },
+
+  pasteClipboard: () => {
+    const state = get();
+    const clipboard = state.clipboard;
+    if (!clipboard || clipboard.items.length === 0) return 0;
+
+    const pasteIdx = (state.clipboardPasteCount || 0) + 1;
+    const dx = DEFAULT_CLONE_OFFSET.x * pasteIdx;
+    const dy = DEFAULT_CLONE_OFFSET.y * pasteIdx;
+    const origin = { x: clipboard.origin.x + dx, y: clipboard.origin.y + dy };
+
+    const newNodes = clipboard.items.map((item) => {
+      const id = `node-${++nodeIdCounter}`;
+      return {
+        id,
+        type: item.type,
+        position: { x: origin.x + item.relPosition.x, y: origin.y + item.relPosition.y },
+        data: deepClone(item.data),
+        selected: true,
+      } as Node<FlowNodeData>;
+    });
+
+    const deselectedExisting = state.nodes.map((n) => (n.selected ? { ...n, selected: false } : n));
+    const last = newNodes[newNodes.length - 1] || null;
+
+    set({
+      nodes: [...deselectedExisting, ...newNodes],
+      selectedNode: last,
+      selectedEdge: null,
+      clipboardPasteCount: pasteIdx,
+    });
+    return newNodes.length;
+  },
+
+  duplicateSelection: () => {
+    const state = get();
+    const selected = getSelection(state);
+    if (selected.length === 0) return 0;
+
+    const newNodes = selected.map((n) => {
+      const id = `node-${++nodeIdCounter}`;
+      return {
+        id,
+        type: n.type || 'custom',
+        position: { x: n.position.x + DEFAULT_CLONE_OFFSET.x, y: n.position.y + DEFAULT_CLONE_OFFSET.y },
+        data: deepClone(n.data),
+        selected: true,
+      } as Node<FlowNodeData>;
+    });
+
+    const deselectedExisting = state.nodes.map((n) => (n.selected ? { ...n, selected: false } : n));
+    const last = newNodes[newNodes.length - 1] || null;
+
+    set({
+      nodes: [...deselectedExisting, ...newNodes],
+      selectedNode: last,
+      selectedEdge: null,
+    });
+    return newNodes.length;
+  },
+
   // Execution state
   setExecutingNodeId: (nodeId) => set({ executingNodeId: nodeId }),
   setIsRunning: (running) =>
@@ -423,6 +569,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       edges: [],
       selectedNode: null,
       selectedEdge: null,
+      clipboard: null,
+      clipboardPasteCount: 0,
     });
     nodeIdCounter = 0;
   },

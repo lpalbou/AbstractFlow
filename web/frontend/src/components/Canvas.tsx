@@ -2,7 +2,7 @@
  * Main canvas component with React Flow.
  */
 
-import { useCallback, useRef, DragEvent, MouseEvent } from 'react';
+import { useCallback, useEffect, useRef, DragEvent, MouseEvent } from 'react';
 import ReactFlow, {
   Controls,
   Background,
@@ -48,7 +48,68 @@ export function Canvas() {
     addNode,
     setSelectedNode,
     setSelectedEdge,
+    copySelectionToClipboard,
+    pasteClipboard,
+    duplicateSelection,
   } = useFlowStore();
+
+  const isEditableTarget = (target: EventTarget | null): boolean => {
+    if (!target) return false;
+    if (!(target instanceof HTMLElement)) return false;
+    const tag = target.tagName.toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
+    if (target.isContentEditable) return true;
+    if (target.closest?.('[data-no-flow-hotkeys="true"]')) return true;
+    return false;
+  };
+
+  useEffect(() => {
+    const opts = { capture: true } as const;
+    const onKeyDown = (e: KeyboardEvent) => {
+      // Avoid hijacking normal typing / editor shortcuts.
+      if (e.defaultPrevented) return;
+      if (isEditableTarget(e.target)) return;
+      const sel = window.getSelection?.();
+      if (sel && !sel.isCollapsed) return;
+
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod) return;
+      const key = (e.key || '').toLowerCase();
+
+      if (!e.shiftKey && key === 'c') {
+        const n = copySelectionToClipboard();
+        if (n > 0) {
+          e.preventDefault();
+          toast.success(n === 1 ? 'Copied node' : `Copied ${n} nodes`);
+        }
+        return;
+      }
+
+      if (!e.shiftKey && key === 'v') {
+        const n = pasteClipboard();
+        if (n > 0) {
+          e.preventDefault();
+          toast.success(n === 1 ? 'Pasted node' : `Pasted ${n} nodes`);
+        }
+        return;
+      }
+
+      // Duplicate selected nodes (Blueprint-style "duplicate quickly") without edges.
+      // NOTE: We avoid Ctrl/Cmd+W (browser tab close). Use Ctrl/Cmd+Shift+V instead.
+      if (e.shiftKey && key === 'v') {
+        const n = duplicateSelection();
+        if (n > 0) {
+          e.preventDefault();
+          toast.success(n === 1 ? 'Duplicated node' : `Duplicated ${n} nodes`);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown, opts);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown, opts);
+    };
+  }, [copySelectionToClipboard, pasteClipboard, duplicateSelection]);
 
   // Handle connection with validation
   const handleConnect = useCallback(

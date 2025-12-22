@@ -150,6 +150,15 @@
   margin-bottom: 16px;
 }
 
+.property-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.property-actions button {
+  flex: 1;
+}
+
 .property-section.danger {
   margin-top: auto;
   padding-top: 16px;

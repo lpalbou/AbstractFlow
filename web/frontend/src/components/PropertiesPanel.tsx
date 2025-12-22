@@ -4,6 +4,7 @@
 
 import React, { useCallback, useEffect, useState, useRef } from 'react';
 import type { Node } from 'reactflow';
+import toast from 'react-hot-toast';
 import type { FlowNodeData, ProviderInfo, VisualFlow, Pin } from '../types/flow';
 import { isEntryNodeType } from '../types/flow';
 import { useFlowStore } from '../hooks/useFlow';
@@ -148,7 +149,16 @@ function jsonSchemaFromAgentFields(fields: AgentSchemaField[]): Record<string, a
 }
 
 export function PropertiesPanel({ node }: PropertiesPanelProps) {
-  const { updateNodeData, deleteNode, setEdges, flowId, nodes, edges } = useFlowStore();
+  const {
+    updateNodeData,
+    deleteNode,
+    setEdges,
+    flowId,
+    nodes,
+    edges,
+    copySelectionToClipboard,
+    duplicateSelection,
+  } = useFlowStore();
   const [showCodeEditor, setShowCodeEditor] = useState(false);
 
   // Provider/model state for agent nodes
@@ -439,6 +449,16 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       deleteNode(node.id);
     }
   }, [node, deleteNode]);
+
+  const handleCopyNode = useCallback(() => {
+    const n = copySelectionToClipboard();
+    if (n > 0) toast.success(n === 1 ? 'Copied node' : `Copied ${n} nodes`);
+  }, [copySelectionToClipboard]);
+
+  const handleDuplicateNode = useCallback(() => {
+    const n = duplicateSelection();
+    if (n > 0) toast.success(n === 1 ? 'Duplicated node' : `Duplicated ${n} nodes`);
+  }, [duplicateSelection]);
 
   const handleSubflowChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -2537,6 +2557,21 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           </span>
         </div>
       )}
+
+      {/* Quick actions */}
+      <div className="property-section">
+        <div className="property-actions">
+          <button type="button" onClick={handleDuplicateNode} title="Duplicate selected node(s) (Ctrl/Cmd+Shift+V)">
+            Duplicate
+          </button>
+          <button type="button" onClick={handleCopyNode} title="Copy selected node(s) (Ctrl/Cmd+C)">
+            Copy
+          </button>
+        </div>
+        <span className="property-hint">
+          Paste on canvas with Ctrl/Cmd+V. Duplicate shortcut: Ctrl/Cmd+Shift+V.
+        </span>
+      </div>
 
       {/* Delete button */}
       <div className="property-section danger">

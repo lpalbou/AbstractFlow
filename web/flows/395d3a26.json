@@ -1,13 +1,13 @@
 {
   "id": "395d3a26",
-  "name": "deep-research",
+  "name": "deep-research-v2",
   "description": "",
   "nodes": [
     {
       "id": "node-1",
       "type": "on_flow_start",
       "position": {
-        "x": -544.0,
+        "x": -672.0,
         "y": 112.0
       },
       "data": {
@@ -26,6 +26,11 @@
             "id": "query",
             "label": "query",
             "type": "string"
+          },
+          {
+            "id": "follow_up_questions",
+            "label": "follow_up_questions",
+            "type": "boolean"
           }
         ]
       },
@@ -39,8 +44,8 @@
       "id": "node-2",
       "type": "agent",
       "position": {
-        "x": 656.0,
-        "y": 112.0
+        "x": 800.0,
+        "y": -192.0
       },
       "data": {
         "nodeType": "agent",
@@ -100,8 +105,8 @@
       "id": "node-4",
       "type": "concat",
       "position": {
-        "x": -288.0,
-        "y": 240.0
+        "x": -224.0,
+        "y": -272.0
       },
       "data": {
         "nodeType": "concat",
@@ -141,8 +146,8 @@
       "id": "node-5",
       "type": "literal_string",
       "position": {
-        "x": -672.0,
-        "y": 320.0
+        "x": -224.0,
+        "y": -368.0
       },
       "data": {
         "nodeType": "literal_string",
@@ -169,8 +174,8 @@
       "id": "node-6",
       "type": "llm_call",
       "position": {
-        "x": -48.0,
-        "y": 112.0
+        "x": 80.0,
+        "y": -192.0
       },
       "data": {
         "nodeType": "llm_call",
@@ -221,8 +226,8 @@
       "id": "node-7",
       "type": "ask_user",
       "position": {
-        "x": 176.0,
-        "y": 112.0
+        "x": 368.0,
+        "y": -192.0
       },
       "data": {
         "nodeType": "ask_user",
@@ -269,8 +274,8 @@
       "id": "node-8",
       "type": "literal_string",
       "position": {
-        "x": 96.0,
-        "y": 352.0
+        "x": 112.0,
+        "y": -672.0
       },
       "data": {
         "nodeType": "literal_string",
@@ -297,8 +302,8 @@
       "id": "node-9",
       "type": "concat",
       "position": {
-        "x": 416.0,
-        "y": 368.0
+        "x": 592.0,
+        "y": -400.0
       },
       "data": {
         "nodeType": "concat",
@@ -353,8 +358,8 @@
       "id": "node-10",
       "type": "literal_string",
       "position": {
-        "x": 96.0,
-        "y": 512.0
+        "x": 112.0,
+        "y": -576.0
       },
       "data": {
         "nodeType": "literal_string",
@@ -381,8 +386,8 @@
       "id": "node-11",
       "type": "literal_string",
       "position": {
-        "x": 96.0,
-        "y": 656.0
+        "x": 112.0,
+        "y": -480.0
       },
       "data": {
         "nodeType": "literal_string",
@@ -409,8 +414,8 @@
       "id": "node-12",
       "type": "on_flow_end",
       "position": {
-        "x": 1664.0,
-        "y": 112.0
+        "x": 1648.0,
+        "y": -192.0
       },
       "data": {
         "nodeType": "on_flow_end",
@@ -441,8 +446,8 @@
       "id": "node-13",
       "type": "break_object",
       "position": {
-        "x": 912.0,
-        "y": 224.0
+        "x": 1040.0,
+        "y": -80.0
       },
       "data": {
         "nodeType": "break_object",
@@ -479,8 +484,8 @@
       "id": "node-14",
       "type": "answer_user",
       "position": {
-        "x": 1168.0,
-        "y": 112.0
+        "x": 1296.0,
+        "y": -192.0
       },
       "data": {
         "nodeType": "answer_user",
@@ -517,17 +522,328 @@
       "headerColor": null,
       "inputs": [],
       "outputs": []
+    },
+    {
+      "id": "node-15",
+      "type": "if",
+      "position": {
+        "x": -288.0,
+        "y": -32.0
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "If/Else",
+        "icon": "&#x2753;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-16",
+      "type": "agent",
+      "position": {
+        "x": 80.0,
+        "y": 176.0
+      },
+      "data": {
+        "nodeType": "agent",
+        "label": "Agent",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "task",
+            "label": "task",
+            "type": "string"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          }
+        ],
+        "agentConfig": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b",
+          "tools": [
+            "web_search",
+            "fetch_url"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-17",
+      "type": "concat",
+      "position": {
+        "x": -192.0,
+        "y": 288.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-18",
+      "type": "literal_string",
+      "position": {
+        "x": -544.0,
+        "y": 448.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "String",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "Below is a query for a deep research agent. You are expected to autonomously search internet for documents which are relevant to answer the user query. Proceed iteratively with an initial search, fetch at least 5 different pages and read them to extend your knowledge on the subject. \n\nBased on that new knowledge, iterate 3 times with the same process and by doing even more targeted search to answer with more precision and clarity the user query. Your goal is to accumulate knowledge, to deepen your understanding of the topic and better answer the user query.\n\nUSER QUERY : "
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-19",
+      "type": "literal_string",
+      "position": {
+        "x": -544.0,
+        "y": 560.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "String",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "\n=====================\nAT THE END OF YOUR RESEARCH, WRITE A CLEAR, STRUCTURED AND COMPREHENSIVE REPORT IN MARKDOWN TO ANSWER THE USER QUERY"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-20",
+      "type": "break_object",
+      "position": {
+        "x": 368.0,
+        "y": 224.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "result"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-21",
+      "type": "answer_user",
+      "position": {
+        "x": 688.0,
+        "y": 176.0
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-22",
+      "type": "on_flow_end",
+      "position": {
+        "x": 1056.0,
+        "y": 176.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "report",
+            "label": "report",
+            "type": "string"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
     }
   ],
   "edges": [
-    {
-      "id": "edge-1766396494230",
-      "source": "node-1",
-      "sourceHandle": "exec-out",
-      "target": "node-6",
-      "targetHandle": "exec-in",
-      "animated": true
-    },
     {
       "id": "edge-1766396514609",
       "source": "node-5",
@@ -663,9 +979,113 @@
       "target": "node-14",
       "targetHandle": "message",
       "animated": false
+    },
+    {
+      "id": "edge-1766402133272",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-15",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1766402137303",
+      "source": "node-1",
+      "sourceHandle": "follow_up_questions",
+      "target": "node-15",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "edge-1766402143296",
+      "source": "node-15",
+      "sourceHandle": "true",
+      "target": "node-6",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1766402432199",
+      "source": "node-15",
+      "sourceHandle": "false",
+      "target": "node-16",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1766402465730",
+      "source": "node-17",
+      "sourceHandle": "result",
+      "target": "node-16",
+      "targetHandle": "task",
+      "animated": false
+    },
+    {
+      "id": "edge-1766402591218",
+      "source": "node-18",
+      "sourceHandle": "value",
+      "target": "node-17",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-1766402602051",
+      "source": "node-19",
+      "sourceHandle": "value",
+      "target": "node-17",
+      "targetHandle": "c",
+      "animated": false
+    },
+    {
+      "id": "edge-1766402605375",
+      "source": "node-1",
+      "sourceHandle": "query",
+      "target": "node-17",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-1766402652483",
+      "source": "node-16",
+      "sourceHandle": "result",
+      "target": "node-20",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1766402671815",
+      "source": "node-16",
+      "sourceHandle": "exec-out",
+      "target": "node-21",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1766402678915",
+      "source": "node-20",
+      "sourceHandle": "result",
+      "target": "node-21",
+      "targetHandle": "message",
+      "animated": false
+    },
+    {
+      "id": "edge-1766402699174",
+      "source": "node-21",
+      "sourceHandle": "exec-out",
+      "target": "node-22",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1766402735221",
+      "source": "node-21",
+      "sourceHandle": "message",
+      "target": "node-22",
+      "targetHandle": "report",
+      "animated": false
     }
   ],
   "entryNode": "node-1",
   "created_at": "2025-12-22T09:52:47.457452",
-  "updated_at": "2025-12-22T10:10:39.536770"
+  "updated_at": "2025-12-22T11:26:49.950574"
 }
