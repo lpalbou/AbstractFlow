@@ -112,9 +112,16 @@ async def _execute_runner_loop(
     connection_id: str,
 ) -> None:
     """Execute the runner loop with waiting support."""
+    # IMPORTANT: UI trace/scratchpad rendering depends on nested fields like
+    # `scratchpad.steps[].effect.type/payload` and `scratchpad.steps[].result`.
+    # A too-small depth limit collapses these into "…", making traces unreadable.
+    #
+    # Keep depth moderate but bounded. Strings/lists/dicts are already size-capped.
+    _MAX_PREVIEW_DEPTH = 12
+
     def _preview(value: Any, *, depth: int = 0) -> Any:
         """Best-effort JSON-safe preview (size-bounded)."""
-        if depth > 4:
+        if depth > _MAX_PREVIEW_DEPTH:
             return "…"
         if value is None:
             return None
@@ -144,7 +151,18 @@ async def _execute_runner_loop(
         if hasattr(runner, "flow") and hasattr(runner.flow, "_node_outputs"):
             outputs = getattr(runner.flow, "_node_outputs")
             if isinstance(outputs, dict) and node_id in outputs:
-                return _preview(outputs.get(node_id))
+                raw = outputs.get(node_id)
+                # Avoid shipping the full nested `node_traces` blob over WS; the UI
+                # uses the flattened `scratchpad.steps` list for rendering.
+                if isinstance(raw, dict):
+                    scratchpad = raw.get("scratchpad")
+                    if isinstance(scratchpad, dict) and "node_traces" in scratchpad:
+                        scratchpad_copy = dict(scratchpad)
+                        scratchpad_copy.pop("node_traces", None)
+                        raw_copy = dict(raw)
+                        raw_copy["scratchpad"] = scratchpad_copy
+                        raw = raw_copy
+                return _preview(raw)
         # Fallback for non-visual flows
         state = runner.get_state() if hasattr(runner, "get_state") else None
         if state and hasattr(state, "vars") and isinstance(state.vars, dict):
@@ -212,18 +230,47 @@ async def _execute_runner_loop(
 
         return ("Waiting for subworkflow…", [], True, getattr(wait, "wait_key", None), reason_value)
 
+    def _is_agent_node(node_id: str) -> bool:
+        try:
+            node = runner.flow.nodes.get(node_id) if hasattr(runner, "flow") and hasattr(runner.flow, "nodes") else None
+        except Exception:
+            node = None
+        return bool(node is not None and getattr(node, "effect_type", None) == "agent")
+
+    def _agent_phase(state_vars: Any, node_id: str) -> str:
+        if not isinstance(state_vars, dict):
+            return ""
+        temp = state_vars.get("_temp")
+        if not isinstance(temp, dict):
+            return ""
+        agent_ns = temp.get("agent")
+        if not isinstance(agent_ns, dict):
+            return ""
+        bucket = agent_ns.get(node_id)
+        if not isinstance(bucket, dict):
+            return ""
+        phase = bucket.get("phase")
+        return str(phase) if phase is not None else ""
+
+    # Track the currently "open" node step so we don't emit misleading `node_complete`
+    # events for multi-tick nodes (e.g., Agent nodes that self-loop across phases).
+    active_node_id: Optional[str] = None
+
     while True:
         # Capture node BEFORE stepping so events refer to the node being executed.
         before = runner.get_state()
         node_before = before.current_node if before else None
 
-        if node_before:
+        # Emit node_start only when we enter a new node (keeps a single running
+        # timeline entry for nodes that require multiple runtime ticks).
+        if node_before and node_before != active_node_id:
             await websocket.send_json(
                 ExecutionEvent(
                     type="node_start",
                     nodeId=node_before,
                 ).model_dump()
             )
+            active_node_id = node_before
 
         state = runner.step()
 
@@ -246,15 +293,29 @@ async def _execute_runner_loop(
             )
             break
 
-        # Completed step: emit node_complete for the node we just executed.
-        if node_before:
-            await websocket.send_json(
-                ExecutionEvent(
-                    type="node_complete",
-                    nodeId=node_before,
-                    result=_node_output(node_before),
-                ).model_dump()
-            )
+        # Completed step: emit node_complete for the node we just executed, but only
+        # when the node is "logically complete" for the visual timeline.
+        #
+        # Agent nodes are implemented as a small internal state machine (phase=init/subworkflow/structured/done)
+        # and self-loop across ticks. Emitting node_complete on every tick produces confusing UI:
+        # a completed step whose payload says `{status:"running"}`.
+        if active_node_id:
+            should_close = True
+            if _is_agent_node(active_node_id):
+                phase = _agent_phase(getattr(state, "vars", None), active_node_id)
+                # Close only when done (or if the run is no longer running, e.g. completed/failed).
+                if phase != "done" and not runner.is_complete() and not runner.is_failed():
+                    should_close = False
+
+            if should_close:
+                await websocket.send_json(
+                    ExecutionEvent(
+                        type="node_complete",
+                        nodeId=active_node_id,
+                        result=_node_output(active_node_id),
+                    ).model_dump()
+                )
+                active_node_id = None
 
         # Check if complete
         if runner.is_complete():
@@ -407,7 +468,11 @@ async def resume_waiting_flow(
                 workflow=_spec_for(parent_state),
                 run_id=parent_id,
                 wait_key=None,
-                payload={"sub_run_id": current_state.run_id, "output": current_state.output},
+                payload={
+                    "sub_run_id": current_state.run_id,
+                    "output": current_state.output,
+                    "node_traces": runtime.get_node_traces(current_state.run_id),
+                },
                 max_steps=0,
             )
 

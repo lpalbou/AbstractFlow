@@ -17,6 +17,7 @@ from ..runner import FlowRunner
 
 from .builtins import get_builtin_handler
 from .code_executor import create_code_handler
+from .agent_ids import visual_react_workflow_id
 from .models import NodeType, VisualEdge, VisualFlow
 
 
@@ -153,6 +154,82 @@ def create_visual_runner(visual_flow: VisualFlow, *, flows: Dict[str, VisualFlow
         child_flow = visual_to_flow(vf)
         child_spec = compile_flow(child_flow)
         registry.register(child_spec)
+
+    # Register per-Agent-node subworkflows (canonical AbstractAgent ReAct).
+    #
+    # Visual Agent nodes compile into START_SUBWORKFLOW effects that reference a
+    # deterministic workflow_id. The registry must contain those WorkflowSpecs.
+    #
+    # This keeps VisualFlow JSON portable across hosts: any host can run a
+    # VisualFlow document by registering these derived specs alongside the flow.
+    agent_nodes: list[tuple[str, Dict[str, Any]]] = []
+    for vf in ordered:
+        for n in vf.nodes:
+            node_type = _node_type(n)
+            if node_type != "agent":
+                continue
+            cfg = n.data.get("agentConfig", {})
+            agent_nodes.append((visual_react_workflow_id(flow_id=vf.id, node_id=n.id), cfg if isinstance(cfg, dict) else {}))
+
+    if agent_nodes:
+        try:
+            from abstractagent.adapters.react_runtime import create_react_workflow
+            from abstractagent.logic.react import ReActLogic
+        except Exception as e:  # pragma: no cover
+            raise RuntimeError(
+                "Visual Agent nodes require AbstractAgent to be installed/importable."
+            ) from e
+
+        from abstractcore.tools import ToolDefinition
+        from abstractruntime.integrations.abstractcore.default_tools import filter_tool_specs
+
+        def _tool_defs(tool_names: list[str]) -> list[ToolDefinition]:
+            specs = filter_tool_specs(tool_names)
+            out: list[ToolDefinition] = []
+            for s in specs:
+                if not isinstance(s, dict):
+                    continue
+                name = s.get("name")
+                if not isinstance(name, str) or not name.strip():
+                    continue
+                desc = s.get("description")
+                params = s.get("parameters")
+                out.append(
+                    ToolDefinition(
+                        name=name.strip(),
+                        description=str(desc or ""),
+                        parameters=dict(params) if isinstance(params, dict) else {},
+                    )
+                )
+            return out
+
+        def _normalize_tool_names(raw: Any) -> list[str]:
+            if not isinstance(raw, list):
+                return []
+            out: list[str] = []
+            for t in raw:
+                if isinstance(t, str) and t.strip():
+                    out.append(t.strip())
+            return out
+
+        for workflow_id, cfg in agent_nodes:
+            provider_raw = cfg.get("provider")
+            model_raw = cfg.get("model")
+            provider = str(provider_raw).strip().lower() if isinstance(provider_raw, str) else None
+            model = str(model_raw).strip() if isinstance(model_raw, str) else None
+
+            tools_selected = _normalize_tool_names(cfg.get("tools"))
+            logic = ReActLogic(tools=_tool_defs(tools_selected))
+            registry.register(
+                create_react_workflow(
+                    logic=logic,
+                    workflow_id=workflow_id,
+                    provider=provider,
+                    model=model,
+                    allowed_tools=tools_selected,
+                )
+            )
+
     runtime.set_workflow_registry(registry)
 
     return runner
@@ -794,7 +871,13 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
             effect_config = node.data.get("effectConfig", {})
         elif type_str == "agent":
             effect_type = "agent"
-            effect_config = node.data.get("agentConfig", {})
+            raw_cfg = node.data.get("agentConfig", {})
+            cfg = dict(raw_cfg) if isinstance(raw_cfg, dict) else {}
+            cfg.setdefault(
+                "_react_workflow_id",
+                visual_react_workflow_id(flow_id=visual.id, node_id=node.id),
+            )
+            effect_config = cfg
         elif type_str == "subflow":
             effect_type = "start_subworkflow"
             subflow_id = node.data.get("subflowId") or node.data.get("flowId")

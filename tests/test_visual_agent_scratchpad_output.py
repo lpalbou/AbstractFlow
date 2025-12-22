@@ -16,8 +16,14 @@ def test_visual_agent_exposes_runtime_backed_scratchpad_output() -> None:
         from abstractruntime.core.models import Effect, EffectType, RunState
         from abstractruntime.core.runtime import EffectOutcome, Runtime
         from abstractruntime.storage.in_memory import InMemoryLedgerStore, InMemoryRunStore
+        from abstractruntime.scheduler.registry import WorkflowRegistry
     except Exception as e:  # pragma: no cover
         raise RuntimeError(f"abstractruntime imports failed: {e}") from e
+
+    from abstractagent.adapters.react_runtime import create_react_workflow
+    from abstractagent.logic.react import ReActLogic
+    from abstractcore.tools import ToolDefinition
+    from abstractflow.visual.agent_ids import visual_react_workflow_id
 
     def llm_handler(run: RunState, effect: Effect, default_next_node: Optional[str]) -> EffectOutcome:
         del effect, default_next_node
@@ -69,7 +75,9 @@ def test_visual_agent_exposes_runtime_backed_scratchpad_output() -> None:
                 {
                     "call_id": tc.get("call_id"),
                     "name": tc.get("name"),
-                    "result": {"stdout": "/fake/dir", "stderr": "", "exit_code": 0},
+                    "success": True,
+                    "output": {"stdout": "/fake/dir", "stderr": "", "exit_code": 0},
+                    "error": None,
                 }
             )
 
@@ -83,6 +91,28 @@ def test_visual_agent_exposes_runtime_backed_scratchpad_output() -> None:
             EffectType.TOOL_CALLS: tool_handler,
         },
     )
+
+    # Visual Agent nodes compile into START_SUBWORKFLOW; register the derived ReAct workflow.
+    react_workflow_id = visual_react_workflow_id(flow_id="test-visual-agent-scratchpad", node_id="agent1")
+    registry = WorkflowRegistry()
+    registry.register(
+        create_react_workflow(
+            logic=ReActLogic(
+                tools=[
+                    ToolDefinition(
+                        name="execute_command",
+                        description="Execute a shell command (stubbed in this test).",
+                        parameters={"command": {"type": "string"}},
+                    )
+                ]
+            ),
+            workflow_id=react_workflow_id,
+            provider="stub",
+            model="stub",
+            allowed_tools=["execute_command"],
+        )
+    )
+    runtime.set_workflow_registry(registry)
 
     flow = Flow("test-visual-agent-scratchpad")
     flow._node_outputs = {}
@@ -116,18 +146,15 @@ def test_visual_agent_exposes_runtime_backed_scratchpad_output() -> None:
     assert isinstance(runtime_ns, dict)
     traces = runtime_ns.get("node_traces")
     assert isinstance(traces, dict)
-    agent_trace = traces.get("agent1")
-    assert isinstance(agent_trace, dict)
-    assert agent_trace.get("node_id") == "agent1"
-    steps = agent_trace.get("steps")
-    assert isinstance(steps, list)
-    assert len(steps) >= 2
-    assert any(
-        isinstance(step, dict) and isinstance(step.get("effect"), dict) and step["effect"].get("type") == "tool_calls"
-        for step in steps
-    )
 
     node_output = flow._node_outputs.get("agent1")
     assert isinstance(node_output, dict)
     assert "result" in node_output
-    assert node_output.get("scratchpad") == agent_trace
+    scratchpad = node_output.get("scratchpad")
+    assert isinstance(scratchpad, dict)
+    steps = scratchpad.get("steps")
+    assert isinstance(steps, list)
+    assert any(
+        isinstance(step, dict) and isinstance(step.get("effect"), dict) and step["effect"].get("type") == "tool_calls"
+        for step in steps
+    )

@@ -6,6 +6,12 @@
 
 AbstractFlow is an innovative Python library that enables visual, diagram-based creation and execution of AI workflows. Built on top of [AbstractCore](https://github.com/lpalbou/AbstractCore), it provides an intuitive interface for designing complex AI pipelines through interactive diagrams.
 
+## Monorepo note (Abstract Framework)
+
+This repository is the **Abstract Framework monorepo**. The implementation in `abstractflow/abstractflow/*` (Flow/FlowRunner/compiler) and `abstractflow/abstractflow/visual/*` (VisualFlow models + portable executor) is aligned with `docs/architecture.md`.
+
+Some parts of this README (and `abstractflow/pyproject.toml` / `abstractflow/CHANGELOG.md`) were originally written for a standalone placeholder package and may be out of sync with the monorepo implementation. See `docs/architecture.md` and planned backlog `docs/backlog/planned/093-framework-packaging-alignment-flow-runtime.md`.
+
 ## 🎯 Vision
 
 AbstractFlow aims to democratize AI workflow creation by providing:
@@ -96,7 +102,7 @@ cd AbstractFlow
 pip install -e .
 
 # Or install with web editor dependencies
-pip install -e .[web]
+pip install -e .[server]
 
 # Development installation (includes tests)
 pip install -e .[dev]
@@ -147,14 +153,10 @@ print(result)  # {"value": 5, "doubled": 10, "result": 20}
 
 ```python
 from abstractflow import Flow, FlowRunner
-from abstractagent import Agent
+from abstractagent import create_react_agent
 
 # Create an agent
-planner = Agent(
-    name="planner",
-    model="gpt-4o-mini",
-    system_prompt="You are a helpful planning assistant."
-)
+planner = create_react_agent(provider="ollama", model="qwen3:4b-instruct-2507-q4_K_M")
 
 # Create flow with agent node
 flow = Flow("agent-workflow")

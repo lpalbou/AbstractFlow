@@ -1,0 +1,483 @@
+{
+  "id": "2d26aee4",
+  "name": "Untitled Flow",
+  "description": "",
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": {
+        "x": -256.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "query",
+            "label": "query",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-2",
+      "type": "agent",
+      "position": {
+        "x": 32.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "agent",
+        "label": "Agent",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "task",
+            "label": "task",
+            "type": "string"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          }
+        ],
+        "agentConfig": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b",
+          "tools": [
+            "list_files",
+            "read_file"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-3",
+      "type": "agent",
+      "position": {
+        "x": 944.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "agent",
+        "label": "Agent",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "task",
+            "label": "task",
+            "type": "string"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          }
+        ],
+        "agentConfig": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b",
+          "tools": [
+            "list_files",
+            "read_file"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-4",
+      "type": "concat",
+      "position": {
+        "x": 688.0,
+        "y": 288.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          },
+          {
+            "id": "d",
+            "label": "d",
+            "type": "string"
+          },
+          {
+            "id": "e",
+            "label": "e",
+            "type": "string"
+          },
+          {
+            "id": "f",
+            "label": "f",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-5",
+      "type": "literal_string",
+      "position": {
+        "x": -240.0,
+        "y": 320.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "String",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "Your role is to perform a critical review of the analysis provided by another agent.\n\nHere is the initial query : \n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-6",
+      "type": "literal_string",
+      "position": {
+        "x": 352.0,
+        "y": 368.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "String",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "\n\nAnd here is the analysis provided: \n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-7",
+      "type": "break_object",
+      "position": {
+        "x": 400.0,
+        "y": 160.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "result"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-8",
+      "type": "break_object",
+      "position": {
+        "x": 352.0,
+        "y": 480.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "result"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-9",
+      "type": "literal_string",
+      "position": {
+        "x": 400.0,
+        "y": 624.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "String",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "\n\nAnd here is the scratchpad that enable to deliver that analysis :\n\n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1766391540810",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-2",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1766391881776",
+      "source": "node-1",
+      "sourceHandle": "query",
+      "target": "node-2",
+      "targetHandle": "task",
+      "animated": false
+    },
+    {
+      "id": "edge-1766392047806",
+      "source": "node-2",
+      "sourceHandle": "exec-out",
+      "target": "node-3",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1766392080295",
+      "source": "node-4",
+      "sourceHandle": "result",
+      "target": "node-3",
+      "targetHandle": "task",
+      "animated": false
+    },
+    {
+      "id": "edge-1766392140087",
+      "source": "node-5",
+      "sourceHandle": "value",
+      "target": "node-4",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-1766392142796",
+      "source": "node-1",
+      "sourceHandle": "query",
+      "target": "node-4",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-1766392169577",
+      "source": "node-6",
+      "sourceHandle": "value",
+      "target": "node-4",
+      "targetHandle": "c",
+      "animated": false
+    },
+    {
+      "id": "edge-1766392203750",
+      "source": "node-2",
+      "sourceHandle": "result",
+      "target": "node-7",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1766392209400",
+      "source": "node-7",
+      "sourceHandle": "result",
+      "target": "node-4",
+      "targetHandle": "d",
+      "animated": false
+    },
+    {
+      "id": "edge-1766392218410",
+      "source": "node-2",
+      "sourceHandle": "scratchpad",
+      "target": "node-8",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1766392242483",
+      "source": "node-9",
+      "sourceHandle": "value",
+      "target": "node-4",
+      "targetHandle": "e",
+      "animated": false
+    },
+    {
+      "id": "edge-1766392276658",
+      "source": "node-8",
+      "sourceHandle": "result",
+      "target": "node-4",
+      "targetHandle": "f",
+      "animated": false
+    }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2025-12-22T08:24:45.180623",
+  "updated_at": "2025-12-22T08:33:57.478542"
+}

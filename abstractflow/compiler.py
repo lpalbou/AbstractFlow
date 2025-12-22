@@ -180,18 +180,20 @@ def _create_visual_agent_effect_handler(
 ) -> Callable:
     """Create a handler for the visual Agent node.
 
-    The Agent node is implemented as a small state machine that:
-    - resolves inputs via data edges (task/context)
-    - runs an LLM_CALL effect (optionally with tools)
-    - executes TOOL_CALLS effects when tool calls are returned
-    - optionally performs a final structured-output LLM_CALL
+    Visual Agent nodes delegate to AbstractAgent's canonical ReAct workflow
+    via `START_SUBWORKFLOW` (runtime-owned execution and persistence).
+
+    This handler:
+    - resolves `task` / `context` via data edges
+    - starts the configured ReAct subworkflow (sync; may wait)
+    - exposes the final agent result and trace ("scratchpad") via output pins
+    - optionally performs a final structured-output LLM_CALL (format-only pass)
     """
     import json
-    from abstractruntime.core.models import StepPlan, Effect, EffectType
-    try:
-        from abstractruntime.core.vars import get_node_trace as _get_node_trace
-    except Exception:  # pragma: no cover
-        _get_node_trace = None  # type: ignore[assignment]
+
+    from abstractruntime.core.models import Effect, EffectType, StepPlan
+
+    from .visual.agent_ids import visual_react_workflow_id
 
     def _ensure_temp_dict(run: Any) -> Dict[str, Any]:
         temp = run.vars.get("_temp")
@@ -212,21 +214,6 @@ def _create_visual_agent_effect_handler(
             agent[node_id] = bucket
         return bucket
 
-    def _normalize_tools(raw: Any) -> list[str]:
-        if not isinstance(raw, list):
-            return []
-        out: list[str] = []
-        for t in raw:
-            if isinstance(t, str) and t.strip():
-                out.append(t.strip())
-        return out
-
-    def _build_prompt(*, task: str, context: Dict[str, Any]) -> str:
-        if not context:
-            return task
-        context_str = "\n".join(f"{k}: {v}" for k, v in context.items())
-        return f"Context:\n{context_str}\n\nTask: {task}"
-
     def _resolve_inputs(run: Any) -> Dict[str, Any]:
         if hasattr(flow, "_node_outputs") and hasattr(flow, "_data_edge_map"):
             _sync_effect_results_to_node_outputs(run, flow)
@@ -240,10 +227,48 @@ def _create_visual_agent_effect_handler(
             resolved = {}
         return resolved if isinstance(resolved, dict) else {}
 
-    def _runtime_node_trace(run: Any) -> Dict[str, Any]:
-        if callable(_get_node_trace):
-            return _get_node_trace(run.vars, node_id)
-        return {"node_id": node_id, "steps": []}
+    def _flatten_node_traces(node_traces: Any) -> list[Dict[str, Any]]:
+        if not isinstance(node_traces, dict):
+            return []
+        out: list[Dict[str, Any]] = []
+        for trace in node_traces.values():
+            if not isinstance(trace, dict):
+                continue
+            steps = trace.get("steps")
+            if not isinstance(steps, list):
+                continue
+            for s in steps:
+                if isinstance(s, dict):
+                    out.append(dict(s))
+        out.sort(key=lambda s: str(s.get("ts") or ""))
+        return out
+
+    def _build_sub_vars(run: Any, *, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        parent_limits = run.vars.get("_limits")
+        limits = dict(parent_limits) if isinstance(parent_limits, dict) else {}
+        limits.setdefault("max_iterations", 25)
+        limits.setdefault("current_iteration", 0)
+        limits.setdefault("max_tokens", 32768)
+        limits.setdefault("max_output_tokens", None)
+        limits.setdefault("max_history_messages", -1)
+        limits.setdefault("estimated_tokens_used", 0)
+        limits.setdefault("warn_iterations_pct", 80)
+        limits.setdefault("warn_tokens_pct", 80)
+
+        ctx_ns: Dict[str, Any] = {"task": str(task or ""), "messages": []}
+        if isinstance(context, dict) and context:
+            for k, v in context.items():
+                if k in ("task", "messages"):
+                    continue
+                ctx_ns[str(k)] = v
+
+        return {
+            "context": ctx_ns,
+            "scratchpad": {"iteration": 0, "max_iterations": int(limits.get("max_iterations") or 25)},
+            "_runtime": {"inbox": []},
+            "_temp": {},
+            "_limits": limits,
+        }
 
     def handler(run: Any, ctx: Any) -> "StepPlan":
         del ctx
@@ -253,29 +278,28 @@ def _create_visual_agent_effect_handler(
         provider = str(provider_raw or "").strip().lower() if isinstance(provider_raw, str) else ""
         model = str(model_raw or "").strip() if isinstance(model_raw, str) else ""
 
-        tools_selected = _normalize_tools(agent_config.get("tools"))
-
         output_schema_cfg = agent_config.get("outputSchema") if isinstance(agent_config.get("outputSchema"), dict) else {}
         schema_enabled = bool(output_schema_cfg.get("enabled"))
         schema = output_schema_cfg.get("jsonSchema") if isinstance(output_schema_cfg.get("jsonSchema"), dict) else None
 
         bucket = _get_agent_bucket(run)
         phase = str(bucket.get("phase") or "init")
-        try:
-            tool_round = int(bucket.get("tool_round") or 0)
-        except (TypeError, ValueError):
-            tool_round = 0
-        try:
-            max_tool_rounds = int(bucket.get("max_tool_rounds") or 8)
-        except (TypeError, ValueError):
-            max_tool_rounds = 8
-        if max_tool_rounds < 1:
-            max_tool_rounds = 1
 
-        resolved_inputs = _resolve_inputs(run)
+        resolved_inputs = bucket.get("resolved_inputs")
+        if not isinstance(resolved_inputs, dict) or phase == "init":
+            resolved_inputs = _resolve_inputs(run)
+            bucket["resolved_inputs"] = resolved_inputs if isinstance(resolved_inputs, dict) else {}
+
         task = str(resolved_inputs.get("task") or "")
         context_raw = resolved_inputs.get("context")
         context = context_raw if isinstance(context_raw, dict) else {}
+
+        workflow_id_raw = agent_config.get("_react_workflow_id")
+        react_workflow_id = (
+            workflow_id_raw.strip()
+            if isinstance(workflow_id_raw, str) and workflow_id_raw.strip()
+            else visual_react_workflow_id(flow_id=flow.flow_id, node_id=node_id)
+        )
 
         if phase == "init":
             if not provider or not model:
@@ -292,206 +316,105 @@ def _create_visual_agent_effect_handler(
                 }
                 _set_nested(run.vars, f"_temp.effects.{node_id}", out)
                 bucket["phase"] = "done"
-                flow._node_outputs[node_id] = {"result": out, "scratchpad": _runtime_node_trace(run)}
+                flow._node_outputs[node_id] = {"result": out, "scratchpad": {"node_id": node_id, "steps": []}}
                 run.vars["_last_output"] = {"result": out}
                 if next_node:
                     return StepPlan(node_id=node_id, next_node=next_node)
                 return StepPlan(node_id=node_id, complete_output={"result": out, "success": False})
 
-            bucket["messages"] = [{"role": "user", "content": _build_prompt(task=task, context=context)}]
-            bucket["phase"] = "llm"
-            bucket["tool_round"] = 0
-
-            tools_payload = None
-            if tools_selected:
-                from abstractruntime.integrations.abstractcore.default_tools import filter_tool_specs
-
-                tools_payload = filter_tool_specs(tools_selected)
+            bucket["phase"] = "subworkflow"
+            flow._node_outputs[node_id] = {"status": "running", "task": task, "context": context, "result": None}
 
             return StepPlan(
                 node_id=node_id,
                 effect=Effect(
-                    type=EffectType.LLM_CALL,
+                    type=EffectType.START_SUBWORKFLOW,
                     payload={
-                        "messages": bucket["messages"],
-                        "provider": provider,
-                        "model": model,
-                        "tools": tools_payload,
-                        "params": {"temperature": 0.7},
+                        "workflow_id": react_workflow_id,
+                        "vars": _build_sub_vars(run, task=task, context=context),
+                        "async": False,
+                        "include_traces": True,
                     },
-                    result_key=f"_temp.agent.{node_id}.llm",
+                    result_key=f"_temp.agent.{node_id}.sub",
                 ),
                 next_node=node_id,
             )
 
-        if phase == "llm":
-            llm_resp = bucket.get("llm")
-            if llm_resp is None:
+        if phase == "subworkflow":
+            sub = bucket.get("sub")
+            if sub is None:
                 temp = _ensure_temp_dict(run)
-                agent_bucket = temp.get("agent", {}).get(node_id, {}) if isinstance(temp.get("agent"), dict) else {}
-                llm_resp = agent_bucket.get("llm") if isinstance(agent_bucket, dict) else None
+                agent_ns = temp.get("agent")
+                if isinstance(agent_ns, dict):
+                    node_bucket = agent_ns.get(node_id)
+                    if isinstance(node_bucket, dict):
+                        sub = node_bucket.get("sub")
 
-            # In normal execution, the LLM_CALL effect stores under _temp.agent.{node_id}.llm
-            # which is the same dict bucket we use; keep defensive reads anyway.
-            if isinstance(llm_resp, dict):
-                tool_calls = llm_resp.get("tool_calls")
-                if isinstance(tool_calls, list) and tool_calls and tools_selected:
-                    # Preserve any assistant content as context for the next turn.
-                    content = llm_resp.get("content")
-                    messages = bucket.get("messages")
-                    if not isinstance(messages, list):
-                        messages = []
-                    if content:
-                        messages.append({"role": "assistant", "content": str(content)})
-                    bucket["messages"] = messages
+            if not isinstance(sub, dict):
+                return StepPlan(node_id=node_id, next_node=node_id)
 
-                    bucket["phase"] = "tool_calls"
-                    bucket["last_tool_calls"] = tool_calls
-                    return StepPlan(
-                        node_id=node_id,
-                        effect=Effect(
-                            type=EffectType.TOOL_CALLS,
-                            payload={
-                                "tool_calls": tool_calls,
-                                "allowed_tools": tools_selected,
-                            },
-                            result_key=f"_temp.agent.{node_id}.tool_results",
+            sub_run_id = sub.get("sub_run_id") if isinstance(sub.get("sub_run_id"), str) else None
+            output = sub.get("output")
+            output_dict = output if isinstance(output, dict) else {}
+            answer = str(output_dict.get("answer") or "")
+            iterations = output_dict.get("iterations")
+
+            node_traces = sub.get("node_traces")
+            scratchpad = {
+                "sub_run_id": sub_run_id,
+                "workflow_id": react_workflow_id,
+                "node_traces": node_traces if isinstance(node_traces, dict) else {},
+                "steps": _flatten_node_traces(node_traces),
+            }
+            bucket["scratchpad"] = scratchpad
+
+            result_obj = {
+                "result": answer,
+                "task": task,
+                "context": context,
+                "success": True,
+                "provider": provider,
+                "model": model,
+                "iterations": iterations,
+                "sub_run_id": sub_run_id,
+            }
+
+            if schema_enabled and schema:
+                bucket["phase"] = "structured"
+                messages = [
+                    {
+                        "role": "user",
+                        "content": (
+                            "Convert the Agent answer into a JSON object matching the required schema. Return JSON only.\n\n"
+                            f"Task:\n{task}\n\n"
+                            f"Answer:\n{answer}"
                         ),
-                        next_node=node_id,
-                    )
+                    }
+                ]
+                return StepPlan(
+                    node_id=node_id,
+                    effect=Effect(
+                        type=EffectType.LLM_CALL,
+                        payload={
+                            "messages": messages,
+                            "provider": provider,
+                            "model": model,
+                            "response_schema": schema,
+                            "response_schema_name": f"Agent_{node_id}",
+                            "params": {"temperature": 0.2},
+                        },
+                        result_key=f"_temp.agent.{node_id}.structured",
+                    ),
+                    next_node=node_id,
+                )
 
-                content = llm_resp.get("content")
-                usage = llm_resp.get("usage")
-                result_obj = {
-                    "result": str(content or ""),
-                    "task": task,
-                    "context": context,
-                    "success": True,
-                    "provider": provider,
-                    "model": model,
-                    "usage": usage,
-                }
-
-                if schema_enabled and schema:
-                    bucket["phase"] = "structured"
-                    messages = bucket.get("messages")
-                    if not isinstance(messages, list):
-                        messages = []
-                    # Append the previous assistant response as context.
-                    if content:
-                        messages.append({"role": "assistant", "content": str(content)})
-                    messages.append(
-                        {
-                            "role": "user",
-                            "content": "Return a JSON object that matches the required schema. Return JSON only.",
-                        }
-                    )
-                    bucket["messages"] = messages
-
-                    return StepPlan(
-                        node_id=node_id,
-                        effect=Effect(
-                            type=EffectType.LLM_CALL,
-                            payload={
-                                "messages": messages,
-                                "provider": provider,
-                                "model": model,
-                                "response_schema": schema,
-                                "response_schema_name": f"Agent_{node_id}",
-                                "params": {"temperature": 0.2},
-                            },
-                            result_key=f"_temp.agent.{node_id}.structured",
-                        ),
-                        next_node=node_id,
-                    )
-
-                _set_nested(run.vars, f"_temp.effects.{node_id}", result_obj)
-                bucket["phase"] = "done"
-                flow._node_outputs[node_id] = {"result": result_obj, "scratchpad": _runtime_node_trace(run)}
-                run.vars["_last_output"] = {"result": result_obj}
-                if next_node:
-                    return StepPlan(node_id=node_id, next_node=next_node)
-                return StepPlan(node_id=node_id, complete_output={"result": result_obj, "success": True})
-
-            # No llm result; fail fast.
-            run.vars["_flow_error"] = "Agent node missing llm result"
-            run.vars["_flow_error_node"] = node_id
-            return StepPlan(
-                node_id=node_id,
-                complete_output={"error": "Agent node missing llm result", "success": False, "node": node_id},
-            )
-
-        if phase == "tool_calls":
-            tool_results = bucket.get("tool_results")
-            if tool_results is None:
-                temp = _ensure_temp_dict(run)
-                agent_bucket = temp.get("agent", {}).get(node_id, {}) if isinstance(temp.get("agent"), dict) else {}
-                tool_results = agent_bucket.get("tool_results") if isinstance(agent_bucket, dict) else None
-
-            results_list = tool_results.get("results") if isinstance(tool_results, dict) else None
-            results = results_list if isinstance(results_list, list) else []
-
-            messages = bucket.get("messages")
-            if not isinstance(messages, list):
-                messages = []
-
-            # Feed tool results back into the model in a provider-agnostic way.
-            try:
-                results_json = json.dumps({"results": results}, ensure_ascii=False)
-            except Exception:
-                results_json = str({"results": results})
-            messages.append(
-                {
-                    "role": "user",
-                    "content": f"Tool execution results (JSON):\n{results_json}\n\nContinue the task using these results.",
-                }
-            )
-
-            bucket["messages"] = messages
-            tool_round += 1
-            bucket["tool_round"] = tool_round
-
-            if tool_round >= max_tool_rounds:
-                out = {
-                    "result": "Agent exceeded max tool iterations",
-                    "task": task,
-                    "context": context,
-                    "success": False,
-                    "error": "max_tool_iterations",
-                    "provider": provider,
-                    "model": model,
-                    "tool_results": results,
-                }
-                _set_nested(run.vars, f"_temp.effects.{node_id}", out)
-                bucket["phase"] = "done"
-                flow._node_outputs[node_id] = {"result": out, "scratchpad": _runtime_node_trace(run)}
-                run.vars["_last_output"] = {"result": out}
-                if next_node:
-                    return StepPlan(node_id=node_id, next_node=next_node)
-                return StepPlan(node_id=node_id, complete_output={"result": out, "success": False})
-
-            tools_payload = None
-            if tools_selected:
-                from abstractruntime.integrations.abstractcore.default_tools import filter_tool_specs
-
-                tools_payload = filter_tool_specs(tools_selected)
-
-            bucket["phase"] = "llm"
-            return StepPlan(
-                node_id=node_id,
-                effect=Effect(
-                    type=EffectType.LLM_CALL,
-                    payload={
-                        "messages": messages,
-                        "provider": provider,
-                        "model": model,
-                        "tools": tools_payload,
-                        "params": {"temperature": 0.7},
-                    },
-                    result_key=f"_temp.agent.{node_id}.llm",
-                ),
-                next_node=node_id,
-            )
+            _set_nested(run.vars, f"_temp.effects.{node_id}", result_obj)
+            bucket["phase"] = "done"
+            flow._node_outputs[node_id] = {"result": result_obj, "scratchpad": scratchpad}
+            run.vars["_last_output"] = {"result": result_obj}
+            if next_node:
+                return StepPlan(node_id=node_id, next_node=next_node)
+            return StepPlan(node_id=node_id, complete_output={"result": result_obj, "success": True})
 
         if phase == "structured":
             structured_resp = bucket.get("structured")
@@ -502,7 +425,6 @@ def _create_visual_agent_effect_handler(
 
             data = structured_resp.get("data") if isinstance(structured_resp, dict) else None
             if data is None and isinstance(structured_resp, dict):
-                # Best-effort parse: some providers may return JSON in content.
                 content = structured_resp.get("content")
                 if isinstance(content, str) and content.strip():
                     try:
@@ -515,13 +437,15 @@ def _create_visual_agent_effect_handler(
 
             _set_nested(run.vars, f"_temp.effects.{node_id}", data)
             bucket["phase"] = "done"
-            flow._node_outputs[node_id] = {"result": data, "scratchpad": _runtime_node_trace(run)}
+            scratchpad = bucket.get("scratchpad")
+            if not isinstance(scratchpad, dict):
+                scratchpad = {"node_id": node_id, "steps": []}
+            flow._node_outputs[node_id] = {"result": data, "scratchpad": scratchpad}
             run.vars["_last_output"] = {"result": data}
             if next_node:
                 return StepPlan(node_id=node_id, next_node=next_node)
             return StepPlan(node_id=node_id, complete_output={"result": data, "success": True})
 
-        # done / unknown phase
         if next_node:
             return StepPlan(node_id=node_id, next_node=next_node)
         return StepPlan(node_id=node_id, complete_output={"result": run.vars.get("_last_output"), "success": True})
@@ -720,13 +644,23 @@ def _sync_effect_results_to_node_outputs(run: Any, flow: Flow) -> None:
                 mapped_value = current["response"]
         elif effect_type == "agent":
             current["result"] = raw
-            try:
-                from abstractruntime.core.vars import get_node_trace as _get_node_trace
-            except Exception:  # pragma: no cover
-                _get_node_trace = None  # type: ignore[assignment]
+            scratchpad = None
+            agent_ns = temp_data.get("agent")
+            if isinstance(agent_ns, dict):
+                bucket = agent_ns.get(node_id)
+                if isinstance(bucket, dict):
+                    scratchpad = bucket.get("scratchpad")
 
-            if callable(_get_node_trace):
-                current["scratchpad"] = _get_node_trace(run.vars, node_id)
+            if scratchpad is None:
+                # Fallback: use this node's own trace if present.
+                try:
+                    from abstractruntime.core.vars import get_node_trace as _get_node_trace
+                except Exception:  # pragma: no cover
+                    _get_node_trace = None  # type: ignore[assignment]
+                if callable(_get_node_trace):
+                    scratchpad = _get_node_trace(run.vars, node_id)
+
+            current["scratchpad"] = scratchpad if scratchpad is not None else {"node_id": node_id, "steps": []}
             mapped_value = raw
         elif effect_type == "wait_event":
             current["event_data"] = raw

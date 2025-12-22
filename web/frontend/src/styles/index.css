@@ -506,6 +506,53 @@ button.primary:hover:not(:disabled) {
 .run-steps-subtitle {
   font-size: 12px;
   color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.run-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: run-spin 0.9s linear infinite;
+}
+
+.run-step-status.running {
+  color: var(--warning);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.run-working {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.run-working-title {
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.run-working-note {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+@keyframes run-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .run-details-type {
@@ -600,6 +647,12 @@ button.primary:hover:not(:disabled) {
   white-space: nowrap;
 }
 
+.run-step-id {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
 .run-step-status {
   margin-left: auto;
   font-size: 11px;
@@ -622,6 +675,15 @@ button.primary:hover:not(:disabled) {
 
 .run-step-error,
 .run-step-waiting {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.run-step-summary {
   margin-top: 6px;
   font-size: 12px;
   color: var(--text-secondary);
@@ -662,6 +724,133 @@ button.primary:hover:not(:disabled) {
   word-break: break-word;
   max-height: 360px;
   overflow: auto;
+}
+
+.run-output-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.run-output-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.run-output-title {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.run-output-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.run-output-meta-key {
+  display: inline-block;
+  min-width: 60px;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-right: 8px;
+}
+
+.run-output-meta-val {
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.run-trace {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.run-trace-step {
+  border: 1px solid var(--bg-tertiary);
+  border-radius: 10px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.run-trace-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.run-trace-status {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+}
+
+.run-trace-status.completed {
+  color: var(--success);
+}
+
+.run-trace-status.failed {
+  color: var(--error);
+}
+
+.run-trace-status.waiting {
+  color: var(--warning);
+}
+
+.run-trace-effect {
+  font-weight: 800;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.run-trace-meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.run-trace-time {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.run-trace-preview {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.run-raw-details {
+  border: 1px solid var(--bg-tertiary);
+  border-radius: 10px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.run-raw-details summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-secondary);
+  user-select: none;
+}
+
+.run-raw-details[open] summary {
+  margin-bottom: 10px;
 }
 
 .run-details-empty {

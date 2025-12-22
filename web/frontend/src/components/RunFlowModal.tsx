@@ -150,17 +150,15 @@ export function RunFlowModal({
   }, [formValues, inputPins, onRun]);
 
   type StepStatus = 'running' | 'completed' | 'waiting' | 'failed';
-  type StepKind = 'node' | 'flow';
-
   type Step = {
     id: string;
-    kind: StepKind;
     status: StepStatus;
     nodeId?: string;
     nodeLabel?: string;
     nodeType?: string;
     nodeIcon?: string;
     nodeColor?: string;
+    summary?: string;
     output?: unknown;
     error?: string;
     waiting?: {
@@ -176,6 +174,42 @@ export function RunFlowModal({
     const out: Step[] = [];
     const openByNode = new Map<string, number>();
 
+    const safeString = (value: unknown) => (typeof value === 'string' ? value : value == null ? '' : String(value));
+
+    const pickSummary = (value: unknown): string => {
+      if (value == null) return '';
+      if (typeof value === 'string') return value;
+      if (typeof value !== 'object') return String(value);
+
+      const obj = value as Record<string, unknown>;
+      const direct =
+        (typeof obj.message === 'string' && obj.message) ||
+        (typeof obj.response === 'string' && obj.response) ||
+        '';
+      if (direct) return direct;
+
+      const nested = obj.result;
+      if (nested && typeof nested === 'object') {
+        const nestedObj = nested as Record<string, unknown>;
+        if (typeof nestedObj.result === 'string' && nestedObj.result) return nestedObj.result;
+        if (typeof nestedObj.message === 'string' && nestedObj.message) return nestedObj.message;
+        if (typeof nestedObj.response === 'string' && nestedObj.response) return nestedObj.response;
+      }
+
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return String(value);
+      }
+    };
+
+    const summarize = (value: unknown): string => {
+      const text = safeString(pickSummary(value)).replace(/\s+/g, ' ').trim();
+      if (!text) return '';
+      if (text.length <= 120) return text;
+      return text.slice(0, 120) + '…';
+    };
+
     const nodeMeta = (nodeId: string | undefined) => {
       if (!nodeId) return null;
       const n = nodeById.get(nodeId);
@@ -190,26 +224,13 @@ export function RunFlowModal({
 
     for (let i = 0; i < events.length; i++) {
       const ev = events[i];
-      if (ev.type === 'flow_start') {
-        out.push({ id: `flow_start:${i}`, kind: 'flow', status: 'running' });
-        continue;
-      }
-
-      if (ev.type === 'flow_complete') {
-        out.push({ id: `flow_complete:${i}`, kind: 'flow', status: 'completed', output: ev.result });
-        continue;
-      }
-
-      if (ev.type === 'flow_error') {
-        out.push({ id: `flow_error:${i}`, kind: 'flow', status: 'failed', error: ev.error || 'Unknown error' });
-        continue;
-      }
+      // We show only node steps in the left timeline; flow-level status is surfaced in the header / final result.
+      if (ev.type === 'flow_start' || ev.type === 'flow_complete') continue;
 
       if (ev.type === 'node_start') {
         const meta = nodeMeta(ev.nodeId);
         const step: Step = {
           id: `node_start:${ev.nodeId || 'unknown'}:${i}`,
-          kind: 'node',
           status: 'running',
           nodeId: ev.nodeId,
           nodeLabel: meta?.label,
@@ -226,14 +247,13 @@ export function RunFlowModal({
         const nodeId = ev.nodeId;
         const idx = nodeId ? openByNode.get(nodeId) : undefined;
         if (typeof idx === 'number') {
-          out[idx] = { ...out[idx], status: 'completed', output: ev.result };
+          out[idx] = { ...out[idx], status: 'completed', output: ev.result, summary: summarize(ev.result) };
           openByNode.delete(nodeId!);
           continue;
         }
         const meta = nodeMeta(nodeId);
         out.push({
           id: `node_complete:${nodeId || 'unknown'}:${i}`,
-          kind: 'node',
           status: 'completed',
           nodeId,
           nodeLabel: meta?.label,
@@ -241,6 +261,7 @@ export function RunFlowModal({
           nodeIcon: meta?.icon,
           nodeColor: meta?.color,
           output: ev.result,
+          summary: summarize(ev.result),
         });
         continue;
       }
@@ -266,7 +287,6 @@ export function RunFlowModal({
         const meta = nodeMeta(nodeId);
         out.push({
           id: `flow_waiting:${nodeId || 'unknown'}:${i}`,
-          kind: 'node',
           status: 'waiting',
           nodeId,
           nodeLabel: meta?.label,
@@ -275,6 +295,22 @@ export function RunFlowModal({
           nodeColor: meta?.color,
           waiting,
         });
+        continue;
+      }
+
+      if (ev.type === 'flow_error') {
+        const nodeId = ev.nodeId;
+        const idx = nodeId ? openByNode.get(nodeId) : undefined;
+        if (typeof idx === 'number') {
+          out[idx] = { ...out[idx], status: 'failed', error: ev.error || 'Unknown error' };
+          openByNode.delete(nodeId!);
+          continue;
+        }
+        // Best-effort: attach to the most recent step if we can't map to a node.
+        if (out.length > 0) {
+          const lastIdx = out.length - 1;
+          out[lastIdx] = { ...out[lastIdx], status: 'failed', error: ev.error || 'Unknown error' };
+        }
       }
     }
 
@@ -295,6 +331,20 @@ export function RunFlowModal({
   const selectedStep = useMemo(() => steps.find((s) => s.id === selectedStepId) || null, [steps, selectedStepId]);
 
   const hasRunData = isRunning || result != null || events.length > 0;
+
+  const showFinalResult = useMemo(() => {
+    if (!result || isRunning) return false;
+    if (steps.length === 0) return true;
+    const last = steps[steps.length - 1];
+    return Boolean(last && selectedStepId === last.id);
+  }, [isRunning, result, selectedStepId, steps]);
+
+  const runStatusLabel = useMemo(() => {
+    if (isRunning) return 'RUNNING';
+    if (isWaiting) return 'WAITING';
+    if (result) return result.success ? 'SUCCESS' : 'FAILED';
+    return '';
+  }, [isRunning, isWaiting, result]);
 
   const hexToRgba = (hex: string, alpha: number) => {
     const m = hex.trim().match(/^#?([0-9a-f]{6})$/i);
@@ -331,6 +381,168 @@ export function RunFlowModal({
     }
   };
 
+  const outputPreview = useMemo(() => {
+    if (!selectedStep?.output) return null;
+    const value = selectedStep.output;
+
+    if (typeof value === 'string') {
+      const text = value.trim();
+      return text ? { previewText: text, task: null, scratchpad: null, raw: value, cleaned: value } : null;
+    }
+
+    if (!value || typeof value !== 'object') {
+      return { previewText: String(value), task: null, scratchpad: null, raw: value, cleaned: value };
+    }
+
+    const obj = value as Record<string, unknown>;
+
+    let task: string | null = null;
+    let previewText: string | null = null;
+    let scratchpad: unknown = null;
+    let provider: string | null = null;
+    let model: string | null = null;
+    let usage: unknown = null;
+
+    // Agent output shape: { result: { task, result, ... }, scratchpad: ... }
+    if (obj.result && typeof obj.result === 'object') {
+      const res = obj.result as Record<string, unknown>;
+      if (typeof res.task === 'string' && res.task.trim()) task = res.task.trim();
+      if (typeof res.result === 'string' && res.result.trim()) previewText = res.result.trim();
+      if (!previewText && typeof res.message === 'string' && res.message.trim()) previewText = res.message.trim();
+      if (!previewText && typeof res.response === 'string' && res.response.trim()) previewText = res.response.trim();
+      if (typeof res.provider === 'string' && res.provider.trim()) provider = res.provider.trim();
+      if (typeof res.model === 'string' && res.model.trim()) model = res.model.trim();
+      if ('usage' in res) usage = res.usage;
+    }
+
+    if (!previewText && typeof obj.message === 'string' && obj.message.trim()) previewText = obj.message.trim();
+    if (!previewText && typeof obj.response === 'string' && obj.response.trim()) previewText = obj.response.trim();
+    if (!previewText && typeof obj.result === 'string' && obj.result.trim()) previewText = obj.result.trim();
+    if (!provider && typeof obj.provider === 'string' && obj.provider.trim()) provider = obj.provider.trim();
+    if (!model && typeof obj.model === 'string' && obj.model.trim()) model = obj.model.trim();
+    if (!usage && 'usage' in obj) usage = obj.usage;
+
+    if ('scratchpad' in obj) scratchpad = obj.scratchpad;
+
+    let cleaned: unknown = value;
+    if (obj && typeof obj === 'object') {
+      const copy = { ...obj };
+      delete (copy as Record<string, unknown>)._pending_effect;
+      cleaned = copy;
+    }
+
+    if (!task && !previewText && scratchpad == null && !provider && !model && !usage) return null;
+    return { task, previewText, scratchpad, provider, model, usage, raw: value, cleaned };
+  }, [selectedStep?.output]);
+
+  const traceSteps = useMemo(() => {
+    const scratchpad = outputPreview?.scratchpad;
+    if (!scratchpad || typeof scratchpad !== 'object') return null;
+    const stepsRaw = (scratchpad as Record<string, unknown>).steps;
+    if (!Array.isArray(stepsRaw)) return null;
+    return stepsRaw.filter((s): s is Record<string, unknown> => !!s && typeof s === 'object');
+  }, [outputPreview?.scratchpad]);
+
+  const formatTraceTime = (raw: unknown) => {
+    const ts = typeof raw === 'string' ? raw : '';
+    if (!ts) return '';
+    const d = new Date(ts);
+    if (Number.isNaN(d.getTime())) return ts;
+    return d.toLocaleTimeString();
+  };
+
+  const traceStatusLabel = (raw: unknown) => {
+    const s = typeof raw === 'string' ? raw : '';
+    if (s === 'completed') return 'OK';
+    if (s === 'failed') return 'FAILED';
+    if (s === 'waiting') return 'WAITING';
+    return s ? s.toUpperCase() : 'UNKNOWN';
+  };
+
+  const traceEffectSummary = (step: Record<string, unknown>) => {
+    const effect = step.effect && typeof step.effect === 'object' ? (step.effect as Record<string, unknown>) : null;
+    const effectType = effect && typeof effect.type === 'string' ? effect.type : 'effect';
+    const payload = effect && typeof effect.payload === 'object' ? (effect.payload as Record<string, unknown>) : null;
+    const result = step.result && typeof step.result === 'object' ? (step.result as Record<string, unknown>) : null;
+    const wait = step.wait && typeof step.wait === 'object' ? (step.wait as Record<string, unknown>) : null;
+
+    if (effectType === 'llm_call') {
+      const provider =
+        (payload && typeof payload.provider === 'string' ? payload.provider : '') ||
+        (result && typeof result.provider === 'string' ? result.provider : '') ||
+        '';
+      const model =
+        (payload && typeof payload.model === 'string' ? payload.model : '') ||
+        (result && typeof result.model === 'string' ? result.model : '') ||
+        '';
+
+      const usageRaw = result ? result.usage : null;
+      const usage = usageRaw && typeof usageRaw === 'object' ? (usageRaw as Record<string, unknown>) : null;
+      const totalTokens = usage && typeof usage.total_tokens === 'number' ? usage.total_tokens : null;
+
+      const toolCallsRaw = result ? result.tool_calls : null;
+      const toolCalls = Array.isArray(toolCallsRaw) ? toolCallsRaw.length : null;
+
+      const contentRaw = result ? result.content : null;
+      const content = typeof contentRaw === 'string' ? contentRaw.trim() : '';
+      const preview = content ? (content.length <= 140 ? content : content.slice(0, 140) + '…') : '';
+
+      const meta = [provider && model ? `${provider}/${model}` : provider || model, totalTokens != null ? `${totalTokens} tk` : null, toolCalls != null ? `${toolCalls} tool_calls` : null]
+        .filter(Boolean)
+        .join(' · ');
+      return { title: 'LLM_CALL', meta, preview };
+    }
+
+    if (effectType === 'tool_calls') {
+      const callsRaw = payload ? payload.tool_calls : null;
+      const calls = Array.isArray(callsRaw) ? callsRaw : [];
+      const names = calls
+        .map((c) => (c && typeof c === 'object' ? (c as Record<string, unknown>).name : null))
+        .filter((n): n is string => typeof n === 'string' && n.trim().length > 0)
+        .map((n) => n.trim());
+      const uniqueNames = Array.from(new Set(names));
+
+      const resultsRaw = result ? result.results : null;
+      const results = Array.isArray(resultsRaw) ? resultsRaw : [];
+      const okCount = results.filter((r) => r && typeof r === 'object' && (r as Record<string, unknown>).success === true).length;
+      const failCount = results.filter((r) => r && typeof r === 'object' && (r as Record<string, unknown>).success === false).length;
+
+      let preview = '';
+      const first = results.find((r) => r && typeof r === 'object') as Record<string, unknown> | undefined;
+      if (first) {
+        const success = first.success === true;
+        const rawOut = success ? first.output : (first.error ?? first.output);
+        if (rawOut != null) {
+          const text = typeof rawOut === 'string' ? rawOut : (() => {
+            try {
+              return JSON.stringify(rawOut);
+            } catch {
+              return String(rawOut);
+            }
+          })();
+          preview = text.length <= 140 ? text : text.slice(0, 140) + '…';
+        }
+      }
+
+      const meta = [
+        uniqueNames.length ? uniqueNames.join(', ') : null,
+        results.length ? `${okCount} ok${failCount ? ` · ${failCount} failed` : ''}` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ');
+      return { title: 'TOOL_CALLS', meta, preview };
+    }
+
+    if (effectType === 'ask_user') {
+      const prompt = typeof payload?.prompt === 'string' ? payload.prompt : typeof wait?.prompt === 'string' ? wait.prompt : '';
+      const text = prompt.trim();
+      const preview = text ? (text.length <= 140 ? text : text.slice(0, 140) + '…') : '';
+      return { title: 'ASK_USER', meta: '', preview };
+    }
+
+    return { title: String(effectType).toUpperCase(), meta: '', preview: '' };
+  };
+
   const submitResume = () => {
     const response = resumeDraft.trim();
     if (!response) return;
@@ -354,7 +566,7 @@ export function RunFlowModal({
             <div className="run-steps">
               <div className="run-steps-header">
                 <div className="run-steps-title">Execution</div>
-                <div className="run-steps-subtitle">{isRunning ? 'Running…' : result ? 'Finished' : ''}</div>
+                <div className="run-steps-subtitle">{runStatusLabel}</div>
               </div>
 
               <div className="run-steps-list">
@@ -366,7 +578,7 @@ export function RunFlowModal({
                     const color = s.nodeColor || '#888888';
                     const bg = hexToRgba(color, 0.12);
                     const statusLabel =
-                      s.status === 'running' ? 'running' : s.status === 'completed' ? 'completed' : s.status;
+                      s.status === 'running' ? 'RUNNING' : s.status === 'completed' ? 'OK' : s.status === 'waiting' ? 'WAITING' : 'FAILED';
 
                     return (
                       <button
@@ -379,29 +591,29 @@ export function RunFlowModal({
                         <div className="run-step-main">
                           <div className="run-step-top">
                             <span className="run-step-index">#{idx + 1}</span>
-                            {s.kind === 'node' ? (
-                              <>
-                                {s.nodeIcon ? (
-                                  <span
-                                    className="run-step-icon"
-                                    style={{ color }}
-                                    dangerouslySetInnerHTML={{ __html: s.nodeIcon }}
-                                  />
-                                ) : null}
-                                <span className="run-step-label">{s.nodeLabel || s.nodeId || 'node'}</span>
-                                <span className="run-step-type" style={{ background: bg, borderColor: color }}>
-                                  {s.nodeType || 'node'}
-                                </span>
-                              </>
-                            ) : (
-                              <span className="run-step-label">flow</span>
-                            )}
+                            {s.nodeIcon ? (
+                              <span
+                                className="run-step-icon"
+                                style={{ color }}
+                                dangerouslySetInnerHTML={{ __html: s.nodeIcon }}
+                              />
+                            ) : null}
+                            <span className="run-step-label">{s.nodeLabel || s.nodeId || 'node'}</span>
+                            <span className="run-step-type" style={{ background: bg, borderColor: color }}>
+                              {s.nodeType || 'node'}
+                            </span>
+                            {s.nodeId ? <span className="run-step-id">{s.nodeId}</span> : null}
                             <span className={`run-step-status ${s.status}`}>{statusLabel}</span>
                           </div>
                           {s.status === 'failed' && s.error ? (
                             <div className="run-step-error">{s.error}</div>
                           ) : s.status === 'waiting' && s.waiting ? (
-                            <div className="run-step-waiting">{s.waiting.reason ? `waiting · ${s.waiting.reason}` : 'waiting'}</div>
+                            <div className="run-step-waiting">
+                              {s.waiting.reason ? `waiting · ${s.waiting.reason}` : 'waiting'}
+                              {s.waiting.prompt ? ` · ${s.waiting.prompt}` : ''}
+                            </div>
+                          ) : s.status === 'completed' && s.summary ? (
+                            <div className="run-step-summary">{s.summary}</div>
                           ) : null}
                         </div>
                       </button>
@@ -414,11 +626,7 @@ export function RunFlowModal({
             <div className="run-details">
               <div className="run-details-header">
                 <div className="run-details-title">
-                  {selectedStep?.kind === 'node'
-                    ? selectedStep.nodeLabel || selectedStep.nodeId || 'Step'
-                    : selectedStep
-                      ? 'Flow'
-                      : 'Details'}
+                  {selectedStep ? selectedStep.nodeLabel || selectedStep.nodeId || 'Step' : 'Details'}
                 </div>
                 {selectedStep?.nodeType ? (
                   <span
@@ -483,20 +691,110 @@ export function RunFlowModal({
                   ) : selectedStep.output != null ? (
                     <>
                       <div className="run-details-actions">
-                        <button type="button" className="modal-button" onClick={() => copyToClipboard(selectedStep.output)}>
-                          Copy
+                        <button type="button" className="modal-button" onClick={() => copyToClipboard(outputPreview?.cleaned ?? selectedStep.output)}>
+                          Copy raw
                         </button>
+                        {outputPreview?.previewText ? (
+                          <button type="button" className="modal-button" onClick={() => copyToClipboard(outputPreview.previewText)}>
+                            Copy preview
+                          </button>
+                        ) : null}
+                        {outputPreview?.scratchpad != null ? (
+                          <button type="button" className="modal-button" onClick={() => copyToClipboard(outputPreview.scratchpad)}>
+                            Copy trace
+                          </button>
+                        ) : null}
                       </div>
-                      <pre className="run-details-output">{formatValue(selectedStep.output)}</pre>
+
+                      {outputPreview ? (
+                        <div className="run-output-preview">
+                          {outputPreview.task ? (
+                            <div className="run-output-section">
+                              <div className="run-output-title">Task</div>
+                              <pre className="run-details-output">{outputPreview.task}</pre>
+                            </div>
+                          ) : null}
+
+                          {(outputPreview.provider || outputPreview.model || outputPreview.usage) ? (
+                            <div className="run-output-section">
+                              <div className="run-output-title">Meta</div>
+                              <div className="run-output-meta">
+                                {(outputPreview.provider || outputPreview.model) ? (
+                                  <div>
+                                    <span className="run-output-meta-key">Model</span>
+                                    <span className="run-output-meta-val">
+                                      {(outputPreview.provider || '').trim()}
+                                      {(outputPreview.provider && outputPreview.model) ? ' / ' : ''}
+                                      {(outputPreview.model || '').trim()}
+                                    </span>
+                                  </div>
+                                ) : null}
+                                {outputPreview.usage ? (
+                                  <div>
+                                    <span className="run-output-meta-key">Usage</span>
+                                    <span className="run-output-meta-val">{formatValue(outputPreview.usage)}</span>
+                                  </div>
+                                ) : null}
+                              </div>
+                            </div>
+                          ) : null}
+
+                          {outputPreview.previewText ? (
+                            <div className="run-output-section">
+                              <div className="run-output-title">Preview</div>
+                              <pre className="run-details-output">{outputPreview.previewText}</pre>
+                            </div>
+                          ) : null}
+
+                          {traceSteps ? (
+                            <div className="run-output-section">
+                              <div className="run-output-title">Trace</div>
+                              <div className="run-trace">
+                                {traceSteps.map((t, idx) => {
+                                  const status = typeof t.status === 'string' ? t.status : 'unknown';
+                                  const label = traceStatusLabel(status);
+                                  const summary = traceEffectSummary(t);
+                                  return (
+                                    <div key={idx} className={`run-trace-step ${status}`}>
+                                      <div className="run-trace-top">
+                                        <span className={`run-trace-status ${status}`}>{label}</span>
+                                        <span className="run-trace-effect">{summary.title}</span>
+                                        {summary.meta ? <span className="run-trace-meta">{summary.meta}</span> : null}
+                                        <span className="run-trace-time">{formatTraceTime(t.ts)}</span>
+                                      </div>
+                                      {summary.preview ? <div className="run-trace-preview">{summary.preview}</div> : null}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+
+                              <details className="run-raw-details">
+                                <summary>Trace JSON</summary>
+                                <pre className="run-details-output">{formatValue(outputPreview.scratchpad)}</pre>
+                              </details>
+                            </div>
+                          ) : outputPreview.scratchpad != null ? (
+                            <details className="run-raw-details">
+                              <summary>Scratchpad</summary>
+                              <pre className="run-details-output">{formatValue(outputPreview.scratchpad)}</pre>
+                            </details>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      <details className="run-raw-details" open={!outputPreview}>
+                        <summary>Raw JSON</summary>
+                        <pre className="run-details-output">{formatValue(outputPreview?.cleaned ?? selectedStep.output)}</pre>
+                      </details>
                     </>
                   ) : (
                     <div className="run-details-empty">No output for this step.</div>
                   )}
 
-                  {result && !isRunning ? (
+                  {showFinalResult && result ? (
                     <div className="run-final">
                       <div className={`run-final-header ${result.success ? 'success' : 'error'}`}>
-                        <span className="run-final-title">{result.success ? 'Final Result' : 'Flow Failed'}</span>
+                        <span className="run-final-title">{result.success ? 'Final Result (SUCCESS)' : 'Final Result (FAILED)'}</span>
                         <div className="run-details-actions">
                           <button type="button" className="modal-button" onClick={() => copyToClipboard(result.error ?? result.result)}>
                             Copy
