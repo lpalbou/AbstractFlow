@@ -271,8 +271,14 @@ async def _execute_runner_loop(
                 ).model_dump()
             )
             active_node_id = node_before
+            # Yield once so the client can render the new "running" item before
+            # we perform any potentially long-running work in the tick.
+            await asyncio.sleep(0)
 
-        state = runner.step()
+        # IMPORTANT: FlowRunner.step() can block for a long time when running a
+        # subworkflow synchronously (e.g., Agent nodes that execute LLM calls and tools).
+        # Run it in a thread so the event loop can keep the websocket responsive.
+        state = await asyncio.to_thread(runner.step)
 
         # Check if waiting
         if runner.is_waiting():

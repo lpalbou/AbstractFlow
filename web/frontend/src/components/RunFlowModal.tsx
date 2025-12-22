@@ -566,7 +566,10 @@ export function RunFlowModal({
             <div className="run-steps">
               <div className="run-steps-header">
                 <div className="run-steps-title">Execution</div>
-                <div className="run-steps-subtitle">{runStatusLabel}</div>
+                <div className="run-steps-subtitle">
+                  {isRunning ? <span className="run-spinner" aria-label="running" /> : null}
+                  {runStatusLabel}
+                </div>
               </div>
 
               <div className="run-steps-list">
@@ -603,7 +606,10 @@ export function RunFlowModal({
                               {s.nodeType || 'node'}
                             </span>
                             {s.nodeId ? <span className="run-step-id">{s.nodeId}</span> : null}
-                            <span className={`run-step-status ${s.status}`}>{statusLabel}</span>
+                            <span className={`run-step-status ${s.status}`}>
+                              {s.status === 'running' ? <span className="run-spinner" aria-label="running" /> : null}
+                              {statusLabel}
+                            </span>
                           </div>
                           {s.status === 'failed' && s.error ? (
                             <div className="run-step-error">{s.error}</div>
@@ -643,7 +649,15 @@ export function RunFlowModal({
 
               {selectedStep ? (
                 <div className="run-details-body">
-                  {selectedStep.status === 'waiting' && (waitingInfo || selectedStep.waiting) ? (
+                  {selectedStep.status === 'running' ? (
+                    <div className="run-working">
+                      <span className="run-spinner" aria-label="working" />
+                      <div>
+                        <div className="run-working-title">Working…</div>
+                        <div className="run-working-note">This node is still processing. The output will appear when it completes.</div>
+                      </div>
+                    </div>
+                  ) : selectedStep.status === 'waiting' && (waitingInfo || selectedStep.waiting) ? (
                     <div className="run-waiting">
                       <div className="run-waiting-prompt">
                         {(selectedStep.waiting?.prompt || waitingInfo?.prompt || 'Please respond:').trim()}
