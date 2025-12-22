@@ -119,7 +119,7 @@ async def _execute_runner_loop(
     # Keep depth moderate but bounded. Strings/lists/dicts are already size-capped.
     _MAX_PREVIEW_DEPTH = 12
 
-    def _preview(value: Any, *, depth: int = 0) -> Any:
+    def _preview(value: Any, *, depth: int = 0, max_str_len: Optional[int] = 2000) -> Any:
         """Best-effort JSON-safe preview (size-bounded)."""
         if depth > _MAX_PREVIEW_DEPTH:
             return "…"
@@ -128,24 +128,34 @@ async def _execute_runner_loop(
         if isinstance(value, (bool, int, float)):
             return value
         if isinstance(value, str):
-            if len(value) <= 2000:
+            if max_str_len is None or len(value) <= max_str_len:
                 return value
-            return value[:2000] + "…"
+            return value[:max_str_len] + "…"
         if isinstance(value, dict):
             out: Dict[str, Any] = {}
             for i, (k, v) in enumerate(value.items()):
                 if i >= 50:
                     out["…"] = f"+{max(0, len(value) - 50)} more"
                     break
-                out[str(k)] = _preview(v, depth=depth + 1)
+                out[str(k)] = _preview(v, depth=depth + 1, max_str_len=max_str_len)
             return out
         if isinstance(value, list):
             items = value[:50]
-            out_list = [_preview(v, depth=depth + 1) for v in items]
+            out_list = [_preview(v, depth=depth + 1, max_str_len=max_str_len) for v in items]
             if len(value) > 50:
                 out_list.append(f"… +{len(value) - 50} more")
             return out_list
         return str(value)
+
+    def _node_effect_type(node_id: str) -> Optional[str]:
+        try:
+            node = runner.flow.nodes.get(node_id) if hasattr(runner, "flow") and hasattr(runner.flow, "nodes") else None
+        except Exception:
+            node = None
+        if node is None:
+            return None
+        t = getattr(node, "effect_type", None)
+        return str(t) if isinstance(t, str) else None
 
     def _node_output(node_id: str) -> Any:
         if hasattr(runner, "flow") and hasattr(runner.flow, "_node_outputs"):
@@ -162,6 +172,29 @@ async def _execute_runner_loop(
                         raw_copy = dict(raw)
                         raw_copy["scratchpad"] = scratchpad_copy
                         raw = raw_copy
+                effect_type = _node_effect_type(node_id)
+
+                # Never truncate user-visible message content.
+                if effect_type in {"ask_user", "answer_user"}:
+                    return _preview(raw, max_str_len=None)
+
+                # Agent node: keep preview size-bounded but never truncate the final answer.
+                if effect_type == "agent":
+                    previewed = _preview(raw)
+                    try:
+                        if (
+                            isinstance(raw, dict)
+                            and isinstance(previewed, dict)
+                            and isinstance(raw.get("result"), dict)
+                            and isinstance(previewed.get("result"), dict)
+                        ):
+                            raw_answer = raw["result"].get("result")
+                            if isinstance(raw_answer, str):
+                                previewed["result"]["result"] = raw_answer
+                    except Exception:
+                        pass
+                    return previewed
+
                 return _preview(raw)
         # Fallback for non-visual flows
         state = runner.get_state() if hasattr(runner, "get_state") else None

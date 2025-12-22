@@ -10,6 +10,7 @@ import { useFlowStore } from '../hooks/useFlow';
 import type { ExecutionEvent, Pin, FlowRunResult } from '../types/flow';
 import { isEntryNodeType } from '../types/flow';
 import type { WaitingInfo } from '../hooks/useWebSocket';
+import { MarkdownRenderer } from './MarkdownRenderer';
 
 interface RunFlowModalProps {
   isOpen: boolean;
@@ -328,6 +329,17 @@ export function RunFlowModal({
     setSelectedStepId(steps[steps.length - 1].id);
   }, [isOpen, steps, selectedStepId]);
 
+  // Follow the live execution: when new steps arrive during a run (or waiting),
+  // auto-select the latest step so the user always sees what's happening.
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!(isRunning || isWaiting)) return;
+    if (steps.length === 0) return;
+    const last = steps[steps.length - 1];
+    if (!last) return;
+    setSelectedStepId(last.id);
+  }, [isOpen, isRunning, isWaiting, steps]);
+
   const selectedStep = useMemo(() => steps.find((s) => s.id === selectedStepId) || null, [steps, selectedStepId]);
 
   const hasRunData = isRunning || result != null || events.length > 0;
@@ -345,6 +357,14 @@ export function RunFlowModal({
     if (result) return result.success ? 'SUCCESS' : 'FAILED';
     return '';
   }, [isRunning, isWaiting, result]);
+
+  const shouldRenderMarkdown = useCallback(
+    (nodeType?: string | null) => {
+      if (!nodeType) return false;
+      return nodeType === 'ask_user' || nodeType === 'answer_user';
+    },
+    []
+  );
 
   const hexToRgba = (hex: string, alpha: number) => {
     const m = hex.trim().match(/^#?([0-9a-f]{6})$/i);
@@ -660,7 +680,9 @@ export function RunFlowModal({
                   ) : selectedStep.status === 'waiting' && (waitingInfo || selectedStep.waiting) ? (
                     <div className="run-waiting">
                       <div className="run-waiting-prompt">
-                        {(selectedStep.waiting?.prompt || waitingInfo?.prompt || 'Please respond:').trim()}
+                        <MarkdownRenderer
+                          markdown={(selectedStep.waiting?.prompt || waitingInfo?.prompt || 'Please respond:').trim()}
+                        />
                       </div>
 
                       {(selectedStep.waiting?.choices?.length || waitingInfo?.choices?.length) ? (
@@ -756,7 +778,13 @@ export function RunFlowModal({
                           {outputPreview.previewText ? (
                             <div className="run-output-section">
                               <div className="run-output-title">Preview</div>
-                              <pre className="run-details-output">{outputPreview.previewText}</pre>
+                              {shouldRenderMarkdown(selectedStep?.nodeType) ? (
+                                <div className="run-details-markdown">
+                                  <MarkdownRenderer markdown={outputPreview.previewText} />
+                                </div>
+                              ) : (
+                                <pre className="run-details-output">{outputPreview.previewText}</pre>
+                              )}
                             </div>
                           ) : null}
 

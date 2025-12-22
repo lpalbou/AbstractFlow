@@ -1,0 +1,671 @@
+{
+  "id": "395d3a26",
+  "name": "deep-research",
+  "description": "",
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": {
+        "x": -544.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "query",
+            "label": "query",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-2",
+      "type": "agent",
+      "position": {
+        "x": 656.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "agent",
+        "label": "Agent",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "task",
+            "label": "task",
+            "type": "string"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          }
+        ],
+        "agentConfig": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b",
+          "tools": [
+            "web_search",
+            "fetch_url"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-4",
+      "type": "concat",
+      "position": {
+        "x": -288.0,
+        "y": 240.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-5",
+      "type": "literal_string",
+      "position": {
+        "x": -672.0,
+        "y": 320.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "String",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "Below is a query for a deep research agent. What clarifying questions do you want to ask to the user ? Keep them short and targeted.\n\nUSER QUERY : "
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-6",
+      "type": "llm_call",
+      "position": {
+        "x": -48.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "LLM Call",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          }
+        ],
+        "effectConfig": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-7",
+      "type": "ask_user",
+      "position": {
+        "x": 176.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "ask_user",
+        "label": "Ask User",
+        "icon": "&#x2753;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "choices",
+            "label": "choices",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-8",
+      "type": "literal_string",
+      "position": {
+        "x": 96.0,
+        "y": 352.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "String",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "Below is a query for a deep research agent and optionally some refinements of the query. You are expected to autonomously search internet for documents which are relevant to answer the user query. Proceed iteratively with an initial search, fetch at least 5 different pages and read them to extend your knowledge on the subject. \n\nBased on that new knowledge, iterate 3 times with the same process and by doing even more targeted search to answer with more precision and clarity the user query. Your goal is to accumulate knowledge, to deepen your understanding of the topic and better answer the user query.\n\nUSER QUERY : "
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-9",
+      "type": "concat",
+      "position": {
+        "x": 416.0,
+        "y": 368.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          },
+          {
+            "id": "d",
+            "label": "d",
+            "type": "string"
+          },
+          {
+            "id": "e",
+            "label": "e",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-10",
+      "type": "literal_string",
+      "position": {
+        "x": 96.0,
+        "y": 512.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "String",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "\nCLARIFYING ANSWERS : "
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-11",
+      "type": "literal_string",
+      "position": {
+        "x": 96.0,
+        "y": 656.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "String",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "\n\n=====================\nAT THE END OF YOUR RESEARCH, WRITE A CLEAR, STRUCTURED AND COMPREHENSIVE REPORT IN MARKDOWN TO ANSWER THE USER QUERY"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-12",
+      "type": "on_flow_end",
+      "position": {
+        "x": 1664.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "report",
+            "label": "report",
+            "type": "string"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-13",
+      "type": "break_object",
+      "position": {
+        "x": 912.0,
+        "y": 224.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "result"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-14",
+      "type": "answer_user",
+      "position": {
+        "x": 1168.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1766396494230",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-6",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1766396514609",
+      "source": "node-5",
+      "sourceHandle": "value",
+      "target": "node-4",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-1766396522218",
+      "source": "node-1",
+      "sourceHandle": "query",
+      "target": "node-4",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-1766396665810",
+      "source": "node-4",
+      "sourceHandle": "result",
+      "target": "node-6",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "edge-1766396702268",
+      "source": "node-6",
+      "sourceHandle": "exec-out",
+      "target": "node-7",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1766396887038",
+      "source": "node-8",
+      "sourceHandle": "value",
+      "target": "node-9",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-1766396890512",
+      "source": "node-1",
+      "sourceHandle": "query",
+      "target": "node-9",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-1766396905953",
+      "source": "node-10",
+      "sourceHandle": "value",
+      "target": "node-9",
+      "targetHandle": "c",
+      "animated": false
+    },
+    {
+      "id": "edge-1766396946161",
+      "source": "node-9",
+      "sourceHandle": "result",
+      "target": "node-2",
+      "targetHandle": "task",
+      "animated": false
+    },
+    {
+      "id": "edge-1766396962054",
+      "source": "node-6",
+      "sourceHandle": "response",
+      "target": "node-7",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "edge-1766396965003",
+      "source": "node-7",
+      "sourceHandle": "response",
+      "target": "node-9",
+      "targetHandle": "d",
+      "animated": false
+    },
+    {
+      "id": "edge-1766396972151",
+      "source": "node-7",
+      "sourceHandle": "exec-out",
+      "target": "node-2",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1766396988996",
+      "source": "node-11",
+      "sourceHandle": "value",
+      "target": "node-9",
+      "targetHandle": "e",
+      "animated": false
+    },
+    {
+      "id": "edge-1766397153032",
+      "source": "node-2",
+      "sourceHandle": "result",
+      "target": "node-13",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1766397160299",
+      "source": "node-13",
+      "sourceHandle": "result",
+      "target": "node-12",
+      "targetHandle": "report",
+      "animated": false
+    },
+    {
+      "id": "edge-1766398211169",
+      "source": "node-2",
+      "sourceHandle": "exec-out",
+      "target": "node-14",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1766398213411",
+      "source": "node-14",
+      "sourceHandle": "exec-out",
+      "target": "node-12",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1766398222452",
+      "source": "node-13",
+      "sourceHandle": "result",
+      "target": "node-14",
+      "targetHandle": "message",
+      "animated": false
+    }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2025-12-22T09:52:47.457452",
+  "updated_at": "2025-12-22T10:10:39.536770"
+}
