@@ -47,17 +47,22 @@ def create_visual_runner(visual_flow: VisualFlow, *, flows: Dict[str, VisualFlow
     except Exception:  # pragma: no cover
         from abstractruntime.storage.in_memory import InMemoryRunStore, InMemoryLedgerStore  # type: ignore
 
+    # Workflow registry is used for START_SUBWORKFLOW composition (subflows + Agent nodes).
+    #
+    # This project supports different AbstractRuntime distributions; some older installs
+    # may not expose WorkflowRegistry. In that case, fall back to a tiny in-process
+    # dict-based registry with the same `.register()` + `.get()` surface.
     try:
         from abstractruntime import WorkflowRegistry  # type: ignore
     except Exception:  # pragma: no cover
-        from abstractruntime.scheduler.registry import WorkflowRegistry  # type: ignore
+        try:
+            from abstractruntime.scheduler.registry import WorkflowRegistry  # type: ignore
+        except Exception:  # pragma: no cover
+            from abstractruntime.core.spec import WorkflowSpec  # type: ignore
 
-    try:
-        from abstractruntime import InMemoryArtifactStore  # type: ignore
-    except Exception:  # pragma: no cover
-        from abstractruntime.storage.artifacts import InMemoryArtifactStore  # type: ignore
-
-    from abstractruntime.integrations.abstractcore.factory import create_local_runtime
+            class WorkflowRegistry(dict):  # type: ignore[no-redef]
+                def register(self, workflow: "WorkflowSpec") -> None:
+                    self[str(workflow.workflow_id)] = workflow
 
     from ..compiler import compile_flow
 
@@ -97,6 +102,18 @@ def create_visual_runner(visual_flow: VisualFlow, *, flows: Dict[str, VisualFlow
 
     _dfs(visual_flow)
 
+    # Detect optional runtime features needed by this flow tree.
+    # These flags keep `create_visual_runner()` resilient to older AbstractRuntime installs.
+    needs_registry = False
+    needs_artifacts = False
+    for vf in ordered:
+        for n in vf.nodes:
+            t = _node_type(n)
+            if t in {"subflow", "agent"}:
+                needs_registry = True
+            if t in {"memory_note", "memory_query"}:
+                needs_artifacts = True
+
     # Validate LLM config across the flow tree and choose a default runtime model.
     llm_configs: set[tuple[str, str]] = set()
     default_llm: tuple[str, str] | None = None
@@ -130,8 +147,16 @@ def create_visual_runner(visual_flow: VisualFlow, *, flows: Dict[str, VisualFlow
 
     if llm_configs:
         provider, model = default_llm or next(iter(llm_configs))
-        from abstractruntime.integrations.abstractcore import MappingToolExecutor
-        from abstractruntime.integrations.abstractcore.default_tools import get_default_tools
+        try:
+            from abstractruntime.integrations.abstractcore.factory import create_local_runtime
+            from abstractruntime.integrations.abstractcore import MappingToolExecutor
+            from abstractruntime.integrations.abstractcore.default_tools import get_default_tools
+        except Exception as e:  # pragma: no cover
+            raise RuntimeError(
+                "This flow uses LLM nodes (llm_call/agent), but the installed AbstractRuntime "
+                "does not provide the AbstractCore integration. Install/enable the integration "
+                "or remove LLM nodes from the flow."
+            ) from e
 
         runtime = create_local_runtime(
             provider=provider,
@@ -139,98 +164,139 @@ def create_visual_runner(visual_flow: VisualFlow, *, flows: Dict[str, VisualFlow
             tool_executor=MappingToolExecutor.from_tools(get_default_tools()),
         )
     else:
-        runtime = Runtime(
-            run_store=InMemoryRunStore(),
-            ledger_store=InMemoryLedgerStore(),
-            artifact_store=InMemoryArtifactStore(),
-        )
+        runtime_kwargs: Dict[str, Any] = {
+            "run_store": InMemoryRunStore(),
+            "ledger_store": InMemoryLedgerStore(),
+        }
+
+        if needs_artifacts:
+            # MEMORY_* effects require an ArtifactStore. Only configure it when needed.
+            artifact_store_obj: Any = None
+            try:
+                from abstractruntime import InMemoryArtifactStore  # type: ignore
+                artifact_store_obj = InMemoryArtifactStore()
+            except Exception:  # pragma: no cover
+                try:
+                    from abstractruntime.storage.artifacts import InMemoryArtifactStore  # type: ignore
+                    artifact_store_obj = InMemoryArtifactStore()
+                except Exception as e:  # pragma: no cover
+                    raise RuntimeError(
+                        "This flow uses MEMORY_* nodes, but the installed AbstractRuntime "
+                        "does not provide an ArtifactStore implementation."
+                    ) from e
+
+            # Only pass artifact_store if the runtime supports it (older runtimes may not).
+            try:
+                from inspect import signature
+
+                if "artifact_store" in signature(Runtime).parameters:
+                    runtime_kwargs["artifact_store"] = artifact_store_obj
+            except Exception:  # pragma: no cover
+                # Best-effort: attempt to set via method if present.
+                pass
+
+        runtime = Runtime(**runtime_kwargs)
+
+        # Best-effort: configure artifact store via setter if supported.
+        if needs_artifacts and "artifact_store" not in runtime_kwargs and hasattr(runtime, "set_artifact_store"):
+            try:
+                runtime.set_artifact_store(artifact_store_obj)  # type: ignore[name-defined]
+            except Exception:
+                pass
 
     flow = visual_to_flow(visual_flow)
     runner = FlowRunner(flow, runtime=runtime)
 
-    registry = WorkflowRegistry()
-    registry.register(runner.workflow)
-    for vf in ordered[1:]:
-        child_flow = visual_to_flow(vf)
-        child_spec = compile_flow(child_flow)
-        registry.register(child_spec)
+    if needs_registry:
+        registry = WorkflowRegistry()
+        registry.register(runner.workflow)
+        for vf in ordered[1:]:
+            child_flow = visual_to_flow(vf)
+            child_spec = compile_flow(child_flow)
+            registry.register(child_spec)
 
-    # Register per-Agent-node subworkflows (canonical AbstractAgent ReAct).
-    #
-    # Visual Agent nodes compile into START_SUBWORKFLOW effects that reference a
-    # deterministic workflow_id. The registry must contain those WorkflowSpecs.
-    #
-    # This keeps VisualFlow JSON portable across hosts: any host can run a
-    # VisualFlow document by registering these derived specs alongside the flow.
-    agent_nodes: list[tuple[str, Dict[str, Any]]] = []
-    for vf in ordered:
-        for n in vf.nodes:
-            node_type = _node_type(n)
-            if node_type != "agent":
-                continue
-            cfg = n.data.get("agentConfig", {})
-            agent_nodes.append((visual_react_workflow_id(flow_id=vf.id, node_id=n.id), cfg if isinstance(cfg, dict) else {}))
-
-    if agent_nodes:
-        try:
-            from abstractagent.adapters.react_runtime import create_react_workflow
-            from abstractagent.logic.react import ReActLogic
-        except Exception as e:  # pragma: no cover
-            raise RuntimeError(
-                "Visual Agent nodes require AbstractAgent to be installed/importable."
-            ) from e
-
-        from abstractcore.tools import ToolDefinition
-        from abstractruntime.integrations.abstractcore.default_tools import filter_tool_specs
-
-        def _tool_defs(tool_names: list[str]) -> list[ToolDefinition]:
-            specs = filter_tool_specs(tool_names)
-            out: list[ToolDefinition] = []
-            for s in specs:
-                if not isinstance(s, dict):
+        # Register per-Agent-node subworkflows (canonical AbstractAgent ReAct).
+        #
+        # Visual Agent nodes compile into START_SUBWORKFLOW effects that reference a
+        # deterministic workflow_id. The registry must contain those WorkflowSpecs.
+        #
+        # This keeps VisualFlow JSON portable across hosts: any host can run a
+        # VisualFlow document by registering these derived specs alongside the flow.
+        agent_nodes: list[tuple[str, Dict[str, Any]]] = []
+        for vf in ordered:
+            for n in vf.nodes:
+                node_type = _node_type(n)
+                if node_type != "agent":
                     continue
-                name = s.get("name")
-                if not isinstance(name, str) or not name.strip():
-                    continue
-                desc = s.get("description")
-                params = s.get("parameters")
-                out.append(
-                    ToolDefinition(
-                        name=name.strip(),
-                        description=str(desc or ""),
-                        parameters=dict(params) if isinstance(params, dict) else {},
+                cfg = n.data.get("agentConfig", {})
+                agent_nodes.append((visual_react_workflow_id(flow_id=vf.id, node_id=n.id), cfg if isinstance(cfg, dict) else {}))
+
+        if agent_nodes:
+            try:
+                from abstractagent.adapters.react_runtime import create_react_workflow
+                from abstractagent.logic.react import ReActLogic
+            except Exception as e:  # pragma: no cover
+                raise RuntimeError(
+                    "Visual Agent nodes require AbstractAgent to be installed/importable."
+                ) from e
+
+            from abstractcore.tools import ToolDefinition
+            from abstractruntime.integrations.abstractcore.default_tools import filter_tool_specs
+
+            def _tool_defs(tool_names: list[str]) -> list[ToolDefinition]:
+                specs = filter_tool_specs(tool_names)
+                out: list[ToolDefinition] = []
+                for s in specs:
+                    if not isinstance(s, dict):
+                        continue
+                    name = s.get("name")
+                    if not isinstance(name, str) or not name.strip():
+                        continue
+                    desc = s.get("description")
+                    params = s.get("parameters")
+                    out.append(
+                        ToolDefinition(
+                            name=name.strip(),
+                            description=str(desc or ""),
+                            parameters=dict(params) if isinstance(params, dict) else {},
+                        )
+                    )
+                return out
+
+            def _normalize_tool_names(raw: Any) -> list[str]:
+                if not isinstance(raw, list):
+                    return []
+                out: list[str] = []
+                for t in raw:
+                    if isinstance(t, str) and t.strip():
+                        out.append(t.strip())
+                return out
+
+            for workflow_id, cfg in agent_nodes:
+                provider_raw = cfg.get("provider")
+                model_raw = cfg.get("model")
+                provider = str(provider_raw).strip().lower() if isinstance(provider_raw, str) else None
+                model = str(model_raw).strip() if isinstance(model_raw, str) else None
+
+                tools_selected = _normalize_tool_names(cfg.get("tools"))
+                logic = ReActLogic(tools=_tool_defs(tools_selected))
+                registry.register(
+                    create_react_workflow(
+                        logic=logic,
+                        workflow_id=workflow_id,
+                        provider=provider,
+                        model=model,
+                        allowed_tools=tools_selected,
                     )
                 )
-            return out
 
-        def _normalize_tool_names(raw: Any) -> list[str]:
-            if not isinstance(raw, list):
-                return []
-            out: list[str] = []
-            for t in raw:
-                if isinstance(t, str) and t.strip():
-                    out.append(t.strip())
-            return out
-
-        for workflow_id, cfg in agent_nodes:
-            provider_raw = cfg.get("provider")
-            model_raw = cfg.get("model")
-            provider = str(provider_raw).strip().lower() if isinstance(provider_raw, str) else None
-            model = str(model_raw).strip() if isinstance(model_raw, str) else None
-
-            tools_selected = _normalize_tool_names(cfg.get("tools"))
-            logic = ReActLogic(tools=_tool_defs(tools_selected))
-            registry.register(
-                create_react_workflow(
-                    logic=logic,
-                    workflow_id=workflow_id,
-                    provider=provider,
-                    model=model,
-                    allowed_tools=tools_selected,
-                )
+        if hasattr(runtime, "set_workflow_registry"):
+            runtime.set_workflow_registry(registry)  # type: ignore[name-defined]
+        else:  # pragma: no cover
+            raise RuntimeError(
+                "This flow requires subworkflows (agent/subflow nodes), but the installed "
+                "AbstractRuntime does not support workflow registries."
             )
-
-    runtime.set_workflow_registry(registry)
 
     return runner
 
@@ -798,6 +864,11 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
         if type_str == "array_concat":
             return _create_array_concat_handler(data)
 
+        # Sequence / Parallel are scheduler nodes compiled specially by `compile_flow`.
+        # Their runtime semantics are handled in `abstractflow.adapters.control_adapter`.
+        if type_str in ("sequence", "parallel"):
+            return lambda x: x
+
         builtin = get_builtin_handler(type_str)
         if builtin:
             return _wrap_builtin(builtin, data)
@@ -878,6 +949,36 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
                 visual_react_workflow_id(flow_id=visual.id, node_id=node.id),
             )
             effect_config = cfg
+        elif type_str in ("sequence", "parallel"):
+            # Control-flow scheduler nodes. Store pin order so compilation can
+            # execute branches deterministically (Blueprint-style).
+            effect_type = type_str
+
+            pins = node.data.get("outputs") if isinstance(node.data, dict) else None
+            exec_ids: list[str] = []
+            if isinstance(pins, list):
+                for p in pins:
+                    if not isinstance(p, dict):
+                        continue
+                    if p.get("type") != "execution":
+                        continue
+                    pid = p.get("id")
+                    if isinstance(pid, str) and pid:
+                        exec_ids.append(pid)
+
+            def _then_key(h: str) -> int:
+                try:
+                    if h.startswith("then:"):
+                        return int(h.split(":", 1)[1])
+                except Exception:
+                    pass
+                return 10**9
+
+            then_handles = sorted([h for h in exec_ids if h.startswith("then:")], key=_then_key)
+            cfg = {"then_handles": then_handles}
+            if type_str == "parallel":
+                cfg["completed_handle"] = "completed"
+            effect_config = cfg
         elif type_str == "subflow":
             effect_type = "start_subworkflow"
             subflow_id = node.data.get("subflowId") or node.data.get("flowId")
@@ -893,6 +994,12 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
                     if isinstance(pid, str) and pid and pid != "output":
                         output_pin_ids.append(pid)
             effect_config = {"workflow_id": subflow_id, "output_pins": output_pin_ids}
+
+        # Always attach minimal visual metadata for downstream compilation/wrapping.
+        meta_cfg: Dict[str, Any] = {"_visual_type": type_str}
+        if isinstance(effect_config, dict):
+            meta_cfg.update(effect_config)
+        effect_config = meta_cfg
 
         flow.add_node(
             node_id=node.id,

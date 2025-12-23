@@ -65,6 +65,8 @@ class NodeType(str, Enum):
     IF = "if"
     SWITCH = "switch"
     LOOP = "loop"
+    SEQUENCE = "sequence"
+    PARALLEL = "parallel"
     COMPARE = "compare"
     NOT = "not"
     AND = "and"

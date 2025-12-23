@@ -6,7 +6,7 @@
  * - Empty shapes = not connected, Filled = connected
  */
 
-import { memo, type MouseEvent, useEffect, useMemo } from 'react';
+import { memo, type MouseEvent, useCallback, useEffect, useMemo } from 'react';
 import { Handle, Position, NodeProps, useEdges, useUpdateNodeInternals } from 'reactflow';
 import { clsx } from 'clsx';
 import type { FlowNodeData } from '../../types/flow';
@@ -19,7 +19,7 @@ export const BaseNode = memo(function BaseNode({
   data,
   selected,
 }: NodeProps<FlowNodeData>) {
-  const { executingNodeId, disconnectPin } = useFlowStore();
+  const { executingNodeId, disconnectPin, updateNodeData } = useFlowStore();
   const isExecuting = executingNodeId === id;
   const edges = useEdges();
   const updateNodeInternals = useUpdateNodeInternals();
@@ -58,6 +58,48 @@ export const BaseNode = memo(function BaseNode({
   const outputExecs = data.outputs.filter((p) => p.type === 'execution');
   const inputData = data.inputs.filter((p) => p.type !== 'execution');
   const outputData = data.outputs.filter((p) => p.type !== 'execution');
+
+  const isSequenceLike = data.nodeType === 'sequence';
+  const isParallelLike = data.nodeType === 'parallel';
+
+  const parseThenIndex = (raw: string): number | null => {
+    const m = /^then:(\d+)$/.exec(raw);
+    if (!m) return null;
+    const n = Number(m[1]);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const addThenPin = useCallback(
+    (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const existingExec = data.outputs.filter((p) => p.type === 'execution');
+      const thenPins = existingExec.filter((p) => parseThenIndex(p.id) !== null);
+      const completedPin = isParallelLike ? existingExec.find((p) => p.id === 'completed') : undefined;
+
+      let maxIdx = -1;
+      for (const p of thenPins) {
+        const idx = parseThenIndex(p.id);
+        if (idx !== null) maxIdx = Math.max(maxIdx, idx);
+      }
+      const nextIdx = maxIdx + 1;
+
+      const newPin = { id: `then:${nextIdx}`, label: `Then ${nextIdx}`, type: 'execution' as const };
+
+      // Preserve existing ordering, but keep `completed` (Parallel) as the last pin.
+      const nextOutputs = (() => {
+        const nonExec = data.outputs.filter((p) => p.type !== 'execution');
+        const nextExec = isParallelLike
+          ? [...thenPins, newPin, ...(completedPin ? [completedPin] : [])]
+          : [...existingExec, newPin];
+        return [...nonExec, ...nextExec];
+      })();
+
+      updateNodeData(id, { outputs: nextOutputs });
+    },
+    [data.outputs, id, isParallelLike, updateNodeData]
+  );
 
   const overlayHandleStyle = {
     position: 'absolute' as const,
@@ -140,29 +182,99 @@ export const BaseNode = memo(function BaseNode({
         {/* Multiple execution outputs (for branch nodes like If/Else) */}
         {outputExecs.length > 1 && (
           <div className="pins-right exec-branches">
-            {outputExecs.map((pin) => (
-              <div key={pin.id} className="pin-row output exec-branch">
-                <span className="pin-label">{pin.label}</span>
-                <span
-                  className="pin-shape"
-                  style={{ color: PIN_COLORS.execution }}
-                  onClick={(e) => handlePinClick(e, pin.id, false)}
-                >
-                  <PinShape
-                    type="execution"
-                    size={12}
-                    filled={isPinConnected(pin.id, false)}
+            {(() => {
+              // Special layout:
+              // - Sequence: Then pins + "Add pin"
+              // - Parallel: Then pins + "Add pin" + Completed (bottom-right)
+              if (isSequenceLike || isParallelLike) {
+                const thenPins = outputExecs
+                  .filter((p) => /^then:\d+$/.test(p.id))
+                  .sort((a, b) => (parseThenIndex(a.id) ?? 0) - (parseThenIndex(b.id) ?? 0));
+                const completed = isParallelLike ? outputExecs.find((p) => p.id === 'completed') : undefined;
+
+                return (
+                  <>
+                    {thenPins.map((pin) => (
+                      <div key={pin.id} className="pin-row output exec-branch">
+                        <span className="pin-label">{pin.label}</span>
+                        <span
+                          className="pin-shape"
+                          style={{ color: PIN_COLORS.execution }}
+                          onClick={(e) => handlePinClick(e, pin.id, false)}
+                        >
+                          <PinShape
+                            type="execution"
+                            size={12}
+                            filled={isPinConnected(pin.id, false)}
+                          />
+                        </span>
+                        <Handle
+                          type="source"
+                          position={Position.Right}
+                          id={pin.id}
+                          className="exec-handle"
+                          onMouseDownCapture={(e) => handlePinClick(e, pin.id, false)}
+                        />
+                      </div>
+                    ))}
+
+                    <div className="pin-row output exec-add-pin" onClick={addThenPin}>
+                      <span className="pin-label">Add pin</span>
+                      <span className="exec-add-plus">+</span>
+                    </div>
+
+                    {completed ? (
+                      <div key={completed.id} className="pin-row output exec-branch exec-completed">
+                        <span className="pin-label">{completed.label}</span>
+                        <span
+                          className="pin-shape"
+                          style={{ color: PIN_COLORS.execution }}
+                          onClick={(e) => handlePinClick(e, completed.id, false)}
+                        >
+                          <PinShape
+                            type="execution"
+                            size={12}
+                            filled={isPinConnected(completed.id, false)}
+                          />
+                        </span>
+                        <Handle
+                          type="source"
+                          position={Position.Right}
+                          id={completed.id}
+                          className="exec-handle"
+                          onMouseDownCapture={(e) => handlePinClick(e, completed.id, false)}
+                        />
+                      </div>
+                    ) : null}
+                  </>
+                );
+              }
+
+              // Default: render all execution outputs in order.
+              return outputExecs.map((pin) => (
+                <div key={pin.id} className="pin-row output exec-branch">
+                  <span className="pin-label">{pin.label}</span>
+                  <span
+                    className="pin-shape"
+                    style={{ color: PIN_COLORS.execution }}
+                    onClick={(e) => handlePinClick(e, pin.id, false)}
+                  >
+                    <PinShape
+                      type="execution"
+                      size={12}
+                      filled={isPinConnected(pin.id, false)}
+                    />
+                  </span>
+                  <Handle
+                    type="source"
+                    position={Position.Right}
+                    id={pin.id}
+                    className="exec-handle"
+                    onMouseDownCapture={(e) => handlePinClick(e, pin.id, false)}
                   />
-                </span>
-                <Handle
-                  type="source"
-                  position={Position.Right}
-                  id={pin.id}
-                  className="exec-handle"
-                  onMouseDownCapture={(e) => handlePinClick(e, pin.id, false)}
-                />
-              </div>
-            ))}
+                </div>
+              ));
+            })()}
           </div>
         )}
 

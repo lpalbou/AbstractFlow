@@ -124,6 +124,45 @@
   transform: scale(1.2);
 }
 
+.exec-add-pin {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  user-select: none;
+}
+
+.exec-add-pin .pin-label {
+  color: var(--text-muted);
+  font-size: 11px;
+  text-transform: none;
+}
+
+.exec-add-plus {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+  color: var(--text-primary);
+  font-weight: 700;
+  line-height: 1;
+  margin-left: 6px;
+}
+
+.exec-add-pin:hover .exec-add-plus {
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.exec-completed {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
 .node-icon {
   font-size: 14px;
 }

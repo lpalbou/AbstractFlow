@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 
+import pytest
 from fastapi.testclient import TestClient
 
 from web.backend.main import app
@@ -90,6 +91,13 @@ def test_ws_answer_user_emits_message_and_continues() -> None:
                 for _ in range(300):
                     msg = ws.receive_json()
                     messages.append(msg)
+                    if msg.get("type") == "flow_error":
+                        pytest.fail(f"Flow failed over WS: {msg.get('error')}")
+                    if msg.get("type") == "flow_waiting":
+                        pytest.fail(
+                            "Flow unexpectedly entered waiting state over WS: "
+                            + json.dumps(msg, ensure_ascii=False)
+                        )
                     if msg.get("type") == "flow_complete":
                         completed = msg
                         break

@@ -773,6 +773,7 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
     # Build next-node map (linear) and branch maps (If/Else).
     next_node_map: Dict[str, Optional[str]] = {}
     branch_maps: Dict[str, Dict[str, str]] = {}
+    control_specs: Dict[str, Dict[str, Any]] = {}
 
     def _is_supported_branch_handle(handle: str) -> bool:
         return handle in {"true", "false", "default"} or handle.startswith("case:")
@@ -780,6 +781,65 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
     for node_id in flow.nodes:
         outs = outgoing.get(node_id, [])
         if not outs:
+            next_node_map[node_id] = None
+            continue
+
+        flow_node = flow.nodes.get(node_id)
+        node_effect_type = getattr(flow_node, "effect_type", None) if flow_node else None
+
+        # Sequence / Parallel: deterministic fan-out scheduling (Blueprint-style).
+        #
+        # Important: these nodes may have 0..N connected outputs; even a single
+        # `then:0` edge should compile (it is not "branching" based on data).
+        if node_effect_type in {"sequence", "parallel"}:
+            # Validate all execution edges have a handle
+            handles: list[str] = []
+            targets_by_handle: Dict[str, str] = {}
+            for e in outs:
+                h = getattr(e, "source_handle", None)
+                if not isinstance(h, str) or not h:
+                    raise ValueError(
+                        f"Control node '{node_id}' has an execution edge with no source_handle."
+                    )
+                handles.append(h)
+                targets_by_handle[h] = e.target
+
+            cfg = getattr(flow_node, "effect_config", None) if flow_node else None
+            cfg_dict = cfg if isinstance(cfg, dict) else {}
+            then_handles = cfg_dict.get("then_handles")
+            if not isinstance(then_handles, list):
+                then_handles = [h for h in handles if h.startswith("then:")]
+
+                def _then_key(h: str) -> int:
+                    try:
+                        if h.startswith("then:"):
+                            return int(h.split(":", 1)[1])
+                    except Exception:
+                        pass
+                    return 10**9
+
+                then_handles = sorted(then_handles, key=_then_key)
+            else:
+                then_handles = [str(h) for h in then_handles if isinstance(h, str) and h]
+
+            allowed = set(then_handles)
+            completed_target: Optional[str] = None
+            if node_effect_type == "parallel":
+                allowed.add("completed")
+                completed_target = targets_by_handle.get("completed")
+
+            unknown = [h for h in handles if h not in allowed]
+            if unknown:
+                raise ValueError(
+                    f"Control node '{node_id}' has unsupported execution outputs: {unknown}"
+                )
+
+            control_specs[node_id] = {
+                "kind": node_effect_type,
+                "then_handles": then_handles,
+                "targets_by_handle": targets_by_handle,
+                "completed_target": completed_target,
+            }
             next_node_map[node_id] = None
             continue
 
@@ -841,15 +901,85 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
     # Create node handlers
     handlers: Dict[str, Callable] = {}
 
+    def _wrap_return_to_active_control(
+        handler: Callable,
+        *,
+        node_id: str,
+        visual_type: Optional[str],
+    ) -> Callable:
+        """If a node tries to complete the run inside an active control block, return to the scheduler.
+
+        This is crucial for Blueprint-style nodes:
+        - branch chains can end (no outgoing exec edges) without ending the whole flow
+        - Sequence/Parallel can then continue scheduling other branches
+        """
+        from abstractruntime.core.models import StepPlan
+
+        try:
+            from .adapters.control_adapter import get_active_control_node_id
+        except Exception:  # pragma: no cover
+            get_active_control_node_id = None  # type: ignore[assignment]
+
+        def wrapped(run: Any, ctx: Any) -> "StepPlan":
+            plan: StepPlan = handler(run, ctx)
+            if not callable(get_active_control_node_id):
+                return plan
+
+            active = get_active_control_node_id(run.vars)
+            if not isinstance(active, str) or not active:
+                return plan
+            if active == node_id:
+                return plan
+
+            # Explicit end node should always terminate the run, even inside a control block.
+            if visual_type == "on_flow_end":
+                return plan
+
+            # If the node is about to complete the run, treat it as "branch complete" instead.
+            if plan.complete_output is not None:
+                return StepPlan(node_id=plan.node_id, next_node=active)
+
+            # Terminal effect node: runtime would auto-complete if next_node is missing.
+            if plan.effect is not None and not plan.next_node:
+                return StepPlan(node_id=plan.node_id, effect=plan.effect, next_node=active)
+
+            # Defensive fallback.
+            if plan.effect is None and not plan.next_node and plan.complete_output is None:
+                return StepPlan(node_id=plan.node_id, next_node=active)
+
+            return plan
+
+        return wrapped
+
     for node_id, flow_node in flow.nodes.items():
         next_node = next_node_map.get(node_id)
         branch_map = branch_maps.get(node_id)
         handler_obj = getattr(flow_node, "handler", None)
         effect_type = getattr(flow_node, "effect_type", None)
         effect_config = getattr(flow_node, "effect_config", None) or {}
+        visual_type = effect_config.get("_visual_type") if isinstance(effect_config, dict) else None
 
         # Check for effect nodes first
-        if effect_type == "agent":
+        if effect_type == "sequence":
+            from .adapters.control_adapter import create_sequence_node_handler
+
+            spec = control_specs.get(node_id) or {}
+            handlers[node_id] = create_sequence_node_handler(
+                node_id=node_id,
+                ordered_then_handles=list(spec.get("then_handles") or []),
+                targets_by_handle=dict(spec.get("targets_by_handle") or {}),
+            )
+        elif effect_type == "parallel":
+            from .adapters.control_adapter import create_parallel_node_handler
+
+            spec = control_specs.get(node_id) or {}
+            handlers[node_id] = create_parallel_node_handler(
+                node_id=node_id,
+                ordered_then_handles=list(spec.get("then_handles") or []),
+                targets_by_handle=dict(spec.get("targets_by_handle") or {}),
+                completed_target=spec.get("completed_target"),
+            )
+        elif effect_type == "agent":
             data_aware_handler = handler_obj if callable(handler_obj) else None
             handlers[node_id] = _create_visual_agent_effect_handler(
                 node_id=node_id,
@@ -907,6 +1037,14 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
                 f"Unknown handler type for node '{node_id}': {type(handler_obj)}. "
                 "Expected agent, function, or Flow."
             )
+
+        # Blueprint-style control flow: terminal nodes inside Sequence/Parallel should
+        # return to the active scheduler instead of completing the whole run.
+        handlers[node_id] = _wrap_return_to_active_control(
+            handlers[node_id],
+            node_id=node_id,
+            visual_type=visual_type if isinstance(visual_type, str) else None,
+        )
 
     return WorkflowSpec(
         workflow_id=flow.flow_id,

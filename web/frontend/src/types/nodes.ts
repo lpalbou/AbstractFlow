@@ -180,6 +180,31 @@ const CONTROL_NODES: NodeTemplate[] = [
 	    ],
 	    category: 'control',
 	  },
+  {
+    type: 'sequence',
+    icon: '&#x21E5;', // Rightwards arrow to bar (sequence-ish)
+    label: 'Sequence',
+    headerColor: '#F39C12',
+    inputs: [{ id: 'exec-in', label: '', type: 'execution' }],
+    outputs: [
+      { id: 'then:0', label: 'Then 0', type: 'execution' },
+      { id: 'then:1', label: 'Then 1', type: 'execution' },
+    ],
+    category: 'control',
+  },
+  {
+    type: 'parallel',
+    icon: '&#x2225;', // Parallel lines
+    label: 'Parallel',
+    headerColor: '#F39C12',
+    inputs: [{ id: 'exec-in', label: '', type: 'execution' }],
+    outputs: [
+      { id: 'then:0', label: 'Then 0', type: 'execution' },
+      { id: 'then:1', label: 'Then 1', type: 'execution' },
+      { id: 'completed', label: 'Completed', type: 'execution' },
+    ],
+    category: 'control',
+  },
   { type: 'loop', icon: '&#x1F501;', label: 'ForEach', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'items', label: 'items', type: 'array' }], outputs: [{ id: 'loop', label: 'loop', type: 'execution' }, { id: 'done', label: 'done', type: 'execution' }, { id: 'item', label: 'item', type: 'any' }, { id: 'index', label: 'index', type: 'number' }], category: 'control' },
   // Pure functions - just produce data
   { type: 'compare', icon: '=?', label: 'Compare', headerColor: '#F39C12', inputs: [{ id: 'a', label: 'a', type: 'any' }, { id: 'b', label: 'b', type: 'any' }], outputs: [{ id: 'result', label: 'result', type: 'boolean' }], category: 'control' },

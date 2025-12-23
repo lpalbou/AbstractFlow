@@ -51,7 +51,7 @@ export type NodeType =
   // String - Pure functions (no exec pins)
   | 'concat' | 'split' | 'join' | 'format' | 'uppercase' | 'lowercase' | 'trim' | 'substring' | 'length'
   // Control - if/loop have exec, logic gates are pure
-  | 'if' | 'switch' | 'loop' | 'compare' | 'not' | 'and' | 'or'
+  | 'if' | 'switch' | 'loop' | 'sequence' | 'parallel' | 'compare' | 'not' | 'and' | 'or'
   // Data - Pure functions (no exec pins)
   | 'get' | 'set' | 'merge' | 'array_map' | 'array_filter' | 'array_concat' | 'break_object' | 'system_datetime'
   // Literals - Pure value nodes (no exec pins, no inputs)
