@@ -401,7 +401,7 @@ export function RunFlowModal({
   const shouldRenderMarkdown = useCallback(
     (nodeType?: string | null) => {
       if (!nodeType) return false;
-      return nodeType === 'ask_user' || nodeType === 'answer_user';
+      return nodeType === 'ask_user' || nodeType === 'answer_user' || nodeType === 'llm_call' || nodeType === 'agent';
     },
     []
   );

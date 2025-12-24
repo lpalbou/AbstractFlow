@@ -176,7 +176,7 @@ async def _execute_runner_loop(
                 effect_type = _node_effect_type(node_id)
 
                 # Never truncate user-visible message content.
-                if effect_type in {"ask_user", "answer_user"}:
+                if effect_type in {"ask_user", "answer_user", "llm_call"}:
                     return _preview(raw, max_str_len=None)
 
                 # Agent node: keep preview size-bounded but never truncate the final answer.

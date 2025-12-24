@@ -64,6 +64,15 @@ export function MarkdownRenderer({ markdown, className }: MarkdownRendererProps)
     if (!root) return;
     if (!monaco) return;
 
+    // Ensure syntax highlighting matches the app's dark UI.
+    // Without this, Monaco can default to the light theme ("vs"), producing black tokens
+    // that are unreadable on our dark code block background.
+    try {
+      monaco.editor.setTheme('vs-dark');
+    } catch {
+      // Ignore: theme setting is best-effort.
+    }
+
     let cancelled = false;
     const nodes = Array.from(root.querySelectorAll('pre code[data-lang]')) as HTMLElement[];
 
