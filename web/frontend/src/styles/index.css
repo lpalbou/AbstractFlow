@@ -546,6 +546,18 @@ button.primary:hover:not(:disabled) {
   color: rgba(210, 255, 230, 0.95);
 }
 
+.run-metric-badge.metric-provider {
+  border-color: rgba(233, 69, 96, 0.35);
+  background: rgba(233, 69, 96, 0.10);
+  color: rgba(255, 220, 225, 0.95);
+}
+
+.run-metric-badge.metric-model {
+  border-color: rgba(52, 235, 210, 0.35);
+  background: rgba(52, 235, 210, 0.10);
+  color: rgba(200, 255, 250, 0.95);
+}
+
 .run-step-metrics {
   display: inline-flex;
   align-items: center;
@@ -604,6 +616,12 @@ button.primary:hover:not(:disabled) {
   padding: 3px 8px;
   border-radius: 999px;
   white-space: nowrap;
+}
+
+.run-details-header-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .run-steps-list {
@@ -838,6 +856,13 @@ button.primary:hover:not(:disabled) {
   color: var(--text-primary);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.run-output-meta-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .run-trace {

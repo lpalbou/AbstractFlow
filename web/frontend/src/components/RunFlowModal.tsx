@@ -160,6 +160,8 @@ export function RunFlowModal({
     nodeType?: string;
     nodeIcon?: string;
     nodeColor?: string;
+    provider?: string;
+    model?: string;
     summary?: string;
     output?: unknown;
     error?: string;
@@ -201,11 +203,101 @@ export function RunFlowModal({
     return `${tps.toFixed(tps < 10 ? 2 : 1)} tk/s`;
   };
 
+  type UsageBadge = { label: string; value: number };
+
+  const getUsageBadges = (usage: unknown): UsageBadge[] => {
+    if (!usage || typeof usage !== 'object') return [];
+    const u = usage as Record<string, unknown>;
+    const num = (key: string): number | null => {
+      const v = u[key];
+      return typeof v === 'number' && Number.isFinite(v) ? v : null;
+    };
+
+    const inputTokens = num('input_tokens');
+    const outputTokens = num('output_tokens');
+    const promptTokens = num('prompt_tokens');
+    const completionTokens = num('completion_tokens');
+    const totalTokens = num('total_tokens');
+
+    const inVal = inputTokens ?? promptTokens;
+    const outVal = outputTokens ?? completionTokens;
+
+    const badges: UsageBadge[] = [];
+    if (inVal != null) badges.push({ label: 'in', value: inVal });
+    if (outVal != null) badges.push({ label: 'out', value: outVal });
+    if (totalTokens != null) badges.push({ label: 'total', value: totalTokens });
+
+    // Only show prompt/completion if they differ from the chosen in/out values.
+    if (promptTokens != null && inVal != null && promptTokens !== inVal) badges.push({ label: 'prompt', value: promptTokens });
+    if (completionTokens != null && outVal != null && completionTokens !== outVal)
+      badges.push({ label: 'completion', value: completionTokens });
+
+    const cached = num('cache_read_tokens') ?? num('cached_tokens');
+    if (cached != null && cached > 0) badges.push({ label: 'cached', value: cached });
+
+    return badges;
+  };
+
   const steps = useMemo<Step[]>(() => {
     const out: Step[] = [];
     const openByNode = new Map<string, number>();
 
     const safeString = (value: unknown) => (typeof value === 'string' ? value : value == null ? '' : String(value));
+
+    const extractModelInfo = (value: unknown): { provider?: string; model?: string } => {
+      if (!value || typeof value !== 'object') return {};
+      const obj = value as Record<string, unknown>;
+      const pick = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+
+      // Common shapes:
+      // - llm_call: { response: "...", raw: { provider, model, usage, ... } }
+      // - agent: { result: { provider, model, ... }, scratchpad: ... }
+      let provider = pick(obj.provider);
+      let model = pick(obj.model);
+
+      const raw = obj.raw;
+      if ((!provider || !model) && raw && typeof raw === 'object') {
+        const r = raw as Record<string, unknown>;
+        provider = provider ?? pick(r.provider);
+        model = model ?? pick(r.model);
+      }
+
+      const nested = obj.result;
+      if ((!provider || !model) && nested && typeof nested === 'object') {
+        const n = nested as Record<string, unknown>;
+        provider = provider ?? pick(n.provider);
+        model = model ?? pick(n.model);
+      }
+
+      // Agent nodes may not expose provider/model directly; try to infer from the last llm_call
+      // step inside the scratchpad trace.
+      const scratchpad = obj.scratchpad;
+      if ((!provider || !model) && scratchpad && typeof scratchpad === 'object') {
+        const sp = scratchpad as Record<string, unknown>;
+        const steps = Array.isArray(sp.steps) ? sp.steps : [];
+        for (let i = steps.length - 1; i >= 0; i--) {
+          const st = steps[i];
+          if (!st || typeof st !== 'object') continue;
+          const stepObj = st as Record<string, unknown>;
+          const effect = stepObj.effect && typeof stepObj.effect === 'object' ? (stepObj.effect as Record<string, unknown>) : null;
+          const effectType = effect && typeof effect.type === 'string' ? effect.type : '';
+          if (effectType !== 'llm_call') continue;
+
+          const payload =
+            effect && effect.payload && typeof effect.payload === 'object' ? (effect.payload as Record<string, unknown>) : null;
+          provider = provider ?? pick(payload?.provider);
+          model = model ?? pick(payload?.model);
+
+          const result = stepObj.result && typeof stepObj.result === 'object' ? (stepObj.result as Record<string, unknown>) : null;
+          provider = provider ?? pick(result?.provider);
+          model = model ?? pick(result?.model);
+
+          if (provider || model) break;
+        }
+      }
+
+      return { provider, model };
+    };
 
     const pickSummary = (value: unknown): string => {
       if (value == null) return '';
@@ -277,8 +369,17 @@ export function RunFlowModal({
       if (ev.type === 'node_complete') {
         const nodeId = ev.nodeId;
         const idx = nodeId ? openByNode.get(nodeId) : undefined;
+        const mi = extractModelInfo(ev.result);
         if (typeof idx === 'number') {
-          out[idx] = { ...out[idx], status: 'completed', output: ev.result, summary: summarize(ev.result), metrics: ev.meta };
+          out[idx] = {
+            ...out[idx],
+            status: 'completed',
+            output: ev.result,
+            summary: summarize(ev.result),
+            metrics: ev.meta,
+            provider: mi.provider,
+            model: mi.model,
+          };
           openByNode.delete(nodeId!);
           continue;
         }
@@ -291,6 +392,8 @@ export function RunFlowModal({
           nodeType: meta?.type,
           nodeIcon: meta?.icon,
           nodeColor: meta?.color,
+          provider: mi.provider,
+          model: mi.model,
           output: ev.result,
           summary: summarize(ev.result),
           metrics: ev.meta,
@@ -482,7 +585,40 @@ export function RunFlowModal({
     if (!model && typeof obj.model === 'string' && obj.model.trim()) model = obj.model.trim();
     if (!usage && 'usage' in obj) usage = obj.usage;
 
+    // llm_call output shape stores provider/model/usage under `raw`.
+    if ((!provider || !model || !usage) && obj.raw && typeof obj.raw === 'object') {
+      const raw = obj.raw as Record<string, unknown>;
+      if (!provider && typeof raw.provider === 'string' && raw.provider.trim()) provider = raw.provider.trim();
+      if (!model && typeof raw.model === 'string' && raw.model.trim()) model = raw.model.trim();
+      if (!usage && 'usage' in raw) usage = raw.usage;
+    }
+
     if ('scratchpad' in obj) scratchpad = obj.scratchpad;
+
+    // Agent nodes: infer provider/model from the last llm_call inside scratchpad steps if needed.
+    if ((!provider || !model) && scratchpad && typeof scratchpad === 'object') {
+      const sp = scratchpad as Record<string, unknown>;
+      const steps = Array.isArray(sp.steps) ? sp.steps : [];
+      for (let i = steps.length - 1; i >= 0; i--) {
+        const st = steps[i];
+        if (!st || typeof st !== 'object') continue;
+        const stepObj = st as Record<string, unknown>;
+        const effect = stepObj.effect && typeof stepObj.effect === 'object' ? (stepObj.effect as Record<string, unknown>) : null;
+        const effectType = effect && typeof effect.type === 'string' ? effect.type : '';
+        if (effectType !== 'llm_call') continue;
+
+        const payload =
+          effect && effect.payload && typeof effect.payload === 'object' ? (effect.payload as Record<string, unknown>) : null;
+        if (!provider && typeof payload?.provider === 'string' && payload.provider.trim()) provider = payload.provider.trim();
+        if (!model && typeof payload?.model === 'string' && payload.model.trim()) model = payload.model.trim();
+
+        const result = stepObj.result && typeof stepObj.result === 'object' ? (stepObj.result as Record<string, unknown>) : null;
+        if (!provider && typeof result?.provider === 'string' && result.provider.trim()) provider = result.provider.trim();
+        if (!model && typeof result?.model === 'string' && result.model.trim()) model = result.model.trim();
+
+        if (provider || model) break;
+      }
+    }
 
     let cleaned: unknown = value;
     if (obj && typeof obj === 'object') {
@@ -494,6 +630,8 @@ export function RunFlowModal({
     if (!task && !previewText && scratchpad == null && !provider && !model && !usage) return null;
     return { task, previewText, scratchpad, provider, model, usage, raw: value, cleaned };
   }, [selectedStep?.output]);
+
+  const usageBadges = useMemo(() => getUsageBadges(outputPreview?.usage), [outputPreview?.usage]);
 
   const traceSteps = useMemo(() => {
     const scratchpad = outputPreview?.scratchpad;
@@ -704,6 +842,8 @@ export function RunFlowModal({
                             <span className="run-step-type" style={{ background: bg, borderColor: color }}>
                               {s.nodeType || 'node'}
                             </span>
+                            {s.provider ? <span className="run-metric-badge metric-provider">{s.provider}</span> : null}
+                            {s.model ? <span className="run-metric-badge metric-model">{s.model}</span> : null}
                             {s.nodeId ? <span className="run-step-id">{s.nodeId}</span> : null}
                             {s.status === 'completed' && s.metrics ? (
                               <span className="run-step-metrics">
@@ -747,15 +887,19 @@ export function RunFlowModal({
                   {selectedStep ? selectedStep.nodeLabel || selectedStep.nodeId || 'Step' : 'Details'}
                 </div>
                 {selectedStep?.nodeType ? (
-                  <span
-                    className="run-details-type"
-                    style={{
-                      borderColor: selectedStep.nodeColor || '#888888',
-                      background: hexToRgba(selectedStep.nodeColor || '#888888', 0.12),
-                    }}
-                  >
-                    {selectedStep.nodeType}
-                  </span>
+                  <div className="run-details-header-badges">
+                    {selectedStep.provider ? <span className="run-metric-badge metric-provider">{selectedStep.provider}</span> : null}
+                    {selectedStep.model ? <span className="run-metric-badge metric-model">{selectedStep.model}</span> : null}
+                    <span
+                      className="run-details-type"
+                      style={{
+                        borderColor: selectedStep.nodeColor || '#888888',
+                        background: hexToRgba(selectedStep.nodeColor || '#888888', 0.12),
+                      }}
+                    >
+                      {selectedStep.nodeType}
+                    </span>
+                  </div>
                 ) : null}
               </div>
 
@@ -871,16 +1015,33 @@ export function RunFlowModal({
                                   <div>
                                     <span className="run-output-meta-key">Model</span>
                                     <span className="run-output-meta-val">
-                                      {(outputPreview.provider || '').trim()}
-                                      {(outputPreview.provider && outputPreview.model) ? ' / ' : ''}
-                                      {(outputPreview.model || '').trim()}
+                                      <span className="run-output-meta-badges">
+                                        {outputPreview.provider ? (
+                                          <span className="run-metric-badge metric-provider">{outputPreview.provider}</span>
+                                        ) : null}
+                                        {outputPreview.model ? (
+                                          <span className="run-metric-badge metric-model">{outputPreview.model}</span>
+                                        ) : null}
+                                      </span>
                                     </span>
                                   </div>
                                 ) : null}
                                 {outputPreview.usage ? (
                                   <div>
                                     <span className="run-output-meta-key">Usage</span>
-                                    <span className="run-output-meta-val">{formatValue(outputPreview.usage)}</span>
+                                    <span className="run-output-meta-val">
+                                      {usageBadges.length ? (
+                                        <span className="run-output-meta-badges">
+                                          {usageBadges.map((b) => (
+                                            <span key={b.label} className="run-metric-badge metric-tokens">
+                                              {b.label}: {b.value}
+                                            </span>
+                                          ))}
+                                        </span>
+                                      ) : (
+                                        formatValue(outputPreview.usage)
+                                      )}
+                                    </span>
                                   </div>
                                 ) : null}
                               </div>
