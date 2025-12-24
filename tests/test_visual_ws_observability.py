@@ -98,5 +98,17 @@ def test_ws_node_events_are_in_order_and_include_outputs() -> None:
                 assert complete_n1.get("result") == {"message": "hello", "context": {}}
                 assert complete_n2.get("result") == {"step": "n2", "message": "hello"}
                 assert complete_n3.get("result") == {"step": "n3", "prev": {"step": "n2", "message": "hello"}}
+
+                # Metrics are best-effort but duration should always be present for node_complete.
+                for m in (complete_n1, complete_n2, complete_n3):
+                    meta = m.get("meta")
+                    assert isinstance(meta, dict)
+                    assert isinstance(meta.get("duration_ms"), (int, float))
+                    assert meta.get("duration_ms") >= 0
+
+                flow_complete = next(m for m in msgs if m.get("type") == "flow_complete")
+                meta = flow_complete.get("meta")
+                assert isinstance(meta, dict)
+                assert isinstance(meta.get("duration_ms"), (int, float))
     finally:
         _flows.pop(flow_id, None)

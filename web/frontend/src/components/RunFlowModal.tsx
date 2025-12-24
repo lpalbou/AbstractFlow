@@ -7,7 +7,7 @@
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useFlowStore } from '../hooks/useFlow';
-import type { ExecutionEvent, Pin, FlowRunResult } from '../types/flow';
+import type { ExecutionEvent, ExecutionMetrics, Pin, FlowRunResult } from '../types/flow';
 import { isEntryNodeType } from '../types/flow';
 import type { WaitingInfo } from '../hooks/useWebSocket';
 import { MarkdownRenderer } from './MarkdownRenderer';
@@ -163,6 +163,7 @@ export function RunFlowModal({
     summary?: string;
     output?: unknown;
     error?: string;
+    metrics?: ExecutionMetrics;
     waiting?: {
       prompt: string;
       choices: string[];
@@ -170,6 +171,34 @@ export function RunFlowModal({
       waitKey?: string;
       reason?: string;
     };
+  };
+
+  const formatDuration = (rawMs: unknown): string => {
+    const ms = typeof rawMs === 'number' ? rawMs : rawMs == null ? NaN : Number(rawMs);
+    if (!Number.isFinite(ms) || ms < 0) return '';
+    if (ms < 950) return `${Math.round(ms)}ms`;
+    const s = ms / 1000;
+    if (s < 60) return `${s.toFixed(s < 10 ? 2 : 1)}s`;
+    const m = Math.floor(s / 60);
+    const rem = s - m * 60;
+    return `${m}m ${rem.toFixed(0)}s`;
+  };
+
+  const formatTokenBadge = (m?: ExecutionMetrics | null): string => {
+    if (!m) return '';
+    const input = typeof m.input_tokens === 'number' ? m.input_tokens : null;
+    const output = typeof m.output_tokens === 'number' ? m.output_tokens : null;
+    if (input == null && output == null) return '';
+    if (input != null && output != null) return `${input}→${output} tk`;
+    if (input != null) return `${input} in`;
+    return `${output} out`;
+  };
+
+  const formatTpsBadge = (m?: ExecutionMetrics | null): string => {
+    if (!m) return '';
+    const tps = typeof m.tokens_per_s === 'number' ? m.tokens_per_s : null;
+    if (tps == null || !Number.isFinite(tps) || tps <= 0) return '';
+    return `${tps.toFixed(tps < 10 ? 2 : 1)} tk/s`;
   };
 
   const steps = useMemo<Step[]>(() => {
@@ -249,7 +278,7 @@ export function RunFlowModal({
         const nodeId = ev.nodeId;
         const idx = nodeId ? openByNode.get(nodeId) : undefined;
         if (typeof idx === 'number') {
-          out[idx] = { ...out[idx], status: 'completed', output: ev.result, summary: summarize(ev.result) };
+          out[idx] = { ...out[idx], status: 'completed', output: ev.result, summary: summarize(ev.result), metrics: ev.meta };
           openByNode.delete(nodeId!);
           continue;
         }
@@ -264,6 +293,7 @@ export function RunFlowModal({
           nodeColor: meta?.color,
           output: ev.result,
           summary: summarize(ev.result),
+          metrics: ev.meta,
         });
         continue;
       }
@@ -318,6 +348,15 @@ export function RunFlowModal({
 
     return out;
   }, [events, nodeById]);
+
+  const flowSummary = useMemo<ExecutionMetrics | null>(() => {
+    if (!events || events.length === 0) return null;
+    for (let i = events.length - 1; i >= 0; i--) {
+      const ev = events[i];
+      if (ev.type === 'flow_complete' && ev.meta) return ev.meta;
+    }
+    return null;
+  }, [events]);
 
   // Keep selection valid; default to last step.
   useEffect(() => {
@@ -486,6 +525,7 @@ export function RunFlowModal({
     const payload = effect && typeof effect.payload === 'object' ? (effect.payload as Record<string, unknown>) : null;
     const result = step.result && typeof step.result === 'object' ? (step.result as Record<string, unknown>) : null;
     const wait = step.wait && typeof step.wait === 'object' ? (step.wait as Record<string, unknown>) : null;
+    const durationMs = typeof step.duration_ms === 'number' ? step.duration_ms : null;
 
     if (effectType === 'llm_call') {
       const provider =
@@ -499,6 +539,18 @@ export function RunFlowModal({
 
       const usageRaw = result ? result.usage : null;
       const usage = usageRaw && typeof usageRaw === 'object' ? (usageRaw as Record<string, unknown>) : null;
+      const inTokens =
+        usage && typeof usage.prompt_tokens === 'number'
+          ? usage.prompt_tokens
+          : usage && typeof usage.input_tokens === 'number'
+            ? usage.input_tokens
+            : null;
+      const outTokens =
+        usage && typeof usage.completion_tokens === 'number'
+          ? usage.completion_tokens
+          : usage && typeof usage.output_tokens === 'number'
+            ? usage.output_tokens
+            : null;
       const totalTokens = usage && typeof usage.total_tokens === 'number' ? usage.total_tokens : null;
 
       const toolCallsRaw = result ? result.tool_calls : null;
@@ -508,7 +560,19 @@ export function RunFlowModal({
       const content = typeof contentRaw === 'string' ? contentRaw.trim() : '';
       const preview = content ? (content.length <= 140 ? content : content.slice(0, 140) + '…') : '';
 
-      const meta = [provider && model ? `${provider}/${model}` : provider || model, totalTokens != null ? `${totalTokens} tk` : null, toolCalls != null ? `${toolCalls} tool_calls` : null]
+      const tps =
+        typeof outTokens === 'number' && outTokens > 0 && typeof durationMs === 'number' && durationMs > 0
+          ? outTokens / (durationMs / 1000)
+          : null;
+
+      const meta = [
+        provider && model ? `${provider}/${model}` : provider || model,
+        durationMs != null ? formatDuration(durationMs) : null,
+        inTokens != null || outTokens != null ? `${inTokens ?? 0}→${outTokens ?? 0} tk` : null,
+        tps != null ? `${tps.toFixed(tps < 10 ? 2 : 1)} tk/s` : null,
+        totalTokens != null ? `${totalTokens} total` : null,
+        toolCalls != null ? `${toolCalls} tool_calls` : null,
+      ]
         .filter(Boolean)
         .join(' · ');
       return { title: 'LLM_CALL', meta, preview };
@@ -546,6 +610,7 @@ export function RunFlowModal({
       }
 
       const meta = [
+        durationMs != null ? formatDuration(durationMs) : null,
         uniqueNames.length ? uniqueNames.join(', ') : null,
         results.length ? `${okCount} ok${failCount ? ` · ${failCount} failed` : ''}` : null,
       ]
@@ -590,6 +655,19 @@ export function RunFlowModal({
                 <div className="run-steps-subtitle">
                   {isRunning ? <span className="run-spinner" aria-label="running" /> : null}
                   {runStatusLabel}
+                  {flowSummary ? (
+                    <span className="run-metrics-inline">
+                      {formatDuration(flowSummary.duration_ms) ? (
+                        <span className="run-metric-badge metric-duration">{formatDuration(flowSummary.duration_ms)}</span>
+                      ) : null}
+                      {formatTokenBadge(flowSummary) ? (
+                        <span className="run-metric-badge metric-tokens">{formatTokenBadge(flowSummary)}</span>
+                      ) : null}
+                      {formatTpsBadge(flowSummary) ? (
+                        <span className="run-metric-badge metric-throughput">{formatTpsBadge(flowSummary)}</span>
+                      ) : null}
+                    </span>
+                  ) : null}
                 </div>
               </div>
 
@@ -627,6 +705,19 @@ export function RunFlowModal({
                               {s.nodeType || 'node'}
                             </span>
                             {s.nodeId ? <span className="run-step-id">{s.nodeId}</span> : null}
+                            {s.status === 'completed' && s.metrics ? (
+                              <span className="run-step-metrics">
+                                {s.metrics.duration_ms != null ? (
+                                  <span className="run-metric-badge metric-duration">{formatDuration(s.metrics.duration_ms)}</span>
+                                ) : null}
+                                {formatTokenBadge(s.metrics) ? (
+                                  <span className="run-metric-badge metric-tokens">{formatTokenBadge(s.metrics)}</span>
+                                ) : null}
+                                {formatTpsBadge(s.metrics) ? (
+                                  <span className="run-metric-badge metric-throughput">{formatTpsBadge(s.metrics)}</span>
+                                ) : null}
+                              </span>
+                            ) : null}
                             <span className={`run-step-status ${s.status}`}>
                               {s.status === 'running' ? <span className="run-spinner" aria-label="running" /> : null}
                               {statusLabel}
@@ -727,6 +818,26 @@ export function RunFlowModal({
                     <div className="run-details-error">{selectedStep.error}</div>
                   ) : selectedStep.output != null ? (
                     <>
+                      {selectedStep.metrics ? (
+                        <div className="run-details-metrics">
+                          <div className="run-details-metrics-row">
+                            <span className="run-details-metrics-label">Duration</span>
+                            <span className="run-details-metrics-value">{formatDuration(selectedStep.metrics.duration_ms)}</span>
+                          </div>
+                          {(typeof selectedStep.metrics.input_tokens === 'number' || typeof selectedStep.metrics.output_tokens === 'number') ? (
+                            <div className="run-details-metrics-row">
+                              <span className="run-details-metrics-label">Tokens</span>
+                              <span className="run-details-metrics-value">{formatTokenBadge(selectedStep.metrics)}</span>
+                            </div>
+                          ) : null}
+                          {formatTpsBadge(selectedStep.metrics) ? (
+                            <div className="run-details-metrics-row">
+                              <span className="run-details-metrics-label">Throughput</span>
+                              <span className="run-details-metrics-value">{formatTpsBadge(selectedStep.metrics)}</span>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
                       <div className="run-details-actions">
                         <button type="button" className="modal-button" onClick={() => copyToClipboard(outputPreview?.cleaned ?? selectedStep.output)}>
                           Copy raw

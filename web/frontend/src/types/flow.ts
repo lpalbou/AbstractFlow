@@ -160,12 +160,20 @@ export interface ExecutionEvent {
   nodeId?: string;
   result?: unknown;
   error?: string;
+  meta?: ExecutionMetrics;
   // Waiting payload (for ASK_USER / WAIT_EVENT / subworkflow bubbling)
   prompt?: string;
   choices?: string[];
   allow_free_text?: boolean;
   wait_key?: string;
   reason?: string;
+}
+
+export interface ExecutionMetrics {
+  duration_ms?: number;
+  input_tokens?: number;
+  output_tokens?: number;
+  tokens_per_s?: number;
 }
 
 // Flow run result

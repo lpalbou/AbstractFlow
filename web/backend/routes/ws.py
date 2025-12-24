@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from typing import Any, Dict, Optional, Tuple
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -289,6 +290,101 @@ async def _execute_runner_loop(
     # events for multi-tick nodes (e.g., Agent nodes that self-loop across phases).
     active_node_id: Optional[str] = None
 
+    # Best-effort aggregate metrics (active time + token usage).
+    total_duration_ms: float = 0.0
+    total_input_tokens: int = 0
+    total_output_tokens: int = 0
+    token_duration_ms: float = 0.0
+
+    def _extract_usage_tokens(usage_raw: Any) -> Tuple[Optional[int], Optional[int]]:
+        """Return (input_tokens, output_tokens) from a usage object (best-effort)."""
+        if not isinstance(usage_raw, dict):
+            return (None, None)
+        usage = usage_raw
+
+        def _as_int(v: Any) -> Optional[int]:
+            try:
+                n = int(v)
+                return n if n >= 0 else None
+            except Exception:
+                return None
+
+        input_tokens = _as_int(usage.get("prompt_tokens"))
+        if input_tokens is None:
+            input_tokens = _as_int(usage.get("input_tokens"))
+
+        output_tokens = _as_int(usage.get("completion_tokens"))
+        if output_tokens is None:
+            output_tokens = _as_int(usage.get("output_tokens"))
+
+        return (input_tokens, output_tokens)
+
+    def _node_metrics(node_id: str, *, duration_ms: float) -> Dict[str, Any]:
+        """Compute per-node metrics for UI badges (best-effort, JSON-safe)."""
+        metrics: Dict[str, Any] = {"duration_ms": round(float(duration_ms), 2)}
+
+        effect_type = _node_effect_type(node_id)
+        if not effect_type:
+            return metrics
+
+        # Pull raw (non-preview) output so we can parse usage tokens.
+        raw_out: Any = None
+        if hasattr(runner, "flow") and hasattr(runner.flow, "_node_outputs"):
+            outputs = getattr(runner.flow, "_node_outputs")
+            if isinstance(outputs, dict):
+                raw_out = outputs.get(node_id)
+
+        input_tokens: Optional[int] = None
+        output_tokens: Optional[int] = None
+
+        if effect_type == "llm_call":
+            if isinstance(raw_out, dict):
+                raw_llm = raw_out.get("raw")
+                if isinstance(raw_llm, dict):
+                    usage = raw_llm.get("usage")
+                else:
+                    usage = raw_out.get("usage")
+                input_tokens, output_tokens = _extract_usage_tokens(usage)
+
+        elif effect_type == "agent":
+            # Agent node: aggregate usage across its runtime-owned scratchpad steps.
+            if isinstance(raw_out, dict):
+                scratchpad = raw_out.get("scratchpad")
+                steps = scratchpad.get("steps") if isinstance(scratchpad, dict) else None
+                if isinstance(steps, list):
+                    in_sum = 0
+                    out_sum = 0
+                    has_any = False
+                    for s in steps:
+                        if not isinstance(s, dict):
+                            continue
+                        effect = s.get("effect")
+                        if not isinstance(effect, dict):
+                            continue
+                        if effect.get("type") != "llm_call":
+                            continue
+                        result = s.get("result")
+                        usage = result.get("usage") if isinstance(result, dict) else None
+                        i, o = _extract_usage_tokens(usage if isinstance(usage, dict) else None)
+                        if i is not None:
+                            in_sum += i
+                            has_any = True
+                        if o is not None:
+                            out_sum += o
+                            has_any = True
+                    if has_any:
+                        input_tokens = in_sum
+                        output_tokens = out_sum
+
+        if input_tokens is not None:
+            metrics["input_tokens"] = int(input_tokens)
+        if output_tokens is not None:
+            metrics["output_tokens"] = int(output_tokens)
+        if output_tokens is not None and duration_ms > 0:
+            metrics["tokens_per_s"] = round(float(output_tokens) / (float(duration_ms) / 1000.0), 2)
+
+        return metrics
+
     while True:
         # Capture node BEFORE stepping so events refer to the node being executed.
         before = runner.get_state()
@@ -311,7 +407,22 @@ async def _execute_runner_loop(
         # IMPORTANT: FlowRunner.step() can block for a long time when running a
         # subworkflow synchronously (e.g., Agent nodes that execute LLM calls and tools).
         # Run it in a thread so the event loop can keep the websocket responsive.
+        t0 = time.perf_counter()
         state = await asyncio.to_thread(runner.step)
+        duration_ms = (time.perf_counter() - t0) * 1000.0
+
+        # IMPORTANT: Sync effect outcomes into `flow._node_outputs` immediately after the tick.
+        #
+        # Without this, effect nodes (notably LLM_CALL) will still show the pre-effect
+        # placeholder output (e.g. `{"response": null, "_pending_effect": ...}`) at the moment
+        # we emit `node_complete`, which also prevents token/usage extraction for metrics.
+        try:
+            from abstractflow.compiler import _sync_effect_results_to_node_outputs as _sync_effect_results  # type: ignore
+
+            if hasattr(runner, "flow"):
+                _sync_effect_results(state, runner.flow)
+        except Exception:
+            pass
 
         # Check if waiting
         if runner.is_waiting():
@@ -347,11 +458,27 @@ async def _execute_runner_loop(
                     should_close = False
 
             if should_close:
+                meta = _node_metrics(active_node_id, duration_ms=duration_ms)
+                try:
+                    total_duration_ms += float(duration_ms)
+                except Exception:
+                    pass
+                try:
+                    if isinstance(meta.get("input_tokens"), int):
+                        total_input_tokens += int(meta.get("input_tokens") or 0)
+                    if isinstance(meta.get("output_tokens"), int):
+                        total_output_tokens += int(meta.get("output_tokens") or 0)
+                        if duration_ms > 0:
+                            token_duration_ms += float(duration_ms)
+                except Exception:
+                    pass
+
                 await websocket.send_json(
                     ExecutionEvent(
                         type="node_complete",
                         nodeId=active_node_id,
                         result=_node_output(active_node_id),
+                        meta=meta,
                     ).model_dump()
                 )
                 active_node_id = None
@@ -362,10 +489,20 @@ async def _execute_runner_loop(
             if connection_id in _waiting_runners:
                 del _waiting_runners[connection_id]
 
+            summary: Dict[str, Any] = {
+                "duration_ms": round(float(total_duration_ms), 2),
+                "input_tokens": int(total_input_tokens),
+                "output_tokens": int(total_output_tokens),
+            }
+            # Throughput is meaningful only over steps that actually produced tokens.
+            if total_output_tokens > 0 and token_duration_ms > 0:
+                summary["tokens_per_s"] = round(float(total_output_tokens) / (float(token_duration_ms) / 1000.0), 2)
+
             await websocket.send_json(
                 ExecutionEvent(
                     type="flow_complete",
                     result=state.output,
+                    meta=summary,
                 ).model_dump()
             )
             break

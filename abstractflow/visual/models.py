@@ -190,6 +190,18 @@ class FlowRunResult(BaseModel):
     allow_free_text: Optional[bool] = None
 
 
+class ExecutionMetrics(BaseModel):
+    """Optional per-step (or whole-run) execution metrics.
+
+    These fields are best-effort and may be omitted depending on host/runtime capabilities.
+    """
+
+    duration_ms: Optional[float] = None
+    input_tokens: Optional[int] = None
+    output_tokens: Optional[int] = None
+    tokens_per_s: Optional[float] = None
+
+
 class ExecutionEvent(BaseModel):
     """Real-time execution event for WebSocket."""
 
@@ -197,3 +209,4 @@ class ExecutionEvent(BaseModel):
     nodeId: Optional[str] = None
     result: Optional[Any] = None
     error: Optional[str] = None
+    meta: Optional[ExecutionMetrics] = None

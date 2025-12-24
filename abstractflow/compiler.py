@@ -622,6 +622,11 @@ def _sync_effect_results_to_node_outputs(run: Any, flow: Flow) -> None:
         if not isinstance(current, dict):
             current = {}
             node_outputs[node_id] = current
+        else:
+            # If this node previously produced a pre-effect placeholder from the
+            # visual executor (e.g. `_pending_effect`), remove it now that we have
+            # the durable effect outcome in `run.vars["_temp"]["effects"]`.
+            current.pop("_pending_effect", None)
 
         mapped_value: Any = None
 
