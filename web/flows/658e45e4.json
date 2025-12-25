@@ -92,8 +92,8 @@
       "id": "node-5",
       "type": "provider_models",
       "position": {
-        "x": -208.0,
-        "y": 160.0
+        "x": -80.0,
+        "y": -208.0
       },
       "data": {
         "nodeType": "provider_models",
@@ -143,8 +143,8 @@
       "id": "node-6",
       "type": "answer_user",
       "position": {
-        "x": 528.0,
-        "y": -32.0
+        "x": 832.0,
+        "y": 32.0
       },
       "data": {
         "nodeType": "answer_user",
@@ -338,14 +338,6 @@
       "animated": false
     },
     {
-      "id": "edge-1766635148493",
-      "source": "node-4",
-      "sourceHandle": "loop",
-      "target": "node-6",
-      "targetHandle": "exec-in",
-      "animated": true
-    },
-    {
       "id": "edge-1766635154221",
       "source": "node-4",
       "sourceHandle": "item",
@@ -362,14 +354,6 @@
       "animated": false
     },
     {
-      "id": "edge-1766635359465",
-      "source": "node-4",
-      "sourceHandle": "done",
-      "target": "node-9",
-      "targetHandle": "exec-in",
-      "animated": true
-    },
-    {
       "id": "edge-1766635362548",
       "source": "node-9",
       "sourceHandle": "exec-out",
@@ -384,9 +368,25 @@
       "target": "node-9",
       "targetHandle": "duration",
       "animated": false
+    },
+    {
+      "id": "edge-1766636177602",
+      "source": "node-4",
+      "sourceHandle": "done",
+      "target": "node-9",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1766637527386",
+      "source": "node-4",
+      "sourceHandle": "loop",
+      "target": "node-6",
+      "targetHandle": "exec-in",
+      "animated": true
     }
   ],
   "entryNode": "node-1",
   "created_at": "2025-12-25T03:57:29.415090",
-  "updated_at": "2025-12-25T04:03:49.011042"
+  "updated_at": "2025-12-25T04:39:00.497706"
 }

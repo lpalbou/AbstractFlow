@@ -289,6 +289,8 @@ async def _execute_runner_loop(
     # Track the currently "open" node step so we don't emit misleading `node_complete`
     # events for multi-tick nodes (e.g., Agent nodes that self-loop across phases).
     active_node_id: Optional[str] = None
+    wait_until_started_at: Optional[float] = None
+    wait_until_node_id: Optional[str] = None
 
     # Best-effort aggregate metrics (active time + token usage).
     total_duration_ms: float = 0.0
@@ -390,6 +392,73 @@ async def _execute_runner_loop(
         before = runner.get_state()
         node_before = before.current_node if before else None
 
+        # Special-case WAIT_UNTIL (Delay node): it's time-based and should not emit
+        # a user prompt. Also, when the delay expires we want the *next node* to
+        # appear in the timeline; therefore we resume the run without executing
+        # any nodes in the same tick.
+        wait0 = getattr(before, "waiting", None) if before is not None else None
+        # We avoid importing RunStatus here; string compare is stable enough and keeps this module decoupled.
+        if before is not None and str(getattr(before, "status", None)) == "RunStatus.WAITING":
+            reason0 = getattr(wait0, "reason", None) if wait0 is not None else None
+            reason_value0 = (
+                reason0.value if hasattr(reason0, "value") else str(reason0) if reason0 else None
+            )
+            if reason_value0 == "until":
+                if wait_until_started_at is None or wait_until_node_id != node_before:
+                    wait_until_started_at = time.perf_counter()
+                    wait_until_node_id = node_before
+
+                until_raw = getattr(wait0, "until", None) if wait0 is not None else None
+                remaining_s = 0.2
+                try:
+                    from datetime import datetime, timezone
+
+                    until = datetime.fromisoformat(str(until_raw))
+                    now = datetime.now(timezone.utc)
+                    remaining_s = (until - now).total_seconds()
+                except Exception:
+                    remaining_s = 0.2
+
+                if remaining_s > 0:
+                    await asyncio.sleep(float(min(max(remaining_s, 0.05), 0.25)))
+                    continue
+
+                # Time elapsed: resume to the next node, but do not execute it yet.
+                await asyncio.to_thread(runner.resume, payload={}, max_steps=0)
+                after_resume = runner.get_state()
+                try:
+                    from abstractflow.compiler import _sync_effect_results_to_node_outputs as _sync_effect_results  # type: ignore
+
+                    if hasattr(runner, "flow"):
+                        _sync_effect_results(after_resume, runner.flow)
+                except Exception:
+                    pass
+
+                # Close the Delay node step now (the wait is finished).
+                if active_node_id:
+                    waited_ms = 0.0
+                    if wait_until_started_at is not None:
+                        waited_ms = (time.perf_counter() - wait_until_started_at) * 1000.0
+                    meta = _node_metrics(active_node_id, duration_ms=waited_ms)
+                    try:
+                        total_duration_ms += float(waited_ms)
+                    except Exception:
+                        pass
+
+                    await websocket.send_json(
+                        ExecutionEvent(
+                            type="node_complete",
+                            nodeId=active_node_id,
+                            result=_node_output(active_node_id),
+                            meta=meta,
+                        ).model_dump()
+                    )
+                    active_node_id = None
+
+                wait_until_started_at = None
+                wait_until_node_id = None
+                continue
+
         # Emit node_start only when we enter a new node (keeps a single running
         # timeline entry for nodes that require multiple runtime ticks).
         if node_before and node_before != active_node_id:
@@ -431,21 +500,11 @@ async def _execute_runner_loop(
             reason_value = reason.value if hasattr(reason, "value") else str(reason) if reason else None
 
             # WAIT_UNTIL (Delay node) is time-based and should not require user input.
-            # Keep the websocket loop running; sleep until the target time then continue ticking.
+            # Keep the websocket loop running; we handle sleeping/resume at the top of the loop.
             if reason_value == "until":
-                until_raw = getattr(wait, "until", None) if wait is not None else None
-                try:
-                    from datetime import datetime, timezone
-
-                    until = datetime.fromisoformat(str(until_raw))
-                    now = datetime.now(timezone.utc)
-                    remaining_s = (until - now).total_seconds()
-                    # Poll at a small cadence to keep the UI responsive without spamming events.
-                    sleep_s = min(max(remaining_s, 0.05), 0.25)
-                except Exception:
-                    sleep_s = 0.2
-
-                await asyncio.sleep(float(sleep_s))
+                if wait_until_started_at is None or wait_until_node_id != active_node_id:
+                    wait_until_started_at = time.perf_counter()
+                    wait_until_node_id = active_node_id
                 continue
 
             # All other waiting reasons require an external resume signal.
