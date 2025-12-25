@@ -77,8 +77,9 @@
 
 /* Execution handle - invisible, overlays the shape for connection */
 .exec-handle {
-  width: 16px !important;
-  height: 16px !important;
+  /* Make the handle hit-area generous so starting an edge is easy */
+  width: 28px !important;
+  height: 28px !important;
   background: transparent !important;
   border: none !important;
   opacity: 0 !important;
@@ -87,11 +88,11 @@
 }
 
 .exec-pin-in .exec-handle {
-  left: -8px;
+  left: 0;
 }
 
 .exec-pin-out .exec-handle {
-  right: -8px;
+  right: 0;
 }
 
 /* Execution branches in body (for If/Else True/False) */
@@ -111,7 +112,7 @@
 }
 
 .exec-branch .exec-handle {
-  right: -12px;
+  right: 0;
   top: 50%;
   transform: translateY(-50%);
 }

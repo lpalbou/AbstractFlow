@@ -186,7 +186,7 @@ export const BaseNode = memo(function BaseNode({
       >
         {/* Execution input pin (left side of header) */}
         {inputExec && (
-          <div className="exec-pin exec-pin-in">
+          <div className="exec-pin exec-pin-in nodrag">
             <Handle
               type="target"
               position={Position.Left}
@@ -216,7 +216,7 @@ export const BaseNode = memo(function BaseNode({
 
         {/* Execution output pins (right side of header) */}
         {outputExecs.length === 1 && (
-          <div className="exec-pin exec-pin-out">
+          <div className="exec-pin exec-pin-out nodrag">
             <span
               className="exec-shape"
               style={{ color: PIN_COLORS.execution }}
@@ -257,7 +257,7 @@ export const BaseNode = memo(function BaseNode({
                 return (
                   <>
                     {thenPins.map((pin) => (
-                      <div key={pin.id} className="pin-row output exec-branch">
+                      <div key={pin.id} className="pin-row output exec-branch nodrag">
                         <span className="pin-label">{pin.label}</span>
                         <span
                           className="pin-shape"
@@ -286,7 +286,7 @@ export const BaseNode = memo(function BaseNode({
                     </div>
 
                     {completed ? (
-                      <div key={completed.id} className="pin-row output exec-branch exec-completed">
+                      <div key={completed.id} className="pin-row output exec-branch exec-completed nodrag">
                         <span className="pin-label">{completed.label}</span>
                         <span
                           className="pin-shape"
@@ -314,7 +314,7 @@ export const BaseNode = memo(function BaseNode({
 
               // Default: render all execution outputs in order.
               return outputExecs.map((pin) => (
-                <div key={pin.id} className="pin-row output exec-branch">
+                <div key={pin.id} className="pin-row output exec-branch nodrag">
                   <span className="pin-label">{pin.label}</span>
                   <span
                     className="pin-shape"
