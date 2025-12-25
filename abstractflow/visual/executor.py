@@ -114,39 +114,150 @@ def create_visual_runner(visual_flow: VisualFlow, *, flows: Dict[str, VisualFlow
             if t in {"memory_note", "memory_query"}:
                 needs_artifacts = True
 
-    # Validate LLM config across the flow tree and choose a default runtime model.
+    # Detect whether this flow tree needs AbstractCore LLM integration.
+    # Provider/model can be supplied either via node config *or* via connected input pins.
+    has_llm_nodes = False
     llm_configs: set[tuple[str, str]] = set()
     default_llm: tuple[str, str] | None = None
+    provider_hints: list[str] = []
+
+    def _pin_connected(vf: VisualFlow, *, node_id: str, pin_id: str) -> bool:
+        for e in vf.edges:
+            try:
+                if e.target == node_id and e.targetHandle == pin_id:
+                    return True
+            except Exception:
+                continue
+        return False
+
+    def _add_pair(provider_raw: Any, model_raw: Any) -> None:
+        nonlocal default_llm
+        if not isinstance(provider_raw, str) or not provider_raw.strip():
+            return
+        if not isinstance(model_raw, str) or not model_raw.strip():
+            return
+        pair = (provider_raw.strip().lower(), model_raw.strip())
+        llm_configs.add(pair)
+        if default_llm is None:
+            default_llm = pair
+
     for vf in ordered:
         for n in vf.nodes:
             node_type = _node_type(n)
-            if node_type not in {"llm_call", "agent"}:
-                continue
+            if node_type in {"llm_call", "agent"}:
+                has_llm_nodes = True
 
             if node_type == "llm_call":
-                cfg = n.data.get("effectConfig", {})
+                cfg = n.data.get("effectConfig", {}) if isinstance(n.data, dict) else {}
+                cfg = cfg if isinstance(cfg, dict) else {}
                 provider = cfg.get("provider")
                 model = cfg.get("model")
-                if not isinstance(provider, str) or not provider.strip():
-                    raise ValueError(f"LLM_CALL node '{n.id}' in flow '{vf.id}' missing provider")
-                if not isinstance(model, str) or not model.strip():
-                    raise ValueError(f"LLM_CALL node '{n.id}' in flow '{vf.id}' missing model")
-            else:
-                cfg = n.data.get("agentConfig", {})
+
+                provider_ok = isinstance(provider, str) and provider.strip()
+                model_ok = isinstance(model, str) and model.strip()
+                provider_connected = _pin_connected(vf, node_id=n.id, pin_id="provider")
+                model_connected = _pin_connected(vf, node_id=n.id, pin_id="model")
+
+                if not provider_ok and not provider_connected:
+                    raise ValueError(
+                        f"LLM_CALL node '{n.id}' in flow '{vf.id}' missing provider "
+                        "(set effectConfig.provider or connect the provider input pin)"
+                    )
+                if not model_ok and not model_connected:
+                    raise ValueError(
+                        f"LLM_CALL node '{n.id}' in flow '{vf.id}' missing model "
+                        "(set effectConfig.model or connect the model input pin)"
+                    )
+                _add_pair(provider, model)
+
+            elif node_type == "agent":
+                cfg = n.data.get("agentConfig", {}) if isinstance(n.data, dict) else {}
+                cfg = cfg if isinstance(cfg, dict) else {}
                 provider = cfg.get("provider")
                 model = cfg.get("model")
-                if not isinstance(provider, str) or not provider.strip():
-                    continue
-                if not isinstance(model, str) or not model.strip():
-                    continue
 
-            pair = (provider.strip().lower(), model.strip())
-            llm_configs.add(pair)
-            if default_llm is None:
-                default_llm = pair
+                provider_ok = isinstance(provider, str) and provider.strip()
+                model_ok = isinstance(model, str) and model.strip()
+                provider_connected = _pin_connected(vf, node_id=n.id, pin_id="provider")
+                model_connected = _pin_connected(vf, node_id=n.id, pin_id="model")
 
-    if llm_configs:
-        provider, model = default_llm or next(iter(llm_configs))
+                if not provider_ok and not provider_connected:
+                    raise ValueError(
+                        f"Agent node '{n.id}' in flow '{vf.id}' missing provider "
+                        "(set agentConfig.provider or connect the provider input pin)"
+                    )
+                if not model_ok and not model_connected:
+                    raise ValueError(
+                        f"Agent node '{n.id}' in flow '{vf.id}' missing model "
+                        "(set agentConfig.model or connect the model input pin)"
+                    )
+                _add_pair(provider, model)
+
+            elif node_type == "provider_models":
+                cfg = n.data.get("providerModelsConfig", {}) if isinstance(n.data, dict) else {}
+                cfg = cfg if isinstance(cfg, dict) else {}
+                provider = cfg.get("provider")
+                if isinstance(provider, str) and provider.strip():
+                    provider_hints.append(provider.strip().lower())
+                    allowed = cfg.get("allowedModels")
+                    if not isinstance(allowed, list):
+                        allowed = cfg.get("allowed_models")
+                    if isinstance(allowed, list):
+                        for m in allowed:
+                            _add_pair(provider, m)
+
+    if has_llm_nodes:
+        provider_model = default_llm
+        if provider_model is None and provider_hints:
+            # If the graph contains a provider selection node, prefer it for the runtime default.
+            try:
+                from abstractcore.providers.registry import get_available_models_for_provider
+            except Exception:
+                get_available_models_for_provider = None  # type: ignore[assignment]
+            if callable(get_available_models_for_provider):
+                for p in provider_hints:
+                    try:
+                        models = get_available_models_for_provider(p)
+                    except Exception:
+                        models = []
+                    if isinstance(models, list):
+                        first = next((m for m in models if isinstance(m, str) and m.strip()), None)
+                        if first:
+                            provider_model = (p, first.strip())
+                            break
+
+        if provider_model is None:
+            # Fall back to the first available provider/model from AbstractCore.
+            try:
+                from abstractcore.providers.registry import get_all_providers_with_models
+
+                providers_meta = get_all_providers_with_models(include_models=True)
+                for p in providers_meta:
+                    if not isinstance(p, dict):
+                        continue
+                    if p.get("status") != "available":
+                        continue
+                    name = p.get("name")
+                    models = p.get("models")
+                    if not isinstance(name, str) or not name.strip():
+                        continue
+                    if not isinstance(models, list):
+                        continue
+                    first = next((m for m in models if isinstance(m, str) and m.strip()), None)
+                    if first:
+                        provider_model = (name.strip().lower(), first.strip())
+                        break
+            except Exception:
+                provider_model = None
+
+        if provider_model is None:
+            raise RuntimeError(
+                "This flow uses LLM nodes (llm_call/agent), but no provider/model could be determined. "
+                "Either set provider/model on a node, connect provider+model pins, or ensure AbstractCore "
+                "has at least one available provider with models."
+            )
+
+        provider, model = provider_model
         try:
             from abstractruntime.integrations.abstractcore.factory import create_local_runtime
             # Older/newer AbstractRuntime distributions expose tool executors differently.

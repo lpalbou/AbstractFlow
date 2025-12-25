@@ -646,6 +646,8 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   }
 
   const { data } = node;
+  const providerPinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'provider');
+  const modelPinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'model');
 
   const updateAgentConfig = (patch: Partial<NonNullable<FlowNodeData['agentConfig']>>) => {
     updateNodeData(node.id, {
@@ -1144,39 +1146,47 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           <label className="property-label">Agent Configuration</label>
           <div className="property-group">
             <label className="property-sublabel">Provider</label>
-            <select
-              className="property-select"
-              value={data.agentConfig?.provider || ''}
-              onChange={handleProviderChange}
-              disabled={loadingProviders}
-            >
-              <option value="">
-                {loadingProviders ? 'Loading...' : 'Select provider...'}
-              </option>
-              {providers.map((p) => (
-                <option key={p.name} value={p.name}>
-                  {p.display_name}
+            {providerPinConnected ? (
+              <span className="property-hint">Provided by connected pin.</span>
+            ) : (
+              <select
+                className="property-select"
+                value={data.agentConfig?.provider || ''}
+                onChange={handleProviderChange}
+                disabled={loadingProviders}
+              >
+                <option value="">
+                  {loadingProviders ? 'Loading...' : 'Select provider...'}
                 </option>
-              ))}
-            </select>
+                {providers.map((p) => (
+                  <option key={p.name} value={p.name}>
+                    {p.display_name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
           <div className="property-group">
             <label className="property-sublabel">Model</label>
-            <select
-              className="property-select"
-              value={data.agentConfig?.model || ''}
-              onChange={handleModelChange}
-              disabled={!data.agentConfig?.provider || loadingModels}
-            >
-              <option value="">
-                {loadingModels ? 'Loading...' : 'Select model...'}
-              </option>
-              {models.map((m) => (
-                <option key={m} value={m}>
-                  {m}
+            {modelPinConnected ? (
+              <span className="property-hint">Provided by connected pin.</span>
+            ) : (
+              <select
+                className="property-select"
+                value={data.agentConfig?.model || ''}
+                onChange={handleModelChange}
+                disabled={!data.agentConfig?.provider || loadingModels}
+              >
+                <option value="">
+                  {loadingModels ? 'Loading...' : 'Select model...'}
                 </option>
-              ))}
-            </select>
+                {models.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           <div className="property-group">
@@ -2460,54 +2470,62 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           <label className="property-label">LLM Configuration</label>
           <div className="property-group">
             <label className="property-sublabel">Provider</label>
-            <select
-              className="property-select"
-              value={data.effectConfig?.provider || ''}
-              onChange={(e) =>
-                updateNodeData(node.id, {
-                  effectConfig: {
-                    ...data.effectConfig,
-                    provider: e.target.value || undefined,
-                    model: undefined, // Reset model when provider changes
-                  },
-                })
-              }
-              disabled={loadingProviders}
-            >
-              <option value="">
-                {loadingProviders ? 'Loading...' : 'Select provider...'}
-              </option>
-              {providers.map((p) => (
-                <option key={p.name} value={p.name}>
-                  {p.display_name}
+            {providerPinConnected ? (
+              <span className="property-hint">Provided by connected pin.</span>
+            ) : (
+              <select
+                className="property-select"
+                value={data.effectConfig?.provider || ''}
+                onChange={(e) =>
+                  updateNodeData(node.id, {
+                    effectConfig: {
+                      ...data.effectConfig,
+                      provider: e.target.value || undefined,
+                      model: undefined, // Reset model when provider changes
+                    },
+                  })
+                }
+                disabled={loadingProviders}
+              >
+                <option value="">
+                  {loadingProviders ? 'Loading...' : 'Select provider...'}
                 </option>
-              ))}
-            </select>
+                {providers.map((p) => (
+                  <option key={p.name} value={p.name}>
+                    {p.display_name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
           <div className="property-group">
             <label className="property-sublabel">Model</label>
-            <select
-              className="property-select"
-              value={data.effectConfig?.model || ''}
-              onChange={(e) =>
-                updateNodeData(node.id, {
-                  effectConfig: {
-                    ...data.effectConfig,
-                    model: e.target.value || undefined,
-                  },
-                })
-              }
-              disabled={!data.effectConfig?.provider || loadingModels}
-            >
-              <option value="">
-                {loadingModels ? 'Loading...' : 'Select model...'}
-              </option>
-              {models.map((m) => (
-                <option key={m} value={m}>
-                  {m}
+            {modelPinConnected ? (
+              <span className="property-hint">Provided by connected pin.</span>
+            ) : (
+              <select
+                className="property-select"
+                value={data.effectConfig?.model || ''}
+                onChange={(e) =>
+                  updateNodeData(node.id, {
+                    effectConfig: {
+                      ...data.effectConfig,
+                      model: e.target.value || undefined,
+                    },
+                  })
+                }
+                disabled={!data.effectConfig?.provider || loadingModels}
+              >
+                <option value="">
+                  {loadingModels ? 'Loading...' : 'Select model...'}
                 </option>
-              ))}
-            </select>
+                {models.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
           <div className="property-group">
             <label className="property-sublabel">Temperature</label>

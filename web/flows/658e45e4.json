@@ -143,8 +143,8 @@
       "id": "node-6",
       "type": "answer_user",
       "position": {
-        "x": 832.0,
-        "y": 32.0
+        "x": 800.0,
+        "y": -192.0
       },
       "data": {
         "nodeType": "answer_user",
@@ -318,6 +318,64 @@
       "headerColor": null,
       "inputs": [],
       "outputs": []
+    },
+    {
+      "id": "node-11",
+      "type": "llm_call",
+      "position": {
+        "x": 512.0,
+        "y": -192.0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "LLM Call",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "string"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
     }
   ],
   "edges": [
@@ -335,14 +393,6 @@
       "sourceHandle": "models",
       "target": "node-4",
       "targetHandle": "items",
-      "animated": false
-    },
-    {
-      "id": "edge-1766635154221",
-      "source": "node-4",
-      "sourceHandle": "item",
-      "target": "node-6",
-      "targetHandle": "message",
       "animated": false
     },
     {
@@ -378,9 +428,49 @@
       "animated": true
     },
     {
-      "id": "edge-1766637527386",
+      "id": "edge-1766641815193",
       "source": "node-4",
       "sourceHandle": "loop",
+      "target": "node-11",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1766641820950",
+      "source": "node-5",
+      "sourceHandle": "provider",
+      "target": "node-11",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1766641824284",
+      "source": "node-4",
+      "sourceHandle": "item",
+      "target": "node-11",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-1766641828009",
+      "source": "node-1",
+      "sourceHandle": "query",
+      "target": "node-11",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "edge-1766641835110",
+      "source": "node-11",
+      "sourceHandle": "response",
+      "target": "node-6",
+      "targetHandle": "message",
+      "animated": false
+    },
+    {
+      "id": "edge-1766641839542",
+      "source": "node-11",
+      "sourceHandle": "exec-out",
       "target": "node-6",
       "targetHandle": "exec-in",
       "animated": true
@@ -388,5 +478,5 @@
   ],
   "entryNode": "node-1",
   "created_at": "2025-12-25T03:57:29.415090",
-  "updated_at": "2025-12-25T04:39:00.497706"
+  "updated_at": "2025-12-25T05:50:45.455848"
 }
