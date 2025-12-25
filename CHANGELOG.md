@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Notes
 - In this monorepo, `abstractflow` contains a working Flow compiler/runner and VisualFlow execution utilities. Packaging/docs alignment is tracked in `docs/backlog/planned/093-framework-packaging-alignment-flow-runtime.md`.
 
+### Fixed
+- VisualFlow execution now ignores unreachable/disconnected execution nodes (e.g. orphan `llm_call` / `subflow` nodes) so they cannot fail run initialization.
+
 ### Planned
 - Visual workflow editor with drag-and-drop interface
 - Real-time workflow execution and monitoring

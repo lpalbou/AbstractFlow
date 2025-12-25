@@ -70,6 +70,78 @@ def create_visual_runner(visual_flow: VisualFlow, *, flows: Dict[str, VisualFlow
         t = getattr(node, "type", None)
         return t.value if hasattr(t, "value") else str(t)
 
+    def _reachable_exec_node_ids(vf: VisualFlow) -> set[str]:
+        """Return execution-reachable node ids (within this VisualFlow only).
+
+        We consider only the *execution graph* (exec edges: targetHandle=exec-in).
+        Disconnected/isolated execution nodes are ignored (Blueprint-style).
+        """
+        EXEC_TYPES: set[str] = {
+            # Triggers / core exec
+            "on_flow_start",
+            "on_user_request",
+            "on_agent_message",
+            "on_schedule",
+            "on_flow_end",
+            "agent",
+            "function",
+            "code",
+            "subflow",
+            # Control exec
+            "if",
+            "switch",
+            "loop",
+            "while",
+            "sequence",
+            "parallel",
+            # Effects
+            "ask_user",
+            "answer_user",
+            "llm_call",
+            "wait_until",
+            "wait_event",
+            "memory_note",
+            "memory_query",
+        }
+
+        node_types: Dict[str, str] = {n.id: _node_type(n) for n in vf.nodes}
+        exec_ids = {nid for nid, t in node_types.items() if t in EXEC_TYPES}
+        if not exec_ids:
+            return set()
+
+        incoming_exec = {e.target for e in vf.edges if getattr(e, "targetHandle", None) == "exec-in"}
+
+        entry: Optional[str] = None
+        if isinstance(vf.entryNode, str) and vf.entryNode in exec_ids:
+            entry = vf.entryNode
+        if entry is None:
+            for n in vf.nodes:
+                if n.id in exec_ids and n.id not in incoming_exec:
+                    entry = n.id
+                    break
+        if entry is None:
+            entry = next(iter(exec_ids))
+
+        adj: Dict[str, list[str]] = {}
+        for e in vf.edges:
+            if getattr(e, "targetHandle", None) != "exec-in":
+                continue
+            if e.source not in exec_ids or e.target not in exec_ids:
+                continue
+            adj.setdefault(e.source, []).append(e.target)
+
+        reachable: set[str] = set()
+        stack2 = [entry]
+        while stack2:
+            cur = stack2.pop()
+            if cur in reachable:
+                continue
+            reachable.add(cur)
+            for nxt in adj.get(cur, []):
+                if nxt not in reachable:
+                    stack2.append(nxt)
+        return reachable
+
     # Collect all reachable flows (root + transitive subflows), with cycle detection.
     ordered: list[VisualFlow] = []
     visited: set[str] = set()
@@ -85,9 +157,12 @@ def create_visual_runner(visual_flow: VisualFlow, *, flows: Dict[str, VisualFlow
         ordered.append(vf)
         visited.add(vf.id)
 
+        reachable = _reachable_exec_node_ids(vf)
         for n in vf.nodes:
             node_type = _node_type(n)
             if node_type != "subflow":
+                continue
+            if reachable and n.id not in reachable:
                 continue
             subflow_id = n.data.get("subflowId") or n.data.get("flowId")  # legacy
             if not isinstance(subflow_id, str) or not subflow_id.strip():
@@ -107,7 +182,10 @@ def create_visual_runner(visual_flow: VisualFlow, *, flows: Dict[str, VisualFlow
     needs_registry = False
     needs_artifacts = False
     for vf in ordered:
+        reachable = _reachable_exec_node_ids(vf)
         for n in vf.nodes:
+            if reachable and n.id not in reachable:
+                continue
             t = _node_type(n)
             if t in {"subflow", "agent"}:
                 needs_registry = True
@@ -142,8 +220,11 @@ def create_visual_runner(visual_flow: VisualFlow, *, flows: Dict[str, VisualFlow
             default_llm = pair
 
     for vf in ordered:
+        reachable = _reachable_exec_node_ids(vf)
         for n in vf.nodes:
             node_type = _node_type(n)
+            if reachable and n.id not in reachable:
+                continue
             if node_type in {"llm_call", "agent"}:
                 has_llm_nodes = True
 
@@ -546,10 +627,57 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
             flow._node_outputs[node.id] = {"value": literal_value}  # type: ignore[attr-defined]
             literal_node_ids.add(node.id)
 
-    # Expose node-type metadata for advanced control nodes (e.g., WHILE re-evaluation).
-    # These are runtime-local and never persisted into RunState.vars.
-    flow._pure_node_ids = set(pure_base_handlers.keys())  # type: ignore[attr-defined]
-    flow._literal_node_ids = set(literal_node_ids)  # type: ignore[attr-defined]
+    # Compute execution reachability and ignore disconnected execution nodes.
+    #
+    # Visual editors often contain experimentation / orphan nodes. These should not
+    # prevent execution of the reachable pipeline.
+    exec_node_ids: set[str] = set()
+    for node in visual.nodes:
+        type_str = node.type.value if hasattr(node.type, "value") else str(node.type)
+        if type_str in LITERAL_NODE_TYPES:
+            continue
+        if _has_execution_pins(type_str, node.data):
+            exec_node_ids.add(node.id)
+
+    def _pick_entry() -> Optional[str]:
+        # Prefer explicit entryNode if it is an execution node.
+        if isinstance(getattr(visual, "entryNode", None), str) and visual.entryNode in exec_node_ids:
+            return visual.entryNode
+        # Otherwise, infer entry as a node with no incoming execution edges.
+        targets = {e.target for e in visual.edges if getattr(e, "targetHandle", None) == "exec-in"}
+        for node in visual.nodes:
+            if node.id in exec_node_ids and node.id not in targets:
+                return node.id
+        # Fallback: first exec node in document order
+        for node in visual.nodes:
+            if node.id in exec_node_ids:
+                return node.id
+        return None
+
+    entry_exec = _pick_entry()
+    reachable_exec: set[str] = set()
+    if entry_exec:
+        adj: Dict[str, list[str]] = {}
+        for e in visual.edges:
+            if getattr(e, "targetHandle", None) != "exec-in":
+                continue
+            if e.source not in exec_node_ids or e.target not in exec_node_ids:
+                continue
+            adj.setdefault(e.source, []).append(e.target)
+        stack = [entry_exec]
+        while stack:
+            cur = stack.pop()
+            if cur in reachable_exec:
+                continue
+            reachable_exec.add(cur)
+            for nxt in adj.get(cur, []):
+                if nxt not in reachable_exec:
+                    stack.append(nxt)
+
+    ignored_exec = sorted([nid for nid in exec_node_ids if nid not in reachable_exec])
+    if ignored_exec:
+        # Runtime-local metadata for hosts/UIs that want to show warnings.
+        flow._ignored_exec_nodes = ignored_exec  # type: ignore[attr-defined]
 
     def _decode_separator(value: str) -> str:
         return value.replace("\\n", "\n").replace("\\t", "\t").replace("\\r", "\r")
@@ -1288,6 +1416,10 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
 
         if not _has_execution_pins(type_str, node.data):
             pure_base_handlers[node.id] = base_handler
+            continue
+
+        # Ignore disconnected/unreachable execution nodes.
+        if reachable_exec and node.id not in reachable_exec:
             continue
 
         wrapped_handler = _create_data_aware_handler(
