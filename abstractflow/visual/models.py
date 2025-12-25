@@ -65,6 +65,7 @@ class NodeType(str, Enum):
     IF = "if"
     SWITCH = "switch"
     LOOP = "loop"
+    WHILE = "while"
     SEQUENCE = "sequence"
     PARALLEL = "parallel"
     COMPARE = "compare"
@@ -80,6 +81,9 @@ class NodeType(str, Enum):
     ARRAY_CONCAT = "array_concat"
     BREAK_OBJECT = "break_object"
     SYSTEM_DATETIME = "system_datetime"
+    MODEL_CATALOG = "model_catalog"
+    PROVIDER_CATALOG = "provider_catalog"
+    PROVIDER_MODELS = "provider_models"
     # Literals
     LITERAL_STRING = "literal_string"
     LITERAL_NUMBER = "literal_number"

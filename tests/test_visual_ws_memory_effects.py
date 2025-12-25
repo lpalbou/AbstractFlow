@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 
 from fastapi.testclient import TestClient
+import pytest
 
 from web.backend.main import app
 from web.backend.models import NodeType, Position, VisualEdge, VisualFlow, VisualNode
@@ -90,9 +91,16 @@ def test_ws_memory_note_and_query_work_with_in_memory_artifacts() -> None:
                 completed = None
                 for _ in range(400):
                     msg = ws.receive_json()
-                    if msg.get("type") == "flow_complete":
+                    t = msg.get("type")
+                    if t == "flow_complete":
                         completed = msg
                         break
+                    if t == "flow_error":
+                        pytest.fail(f"flow_error: {msg.get('error')}")
+                    if t == "flow_waiting":
+                        pytest.fail(
+                            f"flow_waiting: reason={msg.get('reason')} wait_key={msg.get('wait_key')} prompt={msg.get('prompt')}"
+                        )
 
                 assert completed is not None
                 assert completed["result"]["success"] is True

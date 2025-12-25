@@ -149,8 +149,20 @@ def create_visual_runner(visual_flow: VisualFlow, *, flows: Dict[str, VisualFlow
         provider, model = default_llm or next(iter(llm_configs))
         try:
             from abstractruntime.integrations.abstractcore.factory import create_local_runtime
-            from abstractruntime.integrations.abstractcore import MappingToolExecutor
-            from abstractruntime.integrations.abstractcore.default_tools import get_default_tools
+            # Older/newer AbstractRuntime distributions expose tool executors differently.
+            # Tool execution is not required for plain LLM_CALL-only flows, so we make
+            # this optional and fall back to the factory defaults.
+            try:
+                from abstractruntime.integrations.abstractcore import MappingToolExecutor  # type: ignore
+            except Exception:  # pragma: no cover
+                try:
+                    from abstractruntime.integrations.abstractcore.tool_executor import MappingToolExecutor  # type: ignore
+                except Exception:  # pragma: no cover
+                    MappingToolExecutor = None  # type: ignore[assignment]
+            try:
+                from abstractruntime.integrations.abstractcore.default_tools import get_default_tools  # type: ignore
+            except Exception:  # pragma: no cover
+                get_default_tools = None  # type: ignore[assignment]
         except Exception as e:  # pragma: no cover
             raise RuntimeError(
                 "This flow uses LLM nodes (llm_call/agent), but the installed AbstractRuntime "
@@ -158,10 +170,17 @@ def create_visual_runner(visual_flow: VisualFlow, *, flows: Dict[str, VisualFlow
                 "or remove LLM nodes from the flow."
             ) from e
 
+        tool_executor = None
+        if MappingToolExecutor is not None and callable(get_default_tools):
+            try:
+                tool_executor = MappingToolExecutor.from_tools(get_default_tools())  # type: ignore[attr-defined]
+            except Exception:
+                tool_executor = None
+
         runtime = create_local_runtime(
             provider=provider,
             model=model,
-            tool_executor=MappingToolExecutor.from_tools(get_default_tools()),
+            tool_executor=tool_executor,
         )
     else:
         runtime_kwargs: Dict[str, Any] = {
@@ -275,8 +294,12 @@ def create_visual_runner(visual_flow: VisualFlow, *, flows: Dict[str, VisualFlow
             for workflow_id, cfg in agent_nodes:
                 provider_raw = cfg.get("provider")
                 model_raw = cfg.get("model")
-                provider = str(provider_raw).strip().lower() if isinstance(provider_raw, str) else None
-                model = str(model_raw).strip() if isinstance(model_raw, str) else None
+                # NOTE: Provider/model are injected durably through the Agent node's
+                # START_SUBWORKFLOW vars (see compiler `_build_sub_vars`). We keep the
+                # registered workflow spec provider/model-agnostic so Agent pins can
+                # override without breaking persistence/resume.
+                provider = None
+                model = None
 
                 tools_selected = _normalize_tool_names(cfg.get("tools"))
                 logic = ReActLogic(tools=_tool_defs(tools_selected))
@@ -403,12 +426,19 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
         "memory_query",
     }
 
+    literal_node_ids: set[str] = set()
     # Pre-evaluate literal nodes and store their values
     for node in visual.nodes:
         type_str = node.type.value if hasattr(node.type, "value") else str(node.type)
         if type_str in LITERAL_NODE_TYPES:
             literal_value = node.data.get("literalValue")
             flow._node_outputs[node.id] = {"value": literal_value}  # type: ignore[attr-defined]
+            literal_node_ids.add(node.id)
+
+    # Expose node-type metadata for advanced control nodes (e.g., WHILE re-evaluation).
+    # These are runtime-local and never persisted into RunState.vars.
+    flow._pure_node_ids = set(pure_base_handlers.keys())  # type: ignore[attr-defined]
+    flow._literal_node_ids = set(literal_node_ids)  # type: ignore[attr-defined]
 
     def _decode_separator(value: str) -> str:
         return value.replace("\\n", "\n").replace("\\t", "\t").replace("\\r", "\r")
@@ -549,7 +579,14 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
             task = input_data.get("task") if isinstance(input_data, dict) else str(input_data)
             context_raw = input_data.get("context", {}) if isinstance(input_data, dict) else {}
             context = context_raw if isinstance(context_raw, dict) else {}
-            return {"task": task, "context": context}
+            provider = input_data.get("provider") if isinstance(input_data, dict) else None
+            model = input_data.get("model") if isinstance(input_data, dict) else None
+            return {
+                "task": task,
+                "context": context,
+                "provider": provider if isinstance(provider, str) else None,
+                "model": model if isinstance(model, str) else None,
+            }
 
         return handler
 
@@ -705,12 +742,22 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
 
         return handler
 
+    def _create_while_handler(data: Dict[str, Any]):
+        def handler(input_data):
+            condition = input_data.get("condition") if isinstance(input_data, dict) else bool(input_data)
+            return {"condition": bool(condition)}
+
+        return handler
+
     def _create_loop_handler(data: Dict[str, Any]):
         def handler(input_data):
             items = input_data.get("items") if isinstance(input_data, dict) else input_data
+            if items is None:
+                items = []
             if not isinstance(items, (list, tuple)):
                 items = [items]
-            return {"items": items, "count": len(items)}
+            items_list = list(items) if isinstance(items, tuple) else list(items)  # type: ignore[arg-type]
+            return {"items": items_list, "count": len(items_list)}
 
         return handler
 
@@ -763,13 +810,24 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
         return handler
 
     def _create_llm_call_handler(data: Dict[str, Any], config: Dict[str, Any]):
-        provider = config.get("provider", "")
-        model = config.get("model", "")
+        provider_default = config.get("provider", "")
+        model_default = config.get("model", "")
         temperature = config.get("temperature", 0.7)
 
         def handler(input_data):
             prompt = input_data.get("prompt", "") if isinstance(input_data, dict) else str(input_data)
             system = input_data.get("system", "") if isinstance(input_data, dict) else ""
+
+            provider = (
+                input_data.get("provider")
+                if isinstance(input_data, dict) and isinstance(input_data.get("provider"), str)
+                else provider_default
+            )
+            model = (
+                input_data.get("model")
+                if isinstance(input_data, dict) and isinstance(input_data.get("model"), str)
+                else model_default
+            )
 
             if not provider or not model:
                 return {
@@ -794,6 +852,192 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
                     "model": model,
                 },
             }
+
+        return handler
+
+    def _create_model_catalog_handler(data: Dict[str, Any]):
+        cfg = data.get("modelCatalogConfig", {}) if isinstance(data, dict) else {}
+        cfg = dict(cfg) if isinstance(cfg, dict) else {}
+
+        allowed_providers_default = cfg.get("allowedProviders")
+        allowed_models_default = cfg.get("allowedModels")
+        index_default = cfg.get("index", 0)
+
+        def _as_str_list(raw: Any) -> list[str]:
+            if not isinstance(raw, list):
+                return []
+            out: list[str] = []
+            for x in raw:
+                if isinstance(x, str) and x.strip():
+                    out.append(x.strip())
+            return out
+
+        def handler(input_data: Any):
+            # Allow pin-based overrides (data edges) while keeping node config as defaults.
+            allowed_providers = _as_str_list(
+                input_data.get("allowed_providers") if isinstance(input_data, dict) else None
+            ) or _as_str_list(allowed_providers_default)
+            allowed_models = _as_str_list(
+                input_data.get("allowed_models") if isinstance(input_data, dict) else None
+            ) or _as_str_list(allowed_models_default)
+
+            idx_raw = input_data.get("index") if isinstance(input_data, dict) else None
+            try:
+                idx = int(idx_raw) if idx_raw is not None else int(index_default or 0)
+            except Exception:
+                idx = 0
+            if idx < 0:
+                idx = 0
+
+            try:
+                from abstractcore.providers.registry import get_all_providers_with_models, get_available_models_for_provider
+            except Exception:
+                return {"providers": [], "models": [], "pair": None, "provider": "", "model": ""}
+
+            providers_meta = get_all_providers_with_models(include_models=False)
+            available_providers: list[str] = []
+            for p in providers_meta:
+                if not isinstance(p, dict):
+                    continue
+                if p.get("status") != "available":
+                    continue
+                name = p.get("name")
+                if isinstance(name, str) and name.strip():
+                    available_providers.append(name.strip())
+
+            if allowed_providers:
+                allow = {x.lower(): x for x in allowed_providers}
+                available_providers = [p for p in available_providers if p.lower() in allow]
+
+            pairs: list[dict[str, str]] = []
+            model_ids: list[str] = []
+
+            allow_models_norm = {m.strip() for m in allowed_models if isinstance(m, str) and m.strip()}
+
+            for provider in available_providers:
+                try:
+                    models = get_available_models_for_provider(provider)
+                except Exception:
+                    models = []
+                if not isinstance(models, list):
+                    models = []
+                for m in models:
+                    if not isinstance(m, str) or not m.strip():
+                        continue
+                    model = m.strip()
+                    mid = f"{provider}/{model}"
+                    if allow_models_norm:
+                        # Accept either full ids or raw model names.
+                        if mid not in allow_models_norm and model not in allow_models_norm:
+                            continue
+                    pairs.append({"provider": provider, "model": model, "id": mid})
+                    model_ids.append(mid)
+
+            selected = pairs[idx] if pairs and idx < len(pairs) else (pairs[0] if pairs else None)
+            return {
+                "providers": available_providers,
+                "models": model_ids,
+                "pair": selected,
+                "provider": selected.get("provider", "") if isinstance(selected, dict) else "",
+                "model": selected.get("model", "") if isinstance(selected, dict) else "",
+            }
+
+        return handler
+
+    def _create_provider_catalog_handler(data: Dict[str, Any]):
+        def _as_str_list(raw: Any) -> list[str]:
+            if not isinstance(raw, list):
+                return []
+            out: list[str] = []
+            for x in raw:
+                if isinstance(x, str) and x.strip():
+                    out.append(x.strip())
+            return out
+
+        def handler(input_data: Any):
+            allowed_providers = _as_str_list(
+                input_data.get("allowed_providers") if isinstance(input_data, dict) else None
+            )
+
+            try:
+                from abstractcore.providers.registry import get_all_providers_with_models
+            except Exception:
+                return {"providers": []}
+
+            providers_meta = get_all_providers_with_models(include_models=False)
+            available: list[str] = []
+            for p in providers_meta:
+                if not isinstance(p, dict):
+                    continue
+                if p.get("status") != "available":
+                    continue
+                name = p.get("name")
+                if isinstance(name, str) and name.strip():
+                    available.append(name.strip())
+
+            if allowed_providers:
+                allow = {x.lower() for x in allowed_providers}
+                available = [p for p in available if p.lower() in allow]
+
+            return {"providers": available}
+
+        return handler
+
+    def _create_provider_models_handler(data: Dict[str, Any]):
+        cfg = data.get("providerModelsConfig", {}) if isinstance(data, dict) else {}
+        cfg = dict(cfg) if isinstance(cfg, dict) else {}
+
+        def _as_str_list(raw: Any) -> list[str]:
+            if not isinstance(raw, list):
+                return []
+            out: list[str] = []
+            for x in raw:
+                if isinstance(x, str) and x.strip():
+                    out.append(x.strip())
+            return out
+
+        def handler(input_data: Any):
+            provider = None
+            if isinstance(input_data, dict) and isinstance(input_data.get("provider"), str):
+                provider = input_data.get("provider")
+            if not provider and isinstance(cfg.get("provider"), str):
+                provider = cfg.get("provider")
+
+            provider = str(provider or "").strip()
+            if not provider:
+                return {"provider": "", "models": []}
+
+            allowed_models = _as_str_list(
+                input_data.get("allowed_models") if isinstance(input_data, dict) else None
+            )
+            if not allowed_models:
+                # Optional allowlist from node config when the pin isn't connected.
+                allowed_models = _as_str_list(cfg.get("allowedModels")) or _as_str_list(cfg.get("allowed_models"))
+            allow = {m for m in allowed_models if m}
+
+            try:
+                from abstractcore.providers.registry import get_available_models_for_provider
+            except Exception:
+                return {"provider": provider, "models": []}
+
+            try:
+                models = get_available_models_for_provider(provider)
+            except Exception:
+                models = []
+            if not isinstance(models, list):
+                models = []
+
+            out: list[str] = []
+            for m in models:
+                if not isinstance(m, str) or not m.strip():
+                    continue
+                name = m.strip()
+                mid = f"{provider}/{name}"
+                if allow and (name not in allow and mid not in allow):
+                    continue
+                out.append(name)
+
+            return {"provider": provider, "models": out}
 
         return handler
 
@@ -881,6 +1125,15 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
         if type_str == "agent":
             return _create_agent_input_handler(data)
 
+        if type_str == "model_catalog":
+            return _create_model_catalog_handler(data)
+
+        if type_str == "provider_catalog":
+            return _create_provider_catalog_handler(data)
+
+        if type_str == "provider_models":
+            return _create_provider_models_handler(data)
+
         if type_str == "subflow":
             return _create_subflow_effect_builder(data)
 
@@ -904,6 +1157,8 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
             return _create_if_handler(data)
         if type_str == "switch":
             return _create_switch_handler(data)
+        if type_str == "while":
+            return _create_while_handler(data)
         if type_str == "loop":
             return _create_loop_handler(data)
 
@@ -979,6 +1234,16 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
             if type_str == "parallel":
                 cfg["completed_handle"] = "completed"
             effect_config = cfg
+        elif type_str == "loop":
+            # Control-flow scheduler node (Blueprint-style foreach).
+            # Runtime semantics are handled in `abstractflow.adapters.control_adapter`.
+            effect_type = type_str
+            effect_config = {}
+        elif type_str == "while":
+            # Control-flow scheduler node (Blueprint-style while).
+            # Runtime semantics are handled in `abstractflow.adapters.control_adapter`.
+            effect_type = type_str
+            effect_config = {}
         elif type_str == "subflow":
             effect_type = "start_subworkflow"
             subflow_id = node.data.get("subflowId") or node.data.get("flowId")

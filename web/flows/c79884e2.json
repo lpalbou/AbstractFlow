@@ -126,7 +126,7 @@
         ],
         "effectConfig": {
           "provider": "lmstudio",
-          "model": "bytedance/seed-oss-36b"
+          "model": "zai-org/glm-4.6v-flash"
         }
       },
       "label": null,
@@ -178,7 +178,7 @@
         ],
         "effectConfig": {
           "provider": "lmstudio",
-          "model": "mistralai/devstral-small-2-2512"
+          "model": "gemma-3-1b-it-qat"
         }
       },
       "label": null,
@@ -230,7 +230,7 @@
         ],
         "effectConfig": {
           "provider": "lmstudio",
-          "model": "glm-4.6v"
+          "model": "mistralai/devstral-small-2-2512"
         }
       },
       "label": null,
@@ -722,5 +722,5 @@
   ],
   "entryNode": "node-1",
   "created_at": "2025-12-23T16:14:02.456601",
-  "updated_at": "2025-12-24T02:01:15.114263"
+  "updated_at": "2025-12-24T05:22:16.152106"
 }

@@ -426,7 +426,29 @@ async def _execute_runner_loop(
 
         # Check if waiting
         if runner.is_waiting():
-            # Store the runner for resumption
+            wait = getattr(state, "waiting", None)
+            reason = getattr(wait, "reason", None) if wait is not None else None
+            reason_value = reason.value if hasattr(reason, "value") else str(reason) if reason else None
+
+            # WAIT_UNTIL (Delay node) is time-based and should not require user input.
+            # Keep the websocket loop running; sleep until the target time then continue ticking.
+            if reason_value == "until":
+                until_raw = getattr(wait, "until", None) if wait is not None else None
+                try:
+                    from datetime import datetime, timezone
+
+                    until = datetime.fromisoformat(str(until_raw))
+                    now = datetime.now(timezone.utc)
+                    remaining_s = (until - now).total_seconds()
+                    # Poll at a small cadence to keep the UI responsive without spamming events.
+                    sleep_s = min(max(remaining_s, 0.05), 0.25)
+                except Exception:
+                    sleep_s = 0.2
+
+                await asyncio.sleep(float(sleep_s))
+                continue
+
+            # All other waiting reasons require an external resume signal.
             _waiting_runners[connection_id] = runner
 
             prompt, choices, allow_free_text, wait_key, reason = _resolve_waiting_info(state)

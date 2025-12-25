@@ -50,10 +50,13 @@ export type NodeType =
   | 'add' | 'subtract' | 'multiply' | 'divide' | 'modulo' | 'power' | 'abs' | 'round'
   // String - Pure functions (no exec pins)
   | 'concat' | 'split' | 'join' | 'format' | 'uppercase' | 'lowercase' | 'trim' | 'substring' | 'length'
-  // Control - if/loop have exec, logic gates are pure
-  | 'if' | 'switch' | 'loop' | 'sequence' | 'parallel' | 'compare' | 'not' | 'and' | 'or'
+  // Control - if/loop/while have exec, logic gates are pure
+  | 'if' | 'switch' | 'loop' | 'while' | 'sequence' | 'parallel' | 'compare' | 'not' | 'and' | 'or'
   // Data - Pure functions (no exec pins)
   | 'get' | 'set' | 'merge' | 'array_map' | 'array_filter' | 'array_concat' | 'break_object' | 'system_datetime'
+  | 'provider_catalog' | 'provider_models'
+  // Backward-compat: deprecated
+  | 'model_catalog'
   // Literals - Pure value nodes (no exec pins, no inputs)
   | 'literal_string' | 'literal_number' | 'literal_boolean' | 'literal_json' | 'literal_array'
   // Effects - Side-effect nodes (require execution pins)
@@ -123,6 +126,20 @@ export interface FlowNodeData {
     temperature?: number;  // For llm_call
     allowFreeText?: boolean; // For ask_user
     durationType?: 'seconds' | 'minutes' | 'hours' | 'timestamp'; // For wait_until
+  };
+
+  // Model Catalog node configuration
+  modelCatalogConfig?: {
+    // Optional allowlists to restrict the catalog; when empty/undefined, everything is allowed.
+    allowedProviders?: string[];
+    allowedModels?: string[]; // Supports either "provider/model" ids or raw model names.
+    // Selection of an active pair (used to output `provider` + `model`).
+    index?: number; // Default: 0
+  };
+
+  providerModelsConfig?: {
+    provider?: string;
+    allowedModels?: string[];
   };
 }
 

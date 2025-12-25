@@ -13,6 +13,8 @@ import type { FlowNodeData } from '../../types/flow';
 import { PIN_COLORS, isEntryNodeType } from '../../types/flow';
 import { PinShape } from '../pins/PinShape';
 import { useFlowStore } from '../../hooks/useFlow';
+import { useModels, useProviders } from '../../hooks/useProviders';
+import AfSelect from '../inputs/AfSelect';
 
 export const BaseNode = memo(function BaseNode({
   id,
@@ -59,8 +61,68 @@ export const BaseNode = memo(function BaseNode({
   const inputData = data.inputs.filter((p) => p.type !== 'execution');
   const outputData = data.outputs.filter((p) => p.type !== 'execution');
 
+  const isLlmNode = data.nodeType === 'llm_call';
+  const isAgentNode = data.nodeType === 'agent';
+  const isProviderModelsNode = data.nodeType === 'provider_models';
+  const isDelayNode = data.nodeType === 'wait_until';
+
+  const hasModelControls = isLlmNode || isAgentNode;
+  const hasProviderDropdown = hasModelControls || isProviderModelsNode;
+
+  const providerConnected = hasProviderDropdown ? isPinConnected('provider', true) : false;
+  const modelConnected = hasModelControls ? isPinConnected('model', true) : false;
+
+  const selectedProvider = isAgentNode
+    ? data.agentConfig?.provider
+    : isLlmNode
+      ? data.effectConfig?.provider
+      : data.providerModelsConfig?.provider;
+  const selectedModel = isAgentNode ? data.agentConfig?.model : data.effectConfig?.model;
+
+  const providersQuery = useProviders(hasProviderDropdown && (!providerConnected || !modelConnected));
+  const modelsQuery = useModels(selectedProvider, hasModelControls && !modelConnected);
+
+  const providers = Array.isArray(providersQuery.data) ? providersQuery.data : [];
+  const models = Array.isArray(modelsQuery.data) ? modelsQuery.data : [];
+
+  const setProviderModel = useCallback(
+    (provider: string | undefined, model: string | undefined) => {
+      if (isAgentNode) {
+        const prev = data.agentConfig || {};
+        updateNodeData(id, { agentConfig: { ...prev, provider: provider || undefined, model: model || undefined } });
+        return;
+      }
+      if (isLlmNode) {
+        const prev = data.effectConfig || {};
+        updateNodeData(id, { effectConfig: { ...prev, provider: provider || undefined, model: model || undefined } });
+        return;
+      }
+      if (isProviderModelsNode) {
+        const prev = data.providerModelsConfig || {};
+        updateNodeData(id, { providerModelsConfig: { ...prev, provider: provider || undefined, allowedModels: [] } });
+      }
+    },
+    [data.agentConfig, data.effectConfig, data.providerModelsConfig, id, isAgentNode, isLlmNode, isProviderModelsNode, updateNodeData]
+  );
+
   const isSequenceLike = data.nodeType === 'sequence';
   const isParallelLike = data.nodeType === 'parallel';
+
+  const delayDurationType = (data.effectConfig?.durationType ?? 'seconds') as
+    | 'seconds'
+    | 'minutes'
+    | 'hours'
+    | 'timestamp';
+
+  const setDelayDurationType = useCallback(
+    (next: string) => {
+      const v =
+        next === 'minutes' || next === 'hours' || next === 'timestamp' ? next : 'seconds';
+      const prev = data.effectConfig || {};
+      updateNodeData(id, { effectConfig: { ...prev, durationType: v } });
+    },
+    [data.effectConfig, id, updateNodeData]
+  );
 
   const parseThenIndex = (raw: string): number | null => {
     const m = /^then:(\d+)$/.exec(raw);
@@ -305,6 +367,53 @@ export const BaseNode = memo(function BaseNode({
                 />
               </span>
               <span className="pin-label">{pin.label}</span>
+              {isDelayNode && pin.id === 'duration' ? (
+                <AfSelect
+                  variant="pin"
+                  value={delayDurationType}
+                  placeholder="seconds"
+                  options={[
+                    { value: 'seconds', label: 'seconds' },
+                    { value: 'minutes', label: 'minutes' },
+                    { value: 'hours', label: 'hours' },
+                    { value: 'timestamp', label: 'timestamp' },
+                  ]}
+                  searchable={false}
+                  minPopoverWidth={180}
+                  onChange={setDelayDurationType}
+                />
+              ) : null}
+              {hasProviderDropdown && pin.id === 'provider' && !providerConnected ? (
+                <AfSelect
+                  variant="pin"
+                  value={selectedProvider || ''}
+                  placeholder={providersQuery.isLoading ? 'Loading…' : 'Select…'}
+                  options={providers.map((p) => ({ value: p.name, label: p.display_name || p.name }))}
+                  disabled={providersQuery.isLoading}
+                  loading={providersQuery.isLoading}
+                  searchable
+                  searchPlaceholder="Search providers…"
+                  clearable
+                  minPopoverWidth={260}
+                  onChange={(v) => setProviderModel(v || undefined, undefined)}
+                />
+              ) : null}
+
+              {hasModelControls && pin.id === 'model' && !modelConnected ? (
+                <AfSelect
+                  variant="pin"
+                  value={selectedModel || ''}
+                  placeholder={!selectedProvider ? 'Pick provider…' : modelsQuery.isLoading ? 'Loading…' : 'Select…'}
+                  options={models.map((m) => ({ value: m, label: m }))}
+                  disabled={!selectedProvider || modelsQuery.isLoading}
+                  loading={modelsQuery.isLoading}
+                  searchable
+                  searchPlaceholder="Search models…"
+                  clearable
+                  minPopoverWidth={360}
+                  onChange={(v) => setProviderModel(selectedProvider || undefined, v || undefined)}
+                />
+              ) : null}
             </div>
           ))}
         </div>

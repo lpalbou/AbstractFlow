@@ -98,6 +98,8 @@ const CORE_NODES: NodeTemplate[] = [
     headerColor: '#4488FF',
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'provider', label: 'provider', type: 'string' },
+      { id: 'model', label: 'model', type: 'string' },
       { id: 'task', label: 'task', type: 'string' },
       { id: 'context', label: 'context', type: 'object' },
     ],
@@ -166,6 +168,7 @@ const STRING_NODES: NodeTemplate[] = [
 const CONTROL_NODES: NodeTemplate[] = [
   // Execution nodes - control the flow
   { type: 'if', icon: '&#x2753;', label: 'If/Else', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'condition', label: 'condition', type: 'boolean' }], outputs: [{ id: 'true', label: 'true', type: 'execution' }, { id: 'false', label: 'false', type: 'execution' }], category: 'control' },
+  { type: 'while', icon: '&#x267B;', label: 'While', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'condition', label: 'condition', type: 'boolean' }], outputs: [{ id: 'loop', label: 'loop', type: 'execution' }, { id: 'done', label: 'done', type: 'execution' }], category: 'control' },
 	  {
 	    type: 'switch',
 	    icon: '&#x1F500;', // Shuffle
@@ -242,6 +245,30 @@ const DATA_NODES: NodeTemplate[] = [
     headerColor: '#3498DB',
     inputs: [{ id: 'object', label: 'object', type: 'object' }],
     outputs: [], // Dynamic pins based on selected paths
+    category: 'data',
+  },
+  {
+    type: 'provider_catalog',
+    icon: '&#x1F4E6;', // Package-ish (catalog)
+    label: 'Provider Catalog',
+    headerColor: '#3498DB',
+    inputs: [{ id: 'allowed_providers', label: 'allowed_providers', type: 'array' }],
+    outputs: [{ id: 'providers', label: 'providers', type: 'array' }],
+    category: 'data',
+  },
+  {
+    type: 'provider_models',
+    icon: '&#x1F4DA;', // Books
+    label: 'Provider Models',
+    headerColor: '#3498DB',
+    inputs: [
+      { id: 'provider', label: 'provider', type: 'string' },
+      { id: 'allowed_models', label: 'allowed_models', type: 'array' },
+    ],
+    outputs: [
+      { id: 'provider', label: 'provider', type: 'string' },
+      { id: 'models', label: 'models', type: 'array' },
+    ],
     category: 'data',
   },
 ];
@@ -337,6 +364,8 @@ const EFFECT_NODES: NodeTemplate[] = [
     headerColor: '#3498DB', // Blue - AI
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'provider', label: 'provider', type: 'string' },
+      { id: 'model', label: 'model', type: 'string' },
       { id: 'prompt', label: 'prompt', type: 'string' },
       { id: 'system', label: 'system', type: 'string' },
     ],
@@ -488,5 +517,7 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
     ...(template.type === 'break_object' && { breakConfig: { selectedPaths: [] } }),
     ...(template.type === 'concat' && { concatConfig: { separator: ' ' } }),
     ...(template.type === 'switch' && { switchConfig: { cases: [] } }),
+    ...(template.type === 'model_catalog' && { modelCatalogConfig: { allowedProviders: [], allowedModels: [], index: 0 } }),
+    ...(template.type === 'provider_models' && { providerModelsConfig: { provider: '', allowedModels: [] } }),
   };
 }

@@ -243,7 +243,7 @@ def _create_visual_agent_effect_handler(
         out.sort(key=lambda s: str(s.get("ts") or ""))
         return out
 
-    def _build_sub_vars(run: Any, *, task: str, context: Dict[str, Any]) -> Dict[str, Any]:
+    def _build_sub_vars(run: Any, *, task: str, context: Dict[str, Any], provider: str, model: str) -> Dict[str, Any]:
         parent_limits = run.vars.get("_limits")
         limits = dict(parent_limits) if isinstance(parent_limits, dict) else {}
         limits.setdefault("max_iterations", 25)
@@ -265,18 +265,15 @@ def _create_visual_agent_effect_handler(
         return {
             "context": ctx_ns,
             "scratchpad": {"iteration": 0, "max_iterations": int(limits.get("max_iterations") or 25)},
-            "_runtime": {"inbox": []},
+            # `_runtime` is durable; we store provider/model here so the ReAct subworkflow
+            # can inject them into LLM_CALL payloads (and remain resumable).
+            "_runtime": {"inbox": [], "provider": provider, "model": model},
             "_temp": {},
             "_limits": limits,
         }
 
     def handler(run: Any, ctx: Any) -> "StepPlan":
         del ctx
-
-        provider_raw = agent_config.get("provider")
-        model_raw = agent_config.get("model")
-        provider = str(provider_raw or "").strip().lower() if isinstance(provider_raw, str) else ""
-        model = str(model_raw or "").strip() if isinstance(model_raw, str) else ""
 
         output_schema_cfg = agent_config.get("outputSchema") if isinstance(agent_config.get("outputSchema"), dict) else {}
         schema_enabled = bool(output_schema_cfg.get("enabled"))
@@ -289,6 +286,17 @@ def _create_visual_agent_effect_handler(
         if not isinstance(resolved_inputs, dict) or phase == "init":
             resolved_inputs = _resolve_inputs(run)
             bucket["resolved_inputs"] = resolved_inputs if isinstance(resolved_inputs, dict) else {}
+
+        # Provider/model can come from Agent node config or from data-edge inputs (pins).
+        provider_raw = resolved_inputs.get("provider") if isinstance(resolved_inputs, dict) else None
+        model_raw = resolved_inputs.get("model") if isinstance(resolved_inputs, dict) else None
+        if not isinstance(provider_raw, str) or not provider_raw.strip():
+            provider_raw = agent_config.get("provider")
+        if not isinstance(model_raw, str) or not model_raw.strip():
+            model_raw = agent_config.get("model")
+
+        provider = str(provider_raw or "").strip().lower() if isinstance(provider_raw, str) else ""
+        model = str(model_raw or "").strip() if isinstance(model_raw, str) else ""
 
         task = str(resolved_inputs.get("task") or "")
         context_raw = resolved_inputs.get("context")
@@ -331,7 +339,7 @@ def _create_visual_agent_effect_handler(
                     type=EffectType.START_SUBWORKFLOW,
                     payload={
                         "workflow_id": react_workflow_id,
-                        "vars": _build_sub_vars(run, task=task, context=context),
+                        "vars": _build_sub_vars(run, task=task, context=context, provider=provider, model=model),
                         "async": False,
                         "include_traces": True,
                     },
@@ -848,6 +856,65 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
             next_node_map[node_id] = None
             continue
 
+        # Loop (Foreach): structured scheduling via `loop` (body) and `done` (completed).
+        #
+        # This is a scheduler node (like Sequence/Parallel), not data-driven branching.
+        if node_effect_type == "loop":
+            handles: list[str] = []
+            targets_by_handle: Dict[str, str] = {}
+            for e in outs:
+                h = getattr(e, "source_handle", None)
+                if not isinstance(h, str) or not h:
+                    raise ValueError(
+                        f"Control node '{node_id}' has an execution edge with no source_handle."
+                    )
+                handles.append(h)
+                targets_by_handle[h] = e.target
+
+            allowed = {"loop", "done"}
+            unknown = [h for h in handles if h not in allowed]
+            if unknown:
+                raise ValueError(
+                    f"Control node '{node_id}' has unsupported execution outputs: {unknown}"
+                )
+
+            control_specs[node_id] = {
+                "kind": "loop",
+                "loop_target": targets_by_handle.get("loop"),
+                "done_target": targets_by_handle.get("done"),
+            }
+            next_node_map[node_id] = None
+            continue
+
+        # While: structured scheduling via `loop` (body) and `done` (completed),
+        # gated by a boolean condition pin resolved via data edges.
+        if node_effect_type == "while":
+            handles = []
+            targets_by_handle = {}
+            for e in outs:
+                h = getattr(e, "source_handle", None)
+                if not isinstance(h, str) or not h:
+                    raise ValueError(
+                        f"Control node '{node_id}' has an execution edge with no source_handle."
+                    )
+                handles.append(h)
+                targets_by_handle[h] = e.target
+
+            allowed = {"loop", "done"}
+            unknown = [h for h in handles if h not in allowed]
+            if unknown:
+                raise ValueError(
+                    f"Control node '{node_id}' has unsupported execution outputs: {unknown}"
+                )
+
+            control_specs[node_id] = {
+                "kind": "while",
+                "loop_target": targets_by_handle.get("loop"),
+                "done_target": targets_by_handle.get("done"),
+            }
+            next_node_map[node_id] = None
+            continue
+
         if len(outs) == 1:
             h = getattr(outs[0], "source_handle", None)
             if isinstance(h, str) and h and h != "exec-out":
@@ -984,6 +1051,49 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
                 targets_by_handle=dict(spec.get("targets_by_handle") or {}),
                 completed_target=spec.get("completed_target"),
             )
+        elif effect_type == "loop":
+            from .adapters.control_adapter import create_loop_node_handler
+
+            spec = control_specs.get(node_id) or {}
+            loop_data_handler = handler_obj if callable(handler_obj) else None
+
+            def _resolve_items(
+                run: Any,
+                _handler: Any = loop_data_handler,
+                _node_id: str = node_id,
+            ) -> list[Any]:
+                if flow is not None and hasattr(flow, "_node_outputs") and hasattr(flow, "_data_edge_map"):
+                    _sync_effect_results_to_node_outputs(run, flow)
+                if not callable(_handler):
+                    return []
+                last_output = run.vars.get("_last_output", {})
+                try:
+                    resolved = _handler(last_output)
+                except Exception as e:
+                    # Surface this as a workflow error (don't silently treat as empty).
+                    try:
+                        run.vars["_flow_error"] = f"Loop items resolution failed: {e}"
+                        run.vars["_flow_error_node"] = _node_id
+                    except Exception:
+                        pass
+                    raise
+                if not isinstance(resolved, dict):
+                    return []
+                raw = resolved.get("items")
+                if isinstance(raw, list):
+                    return raw
+                if isinstance(raw, tuple):
+                    return list(raw)
+                if raw is None:
+                    return []
+                return [raw]
+
+            handlers[node_id] = create_loop_node_handler(
+                node_id=node_id,
+                loop_target=spec.get("loop_target"),
+                done_target=spec.get("done_target"),
+                resolve_items=_resolve_items,
+            )
         elif effect_type == "agent":
             data_aware_handler = handler_obj if callable(handler_obj) else None
             handlers[node_id] = _create_visual_agent_effect_handler(
@@ -992,6 +1102,80 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
                 agent_config=effect_config if isinstance(effect_config, dict) else {},
                 data_aware_handler=data_aware_handler,
                 flow=flow,
+            )
+        elif effect_type == "while":
+            from .adapters.control_adapter import create_while_node_handler
+
+            spec = control_specs.get(node_id) or {}
+            while_data_handler = handler_obj if callable(handler_obj) else None
+
+            # Precompute upstream pure-node ids for cache invalidation (best-effort).
+            pure_ids = getattr(flow, "_pure_node_ids", None) if flow is not None else None
+            pure_ids = set(pure_ids) if isinstance(pure_ids, (set, list, tuple)) else set()
+
+            data_edge_map = getattr(flow, "_data_edge_map", None) if flow is not None else None
+            data_edge_map = data_edge_map if isinstance(data_edge_map, dict) else {}
+
+            upstream_pure: set[str] = set()
+            if pure_ids:
+                stack2 = [node_id]
+                seen2: set[str] = set()
+                while stack2:
+                    cur = stack2.pop()
+                    if cur in seen2:
+                        continue
+                    seen2.add(cur)
+                    deps = data_edge_map.get(cur)
+                    if not isinstance(deps, dict):
+                        continue
+                    for _pin, src in deps.items():
+                        if not isinstance(src, tuple) or len(src) != 2:
+                            continue
+                        src_node = src[0]
+                        if not isinstance(src_node, str) or not src_node:
+                            continue
+                        stack2.append(src_node)
+                        if src_node in pure_ids:
+                            upstream_pure.add(src_node)
+
+            def _resolve_condition(
+                run: Any,
+                _handler: Any = while_data_handler,
+                _node_id: str = node_id,
+                _upstream_pure: set[str] = upstream_pure,
+            ) -> bool:
+                if flow is not None and hasattr(flow, "_node_outputs") and hasattr(flow, "_data_edge_map"):
+                    _sync_effect_results_to_node_outputs(run, flow)
+                    # Ensure pure nodes feeding the condition are re-evaluated per iteration.
+                    if _upstream_pure and hasattr(flow, "_node_outputs"):
+                        node_outputs = getattr(flow, "_node_outputs", None)
+                        if isinstance(node_outputs, dict):
+                            for nid in _upstream_pure:
+                                node_outputs.pop(nid, None)
+
+                if not callable(_handler):
+                    return False
+
+                last_output = run.vars.get("_last_output", {})
+                try:
+                    resolved = _handler(last_output)
+                except Exception as e:
+                    try:
+                        run.vars["_flow_error"] = f"While condition resolution failed: {e}"
+                        run.vars["_flow_error_node"] = _node_id
+                    except Exception:
+                        pass
+                    raise
+
+                if isinstance(resolved, dict) and "condition" in resolved:
+                    return bool(resolved.get("condition"))
+                return bool(resolved)
+
+            handlers[node_id] = create_while_node_handler(
+                node_id=node_id,
+                loop_target=spec.get("loop_target"),
+                done_target=spec.get("done_target"),
+                resolve_condition=_resolve_condition,
             )
         elif effect_type:
             # Pass the handler_obj as data_aware_handler if it's callable

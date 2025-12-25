@@ -9,6 +9,7 @@ import type { FlowNodeData, ProviderInfo, VisualFlow, Pin } from '../types/flow'
 import { isEntryNodeType } from '../types/flow';
 import { useFlowStore } from '../hooks/useFlow';
 import { CodeEditorModal } from './CodeEditorModal';
+import ProviderModelsPanel from './ProviderModelsPanel';
 import { extractFunctionBody, generatePythonTransformCode, sanitizePythonIdentifier } from '../utils/codegen';
 
 interface PropertiesPanelProps {
@@ -2529,6 +2530,11 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
             <span className="property-hint">0 = deterministic, 2 = creative</span>
           </div>
         </div>
+      )}
+
+      {/* Provider Models (catalog helper) */}
+      {data.nodeType === 'provider_models' && (
+        <ProviderModelsPanel node={node} edges={edges} updateNodeData={updateNodeData} />
       )}
 
       {/* Wait Until (Delay) effect properties */}

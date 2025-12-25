@@ -440,6 +440,32 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         ? { ...createNodeData(template), ...vn.data }
         : (vn.data as FlowNodeData);
 
+      // Backward-compat: older saved flows may not include the new provider/model pins
+      // for Agent and LLM Call nodes. Add them without disturbing existing pins/edges.
+      if (data.nodeType === 'agent' || data.nodeType === 'llm_call') {
+        const existingInputs = Array.isArray(data.inputs) ? data.inputs : [];
+        const existingIds = new Set(existingInputs.map((p) => p.id));
+
+        const providerPin = existingIds.has('provider') ? null : { id: 'provider', label: 'provider', type: 'string' as const };
+        const modelPin = existingIds.has('model') ? null : { id: 'model', label: 'model', type: 'string' as const };
+
+        if (providerPin || modelPin) {
+          const nextInputs: typeof existingInputs = [];
+          for (const p of existingInputs) {
+            nextInputs.push(p);
+            if (p.id === 'exec-in') {
+              if (providerPin) nextInputs.push(providerPin);
+              if (modelPin) nextInputs.push(modelPin);
+            }
+          }
+          if (!existingInputs.some((p) => p.id === 'exec-in')) {
+            if (providerPin) nextInputs.unshift(providerPin);
+            if (modelPin) nextInputs.unshift(modelPin);
+          }
+          data = { ...data, inputs: nextInputs };
+        }
+      }
+
       // Normalize Switch nodes: execution outputs only (cases + default).
       if (data.nodeType === 'switch') {
         const existingExecPins = data.outputs.filter((p) => p.type === 'execution');

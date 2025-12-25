@@ -210,6 +210,146 @@ button.primary:hover:not(:disabled) {
   background: #ff6b81;
 }
 
+/* AbstractFlow custom select (searchable popover) */
+.af-select {
+  display: inline-flex;
+}
+
+.af-select--pin {
+  margin-left: auto;
+}
+
+.af-select-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--text-primary);
+  border-radius: 8px;
+  padding: 0 8px;
+  line-height: 1;
+}
+
+.af-select--pin .af-select-trigger {
+  height: 20px;
+  max-width: 140px;
+  font-size: 11px;
+}
+
+.af-select--panel .af-select-trigger {
+  height: 34px;
+  width: 100%;
+}
+
+.af-select-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  text-align: left;
+}
+
+.af-select-value--placeholder {
+  color: var(--text-secondary);
+}
+
+.af-select-clear {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.af-select-clear:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.af-select-caret {
+  color: var(--text-secondary);
+  transform: translateY(-1px);
+}
+
+.af-select-caret--open {
+  color: var(--text-primary);
+}
+
+.af-select-popover {
+  z-index: 10000;
+  background: #121223;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+
+.af-select-popover--top {
+  transform: translateY(-100%);
+}
+
+.af-select-search {
+  padding: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.af-select-search-input {
+  width: 100%;
+  height: 32px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text-primary);
+}
+
+.af-select-options {
+  max-height: 320px;
+  overflow: auto;
+  padding: 6px;
+}
+
+.af-select-empty {
+  padding: 10px;
+  color: var(--text-secondary);
+}
+
+.af-select-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.af-select-option--highlighted {
+  background: rgba(233, 69, 96, 0.22);
+}
+
+.af-select-option--selected {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.af-select-option-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.af-select-check {
+  color: var(--accent);
+  font-weight: 700;
+}
+
 /* Modal */
 .modal-overlay {
   position: fixed;
@@ -252,6 +392,24 @@ button.primary:hover:not(:disabled) {
   gap: 8px;
   justify-content: flex-end;
   margin-top: 16px;
+}
+
+/* Property helpers */
+.property-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.property-checkbox-list {
+  margin-top: 10px;
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid var(--bg-tertiary);
+  border-radius: 8px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .modal-button.cancel {
