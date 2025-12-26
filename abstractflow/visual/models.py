@@ -98,6 +98,8 @@ class NodeType(str, Enum):
     WAIT_UNTIL = "wait_until"
     WAIT_EVENT = "wait_event"
     EMIT_EVENT = "emit_event"
+    READ_FILE = "read_file"
+    WRITE_FILE = "write_file"
     MEMORY_NOTE = "memory_note"
     MEMORY_QUERY = "memory_query"
 

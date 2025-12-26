@@ -9,7 +9,8 @@ export function NodePalette() {
   const [expandedCategories, setExpandedCategories] = useState<
     Record<string, boolean>
   >({
-    core: true, // Core is expanded by default
+    events: true,
+    core: true,
   });
 
   const [searchTerm, setSearchTerm] = useState('');

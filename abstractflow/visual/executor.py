@@ -771,6 +771,96 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
     def _decode_separator(value: str) -> str:
         return value.replace("\\n", "\n").replace("\\t", "\t").replace("\\r", "\r")
 
+    def _create_read_file_handler(_data: Dict[str, Any]):
+        import json
+        from pathlib import Path
+
+        def handler(input_data: Any) -> Dict[str, Any]:
+            payload = input_data if isinstance(input_data, dict) else {}
+            raw_path = payload.get("file_path")
+            if not isinstance(raw_path, str) or not raw_path.strip():
+                raise ValueError("read_file requires a non-empty 'file_path' input.")
+
+            file_path = raw_path.strip()
+            path = Path(file_path).expanduser()
+            if not path.is_absolute():
+                path = Path.cwd() / path
+
+            if not path.exists():
+                raise FileNotFoundError(f"File not found: {file_path}")
+            if not path.is_file():
+                raise ValueError(f"Not a file: {file_path}")
+
+            try:
+                text = path.read_text(encoding="utf-8")
+            except UnicodeDecodeError as e:
+                raise ValueError(f"Cannot read '{file_path}' as UTF-8: {e}") from e
+
+            # Detect JSON primarily from file extension; also opportunistically parse
+            # when the content looks like JSON. Markdown and text are returned as-is.
+            lower_name = path.name.lower()
+            content_stripped = text.lstrip()
+            looks_like_json = bool(content_stripped) and content_stripped[0] in "{["
+
+            if lower_name.endswith(".json"):
+                try:
+                    return {"content": json.loads(text)}
+                except Exception as e:
+                    raise ValueError(f"Invalid JSON in '{file_path}': {e}") from e
+
+            if looks_like_json:
+                try:
+                    return {"content": json.loads(text)}
+                except Exception:
+                    pass
+
+            return {"content": text}
+
+        return handler
+
+    def _create_write_file_handler(_data: Dict[str, Any]):
+        import json
+        from pathlib import Path
+
+        def handler(input_data: Any) -> Dict[str, Any]:
+            payload = input_data if isinstance(input_data, dict) else {}
+            raw_path = payload.get("file_path")
+            if not isinstance(raw_path, str) or not raw_path.strip():
+                raise ValueError("write_file requires a non-empty 'file_path' input.")
+
+            file_path = raw_path.strip()
+            path = Path(file_path).expanduser()
+            if not path.is_absolute():
+                path = Path.cwd() / path
+
+            raw_content = payload.get("content")
+
+            if path.name.lower().endswith(".json"):
+                if isinstance(raw_content, str):
+                    try:
+                        raw_content = json.loads(raw_content)
+                    except Exception as e:
+                        raise ValueError(f"write_file JSON content must be valid JSON: {e}") from e
+                text = json.dumps(raw_content, indent=2, ensure_ascii=False)
+                if not text.endswith("\n"):
+                    text += "\n"
+            else:
+                if raw_content is None:
+                    text = ""
+                elif isinstance(raw_content, str):
+                    text = raw_content
+                elif isinstance(raw_content, (dict, list)):
+                    text = json.dumps(raw_content, indent=2, ensure_ascii=False)
+                else:
+                    text = str(raw_content)
+
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8")
+
+            return {"bytes": len(text.encode("utf-8")), "file_path": str(path)}
+
+        return handler
+
     def _create_concat_handler(data: Dict[str, Any]):
         config = data.get("concatConfig", {}) if isinstance(data, dict) else {}
         separator = " "
@@ -1482,6 +1572,12 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
 
         if type_str == "array_concat":
             return _create_array_concat_handler(data)
+
+        if type_str == "read_file":
+            return _create_read_file_handler(data)
+
+        if type_str == "write_file":
+            return _create_write_file_handler(data)
 
         # Sequence / Parallel are scheduler nodes compiled specially by `compile_flow`.
         # Their runtime semantics are handled in `abstractflow.adapters.control_adapter`.

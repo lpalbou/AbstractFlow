@@ -511,6 +511,45 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         data = { ...data, inputs: [...canonicalInputs, ...extras] };
       }
 
+      // Backward-compat + canonical ordering for file IO nodes (remove deprecated `file_type` pin).
+      if (data.nodeType === 'read_file' || data.nodeType === 'write_file') {
+        const existingInputs = Array.isArray(data.inputs) ? data.inputs : [];
+        const byId = new Map(existingInputs.map((p) => [p.id, p] as const));
+        const used = new Set<string>();
+
+        const want = (pin: Pin): Pin => {
+          const prev = byId.get(pin.id);
+          used.add(pin.id);
+          if (!prev) return pin;
+          if (prev.label === pin.label && prev.type === pin.type) return prev;
+          return { ...prev, label: pin.label, type: pin.type };
+        };
+
+        const canonicalInputs: Pin[] =
+          data.nodeType === 'read_file'
+            ? [
+                want({ id: 'exec-in', label: '', type: 'execution' }),
+                want({ id: 'file_path', label: 'file_path', type: 'string' }),
+              ]
+            : [
+                want({ id: 'exec-in', label: '', type: 'execution' }),
+                want({ id: 'file_path', label: 'file_path', type: 'string' }),
+                want({ id: 'content', label: 'content', type: 'any' }),
+              ];
+
+        const extras = existingInputs.filter((p) => !used.has(p.id) && p.id !== 'file_type');
+
+        const nextDefaults = (() => {
+          const prev = data.pinDefaults;
+          if (!prev || typeof prev !== 'object') return prev;
+          if (!('file_type' in prev)) return prev;
+          const { file_type: _unused, ...rest } = prev as any;
+          return rest;
+        })();
+
+        data = { ...data, pinDefaults: nextDefaults, inputs: [...canonicalInputs, ...extras] };
+      }
+
       // Normalize Switch nodes: execution outputs only (cases + default).
       if (data.nodeType === 'switch') {
         const existingExecPins = data.outputs.filter((p) => p.type === 'execution');

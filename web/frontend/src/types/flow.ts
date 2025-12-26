@@ -61,7 +61,16 @@ export type NodeType =
   // Literals - Pure value nodes (no exec pins, no inputs)
   | 'literal_string' | 'literal_number' | 'literal_boolean' | 'literal_json' | 'literal_array'
   // Effects - Side-effect nodes (require execution pins)
-  | 'ask_user' | 'answer_user' | 'llm_call' | 'wait_until' | 'wait_event' | 'emit_event' | 'memory_note' | 'memory_query';
+  | 'ask_user'
+  | 'answer_user'
+  | 'llm_call'
+  | 'wait_until'
+  | 'wait_event'
+  | 'emit_event'
+  | 'read_file'
+  | 'write_file'
+  | 'memory_note'
+  | 'memory_query';
 
 export const ENTRY_NODE_TYPES: NodeType[] = [
   'on_flow_start',

@@ -93,6 +93,41 @@ const EVENT_NODES: NodeTemplate[] = [
     category: 'events',
   },
   {
+    type: 'wait_event',
+    icon: '&#x1F514;', // Bell
+    label: 'Wait Event',
+    headerColor: '#C0392B',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'event_key', label: 'event_key', type: 'string' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'event_data', label: 'event_data', type: 'object' },
+    ],
+    category: 'events',
+  },
+  {
+    type: 'emit_event',
+    icon: '&#x1F4E3;', // Megaphone
+    label: 'Emit Event',
+    headerColor: '#C0392B',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'name', label: 'name', type: 'string' },
+      { id: 'scope', label: 'scope', type: 'string' },
+      { id: 'payload', label: 'payload', type: 'any' },
+      { id: 'session_id', label: 'session_id', type: 'string' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'delivered', label: 'delivered', type: 'number' },
+      { id: 'delivered_to', label: 'delivered_to', type: 'array' },
+      { id: 'wait_key', label: 'wait_key', type: 'string' },
+    ],
+    category: 'events',
+  },
+  {
     type: 'on_flow_end',
     icon: '&#x23F9;', // Stop button
     label: 'On Flow End',
@@ -125,6 +160,55 @@ const CORE_NODES: NodeTemplate[] = [
       { id: 'exec-out', label: '', type: 'execution' },
       { id: 'result', label: 'result', type: 'object' },
       { id: 'scratchpad', label: 'scratchpad', type: 'object' },
+    ],
+    category: 'core',
+  },
+  {
+    type: 'ask_user',
+    icon: '&#x2753;', // Question mark
+    label: 'Ask User',
+    headerColor: '#9B59B6', // Purple - human interaction
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'prompt', label: 'prompt', type: 'string' },
+      { id: 'choices', label: 'choices', type: 'array' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'response', label: 'response', type: 'string' },
+    ],
+    category: 'core',
+  },
+  {
+    type: 'answer_user',
+    icon: '&#x1F4AC;', // Speech bubble
+    label: 'Answer User',
+    headerColor: '#9B59B6', // Purple - human interaction
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'message', label: 'message', type: 'string' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'message', label: 'message', type: 'string' },
+    ],
+    category: 'core',
+  },
+  {
+    type: 'llm_call',
+    icon: '&#x1F4AD;', // Thought bubble
+    label: 'LLM Call',
+    headerColor: '#3498DB', // Blue - AI
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'provider', label: 'provider', type: 'string' },
+      { id: 'model', label: 'model', type: 'string' },
+      { id: 'system', label: 'system', type: 'string' },
+      { id: 'prompt', label: 'prompt', type: 'string' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'response', label: 'response', type: 'string' },
     ],
     category: 'core',
   },
@@ -345,55 +429,6 @@ const LITERAL_NODES: NodeTemplate[] = [
 // These nodes have execution pins and can pause/resume flows
 const EFFECT_NODES: NodeTemplate[] = [
   {
-    type: 'ask_user',
-    icon: '&#x2753;', // Question mark
-    label: 'Ask User',
-    headerColor: '#9B59B6', // Purple - human interaction
-    inputs: [
-      { id: 'exec-in', label: '', type: 'execution' },
-      { id: 'prompt', label: 'prompt', type: 'string' },
-      { id: 'choices', label: 'choices', type: 'array' },
-    ],
-    outputs: [
-      { id: 'exec-out', label: '', type: 'execution' },
-      { id: 'response', label: 'response', type: 'string' },
-    ],
-    category: 'effects',
-  },
-  {
-    type: 'answer_user',
-    icon: '&#x1F4AC;', // Speech bubble
-    label: 'Answer User',
-    headerColor: '#9B59B6', // Purple - human interaction
-    inputs: [
-      { id: 'exec-in', label: '', type: 'execution' },
-      { id: 'message', label: 'message', type: 'string' },
-    ],
-    outputs: [
-      { id: 'exec-out', label: '', type: 'execution' },
-      { id: 'message', label: 'message', type: 'string' },
-    ],
-    category: 'effects',
-  },
-  {
-    type: 'llm_call',
-    icon: '&#x1F4AD;', // Thought bubble
-    label: 'LLM Call',
-    headerColor: '#3498DB', // Blue - AI
-    inputs: [
-      { id: 'exec-in', label: '', type: 'execution' },
-      { id: 'provider', label: 'provider', type: 'string' },
-      { id: 'model', label: 'model', type: 'string' },
-      { id: 'system', label: 'system', type: 'string' },
-      { id: 'prompt', label: 'prompt', type: 'string' },
-    ],
-    outputs: [
-      { id: 'exec-out', label: '', type: 'execution' },
-      { id: 'response', label: 'response', type: 'string' },
-    ],
-    category: 'effects',
-  },
-  {
     type: 'wait_until',
     icon: '&#x23F3;', // Hourglass
     label: 'Delay',
@@ -408,37 +443,34 @@ const EFFECT_NODES: NodeTemplate[] = [
     category: 'effects',
   },
   {
-    type: 'wait_event',
-    icon: '&#x1F514;', // Bell
-    label: 'Wait Event',
-    headerColor: '#E74C3C', // Red - waiting
+    type: 'read_file',
+    icon: '&#x1F4C4;', // Page facing up
+    label: 'Read File',
+    headerColor: '#16A085', // Teal - IO
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
-      { id: 'event_key', label: 'event_key', type: 'string' },
+      { id: 'file_path', label: 'file_path', type: 'string' },
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
-      { id: 'event_data', label: 'event_data', type: 'object' },
+      { id: 'content', label: 'content', type: 'any' },
     ],
     category: 'effects',
   },
   {
-    type: 'emit_event',
-    icon: '&#x1F4E3;', // Megaphone
-    label: 'Emit Event',
-    headerColor: '#E74C3C', // Red - eventing
+    type: 'write_file',
+    icon: '&#x1F4BE;', // Floppy disk
+    label: 'Write File',
+    headerColor: '#16A085', // Teal - IO
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
-      { id: 'name', label: 'name', type: 'string' },
-      { id: 'scope', label: 'scope', type: 'string' },
-      { id: 'payload', label: 'payload', type: 'any' },
-      { id: 'session_id', label: 'session_id', type: 'string' },
+      { id: 'file_path', label: 'file_path', type: 'string' },
+      { id: 'content', label: 'content', type: 'any' },
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
-      { id: 'delivered', label: 'delivered', type: 'number' },
-      { id: 'delivered_to', label: 'delivered_to', type: 'array' },
-      { id: 'wait_key', label: 'wait_key', type: 'string' },
+      { id: 'bytes', label: 'bytes', type: 'number' },
+      { id: 'file_path', label: 'file_path', type: 'string' },
     ],
     category: 'effects',
   },

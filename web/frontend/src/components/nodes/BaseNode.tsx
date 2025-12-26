@@ -135,6 +135,7 @@ export const BaseNode = memo(function BaseNode({
   const isProviderModelsNode = data.nodeType === 'provider_models';
   const isDelayNode = data.nodeType === 'wait_until';
   const isOnEventNode = data.nodeType === 'on_event';
+  const isWriteFileNode = data.nodeType === 'write_file';
 
   const hasModelControls = isLlmNode || isAgentNode;
   const hasProviderDropdown = hasModelControls || isProviderModelsNode;
@@ -271,6 +272,9 @@ export const BaseNode = memo(function BaseNode({
 
   const isSequenceLike = data.nodeType === 'sequence';
   const isParallelLike = data.nodeType === 'parallel';
+  const isSwitchNode = data.nodeType === 'switch';
+  const isConcatNode = data.nodeType === 'concat';
+  const isArrayConcatNode = data.nodeType === 'array_concat';
 
   const delayDurationType = (data.effectConfig?.durationType ?? 'seconds') as
     | 'seconds'
@@ -308,6 +312,12 @@ export const BaseNode = memo(function BaseNode({
     return Number.isFinite(n) ? n : null;
   };
 
+  const parseCaseId = (raw: string): string | null => {
+    if (!raw.startsWith('case:')) return null;
+    const id = raw.slice('case:'.length);
+    return id ? id : null;
+  };
+
   const addThenPin = useCallback(
     (e: MouseEvent) => {
       e.preventDefault();
@@ -338,6 +348,79 @@ export const BaseNode = memo(function BaseNode({
       updateNodeData(id, { outputs: nextOutputs });
     },
     [data.outputs, id, isParallelLike, updateNodeData]
+  );
+
+  const addSwitchCasePin = useCallback(
+    (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!isSwitchNode) return;
+
+      const existingCases = data.switchConfig?.cases ?? [];
+
+      const newId =
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? (crypto.randomUUID() as string).slice(0, 8)
+          : `c${Date.now().toString(16)}${Math.random().toString(16).slice(2, 6)}`;
+
+      const nextCases = [...existingCases, { id: newId, value: '' }];
+
+      const existingExec = data.outputs.filter((p) => p.type === 'execution');
+      const existingById = new Map(existingExec.map((p) => [p.id, p] as const));
+
+      const nextCasePins = nextCases.map((c) => {
+        const pid = `case:${c.id}`;
+        const existing = existingById.get(pid);
+        return {
+          id: pid,
+          label: c.value || existing?.label || 'case',
+          type: 'execution' as const,
+        };
+      });
+
+      const defaultExisting = existingById.get('default');
+      const defaultPin = { id: 'default', label: defaultExisting?.label || 'default', type: 'execution' as const };
+
+      const reserved = new Set<string>([...nextCasePins.map((p) => p.id), 'default']);
+      const extraExecPins = existingExec.filter((p) => !reserved.has(p.id));
+
+      updateNodeData(id, {
+        switchConfig: { cases: nextCases },
+        outputs: [...nextCasePins, defaultPin, ...extraExecPins],
+      });
+    },
+    [data.outputs, data.switchConfig?.cases, id, isSwitchNode, updateNodeData]
+  );
+
+  const addConcatInputPin = useCallback(
+    (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!isConcatNode && !isArrayConcatNode) return;
+
+      const pins = data.inputs.filter((p) => p.type !== 'execution');
+      const ids = new Set(pins.map((p) => p.id));
+
+      let nextId: string | null = null;
+      for (let code = 97; code <= 122; code++) {
+        const candidate = String.fromCharCode(code);
+        if (!ids.has(candidate)) {
+          nextId = candidate;
+          break;
+        }
+      }
+      if (!nextId) {
+        let idx = pins.length + 1;
+        while (ids.has(`p${idx}`)) idx++;
+        nextId = `p${idx}`;
+      }
+
+      const nextPinType = isArrayConcatNode ? ('array' as const) : ('string' as const);
+      updateNodeData(id, {
+        inputs: [...data.inputs, { id: nextId, label: nextId, type: nextPinType }],
+      });
+    },
+    [data.inputs, id, isArrayConcatNode, isConcatNode, updateNodeData]
   );
 
   const overlayHandleStyle = {
@@ -392,7 +475,7 @@ export const BaseNode = memo(function BaseNode({
         <span className="node-title">{data.label}</span>
 
         {/* Execution output pins (right side of header) */}
-        {outputExecs.length === 1 && (
+        {outputExecs.length === 1 && !isSwitchNode && (
           <div className="exec-pin exec-pin-out nodrag">
             <span
               className="exec-shape"
@@ -419,7 +502,7 @@ export const BaseNode = memo(function BaseNode({
       {/* Body with pins */}
       <div className="node-body">
         {/* Multiple execution outputs (for branch nodes like If/Else) */}
-        {outputExecs.length > 1 && (
+        {(outputExecs.length > 1 || isSwitchNode) && (
           <div className="pins-right exec-branches">
             {(() => {
               // Special layout:
@@ -485,6 +568,82 @@ export const BaseNode = memo(function BaseNode({
                         />
                       </div>
                     ) : null}
+                  </>
+                );
+              }
+
+              // Switch: case pins + "Add pin" + Default (always visible)
+              if (isSwitchNode) {
+                const casePins = outputExecs.filter((p) => parseCaseId(p.id) !== null);
+                const defaultPin = outputExecs.find((p) => p.id === 'default');
+                const extras = outputExecs.filter((p) => p.id !== 'default' && parseCaseId(p.id) === null);
+
+                return (
+                  <>
+                    {casePins.map((pin) => (
+                      <div key={pin.id} className="pin-row output exec-branch nodrag">
+                        <span className="pin-label">{pin.label}</span>
+                        <span
+                          className="pin-shape"
+                          style={{ color: PIN_COLORS.execution }}
+                          onClick={(e) => handlePinClick(e, pin.id, false)}
+                        >
+                          <PinShape type="execution" size={12} filled={isPinConnected(pin.id, false)} />
+                        </span>
+                        <Handle
+                          type="source"
+                          position={Position.Right}
+                          id={pin.id}
+                          className="exec-handle"
+                          onMouseDownCapture={(e) => handlePinClick(e, pin.id, false)}
+                        />
+                      </div>
+                    ))}
+
+                    {extras.map((pin) => (
+                      <div key={pin.id} className="pin-row output exec-branch nodrag">
+                        <span className="pin-label">{pin.label}</span>
+                        <span
+                          className="pin-shape"
+                          style={{ color: PIN_COLORS.execution }}
+                          onClick={(e) => handlePinClick(e, pin.id, false)}
+                        >
+                          <PinShape type="execution" size={12} filled={isPinConnected(pin.id, false)} />
+                        </span>
+                        <Handle
+                          type="source"
+                          position={Position.Right}
+                          id={pin.id}
+                          className="exec-handle"
+                          onMouseDownCapture={(e) => handlePinClick(e, pin.id, false)}
+                        />
+                      </div>
+                    ))}
+
+                    {defaultPin ? (
+                      <div key={defaultPin.id} className="pin-row output exec-branch nodrag">
+                        <span className="pin-label">{defaultPin.label}</span>
+                        <span
+                          className="pin-shape"
+                          style={{ color: PIN_COLORS.execution }}
+                          onClick={(e) => handlePinClick(e, defaultPin.id, false)}
+                        >
+                          <PinShape type="execution" size={12} filled={isPinConnected(defaultPin.id, false)} />
+                        </span>
+                        <Handle
+                          type="source"
+                          position={Position.Right}
+                          id={defaultPin.id}
+                          className="exec-handle"
+                          onMouseDownCapture={(e) => handlePinClick(e, defaultPin.id, false)}
+                        />
+                      </div>
+                    ) : null}
+
+                    <div className="pin-row output exec-add-pin" onClick={addSwitchCasePin}>
+                      <span className="pin-label">Add pin</span>
+                      <span className="exec-add-plus">+</span>
+                    </div>
                   </>
                 );
               }
@@ -561,13 +720,15 @@ export const BaseNode = memo(function BaseNode({
                 const isEmitEventName = isEmitEventNode && pin.id === 'name';
                 const isEmitEventScopePin = isEmitEventNode && pin.id === 'scope';
                 const isOnEventScopePin = isOnEventNode && pin.id === 'scope';
+                const isWriteFileContentPin = isWriteFileNode && pin.id === 'content';
                 const hasSpecialControl =
                   (hasProviderDropdown && pin.id === 'provider') ||
                   (hasModelControls && pin.id === 'model') ||
                   (isAgentNode && pin.id === 'tools') ||
                   isEmitEventName ||
                   isEmitEventScopePin ||
-                  isOnEventScopePin;
+                  isOnEventScopePin ||
+                  isWriteFileContentPin;
 
                 if (isEmitEventName) {
                   const pinned = pinDefaults.name;
@@ -616,13 +777,32 @@ export const BaseNode = memo(function BaseNode({
                   );
                 }
 
+                if (isWriteFileContentPin && !connected) {
+                  const raw = pinDefaults.content;
+                  controls.push(
+                    <input
+                      key="file-content"
+                      className="af-pin-input nodrag"
+                      type="text"
+                      value={typeof raw === 'string' ? raw : ''}
+                      placeholder=""
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => setPinDefault('content', e.target.value)}
+                    />
+                  );
+                }
+
                 if (!connected && isPrimitive && !hasSpecialControl) {
                   const raw = pinDefaults[pin.id];
                   if (pin.type === 'string') {
                     controls.push(
                       <input
                         key="pin-default"
-                        className="af-pin-input nodrag"
+                        className={clsx(
+                          'af-pin-input nodrag',
+                          isSwitchNode && pin.id === 'value' && 'af-pin-input--switch-value'
+                        )}
                         type="text"
                         value={typeof raw === 'string' ? raw : ''}
                         placeholder=""
@@ -758,6 +938,14 @@ export const BaseNode = memo(function BaseNode({
               })()}
             </div>
           ))}
+
+          {(isConcatNode || isArrayConcatNode) && (
+            <div className="pin-row exec-add-pin nodrag" onClick={addConcatInputPin}>
+              <span className="pin-shape" style={{ opacity: 0 }} aria-hidden="true" />
+              <span className="pin-label">Add pin</span>
+              <span className="exec-add-plus">+</span>
+            </div>
+          )}
         </div>
 
         {/* Data output pins */}

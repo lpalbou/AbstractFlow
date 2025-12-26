@@ -378,9 +378,22 @@ button.primary:hover:not(:disabled) {
   color: var(--text-primary);
 }
 
+.af-pin-input--switch-value {
+  width: 120px;
+  max-width: 120px;
+}
+
 .af-pin-input[type='number'] {
   width: 96px;
   max-width: 96px;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.af-pin-input[type='number']::-webkit-outer-spin-button,
+.af-pin-input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .af-pin-input:focus {
