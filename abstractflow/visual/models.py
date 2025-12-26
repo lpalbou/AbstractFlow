@@ -214,6 +214,7 @@ class ExecutionEvent(BaseModel):
     """Real-time execution event for WebSocket."""
 
     type: str  # "node_start", "node_complete", "flow_complete", "flow_error"
+    runId: Optional[str] = None
     nodeId: Optional[str] = None
     result: Optional[Any] = None
     error: Optional[str] = None

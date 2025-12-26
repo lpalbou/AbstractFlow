@@ -204,7 +204,8 @@
 .node-config-label {
   font-size: 11px;
   color: var(--text-secondary);
-  flex: 0 0 5ch;
+  flex: 0 0 auto;
+  min-width: 5ch;
   text-transform: capitalize;
   white-space: nowrap;
 }

@@ -110,7 +110,7 @@ export function Toolbar() {
   });
 
   // WebSocket for real-time execution (if flow is saved)
-  const { isWaiting, waitingInfo, resumeFlow, runFlow } = useWebSocket({
+  const { isWaiting, isPaused, waitingInfo, resumeFlow, runFlow, pauseRun, resumeRun, cancelRun } = useWebSocket({
     flowId: flowId || '',
     onEvent: (event) => {
       console.log('Execution event:', event);
@@ -155,6 +155,12 @@ export function Toolbar() {
           error: event.error || 'Unknown error',
         });
         toast.error('Workflow failed');
+      } else if (event.type === 'flow_cancelled') {
+        setRunResult({
+          success: false,
+          error: 'Cancelled',
+        });
+        toast('Workflow cancelled');
       }
     },
     onWaiting: (info) => {
@@ -354,11 +360,15 @@ export function Toolbar() {
         onRun={handleRunExecute}
         onRunAgain={handleRunAgain}
         isRunning={isRunning}
+        isPaused={isPaused}
         result={runResult}
         events={executionEvents}
         isWaiting={isWaiting}
         waitingInfo={waitingInfo}
         onResume={resumeFlow}
+        onPause={pauseRun}
+        onResumeRun={resumeRun}
+        onCancelRun={cancelRun}
       />
 
       {/* Load flows modal */}

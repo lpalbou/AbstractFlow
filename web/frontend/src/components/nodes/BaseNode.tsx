@@ -135,6 +135,7 @@ export const BaseNode = memo(function BaseNode({
   const isProviderModelsNode = data.nodeType === 'provider_models';
   const isDelayNode = data.nodeType === 'wait_until';
   const isOnEventNode = data.nodeType === 'on_event';
+  const isOnScheduleNode = data.nodeType === 'on_schedule';
   const isWriteFileNode = data.nodeType === 'write_file';
 
   const hasModelControls = isLlmNode || isAgentNode;
@@ -268,6 +269,32 @@ export const BaseNode = memo(function BaseNode({
       updateNodeData(id, { eventConfig: { ...prev, scope: v } });
     },
     [data.eventConfig, id, isOnEventNode, updateNodeData]
+  );
+
+  const onScheduleSchedule = useMemo(() => {
+    const raw = data.eventConfig?.schedule;
+    const s = typeof raw === 'string' ? raw : '';
+    return s.trim().length > 0 ? s : '15s';
+  }, [data.eventConfig?.schedule]);
+
+  const onScheduleRecurrent = data.eventConfig?.recurrent ?? true;
+
+  const setOnScheduleSchedule = useCallback(
+    (next: string) => {
+      if (!isOnScheduleNode) return;
+      const prev = data.eventConfig || {};
+      updateNodeData(id, { eventConfig: { ...prev, schedule: next } });
+    },
+    [data.eventConfig, id, isOnScheduleNode, updateNodeData]
+  );
+
+  const setOnScheduleRecurrent = useCallback(
+    (next: boolean) => {
+      if (!isOnScheduleNode) return;
+      const prev = data.eventConfig || {};
+      updateNodeData(id, { eventConfig: { ...prev, recurrent: next } });
+    },
+    [data.eventConfig, id, isOnScheduleNode, updateNodeData]
   );
 
   const isSequenceLike = data.nodeType === 'sequence';
@@ -720,6 +747,8 @@ export const BaseNode = memo(function BaseNode({
                 const isEmitEventName = isEmitEventNode && pin.id === 'name';
                 const isEmitEventScopePin = isEmitEventNode && pin.id === 'scope';
                 const isOnEventScopePin = isOnEventNode && pin.id === 'scope';
+                const isOnScheduleTimestampPin = isOnScheduleNode && pin.id === 'schedule';
+                const isOnScheduleRecurrentPin = isOnScheduleNode && pin.id === 'recurrent';
                 const isWriteFileContentPin = isWriteFileNode && pin.id === 'content';
                 const hasSpecialControl =
                   (hasProviderDropdown && pin.id === 'provider') ||
@@ -728,6 +757,8 @@ export const BaseNode = memo(function BaseNode({
                   isEmitEventName ||
                   isEmitEventScopePin ||
                   isOnEventScopePin ||
+                  isOnScheduleTimestampPin ||
+                  isOnScheduleRecurrentPin ||
                   isWriteFileContentPin;
 
                 if (isEmitEventName) {
@@ -774,6 +805,42 @@ export const BaseNode = memo(function BaseNode({
                       minPopoverWidth={180}
                       onChange={onChange}
                     />
+                  );
+                }
+
+                if (isOnScheduleTimestampPin && !connected) {
+                  controls.push(
+                    <input
+                      key="on-schedule-timestamp"
+                      className="af-pin-input nodrag"
+                      type="text"
+                      value={onScheduleSchedule}
+                      placeholder=""
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => setOnScheduleSchedule(e.target.value)}
+                    />
+                  );
+                }
+
+                if (isOnScheduleRecurrentPin && !connected) {
+                  controls.push(
+                    <label
+                      key="on-schedule-recurrent"
+                      className="af-pin-checkbox nodrag"
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        className="af-pin-checkbox-input"
+                        type="checkbox"
+                        checked={onScheduleRecurrent}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => setOnScheduleRecurrent(e.target.checked)}
+                      />
+                      <span className="af-pin-checkbox-box" aria-hidden="true" />
+                    </label>
                   );
                 }
 

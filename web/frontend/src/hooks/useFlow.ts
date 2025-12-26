@@ -511,6 +511,58 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         data = { ...data, inputs: [...canonicalInputs, ...extras] };
       }
 
+      // Backward-compat: On Schedule pins (schedule/recurrent inputs, time output).
+      if (data.nodeType === 'on_schedule') {
+        const existingInputs = Array.isArray(data.inputs) ? data.inputs : [];
+        const byInputId = new Map(existingInputs.map((p) => [p.id, p] as const));
+        const usedInputs = new Set<string>();
+
+        const wantInput = (pin: Pin): Pin => {
+          const prev = byInputId.get(pin.id);
+          usedInputs.add(pin.id);
+          if (!prev) return pin;
+          if (prev.label === pin.label && prev.type === pin.type) return prev;
+          return { ...prev, label: pin.label, type: pin.type };
+        };
+
+        const canonicalInputs: Pin[] = [
+          wantInput({ id: 'schedule', label: 'timestamp', type: 'string' }),
+          wantInput({ id: 'recurrent', label: 'recurrent', type: 'boolean' }),
+        ];
+
+        const inputExtras = existingInputs.filter((p) => !usedInputs.has(p.id));
+
+        const existingOutputs = Array.isArray(data.outputs) ? data.outputs : [];
+        const byId = new Map(existingOutputs.map((p) => [p.id, p] as const));
+        const used = new Set<string>();
+
+        const want = (pin: Pin): Pin => {
+          const prev = byId.get(pin.id);
+          used.add(pin.id);
+          if (!prev) return pin;
+          if (prev.label === pin.label && prev.type === pin.type) return prev;
+          return { ...prev, label: pin.label, type: pin.type };
+        };
+
+        const canonicalOutputs: Pin[] = [
+          want({ id: 'exec-out', label: '', type: 'execution' }),
+          want({ id: 'timestamp', label: 'time', type: 'string' }),
+        ];
+
+        const extras = existingOutputs.filter((p) => !used.has(p.id) && p.id !== 'recurrent');
+        const prevCfg = data.eventConfig && typeof data.eventConfig === 'object' ? data.eventConfig : undefined;
+        const schedule =
+          typeof prevCfg?.schedule === 'string' && prevCfg.schedule.trim().length > 0 ? prevCfg.schedule : '15s';
+        const recurrent = typeof prevCfg?.recurrent === 'boolean' ? prevCfg.recurrent : true;
+
+        data = {
+          ...data,
+          inputs: [...canonicalInputs, ...inputExtras],
+          outputs: [...canonicalOutputs, ...extras],
+          eventConfig: { ...(prevCfg || {}), schedule, recurrent },
+        };
+      }
+
       // Backward-compat + canonical ordering for file IO nodes (remove deprecated `file_type` pin).
       if (data.nodeType === 'read_file' || data.nodeType === 'write_file') {
         const existingInputs = Array.isArray(data.inputs) ? data.inputs : [];

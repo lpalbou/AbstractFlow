@@ -18,11 +18,15 @@ interface RunFlowModalProps {
   onRun: (inputData: Record<string, unknown>) => void;
   onRunAgain: () => void;
   isRunning: boolean;
+  isPaused?: boolean;
   result: FlowRunResult | null;
   events?: ExecutionEvent[];
   isWaiting?: boolean;
   waitingInfo?: WaitingInfo | null;
   onResume?: (response: string) => void;
+  onPause?: () => void;
+  onResumeRun?: () => void;
+  onCancelRun?: () => void;
 }
 
 // Map pin types to input field types
@@ -63,11 +67,15 @@ export function RunFlowModal({
   onRun,
   onRunAgain,
   isRunning,
+  isPaused = false,
   result,
   events = [],
   isWaiting = false,
   waitingInfo = null,
   onResume,
+  onPause,
+  onResumeRun,
+  onCancelRun,
 }: RunFlowModalProps) {
   const { nodes, flowName } = useFlowStore();
 
@@ -1201,6 +1209,29 @@ export function RunFlowModal({
 
         {/* Actions */}
         <div className="modal-actions">
+          {onCancelRun && (
+            <button
+              className="modal-button cancel"
+              onClick={onCancelRun}
+              disabled={!(isRunning || isPaused || isWaiting)}
+            >
+              Cancel Run
+            </button>
+          )}
+
+          {(onPause || onResumeRun) && (
+            <button
+              className={isPaused ? 'modal-button primary' : 'modal-button cancel'}
+              onClick={() => {
+                if (isPaused) onResumeRun?.();
+                else onPause?.();
+              }}
+              disabled={isPaused ? !isPaused : !(isRunning && !isWaiting)}
+            >
+              {isPaused ? 'Resume' : 'Pause'}
+            </button>
+          )}
+
           <button
             className="modal-button cancel"
             onClick={onClose}

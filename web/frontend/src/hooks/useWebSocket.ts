@@ -24,7 +24,9 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
   const wsFlowIdRef = useRef<string>(flowId);
   const [connected, setConnected] = useState(false);
   const [isWaiting, setIsWaiting] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [waitingInfo, setWaitingInfo] = useState<WaitingInfo | null>(null);
+  const [runId, setRunId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const { setExecutingNodeId, setIsRunning } = useFlowStore();
@@ -36,7 +38,9 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
         case 'flow_start':
           setIsRunning(true);
           setIsWaiting(false);
+          setIsPaused(false);
           setWaitingInfo(null);
+          setRunId(event.runId || null);
           break;
         case 'node_start':
           setExecutingNodeId(event.nodeId || null);
@@ -48,6 +52,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
         case 'flow_waiting':
           // Flow is paused waiting for user input
           setIsWaiting(true);
+          setIsPaused(false);
           const info: WaitingInfo = {
             prompt: event.prompt || 'Please respond:',
             choices: event.choices || [],
@@ -57,16 +62,36 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
           setWaitingInfo(info);
           onWaiting?.(info);
           break;
+        case 'flow_paused':
+          setIsPaused(true);
+          setIsWaiting(false);
+          setWaitingInfo(null);
+          setIsRunning(true);
+          setRunId(event.runId || runId || null);
+          break;
+        case 'flow_resumed':
+          setIsPaused(false);
+          setIsRunning(true);
+          setRunId(event.runId || runId || null);
+          break;
+        case 'flow_cancelled':
+          setIsRunning(false);
+          setIsPaused(false);
+          setIsWaiting(false);
+          setWaitingInfo(null);
+          setExecutingNodeId(null);
+          break;
         case 'flow_complete':
         case 'flow_error':
           setIsRunning(false);
           setIsWaiting(false);
+          setIsPaused(false);
           setWaitingInfo(null);
           setExecutingNodeId(null);
           break;
       }
     },
-    [setExecutingNodeId, setIsRunning, onWaiting]
+    [setExecutingNodeId, setIsRunning, onWaiting, runId]
   );
 
   // Ensure strict isolation: when switching flows, disconnect the old socket and
@@ -84,7 +109,9 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
       setConnected(false);
       setError(null);
       setIsWaiting(false);
+      setIsPaused(false);
       setWaitingInfo(null);
+      setRunId(null);
       setExecutingNodeId(null);
       setIsRunning(false);
       wsFlowIdRef.current = flowId;
@@ -191,14 +218,32 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
   // Resume a waiting flow with user response
   const resumeFlow = useCallback(
     (response: string) => {
-      if (wsRef.current?.readyState === WebSocket.OPEN && isWaiting) {
+      if (wsRef.current?.readyState === WebSocket.OPEN && isWaiting && !isPaused) {
         send({ type: 'resume', response });
         setIsWaiting(false);
         setWaitingInfo(null);
       }
     },
-    [send, isWaiting]
+    [send, isWaiting, isPaused]
   );
+
+  const pauseRun = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN && runId) {
+      send({ type: 'control', action: 'pause', run_id: runId });
+    }
+  }, [send, runId]);
+
+  const resumeRun = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN && runId) {
+      send({ type: 'control', action: 'resume', run_id: runId });
+    }
+  }, [send, runId]);
+
+  const cancelRun = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN && runId) {
+      send({ type: 'control', action: 'cancel', run_id: runId });
+    }
+  }, [send, runId]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -215,7 +260,12 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
     send,
     runFlow,
     resumeFlow,
+    pauseRun,
+    resumeRun,
+    cancelRun,
     isWaiting,
+    isPaused,
+    runId,
     waitingInfo,
   };
 }

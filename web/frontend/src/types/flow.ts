@@ -197,7 +197,17 @@ export interface VisualEdge {
 
 // Execution events from WebSocket
 export interface ExecutionEvent {
-  type: 'node_start' | 'node_complete' | 'flow_start' | 'flow_complete' | 'flow_error' | 'flow_waiting';
+  type:
+    | 'node_start'
+    | 'node_complete'
+    | 'flow_start'
+    | 'flow_complete'
+    | 'flow_error'
+    | 'flow_waiting'
+    | 'flow_paused'
+    | 'flow_resumed'
+    | 'flow_cancelled';
+  runId?: string;
   nodeId?: string;
   result?: unknown;
   error?: string;

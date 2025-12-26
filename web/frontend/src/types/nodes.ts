@@ -80,10 +80,14 @@ const EVENT_NODES: NodeTemplate[] = [
     icon: '&#x23F0;', // Alarm clock
     label: 'On Schedule',
     headerColor: '#C0392B',
-    inputs: [], // No inputs - triggered by timer/schedule
+    inputs: [
+      // Configuration pins (Blueprint-style): configurable via inline quick access when unconnected.
+      { id: 'schedule', label: 'timestamp', type: 'string' },
+      { id: 'recurrent', label: 'recurrent', type: 'boolean' },
+    ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
-      { id: 'timestamp', label: 'timestamp', type: 'string' },
+      { id: 'timestamp', label: 'time', type: 'string' },
     ],
     category: 'events',
   },
@@ -588,6 +592,7 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
     ...(template.type === 'concat' && { concatConfig: { separator: ' ' } }),
     ...(template.type === 'switch' && { switchConfig: { cases: [] } }),
     ...(template.type === 'on_event' && { eventConfig: { name: 'my_event', scope: 'session' } }),
+    ...(template.type === 'on_schedule' && { eventConfig: { schedule: '15s', recurrent: true } }),
     ...(template.type === 'model_catalog' && { modelCatalogConfig: { allowedProviders: [], allowedModels: [], index: 0 } }),
     ...(template.type === 'provider_models' && { providerModelsConfig: { provider: '', allowedModels: [] } }),
     ...(template.type === 'emit_event' && { effectConfig: { name: 'my_event', scope: 'session', sessionId: '' } }),

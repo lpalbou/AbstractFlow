@@ -11,11 +11,27 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from ..models import ExecutionEvent, VisualFlow
 from ..services.executor import create_visual_runner
+from ..services.runtime_stores import get_runtime_stores
 
 router = APIRouter(tags=["websocket"])
 
 # Active WebSocket connections
 _connections: Dict[str, WebSocket] = {}
+
+# Active execution tasks per connection (run/resume segments).
+_active_tasks: Dict[str, asyncio.Task] = {}
+
+# Active runner per connection (includes runtime + run_id).
+_active_runners: Dict[str, Any] = {}
+
+# Root run_id per connection (when started).
+_active_run_ids: Dict[str, str] = {}
+
+# Pause gate per connection: cleared when paused, set when running.
+_control_gates: Dict[str, asyncio.Event] = {}
+
+# Per-connection lock to serialize runtime mutations (tick/resume/pause/cancel).
+_connection_locks: Dict[str, asyncio.Lock] = {}
 
 # Active FlowRunners for waiting flows (keyed by connection_id)
 _waiting_runners: Dict[str, Any] = {}
@@ -74,12 +90,71 @@ def _json_safe(value: Any, *, depth: int = 0, seen: Optional[set[int]] = None) -
     return str(value)
 
 
+def _is_pause_wait(wait: Any, *, run_id: str) -> bool:
+    """Return True if this WaitState represents a synthetic manual pause."""
+    if wait is None:
+        return False
+    try:
+        reason = getattr(wait, "reason", None)
+        reason_value = reason.value if hasattr(reason, "value") else str(reason) if reason else None
+    except Exception:
+        reason_value = None
+    if reason_value != "user":
+        return False
+    try:
+        wait_key = getattr(wait, "wait_key", None)
+        if isinstance(wait_key, str) and wait_key == f"pause:{run_id}":
+            return True
+    except Exception:
+        pass
+    try:
+        details = getattr(wait, "details", None)
+        if isinstance(details, dict) and details.get("kind") == "pause":
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _list_descendant_run_ids(runtime: Any, root_run_id: str) -> list[str]:
+    """Best-effort BFS of the run tree rooted at root_run_id (includes root)."""
+    out: list[str] = []
+    queue: list[str] = [root_run_id]
+    seen: set[str] = set()
+
+    run_store = getattr(runtime, "run_store", None)
+    list_children = getattr(run_store, "list_children", None)
+
+    while queue:
+        rid = queue.pop(0)
+        if rid in seen:
+            continue
+        seen.add(rid)
+        out.append(rid)
+
+        if callable(list_children):
+            try:
+                children = list_children(parent_run_id=rid)
+                for c in children:
+                    cid = getattr(c, "run_id", None)
+                    if isinstance(cid, str) and cid and cid not in seen:
+                        queue.append(cid)
+            except Exception:
+                continue
+
+    return out
+
+
 @router.websocket("/ws/{flow_id}")
 async def websocket_execution(websocket: WebSocket, flow_id: str):
     """WebSocket endpoint for real-time flow execution updates."""
     await websocket.accept()
     connection_id = f"{flow_id}:{id(websocket)}"
     _connections[connection_id] = websocket
+    _connection_locks[connection_id] = asyncio.Lock()
+    gate = asyncio.Event()
+    gate.set()
+    _control_gates[connection_id] = gate
 
     try:
         while True:
@@ -88,19 +163,42 @@ async def websocket_execution(websocket: WebSocket, flow_id: str):
             message = json.loads(data)
 
             if message.get("type") == "run":
-                # Execute flow with real-time updates
-                await execute_with_updates(
-                    websocket=websocket,
-                    flow_id=flow_id,
-                    input_data=message.get("input_data", {}),
-                    connection_id=connection_id,
+                existing = _active_tasks.get(connection_id)
+                if existing is not None and not existing.done():
+                    await websocket.send_json(
+                        ExecutionEvent(type="flow_error", error="A run is already in progress on this connection").model_dump()
+                    )
+                    continue
+                task = asyncio.create_task(
+                    execute_with_updates(
+                        websocket=websocket,
+                        flow_id=flow_id,
+                        input_data=message.get("input_data", {}),
+                        connection_id=connection_id,
+                    )
                 )
+                _active_tasks[connection_id] = task
             elif message.get("type") == "resume":
-                # Resume a waiting flow with user response
-                await resume_waiting_flow(
+                existing = _active_tasks.get(connection_id)
+                if existing is not None and not existing.done():
+                    await websocket.send_json(
+                        ExecutionEvent(type="flow_error", error="Cannot resume while a run is in progress").model_dump()
+                    )
+                    continue
+                task = asyncio.create_task(
+                    resume_waiting_flow(
+                        websocket=websocket,
+                        connection_id=connection_id,
+                        response=message.get("response", ""),
+                    )
+                )
+                _active_tasks[connection_id] = task
+            elif message.get("type") == "control":
+                action = str(message.get("action") or "").strip().lower()
+                await control_run(
                     websocket=websocket,
                     connection_id=connection_id,
-                    response=message.get("response", ""),
+                    action=action,
                 )
             elif message.get("type") == "ping":
                 await websocket.send_json({"type": "pong"})
@@ -108,10 +206,17 @@ async def websocket_execution(websocket: WebSocket, flow_id: str):
     except WebSocketDisconnect:
         pass
     finally:
+        task = _active_tasks.pop(connection_id, None)
+        if task is not None and not task.done():
+            task.cancel()
         if connection_id in _connections:
             del _connections[connection_id]
-        if connection_id in _waiting_runners:
-            del _waiting_runners[connection_id]
+        _waiting_runners.pop(connection_id, None)
+        _waiting_steps.pop(connection_id, None)
+        _active_runners.pop(connection_id, None)
+        _active_run_ids.pop(connection_id, None)
+        _control_gates.pop(connection_id, None)
+        _connection_locks.pop(connection_id, None)
 
 
 async def execute_with_updates(
@@ -133,17 +238,29 @@ async def execute_with_updates(
     visual_flow = _flows[flow_id]
 
     try:
-        runner = create_visual_runner(visual_flow, flows=_flows)
+        gate = _control_gates.get(connection_id)
+        if gate is not None:
+            gate.set()
 
-        # Send flow start event
-        await websocket.send_json(
-            ExecutionEvent(type="flow_start").model_dump()
+        run_store, ledger_store, artifact_store = get_runtime_stores()
+        runner = create_visual_runner(
+            visual_flow,
+            flows=_flows,
+            run_store=run_store,
+            ledger_store=ledger_store,
+            artifact_store=artifact_store,
         )
+        _active_runners[connection_id] = runner
 
         # Start execution
         run_id = runner.start(input_data)
+        if isinstance(run_id, str) and run_id:
+            _active_run_ids[connection_id] = run_id
+        await websocket.send_json({"type": "flow_start", "runId": run_id})
 
         # Execute and handle waiting
+        if gate is not None:
+            await gate.wait()
         await _execute_runner_loop(websocket, runner, connection_id)
 
     except Exception as e:
@@ -155,6 +272,97 @@ async def execute_with_updates(
                 error=str(e),
             ).model_dump()
         )
+    finally:
+        # Allow subsequent control/run messages to spawn new tasks.
+        _active_tasks.pop(connection_id, None)
+
+
+async def control_run(
+    *,
+    websocket: WebSocket,
+    connection_id: str,
+    action: str,
+) -> None:
+    """Handle control operations (pause/resume/cancel) for the current run."""
+    runner = _active_runners.get(connection_id) or _waiting_runners.get(connection_id)
+    run_id = _active_run_ids.get(connection_id) or getattr(runner, "run_id", None)
+
+    if not isinstance(run_id, str) or not run_id:
+        await websocket.send_json(ExecutionEvent(type="flow_error", error="No active run to control").model_dump())
+        return
+
+    runtime = getattr(runner, "runtime", None) if runner is not None else None
+    if runtime is None:
+        await websocket.send_json(ExecutionEvent(type="flow_error", error="Runner has no runtime").model_dump())
+        return
+
+    gate = _control_gates.get(connection_id)
+    lock = _connection_locks.get(connection_id)
+
+    action2 = str(action or "").strip().lower()
+    if action2 not in {"pause", "resume", "cancel"}:
+        await websocket.send_json(
+            ExecutionEvent(type="flow_error", error=f"Unknown control action '{action2}'").model_dump()
+        )
+        return
+
+    run_ids = _list_descendant_run_ids(runtime, run_id)
+
+    def _apply(fn_name: str, *, reason: Optional[str] = None) -> None:
+        fn = getattr(runtime, fn_name, None)
+        if not callable(fn):
+            raise RuntimeError(f"Runtime missing '{fn_name}()'")
+        for rid in run_ids:
+            if reason is None:
+                fn(rid)
+            else:
+                fn(rid, reason=reason)
+
+    try:
+        if action2 == "pause":
+            if gate is not None:
+                gate.clear()
+            if lock is not None:
+                async with lock:
+                    await asyncio.to_thread(_apply, "pause_run", reason="Paused via AbstractFlow UI")
+            else:
+                await asyncio.to_thread(_apply, "pause_run", reason="Paused via AbstractFlow UI")
+            await websocket.send_json({"type": "flow_paused", "runId": run_id})
+            return
+
+        if action2 == "resume":
+            if lock is not None:
+                async with lock:
+                    await asyncio.to_thread(_apply, "resume_run")
+            else:
+                await asyncio.to_thread(_apply, "resume_run")
+            if gate is not None:
+                gate.set()
+            await websocket.send_json({"type": "flow_resumed", "runId": run_id})
+            return
+
+        # cancel
+        if gate is not None:
+            gate.set()
+        if lock is not None:
+            async with lock:
+                await asyncio.to_thread(_apply, "cancel_run", reason="Cancelled via AbstractFlow UI")
+        else:
+            await asyncio.to_thread(_apply, "cancel_run", reason="Cancelled via AbstractFlow UI")
+
+        # Stop any in-flight execution loop promptly.
+        task = _active_tasks.get(connection_id)
+        if task is not None and not task.done():
+            task.cancel()
+
+        _waiting_runners.pop(connection_id, None)
+        _waiting_steps.pop(connection_id, None)
+
+        await websocket.send_json({"type": "flow_cancelled", "runId": run_id})
+    except Exception as e:
+        await websocket.send_json(
+            ExecutionEvent(type="flow_error", error=f"Control action failed: {e}").model_dump()
+        )
 
 
 async def _execute_runner_loop(
@@ -164,6 +372,8 @@ async def _execute_runner_loop(
 ) -> None:
     """Execute the runner loop with waiting support."""
     flow_started_at = time.perf_counter()
+    gate = _control_gates.get(connection_id)
+    lock = _connection_locks.get(connection_id)
 
     def _node_effect_type(node_id: str) -> Optional[str]:
         try:
@@ -278,6 +488,8 @@ async def _execute_runner_loop(
     if runtime is None:
         active_node_id: Optional[str] = None
         while True:
+            if gate is not None:
+                await gate.wait()
             before = runner.get_state() if hasattr(runner, "get_state") else None
             node_before = getattr(before, "current_node", None) if before is not None else None
 
@@ -533,9 +745,15 @@ async def _execute_runner_loop(
         nonlocal total_duration_ms, total_input_tokens, total_output_tokens, token_duration_ms
         if runtime is None:
             return None
+        if gate is not None:
+            await gate.wait()
         track = _track(run_id)
 
-        before = runtime.get_state(run_id)
+        if lock is not None:
+            async with lock:
+                before = runtime.get_state(run_id)
+        else:
+            before = runtime.get_state(run_id)
         node_before = getattr(before, "current_node", None)
 
         # Blueprint-style UX: event listeners should not appear as a "running step"
@@ -596,6 +814,11 @@ async def _execute_runner_loop(
         # Special-case WAIT_UNTIL (Delay): handle time-based waits without user prompts.
         wait0 = getattr(before, "waiting", None)
         if str(getattr(before, "status", None)) == "RunStatus.WAITING":
+            if _is_pause_wait(wait0, run_id=run_id):
+                # Manual pause: never surface as flow_waiting.
+                track["active_node_id"] = None
+                track["active_duration_ms"] = 0.0
+                return None
             reason0 = getattr(wait0, "reason", None) if wait0 is not None else None
             reason_value0 = reason0.value if hasattr(reason0, "value") else str(reason0) if reason0 else None
             if reason_value0 == "until":
@@ -615,6 +838,8 @@ async def _execute_runner_loop(
                     remaining_s = 0.2
 
                 if remaining_s > 0:
+                    if gate is not None:
+                        await gate.wait()
                     await asyncio.sleep(float(min(max(remaining_s, 0.05), 0.25)))
                     return None
 
@@ -631,15 +856,27 @@ async def _execute_runner_loop(
                 except Exception:
                     resume_payload = {}
 
-                await asyncio.to_thread(
-                    runtime.resume,
-                    workflow=wf,
-                    run_id=run_id,
-                    wait_key=None,
-                    payload=resume_payload,
-                    max_steps=0,
-                )
-                after_resume = runtime.get_state(run_id)
+                if lock is not None:
+                    async with lock:
+                        await asyncio.to_thread(
+                            runtime.resume,
+                            workflow=wf,
+                            run_id=run_id,
+                            wait_key=None,
+                            payload=resume_payload,
+                            max_steps=0,
+                        )
+                        after_resume = runtime.get_state(run_id)
+                else:
+                    await asyncio.to_thread(
+                        runtime.resume,
+                        workflow=wf,
+                        run_id=run_id,
+                        wait_key=None,
+                        payload=resume_payload,
+                        max_steps=0,
+                    )
+                    after_resume = runtime.get_state(run_id)
 
                 # Close Delay node step now (the wait is finished).
                 active = track.get("active_node_id")
@@ -724,10 +961,18 @@ async def _execute_runner_loop(
         # Tick one step
         t0 = time.perf_counter()
         if is_root:
-            state = await asyncio.to_thread(runner.step)
+            if lock is not None:
+                async with lock:
+                    state = await asyncio.to_thread(runner.step)
+            else:
+                state = await asyncio.to_thread(runner.step)
         else:
             wf = _workflow_for_run_id(run_id)
-            state = await asyncio.to_thread(runtime.tick, workflow=wf, run_id=run_id, max_steps=1)
+            if lock is not None:
+                async with lock:
+                    state = await asyncio.to_thread(runtime.tick, workflow=wf, run_id=run_id, max_steps=1)
+            else:
+                state = await asyncio.to_thread(runtime.tick, workflow=wf, run_id=run_id, max_steps=1)
         duration_ms = (time.perf_counter() - t0) * 1000.0
 
         if is_root:
@@ -750,6 +995,11 @@ async def _execute_runner_loop(
         # Waiting
         if str(getattr(state, "status", None)) == "RunStatus.WAITING":
             wait = getattr(state, "waiting", None)
+            if is_root and _is_pause_wait(wait, run_id=root_run_id):
+                # Manual pause: do not surface as flow_waiting.
+                track["active_node_id"] = None
+                track["active_duration_ms"] = 0.0
+                return state
             reason = getattr(wait, "reason", None) if wait is not None else None
             reason_value = reason.value if hasattr(reason, "value") else str(reason) if reason else None
 
@@ -830,6 +1080,8 @@ async def _execute_runner_loop(
         return state
 
     while True:
+        if gate is not None:
+            await gate.wait()
         # Discover current session children (event listeners + any async descendants).
         run_ids: list[str] = [root_run_id]
         try:
@@ -854,7 +1106,13 @@ async def _execute_runner_loop(
             if rid == root_run_id:
                 continue
             try:
-                st = runtime.get_state(rid) if runtime is not None else None
+                if runtime is None:
+                    st = None
+                elif lock is not None:
+                    async with lock:
+                        st = runtime.get_state(rid)
+                else:
+                    st = runtime.get_state(rid)
                 if st is None:
                     continue
                 # Only drive active children; idle event listeners will stay waiting.
@@ -869,7 +1127,13 @@ async def _execute_runner_loop(
         # Check session completion:
         # - If root failed: error immediately (best-effort: include node id if available).
         try:
-            root_now = runtime.get_state(root_run_id) if runtime is not None else None
+            if runtime is None:
+                root_now = None
+            elif lock is not None:
+                async with lock:
+                    root_now = runtime.get_state(root_run_id)
+            else:
+                root_now = runtime.get_state(root_run_id)
         except Exception:
             root_now = None
 
@@ -886,6 +1150,12 @@ async def _execute_runner_loop(
                     error=getattr(root_now, "error", None),
                 ).model_dump()
             )
+            break
+
+        if root_now is not None and str(getattr(root_now, "status", None)) == "RunStatus.CANCELLED":
+            if connection_id in _waiting_runners:
+                del _waiting_runners[connection_id]
+            await websocket.send_json({"type": "flow_cancelled", "error": getattr(root_now, "error", None)})
             break
 
         # If root completed, keep the websocket open until all children are either:
@@ -976,6 +1246,15 @@ async def resume_waiting_flow(
     # Clear the waiting marker before resuming; `_execute_runner_loop()` uses the
     # presence of `connection_id` in `_waiting_runners` as a signal to stop the loop.
     runner = _waiting_runners.pop(connection_id)
+    _active_runners[connection_id] = runner
+    rid0 = getattr(runner, "run_id", None)
+    if isinstance(rid0, str) and rid0:
+        _active_run_ids[connection_id] = rid0
+
+    gate = _control_gates.get(connection_id)
+    if gate is not None:
+        gate.set()
+    lock = _connection_locks.get(connection_id)
 
     try:
         state = runner.get_state()
@@ -1032,7 +1311,11 @@ async def resume_waiting_flow(
 
         if reason != "subworkflow":
             # Resume with the user's response
-            runner.resume(payload={"response": response}, max_steps=0)
+            if lock is not None:
+                async with lock:
+                    runner.resume(payload={"response": response}, max_steps=0)
+            else:
+                runner.resume(payload={"response": response}, max_steps=0)
             await _maybe_close_waiting_step()
             await _execute_runner_loop(websocket, runner, connection_id)
             return

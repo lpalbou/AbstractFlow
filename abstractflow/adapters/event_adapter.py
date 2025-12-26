@@ -23,6 +23,7 @@ def create_on_event_node_handler(
     resolve_inputs: Optional[Callable[[Any], Dict[str, Any]]] = None,
     default_name: str,
     scope: str = "session",
+    flow: Optional[Any] = None,
 ) -> Callable:
     """Create an `on_event` node handler.
 
@@ -35,6 +36,19 @@ def create_on_event_node_handler(
 
     from .control_adapter import _ensure_control
 
+    def _invalidate_pure_cache() -> None:
+        if flow is None:
+            return
+        node_outputs = getattr(flow, "_node_outputs", None)
+        pure_ids = getattr(flow, "_pure_node_ids", None)
+        if not isinstance(node_outputs, dict):
+            return
+        if not isinstance(pure_ids, (set, list, tuple)):
+            return
+        for nid in list(pure_ids):
+            if isinstance(nid, str) and nid:
+                node_outputs.pop(nid, None)
+
     def _normalize_scope(raw: Any) -> str:
         v = str(raw or "session").strip().lower() or "session"
         if v not in {"session", "workflow", "run", "global"}:
@@ -43,6 +57,8 @@ def create_on_event_node_handler(
 
     def handler(run: Any, ctx: Any) -> "StepPlan":
         del ctx
+
+        _invalidate_pure_cache()
 
         resolved: Dict[str, Any] = {}
         if callable(resolve_inputs):
@@ -86,6 +102,7 @@ def create_on_schedule_node_handler(
     resolve_inputs: Optional[Callable[[Any], Dict[str, Any]]] = None,
     schedule: str,
     recurrent: bool = True,
+    flow: Optional[Any] = None,
 ) -> Callable:
     """Create an `on_schedule` node handler.
 
@@ -100,6 +117,19 @@ def create_on_schedule_node_handler(
     from abstractruntime.core.models import Effect, EffectType, StepPlan
 
     from .control_adapter import _ensure_control
+
+    def _invalidate_pure_cache() -> None:
+        if flow is None:
+            return
+        node_outputs = getattr(flow, "_node_outputs", None)
+        pure_ids = getattr(flow, "_pure_node_ids", None)
+        if not isinstance(node_outputs, dict):
+            return
+        if not isinstance(pure_ids, (set, list, tuple)):
+            return
+        for nid in list(pure_ids):
+            if isinstance(nid, str) and nid:
+                node_outputs.pop(nid, None)
 
     interval_re = re.compile(r"^\s*(\d+(?:\.\d+)?)\s*(ms|s|m|h|d)\s*$", re.IGNORECASE)
     unit_seconds: Dict[str, float] = {"ms": 0.001, "s": 1.0, "m": 60.0, "h": 3600.0, "d": 86400.0}
@@ -133,6 +163,8 @@ def create_on_schedule_node_handler(
 
     def handler(run: Any, ctx: Any) -> "StepPlan":
         del ctx
+
+        _invalidate_pure_cache()
 
         resolved: Dict[str, Any] = {}
         if callable(resolve_inputs):

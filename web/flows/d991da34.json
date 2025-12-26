@@ -1,0 +1,107 @@
+{
+  "id": "d991da34",
+  "name": "schedule",
+  "description": "",
+  "nodes": [
+    {
+      "id": "node-2",
+      "type": "answer_user",
+      "position": {
+        "x": 128.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-3",
+      "type": "on_schedule",
+      "position": {
+        "x": -192.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "on_schedule",
+        "label": "On Schedule",
+        "icon": "&#x23F0;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "timestamp",
+            "label": "timestamp",
+            "type": "string"
+          }
+        ],
+        "eventConfig": {
+          "schedule": "15s",
+          "recurrent": true
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1766781475128",
+      "source": "node-3",
+      "sourceHandle": "exec-out",
+      "target": "node-2",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1766781646516",
+      "source": "node-3",
+      "sourceHandle": "timestamp",
+      "target": "node-2",
+      "targetHandle": "message",
+      "animated": false
+    }
+  ],
+  "entryNode": "node-3",
+  "created_at": "2025-12-26T20:07:41.643055",
+  "updated_at": "2025-12-26T20:40:47.722921"
+}

@@ -738,15 +738,29 @@ def _sync_effect_results_to_node_outputs(run: Any, flow: Flow) -> None:
                 current["event"] = raw
                 mapped_value = raw
         elif effect_type == "on_schedule":
+            cfg = flow_node.effect_config if isinstance(flow_node.effect_config, dict) else {}
+            schedule_cfg = cfg.get("schedule")
+            schedule_str = str(schedule_cfg or "").strip() if schedule_cfg is not None else ""
+            recurrent_cfg = cfg.get("recurrent")
+            recurrent_flag = True if recurrent_cfg is None else bool(recurrent_cfg)
+            # ISO timestamps are treated as one-shot; recurrence is disabled.
+            if schedule_str and not isinstance(schedule_cfg, (int, float)) and schedule_str:
+                import re
+
+                if not re.match(r"^\\s*\\d+(?:\\.\\d+)?\\s*(ms|s|m|h|d)\\s*$", schedule_str, re.IGNORECASE):
+                    recurrent_flag = False
+
             if isinstance(raw, dict):
                 current.update(raw)
                 ts = raw.get("timestamp")
                 if ts is None:
                     ts = raw.get("scheduled_for")
                 current["timestamp"] = ts
+                current["recurrent"] = recurrent_flag
                 mapped_value = ts if ts is not None else raw
             else:
                 current["timestamp"] = raw
+                current["recurrent"] = recurrent_flag
                 mapped_value = raw
         elif effect_type == "wait_until":
             if isinstance(raw, dict):
@@ -1292,6 +1306,7 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
                 resolve_inputs=_resolve_inputs if callable(on_event_data_handler) else None,
                 default_name=default_name,
                 scope=scope,
+                flow=flow,
             )
         elif effect_type == "on_schedule":
             from .adapters.event_adapter import create_on_schedule_node_handler
@@ -1313,7 +1328,7 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
                     resolved = {}
                 return resolved if isinstance(resolved, dict) else {}
 
-            schedule = ""
+            schedule = "15s"
             recurrent = True
             if isinstance(effect_config, dict):
                 raw_schedule = effect_config.get("schedule")
@@ -1329,6 +1344,7 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
                 resolve_inputs=_resolve_inputs if callable(on_schedule_data_handler) else None,
                 schedule=schedule,
                 recurrent=recurrent,
+                flow=flow,
             )
         elif effect_type == "emit_event":
             from .adapters.event_adapter import create_emit_event_node_handler

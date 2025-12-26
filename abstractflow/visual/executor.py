@@ -26,7 +26,14 @@ from .models import NodeType, VisualEdge, VisualFlow
 DataEdgeMap = Dict[str, Dict[str, tuple[str, str]]]
 
 
-def create_visual_runner(visual_flow: VisualFlow, *, flows: Dict[str, VisualFlow]) -> FlowRunner:
+def create_visual_runner(
+    visual_flow: VisualFlow,
+    *,
+    flows: Dict[str, VisualFlow],
+    run_store: Optional[Any] = None,
+    ledger_store: Optional[Any] = None,
+    artifact_store: Optional[Any] = None,
+) -> FlowRunner:
     """Create a FlowRunner for a visual run with a correctly wired runtime.
 
     Responsibilities:
@@ -385,28 +392,32 @@ def create_visual_runner(visual_flow: VisualFlow, *, flows: Dict[str, VisualFlow
             provider=provider,
             model=model,
             tool_executor=tool_executor,
+            run_store=run_store,
+            ledger_store=ledger_store,
+            artifact_store=artifact_store,
         )
     else:
         runtime_kwargs: Dict[str, Any] = {
-            "run_store": InMemoryRunStore(),
-            "ledger_store": InMemoryLedgerStore(),
+            "run_store": run_store or InMemoryRunStore(),
+            "ledger_store": ledger_store or InMemoryLedgerStore(),
         }
 
         if needs_artifacts:
             # MEMORY_* effects require an ArtifactStore. Only configure it when needed.
-            artifact_store_obj: Any = None
-            try:
-                from abstractruntime import InMemoryArtifactStore  # type: ignore
-                artifact_store_obj = InMemoryArtifactStore()
-            except Exception:  # pragma: no cover
+            artifact_store_obj: Any = artifact_store
+            if artifact_store_obj is None:
                 try:
-                    from abstractruntime.storage.artifacts import InMemoryArtifactStore  # type: ignore
+                    from abstractruntime import InMemoryArtifactStore  # type: ignore
                     artifact_store_obj = InMemoryArtifactStore()
-                except Exception as e:  # pragma: no cover
-                    raise RuntimeError(
-                        "This flow uses MEMORY_* nodes, but the installed AbstractRuntime "
-                        "does not provide an ArtifactStore implementation."
-                    ) from e
+                except Exception:  # pragma: no cover
+                    try:
+                        from abstractruntime.storage.artifacts import InMemoryArtifactStore  # type: ignore
+                        artifact_store_obj = InMemoryArtifactStore()
+                    except Exception as e:  # pragma: no cover
+                        raise RuntimeError(
+                            "This flow uses MEMORY_* nodes, but the installed AbstractRuntime "
+                            "does not provide an ArtifactStore implementation."
+                        ) from e
 
             # Only pass artifact_store if the runtime supports it (older runtimes may not).
             try:
@@ -606,6 +617,7 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
     # Store node outputs during execution (visual data-edge evaluation cache)
     flow._node_outputs = {}  # type: ignore[attr-defined]
     flow._data_edge_map = data_edge_map  # type: ignore[attr-defined]
+    flow._pure_node_ids = set()  # type: ignore[attr-defined]
 
     def _normalize_pin_defaults(raw: Any) -> Dict[str, Any]:
         if not isinstance(raw, dict):
@@ -634,6 +646,7 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
     }
 
     pure_base_handlers: Dict[str, Any] = {}
+    pure_node_ids: set[str] = set()
 
     def _has_execution_pins(type_str: str, node_data: Dict[str, Any]) -> bool:
         pins: list[Any] = []
@@ -1646,6 +1659,7 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
 
         if not _has_execution_pins(type_str, node.data):
             pure_base_handlers[node.id] = base_handler
+            pure_node_ids.add(node.id)
             continue
 
         # Ignore disconnected/unreachable execution nodes.
@@ -1773,6 +1787,10 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
                 break
         if not flow.entry_node and flow.nodes:
             flow.set_entry(next(iter(flow.nodes)))
+
+    # Pure (no-exec) nodes are cached in `flow._node_outputs` for data-edge resolution.
+    # Some schedulers (While, On Event, On Schedule) must invalidate these caches between iterations.
+    flow._pure_node_ids = pure_node_ids  # type: ignore[attr-defined]
 
     return flow
 
