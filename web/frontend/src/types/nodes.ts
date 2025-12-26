@@ -38,6 +38,17 @@ const EVENT_NODES: NodeTemplate[] = [
     category: 'events',
   },
   {
+    type: 'on_flow_end',
+    icon: '&#x23F9;', // Stop button
+    label: 'On Flow End',
+    headerColor: '#C0392B',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+    ],
+    outputs: [],
+    category: 'events',
+  },
+  {
     type: 'on_user_request',
     icon: '&#x1F4AC;', // Speech bubble
     label: 'On User Request',
@@ -125,17 +136,6 @@ const EVENT_NODES: NodeTemplate[] = [
       { id: 'delivered_to', label: 'delivered_to', type: 'array' },
       { id: 'wait_key', label: 'wait_key', type: 'string' },
     ],
-    category: 'events',
-  },
-  {
-    type: 'on_flow_end',
-    icon: '&#x23F9;', // Stop button
-    label: 'On Flow End',
-    headerColor: '#C0392B',
-    inputs: [
-      { id: 'exec-in', label: '', type: 'execution' },
-    ],
-    outputs: [],
     category: 'events',
   },
 ];
@@ -519,20 +519,25 @@ export const NODE_CATEGORIES: Record<string, NodeCategory> = {
     icon: '&#x26A1;', // Lightning
     nodes: CORE_NODES,
   },
-  math: {
-    label: 'Math',
-    icon: '&#x1F522;', // Numbers
-    nodes: MATH_NODES,
+  effects: {
+    label: 'Effects',
+    icon: '&#x26A1;', // Lightning bolt - side effects
+    nodes: EFFECT_NODES,
+  },
+  control: {
+    label: 'Control',
+    icon: '&#x1F500;', // Shuffle
+    nodes: CONTROL_NODES,
   },
   string: {
     label: 'String',
     icon: '&#x1F4DD;', // Memo
     nodes: STRING_NODES,
   },
-  control: {
-    label: 'Control',
-    icon: '&#x1F500;', // Shuffle
-    nodes: CONTROL_NODES,
+  math: {
+    label: 'Math',
+    icon: '&#x1F522;', // Numbers
+    nodes: MATH_NODES,
   },
   data: {
     label: 'Data',
@@ -543,11 +548,6 @@ export const NODE_CATEGORIES: Record<string, NodeCategory> = {
     label: 'Literals',
     icon: '&#x270F;', // Pencil - for constants/values
     nodes: LITERAL_NODES,
-  },
-  effects: {
-    label: 'Effects',
-    icon: '&#x26A1;', // Lightning bolt - side effects
-    nodes: EFFECT_NODES,
   },
 };
 

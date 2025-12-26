@@ -4,41 +4,6 @@
   "description": "",
   "nodes": [
     {
-      "id": "node-10",
-      "type": "on_schedule",
-      "position": {
-        "x": -1024.0,
-        "y": 224.0
-      },
-      "data": {
-        "nodeType": "on_schedule",
-        "label": "On Schedule",
-        "icon": "&#x23F0;",
-        "headerColor": "#C0392B",
-        "inputs": [],
-        "outputs": [
-          {
-            "id": "exec-out",
-            "label": "",
-            "type": "execution"
-          },
-          {
-            "id": "timestamp",
-            "label": "timestamp",
-            "type": "string"
-          }
-        ],
-        "eventConfig": {
-          "schedule": "1m"
-        }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
       "id": "node-11",
       "type": "answer_user",
       "position": {
@@ -124,25 +89,44 @@
       "headerColor": null,
       "inputs": [],
       "outputs": []
+    },
+    {
+      "id": "node-13",
+      "type": "on_schedule",
+      "position": {
+        "x": -1040.0,
+        "y": 224.0
+      },
+      "data": {
+        "nodeType": "on_schedule",
+        "label": "On Schedule",
+        "icon": "&#x23F0;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "timestamp",
+            "label": "timestamp",
+            "type": "string"
+          }
+        ],
+        "eventConfig": {
+          "schedule": "15s"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
     }
   ],
   "edges": [
-    {
-      "id": "edge-1766760932152",
-      "source": "node-10",
-      "sourceHandle": "exec-out",
-      "target": "node-11",
-      "targetHandle": "exec-in",
-      "animated": true
-    },
-    {
-      "id": "edge-1766760940102",
-      "source": "node-10",
-      "sourceHandle": "timestamp",
-      "target": "node-12",
-      "targetHandle": "b",
-      "animated": false
-    },
     {
       "id": "edge-1766760945512",
       "source": "node-12",
@@ -150,9 +134,25 @@
       "target": "node-11",
       "targetHandle": "message",
       "animated": false
+    },
+    {
+      "id": "edge-1766767358921",
+      "source": "node-13",
+      "sourceHandle": "exec-out",
+      "target": "node-11",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1766767366947",
+      "source": "node-13",
+      "sourceHandle": "timestamp",
+      "target": "node-12",
+      "targetHandle": "b",
+      "animated": false
     }
   ],
-  "entryNode": "node-10",
+  "entryNode": "node-12",
   "created_at": "2025-12-26T14:33:10.582784",
-  "updated_at": "2025-12-26T15:08:44.667232"
+  "updated_at": "2025-12-26T16:42:54.837061"
 }

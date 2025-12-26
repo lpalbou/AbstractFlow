@@ -737,6 +737,17 @@ def _sync_effect_results_to_node_outputs(run: Any, flow: Flow) -> None:
             else:
                 current["event"] = raw
                 mapped_value = raw
+        elif effect_type == "on_schedule":
+            if isinstance(raw, dict):
+                current.update(raw)
+                ts = raw.get("timestamp")
+                if ts is None:
+                    ts = raw.get("scheduled_for")
+                current["timestamp"] = ts
+                mapped_value = ts if ts is not None else raw
+            else:
+                current["timestamp"] = raw
+                mapped_value = raw
         elif effect_type == "wait_until":
             if isinstance(raw, dict):
                 current.update(raw)
@@ -1281,6 +1292,43 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
                 resolve_inputs=_resolve_inputs if callable(on_event_data_handler) else None,
                 default_name=default_name,
                 scope=scope,
+            )
+        elif effect_type == "on_schedule":
+            from .adapters.event_adapter import create_on_schedule_node_handler
+
+            on_schedule_data_handler = handler_obj if callable(handler_obj) else None
+
+            def _resolve_inputs(
+                run: Any,
+                _handler: Any = on_schedule_data_handler,
+            ) -> Dict[str, Any]:
+                if flow is not None and hasattr(flow, "_node_outputs") and hasattr(flow, "_data_edge_map"):
+                    _sync_effect_results_to_node_outputs(run, flow)
+                if not callable(_handler):
+                    return {}
+                last_output = run.vars.get("_last_output", {})
+                try:
+                    resolved = _handler(last_output)
+                except Exception:
+                    resolved = {}
+                return resolved if isinstance(resolved, dict) else {}
+
+            schedule = ""
+            recurrent = True
+            if isinstance(effect_config, dict):
+                raw_schedule = effect_config.get("schedule")
+                if isinstance(raw_schedule, str) and raw_schedule.strip():
+                    schedule = raw_schedule.strip()
+                raw_recurrent = effect_config.get("recurrent")
+                if isinstance(raw_recurrent, bool):
+                    recurrent = raw_recurrent
+
+            handlers[node_id] = create_on_schedule_node_handler(
+                node_id=node_id,
+                next_node=next_node,
+                resolve_inputs=_resolve_inputs if callable(on_schedule_data_handler) else None,
+                schedule=schedule,
+                recurrent=recurrent,
             )
         elif effect_type == "emit_event":
             from .adapters.event_adapter import create_emit_event_node_handler

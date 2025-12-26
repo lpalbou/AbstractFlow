@@ -1933,10 +1933,34 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                   },
                 })
               }
-              placeholder="e.g., */5 * * * * (every 5 min)"
+              placeholder='e.g., "30s", "5m", "2025-01-01T12:00:00Z"'
             />
             <span className="property-hint">
-              Cron expression or interval (e.g., "30s", "5m", "1h")
+              Interval (e.g., "30s", "5m", "1h") or an ISO timestamp
+            </span>
+          </div>
+          <div className="property-group">
+            <label className="property-sublabel">Recurrent</label>
+            <label className="toggle-container">
+              <input
+                type="checkbox"
+                className="toggle-checkbox"
+                checked={data.eventConfig?.recurrent ?? true}
+                onChange={(e) =>
+                  updateNodeData(node.id, {
+                    eventConfig: {
+                      ...data.eventConfig,
+                      recurrent: e.target.checked,
+                    },
+                  })
+                }
+              />
+              <span className="toggle-label">
+                {(data.eventConfig?.recurrent ?? true) ? 'Enabled' : 'Disabled'}
+              </span>
+            </label>
+            <span className="property-hint">
+              When enabled, the schedule re-arms after the branch completes.
             </span>
           </div>
         </div>

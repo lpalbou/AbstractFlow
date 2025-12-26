@@ -1129,8 +1129,6 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
                 message = input_data.get("message", "") if isinstance(input_data, dict) else str(input_data)
                 channel = data.get("eventConfig", {}).get("channel", "")
                 return {"sender": sender, "message": message, "channel": channel}
-            if event_type == "on_schedule":
-                return {"timestamp": datetime.datetime.utcnow().isoformat()}
             return input_data
 
         return handler
@@ -1621,7 +1619,7 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
         if type_str == "on_flow_end":
             return _create_flow_end_handler(data)
 
-        if type_str in ("on_flow_start", "on_user_request", "on_agent_message", "on_schedule"):
+        if type_str in ("on_flow_start", "on_user_request", "on_agent_message"):
             return _create_event_handler(type_str, data)
 
         if type_str == "if":
@@ -1671,6 +1669,10 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
         if type_str in EFFECT_NODE_TYPES:
             effect_type = type_str
             effect_config = node.data.get("effectConfig", {})
+        elif type_str == "on_schedule":
+            # Schedule trigger: compiles into WAIT_UNTIL under the hood.
+            effect_type = "on_schedule"
+            effect_config = node.data.get("eventConfig", {})
         elif type_str == "on_event":
             # Custom event listener (Blueprint-style "Custom Event").
             # Compiles into WAIT_EVENT under the hood.

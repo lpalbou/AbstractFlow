@@ -2,10 +2,12 @@
 
 This module provides durable, session-scoped custom events (Blueprint-style):
 - `on_event`: a listener node that waits for an event and then runs its branch
+- `on_schedule`: a listener node that waits for a schedule tick and then runs its branch
 - `emit_event`: an emitter node that signals listeners in the same session (or a target session)
 
 These are built on AbstractRuntime primitives:
 - WAIT_EVENT (durable pause)
+- WAIT_UNTIL (durable time wait)
 - EMIT_EVENT (durable dispatch + resume)
 """
 
@@ -69,6 +71,100 @@ def create_on_event_node_handler(
         effect = Effect(
             type=EffectType.WAIT_EVENT,
             payload={"scope": scope_norm, "name": name, "resume_to_node": resume_to},
+            result_key=f"_temp.effects.{node_id}",
+        )
+
+        return StepPlan(node_id=node_id, effect=effect, next_node=next_node)
+
+    return handler
+
+
+def create_on_schedule_node_handler(
+    *,
+    node_id: str,
+    next_node: Optional[str],
+    resolve_inputs: Optional[Callable[[Any], Dict[str, Any]]] = None,
+    schedule: str,
+    recurrent: bool = True,
+) -> Callable:
+    """Create an `on_schedule` node handler.
+
+    The node:
+    - (optionally) pushes itself as the active control node so terminal branch nodes return here
+    - waits for a time tick via WAIT_UNTIL
+    - resumes into `next_node` when the time elapses
+    """
+    import re
+    from datetime import datetime, timedelta, timezone
+
+    from abstractruntime.core.models import Effect, EffectType, StepPlan
+
+    from .control_adapter import _ensure_control
+
+    interval_re = re.compile(r"^\s*(\d+(?:\.\d+)?)\s*(ms|s|m|h|d)\s*$", re.IGNORECASE)
+    unit_seconds: Dict[str, float] = {"ms": 0.001, "s": 1.0, "m": 60.0, "h": 3600.0, "d": 86400.0}
+
+    def _parse_until(raw: str, *, now: datetime) -> tuple[str, Optional[float]]:
+        """Return (until_iso, interval_seconds_or_none)."""
+        s = str(raw or "").strip()
+        if not s:
+            raise ValueError("Missing schedule")
+
+        m = interval_re.match(s)
+        if m:
+            amount = float(m.group(1))
+            unit = str(m.group(2)).lower()
+            seconds = amount * unit_seconds.get(unit, 1.0)
+            until = (now + timedelta(seconds=float(seconds))).isoformat()
+            return until, float(seconds)
+
+        # ISO 8601 timestamp (treated as one-shot)
+        s2 = s[:-1] + "+00:00" if s.endswith("Z") else s
+        try:
+            dt = datetime.fromisoformat(s2)
+        except Exception as e:
+            raise ValueError(
+                f"Invalid schedule '{s}': expected interval like '30s', '5m', '1h' or an ISO timestamp"
+            ) from e
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.astimezone(timezone.utc)
+        return dt.isoformat(), None
+
+    def handler(run: Any, ctx: Any) -> "StepPlan":
+        del ctx
+
+        resolved: Dict[str, Any] = {}
+        if callable(resolve_inputs):
+            try:
+                resolved = resolve_inputs(run)
+            except Exception:
+                resolved = {}
+        resolved = resolved if isinstance(resolved, dict) else {}
+
+        schedule_raw = resolved.get("schedule") if "schedule" in resolved else None
+        schedule_str = str(schedule_raw or schedule or "").strip()
+        if not schedule_str:
+            raise ValueError(f"on_schedule node '{node_id}' missing schedule")
+
+        recurrent_raw = resolved.get("recurrent") if "recurrent" in resolved else recurrent
+        recurrent_flag = bool(recurrent_raw) if recurrent_raw is not None else bool(recurrent)
+
+        now = datetime.now(timezone.utc)
+        until, interval_s = _parse_until(schedule_str, now=now)
+
+        # Absolute timestamps are one-shot; recurrence would cause a tight loop.
+        if interval_s is None:
+            recurrent_flag = False
+
+        if recurrent_flag:
+            _ctrl, stack, _frames = _ensure_control(run.vars)
+            if not stack or stack[-1] != node_id:
+                stack.append(node_id)
+
+        effect = Effect(
+            type=EffectType.WAIT_UNTIL,
+            payload={"until": until},
             result_key=f"_temp.effects.{node_id}",
         )
 
@@ -175,4 +271,3 @@ def create_emit_event_node_handler(
         return StepPlan(node_id=node_id, effect=effect, next_node=next_node)
 
     return handler
-

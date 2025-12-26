@@ -122,6 +122,7 @@ export interface FlowNodeData {
     channel?: string;        // For on_agent_message: channel to listen to
     agentFilter?: string;    // For on_agent_message: specific agent to listen to
     schedule?: string;       // For on_schedule: cron expression or interval
+    recurrent?: boolean;     // For on_schedule: re-arm after firing
     description?: string;    // Description of what triggers this event
   };
   // Literal node value

@@ -620,12 +620,40 @@ async def _execute_runner_loop(
 
                 # Time elapsed: resume to next node, but do not execute it yet.
                 wf = _workflow_for_run_id(run_id)
-                await asyncio.to_thread(runtime.resume, workflow=wf, run_id=run_id, wait_key=None, payload={}, max_steps=0)
+                resume_payload: Dict[str, Any] = {}
+                try:
+                    from datetime import datetime, timezone
+
+                    if _node_effect_type(str(node_before)) == "on_schedule":
+                        resume_payload = {"timestamp": datetime.now(timezone.utc).isoformat()}
+                        if until_raw is not None:
+                            resume_payload["scheduled_for"] = str(until_raw)
+                except Exception:
+                    resume_payload = {}
+
+                await asyncio.to_thread(
+                    runtime.resume,
+                    workflow=wf,
+                    run_id=run_id,
+                    wait_key=None,
+                    payload=resume_payload,
+                    max_steps=0,
+                )
                 after_resume = runtime.get_state(run_id)
 
                 # Close Delay node step now (the wait is finished).
                 active = track.get("active_node_id")
                 if isinstance(active, str) and active:
+                    if is_root:
+                        # Ensure root flow outputs reflect the resumed effect payload.
+                        try:
+                            from abstractflow.compiler import _sync_effect_results_to_node_outputs as _sync_effect_results  # type: ignore
+
+                            if hasattr(runner, "flow"):
+                                _sync_effect_results(after_resume, runner.flow)
+                        except Exception:
+                            pass
+
                     waited_ms = 0.0
                     started = track.get("wait_until_started_at")
                     if isinstance(started, (int, float)):
