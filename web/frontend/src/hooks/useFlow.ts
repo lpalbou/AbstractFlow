@@ -480,6 +480,37 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         data = { ...data, inputs: [...canonicalInputs, ...extras] };
       }
 
+      // Backward-compat + canonical ordering for durable custom event nodes.
+      if (data.nodeType === 'emit_event' || data.nodeType === 'on_event') {
+        const existingInputs = Array.isArray(data.inputs) ? data.inputs : [];
+        const byId = new Map(existingInputs.map((p) => [p.id, p] as const));
+        const used = new Set<string>();
+
+        const want = (pin: Pin): Pin => {
+          const prev = byId.get(pin.id);
+          used.add(pin.id);
+          if (!prev) return pin;
+          if (prev.label === pin.label && prev.type === pin.type) return prev;
+          return { ...prev, label: pin.label, type: pin.type };
+        };
+
+        const canonicalInputs: Pin[] =
+          data.nodeType === 'emit_event'
+            ? [
+                want({ id: 'exec-in', label: '', type: 'execution' }),
+                want({ id: 'name', label: 'name', type: 'string' }),
+                want({ id: 'scope', label: 'scope', type: 'string' }),
+                want({ id: 'payload', label: 'payload', type: 'any' }),
+                want({ id: 'session_id', label: 'session_id', type: 'string' }),
+              ]
+            : [
+                want({ id: 'scope', label: 'scope', type: 'string' }),
+              ];
+
+        const extras = existingInputs.filter((p) => !used.has(p.id));
+        data = { ...data, inputs: [...canonicalInputs, ...extras] };
+      }
+
       // Normalize Switch nodes: execution outputs only (cases + default).
       if (data.nodeType === 'switch') {
         const existingExecPins = data.outputs.filter((p) => p.type === 'execution');

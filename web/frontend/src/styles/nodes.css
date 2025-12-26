@@ -5,6 +5,8 @@
 /* Base Flow Node */
 .flow-node {
   min-width: 180px;
+  display: inline-flex;
+  flex-direction: column;
   background: #2a2a3e;
   border: 2px solid #444;
   border-radius: 6px;
@@ -47,6 +49,7 @@
   letter-spacing: 0.5px;
   color: #fff;
   position: relative;
+  min-width: 0;
 }
 
 /* Execution pins in header (UE4 Blueprint style) */
@@ -180,6 +183,30 @@
   padding: 12px;
   min-height: 48px;
   position: relative;
+  min-width: 0;
+}
+
+/* Inline config rows (for nodes without input pins, e.g. triggers) */
+.node-inline-config {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.node-config-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+}
+
+.node-config-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  flex: 0 0 5ch;
+  text-transform: capitalize;
+  white-space: nowrap;
 }
 
 /* Pin rows don't need special handle positioning - handles are hidden */
@@ -197,25 +224,28 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
 }
 
 .pins-left {
-  align-items: flex-start;
+  /* Stretch rows to node width so inline controls can shrink instead of overflowing */
+  align-items: stretch;
 }
 
 .pins-right {
-  align-items: flex-end;
+  align-items: stretch;
 }
 
 .pin-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   padding: 2px 0;
+  min-width: 0;
 }
 
 .pin-row.input .pin-label {
-  flex: 0 0 var(--pin-label-width, 84px);
+  flex: 0 0 var(--pin-label-width, 6ch);
   text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;

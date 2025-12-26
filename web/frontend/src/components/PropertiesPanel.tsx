@@ -11,6 +11,7 @@ import { useFlowStore } from '../hooks/useFlow';
 import { CodeEditorModal } from './CodeEditorModal';
 import ProviderModelsPanel from './ProviderModelsPanel';
 import { extractFunctionBody, generatePythonTransformCode, sanitizePythonIdentifier } from '../utils/codegen';
+import { collectCustomEventNames } from '../utils/events';
 
 interface PropertiesPanelProps {
   node: Node<FlowNodeData> | null;
@@ -649,21 +650,12 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const providerPinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'provider');
   const modelPinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'model');
   const emitEventNamePinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'name');
+  const scopePinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'scope');
+  const emitEventScopePinConnected = scopePinConnected && data.nodeType === 'emit_event';
   const emitEventSessionPinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'session_id');
+  const onEventScopePinConnected = scopePinConnected && data.nodeType === 'on_event';
 
-  const availableOnEventNames = (() => {
-    const out: string[] = [];
-    for (const n of nodes) {
-      if (n.data.nodeType !== 'on_event') continue;
-      const name = (n.data.eventConfig as any)?.name;
-      if (typeof name === 'string' && name.trim().length > 0) {
-        const v = name.trim();
-        if (!out.includes(v)) out.push(v);
-      }
-    }
-    out.sort((a, b) => a.localeCompare(b));
-    return out;
-  })();
+  const availableEventNames = collectCustomEventNames(nodes);
 
   const updateAgentConfig = (patch: Partial<NonNullable<FlowNodeData['agentConfig']>>) => {
     updateNodeData(node.id, {
@@ -1067,6 +1059,57 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               sample = sourceNode.data.literalValue;
             } else if (sourceNode?.data.nodeType === 'literal_array') {
               sample = sourceNode.data.literalValue;
+            } else if (sourceNode?.data.nodeType === 'on_event' && inputEdge?.sourceHandle === 'event') {
+              // Best-effort sample of AbstractRuntime's event envelope so users can break it into fields.
+              sample = {
+                event_id: 'run:node:1',
+                name: 'my_event',
+                scope: 'session',
+                session_id: 'run_id_or_session_id',
+                payload: {},
+                emitted_at: '2025-01-01T00:00:00Z',
+                emitter: {
+                  run_id: 'run_id',
+                  workflow_id: 'workflow_id',
+                  node_id: 'node_id',
+                },
+              };
+            } else if (sourceNode?.data.nodeType === 'on_event' && inputEdge?.sourceHandle === 'payload') {
+              // Payload is always a JSON object in our event envelope; for non-object payloads we wrap them as `{ value: ... }`.
+              // When possible, infer a payload sample from a matching Emit Event node in the current graph.
+              const eventName = (sourceNode.data.eventConfig?.name || '').trim();
+              let inferred: unknown = undefined;
+
+              if (eventName) {
+                const emitters = nodes.filter((n) => n.data.nodeType === 'emit_event');
+
+                const effectiveEmitName = (n: typeof emitters[number]) => {
+                  const pinned = n.data.pinDefaults?.name;
+                  if (typeof pinned === 'string' && pinned.trim()) return pinned.trim();
+                  const cfg = n.data.effectConfig?.name;
+                  if (typeof cfg === 'string' && cfg.trim()) return cfg.trim();
+                  return '';
+                };
+
+                for (const emitter of emitters) {
+                  if (effectiveEmitName(emitter) !== eventName) continue;
+                  const payloadEdge = edges.find((e) => e.target === emitter.id && e.targetHandle === 'payload');
+                  if (!payloadEdge) continue;
+                  const payloadSrc = nodes.find((n) => n.id === payloadEdge.source);
+                  if (!payloadSrc) continue;
+                  if (payloadSrc.data.nodeType === 'literal_json' || payloadSrc.data.nodeType === 'literal_array') {
+                    inferred = payloadSrc.data.literalValue;
+                    break;
+                  }
+                }
+              }
+
+              if (inferred && typeof inferred === 'object') {
+                sample = inferred;
+              } else {
+                // Minimal, still useful: exposes the stable `{ value }` wrapper field.
+                sample = { value: inferred ?? '' };
+              }
             } else if (sourceNode?.data.nodeType === 'agent') {
               const outputSchema = sourceNode.data.agentConfig?.outputSchema;
               if (outputSchema?.enabled && outputSchema.jsonSchema && typeof outputSchema.jsonSchema === 'object') {
@@ -1905,10 +1948,18 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           <label className="property-label">Event Configuration</label>
           <div className="property-group">
             <label className="property-sublabel">Name</label>
+            {availableEventNames.length > 0 ? (
+              <datalist id="af-custom-event-names">
+                {availableEventNames.map((n) => (
+                  <option key={n} value={n} />
+                ))}
+              </datalist>
+            ) : null}
             <input
               type="text"
               className="property-input"
               value={data.eventConfig?.name || ''}
+              list={availableEventNames.length > 0 ? 'af-custom-event-names' : undefined}
               onChange={(e) =>
                 updateNodeData(node.id, {
                   eventConfig: {
@@ -1917,7 +1968,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                   },
                 })
               }
-              placeholder="e.g., my_event"
+              placeholder={availableEventNames.length > 0 ? 'Type or pick a name…' : 'e.g., my_event'}
             />
             <span className="property-hint">
               Durable event name (session-scoped by default)
@@ -1925,23 +1976,27 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           </div>
           <div className="property-group">
             <label className="property-sublabel">Scope</label>
-            <select
-              className="property-select"
-              value={data.eventConfig?.scope ?? 'session'}
-              onChange={(e) =>
-                updateNodeData(node.id, {
-                  eventConfig: {
-                    ...data.eventConfig,
-                    scope: e.target.value as 'session' | 'workflow' | 'run' | 'global',
-                  },
-                })
-              }
-            >
-              <option value="session">Session (recommended)</option>
-              <option value="workflow">Workflow</option>
-              <option value="run">Run</option>
-              <option value="global">Global</option>
-            </select>
+            {onEventScopePinConnected ? (
+              <span className="property-hint">Provided by connected pin.</span>
+            ) : (
+              <select
+                className="property-select"
+                value={data.eventConfig?.scope ?? 'session'}
+                onChange={(e) =>
+                  updateNodeData(node.id, {
+                    eventConfig: {
+                      ...data.eventConfig,
+                      scope: e.target.value as 'session' | 'workflow' | 'run' | 'global',
+                    },
+                  })
+                }
+              >
+                <option value="session">Session (recommended)</option>
+                <option value="workflow">Workflow</option>
+                <option value="run">Run</option>
+                <option value="global">Global</option>
+              </select>
+            )}
             <span className="property-hint">
               Session scope targets one workflow instance (root run id).
             </span>
@@ -2659,40 +2714,44 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               <span className="property-hint">Provided by connected pin.</span>
             ) : (
               <>
-                {availableOnEventNames.length > 0 ? (
-                  <select
-                    className="property-select"
-                    value={data.effectConfig?.name || ''}
-                    onChange={(e) =>
-                      updateNodeData(node.id, {
-                        effectConfig: {
-                          ...data.effectConfig,
-                          name: e.target.value || undefined,
-                        },
-                      })
-                    }
-                  >
-                    <option value="">Select event…</option>
-                    {availableOnEventNames.map((n) => (
-                      <option key={n} value={n}>
-                        {n}
-                      </option>
+                {availableEventNames.length > 0 ? (
+                  <datalist id="af-custom-event-names">
+                    {availableEventNames.map((n) => (
+                      <option key={n} value={n} />
                     ))}
-                  </select>
+                  </datalist>
                 ) : null}
                 <input
                   type="text"
                   className="property-input"
-                  value={data.effectConfig?.name || ''}
-                  onChange={(e) =>
-                    updateNodeData(node.id, {
-                      effectConfig: {
-                        ...data.effectConfig,
-                        name: e.target.value || undefined,
-                      },
-                    })
+                  value={
+                    (typeof data.pinDefaults?.name === 'string' && data.pinDefaults.name.trim()
+                      ? data.pinDefaults.name
+                      : data.effectConfig?.name) || ''
                   }
-                  placeholder={availableOnEventNames.length > 0 ? 'Or type a custom name…' : 'e.g., my_event'}
+                  list={availableEventNames.length > 0 ? 'af-custom-event-names' : undefined}
+                  onChange={(e) =>
+                    updateNodeData(node.id, (() => {
+                      const nextRaw = e.target.value;
+                      const nextName = nextRaw.trim();
+
+                      const prevDefaults = data.pinDefaults || {};
+                      const nextDefaults = { ...prevDefaults };
+                      if (!nextName) {
+                        delete nextDefaults.name;
+                      } else {
+                        nextDefaults.name = nextName;
+                      }
+
+                      const prevCfg = data.effectConfig || {};
+                      const nextCfg = { ...prevCfg, name: nextName || undefined };
+                      return {
+                        pinDefaults: nextDefaults,
+                        effectConfig: nextCfg,
+                      };
+                    })())
+                  }
+                  placeholder={availableEventNames.length > 0 ? 'Type or pick a name…' : 'e.g., my_event'}
                 />
               </>
             )}
@@ -2700,23 +2759,27 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
           <div className="property-group">
             <label className="property-sublabel">Scope</label>
-            <select
-              className="property-select"
-              value={data.effectConfig?.scope ?? 'session'}
-              onChange={(e) =>
-                updateNodeData(node.id, {
-                  effectConfig: {
-                    ...data.effectConfig,
-                    scope: e.target.value as 'session' | 'workflow' | 'run' | 'global',
-                  },
-                })
-              }
-            >
-              <option value="session">Session (recommended)</option>
-              <option value="workflow">Workflow</option>
-              <option value="run">Run</option>
-              <option value="global">Global</option>
-            </select>
+            {emitEventScopePinConnected ? (
+              <span className="property-hint">Provided by connected pin.</span>
+            ) : (
+              <select
+                className="property-select"
+                value={data.effectConfig?.scope ?? 'session'}
+                onChange={(e) =>
+                  updateNodeData(node.id, {
+                    effectConfig: {
+                      ...data.effectConfig,
+                      scope: e.target.value as 'session' | 'workflow' | 'run' | 'global',
+                    },
+                  })
+                }
+              >
+                <option value="session">Session (recommended)</option>
+                <option value="workflow">Workflow</option>
+                <option value="run">Run</option>
+                <option value="global">Global</option>
+              </select>
+            )}
           </div>
 
           <div className="property-group">

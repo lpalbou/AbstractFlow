@@ -81,7 +81,10 @@ const EVENT_NODES: NodeTemplate[] = [
     icon: '&#x1F4E3;', // Megaphone
     label: 'On Event',
     headerColor: '#C0392B', // Red for events (like UE4)
-    inputs: [], // No inputs - triggered by durable event
+    inputs: [
+      // Configuration pins (Blueprint-style): configurable via inline quick access when unconnected.
+      { id: 'scope', label: 'scope', type: 'string' },
+    ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
       { id: 'event', label: 'event', type: 'object' },
@@ -427,6 +430,7 @@ const EFFECT_NODES: NodeTemplate[] = [
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
       { id: 'name', label: 'name', type: 'string' },
+      { id: 'scope', label: 'scope', type: 'string' },
       { id: 'payload', label: 'payload', type: 'any' },
       { id: 'session_id', label: 'session_id', type: 'string' },
     ],

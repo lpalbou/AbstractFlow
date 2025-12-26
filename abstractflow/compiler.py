@@ -317,7 +317,14 @@ def _create_visual_agent_effect_handler(
         system_raw = resolved_inputs.get("system") if isinstance(resolved_inputs, dict) else None
         system_prompt = system_raw if isinstance(system_raw, str) else str(system_raw or "")
 
-        tools_raw = resolved_inputs.get("tools") if isinstance(resolved_inputs, dict) else None
+        # Tools selection:
+        # - If the resolved inputs explicitly include `tools` (e.g. tools pin connected),
+        #   respect it even if it's an empty list (disables tools).
+        # - Otherwise fall back to the Agent node's configuration.
+        if isinstance(resolved_inputs, dict) and "tools" in resolved_inputs:
+            tools_raw = resolved_inputs.get("tools")
+        else:
+            tools_raw = agent_config.get("tools")
         allowed_tools: list[str] = []
         if isinstance(tools_raw, list):
             for t in tools_raw:
@@ -1240,15 +1247,30 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
         elif effect_type == "on_event":
             from .adapters.event_adapter import create_on_event_node_handler
 
+            on_event_data_handler = handler_obj if callable(handler_obj) else None
+
+            def _resolve_inputs(
+                run: Any,
+                _handler: Any = on_event_data_handler,
+            ) -> Dict[str, Any]:
+                if flow is not None and hasattr(flow, "_node_outputs") and hasattr(flow, "_data_edge_map"):
+                    _sync_effect_results_to_node_outputs(run, flow)
+                if not callable(_handler):
+                    return {}
+                last_output = run.vars.get("_last_output", {})
+                try:
+                    resolved = _handler(last_output)
+                except Exception:
+                    resolved = {}
+                return resolved if isinstance(resolved, dict) else {}
+
             # Blank/unspecified name is treated as "listen to any event" (wildcard).
-            # This is both more ergonomic and more backward-compatible than binding
-            # the listener to an opaque node_id.
-            name = "*"
+            default_name = ""
             scope = "session"
             if isinstance(effect_config, dict):
                 raw_name = effect_config.get("name") or effect_config.get("event_name")
                 if isinstance(raw_name, str) and raw_name.strip():
-                    name = raw_name
+                    default_name = raw_name
                 raw_scope = effect_config.get("scope")
                 if isinstance(raw_scope, str) and raw_scope.strip():
                     scope = raw_scope
@@ -1256,7 +1278,8 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
             handlers[node_id] = create_on_event_node_handler(
                 node_id=node_id,
                 next_node=next_node,
-                event_name=name,
+                resolve_inputs=_resolve_inputs if callable(on_event_data_handler) else None,
+                default_name=default_name,
                 scope=scope,
             )
         elif effect_type == "emit_event":

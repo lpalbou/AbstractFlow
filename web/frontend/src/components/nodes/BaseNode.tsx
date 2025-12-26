@@ -15,8 +15,55 @@ import { PinShape } from '../pins/PinShape';
 import { useFlowStore } from '../../hooks/useFlow';
 import { useModels, useProviders } from '../../hooks/useProviders';
 import { useTools } from '../../hooks/useTools';
+import { collectCustomEventNames } from '../../utils/events';
 import AfSelect from '../inputs/AfSelect';
 import AfMultiSelect from '../inputs/AfMultiSelect';
+
+const OnEventNameInline = memo(function OnEventNameInline({
+  nodeId,
+  value,
+  eventConfig,
+  updateNodeData,
+}: {
+  nodeId: string;
+  value: string;
+  eventConfig: FlowNodeData['eventConfig'] | undefined;
+  updateNodeData: (nodeId: string, data: Partial<FlowNodeData>) => void;
+}) {
+  const nodes = useFlowStore((s) => s.nodes);
+  const options = useMemo(() => collectCustomEventNames(nodes), [nodes]);
+  const listId = `af-on-event-names-${nodeId}`;
+
+  return (
+    <div className="node-inline-config nodrag">
+      {options.length > 0 ? (
+        <datalist id={listId}>
+          {options.map((n) => (
+            <option key={n} value={n} />
+          ))}
+        </datalist>
+      ) : null}
+
+      <div className="node-config-row">
+        <span className="node-config-label">name</span>
+        <input
+          className="af-pin-input nodrag"
+          type="text"
+          value={value}
+          list={options.length > 0 ? listId : undefined}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) =>
+            updateNodeData(nodeId, {
+              eventConfig: { ...(eventConfig || {}), name: e.target.value },
+            })
+          }
+          placeholder={options.length > 0 ? 'Pick…' : 'e.g., my_event'}
+        />
+      </div>
+    </div>
+  );
+});
 
 export const BaseNode = memo(function BaseNode({
   id,
@@ -39,9 +86,20 @@ export const BaseNode = memo(function BaseNode({
     return `${inputs}__${outputs}`;
   }, [data.inputs, data.outputs]);
 
+  // Node width can change when pin connections toggle inline controls (quick defaults),
+  // so nudge ReactFlow to re-measure when connections for this node change.
+  const connectedInputsKey = useMemo(() => {
+    const connected = edges
+      .filter((e) => e.target === id && typeof e.targetHandle === 'string' && e.targetHandle !== 'exec-in')
+      .map((e) => e.targetHandle as string)
+      .sort()
+      .join('|');
+    return connected;
+  }, [edges, id]);
+
   useEffect(() => {
     updateNodeInternals(id);
-  }, [id, handlesKey, updateNodeInternals]);
+  }, [id, handlesKey, connectedInputsKey, updateNodeInternals]);
 
   // Check if a pin is connected
   const isPinConnected = (pinId: string, isInput: boolean): boolean => {
@@ -76,6 +134,7 @@ export const BaseNode = memo(function BaseNode({
   const isAgentNode = data.nodeType === 'agent';
   const isProviderModelsNode = data.nodeType === 'provider_models';
   const isDelayNode = data.nodeType === 'wait_until';
+  const isOnEventNode = data.nodeType === 'on_event';
 
   const hasModelControls = isLlmNode || isAgentNode;
   const hasProviderDropdown = hasModelControls || isProviderModelsNode;
@@ -167,6 +226,49 @@ export const BaseNode = memo(function BaseNode({
     [data.pinDefaults, id, updateNodeData]
   );
 
+  const setEmitEventName = useCallback(
+    (raw: string) => {
+      if (!isEmitEventNode) return;
+      const nextName = raw.trim();
+
+      const prevDefaults = data.pinDefaults || {};
+      const nextDefaults: typeof prevDefaults = { ...prevDefaults };
+      if (!nextName) {
+        delete nextDefaults.name;
+      } else {
+        nextDefaults.name = nextName;
+      }
+
+      const prevCfg = data.effectConfig || {};
+      const nextCfg = { ...prevCfg, name: nextName || undefined };
+
+      updateNodeData(id, { pinDefaults: nextDefaults, effectConfig: nextCfg });
+    },
+    [data.effectConfig, data.pinDefaults, id, isEmitEventNode, updateNodeData]
+  );
+
+  const emitEventScope = (data.effectConfig?.scope ?? 'session') as 'session' | 'workflow' | 'run' | 'global';
+  const setEmitEventScope = useCallback(
+    (next: string) => {
+      if (!isEmitEventNode) return;
+      const v = next === 'workflow' || next === 'run' || next === 'global' ? next : 'session';
+      const prev = data.effectConfig || {};
+      updateNodeData(id, { effectConfig: { ...prev, scope: v } });
+    },
+    [data.effectConfig, id, isEmitEventNode, updateNodeData]
+  );
+
+  const onEventScope = (data.eventConfig?.scope ?? 'session') as 'session' | 'workflow' | 'run' | 'global';
+  const setOnEventScope = useCallback(
+    (next: string) => {
+      if (!isOnEventNode) return;
+      const v = next === 'workflow' || next === 'run' || next === 'global' ? next : 'session';
+      const prev = data.eventConfig || {};
+      updateNodeData(id, { eventConfig: { ...prev, scope: v } });
+    },
+    [data.eventConfig, id, isOnEventNode, updateNodeData]
+  );
+
   const isSequenceLike = data.nodeType === 'sequence';
   const isParallelLike = data.nodeType === 'parallel';
 
@@ -182,7 +284,10 @@ export const BaseNode = memo(function BaseNode({
       const label = typeof p.label === 'string' ? p.label : '';
       maxLen = Math.max(maxLen, label.length);
     }
-    const clamped = Math.min(14, Math.max(6, maxLen || 0));
+    // Keep pin labels close to the pin (Blueprint-style), while aligning inline controls.
+    const minCh = 2;
+    const maxCh = 12;
+    const clamped = Math.min(maxCh, Math.max(minCh, maxLen || 0));
     return `${clamped}ch`;
   }, [inputData]);
 
@@ -412,6 +517,15 @@ export const BaseNode = memo(function BaseNode({
           </div>
         )}
 
+        {data.nodeType === 'on_event' && (
+          <OnEventNameInline
+            nodeId={id}
+            value={data.eventConfig?.name || ''}
+            eventConfig={data.eventConfig}
+            updateNodeData={updateNodeData}
+          />
+        )}
+
         {/* Data input pins */}
         <div className="pins-left" style={{ ['--pin-label-width' as any]: inputLabelWidth }}>
           {inputData.map((pin) => (
@@ -444,10 +558,63 @@ export const BaseNode = memo(function BaseNode({
                 const controls: ReactNode[] = [];
 
                 const isPrimitive = pin.type === 'string' || pin.type === 'number' || pin.type === 'boolean';
+                const isEmitEventName = isEmitEventNode && pin.id === 'name';
+                const isEmitEventScopePin = isEmitEventNode && pin.id === 'scope';
+                const isOnEventScopePin = isOnEventNode && pin.id === 'scope';
                 const hasSpecialControl =
                   (hasProviderDropdown && pin.id === 'provider') ||
                   (hasModelControls && pin.id === 'model') ||
-                  (isAgentNode && pin.id === 'tools');
+                  (isAgentNode && pin.id === 'tools') ||
+                  isEmitEventName ||
+                  isEmitEventScopePin ||
+                  isOnEventScopePin;
+
+                if (isEmitEventName) {
+                  const pinned = pinDefaults.name;
+                  const configured = data.effectConfig?.name;
+                  const nameValue =
+                    (typeof pinned === 'string' ? pinned : undefined) ??
+                    (typeof configured === 'string' ? configured : undefined) ??
+                    '';
+
+                  if (!connected) {
+                    controls.push(
+                      <input
+                        key="emit-name"
+                        className="af-pin-input nodrag"
+                        type="text"
+                        value={nameValue}
+                        placeholder=""
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => setEmitEventName(e.target.value)}
+                      />
+                    );
+                  }
+                }
+
+                if ((isEmitEventScopePin || isOnEventScopePin) && !connected) {
+                  const value = isEmitEventScopePin ? emitEventScope : onEventScope;
+                  const onChange = isEmitEventScopePin ? setEmitEventScope : setOnEventScope;
+
+                  controls.push(
+                    <AfSelect
+                      key="scope"
+                      variant="pin"
+                      value={value}
+                      placeholder="session"
+                      options={[
+                        { value: 'session', label: 'session' },
+                        { value: 'workflow', label: 'workflow' },
+                        { value: 'run', label: 'run' },
+                        { value: 'global', label: 'global' },
+                      ]}
+                      searchable={false}
+                      minPopoverWidth={180}
+                      onChange={onChange}
+                    />
+                  );
+                }
 
                 if (!connected && isPrimitive && !hasSpecialControl) {
                   const raw = pinDefaults[pin.id];

@@ -18,7 +18,8 @@ def create_on_event_node_handler(
     *,
     node_id: str,
     next_node: Optional[str],
-    event_name: str,
+    resolve_inputs: Optional[Callable[[Any], Dict[str, Any]]] = None,
+    default_name: str,
     scope: str = "session",
 ) -> Callable:
     """Create an `on_event` node handler.
@@ -32,14 +33,29 @@ def create_on_event_node_handler(
 
     from .control_adapter import _ensure_control
 
-    # Blank/unspecified name is treated as "listen to any event" (wildcard).
-    # This avoids the surprising behavior of binding to an opaque node_id and
-    # makes older saved flows (that may have name="") still behave sensibly.
-    name = str(event_name or "").strip() or "*"
-    scope_norm = str(scope or "session").strip().lower() or "session"
+    def _normalize_scope(raw: Any) -> str:
+        v = str(raw or "session").strip().lower() or "session"
+        if v not in {"session", "workflow", "run", "global"}:
+            v = "session"
+        return v
 
     def handler(run: Any, ctx: Any) -> "StepPlan":
         del ctx
+
+        resolved: Dict[str, Any] = {}
+        if callable(resolve_inputs):
+            try:
+                resolved = resolve_inputs(run)
+            except Exception:
+                resolved = {}
+        resolved = resolved if isinstance(resolved, dict) else {}
+
+        # Blank/unspecified name is treated as "listen to any event" (wildcard).
+        # This avoids the surprising behavior of binding to an opaque node_id and
+        # makes older saved flows (that may have name="") still behave sensibly.
+        name_raw = resolved.get("name") or resolved.get("event_name") or default_name
+        name = str(name_raw or "").strip() or "*"
+        scope_norm = _normalize_scope(resolved.get("scope") if "scope" in resolved else scope)
 
         _ctrl, stack, _frames = _ensure_control(run.vars)
         if not stack or stack[-1] != node_id:
@@ -82,7 +98,13 @@ def create_emit_event_node_handler(
     from abstractruntime.core.models import Effect, EffectType, StepPlan
 
     default_name2 = str(default_name or "").strip()
-    scope_norm = str(scope or "session").strip().lower() or "session"
+    default_scope = str(scope or "session").strip()
+
+    def _normalize_scope(raw: Any) -> str:
+        v = str(raw or "session").strip().lower() or "session"
+        if v not in {"session", "workflow", "run", "global"}:
+            v = "session"
+        return v
 
     def _next_seq(run_vars: Dict[str, Any]) -> int:
         temp = run_vars.get("_temp")
@@ -110,6 +132,8 @@ def create_emit_event_node_handler(
         name = str(name_raw or "").strip()
         if not name:
             raise ValueError(f"emit_event node '{node_id}' missing event name")
+
+        scope_norm = _normalize_scope(resolved.get("scope") if "scope" in resolved else default_scope)
 
         payload = resolved.get("payload")
         if isinstance(payload, dict):
@@ -151,5 +175,4 @@ def create_emit_event_node_handler(
         return StepPlan(node_id=node_id, effect=effect, next_node=next_node)
 
     return handler
-
 

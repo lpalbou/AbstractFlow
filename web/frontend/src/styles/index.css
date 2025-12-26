@@ -355,6 +355,9 @@ button.primary:hover:not(:disabled) {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  /* Prevent inputs/selects from overflowing the node frame in constrained widths */
+  min-width: 0;
+  flex: 0 1 auto;
 }
 
 /* When selects are placed inside the inline-controls container, it already handles alignment. */
@@ -365,7 +368,8 @@ button.primary:hover:not(:disabled) {
 .af-pin-input {
   height: 20px;
   width: 160px;
-  max-width: 160px;
+  max-width: 100%;
+  min-width: 0;
   padding: 0 8px;
   font-size: 11px;
   border-radius: 8px;
