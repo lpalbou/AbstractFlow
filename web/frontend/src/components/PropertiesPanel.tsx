@@ -648,6 +648,22 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const { data } = node;
   const providerPinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'provider');
   const modelPinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'model');
+  const emitEventNamePinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'name');
+  const emitEventSessionPinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'session_id');
+
+  const availableOnEventNames = (() => {
+    const out: string[] = [];
+    for (const n of nodes) {
+      if (n.data.nodeType !== 'on_event') continue;
+      const name = (n.data.eventConfig as any)?.name;
+      if (typeof name === 'string' && name.trim().length > 0) {
+        const v = name.trim();
+        if (!out.includes(v)) out.push(v);
+      }
+    }
+    out.sort((a, b) => a.localeCompare(b));
+    return out;
+  })();
 
   const updateAgentConfig = (patch: Partial<NonNullable<FlowNodeData['agentConfig']>>) => {
     updateNodeData(node.id, {
@@ -1883,6 +1899,56 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         </div>
       )}
 
+      {/* Event node properties - On Event (custom durable event) */}
+      {data.nodeType === 'on_event' && (
+        <div className="property-section">
+          <label className="property-label">Event Configuration</label>
+          <div className="property-group">
+            <label className="property-sublabel">Name</label>
+            <input
+              type="text"
+              className="property-input"
+              value={data.eventConfig?.name || ''}
+              onChange={(e) =>
+                updateNodeData(node.id, {
+                  eventConfig: {
+                    ...data.eventConfig,
+                    name: e.target.value,
+                  },
+                })
+              }
+              placeholder="e.g., my_event"
+            />
+            <span className="property-hint">
+              Durable event name (session-scoped by default)
+            </span>
+          </div>
+          <div className="property-group">
+            <label className="property-sublabel">Scope</label>
+            <select
+              className="property-select"
+              value={data.eventConfig?.scope ?? 'session'}
+              onChange={(e) =>
+                updateNodeData(node.id, {
+                  eventConfig: {
+                    ...data.eventConfig,
+                    scope: e.target.value as 'session' | 'workflow' | 'run' | 'global',
+                  },
+                })
+              }
+            >
+              <option value="session">Session (recommended)</option>
+              <option value="workflow">Workflow</option>
+              <option value="run">Run</option>
+              <option value="global">Global</option>
+            </select>
+            <span className="property-hint">
+              Session scope targets one workflow instance (root run id).
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* On Flow Start dynamic parameters (output pins) */}
       {data.nodeType === 'on_flow_start' && (
         <div className="property-section">
@@ -2579,6 +2645,104 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           <span className="property-hint">
             How to interpret the duration input
           </span>
+        </div>
+      )}
+
+      {/* Emit Event effect properties */}
+      {data.nodeType === 'emit_event' && (
+        <div className="property-section">
+          <label className="property-label">Event Emission</label>
+
+          <div className="property-group">
+            <label className="property-sublabel">Name</label>
+            {emitEventNamePinConnected ? (
+              <span className="property-hint">Provided by connected pin.</span>
+            ) : (
+              <>
+                {availableOnEventNames.length > 0 ? (
+                  <select
+                    className="property-select"
+                    value={data.effectConfig?.name || ''}
+                    onChange={(e) =>
+                      updateNodeData(node.id, {
+                        effectConfig: {
+                          ...data.effectConfig,
+                          name: e.target.value || undefined,
+                        },
+                      })
+                    }
+                  >
+                    <option value="">Select event…</option>
+                    {availableOnEventNames.map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
+                <input
+                  type="text"
+                  className="property-input"
+                  value={data.effectConfig?.name || ''}
+                  onChange={(e) =>
+                    updateNodeData(node.id, {
+                      effectConfig: {
+                        ...data.effectConfig,
+                        name: e.target.value || undefined,
+                      },
+                    })
+                  }
+                  placeholder={availableOnEventNames.length > 0 ? 'Or type a custom name…' : 'e.g., my_event'}
+                />
+              </>
+            )}
+          </div>
+
+          <div className="property-group">
+            <label className="property-sublabel">Scope</label>
+            <select
+              className="property-select"
+              value={data.effectConfig?.scope ?? 'session'}
+              onChange={(e) =>
+                updateNodeData(node.id, {
+                  effectConfig: {
+                    ...data.effectConfig,
+                    scope: e.target.value as 'session' | 'workflow' | 'run' | 'global',
+                  },
+                })
+              }
+            >
+              <option value="session">Session (recommended)</option>
+              <option value="workflow">Workflow</option>
+              <option value="run">Run</option>
+              <option value="global">Global</option>
+            </select>
+          </div>
+
+          <div className="property-group">
+            <label className="property-sublabel">Target Session ID (optional)</label>
+            {emitEventSessionPinConnected ? (
+              <span className="property-hint">Provided by connected pin.</span>
+            ) : (
+              <input
+                type="text"
+                className="property-input"
+                value={data.effectConfig?.sessionId || ''}
+                onChange={(e) =>
+                  updateNodeData(node.id, {
+                    effectConfig: {
+                      ...data.effectConfig,
+                      sessionId: e.target.value || undefined,
+                    },
+                  })
+                }
+                placeholder="Leave empty for current session"
+              />
+            )}
+            <span className="property-hint">
+              Set to the target workflow instance (root run id) to signal another session.
+            </span>
+          </div>
         </div>
       )}
 

@@ -58,7 +58,15 @@ export const BaseNode = memo(function BaseNode({
   // Separate execution pins from data pins
   const inputExec = isTriggerNode ? undefined : data.inputs.find((p) => p.type === 'execution');
   const outputExecs = data.outputs.filter((p) => p.type === 'execution');
-  const inputData = data.inputs.filter((p) => p.type !== 'execution');
+  const isEmitEventNode = data.nodeType === 'emit_event';
+  const inputData = data.inputs.filter((p) => {
+    if (p.type === 'execution') return false;
+    // Keep emit_event "session_id" as an advanced pin: hide it unless connected.
+    if (isEmitEventNode && p.id === 'session_id' && !isPinConnected('session_id', true)) {
+      return false;
+    }
+    return true;
+  });
   const outputData = data.outputs.filter((p) => p.type !== 'execution');
 
   const isLlmNode = data.nodeType === 'llm_call';

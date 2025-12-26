@@ -65,6 +65,8 @@ def create_visual_runner(visual_flow: VisualFlow, *, flows: Dict[str, VisualFlow
                     self[str(workflow.workflow_id)] = workflow
 
     from ..compiler import compile_flow
+    from .event_ids import visual_event_listener_workflow_id
+    from .session_runner import VisualSessionRunner
 
     def _node_type(node: Any) -> str:
         t = getattr(node, "type", None)
@@ -82,6 +84,7 @@ def create_visual_runner(visual_flow: VisualFlow, *, flows: Dict[str, VisualFlow
             "on_user_request",
             "on_agent_message",
             "on_schedule",
+            "on_event",
             "on_flow_end",
             "agent",
             "function",
@@ -100,6 +103,7 @@ def create_visual_runner(visual_flow: VisualFlow, *, flows: Dict[str, VisualFlow
             "llm_call",
             "wait_until",
             "wait_event",
+            "emit_event",
             "memory_note",
             "memory_query",
         }
@@ -111,16 +115,22 @@ def create_visual_runner(visual_flow: VisualFlow, *, flows: Dict[str, VisualFlow
 
         incoming_exec = {e.target for e in vf.edges if getattr(e, "targetHandle", None) == "exec-in"}
 
-        entry: Optional[str] = None
+        roots: list[str] = []
         if isinstance(vf.entryNode, str) and vf.entryNode in exec_ids:
-            entry = vf.entryNode
-        if entry is None:
+            roots.append(vf.entryNode)
+        # Custom events are independent entrypoints; include them as roots for "executable" reachability.
+        for n in vf.nodes:
+            if n.id in exec_ids and node_types.get(n.id) == "on_event":
+                roots.append(n.id)
+
+        if not roots:
+            # Fallback: infer a single root as "exec node with no incoming edge".
             for n in vf.nodes:
                 if n.id in exec_ids and n.id not in incoming_exec:
-                    entry = n.id
+                    roots.append(n.id)
                     break
-        if entry is None:
-            entry = next(iter(exec_ids))
+        if not roots:
+            roots.append(next(iter(exec_ids)))
 
         adj: Dict[str, list[str]] = {}
         for e in vf.edges:
@@ -131,7 +141,7 @@ def create_visual_runner(visual_flow: VisualFlow, *, flows: Dict[str, VisualFlow
             adj.setdefault(e.source, []).append(e.target)
 
         reachable: set[str] = set()
-        stack2 = [entry]
+        stack2 = list(dict.fromkeys([r for r in roots if isinstance(r, str) and r]))
         while stack2:
             cur = stack2.pop()
             if cur in reachable:
@@ -188,6 +198,8 @@ def create_visual_runner(visual_flow: VisualFlow, *, flows: Dict[str, VisualFlow
                 continue
             t = _node_type(n)
             if t in {"subflow", "agent"}:
+                needs_registry = True
+            if t in {"on_event", "emit_event"}:
                 needs_registry = True
             if t in {"memory_note", "memory_query"}:
                 needs_artifacts = True
@@ -416,7 +428,54 @@ def create_visual_runner(visual_flow: VisualFlow, *, flows: Dict[str, VisualFlow
                 pass
 
     flow = visual_to_flow(visual_flow)
-    runner = FlowRunner(flow, runtime=runtime)
+    # Build and register custom event listener workflows (On Event nodes).
+    event_listener_specs: list[Any] = []
+    if needs_registry:
+        try:
+            from .agent_ids import visual_react_workflow_id
+        except Exception:  # pragma: no cover
+            visual_react_workflow_id = None  # type: ignore[assignment]
+
+        for vf in ordered:
+            reachable = _reachable_exec_node_ids(vf)
+            for n in vf.nodes:
+                if _node_type(n) != "on_event":
+                    continue
+                # On Event nodes are roots by definition (even if disconnected from the main entry).
+                if reachable and n.id not in reachable:
+                    continue
+
+                workflow_id = visual_event_listener_workflow_id(flow_id=vf.id, node_id=n.id)
+
+                # Create a derived VisualFlow for this listener workflow:
+                # - workflow id is unique (so it can be registered)
+                # - entryNode is the on_event node
+                derived = vf.model_copy(deep=True)
+                derived.id = workflow_id
+                derived.entryNode = n.id
+
+                # Ensure Agent nodes inside this derived workflow reference the canonical
+                # ReAct workflow IDs based on the *source* flow id, not the derived id.
+                if callable(visual_react_workflow_id):
+                    for dn in derived.nodes:
+                        if _node_type(dn) != "agent":
+                            continue
+                        raw_cfg = dn.data.get("agentConfig", {}) if isinstance(dn.data, dict) else {}
+                        cfg = dict(raw_cfg) if isinstance(raw_cfg, dict) else {}
+                        cfg.setdefault(
+                            "_react_workflow_id",
+                            visual_react_workflow_id(flow_id=vf.id, node_id=dn.id),
+                        )
+                        dn.data["agentConfig"] = cfg
+
+                listener_flow = visual_to_flow(derived)
+                listener_spec = compile_flow(listener_flow)
+                event_listener_specs.append(listener_spec)
+    runner: FlowRunner
+    if event_listener_specs:
+        runner = VisualSessionRunner(flow, runtime=runtime, event_listener_specs=event_listener_specs)
+    else:
+        runner = FlowRunner(flow, runtime=runtime)
 
     if needs_registry:
         registry = WorkflowRegistry()
@@ -425,6 +484,8 @@ def create_visual_runner(visual_flow: VisualFlow, *, flows: Dict[str, VisualFlow
             child_flow = visual_to_flow(vf)
             child_spec = compile_flow(child_flow)
             registry.register(child_spec)
+        for spec in event_listener_specs:
+            registry.register(spec)
 
         # Register per-Agent-node subworkflows (canonical AbstractAgent ReAct).
         #
@@ -614,6 +675,7 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
         "llm_call",
         "wait_until",
         "wait_event",
+        "emit_event",
         "memory_note",
         "memory_query",
     }
@@ -1438,6 +1500,11 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
         if type_str in EFFECT_NODE_TYPES:
             effect_type = type_str
             effect_config = node.data.get("effectConfig", {})
+        elif type_str == "on_event":
+            # Custom event listener (Blueprint-style "Custom Event").
+            # Compiles into WAIT_EVENT under the hood.
+            effect_type = "on_event"
+            effect_config = node.data.get("eventConfig", {})
         elif type_str == "agent":
             effect_type = "agent"
             raw_cfg = node.data.get("agentConfig", {})

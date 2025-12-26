@@ -77,6 +77,19 @@ const EVENT_NODES: NodeTemplate[] = [
     category: 'events',
   },
   {
+    type: 'on_event',
+    icon: '&#x1F4E3;', // Megaphone
+    label: 'On Event',
+    headerColor: '#C0392B', // Red for events (like UE4)
+    inputs: [], // No inputs - triggered by durable event
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'event', label: 'event', type: 'object' },
+      { id: 'payload', label: 'payload', type: 'any' },
+    ],
+    category: 'events',
+  },
+  {
     type: 'on_flow_end',
     icon: '&#x23F9;', // Stop button
     label: 'On Flow End',
@@ -405,6 +418,25 @@ const EFFECT_NODES: NodeTemplate[] = [
     category: 'effects',
   },
   {
+    type: 'emit_event',
+    icon: '&#x1F4E3;', // Megaphone
+    label: 'Emit Event',
+    headerColor: '#E74C3C', // Red - eventing
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'name', label: 'name', type: 'string' },
+      { id: 'payload', label: 'payload', type: 'any' },
+      { id: 'session_id', label: 'session_id', type: 'string' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'delivered', label: 'delivered', type: 'number' },
+      { id: 'delivered_to', label: 'delivered_to', type: 'array' },
+      { id: 'wait_key', label: 'wait_key', type: 'string' },
+    ],
+    category: 'effects',
+  },
+  {
     type: 'memory_note',
     icon: '&#x1F4DD;', // Memo
     label: 'Add Note',
@@ -517,7 +549,9 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
     ...(template.type === 'break_object' && { breakConfig: { selectedPaths: [] } }),
     ...(template.type === 'concat' && { concatConfig: { separator: ' ' } }),
     ...(template.type === 'switch' && { switchConfig: { cases: [] } }),
+    ...(template.type === 'on_event' && { eventConfig: { name: 'my_event', scope: 'session' } }),
     ...(template.type === 'model_catalog' && { modelCatalogConfig: { allowedProviders: [], allowedModels: [], index: 0 } }),
     ...(template.type === 'provider_models' && { providerModelsConfig: { provider: '', allowedModels: [] } }),
+    ...(template.type === 'emit_event' && { effectConfig: { name: 'my_event', scope: 'session', sessionId: '' } }),
   };
 }

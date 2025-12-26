@@ -678,12 +678,31 @@ def _sync_effect_results_to_node_outputs(run: Any, flow: Flow) -> None:
         elif effect_type == "wait_event":
             current["event_data"] = raw
             mapped_value = raw
+        elif effect_type == "on_event":
+            # Custom event listener: the resume payload is a structured envelope.
+            if isinstance(raw, dict):
+                current["event"] = raw
+                current["payload"] = raw.get("payload")
+                current["event_id"] = raw.get("event_id")
+                current["name"] = raw.get("name")
+                mapped_value = raw
+            else:
+                current["event"] = raw
+                mapped_value = raw
         elif effect_type == "wait_until":
             if isinstance(raw, dict):
                 current.update(raw)
             else:
                 current["result"] = raw
             mapped_value = raw
+        elif effect_type == "emit_event":
+            # Custom event emission result (dispatch summary).
+            if isinstance(raw, dict):
+                current.update(raw)
+                mapped_value = raw
+            else:
+                current["result"] = raw
+                mapped_value = raw
         elif effect_type == "memory_note":
             span_id = _get_span_id(raw)
             current["note_id"] = span_id
@@ -1031,7 +1050,7 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
         effect_config = getattr(flow_node, "effect_config", None) or {}
         visual_type = effect_config.get("_visual_type") if isinstance(effect_config, dict) else None
 
-        # Check for effect nodes first
+        # Check for effect/control nodes first
         if effect_type == "sequence":
             from .adapters.control_adapter import create_sequence_node_handler
 
@@ -1176,6 +1195,72 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
                 loop_target=spec.get("loop_target"),
                 done_target=spec.get("done_target"),
                 resolve_condition=_resolve_condition,
+            )
+        elif effect_type == "on_event":
+            from .adapters.event_adapter import create_on_event_node_handler
+
+            # Blank/unspecified name is treated as "listen to any event" (wildcard).
+            # This is both more ergonomic and more backward-compatible than binding
+            # the listener to an opaque node_id.
+            name = "*"
+            scope = "session"
+            if isinstance(effect_config, dict):
+                raw_name = effect_config.get("name") or effect_config.get("event_name")
+                if isinstance(raw_name, str) and raw_name.strip():
+                    name = raw_name
+                raw_scope = effect_config.get("scope")
+                if isinstance(raw_scope, str) and raw_scope.strip():
+                    scope = raw_scope
+
+            handlers[node_id] = create_on_event_node_handler(
+                node_id=node_id,
+                next_node=next_node,
+                event_name=name,
+                scope=scope,
+            )
+        elif effect_type == "emit_event":
+            from .adapters.event_adapter import create_emit_event_node_handler
+
+            emit_data_handler = handler_obj if callable(handler_obj) else None
+
+            def _resolve_inputs(
+                run: Any,
+                _handler: Any = emit_data_handler,
+            ) -> Dict[str, Any]:
+                if flow is not None and hasattr(flow, "_node_outputs") and hasattr(flow, "_data_edge_map"):
+                    _sync_effect_results_to_node_outputs(run, flow)
+                if not callable(_handler):
+                    return {}
+                last_output = run.vars.get("_last_output", {})
+                try:
+                    resolved = _handler(last_output)
+                except Exception:
+                    resolved = {}
+                return resolved if isinstance(resolved, dict) else {}
+
+            default_name = ""
+            default_session_id: Optional[str] = None
+            scope = "session"
+            if isinstance(effect_config, dict):
+                raw_name = effect_config.get("name") or effect_config.get("event_name")
+                if isinstance(raw_name, str) and raw_name.strip():
+                    default_name = raw_name
+                raw_session = effect_config.get("session_id")
+                if raw_session is None:
+                    raw_session = effect_config.get("sessionId")
+                if isinstance(raw_session, str) and raw_session.strip():
+                    default_session_id = raw_session.strip()
+                raw_scope = effect_config.get("scope")
+                if isinstance(raw_scope, str) and raw_scope.strip():
+                    scope = raw_scope
+
+            handlers[node_id] = create_emit_event_node_handler(
+                node_id=node_id,
+                next_node=next_node,
+                resolve_inputs=_resolve_inputs,
+                default_name=default_name,
+                default_session_id=default_session_id,
+                scope=scope,
             )
         elif effect_type:
             # Pass the handler_obj as data_aware_handler if it's callable

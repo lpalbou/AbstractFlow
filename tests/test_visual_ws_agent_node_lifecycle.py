@@ -1,12 +1,11 @@
-"""WebSocket regression tests for Agent node lifecycle + trace previews.
+"""WS regression test for Agent node lifecycle + trace previews.
 
-We specifically validate two behaviors:
-1) Agent nodes should not emit misleading `node_complete` events while they are
-   still in an internal "running" phase (multi-tick node).
-2) Agent scratchpad traces shipped over the WS must retain nested fields like
-   `steps[].effect.type/payload` (no premature "…" truncation that breaks UI).
-
-This test uses a fake runner to avoid requiring a real LLM provider.
+Why this test is structured as a unit test (and not via TestClient websocket_receive):
+- Starlette's `WebSocketTestSession.receive_*()` has **no timeout** and will block forever
+  if the server stops emitting messages (flaky + painful to debug).
+- The behavior we care about (event ordering + preview/truncation rules) lives in
+  `web.backend.routes.ws._execute_runner_loop()`, so we can test it directly with a
+  capturing websocket and a hard timeout.
 """
 
 from __future__ import annotations
@@ -15,11 +14,8 @@ import json
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
-from fastapi.testclient import TestClient
-
-from web.backend.main import app
-from web.backend.models import NodeType, Position, VisualEdge, VisualFlow, VisualNode
-from web.backend.routes.flows import _flows
+import anyio
+import pytest
 
 
 @dataclass
@@ -145,86 +141,63 @@ class _FakeRunner:
 
 
 def test_ws_agent_node_emits_single_complete_and_trace_is_not_truncated() -> None:
-    flow_id = "test-ws-agent-lifecycle"
+    import web.backend.routes.ws as ws_routes
 
-    visual = VisualFlow(
-        id=flow_id,
-        name="test ws agent lifecycle",
-        entryNode="n1",
-        nodes=[
-            VisualNode(
-                id="n1",
-                type=NodeType.ON_FLOW_START,
-                position=Position(x=0, y=0),
-                data={},
-            ),
-            VisualNode(
-                id="agent",
-                type=NodeType.AGENT,
-                position=Position(x=0, y=0),
-                data={"agentConfig": {"provider": "lmstudio", "model": "qwen/qwen3-next-80b", "tools": ["list_files", "read_file"]}},
-            ),
-        ],
-        edges=[
-            VisualEdge(id="e1", source="n1", sourceHandle="exec-out", target="agent", targetHandle="exec-in"),
-            VisualEdge(id="d1", source="n1", sourceHandle="query", target="agent", targetHandle="task"),
-        ],
-    )
+    class _CapturingWebSocket:
+        def __init__(self) -> None:
+            self.sent: list[dict] = []
 
-    _flows[flow_id] = visual
-    try:
-        # Patch the WS module to avoid invoking the real visual runner (LLM).
-        import web.backend.routes.ws as ws_routes
+        async def send_json(self, data: Any) -> None:  # matches FastAPI WebSocket API
+            assert isinstance(data, dict)
+            self.sent.append(data)
 
-        original_create = ws_routes.create_visual_runner
-        ws_routes.create_visual_runner = lambda *_args, **_kwargs: _FakeRunner()  # type: ignore[assignment]
+    runner = _FakeRunner()
+    runner.start({"query": "x"})
+    ws = _CapturingWebSocket()
 
-        try:
-            with TestClient(app) as client:
-                with client.websocket_connect(f"/api/ws/{flow_id}") as ws:
-                    ws.send_text(json.dumps({"type": "run", "input_data": {"query": "x"}}))
+    async def _drive() -> None:
+        with anyio.fail_after(2.0):
+            await ws_routes._execute_runner_loop(ws, runner, "conn_fake")  # type: ignore[arg-type]
 
-                    msgs = []
-                    for _ in range(200):
-                        msg = ws.receive_json()
-                        msgs.append(msg)
-                        if msg.get("type") == "flow_complete":
-                            break
+    anyio.run(_drive)
 
-                    node_events = [(m.get("type"), m.get("nodeId")) for m in msgs if m.get("type") in {"node_start", "node_complete"}]
-                    # Agent node should only close once (no misleading "status: running" completion event).
-                    assert node_events == [
-                        ("node_start", "n1"),
-                        ("node_complete", "n1"),
-                        ("node_start", "agent"),
-                        ("node_complete", "agent"),
-                    ]
+    msgs = ws.sent
+    if not msgs:
+        pytest.fail("No WS events were emitted by _execute_runner_loop().")
 
-                    agent_complete = next(m for m in msgs if m.get("type") == "node_complete" and m.get("nodeId") == "agent")
-                    payload = agent_complete.get("result")
-                    assert isinstance(payload, dict)
+    # Must terminate (otherwise we'd hang in the UI too).
+    assert any(m.get("type") == "flow_complete" for m in msgs)
 
-                    # WS preview should preserve scratchpad.step.effect.type/payload (not "…").
-                    scratchpad = payload.get("scratchpad")
-                    assert isinstance(scratchpad, dict)
-                    assert "node_traces" not in scratchpad  # dropped server-side to keep payload sane
+    node_events = [(m.get("type"), m.get("nodeId")) for m in msgs if m.get("type") in {"node_start", "node_complete"}]
+    # Agent node should only close once (no misleading "status: running" completion event).
+    assert node_events == [
+        ("node_start", "n1"),
+        ("node_complete", "n1"),
+        ("node_start", "agent"),
+        ("node_complete", "agent"),
+    ]
 
-                    steps = scratchpad.get("steps")
-                    assert isinstance(steps, list) and steps
-                    first = steps[0]
-                    assert isinstance(first, dict)
-                    effect = first.get("effect")
-                    assert isinstance(effect, dict)
-                    assert effect.get("type") == "tool_calls"
-                    payload_obj = effect.get("payload")
-                    assert isinstance(payload_obj, dict)
-                    tool_calls = payload_obj.get("tool_calls")
-                    assert isinstance(tool_calls, list) and tool_calls
-                    assert tool_calls[0]["name"] == "list_files"
-                    assert tool_calls[0]["arguments"]["directory_path"] == "/Users/albou/r-type/"
-        finally:
-            ws_routes.create_visual_runner = original_create  # type: ignore[assignment]
-    finally:
-        _flows.pop(flow_id, None)
+    agent_complete = next(m for m in msgs if m.get("type") == "node_complete" and m.get("nodeId") == "agent")
+    payload = agent_complete.get("result")
+    assert isinstance(payload, dict)
+
+    # Preview should preserve scratchpad.steps[].effect.type/payload (not "…").
+    scratchpad = payload.get("scratchpad")
+    assert isinstance(scratchpad, dict)
+    assert "node_traces" not in scratchpad  # dropped server-side to keep payload sane
+
+    steps = scratchpad.get("steps")
+    assert isinstance(steps, list) and steps
+    first = steps[0]
+    assert isinstance(first, dict)
+    effect = first.get("effect")
+    assert isinstance(effect, dict)
+    assert effect.get("type") == "tool_calls"
+    payload_obj = effect.get("payload")
+    assert isinstance(payload_obj, dict)
+    tool_calls = payload_obj.get("tool_calls")
+    assert isinstance(tool_calls, list) and tool_calls
+    assert tool_calls[0]["name"] == "list_files"
+    assert tool_calls[0]["arguments"]["directory_path"] == "/Users/albou/r-type/"
 
 

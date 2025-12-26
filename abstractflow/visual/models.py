@@ -35,6 +35,7 @@ class NodeType(str, Enum):
     ON_USER_REQUEST = "on_user_request"
     ON_AGENT_MESSAGE = "on_agent_message"
     ON_SCHEDULE = "on_schedule"
+    ON_EVENT = "on_event"
     # Flow IO nodes
     ON_FLOW_END = "on_flow_end"
     # Core execution nodes
@@ -96,6 +97,7 @@ class NodeType(str, Enum):
     LLM_CALL = "llm_call"
     WAIT_UNTIL = "wait_until"
     WAIT_EVENT = "wait_event"
+    EMIT_EVENT = "emit_event"
     MEMORY_NOTE = "memory_note"
     MEMORY_QUERY = "memory_query"
 

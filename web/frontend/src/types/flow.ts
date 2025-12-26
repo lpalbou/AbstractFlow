@@ -39,6 +39,7 @@ export type NodeType =
   | 'on_user_request'    // Triggered by user input
   | 'on_agent_message'   // Triggered by inter-agent communication
   | 'on_schedule'        // Triggered by scheduled events
+  | 'on_event'           // Triggered by a custom durable event (session-scoped by default)
   // Flow IO nodes
   | 'on_flow_end'        // Terminal node to expose flow outputs
   // Core execution nodes (exec IN and OUT)
@@ -60,13 +61,14 @@ export type NodeType =
   // Literals - Pure value nodes (no exec pins, no inputs)
   | 'literal_string' | 'literal_number' | 'literal_boolean' | 'literal_json' | 'literal_array'
   // Effects - Side-effect nodes (require execution pins)
-  | 'ask_user' | 'answer_user' | 'llm_call' | 'wait_until' | 'wait_event' | 'memory_note' | 'memory_query';
+  | 'ask_user' | 'answer_user' | 'llm_call' | 'wait_until' | 'wait_event' | 'emit_event' | 'memory_note' | 'memory_query';
 
 export const ENTRY_NODE_TYPES: NodeType[] = [
   'on_flow_start',
   'on_user_request',
   'on_agent_message',
   'on_schedule',
+  'on_event',
 ];
 
 export function isEntryNodeType(nodeType: NodeType): boolean {
@@ -100,6 +102,9 @@ export interface FlowNodeData {
   subflowId?: string;      // For subflow nodes
   // Event node configuration
   eventConfig?: {
+    // For on_event
+    name?: string;
+    scope?: 'session' | 'workflow' | 'run' | 'global';
     channel?: string;        // For on_agent_message: channel to listen to
     agentFilter?: string;    // For on_agent_message: specific agent to listen to
     schedule?: string;       // For on_schedule: cron expression or interval
@@ -126,6 +131,10 @@ export interface FlowNodeData {
     temperature?: number;  // For llm_call
     allowFreeText?: boolean; // For ask_user
     durationType?: 'seconds' | 'minutes' | 'hours' | 'timestamp'; // For wait_until
+    // For emit_event
+    name?: string;
+    scope?: 'session' | 'workflow' | 'run' | 'global';
+    sessionId?: string; // Optional target session id when not connected via pin
   };
 
   // Model Catalog node configuration
