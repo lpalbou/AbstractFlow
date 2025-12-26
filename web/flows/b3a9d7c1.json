@@ -1,0 +1,649 @@
+{
+  "id": "b3a9d7c1",
+  "name": "deep-research-pro",
+  "description": "SOTA deep research workflow (clarify -> research dossier -> final report) using Agent nodes with web_search/fetch_url tools.",
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": { "x": -896.0, "y": 64.0 },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "query", "label": "query", "type": "string" },
+          { "id": "follow_up_questions", "label": "follow_up_questions", "type": "boolean" },
+          { "id": "max_web_search", "label": "max_web_search", "type": "number" },
+          { "id": "max_fetch_url", "label": "max_fetch_url", "type": "number" }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-2",
+      "type": "code",
+      "position": { "x": -608.0, "y": 64.0 },
+      "data": {
+        "nodeType": "code",
+        "label": "Python Code",
+        "icon": "&#x1F40D;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "input", "label": "input", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "output", "label": "output", "type": "any" }
+        ],
+        "outputKey": "_limits.max_iterations",
+        "codeBody": "def _to_int(v, default):\n    try:\n        if v is None or v == \"\":\n            return default\n        if isinstance(v, bool):\n            return default\n        return int(float(v))\n    except Exception:\n        return default\n\ndef transform(input):\n    d = input if isinstance(input, dict) else {}\n\n    max_web = _to_int(d.get(\"max_web_search\"), 3)\n    max_fetch = _to_int(d.get(\"max_fetch_url\"), 6)\n    explicit = _to_int(d.get(\"max_iterations\"), 0)\n\n    budget = max_web + max_fetch\n    if budget < 1:\n        budget = 1\n\n    # Heuristic: ReAct often uses ~2 iterations per tool call (call + observation).\n    max_iterations = explicit if explicit > 0 else (budget * 2 + 4)\n\n    return int(max_iterations)\n",
+        "code": "def _to_int(v, default):\n    try:\n        if v is None or v == \"\":\n            return default\n        if isinstance(v, bool):\n            return default\n        return int(float(v))\n    except Exception:\n        return default\n\ndef transform(input):\n    d = input if isinstance(input, dict) else {}\n\n    max_web = _to_int(d.get(\"max_web_search\"), 3)\n    max_fetch = _to_int(d.get(\"max_fetch_url\"), 6)\n    explicit = _to_int(d.get(\"max_iterations\"), 0)\n\n    budget = max_web + max_fetch\n    if budget < 1:\n        budget = 1\n\n    # Heuristic: ReAct often uses ~2 iterations per tool call (call + observation).\n    max_iterations = explicit if explicit > 0 else (budget * 2 + 4)\n\n    return int(max_iterations)\n",
+        "functionName": "transform"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-3",
+      "type": "if",
+      "position": { "x": -320.0, "y": 64.0 },
+      "data": {
+        "nodeType": "if",
+        "label": "If/Else",
+        "icon": "&#x2753;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "condition", "label": "condition", "type": "boolean" }
+        ],
+        "outputs": [
+          { "id": "true", "label": "true", "type": "execution" },
+          { "id": "false", "label": "false", "type": "execution" }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+
+    { "id": "node-10", "type": "literal_string", "position": { "x": -832.0, "y": 272.0 }, "data": { "nodeType": "literal_string", "label": "String", "icon": "&#x270F;", "headerColor": "#95A5A6", "inputs": [], "outputs": [ { "id": "value", "label": "value", "type": "string" } ], "literalValue": "DEEP RESEARCH REQUEST\\n\\nQUERY:\\n" }, "label": null, "icon": null, "headerColor": null, "inputs": [], "outputs": [] },
+    { "id": "node-11", "type": "literal_string", "position": { "x": -832.0, "y": 352.0 }, "data": { "nodeType": "literal_string", "label": "String", "icon": "&#x270F;", "headerColor": "#95A5A6", "inputs": [], "outputs": [ { "id": "value", "label": "value", "type": "string" } ], "literalValue": "\\n\\nBUDGET (strict):\\n- web_search ≤ " }, "label": null, "icon": null, "headerColor": null, "inputs": [], "outputs": [] },
+    { "id": "node-12", "type": "literal_string", "position": { "x": -832.0, "y": 432.0 }, "data": { "nodeType": "literal_string", "label": "String", "icon": "&#x270F;", "headerColor": "#95A5A6", "inputs": [], "outputs": [ { "id": "value", "label": "value", "type": "string" } ], "literalValue": "\\n- fetch_url ≤ " }, "label": null, "icon": null, "headerColor": null, "inputs": [], "outputs": [] },
+    { "id": "node-13", "type": "literal_string", "position": { "x": -832.0, "y": 512.0 }, "data": { "nodeType": "literal_string", "label": "String", "icon": "&#x270F;", "headerColor": "#95A5A6", "inputs": [], "outputs": [ { "id": "value", "label": "value", "type": "string" } ], "literalValue": "\\n\\nDELIVERABLE:\\nReturn a RESEARCH DOSSIER in markdown with: (1) plan, (2) key findings, (3) evidence with citations (URLs), (4) limitations/uncertainty, (5) further reading.\\n\\nRules: only cite URLs you actually fetched; if you didn’t fetch it, don’t cite it. Prefer primary/authoritative sources.\\n" }, "label": null, "icon": null, "headerColor": null, "inputs": [], "outputs": [] },
+    {
+      "id": "node-14",
+      "type": "concat",
+      "position": { "x": -576.0, "y": 384.0 },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          { "id": "a", "label": "a", "type": "string" },
+          { "id": "b", "label": "b", "type": "string" },
+          { "id": "c", "label": "c", "type": "string" },
+          { "id": "d", "label": "d", "type": "string" },
+          { "id": "e", "label": "e", "type": "string" },
+          { "id": "f", "label": "f", "type": "string" },
+          { "id": "g", "label": "g", "type": "string" }
+        ],
+        "outputs": [ { "id": "result", "label": "result", "type": "string" } ],
+        "concatConfig": { "separator": "" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-15",
+      "type": "literal_string",
+      "position": { "x": -576.0, "y": 240.0 },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "String",
+        "icon": "&#x270F;",
+        "headerColor": "#95A5A6",
+        "inputs": [],
+        "outputs": [ { "id": "value", "label": "value", "type": "string" } ],
+        "literalValue": "You are a rigorous deep-research agent. Use tools to gather evidence and write a research dossier.\\n\\nMethod:\\n1) plan what you need to learn\\n2) search broadly (web_search)\\n3) fetch a small set of high-signal sources (fetch_url)\\n4) extract key evidence + cite URLs\\n5) synthesize carefully; clearly separate facts vs interpretation\\n\\nHard rules:\\n- Never invent citations.\\n- If evidence is insufficient, say so and explain what’s missing.\\n"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-16",
+      "type": "agent",
+      "position": { "x": -64.0, "y": 384.0 },
+      "data": {
+        "nodeType": "agent",
+        "label": "Agent",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "provider", "label": "provider", "type": "string" },
+          { "id": "model", "label": "model", "type": "string" },
+          { "id": "system", "label": "system", "type": "string" },
+          { "id": "task", "label": "prompt", "type": "string" },
+          { "id": "tools", "label": "tools", "type": "array" },
+          { "id": "context", "label": "context", "type": "object" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "result", "label": "result", "type": "object" },
+          { "id": "scratchpad", "label": "scratchpad", "type": "object" }
+        ],
+        "agentConfig": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b",
+          "tools": [ "web_search", "fetch_url" ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    { "id": "node-17", "type": "break_object", "position": { "x": 208.0, "y": 384.0 }, "data": { "nodeType": "break_object", "label": "Break Object", "icon": "&#x1F9E9;", "headerColor": "#3498DB", "inputs": [ { "id": "object", "label": "object", "type": "object" } ], "outputs": [ { "id": "result", "label": "result", "type": "string" } ], "breakConfig": { "selectedPaths": [ "result" ] } }, "label": null, "icon": null, "headerColor": null, "inputs": [], "outputs": [] },
+
+    { "id": "node-18", "type": "literal_string", "position": { "x": 208.0, "y": 256.0 }, "data": { "nodeType": "literal_string", "label": "String", "icon": "&#x270F;", "headerColor": "#95A5A6", "inputs": [], "outputs": [ { "id": "value", "label": "value", "type": "string" } ], "literalValue": "You are a senior technical writer. Convert the research dossier into a final report in markdown.\\n\\nRules:\\n- Preserve all citations as URLs.\\n- Don’t add new facts not supported by the dossier.\\n- Produce a clear structure with headings, bullets, and a short executive summary.\\n" }, "label": null, "icon": null, "headerColor": null, "inputs": [], "outputs": [] },
+    { "id": "node-19", "type": "literal_string", "position": { "x": -320.0, "y": 576.0 }, "data": { "nodeType": "literal_string", "label": "String", "icon": "&#x270F;", "headerColor": "#95A5A6", "inputs": [], "outputs": [ { "id": "value", "label": "value", "type": "string" } ], "literalValue": "Write the final report for the query:\\n" }, "label": null, "icon": null, "headerColor": null, "inputs": [], "outputs": [] },
+    { "id": "node-20", "type": "literal_string", "position": { "x": -320.0, "y": 656.0 }, "data": { "nodeType": "literal_string", "label": "String", "icon": "&#x270F;", "headerColor": "#95A5A6", "inputs": [], "outputs": [ { "id": "value", "label": "value", "type": "string" } ], "literalValue": "\\n\\nResearch dossier:\\n" }, "label": null, "icon": null, "headerColor": null, "inputs": [], "outputs": [] },
+    {
+      "id": "node-21",
+      "type": "concat",
+      "position": { "x": -64.0, "y": 624.0 },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          { "id": "a", "label": "a", "type": "string" },
+          { "id": "b", "label": "b", "type": "string" },
+          { "id": "c", "label": "c", "type": "string" },
+          { "id": "d", "label": "d", "type": "string" }
+        ],
+        "outputs": [ { "id": "result", "label": "result", "type": "string" } ],
+        "concatConfig": { "separator": "" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-22",
+      "type": "agent",
+      "position": { "x": 208.0, "y": 624.0 },
+      "data": {
+        "nodeType": "agent",
+        "label": "Agent",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "provider", "label": "provider", "type": "string" },
+          { "id": "model", "label": "model", "type": "string" },
+          { "id": "system", "label": "system", "type": "string" },
+          { "id": "task", "label": "prompt", "type": "string" },
+          { "id": "tools", "label": "tools", "type": "array" },
+          { "id": "context", "label": "context", "type": "object" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "result", "label": "result", "type": "object" },
+          { "id": "scratchpad", "label": "scratchpad", "type": "object" }
+        ],
+        "agentConfig": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b",
+          "tools": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    { "id": "node-23", "type": "break_object", "position": { "x": 480.0, "y": 624.0 }, "data": { "nodeType": "break_object", "label": "Break Object", "icon": "&#x1F9E9;", "headerColor": "#3498DB", "inputs": [ { "id": "object", "label": "object", "type": "object" } ], "outputs": [ { "id": "result", "label": "result", "type": "string" } ], "breakConfig": { "selectedPaths": [ "result" ] } }, "label": null, "icon": null, "headerColor": null, "inputs": [], "outputs": [] },
+    {
+      "id": "node-24",
+      "type": "answer_user",
+      "position": { "x": 704.0, "y": 624.0 },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "message", "label": "message", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "message", "label": "message", "type": "string" }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-25",
+      "type": "on_flow_end",
+      "position": { "x": 960.0, "y": 624.0 },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "report", "label": "report", "type": "string" },
+          { "id": "dossier", "label": "dossier", "type": "string" }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+
+    { "id": "node-30", "type": "literal_string", "position": { "x": -832.0, "y": -256.0 }, "data": { "nodeType": "literal_string", "label": "String", "icon": "&#x270F;", "headerColor": "#95A5A6", "inputs": [], "outputs": [ { "id": "value", "label": "value", "type": "string" } ], "literalValue": "Given the following user query, propose 3–6 high-impact clarifying questions that would significantly improve the quality of web research.\\n\\nOutput markdown bullet list only." }, "label": null, "icon": null, "headerColor": null, "inputs": [], "outputs": [] },
+    {
+      "id": "node-31",
+      "type": "concat",
+      "position": { "x": -576.0, "y": -256.0 },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          { "id": "a", "label": "a", "type": "string" },
+          { "id": "b", "label": "b", "type": "string" }
+        ],
+        "outputs": [ { "id": "result", "label": "result", "type": "string" } ],
+        "concatConfig": { "separator": "\\n\\n" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-32",
+      "type": "llm_call",
+      "position": { "x": -320.0, "y": -256.0 },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "LLM Call",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "provider", "label": "provider", "type": "string" },
+          { "id": "model", "label": "model", "type": "string" },
+          { "id": "system", "label": "system", "type": "string" },
+          { "id": "prompt", "label": "prompt", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "response", "label": "response", "type": "string" }
+        ],
+        "effectConfig": { "provider": "lmstudio", "model": "qwen/qwen3-next-80b" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    { "id": "node-33", "type": "literal_string", "position": { "x": -320.0, "y": -384.0 }, "data": { "nodeType": "literal_string", "label": "String", "icon": "&#x270F;", "headerColor": "#95A5A6", "inputs": [], "outputs": [ { "id": "value", "label": "value", "type": "string" } ], "literalValue": "You are an expert research assistant. Ask clarifying questions, nothing else." }, "label": null, "icon": null, "headerColor": null, "inputs": [], "outputs": [] },
+    { "id": "node-34", "type": "literal_string", "position": { "x": -64.0, "y": -128.0 }, "data": { "nodeType": "literal_string", "label": "String", "icon": "&#x270F;", "headerColor": "#95A5A6", "inputs": [], "outputs": [ { "id": "value", "label": "value", "type": "string" } ], "literalValue": "Please answer these questions (short, factual, bullet list is fine):\\n\\n" }, "label": null, "icon": null, "headerColor": null, "inputs": [], "outputs": [] },
+    {
+      "id": "node-35",
+      "type": "concat",
+      "position": { "x": 208.0, "y": -192.0 },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          { "id": "a", "label": "a", "type": "string" },
+          { "id": "b", "label": "b", "type": "string" }
+        ],
+        "outputs": [ { "id": "result", "label": "result", "type": "string" } ],
+        "concatConfig": { "separator": "" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-36",
+      "type": "ask_user",
+      "position": { "x": 480.0, "y": -256.0 },
+      "data": {
+        "nodeType": "ask_user",
+        "label": "Ask User",
+        "icon": "&#x2753;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "prompt", "label": "prompt", "type": "string" },
+          { "id": "choices", "label": "choices", "type": "array" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "response", "label": "response", "type": "string" }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+
+    { "id": "node-40", "type": "literal_string", "position": { "x": -832.0, "y": -32.0 }, "data": { "nodeType": "literal_string", "label": "String", "icon": "&#x270F;", "headerColor": "#95A5A6", "inputs": [], "outputs": [ { "id": "value", "label": "value", "type": "string" } ], "literalValue": "DEEP RESEARCH REQUEST\\n\\nQUERY:\\n" }, "label": null, "icon": null, "headerColor": null, "inputs": [], "outputs": [] },
+    { "id": "node-41", "type": "literal_string", "position": { "x": -832.0, "y": 48.0 }, "data": { "nodeType": "literal_string", "label": "String", "icon": "&#x270F;", "headerColor": "#95A5A6", "inputs": [], "outputs": [ { "id": "value", "label": "value", "type": "string" } ], "literalValue": "\\n\\nCLARIFICATIONS (from user):\\n" }, "label": null, "icon": null, "headerColor": null, "inputs": [], "outputs": [] },
+    { "id": "node-42", "type": "literal_string", "position": { "x": -832.0, "y": 128.0 }, "data": { "nodeType": "literal_string", "label": "String", "icon": "&#x270F;", "headerColor": "#95A5A6", "inputs": [], "outputs": [ { "id": "value", "label": "value", "type": "string" } ], "literalValue": "\\n\\nBUDGET (strict):\\n- web_search ≤ " }, "label": null, "icon": null, "headerColor": null, "inputs": [], "outputs": [] },
+    { "id": "node-43", "type": "literal_string", "position": { "x": -832.0, "y": 208.0 }, "data": { "nodeType": "literal_string", "label": "String", "icon": "&#x270F;", "headerColor": "#95A5A6", "inputs": [], "outputs": [ { "id": "value", "label": "value", "type": "string" } ], "literalValue": "\\n- fetch_url ≤ " }, "label": null, "icon": null, "headerColor": null, "inputs": [], "outputs": [] },
+    { "id": "node-44", "type": "literal_string", "position": { "x": -832.0, "y": 288.0 }, "data": { "nodeType": "literal_string", "label": "String", "icon": "&#x270F;", "headerColor": "#95A5A6", "inputs": [], "outputs": [ { "id": "value", "label": "value", "type": "string" } ], "literalValue": "\\n\\nDELIVERABLE:\\nReturn a RESEARCH DOSSIER in markdown with: (1) plan, (2) key findings, (3) evidence with citations (URLs), (4) limitations/uncertainty, (5) further reading.\\n\\nRules: only cite URLs you actually fetched; if you didn’t fetch it, don’t cite it. Prefer primary/authoritative sources.\\n" }, "label": null, "icon": null, "headerColor": null, "inputs": [], "outputs": [] },
+    {
+      "id": "node-45",
+      "type": "concat",
+      "position": { "x": -576.0, "y": 128.0 },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          { "id": "a", "label": "a", "type": "string" },
+          { "id": "b", "label": "b", "type": "string" },
+          { "id": "c", "label": "c", "type": "string" },
+          { "id": "d", "label": "d", "type": "string" },
+          { "id": "e", "label": "e", "type": "string" },
+          { "id": "f", "label": "f", "type": "string" },
+          { "id": "g", "label": "g", "type": "string" },
+          { "id": "h", "label": "h", "type": "string" },
+          { "id": "i", "label": "i", "type": "string" }
+        ],
+        "outputs": [ { "id": "result", "label": "result", "type": "string" } ],
+        "concatConfig": { "separator": "" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-46",
+      "type": "agent",
+      "position": { "x": -64.0, "y": 128.0 },
+      "data": {
+        "nodeType": "agent",
+        "label": "Agent",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "provider", "label": "provider", "type": "string" },
+          { "id": "model", "label": "model", "type": "string" },
+          { "id": "system", "label": "system", "type": "string" },
+          { "id": "task", "label": "prompt", "type": "string" },
+          { "id": "tools", "label": "tools", "type": "array" },
+          { "id": "context", "label": "context", "type": "object" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "result", "label": "result", "type": "object" },
+          { "id": "scratchpad", "label": "scratchpad", "type": "object" }
+        ],
+        "agentConfig": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b",
+          "tools": [ "web_search", "fetch_url" ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    { "id": "node-47", "type": "break_object", "position": { "x": 208.0, "y": 128.0 }, "data": { "nodeType": "break_object", "label": "Break Object", "icon": "&#x1F9E9;", "headerColor": "#3498DB", "inputs": [ { "id": "object", "label": "object", "type": "object" } ], "outputs": [ { "id": "result", "label": "result", "type": "string" } ], "breakConfig": { "selectedPaths": [ "result" ] } }, "label": null, "icon": null, "headerColor": null, "inputs": [], "outputs": [] },
+
+    { "id": "node-48", "type": "literal_string", "position": { "x": -320.0, "y": 32.0 }, "data": { "nodeType": "literal_string", "label": "String", "icon": "&#x270F;", "headerColor": "#95A5A6", "inputs": [], "outputs": [ { "id": "value", "label": "value", "type": "string" } ], "literalValue": "Write the final report for the query:\\n" }, "label": null, "icon": null, "headerColor": null, "inputs": [], "outputs": [] },
+    { "id": "node-49", "type": "literal_string", "position": { "x": -320.0, "y": 112.0 }, "data": { "nodeType": "literal_string", "label": "String", "icon": "&#x270F;", "headerColor": "#95A5A6", "inputs": [], "outputs": [ { "id": "value", "label": "value", "type": "string" } ], "literalValue": "\\n\\nClarifications:\\n" }, "label": null, "icon": null, "headerColor": null, "inputs": [], "outputs": [] },
+    { "id": "node-50", "type": "literal_string", "position": { "x": -320.0, "y": 192.0 }, "data": { "nodeType": "literal_string", "label": "String", "icon": "&#x270F;", "headerColor": "#95A5A6", "inputs": [], "outputs": [ { "id": "value", "label": "value", "type": "string" } ], "literalValue": "\\n\\nResearch dossier:\\n" }, "label": null, "icon": null, "headerColor": null, "inputs": [], "outputs": [] },
+    {
+      "id": "node-51",
+      "type": "concat",
+      "position": { "x": -64.0, "y": 0.0 },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          { "id": "a", "label": "a", "type": "string" },
+          { "id": "b", "label": "b", "type": "string" },
+          { "id": "c", "label": "c", "type": "string" },
+          { "id": "d", "label": "d", "type": "string" },
+          { "id": "e", "label": "e", "type": "string" },
+          { "id": "f", "label": "f", "type": "string" }
+        ],
+        "outputs": [ { "id": "result", "label": "result", "type": "string" } ],
+        "concatConfig": { "separator": "" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-52",
+      "type": "agent",
+      "position": { "x": 208.0, "y": 0.0 },
+      "data": {
+        "nodeType": "agent",
+        "label": "Agent",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "provider", "label": "provider", "type": "string" },
+          { "id": "model", "label": "model", "type": "string" },
+          { "id": "system", "label": "system", "type": "string" },
+          { "id": "task", "label": "prompt", "type": "string" },
+          { "id": "tools", "label": "tools", "type": "array" },
+          { "id": "context", "label": "context", "type": "object" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "result", "label": "result", "type": "object" },
+          { "id": "scratchpad", "label": "scratchpad", "type": "object" }
+        ],
+        "agentConfig": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b",
+          "tools": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    { "id": "node-53", "type": "break_object", "position": { "x": 480.0, "y": 0.0 }, "data": { "nodeType": "break_object", "label": "Break Object", "icon": "&#x1F9E9;", "headerColor": "#3498DB", "inputs": [ { "id": "object", "label": "object", "type": "object" } ], "outputs": [ { "id": "result", "label": "result", "type": "string" } ], "breakConfig": { "selectedPaths": [ "result" ] } }, "label": null, "icon": null, "headerColor": null, "inputs": [], "outputs": [] },
+    {
+      "id": "node-54",
+      "type": "answer_user",
+      "position": { "x": 704.0, "y": 0.0 },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "message", "label": "message", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "message", "label": "message", "type": "string" }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-55",
+      "type": "on_flow_end",
+      "position": { "x": 960.0, "y": 0.0 },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "report", "label": "report", "type": "string" },
+          { "id": "dossier", "label": "dossier", "type": "string" },
+          { "id": "clarifications", "label": "clarifications", "type": "string" }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    { "id": "edge-1", "source": "node-1", "sourceHandle": "exec-out", "target": "node-2", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-2", "source": "node-2", "sourceHandle": "exec-out", "target": "node-3", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-3", "source": "node-1", "sourceHandle": "follow_up_questions", "target": "node-3", "targetHandle": "condition" },
+
+    { "id": "edge-4", "source": "node-3", "sourceHandle": "false", "target": "node-16", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-5", "source": "node-16", "sourceHandle": "exec-out", "target": "node-22", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-6", "source": "node-22", "sourceHandle": "exec-out", "target": "node-24", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-7", "source": "node-24", "sourceHandle": "exec-out", "target": "node-25", "targetHandle": "exec-in", "animated": true },
+
+    { "id": "edge-10", "source": "node-3", "sourceHandle": "true", "target": "node-32", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-11", "source": "node-32", "sourceHandle": "exec-out", "target": "node-36", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-12", "source": "node-36", "sourceHandle": "exec-out", "target": "node-46", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-13", "source": "node-46", "sourceHandle": "exec-out", "target": "node-52", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-14", "source": "node-52", "sourceHandle": "exec-out", "target": "node-54", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-15", "source": "node-54", "sourceHandle": "exec-out", "target": "node-55", "targetHandle": "exec-in", "animated": true },
+
+    { "id": "edge-20", "source": "node-10", "sourceHandle": "value", "target": "node-14", "targetHandle": "a" },
+    { "id": "edge-21", "source": "node-1", "sourceHandle": "query", "target": "node-14", "targetHandle": "b" },
+    { "id": "edge-22", "source": "node-11", "sourceHandle": "value", "target": "node-14", "targetHandle": "c" },
+    { "id": "edge-23", "source": "node-1", "sourceHandle": "max_web_search", "target": "node-14", "targetHandle": "d" },
+    { "id": "edge-24", "source": "node-12", "sourceHandle": "value", "target": "node-14", "targetHandle": "e" },
+    { "id": "edge-25", "source": "node-1", "sourceHandle": "max_fetch_url", "target": "node-14", "targetHandle": "f" },
+    { "id": "edge-26", "source": "node-13", "sourceHandle": "value", "target": "node-14", "targetHandle": "g" },
+
+    { "id": "edge-27", "source": "node-15", "sourceHandle": "value", "target": "node-16", "targetHandle": "system" },
+    { "id": "edge-28", "source": "node-14", "sourceHandle": "result", "target": "node-16", "targetHandle": "task" },
+
+    { "id": "edge-29", "source": "node-16", "sourceHandle": "result", "target": "node-17", "targetHandle": "object" },
+
+    { "id": "edge-30", "source": "node-18", "sourceHandle": "value", "target": "node-22", "targetHandle": "system" },
+    { "id": "edge-31", "source": "node-21", "sourceHandle": "result", "target": "node-22", "targetHandle": "task" },
+    { "id": "edge-32", "source": "node-22", "sourceHandle": "result", "target": "node-23", "targetHandle": "object" },
+    { "id": "edge-33", "source": "node-23", "sourceHandle": "result", "target": "node-24", "targetHandle": "message" },
+    { "id": "edge-34", "source": "node-23", "sourceHandle": "result", "target": "node-25", "targetHandle": "report" },
+    { "id": "edge-35", "source": "node-17", "sourceHandle": "result", "target": "node-25", "targetHandle": "dossier" },
+
+    { "id": "edge-36", "source": "node-19", "sourceHandle": "value", "target": "node-21", "targetHandle": "a" },
+    { "id": "edge-37", "source": "node-1", "sourceHandle": "query", "target": "node-21", "targetHandle": "b" },
+    { "id": "edge-38", "source": "node-20", "sourceHandle": "value", "target": "node-21", "targetHandle": "c" },
+    { "id": "edge-39", "source": "node-17", "sourceHandle": "result", "target": "node-21", "targetHandle": "d" },
+
+    { "id": "edge-50", "source": "node-30", "sourceHandle": "value", "target": "node-31", "targetHandle": "a" },
+    { "id": "edge-51", "source": "node-1", "sourceHandle": "query", "target": "node-31", "targetHandle": "b" },
+    { "id": "edge-52", "source": "node-31", "sourceHandle": "result", "target": "node-32", "targetHandle": "prompt" },
+    { "id": "edge-53", "source": "node-33", "sourceHandle": "value", "target": "node-32", "targetHandle": "system" },
+
+    { "id": "edge-54", "source": "node-34", "sourceHandle": "value", "target": "node-35", "targetHandle": "a" },
+    { "id": "edge-55", "source": "node-32", "sourceHandle": "response", "target": "node-35", "targetHandle": "b" },
+    { "id": "edge-56", "source": "node-35", "sourceHandle": "result", "target": "node-36", "targetHandle": "prompt" },
+
+    { "id": "edge-60", "source": "node-40", "sourceHandle": "value", "target": "node-45", "targetHandle": "a" },
+    { "id": "edge-61", "source": "node-1", "sourceHandle": "query", "target": "node-45", "targetHandle": "b" },
+    { "id": "edge-62", "source": "node-41", "sourceHandle": "value", "target": "node-45", "targetHandle": "c" },
+    { "id": "edge-63", "source": "node-36", "sourceHandle": "response", "target": "node-45", "targetHandle": "d" },
+    { "id": "edge-64", "source": "node-42", "sourceHandle": "value", "target": "node-45", "targetHandle": "e" },
+    { "id": "edge-65", "source": "node-1", "sourceHandle": "max_web_search", "target": "node-45", "targetHandle": "f" },
+    { "id": "edge-66", "source": "node-43", "sourceHandle": "value", "target": "node-45", "targetHandle": "g" },
+    { "id": "edge-67", "source": "node-1", "sourceHandle": "max_fetch_url", "target": "node-45", "targetHandle": "h" },
+    { "id": "edge-68", "source": "node-44", "sourceHandle": "value", "target": "node-45", "targetHandle": "i" },
+
+    { "id": "edge-69", "source": "node-15", "sourceHandle": "value", "target": "node-46", "targetHandle": "system" },
+    { "id": "edge-70", "source": "node-45", "sourceHandle": "result", "target": "node-46", "targetHandle": "task" },
+
+    { "id": "edge-71", "source": "node-46", "sourceHandle": "result", "target": "node-47", "targetHandle": "object" },
+
+    { "id": "edge-72", "source": "node-48", "sourceHandle": "value", "target": "node-51", "targetHandle": "a" },
+    { "id": "edge-73", "source": "node-1", "sourceHandle": "query", "target": "node-51", "targetHandle": "b" },
+    { "id": "edge-74", "source": "node-49", "sourceHandle": "value", "target": "node-51", "targetHandle": "c" },
+    { "id": "edge-75", "source": "node-36", "sourceHandle": "response", "target": "node-51", "targetHandle": "d" },
+    { "id": "edge-76", "source": "node-50", "sourceHandle": "value", "target": "node-51", "targetHandle": "e" },
+    { "id": "edge-77", "source": "node-47", "sourceHandle": "result", "target": "node-51", "targetHandle": "f" },
+
+    { "id": "edge-78", "source": "node-18", "sourceHandle": "value", "target": "node-52", "targetHandle": "system" },
+    { "id": "edge-79", "source": "node-51", "sourceHandle": "result", "target": "node-52", "targetHandle": "task" },
+    { "id": "edge-80", "source": "node-52", "sourceHandle": "result", "target": "node-53", "targetHandle": "object" },
+    { "id": "edge-81", "source": "node-53", "sourceHandle": "result", "target": "node-54", "targetHandle": "message" },
+    { "id": "edge-82", "source": "node-53", "sourceHandle": "result", "target": "node-55", "targetHandle": "report" },
+    { "id": "edge-83", "source": "node-47", "sourceHandle": "result", "target": "node-55", "targetHandle": "dossier" },
+    { "id": "edge-84", "source": "node-36", "sourceHandle": "response", "target": "node-55", "targetHandle": "clarifications" }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2025-12-26T21:50:00.000000",
+  "updated_at": "2025-12-26T21:50:00.000000"
+}

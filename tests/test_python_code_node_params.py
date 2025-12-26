@@ -71,3 +71,61 @@ def test_python_code_node_executes_with_multiple_params() -> None:
     result = execute_visual_flow(flow, {}, flows={flow.id: flow})
     assert result["success"] is True
     assert result["result"] == {"sum": 5.0}
+
+
+def test_python_code_node_supports_top_level_helpers() -> None:
+    flow = VisualFlow(
+        id="flow-code-helpers",
+        name="code helpers",
+        entryNode="start",
+        nodes=[
+            VisualNode(
+                id="start",
+                type=NodeType.ON_FLOW_START,
+                position=Position(x=0, y=0),
+                data={},
+            ),
+            VisualNode(
+                id="v",
+                type=NodeType.LITERAL_NUMBER,
+                position=Position(x=0, y=0),
+                data={"literalValue": 41},
+            ),
+            VisualNode(
+                id="code",
+                type=NodeType.CODE,
+                position=Position(x=0, y=0),
+                data={
+                    "code": (
+                        "def _plus_one(x):\n"
+                        "    return (x or 0) + 1\n"
+                        "\n"
+                        "def transform(_input):\n"
+                        "    v = _input.get('v')\n"
+                        "    return {'v': _plus_one(v)}\n"
+                    ),
+                    "functionName": "transform",
+                },
+            ),
+        ],
+        edges=[
+            VisualEdge(
+                id="e1",
+                source="start",
+                sourceHandle="exec-out",
+                target="code",
+                targetHandle="exec-in",
+            ),
+            VisualEdge(
+                id="d1",
+                source="v",
+                sourceHandle="value",
+                target="code",
+                targetHandle="v",
+            ),
+        ],
+    )
+
+    result = execute_visual_flow(flow, {}, flows={flow.id: flow})
+    assert result["success"] is True
+    assert result["result"] == {"v": 42.0}

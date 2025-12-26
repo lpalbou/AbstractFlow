@@ -112,6 +112,18 @@ def _create_restricted_handler(code: str, function_name: str) -> Callable[[Any],
         except Exception as e:
             raise CodeExecutionError(f"Execution error: {e}") from e
 
+        # `exec(..., globals, locals)` stores definitions in `locals`, but functions
+        # resolve globals against the `globals` dict. Make user-defined helpers
+        # (and other top-level values) available to `transform`.
+        reserved = {"__builtins__", "_getiter_", "_getitem_", "_iter_unpack_sequence_"}
+        for name, value in local_vars.items():
+            if name in reserved:
+                continue
+            if name.startswith("__") and name.endswith("__"):
+                continue
+            if name not in restricted_globals:
+                restricted_globals[name] = value
+
         func = local_vars.get(function_name)
         if func is None:
             raise CodeExecutionError(f"Function '{function_name}' not defined in code")
@@ -176,6 +188,18 @@ def _create_basic_handler(code: str, function_name: str) -> Callable[[Any], Any]
         except Exception as e:
             raise CodeExecutionError(f"Execution error: {e}") from e
 
+        # Keep the same semantics as normal Python modules: helper functions and
+        # top-level constants defined alongside `transform()` should be visible
+        # at runtime. Avoid letting user code replace `__builtins__`.
+        reserved = {"__builtins__"}
+        for name, value in local_vars.items():
+            if name in reserved:
+                continue
+            if name.startswith("__") and name.endswith("__"):
+                continue
+            if name not in limited_globals:
+                limited_globals[name] = value
+
         func = local_vars.get(function_name)
         if func is None:
             raise CodeExecutionError(f"Function '{function_name}' not defined in code")
@@ -188,4 +212,3 @@ def _create_basic_handler(code: str, function_name: str) -> Callable[[Any], Any]
             raise CodeExecutionError(f"Runtime error: {e}") from e
 
     return handler
-
