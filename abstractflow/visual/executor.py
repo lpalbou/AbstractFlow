@@ -513,10 +513,9 @@ def create_visual_runner(visual_flow: VisualFlow, *, flows: Dict[str, VisualFlow
                 ) from e
 
             from abstractcore.tools import ToolDefinition
-            from abstractruntime.integrations.abstractcore.default_tools import filter_tool_specs
+            from abstractruntime.integrations.abstractcore.default_tools import list_default_tool_specs
 
-            def _tool_defs(tool_names: list[str]) -> list[ToolDefinition]:
-                specs = filter_tool_specs(tool_names)
+            def _tool_defs_from_specs(specs: list[dict[str, Any]]) -> list[ToolDefinition]:
                 out: list[ToolDefinition] = []
                 for s in specs:
                     if not isinstance(s, dict):
@@ -544,6 +543,8 @@ def create_visual_runner(visual_flow: VisualFlow, *, flows: Dict[str, VisualFlow
                         out.append(t.strip())
                 return out
 
+            all_tool_defs = _tool_defs_from_specs(list_default_tool_specs())
+
             for workflow_id, cfg in agent_nodes:
                 provider_raw = cfg.get("provider")
                 model_raw = cfg.get("model")
@@ -555,7 +556,7 @@ def create_visual_runner(visual_flow: VisualFlow, *, flows: Dict[str, VisualFlow
                 model = None
 
                 tools_selected = _normalize_tool_names(cfg.get("tools"))
-                logic = ReActLogic(tools=_tool_defs(tools_selected))
+                logic = ReActLogic(tools=all_tool_defs)
                 registry.register(
                     create_react_workflow(
                         logic=logic,
@@ -902,17 +903,64 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
         return wrapped
 
     def _create_agent_input_handler(data: Dict[str, Any]):
+        cfg = data.get("agentConfig", {}) if isinstance(data, dict) else {}
+        cfg = cfg if isinstance(cfg, dict) else {}
+
+        def _normalize_tool_names(raw: Any) -> list[str]:
+            if raw is None:
+                return []
+            items: list[Any]
+            if isinstance(raw, list):
+                items = raw
+            elif isinstance(raw, tuple):
+                items = list(raw)
+            else:
+                items = [raw]
+            out: list[str] = []
+            for t in items:
+                if isinstance(t, str) and t.strip():
+                    out.append(t.strip())
+            # preserve order, remove duplicates
+            seen: set[str] = set()
+            uniq: list[str] = []
+            for t in out:
+                if t in seen:
+                    continue
+                seen.add(t)
+                uniq.append(t)
+            return uniq
+
         def handler(input_data):
-            task = input_data.get("task") if isinstance(input_data, dict) else str(input_data)
+            task = ""
+            if isinstance(input_data, dict):
+                raw_task = input_data.get("task")
+                if raw_task is None:
+                    raw_task = input_data.get("prompt")
+                task = "" if raw_task is None else str(raw_task)
+            else:
+                task = str(input_data)
+
             context_raw = input_data.get("context", {}) if isinstance(input_data, dict) else {}
             context = context_raw if isinstance(context_raw, dict) else {}
             provider = input_data.get("provider") if isinstance(input_data, dict) else None
             model = input_data.get("model") if isinstance(input_data, dict) else None
+
+            system_raw = input_data.get("system") if isinstance(input_data, dict) else ""
+            system = system_raw if isinstance(system_raw, str) else str(system_raw or "")
+
+            tools_specified = isinstance(input_data, dict) and "tools" in input_data
+            tools_raw = input_data.get("tools") if isinstance(input_data, dict) else None
+            tools = _normalize_tool_names(tools_raw) if tools_specified else []
+            if not tools_specified:
+                tools = _normalize_tool_names(cfg.get("tools"))
+
             return {
                 "task": task,
                 "context": context,
                 "provider": provider if isinstance(provider, str) else None,
                 "model": model if isinstance(model, str) else None,
+                "system": system,
+                "tools": tools,
             }
 
         return handler

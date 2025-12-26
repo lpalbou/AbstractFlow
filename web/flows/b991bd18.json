@@ -1,6 +1,6 @@
 {
   "id": "b991bd18",
-  "name": "test-pins",
+  "name": "deep-research-3",
   "description": "",
   "nodes": [
     {
@@ -21,6 +21,16 @@
             "id": "exec-out",
             "label": "",
             "type": "execution"
+          },
+          {
+            "id": "query",
+            "label": "query",
+            "type": "string"
+          },
+          {
+            "id": "follow_up",
+            "label": "follow_up",
+            "type": "boolean"
           }
         ]
       },
@@ -32,10 +42,463 @@
     },
     {
       "id": "node-2",
+      "type": "if",
+      "position": {
+        "x": 128.0,
+        "y": 48.0
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "If/Else",
+        "icon": "&#x2753;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ],
+        "pinDefaults": {
+          "condition": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-3",
+      "type": "llm_call",
+      "position": {
+        "x": 416.0,
+        "y": 16.0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "LLM Call",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "string"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "string"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          }
+        ],
+        "effectConfig": {
+          "provider": "lmstudio",
+          "model": "glm-4.6v"
+        },
+        "pinDefaults": {
+          "system": "You are a creactive critital thinker that helps understand the true intent and scope of a request by asking up to 5 clear and concise relevant questions. Each question has a number and you ask them directly without comments.",
+          "prompt": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-4",
+      "type": "concat",
+      "position": {
+        "x": 112.0,
+        "y": 224.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "a": "create up to 5 follow up questions to help refine the following user query : "
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-9",
+      "type": "concat",
+      "position": {
+        "x": 1024.0,
+        "y": 160.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          },
+          {
+            "id": "d",
+            "label": "d",
+            "type": "string"
+          },
+          {
+            "id": "e",
+            "label": "e",
+            "type": "string"
+          },
+          {
+            "id": "f",
+            "label": "f",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "a": "User Query : ",
+          "c": "Refining Questions : ",
+          "e": "Refining Answers : "
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-10",
+      "type": "ask_user",
+      "position": {
+        "x": 752.0,
+        "y": 16.0
+      },
+      "data": {
+        "nodeType": "ask_user",
+        "label": "Ask User",
+        "icon": "&#x2753;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "choices",
+            "label": "choices",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-12",
+      "type": "emit_event",
+      "position": {
+        "x": 1312.0,
+        "y": 16.0
+      },
+      "data": {
+        "nodeType": "emit_event",
+        "label": "Emit Event",
+        "icon": "&#x1F4E3;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "payload",
+            "label": "payload",
+            "type": "any"
+          },
+          {
+            "id": "session_id",
+            "label": "session_id",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "delivered",
+            "label": "delivered",
+            "type": "number"
+          },
+          {
+            "id": "delivered_to",
+            "label": "delivered_to",
+            "type": "array"
+          },
+          {
+            "id": "wait_key",
+            "label": "wait_key",
+            "type": "string"
+          }
+        ],
+        "effectConfig": {
+          "name": "my_event",
+          "scope": "session",
+          "sessionId": ""
+        },
+        "pinDefaults": {
+          "name": "final_query"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-13",
+      "type": "on_event",
+      "position": {
+        "x": -96.0,
+        "y": 592.0
+      },
+      "data": {
+        "nodeType": "on_event",
+        "label": "On Event",
+        "icon": "&#x1F4E3;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "event",
+            "label": "event",
+            "type": "object"
+          },
+          {
+            "id": "payload",
+            "label": "payload",
+            "type": "any"
+          }
+        ],
+        "eventConfig": {
+          "name": "final_query",
+          "scope": "session"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-16",
+      "type": "emit_event",
+      "position": {
+        "x": 416.0,
+        "y": 288.0
+      },
+      "data": {
+        "nodeType": "emit_event",
+        "label": "Emit Event",
+        "icon": "&#x1F4E3;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "payload",
+            "label": "payload",
+            "type": "any"
+          },
+          {
+            "id": "session_id",
+            "label": "session_id",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "delivered",
+            "label": "delivered",
+            "type": "number"
+          },
+          {
+            "id": "delivered_to",
+            "label": "delivered_to",
+            "type": "array"
+          },
+          {
+            "id": "wait_key",
+            "label": "wait_key",
+            "type": "string"
+          }
+        ],
+        "effectConfig": {
+          "name": "my_event",
+          "scope": "session",
+          "sessionId": ""
+        },
+        "pinDefaults": {
+          "name": "final_query"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-17",
       "type": "agent",
       "position": {
-        "x": 384.0,
-        "y": -64.0
+        "x": 304.0,
+        "y": 592.0
       },
       "data": {
         "nodeType": "agent",
@@ -59,9 +522,19 @@
             "type": "string"
           },
           {
-            "id": "task",
-            "label": "task",
+            "id": "system",
+            "label": "system",
             "type": "string"
+          },
+          {
+            "id": "task",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
           },
           {
             "id": "context",
@@ -86,12 +559,16 @@
             "type": "object"
           }
         ],
-        "pinDefaults": {
-          "task": "when did we land on the moon"
-        },
         "agentConfig": {
           "provider": "lmstudio",
-          "model": "gemma-3-1b-it-qat"
+          "model": "qwen/qwen3-30b-a3b-2507",
+          "tools": [
+            "fetch_url",
+            "web_search"
+          ]
+        },
+        "pinDefaults": {
+          "system": "You are an expert web search detective who follow every interesting leads to answer a request"
         }
       },
       "label": null,
@@ -101,17 +578,99 @@
       "outputs": []
     },
     {
-      "id": "node-3",
-      "type": "llm_call",
+      "id": "node-19",
+      "type": "concat",
       "position": {
-        "x": 112.0,
-        "y": 48.0
+        "x": -112.0,
+        "y": 736.0
       },
       "data": {
-        "nodeType": "llm_call",
-        "label": "LLM Call",
-        "icon": "&#x1F4AD;",
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " \\n"
+        },
+        "pinDefaults": {
+          "b": "Using the information above, please search the web, read their content and deepen your understanding of the subject to provide a SOTA structured and comprehensive answer to the request"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-20",
+      "type": "break_object",
+      "position": {
+        "x": 624.0,
+        "y": 800.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
         "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "result"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-21",
+      "type": "answer_user",
+      "position": {
+        "x": 864.0,
+        "y": 592.0
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
         "inputs": [
           {
             "id": "exec-in",
@@ -119,23 +678,8 @@
             "type": "execution"
           },
           {
-            "id": "provider",
-            "label": "provider",
-            "type": "string"
-          },
-          {
-            "id": "model",
-            "label": "model",
-            "type": "string"
-          },
-          {
-            "id": "prompt",
-            "label": "prompt",
-            "type": "string"
-          },
-          {
-            "id": "system",
-            "label": "system",
+            "id": "message",
+            "label": "message",
             "type": "string"
           }
         ],
@@ -146,19 +690,11 @@
             "type": "execution"
           },
           {
-            "id": "response",
-            "label": "response",
+            "id": "message",
+            "label": "message",
             "type": "string"
           }
-        ],
-        "pinDefaults": {
-          "prompt": "when did we land on the moon",
-          "system": "always finish your answer with a joke"
-        },
-        "effectConfig": {
-          "provider": "lmstudio",
-          "model": "gemma-3n-e2b-it-mlx"
-        }
+        ]
       },
       "label": null,
       "icon": null,
@@ -169,15 +705,167 @@
   ],
   "edges": [
     {
-      "id": "edge-1766710403098",
+      "id": "edge-1766713447894",
       "source": "node-1",
       "sourceHandle": "exec-out",
+      "target": "node-2",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1766713492724",
+      "source": "node-1",
+      "sourceHandle": "follow_up",
+      "target": "node-2",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "edge-1766713507899",
+      "source": "node-2",
+      "sourceHandle": "true",
       "target": "node-3",
       "targetHandle": "exec-in",
       "animated": true
+    },
+    {
+      "id": "edge-1766713748248",
+      "source": "node-1",
+      "sourceHandle": "query",
+      "target": "node-4",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-1766713751098",
+      "source": "node-4",
+      "sourceHandle": "result",
+      "target": "node-3",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "edge-1766713936591",
+      "source": "node-1",
+      "sourceHandle": "query",
+      "target": "node-9",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-1766714007507",
+      "source": "node-3",
+      "sourceHandle": "exec-out",
+      "target": "node-10",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1766714065868",
+      "source": "node-3",
+      "sourceHandle": "response",
+      "target": "node-10",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "edge-1766714074883",
+      "source": "node-3",
+      "sourceHandle": "response",
+      "target": "node-9",
+      "targetHandle": "d",
+      "animated": false
+    },
+    {
+      "id": "edge-1766714078199",
+      "source": "node-10",
+      "sourceHandle": "response",
+      "target": "node-9",
+      "targetHandle": "f",
+      "animated": false
+    },
+    {
+      "id": "edge-1766714095956",
+      "source": "node-10",
+      "sourceHandle": "exec-out",
+      "target": "node-12",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1766714105490",
+      "source": "node-9",
+      "sourceHandle": "result",
+      "target": "node-12",
+      "targetHandle": "payload",
+      "animated": false
+    },
+    {
+      "id": "edge-1766714268435",
+      "source": "node-2",
+      "sourceHandle": "false",
+      "target": "node-16",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1766714278109",
+      "source": "node-1",
+      "sourceHandle": "query",
+      "target": "node-16",
+      "targetHandle": "payload",
+      "animated": false
+    },
+    {
+      "id": "edge-1766714724214",
+      "source": "node-13",
+      "sourceHandle": "exec-out",
+      "target": "node-17",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1766714820931",
+      "source": "node-13",
+      "sourceHandle": "payload",
+      "target": "node-19",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-1766714913430",
+      "source": "node-19",
+      "sourceHandle": "result",
+      "target": "node-17",
+      "targetHandle": "task",
+      "animated": false
+    },
+    {
+      "id": "edge-1766714954145",
+      "source": "node-17",
+      "sourceHandle": "result",
+      "target": "node-20",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1766714962696",
+      "source": "node-17",
+      "sourceHandle": "exec-out",
+      "target": "node-21",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1766714967529",
+      "source": "node-20",
+      "sourceHandle": "result",
+      "target": "node-21",
+      "targetHandle": "message",
+      "animated": false
     }
   ],
   "entryNode": "node-1",
   "created_at": "2025-12-26T00:52:47.563164",
-  "updated_at": "2025-12-26T00:54:15.356657"
+  "updated_at": "2025-12-26T02:17:49.382980"
 }

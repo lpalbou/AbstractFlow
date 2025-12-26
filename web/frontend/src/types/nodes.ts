@@ -113,7 +113,9 @@ const CORE_NODES: NodeTemplate[] = [
       { id: 'exec-in', label: '', type: 'execution' },
       { id: 'provider', label: 'provider', type: 'string' },
       { id: 'model', label: 'model', type: 'string' },
-      { id: 'task', label: 'task', type: 'string' },
+      { id: 'system', label: 'system', type: 'string' },
+      { id: 'task', label: 'prompt', type: 'string' },
+      { id: 'tools', label: 'tools', type: 'array' },
       { id: 'context', label: 'context', type: 'object' },
     ],
     outputs: [
@@ -379,8 +381,8 @@ const EFFECT_NODES: NodeTemplate[] = [
       { id: 'exec-in', label: '', type: 'execution' },
       { id: 'provider', label: 'provider', type: 'string' },
       { id: 'model', label: 'model', type: 'string' },
-      { id: 'prompt', label: 'prompt', type: 'string' },
       { id: 'system', label: 'system', type: 'string' },
+      { id: 'prompt', label: 'prompt', type: 'string' },
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },

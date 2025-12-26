@@ -14,7 +14,9 @@ import { PIN_COLORS, isEntryNodeType } from '../../types/flow';
 import { PinShape } from '../pins/PinShape';
 import { useFlowStore } from '../../hooks/useFlow';
 import { useModels, useProviders } from '../../hooks/useProviders';
+import { useTools } from '../../hooks/useTools';
 import AfSelect from '../inputs/AfSelect';
+import AfMultiSelect from '../inputs/AfMultiSelect';
 
 export const BaseNode = memo(function BaseNode({
   id,
@@ -80,6 +82,7 @@ export const BaseNode = memo(function BaseNode({
 
   const providerConnected = hasProviderDropdown ? isPinConnected('provider', true) : false;
   const modelConnected = hasModelControls ? isPinConnected('model', true) : false;
+  const toolsConnected = isAgentNode ? isPinConnected('tools', true) : false;
 
   const selectedProvider = isAgentNode
     ? data.agentConfig?.provider
@@ -90,9 +93,32 @@ export const BaseNode = memo(function BaseNode({
 
   const providersQuery = useProviders(hasProviderDropdown && (!providerConnected || !modelConnected));
   const modelsQuery = useModels(selectedProvider, hasModelControls && !modelConnected);
+  const toolsQuery = useTools(isAgentNode && !toolsConnected);
 
   const providers = Array.isArray(providersQuery.data) ? providersQuery.data : [];
   const models = Array.isArray(modelsQuery.data) ? modelsQuery.data : [];
+  const tools = Array.isArray(toolsQuery.data) ? toolsQuery.data : [];
+
+  const toolOptions = useMemo(() => {
+    const out = tools
+      .filter((t) => t && typeof t.name === 'string' && t.name.trim())
+      .map((t) => ({
+        value: t.name.trim(),
+        label: t.name.trim(),
+      }));
+    out.sort((a, b) => a.label.localeCompare(b.label));
+    return out;
+  }, [tools]);
+
+  const selectedTools = useMemo(() => {
+    if (!isAgentNode) return [];
+    const raw = data.agentConfig?.tools;
+    if (!Array.isArray(raw)) return [];
+    const cleaned = raw
+      .filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
+      .map((t) => t.trim());
+    return Array.from(new Set(cleaned));
+  }, [data.agentConfig?.tools, isAgentNode]);
 
   const setProviderModel = useCallback(
     (provider: string | undefined, model: string | undefined) => {
@@ -112,6 +138,19 @@ export const BaseNode = memo(function BaseNode({
       }
     },
     [data.agentConfig, data.effectConfig, data.providerModelsConfig, id, isAgentNode, isLlmNode, isProviderModelsNode, updateNodeData]
+  );
+
+  const setAgentTools = useCallback(
+    (nextTools: string[]) => {
+      if (!isAgentNode) return;
+      const cleaned = nextTools
+        .filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
+        .map((t) => t.trim());
+      const unique = Array.from(new Set(cleaned));
+      const prev = data.agentConfig || {};
+      updateNodeData(id, { agentConfig: { ...prev, tools: unique.length > 0 ? unique : undefined } });
+    },
+    [data.agentConfig, id, isAgentNode, updateNodeData]
   );
 
   const setPinDefault = useCallback(
@@ -136,6 +175,16 @@ export const BaseNode = memo(function BaseNode({
     | 'minutes'
     | 'hours'
     | 'timestamp';
+
+  const inputLabelWidth = useMemo(() => {
+    let maxLen = 0;
+    for (const p of inputData) {
+      const label = typeof p.label === 'string' ? p.label : '';
+      maxLen = Math.max(maxLen, label.length);
+    }
+    const clamped = Math.min(14, Math.max(6, maxLen || 0));
+    return `${clamped}ch`;
+  }, [inputData]);
 
   const setDelayDurationType = useCallback(
     (next: string) => {
@@ -364,7 +413,7 @@ export const BaseNode = memo(function BaseNode({
         )}
 
         {/* Data input pins */}
-        <div className="pins-left">
+        <div className="pins-left" style={{ ['--pin-label-width' as any]: inputLabelWidth }}>
           {inputData.map((pin) => (
             <div key={pin.id} className="pin-row input">
               <span
@@ -396,7 +445,9 @@ export const BaseNode = memo(function BaseNode({
 
                 const isPrimitive = pin.type === 'string' || pin.type === 'number' || pin.type === 'boolean';
                 const hasSpecialControl =
-                  (hasProviderDropdown && pin.id === 'provider') || (hasModelControls && pin.id === 'model');
+                  (hasProviderDropdown && pin.id === 'provider') ||
+                  (hasModelControls && pin.id === 'model') ||
+                  (isAgentNode && pin.id === 'tools');
 
                 if (!connected && isPrimitive && !hasSpecialControl) {
                   const raw = pinDefaults[pin.id];
@@ -504,6 +555,25 @@ export const BaseNode = memo(function BaseNode({
                       clearable
                       minPopoverWidth={360}
                       onChange={(v) => setProviderModel(selectedProvider || undefined, v || undefined)}
+                    />
+                  );
+                }
+
+                if (isAgentNode && pin.id === 'tools' && !toolsConnected) {
+                  controls.push(
+                    <AfMultiSelect
+                      key="tools"
+                      variant="pin"
+                      values={selectedTools}
+                      placeholder={toolsQuery.isLoading ? 'Loading…' : 'Select…'}
+                      options={toolOptions}
+                      disabled={toolsQuery.isLoading}
+                      loading={toolsQuery.isLoading}
+                      searchable
+                      searchPlaceholder="Search tools…"
+                      clearable
+                      minPopoverWidth={340}
+                      onChange={setAgentTools}
                     />
                   );
                 }

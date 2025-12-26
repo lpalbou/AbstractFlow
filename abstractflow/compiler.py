@@ -243,7 +243,16 @@ def _create_visual_agent_effect_handler(
         out.sort(key=lambda s: str(s.get("ts") or ""))
         return out
 
-    def _build_sub_vars(run: Any, *, task: str, context: Dict[str, Any], provider: str, model: str) -> Dict[str, Any]:
+    def _build_sub_vars(
+        run: Any,
+        *,
+        task: str,
+        context: Dict[str, Any],
+        provider: str,
+        model: str,
+        system_prompt: str,
+        allowed_tools: list[str],
+    ) -> Dict[str, Any]:
         parent_limits = run.vars.get("_limits")
         limits = dict(parent_limits) if isinstance(parent_limits, dict) else {}
         limits.setdefault("max_iterations", 25)
@@ -262,12 +271,16 @@ def _create_visual_agent_effect_handler(
                     continue
                 ctx_ns[str(k)] = v
 
+        runtime_ns: Dict[str, Any] = {"inbox": [], "provider": provider, "model": model, "allowed_tools": list(allowed_tools)}
+        if isinstance(system_prompt, str) and system_prompt.strip():
+            runtime_ns["system_prompt"] = system_prompt
+
         return {
             "context": ctx_ns,
             "scratchpad": {"iteration": 0, "max_iterations": int(limits.get("max_iterations") or 25)},
             # `_runtime` is durable; we store provider/model here so the ReAct subworkflow
             # can inject them into LLM_CALL payloads (and remain resumable).
-            "_runtime": {"inbox": [], "provider": provider, "model": model},
+            "_runtime": runtime_ns,
             "_temp": {},
             "_limits": limits,
         }
@@ -301,6 +314,25 @@ def _create_visual_agent_effect_handler(
         task = str(resolved_inputs.get("task") or "")
         context_raw = resolved_inputs.get("context")
         context = context_raw if isinstance(context_raw, dict) else {}
+        system_raw = resolved_inputs.get("system") if isinstance(resolved_inputs, dict) else None
+        system_prompt = system_raw if isinstance(system_raw, str) else str(system_raw or "")
+
+        tools_raw = resolved_inputs.get("tools") if isinstance(resolved_inputs, dict) else None
+        allowed_tools: list[str] = []
+        if isinstance(tools_raw, list):
+            for t in tools_raw:
+                if isinstance(t, str) and t.strip():
+                    allowed_tools.append(t.strip())
+        elif isinstance(tools_raw, tuple):
+            for t in tools_raw:
+                if isinstance(t, str) and t.strip():
+                    allowed_tools.append(t.strip())
+        elif isinstance(tools_raw, str) and tools_raw.strip():
+            allowed_tools.append(tools_raw.strip())
+
+        # De-dup while preserving order.
+        seen_tools: set[str] = set()
+        allowed_tools = [t for t in allowed_tools if not (t in seen_tools or seen_tools.add(t))]
 
         workflow_id_raw = agent_config.get("_react_workflow_id")
         react_workflow_id = (
@@ -339,7 +371,15 @@ def _create_visual_agent_effect_handler(
                     type=EffectType.START_SUBWORKFLOW,
                     payload={
                         "workflow_id": react_workflow_id,
-                        "vars": _build_sub_vars(run, task=task, context=context, provider=provider, model=model),
+                        "vars": _build_sub_vars(
+                            run,
+                            task=task,
+                            context=context,
+                            provider=provider,
+                            model=model,
+                            system_prompt=system_prompt,
+                            allowed_tools=allowed_tools,
+                        ),
                         "async": False,
                         "include_traces": True,
                     },
@@ -405,6 +445,7 @@ def _create_visual_agent_effect_handler(
                         type=EffectType.LLM_CALL,
                         payload={
                             "messages": messages,
+                            "system_prompt": system_prompt,
                             "provider": provider,
                             "model": model,
                             "response_schema": schema,

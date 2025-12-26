@@ -214,6 +214,14 @@
   padding: 2px 0;
 }
 
+.pin-row.input .pin-label {
+  flex: 0 0 var(--pin-label-width, 84px);
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .pin-inline-select {
   margin-left: auto;
   max-width: 120px;

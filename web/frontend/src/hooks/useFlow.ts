@@ -13,7 +13,7 @@ import {
   NodeChange,
   EdgeChange,
 } from 'reactflow';
-import type { FlowNodeData, VisualFlow } from '../types/flow';
+import type { FlowNodeData, VisualFlow, Pin } from '../types/flow';
 import { createNodeData, getNodeTemplate, NodeTemplate } from '../types/nodes';
 import { validateConnection } from '../utils/validation';
 
@@ -440,30 +440,44 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         ? { ...createNodeData(template), ...vn.data }
         : (vn.data as FlowNodeData);
 
-      // Backward-compat: older saved flows may not include the new provider/model pins
-      // for Agent and LLM Call nodes. Add them without disturbing existing pins/edges.
+      // Backward-compat + canonical ordering for Agent and LLM Call nodes.
+      // Pins are addressable by id (edges), so reordering is safe.
       if (data.nodeType === 'agent' || data.nodeType === 'llm_call') {
         const existingInputs = Array.isArray(data.inputs) ? data.inputs : [];
-        const existingIds = new Set(existingInputs.map((p) => p.id));
+        const byId = new Map(existingInputs.map((p) => [p.id, p] as const));
+        const used = new Set<string>();
 
-        const providerPin = existingIds.has('provider') ? null : { id: 'provider', label: 'provider', type: 'string' as const };
-        const modelPin = existingIds.has('model') ? null : { id: 'model', label: 'model', type: 'string' as const };
+        const want = (pin: Pin): Pin => {
+          const prev = byId.get(pin.id);
+          used.add(pin.id);
+          if (!prev) return pin;
+          if (prev.label === pin.label && prev.type === pin.type) return prev;
+          return { ...prev, label: pin.label, type: pin.type };
+        };
 
-        if (providerPin || modelPin) {
-          const nextInputs: typeof existingInputs = [];
-          for (const p of existingInputs) {
-            nextInputs.push(p);
-            if (p.id === 'exec-in') {
-              if (providerPin) nextInputs.push(providerPin);
-              if (modelPin) nextInputs.push(modelPin);
-            }
-          }
-          if (!existingInputs.some((p) => p.id === 'exec-in')) {
-            if (providerPin) nextInputs.unshift(providerPin);
-            if (modelPin) nextInputs.unshift(modelPin);
-          }
-          data = { ...data, inputs: nextInputs };
-        }
+        const execIn = want({ id: 'exec-in', label: '', type: 'execution' });
+
+        const canonicalInputs: Pin[] =
+          data.nodeType === 'llm_call'
+            ? [
+                execIn,
+                want({ id: 'provider', label: 'provider', type: 'string' }),
+                want({ id: 'model', label: 'model', type: 'string' }),
+                want({ id: 'system', label: 'system', type: 'string' }),
+                want({ id: 'prompt', label: 'prompt', type: 'string' }),
+              ]
+            : [
+                execIn,
+                want({ id: 'provider', label: 'provider', type: 'string' }),
+                want({ id: 'model', label: 'model', type: 'string' }),
+                want({ id: 'system', label: 'system', type: 'string' }),
+                want({ id: 'task', label: 'prompt', type: 'string' }),
+                want({ id: 'tools', label: 'tools', type: 'array' }),
+                want({ id: 'context', label: 'context', type: 'object' }),
+              ];
+
+        const extras = existingInputs.filter((p) => !used.has(p.id));
+        data = { ...data, inputs: [...canonicalInputs, ...extras] };
       }
 
       // Normalize Switch nodes: execution outputs only (cases + default).

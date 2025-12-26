@@ -352,7 +352,6 @@ button.primary:hover:not(:disabled) {
 
 /* Blueprint-style inline default values for unconnected pins */
 .pin-inline-controls {
-  margin-left: auto;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -365,6 +364,7 @@ button.primary:hover:not(:disabled) {
 
 .af-pin-input {
   height: 20px;
+  width: 160px;
   max-width: 160px;
   padding: 0 8px;
   font-size: 11px;
@@ -375,6 +375,7 @@ button.primary:hover:not(:disabled) {
 }
 
 .af-pin-input[type='number'] {
+  width: 96px;
   max-width: 96px;
 }
 
