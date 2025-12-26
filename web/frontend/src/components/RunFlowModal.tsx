@@ -328,9 +328,7 @@ export function RunFlowModal({
 
     const summarize = (value: unknown): string => {
       const text = safeString(pickSummary(value)).replace(/\s+/g, ' ').trim();
-      if (!text) return '';
-      if (text.length <= 120) return text;
-      return text.slice(0, 120) + '…';
+      return text;
     };
 
     const nodeMeta = (nodeId: string | undefined) => {
@@ -415,7 +413,6 @@ export function RunFlowModal({
 
         if (typeof idx === 'number') {
           out[idx] = { ...out[idx], status: 'waiting', waiting };
-          openByNode.delete(nodeId!);
           continue;
         }
 
@@ -430,6 +427,7 @@ export function RunFlowModal({
           nodeColor: meta?.color,
           waiting,
         });
+        if (nodeId) openByNode.set(nodeId, out.length - 1);
         continue;
       }
 
@@ -696,7 +694,7 @@ export function RunFlowModal({
 
       const contentRaw = result ? result.content : null;
       const content = typeof contentRaw === 'string' ? contentRaw.trim() : '';
-      const preview = content ? (content.length <= 140 ? content : content.slice(0, 140) + '…') : '';
+      const preview = content;
 
       const tps =
         typeof outTokens === 'number' && outTokens > 0 && typeof durationMs === 'number' && durationMs > 0
@@ -743,7 +741,7 @@ export function RunFlowModal({
               return String(rawOut);
             }
           })();
-          preview = text.length <= 140 ? text : text.slice(0, 140) + '…';
+          preview = text;
         }
       }
 
@@ -760,7 +758,7 @@ export function RunFlowModal({
     if (effectType === 'ask_user') {
       const prompt = typeof payload?.prompt === 'string' ? payload.prompt : typeof wait?.prompt === 'string' ? wait.prompt : '';
       const text = prompt.trim();
-      const preview = text ? (text.length <= 140 ? text : text.slice(0, 140) + '…') : '';
+      const preview = text;
       return { title: 'ASK_USER', meta: '', preview };
     }
 
@@ -983,7 +981,7 @@ export function RunFlowModal({
                         </div>
                       ) : null}
                       <div className="run-details-actions">
-                        <button type="button" className="modal-button" onClick={() => copyToClipboard(outputPreview?.cleaned ?? selectedStep.output)}>
+                        <button type="button" className="modal-button" onClick={() => copyToClipboard(selectedStep.output)}>
                           Copy raw
                         </button>
                         {outputPreview?.previewText ? (
@@ -1099,7 +1097,7 @@ export function RunFlowModal({
 
                       <details className="run-raw-details" open={!outputPreview}>
                         <summary>Raw JSON</summary>
-                        <pre className="run-details-output">{formatValue(outputPreview?.cleaned ?? selectedStep.output)}</pre>
+                        <pre className="run-details-output">{formatValue(selectedStep.output)}</pre>
                       </details>
                     </>
                   ) : (

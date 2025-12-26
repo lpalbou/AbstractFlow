@@ -1,0 +1,349 @@
+{
+  "id": "da7511f4",
+  "name": "deep-research",
+  "description": "",
+  "nodes": [
+    {
+      "id": "node-2",
+      "type": "on_flow_start",
+      "position": {
+        "x": -320.0,
+        "y": 736.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "query",
+            "label": "query",
+            "type": "string"
+          },
+          {
+            "id": "follow_up",
+            "label": "follow_up",
+            "type": "boolean"
+          },
+          {
+            "id": "min_sources",
+            "label": "min_sources",
+            "type": "number"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-3",
+      "type": "on_flow_end",
+      "position": {
+        "x": 640.0,
+        "y": 736.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "report",
+            "label": "report",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-4",
+      "type": "agent",
+      "position": {
+        "x": 352.0,
+        "y": 736.0
+      },
+      "data": {
+        "nodeType": "agent",
+        "label": "Agent",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "string"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "string"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "task",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "system": "You are an expert investigator over the web with tools at your disposal. You follow every interesting leads to deepen your understanding of a subject and iteratively evaluate and refine the relevance of the sources you find. Your goal is to provide a trusted comprehensive and structured answer to the request you received while providing the references of your discoveries. "
+        },
+        "agentConfig": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b",
+          "tools": [
+            "web_search",
+            "fetch_url"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-5",
+      "type": "concat",
+      "position": {
+        "x": 96.0,
+        "y": 800.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          },
+          {
+            "id": "d",
+            "label": "d",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "a": "Using the information above, please iteratively search the web, read content and refine your search to deepen your understanding of the subject and provide a SOTA structured and comprehensive answer to the request. You must select and leverage at least ",
+          "d": " different sources"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-6",
+      "type": "subflow",
+      "position": {
+        "x": -112.0,
+        "y": 736.0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Subflow",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "query",
+            "label": "query",
+            "type": "string"
+          },
+          {
+            "id": "follow_up",
+            "label": "follow_up",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "refined-query",
+            "label": "refined-query",
+            "type": "string"
+          }
+        ],
+        "subflowId": "b991bd18",
+        "pinDefaults": {
+          "follow_up": true
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1766741062690",
+      "source": "node-2",
+      "sourceHandle": "exec-out",
+      "target": "node-6",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1766741073960",
+      "source": "node-2",
+      "sourceHandle": "query",
+      "target": "node-6",
+      "targetHandle": "query",
+      "animated": false
+    },
+    {
+      "id": "edge-1766741077822",
+      "source": "node-6",
+      "sourceHandle": "refined-query",
+      "target": "node-5",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-1766741089949",
+      "source": "node-6",
+      "sourceHandle": "exec-out",
+      "target": "node-4",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1766741100251",
+      "source": "node-2",
+      "sourceHandle": "follow_up",
+      "target": "node-6",
+      "targetHandle": "follow_up",
+      "animated": false
+    },
+    {
+      "id": "edge-1766741104265",
+      "source": "node-5",
+      "sourceHandle": "result",
+      "target": "node-4",
+      "targetHandle": "task",
+      "animated": false
+    },
+    {
+      "id": "edge-1766741132001",
+      "source": "node-4",
+      "sourceHandle": "result",
+      "target": "node-3",
+      "targetHandle": "report",
+      "animated": false
+    },
+    {
+      "id": "edge-1766741134002",
+      "source": "node-4",
+      "sourceHandle": "exec-out",
+      "target": "node-3",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1766741405406",
+      "source": "node-2",
+      "sourceHandle": "min_sources",
+      "target": "node-5",
+      "targetHandle": "c",
+      "animated": false
+    }
+  ],
+  "entryNode": "node-2",
+  "created_at": "2025-12-26T09:18:38.932808",
+  "updated_at": "2025-12-26T10:03:44.748135"
+}

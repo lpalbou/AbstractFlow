@@ -655,13 +655,21 @@ export const BaseNode = memo(function BaseNode({
                     );
                   } else if (pin.type === 'boolean') {
                     controls.push(
-                      <label key="pin-default" className="af-pin-checkbox nodrag" onMouseDown={(e) => e.stopPropagation()}>
+                      <label
+                        key="pin-default"
+                        className="af-pin-checkbox nodrag"
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <input
+                          className="af-pin-checkbox-input"
                           type="checkbox"
                           checked={typeof raw === 'boolean' ? raw : false}
+                          onMouseDown={(e) => e.stopPropagation()}
                           onClick={(e) => e.stopPropagation()}
                           onChange={(e) => setPinDefault(pin.id, e.target.checked)}
                         />
+                        <span className="af-pin-checkbox-box" aria-hidden="true" />
                       </label>
                     );
                   }

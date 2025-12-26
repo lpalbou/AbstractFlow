@@ -121,16 +121,24 @@ def test_ws_ask_user_waiting_then_resume_completes() -> None:
 
                 ws.send_text(json.dumps({"type": "resume", "response": "beta"}))
 
+                ask_complete = None
                 completed = None
                 for _ in range(200):
                     msg = ws.receive_json()
+                    if msg.get("type") == "node_complete" and msg.get("nodeId") == "n2":
+                        ask_complete = msg
                     if msg.get("type") == "flow_complete":
                         completed = msg
                         break
+
+                assert ask_complete is not None
+                assert isinstance(ask_complete.get("result"), dict)
+                assert ask_complete["result"].get("response") == "beta"
+                assert isinstance(ask_complete.get("meta"), dict)
+                assert isinstance(ask_complete["meta"].get("duration_ms"), (int, float))
 
                 assert completed is not None
                 assert completed["result"]["success"] is True
                 assert completed["result"]["result"]["final"] == "beta"
     finally:
         _flows.pop(flow_id, None)
-

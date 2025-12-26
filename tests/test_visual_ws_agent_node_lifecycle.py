@@ -184,7 +184,7 @@ def test_ws_agent_node_emits_single_complete_and_trace_is_not_truncated() -> Non
     # Preview should preserve scratchpad.steps[].effect.type/payload (not "…").
     scratchpad = payload.get("scratchpad")
     assert isinstance(scratchpad, dict)
-    assert "node_traces" not in scratchpad  # dropped server-side to keep payload sane
+    assert scratchpad.get("node_traces") == {"too": {"deep": {"to": {"ship": "over ws"}}}}
 
     steps = scratchpad.get("steps")
     assert isinstance(steps, list) and steps
@@ -199,5 +199,4 @@ def test_ws_agent_node_emits_single_complete_and_trace_is_not_truncated() -> Non
     assert isinstance(tool_calls, list) and tool_calls
     assert tool_calls[0]["name"] == "list_files"
     assert tool_calls[0]["arguments"]["directory_path"] == "/Users/albou/r-type/"
-
 

@@ -20,8 +20,58 @@ _connections: Dict[str, WebSocket] = {}
 # Active FlowRunners for waiting flows (keyed by connection_id)
 _waiting_runners: Dict[str, Any] = {}
 
+# Waiting step context so we can correctly close the waiting node on resume.
+# Without this, flows that resume to a different node (ASK_USER, START_SUBWORKFLOW)
+# would leave the original node permanently in WAITING in the UI.
+_waiting_steps: Dict[str, Dict[str, Any]] = {}
+
 # Flow storage reference (shared with flows.py)
 from .flows import _flows
+
+# IMPORTANT: UI trace/scratchpad rendering depends on nested fields like
+# `scratchpad.steps[].effect.type/payload` and `scratchpad.steps[].result`.
+# A too-small depth limit collapses these into "…", making traces unreadable.
+#
+# Keep depth bounded to avoid pathological recursion. We do not truncate
+# normal user-visible outputs (no string/list/dict caps).
+_MAX_JSON_DEPTH = 64
+
+
+def _json_safe(value: Any, *, depth: int = 0, seen: Optional[set[int]] = None) -> Any:
+    """Best-effort JSON-safe conversion (no truncation)."""
+    if depth > _MAX_JSON_DEPTH:
+        return str(value)
+
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+
+    if seen is None:
+        seen = set()
+    try:
+        vid = id(value)
+        if vid in seen:
+            return "<cycle>"
+        seen.add(vid)
+    except Exception:
+        pass
+
+    if isinstance(value, dict):
+        out: Dict[str, Any] = {}
+        for k, v in value.items():
+            out[str(k)] = _json_safe(v, depth=depth + 1, seen=seen)
+        return out
+
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(v, depth=depth + 1, seen=seen) for v in list(value)]
+
+    # Pydantic models / dataclasses (best-effort).
+    try:
+        if hasattr(value, "model_dump") and callable(getattr(value, "model_dump")):
+            return _json_safe(value.model_dump(), depth=depth + 1, seen=seen)  # type: ignore[no-any-return]
+    except Exception:
+        pass
+
+    return str(value)
 
 
 @router.websocket("/ws/{flow_id}")
@@ -113,41 +163,7 @@ async def _execute_runner_loop(
     connection_id: str,
 ) -> None:
     """Execute the runner loop with waiting support."""
-    # IMPORTANT: UI trace/scratchpad rendering depends on nested fields like
-    # `scratchpad.steps[].effect.type/payload` and `scratchpad.steps[].result`.
-    # A too-small depth limit collapses these into "…", making traces unreadable.
-    #
-    # Keep depth moderate but bounded. Strings/lists/dicts are already size-capped.
-    _MAX_PREVIEW_DEPTH = 12
     flow_started_at = time.perf_counter()
-
-    def _preview(value: Any, *, depth: int = 0, max_str_len: Optional[int] = 2000) -> Any:
-        """Best-effort JSON-safe preview (size-bounded)."""
-        if depth > _MAX_PREVIEW_DEPTH:
-            return "…"
-        if value is None:
-            return None
-        if isinstance(value, (bool, int, float)):
-            return value
-        if isinstance(value, str):
-            if max_str_len is None or len(value) <= max_str_len:
-                return value
-            return value[:max_str_len] + "…"
-        if isinstance(value, dict):
-            out: Dict[str, Any] = {}
-            for i, (k, v) in enumerate(value.items()):
-                if i >= 50:
-                    out["…"] = f"+{max(0, len(value) - 50)} more"
-                    break
-                out[str(k)] = _preview(v, depth=depth + 1, max_str_len=max_str_len)
-            return out
-        if isinstance(value, list):
-            items = value[:50]
-            out_list = [_preview(v, depth=depth + 1, max_str_len=max_str_len) for v in items]
-            if len(value) > 50:
-                out_list.append(f"… +{len(value) - 50} more")
-            return out_list
-        return str(value)
 
     def _node_effect_type(node_id: str) -> Optional[str]:
         try:
@@ -164,44 +180,11 @@ async def _execute_runner_loop(
             outputs = getattr(runner.flow, "_node_outputs")
             if isinstance(outputs, dict) and node_id in outputs:
                 raw = outputs.get(node_id)
-                # Avoid shipping the full nested `node_traces` blob over WS; the UI
-                # uses the flattened `scratchpad.steps` list for rendering.
-                if isinstance(raw, dict):
-                    scratchpad = raw.get("scratchpad")
-                    if isinstance(scratchpad, dict) and "node_traces" in scratchpad:
-                        scratchpad_copy = dict(scratchpad)
-                        scratchpad_copy.pop("node_traces", None)
-                        raw_copy = dict(raw)
-                        raw_copy["scratchpad"] = scratchpad_copy
-                        raw = raw_copy
-                effect_type = _node_effect_type(node_id)
-
-                # Never truncate user-visible message content.
-                if effect_type in {"ask_user", "answer_user", "llm_call"}:
-                    return _preview(raw, max_str_len=None)
-
-                # Agent node: keep preview size-bounded but never truncate the final answer.
-                if effect_type == "agent":
-                    previewed = _preview(raw)
-                    try:
-                        if (
-                            isinstance(raw, dict)
-                            and isinstance(previewed, dict)
-                            and isinstance(raw.get("result"), dict)
-                            and isinstance(previewed.get("result"), dict)
-                        ):
-                            raw_answer = raw["result"].get("result")
-                            if isinstance(raw_answer, str):
-                                previewed["result"]["result"] = raw_answer
-                    except Exception:
-                        pass
-                    return previewed
-
-                return _preview(raw)
+                return _json_safe(raw)
         # Fallback for non-visual flows
         state = runner.get_state() if hasattr(runner, "get_state") else None
         if state and hasattr(state, "vars") and isinstance(state.vars, dict):
-            return _preview(state.vars.get("_last_output"))
+            return _json_safe(state.vars.get("_last_output"))
         return None
 
     def _extract_sub_run_id(wait: Any) -> Optional[str]:
@@ -312,6 +295,10 @@ async def _execute_runner_loop(
 
             if hasattr(runner, "is_waiting") and runner.is_waiting():
                 _waiting_runners[connection_id] = runner
+                _waiting_steps[connection_id] = {
+                    "node_id": node_before or getattr(state, "current_node", None),
+                    "started_at": time.perf_counter(),
+                }
                 prompt, choices, allow_free_text, wait_key, reason = _resolve_waiting_info(state)
                 await websocket.send_json(
                     {
@@ -383,6 +370,7 @@ async def _execute_runner_loop(
         if not isinstance(t, dict):
             t = {
                 "active_node_id": None,
+                "active_duration_ms": 0.0,
                 "wait_until_started_at": None,
                 "wait_until_node_id": None,
                 "wait_event_started_at": None,
@@ -420,7 +408,7 @@ async def _execute_runner_loop(
 
         return (input_tokens, output_tokens)
 
-    def _node_metrics(node_id: str, *, duration_ms: float) -> Dict[str, Any]:
+    def _node_metrics(node_id: str, *, duration_ms: float, output: Any) -> Dict[str, Any]:
         """Compute per-node metrics for UI badges (best-effort, JSON-safe)."""
         metrics: Dict[str, Any] = {"duration_ms": round(float(duration_ms), 2)}
 
@@ -428,54 +416,46 @@ async def _execute_runner_loop(
         if not effect_type:
             return metrics
 
-        # Pull raw (non-preview) output so we can parse usage tokens.
-        raw_out: Any = None
-        if hasattr(runner, "flow") and hasattr(runner.flow, "_node_outputs"):
-            outputs = getattr(runner.flow, "_node_outputs")
-            if isinstance(outputs, dict):
-                raw_out = outputs.get(node_id)
-
         input_tokens: Optional[int] = None
         output_tokens: Optional[int] = None
 
         if effect_type == "llm_call":
-            if isinstance(raw_out, dict):
-                raw_llm = raw_out.get("raw")
-                if isinstance(raw_llm, dict):
-                    usage = raw_llm.get("usage")
-                else:
-                    usage = raw_out.get("usage")
-                input_tokens, output_tokens = _extract_usage_tokens(usage)
+            usage = None
+            if isinstance(output, dict):
+                raw = output.get("raw")
+                if isinstance(raw, dict):
+                    usage = raw.get("usage")
+                if usage is None:
+                    usage = output.get("usage")
+            input_tokens, output_tokens = _extract_usage_tokens(usage if isinstance(usage, dict) else None)
 
         elif effect_type == "agent":
-            # Agent node: aggregate usage across its runtime-owned scratchpad steps.
-            if isinstance(raw_out, dict):
-                scratchpad = raw_out.get("scratchpad")
-                steps = scratchpad.get("steps") if isinstance(scratchpad, dict) else None
-                if isinstance(steps, list):
-                    in_sum = 0
-                    out_sum = 0
-                    has_any = False
-                    for s in steps:
-                        if not isinstance(s, dict):
-                            continue
-                        effect = s.get("effect")
-                        if not isinstance(effect, dict):
-                            continue
-                        if effect.get("type") != "llm_call":
-                            continue
-                        result = s.get("result")
-                        usage = result.get("usage") if isinstance(result, dict) else None
-                        i, o = _extract_usage_tokens(usage if isinstance(usage, dict) else None)
-                        if i is not None:
-                            in_sum += i
-                            has_any = True
-                        if o is not None:
-                            out_sum += o
-                            has_any = True
-                    if has_any:
-                        input_tokens = in_sum
-                        output_tokens = out_sum
+            scratchpad = output.get("scratchpad") if isinstance(output, dict) else None
+            steps = scratchpad.get("steps") if isinstance(scratchpad, dict) else None
+            if isinstance(steps, list):
+                in_sum = 0
+                out_sum = 0
+                has_any = False
+                for s in steps:
+                    if not isinstance(s, dict):
+                        continue
+                    effect = s.get("effect")
+                    if not isinstance(effect, dict):
+                        continue
+                    if effect.get("type") != "llm_call":
+                        continue
+                    result = s.get("result")
+                    usage = result.get("usage") if isinstance(result, dict) else None
+                    i, o = _extract_usage_tokens(usage if isinstance(usage, dict) else None)
+                    if i is not None:
+                        in_sum += i
+                        has_any = True
+                    if o is not None:
+                        out_sum += o
+                        has_any = True
+                if has_any:
+                    input_tokens = in_sum
+                    output_tokens = out_sum
 
         if input_tokens is not None:
             metrics["input_tokens"] = int(input_tokens)
@@ -497,18 +477,39 @@ async def _execute_runner_loop(
         temp = state.vars.get("_temp")
         if not isinstance(temp, dict):
             temp = {}
+
+        def _agent_scratchpad() -> Any:
+            agent_ns = temp.get("agent")
+            if not isinstance(agent_ns, dict):
+                return None
+            bucket = agent_ns.get(node_id)
+            if not isinstance(bucket, dict):
+                return None
+            return bucket.get("scratchpad")
+
         effects = temp.get("effects")
         if isinstance(effects, dict) and node_id in effects:
             raw = effects.get(node_id)
             effect_type = _node_effect_type(node_id)
-            if effect_type in {"ask_user", "answer_user", "llm_call"}:
-                return _preview(raw, max_str_len=None)
-            return _preview(raw)
+
+            # Normalize child-run outputs to match root visual node outputs where possible.
+            if effect_type == "llm_call":
+                if isinstance(raw, dict):
+                    return _json_safe({"response": raw.get("content"), "raw": raw})
+                return _json_safe({"response": raw, "raw": raw})
+
+            if effect_type == "agent":
+                scratchpad = _agent_scratchpad()
+                if scratchpad is not None:
+                    return _json_safe({"result": raw, "scratchpad": scratchpad})
+                return _json_safe(raw)
+
+            return _json_safe(raw)
         node_outputs = temp.get("node_outputs")
         if isinstance(node_outputs, dict) and node_id in node_outputs:
-            return _preview(node_outputs.get(node_id))
+            return _json_safe(node_outputs.get(node_id))
         last = state.vars.get("_last_output")
-        return _preview(last)
+        return _json_safe(last)
 
     def _workflow_for_run_id(run_id: str) -> Any:
         if runtime is None:
@@ -550,6 +551,7 @@ async def _execute_runner_loop(
                         track["wait_event_started_at"] = time.perf_counter()
                         track["wait_event_node_id"] = node_before
                 track["active_node_id"] = None
+                track["active_duration_ms"] = 0.0
                 return None
 
         # Close EVENT waits for non-root runs when they get resumed (wait is over).
@@ -570,22 +572,25 @@ async def _execute_runner_loop(
                     nodeId=wnode,
                 ).model_dump()
             )
+            out0 = _run_node_output(before, wnode)
             await websocket.send_json(
                 ExecutionEvent(
                     type="node_complete",
                     nodeId=wnode,
-                    result=_run_node_output(before, wnode),
-                    meta=_node_metrics(wnode, duration_ms=waited_ms),
+                    result=out0,
+                    meta=_node_metrics(wnode, duration_ms=waited_ms, output=out0),
                 ).model_dump()
             )
             track["wait_event_node_id"] = None
             track["wait_event_started_at"] = None
             track["active_node_id"] = None
+            track["active_duration_ms"] = 0.0
 
         # Terminal runs: avoid re-emitting node_start/node_complete on every loop
         # iteration while we keep the WS open to drive child runs.
         if str(getattr(before, "status", None)) in {"RunStatus.COMPLETED", "RunStatus.FAILED", "RunStatus.CANCELLED"}:
             track["active_node_id"] = None
+            track["active_duration_ms"] = 0.0
             return None
 
         # Special-case WAIT_UNTIL (Delay): handle time-based waits without user prompts.
@@ -625,15 +630,17 @@ async def _execute_runner_loop(
                     started = track.get("wait_until_started_at")
                     if isinstance(started, (int, float)):
                         waited_ms = (time.perf_counter() - float(started)) * 1000.0
+                    out0 = _run_node_output(after_resume, active) if not is_root else _node_output(active)
                     await websocket.send_json(
                         ExecutionEvent(
                             type="node_complete",
                             nodeId=active,
-                            result=_run_node_output(after_resume, active) if not is_root else _node_output(active),
-                            meta=_node_metrics(active, duration_ms=waited_ms),
+                            result=out0,
+                            meta=_node_metrics(active, duration_ms=waited_ms, output=out0),
                         ).model_dump()
                     )
                     track["active_node_id"] = None
+                    track["active_duration_ms"] = 0.0
                 track["wait_until_started_at"] = None
                 track["wait_until_node_id"] = None
                 return after_resume
@@ -667,10 +674,12 @@ async def _execute_runner_loop(
                         track["wait_event_started_at"] = time.perf_counter()
                         track["wait_event_node_id"] = node_before
                         track["active_node_id"] = None
+                        track["active_duration_ms"] = 0.0
                         return state
 
                 # Fall back to normal processing if the listener entrypoint didn't wait.
                 track["active_node_id"] = None
+                track["active_duration_ms"] = 0.0
 
         # Emit node_start when we enter a new node (per-run).
         if isinstance(node_before, str) and node_before and node_before != track.get("active_node_id"):
@@ -681,6 +690,7 @@ async def _execute_runner_loop(
                 ).model_dump()
             )
             track["active_node_id"] = node_before
+            track["active_duration_ms"] = 0.0
             await asyncio.sleep(0)
 
         # Tick one step
@@ -701,6 +711,14 @@ async def _execute_runner_loop(
             except Exception:
                 pass
 
+        # Accumulate wall time per node while it stays "open" (multi-tick nodes like Agent).
+        active = track.get("active_node_id")
+        if isinstance(active, str) and active:
+            try:
+                track["active_duration_ms"] = float(track.get("active_duration_ms") or 0.0) + float(duration_ms)
+            except Exception:
+                track["active_duration_ms"] = float(duration_ms)
+
         # Waiting
         if str(getattr(state, "status", None)) == "RunStatus.WAITING":
             wait = getattr(state, "waiting", None)
@@ -720,11 +738,16 @@ async def _execute_runner_loop(
                         track["wait_event_started_at"] = time.perf_counter()
                         track["wait_event_node_id"] = node_before
                 track["active_node_id"] = None
+                track["active_duration_ms"] = 0.0
                 return state
 
             # Root waits (or non-event waits) are surfaced to the UI.
             if is_root:
                 _waiting_runners[connection_id] = runner
+                _waiting_steps[connection_id] = {
+                    "node_id": node_before or getattr(state, "current_node", None),
+                    "started_at": time.perf_counter(),
+                }
                 prompt, choices, allow_free_text, wait_key, reason = _resolve_waiting_info(state)
                 await websocket.send_json(
                     {
@@ -745,12 +768,18 @@ async def _execute_runner_loop(
             should_close = True
             if _is_agent_node(active):
                 phase = _agent_phase(getattr(state, "vars", None), active)
-                if phase != "done" and str(getattr(state, "status", None)) == "RunStatus.RUNNING":
+                status_raw = getattr(state, "status", None)
+                status_val = getattr(status_raw, "value", None) if status_raw is not None else None
+                status_str = status_val if isinstance(status_val, str) else (status_raw if isinstance(status_raw, str) else str(status_raw))
+                is_running = status_str in {"running", "RunStatus.RUNNING"}
+                if phase != "done" and is_running:
                     should_close = False
             if should_close:
-                metrics = _node_metrics(active, duration_ms=duration_ms)
+                out0 = _node_output(active) if is_root else _run_node_output(state, active)
+                total_node_ms = float(track.get("active_duration_ms") or duration_ms)
+                metrics = _node_metrics(active, duration_ms=total_node_ms, output=out0)
                 # Aggregate totals (best-effort). We only count tokens on nodes that report them.
-                total_duration_ms += float(duration_ms)
+                total_duration_ms += float(total_node_ms)
                 in_tok = metrics.get("input_tokens")
                 out_tok = metrics.get("output_tokens")
                 if isinstance(in_tok, int) and in_tok >= 0:
@@ -758,16 +787,17 @@ async def _execute_runner_loop(
                 if isinstance(out_tok, int) and out_tok >= 0:
                     total_output_tokens += int(out_tok)
                 if isinstance(in_tok, int) or isinstance(out_tok, int):
-                    token_duration_ms += float(duration_ms)
+                    token_duration_ms += float(total_node_ms)
                 await websocket.send_json(
                     ExecutionEvent(
                         type="node_complete",
                         nodeId=active,
-                        result=_node_output(active) if is_root else _run_node_output(state, active),
+                        result=out0,
                         meta=metrics,
                     ).model_dump()
                 )
                 track["active_node_id"] = None
+                track["active_duration_ms"] = 0.0
 
         return state
 
@@ -923,10 +953,59 @@ async def resume_waiting_flow(
         state = runner.get_state()
         wait = state.waiting if state else None
         reason = wait.reason.value if wait and hasattr(wait, "reason") else None
+        waiting_ctx = _waiting_steps.get(connection_id) if isinstance(_waiting_steps.get(connection_id), dict) else {}
+        waiting_node_id = (
+            waiting_ctx.get("node_id")
+            if isinstance(waiting_ctx, dict) and isinstance(waiting_ctx.get("node_id"), str)
+            else getattr(state, "current_node", None)
+        )
+        started_at = waiting_ctx.get("started_at") if isinstance(waiting_ctx, dict) else None
+        waited_ms = 0.0
+        if isinstance(started_at, (int, float)):
+            waited_ms = (time.perf_counter() - float(started_at)) * 1000.0
+
+        async def _maybe_close_waiting_step() -> None:
+            """Close the node that was WAITING if the run has resumed past it."""
+            if not isinstance(waiting_node_id, str) or not waiting_node_id:
+                return
+            after = runner.get_state()
+            after_node = getattr(after, "current_node", None) if after is not None else None
+            if after_node == waiting_node_id:
+                # Still on the same node (e.g. multi-tick Agent); keep it open.
+                return
+
+            try:
+                from abstractflow.compiler import _sync_effect_results_to_node_outputs as _sync_effect_results  # type: ignore
+                if after is not None and hasattr(runner, "flow"):
+                    _sync_effect_results(after, runner.flow)
+            except Exception:
+                pass
+
+            out = None
+            try:
+                if hasattr(runner, "flow") and hasattr(runner.flow, "_node_outputs"):
+                    outputs = getattr(runner.flow, "_node_outputs")
+                    if isinstance(outputs, dict):
+                        out = outputs.get(waiting_node_id)
+            except Exception:
+                out = None
+
+            # Emit completion so the UI doesn't keep this node permanently "WAITING".
+            # Duration reflects time spent waiting for user input.
+            await websocket.send_json(
+                ExecutionEvent(
+                    type="node_complete",
+                    nodeId=waiting_node_id,
+                    result=_json_safe(out),
+                    meta={"duration_ms": round(float(waited_ms), 2)},
+                ).model_dump()
+            )
+            _waiting_steps.pop(connection_id, None)
 
         if reason != "subworkflow":
             # Resume with the user's response
             runner.resume(payload={"response": response}, max_steps=0)
+            await _maybe_close_waiting_step()
             await _execute_runner_loop(websocket, runner, connection_id)
             return
 
@@ -1075,8 +1154,15 @@ async def resume_waiting_flow(
                     "allow_free_text": allow_free_text,
                 }
             )
+            # Keep runner resumable + record waiting-step context for a follow-up resume.
+            _waiting_runners[connection_id] = runner
+            _waiting_steps[connection_id] = {
+                "node_id": top_state.current_node if top_state else None,
+                "started_at": time.perf_counter(),
+            }
             return
 
+        await _maybe_close_waiting_step()
         await _execute_runner_loop(websocket, runner, connection_id)
 
     except Exception as e:

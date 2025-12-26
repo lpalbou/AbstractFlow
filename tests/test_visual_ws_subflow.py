@@ -271,12 +271,21 @@ def test_ws_subflow_child_ask_user_waits_then_resume_completes() -> None:
 
                 ws.send_text(json.dumps({"type": "resume", "response": "beta"}))
 
+                subflow_complete = None
                 completed = None
                 for _ in range(400):
                     msg = ws.receive_json()
+                    if msg.get("type") == "node_complete" and msg.get("nodeId") == "p2":
+                        subflow_complete = msg
                     if msg.get("type") == "flow_complete":
                         completed = msg
                         break
+
+                assert subflow_complete is not None
+                assert isinstance(subflow_complete.get("result"), dict)
+                assert subflow_complete["result"].get("output") == {"answer": "beta"}
+                assert isinstance(subflow_complete.get("meta"), dict)
+                assert isinstance(subflow_complete["meta"].get("duration_ms"), (int, float))
 
                 assert completed is not None
                 assert completed["result"]["success"] is True
@@ -284,4 +293,3 @@ def test_ws_subflow_child_ask_user_waits_then_resume_completes() -> None:
     finally:
         _flows.pop(child_id, None)
         _flows.pop(parent_id, None)
-
