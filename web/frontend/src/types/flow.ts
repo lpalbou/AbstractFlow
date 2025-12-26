@@ -83,6 +83,11 @@ export interface FlowNodeData {
   headerColor: string;
   inputs: Pin[];
   outputs: Pin[];
+  /**
+   * Blueprint-style default values for *unconnected* input pins.
+   * Keys are input pin ids; values are JSON primitives.
+   */
+  pinDefaults?: Record<string, string | number | boolean>;
   // Node-specific config
   code?: string;           // For code nodes
   codeBody?: string;       // For code nodes (body-only editor)

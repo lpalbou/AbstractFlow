@@ -606,6 +606,24 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
     flow._node_outputs = {}  # type: ignore[attr-defined]
     flow._data_edge_map = data_edge_map  # type: ignore[attr-defined]
 
+    def _normalize_pin_defaults(raw: Any) -> Dict[str, Any]:
+        if not isinstance(raw, dict):
+            return {}
+        out: Dict[str, Any] = {}
+        for k, v in raw.items():
+            if not isinstance(k, str) or not k:
+                continue
+            if isinstance(v, (str, int, float, bool)):
+                out[k] = v
+        return out
+
+    pin_defaults_by_node_id: Dict[str, Dict[str, Any]] = {}
+    for node in visual.nodes:
+        raw_defaults = node.data.get("pinDefaults") if isinstance(node.data, dict) else None
+        normalized = _normalize_pin_defaults(raw_defaults)
+        if normalized:
+            pin_defaults_by_node_id[node.id] = normalized
+
     LITERAL_NODE_TYPES = {
         "literal_string",
         "literal_number",
@@ -664,6 +682,14 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
                 resolved_input[target_pin] = source_output[source_pin]
             elif source_pin in ("result", "output"):
                 resolved_input[target_pin] = source_output
+
+        defaults = pin_defaults_by_node_id.get(node_id)
+        if defaults:
+            for pin_id, value in defaults.items():
+                if pin_id in data_edge_map.get(node_id, {}):
+                    continue
+                if pin_id not in resolved_input:
+                    resolved_input[pin_id] = value
 
         result = handler(resolved_input if resolved_input else {})
         flow._node_outputs[node_id] = result  # type: ignore[attr-defined]
@@ -1488,6 +1514,7 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
             node_id=node.id,
             base_handler=base_handler,
             data_edges=data_edge_map.get(node.id, {}),
+            pin_defaults=pin_defaults_by_node_id.get(node.id),
             node_outputs=flow._node_outputs,  # type: ignore[attr-defined]
             ensure_node_output=_ensure_node_output,
         )
@@ -1608,6 +1635,7 @@ def _create_data_aware_handler(
     node_id: str,
     base_handler,
     data_edges: Dict[str, tuple[str, str]],
+    pin_defaults: Optional[Dict[str, Any]],
     node_outputs: Dict[str, Dict[str, Any]],
     *,
     ensure_node_output=None,
@@ -1629,6 +1657,14 @@ def _create_data_aware_handler(
                     resolved_input[target_pin] = source_output[source_pin]
                 elif source_pin in ("result", "output"):
                     resolved_input[target_pin] = source_output
+
+        if pin_defaults:
+            for pin_id, value in pin_defaults.items():
+                # Connected pins always win (even if the upstream value is None).
+                if pin_id in data_edges:
+                    continue
+                if pin_id not in resolved_input:
+                    resolved_input[pin_id] = value
 
         result = base_handler(resolved_input if resolved_input else input_data)
         node_outputs[node_id] = result

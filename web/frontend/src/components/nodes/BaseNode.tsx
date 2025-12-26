@@ -6,7 +6,7 @@
  * - Empty shapes = not connected, Filled = connected
  */
 
-import { memo, type MouseEvent, useCallback, useEffect, useMemo } from 'react';
+import { memo, type MouseEvent, type ReactNode, useCallback, useEffect, useMemo } from 'react';
 import { Handle, Position, NodeProps, useEdges, useUpdateNodeInternals } from 'reactflow';
 import { clsx } from 'clsx';
 import type { FlowNodeData } from '../../types/flow';
@@ -27,6 +27,7 @@ export const BaseNode = memo(function BaseNode({
   const updateNodeInternals = useUpdateNodeInternals();
 
   const isTriggerNode = isEntryNodeType(data.nodeType);
+  const pinDefaults = data.pinDefaults || {};
 
   // ReactFlow needs an explicit nudge when handles change (dynamic pins),
   // otherwise newly created edges can exist in state but fail to render.
@@ -111,6 +112,20 @@ export const BaseNode = memo(function BaseNode({
       }
     },
     [data.agentConfig, data.effectConfig, data.providerModelsConfig, id, isAgentNode, isLlmNode, isProviderModelsNode, updateNodeData]
+  );
+
+  const setPinDefault = useCallback(
+    (pinId: string, value: string | number | boolean | undefined) => {
+      const prev = data.pinDefaults || {};
+      const next: typeof prev = { ...prev };
+      if (value === undefined) {
+        delete next[pinId];
+      } else {
+        next[pinId] = value;
+      }
+      updateNodeData(id, { pinDefaults: next });
+    },
+    [data.pinDefaults, id, updateNodeData]
   );
 
   const isSequenceLike = data.nodeType === 'sequence';
@@ -375,53 +390,127 @@ export const BaseNode = memo(function BaseNode({
                 />
               </span>
               <span className="pin-label">{pin.label}</span>
-              {isDelayNode && pin.id === 'duration' ? (
-                <AfSelect
-                  variant="pin"
-                  value={delayDurationType}
-                  placeholder="seconds"
-                  options={[
-                    { value: 'seconds', label: 'seconds' },
-                    { value: 'minutes', label: 'minutes' },
-                    { value: 'hours', label: 'hours' },
-                    { value: 'timestamp', label: 'timestamp' },
-                  ]}
-                  searchable={false}
-                  minPopoverWidth={180}
-                  onChange={setDelayDurationType}
-                />
-              ) : null}
-              {hasProviderDropdown && pin.id === 'provider' && !providerConnected ? (
-                <AfSelect
-                  variant="pin"
-                  value={selectedProvider || ''}
-                  placeholder={providersQuery.isLoading ? 'Loading…' : 'Select…'}
-                  options={providers.map((p) => ({ value: p.name, label: p.display_name || p.name }))}
-                  disabled={providersQuery.isLoading}
-                  loading={providersQuery.isLoading}
-                  searchable
-                  searchPlaceholder="Search providers…"
-                  clearable
-                  minPopoverWidth={260}
-                  onChange={(v) => setProviderModel(v || undefined, undefined)}
-                />
-              ) : null}
+              {(() => {
+                const connected = isPinConnected(pin.id, true);
+                const controls: ReactNode[] = [];
 
-              {hasModelControls && pin.id === 'model' && !modelConnected ? (
-                <AfSelect
-                  variant="pin"
-                  value={selectedModel || ''}
-                  placeholder={!selectedProvider ? 'Pick provider…' : modelsQuery.isLoading ? 'Loading…' : 'Select…'}
-                  options={models.map((m) => ({ value: m, label: m }))}
-                  disabled={!selectedProvider || modelsQuery.isLoading}
-                  loading={modelsQuery.isLoading}
-                  searchable
-                  searchPlaceholder="Search models…"
-                  clearable
-                  minPopoverWidth={360}
-                  onChange={(v) => setProviderModel(selectedProvider || undefined, v || undefined)}
-                />
-              ) : null}
+                const isPrimitive = pin.type === 'string' || pin.type === 'number' || pin.type === 'boolean';
+                const hasSpecialControl =
+                  (hasProviderDropdown && pin.id === 'provider') || (hasModelControls && pin.id === 'model');
+
+                if (!connected && isPrimitive && !hasSpecialControl) {
+                  const raw = pinDefaults[pin.id];
+                  if (pin.type === 'string') {
+                    controls.push(
+                      <input
+                        key="pin-default"
+                        className="af-pin-input nodrag"
+                        type="text"
+                        value={typeof raw === 'string' ? raw : ''}
+                        placeholder=""
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => setPinDefault(pin.id, e.target.value)}
+                      />
+                    );
+                  } else if (pin.type === 'number') {
+                    controls.push(
+                      <input
+                        key="pin-default"
+                        className="af-pin-input nodrag"
+                        type="number"
+                        value={typeof raw === 'number' && Number.isFinite(raw) ? String(raw) : ''}
+                        placeholder=""
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (!v) {
+                            setPinDefault(pin.id, undefined);
+                            return;
+                          }
+                          const n = Number(v);
+                          if (!Number.isFinite(n)) return;
+                          setPinDefault(pin.id, n);
+                        }}
+                      />
+                    );
+                  } else if (pin.type === 'boolean') {
+                    controls.push(
+                      <label key="pin-default" className="af-pin-checkbox nodrag" onMouseDown={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={typeof raw === 'boolean' ? raw : false}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => setPinDefault(pin.id, e.target.checked)}
+                        />
+                      </label>
+                    );
+                  }
+                }
+
+                if (isDelayNode && pin.id === 'duration') {
+                  // Always show duration interpretation selector (even when duration pin is connected).
+                  controls.push(
+                    <AfSelect
+                      key="duration-type"
+                      variant="pin"
+                      value={delayDurationType}
+                      placeholder="seconds"
+                      options={[
+                        { value: 'seconds', label: 'seconds' },
+                        { value: 'minutes', label: 'minutes' },
+                        { value: 'hours', label: 'hours' },
+                        { value: 'timestamp', label: 'timestamp' },
+                      ]}
+                      searchable={false}
+                      minPopoverWidth={180}
+                      onChange={setDelayDurationType}
+                    />
+                  );
+                }
+
+                if (hasProviderDropdown && pin.id === 'provider' && !providerConnected) {
+                  controls.push(
+                    <AfSelect
+                      key="provider"
+                      variant="pin"
+                      value={selectedProvider || ''}
+                      placeholder={providersQuery.isLoading ? 'Loading…' : 'Select…'}
+                      options={providers.map((p) => ({ value: p.name, label: p.display_name || p.name }))}
+                      disabled={providersQuery.isLoading}
+                      loading={providersQuery.isLoading}
+                      searchable
+                      searchPlaceholder="Search providers…"
+                      clearable
+                      minPopoverWidth={260}
+                      onChange={(v) => setProviderModel(v || undefined, undefined)}
+                    />
+                  );
+                }
+
+                if (hasModelControls && pin.id === 'model' && !modelConnected) {
+                  controls.push(
+                    <AfSelect
+                      key="model"
+                      variant="pin"
+                      value={selectedModel || ''}
+                      placeholder={!selectedProvider ? 'Pick provider…' : modelsQuery.isLoading ? 'Loading…' : 'Select…'}
+                      options={models.map((m) => ({ value: m, label: m }))}
+                      disabled={!selectedProvider || modelsQuery.isLoading}
+                      loading={modelsQuery.isLoading}
+                      searchable
+                      searchPlaceholder="Search models…"
+                      clearable
+                      minPopoverWidth={360}
+                      onChange={(v) => setProviderModel(selectedProvider || undefined, v || undefined)}
+                    />
+                  );
+                }
+
+                if (controls.length === 0) return null;
+                return <div className="pin-inline-controls nodrag">{controls}</div>;
+              })()}
             </div>
           ))}
         </div>
