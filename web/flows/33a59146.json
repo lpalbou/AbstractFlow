@@ -1,0 +1,437 @@
+{
+  "id": "33a59146",
+  "name": "discuss-deep-research",
+  "description": "Run deep-research-pro once, then chat with the gathered knowledge. Use /research <topic> to branch into additional deep research runs; /stop to end.",
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": { "x": -1024.0, "y": 64.0 },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "query", "label": "query", "type": "string" },
+          { "id": "follow_up_questions", "label": "follow_up_questions", "type": "boolean" },
+          { "id": "max_web_search", "label": "max_web_search", "type": "number" },
+          { "id": "max_fetch_url", "label": "max_fetch_url", "type": "number" },
+          { "id": "followup_max_web_search", "label": "followup_max_web_search", "type": "number" },
+          { "id": "followup_max_fetch_url", "label": "followup_max_fetch_url", "type": "number" },
+          { "id": "allow_branching", "label": "allow_branching", "type": "boolean" },
+          { "id": "max_turns", "label": "max_turns", "type": "number" }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-2",
+      "type": "subflow",
+      "position": { "x": -736.0, "y": 64.0 },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Subflow",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "query", "label": "query", "type": "string" },
+          { "id": "follow_up_questions", "label": "follow_up_questions", "type": "boolean" },
+          { "id": "max_web_search", "label": "max_web_search", "type": "number" },
+          { "id": "max_fetch_url", "label": "max_fetch_url", "type": "number" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "report", "label": "report", "type": "string" },
+          { "id": "dossier", "label": "dossier", "type": "string" },
+          { "id": "clarifications", "label": "clarifications", "type": "string" }
+        ],
+        "subflowId": "b3a9d7c1"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-3",
+      "type": "code",
+      "position": { "x": -448.0, "y": 64.0 },
+      "data": {
+        "nodeType": "code",
+        "label": "Init State",
+        "icon": "&#x1F40D;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "input", "label": "input", "type": "any" },
+          { "id": "report", "label": "report", "type": "string" },
+          { "id": "dossier", "label": "dossier", "type": "string" },
+          { "id": "clarifications", "label": "clarifications", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "output", "label": "output", "type": "any" }
+        ],
+        "code": "def transform(input):\n    d = input if isinstance(input, dict) else {}\n\n    query = str(d.get('query') or '').strip()\n    report = '' if d.get('report') is None else str(d.get('report') or '')\n    dossier = '' if d.get('dossier') is None else str(d.get('dossier') or '')\n    clarifications = '' if d.get('clarifications') is None else str(d.get('clarifications') or '')\n\n    allow_branching = bool(d.get('allow_branching', True))\n\n    def _to_int(v, default):\n        try:\n            if v is None or v == '':\n                return default\n            if isinstance(v, bool):\n                return default\n            return int(float(v))\n        except Exception:\n            return default\n\n    max_turns = _to_int(d.get('max_turns'), 10)\n    if max_turns < 0:\n        max_turns = 0  # 0 = unlimited (bounded by While max_iterations)\n\n    followup_max_web_search = _to_int(d.get('followup_max_web_search'), 3)\n    followup_max_fetch_url = _to_int(d.get('followup_max_fetch_url'), 10)\n\n    knowledge = [\n        {\n            'kind': 'main',\n            'query': query,\n            'report': report,\n            'dossier': dossier,\n            'clarifications': clarifications,\n        }\n    ]\n\n    return {\n        'condition': True,\n        'stop': False,\n        'turn': 0,\n        'max_turns': max_turns,\n        'allow_branching': allow_branching,\n        'main_query': query,\n        'followup_max_web_search': followup_max_web_search,\n        'followup_max_fetch_url': followup_max_fetch_url,\n        'knowledge': knowledge,\n        'chat': [],\n        'last_user': '',\n        'last_answer': '',\n    }\n",
+        "codeBody": "def transform(input):\n    d = input if isinstance(input, dict) else {}\n\n    query = str(d.get('query') or '').strip()\n    report = '' if d.get('report') is None else str(d.get('report') or '')\n    dossier = '' if d.get('dossier') is None else str(d.get('dossier') or '')\n    clarifications = '' if d.get('clarifications') is None else str(d.get('clarifications') or '')\n\n    allow_branching = bool(d.get('allow_branching', True))\n\n    def _to_int(v, default):\n        try:\n            if v is None or v == '':\n                return default\n            if isinstance(v, bool):\n                return default\n            return int(float(v))\n        except Exception:\n            return default\n\n    max_turns = _to_int(d.get('max_turns'), 10)\n    if max_turns < 0:\n        max_turns = 0  # 0 = unlimited (bounded by While max_iterations)\n\n    followup_max_web_search = _to_int(d.get('followup_max_web_search'), 3)\n    followup_max_fetch_url = _to_int(d.get('followup_max_fetch_url'), 10)\n\n    knowledge = [\n        {\n            'kind': 'main',\n            'query': query,\n            'report': report,\n            'dossier': dossier,\n            'clarifications': clarifications,\n        }\n    ]\n\n    return {\n        'condition': True,\n        'stop': False,\n        'turn': 0,\n        'max_turns': max_turns,\n        'allow_branching': allow_branching,\n        'main_query': query,\n        'followup_max_web_search': followup_max_web_search,\n        'followup_max_fetch_url': followup_max_fetch_url,\n        'knowledge': knowledge,\n        'chat': [],\n        'last_user': '',\n        'last_answer': '',\n    }\n",
+        "functionName": "transform"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-4",
+      "type": "while",
+      "position": { "x": -192.0, "y": 64.0 },
+      "data": {
+        "nodeType": "while",
+        "label": "While",
+        "icon": "&#x267B;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "condition", "label": "condition", "type": "boolean" }
+        ],
+        "outputs": [
+          { "id": "loop", "label": "loop", "type": "execution" },
+          { "id": "done", "label": "done", "type": "execution" }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-5",
+      "type": "ask_user",
+      "position": { "x": 64.0, "y": 64.0 },
+      "data": {
+        "nodeType": "ask_user",
+        "label": "Ask User",
+        "icon": "&#x2753;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "prompt", "label": "prompt", "type": "string" },
+          { "id": "choices", "label": "choices", "type": "array" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "response", "label": "response", "type": "string" }
+        ],
+        "effectConfig": { "allowFreeText": true },
+        "pinDefaults": {
+          "prompt": "Ask a follow-up question about the research.\n\nCommands:\n- /research <topic>  (run more deep research on a subtopic)\n- /stop              (end the dialogue)\n"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-6",
+      "type": "code",
+      "position": { "x": 320.0, "y": 64.0 },
+      "data": {
+        "nodeType": "code",
+        "label": "Parse Command",
+        "icon": "&#x1F40D;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "input", "label": "input", "type": "any" },
+          { "id": "message", "label": "message", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "true", "label": "continue", "type": "execution" },
+          { "id": "false", "label": "stop", "type": "execution" },
+          { "id": "output", "label": "output", "type": "any" }
+        ],
+        "code": "def transform(input):\n    d = input if isinstance(input, dict) else {}\n\n    msg = d.get('message')\n    if msg is None:\n        msg = d.get('response')\n    text = '' if msg is None else str(msg)\n    text = text.strip()\n    lower = text.lower().strip()\n\n    stop_cmds = {'stop', '/stop', 'exit', '/exit', 'quit', '/quit', 'done', '/done'}\n    stop = lower in stop_cmds\n\n    out = dict(d)\n    out.pop('message', None)\n\n    if stop:\n        out['stop'] = True\n        out['condition'] = False\n        out['do_research'] = False\n        out['research_query'] = ''\n        out['user_question'] = ''\n        out['message'] = 'Stopping the discussion. You can rerun discuss-deep-research to continue later.'\n        out['branch'] = 'false'\n        return out\n\n    allow_branching = bool(out.get('allow_branching', True))\n\n    research_query = ''\n    if allow_branching:\n        if lower.startswith('/research'):\n            research_query = text[len('/research'):].strip()\n        elif lower.startswith('/expand'):\n            research_query = text[len('/expand'):].strip()\n        elif lower.startswith('research:'):\n            research_query = text[len('research:'):].strip()\n\n    do_research = bool(research_query) and allow_branching\n    user_question = research_query if do_research else text\n\n    out['stop'] = False\n    out['condition'] = True\n    out['do_research'] = do_research\n    out['research_query'] = research_query\n    out['user_question'] = user_question\n    out['branch'] = 'true'\n    return out\n",
+        "codeBody": "def transform(input):\n    d = input if isinstance(input, dict) else {}\n\n    msg = d.get('message')\n    if msg is None:\n        msg = d.get('response')\n    text = '' if msg is None else str(msg)\n    text = text.strip()\n    lower = text.lower().strip()\n\n    stop_cmds = {'stop', '/stop', 'exit', '/exit', 'quit', '/quit', 'done', '/done'}\n    stop = lower in stop_cmds\n\n    out = dict(d)\n    out.pop('message', None)\n\n    if stop:\n        out['stop'] = True\n        out['condition'] = False\n        out['do_research'] = False\n        out['research_query'] = ''\n        out['user_question'] = ''\n        out['message'] = 'Stopping the discussion. You can rerun discuss-deep-research to continue later.'\n        out['branch'] = 'false'\n        return out\n\n    allow_branching = bool(out.get('allow_branching', True))\n\n    research_query = ''\n    if allow_branching:\n        if lower.startswith('/research'):\n            research_query = text[len('/research'):].strip()\n        elif lower.startswith('/expand'):\n            research_query = text[len('/expand'):].strip()\n        elif lower.startswith('research:'):\n            research_query = text[len('research:'):].strip()\n\n    do_research = bool(research_query) and allow_branching\n    user_question = research_query if do_research else text\n\n    out['stop'] = False\n    out['condition'] = True\n    out['do_research'] = do_research\n    out['research_query'] = research_query\n    out['user_question'] = user_question\n    out['branch'] = 'true'\n    return out\n",
+        "functionName": "transform"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-14",
+      "type": "answer_user",
+      "position": { "x": 576.0, "y": 224.0 },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "message", "label": "message", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "message", "label": "message", "type": "string" }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-7",
+      "type": "code",
+      "position": { "x": 576.0, "y": 64.0 },
+      "data": {
+        "nodeType": "code",
+        "label": "Route Research",
+        "icon": "&#x1F40D;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "input", "label": "input", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "true", "label": "research", "type": "execution" },
+          { "id": "false", "label": "answer", "type": "execution" },
+          { "id": "output", "label": "output", "type": "any" }
+        ],
+        "code": "def transform(input):\n    d = input if isinstance(input, dict) else {}\n    out = dict(d)\n\n    do_research = bool(out.get('do_research'))\n    research_query = str(out.get('research_query') or '').strip()\n\n    if do_research and research_query:\n        main_query = str(out.get('main_query') or out.get('query') or '').strip()\n        follow_query = (main_query + '\\n\\nFOLLOW-UP FOCUS:\\n' + research_query).strip()\n\n        def _to_int(v, default):\n            try:\n                if v is None or v == '':\n                    return default\n                if isinstance(v, bool):\n                    return default\n                return int(float(v))\n            except Exception:\n                return default\n\n        out['query'] = follow_query\n        out['follow_up_questions'] = False\n        out['max_web_search'] = _to_int(out.get('followup_max_web_search'), 3)\n        out['max_fetch_url'] = _to_int(out.get('followup_max_fetch_url'), 10)\n        out['branch'] = 'true'\n        return out\n\n    out['branch'] = 'false'\n    return out\n",
+        "codeBody": "def transform(input):\n    d = input if isinstance(input, dict) else {}\n    out = dict(d)\n\n    do_research = bool(out.get('do_research'))\n    research_query = str(out.get('research_query') or '').strip()\n\n    if do_research and research_query:\n        main_query = str(out.get('main_query') or out.get('query') or '').strip()\n        follow_query = (main_query + '\\n\\nFOLLOW-UP FOCUS:\\n' + research_query).strip()\n\n        def _to_int(v, default):\n            try:\n                if v is None or v == '':\n                    return default\n                if isinstance(v, bool):\n                    return default\n                return int(float(v))\n            except Exception:\n                return default\n\n        out['query'] = follow_query\n        out['follow_up_questions'] = False\n        out['max_web_search'] = _to_int(out.get('followup_max_web_search'), 3)\n        out['max_fetch_url'] = _to_int(out.get('followup_max_fetch_url'), 10)\n        out['branch'] = 'true'\n        return out\n\n    out['branch'] = 'false'\n    return out\n",
+        "functionName": "transform"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-8",
+      "type": "subflow",
+      "position": { "x": 832.0, "y": 64.0 },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Subflow",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "query", "label": "query", "type": "string" },
+          { "id": "follow_up_questions", "label": "follow_up_questions", "type": "boolean" },
+          { "id": "max_web_search", "label": "max_web_search", "type": "number" },
+          { "id": "max_fetch_url", "label": "max_fetch_url", "type": "number" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "report", "label": "report", "type": "string" },
+          { "id": "dossier", "label": "dossier", "type": "string" },
+          { "id": "clarifications", "label": "clarifications", "type": "string" }
+        ],
+        "subflowId": "b3a9d7c1"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-9",
+      "type": "code",
+      "position": { "x": 832.0, "y": 224.0 },
+      "data": {
+        "nodeType": "code",
+        "label": "Merge + Prompt",
+        "icon": "&#x1F40D;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "input", "label": "input", "type": "any" },
+          { "id": "new_report", "label": "new_report", "type": "string" },
+          { "id": "new_dossier", "label": "new_dossier", "type": "string" },
+          { "id": "new_clarifications", "label": "new_clarifications", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "output", "label": "output", "type": "any" }
+        ],
+        "code": "def transform(input):\n    d = input if isinstance(input, dict) else {}\n    out = dict(d)\n\n    knowledge = out.get('knowledge')\n    if not isinstance(knowledge, list):\n        knowledge = []\n\n    do_research = bool(out.get('do_research'))\n    if do_research:\n        new_report = '' if out.get('new_report') is None else str(out.get('new_report') or '')\n        new_dossier = '' if out.get('new_dossier') is None else str(out.get('new_dossier') or '')\n        new_clar = '' if out.get('new_clarifications') is None else str(out.get('new_clarifications') or '')\n        rq = str(out.get('research_query') or out.get('query') or '').strip()\n\n        if new_report.strip() or new_dossier.strip():\n            knowledge = list(knowledge)\n            knowledge.append({\n                'kind': 'branch',\n                'query': rq,\n                'report': new_report,\n                'dossier': new_dossier,\n                'clarifications': new_clar,\n            })\n\n    out['knowledge'] = knowledge\n\n    # Build a compact conversation view (last 10 messages)\n    chat = out.get('chat')\n    if not isinstance(chat, list):\n        chat = []\n    chat_tail = chat[-10:] if len(chat) > 10 else chat\n    chat_lines = []\n    for m in chat_tail:\n        if not isinstance(m, dict):\n            continue\n        role = str(m.get('role') or '')\n        content = str(m.get('content') or '')\n        if role and content:\n            chat_lines.append(role + ': ' + content)\n    chat_text = '\\n'.join(chat_lines)\n\n    # Build knowledge text\n    parts = []\n    for i, item in enumerate(knowledge):\n        if not isinstance(item, dict):\n            continue\n        kind = str(item.get('kind') or '')\n        q = str(item.get('query') or '').strip()\n        label = 'MAIN' if kind == 'main' else 'BRANCH'\n        header = f\"## {label} ({i})\" if kind != 'main' else '## MAIN'\n        parts.append(header)\n        if q:\n            parts.append('Query: ' + q)\n        r = str(item.get('report') or '').strip()\n        if r:\n            parts.append('Report:\\n' + r)\n        ds = str(item.get('dossier') or '').strip()\n        if ds:\n            parts.append('Dossier:\\n' + ds)\n        parts.append('')\n    knowledge_text = '\\n\\n'.join(parts).strip()\n\n    main_query = str(out.get('main_query') or '').strip()\n    user_question = str(out.get('user_question') or '').strip()\n\n    system = (\n        'You are a Deep Research Companion. Answer the user using ONLY the research dossiers/reports provided in the prompt.\\n'\n        'If the dossiers do not contain enough information, say exactly what is missing and suggest using /research <topic>.\\n'\n        'When citing sources, use URLs that already appear in the dossiers.\\n'\n    )\n\n    prompt = (\n        'MAIN QUERY:\\n' + main_query + '\\n\\n'\n        + ('CONVERSATION (recent):\\n' + chat_text + '\\n\\n' if chat_text else '')\n        + 'RESEARCH DOSSIERS:\\n' + knowledge_text + '\\n\\n'\n        + 'USER QUESTION:\\n' + user_question + '\\n\\n'\n        + 'Write a markdown answer. Be precise and avoid hallucinations.'\n    )\n\n    out['system'] = system\n    out['prompt'] = prompt\n    return out\n",
+        "codeBody": "def transform(input):\n    d = input if isinstance(input, dict) else {}\n    out = dict(d)\n\n    knowledge = out.get('knowledge')\n    if not isinstance(knowledge, list):\n        knowledge = []\n\n    do_research = bool(out.get('do_research'))\n    if do_research:\n        new_report = '' if out.get('new_report') is None else str(out.get('new_report') or '')\n        new_dossier = '' if out.get('new_dossier') is None else str(out.get('new_dossier') or '')\n        new_clar = '' if out.get('new_clarifications') is None else str(out.get('new_clarifications') or '')\n        rq = str(out.get('research_query') or out.get('query') or '').strip()\n\n        if new_report.strip() or new_dossier.strip():\n            knowledge = list(knowledge)\n            knowledge.append({\n                'kind': 'branch',\n                'query': rq,\n                'report': new_report,\n                'dossier': new_dossier,\n                'clarifications': new_clar,\n            })\n\n    out['knowledge'] = knowledge\n\n    # Build a compact conversation view (last 10 messages)\n    chat = out.get('chat')\n    if not isinstance(chat, list):\n        chat = []\n    chat_tail = chat[-10:] if len(chat) > 10 else chat\n    chat_lines = []\n    for m in chat_tail:\n        if not isinstance(m, dict):\n            continue\n        role = str(m.get('role') or '')\n        content = str(m.get('content') or '')\n        if role and content:\n            chat_lines.append(role + ': ' + content)\n    chat_text = '\\n'.join(chat_lines)\n\n    # Build knowledge text\n    parts = []\n    for i, item in enumerate(knowledge):\n        if not isinstance(item, dict):\n            continue\n        kind = str(item.get('kind') or '')\n        q = str(item.get('query') or '').strip()\n        label = 'MAIN' if kind == 'main' else 'BRANCH'\n        header = f\"## {label} ({i})\" if kind != 'main' else '## MAIN'\n        parts.append(header)\n        if q:\n            parts.append('Query: ' + q)\n        r = str(item.get('report') or '').strip()\n        if r:\n            parts.append('Report:\\n' + r)\n        ds = str(item.get('dossier') or '').strip()\n        if ds:\n            parts.append('Dossier:\\n' + ds)\n        parts.append('')\n    knowledge_text = '\\n\\n'.join(parts).strip()\n\n    main_query = str(out.get('main_query') or '').strip()\n    user_question = str(out.get('user_question') or '').strip()\n\n    system = (\n        'You are a Deep Research Companion. Answer the user using ONLY the research dossiers/reports provided in the prompt.\\n'\n        'If the dossiers do not contain enough information, say exactly what is missing and suggest using /research <topic>.\\n'\n        'When citing sources, use URLs that already appear in the dossiers.\\n'\n    )\n\n    prompt = (\n        'MAIN QUERY:\\n' + main_query + '\\n\\n'\n        + ('CONVERSATION (recent):\\n' + chat_text + '\\n\\n' if chat_text else '')\n        + 'RESEARCH DOSSIERS:\\n' + knowledge_text + '\\n\\n'\n        + 'USER QUESTION:\\n' + user_question + '\\n\\n'\n        + 'Write a markdown answer. Be precise and avoid hallucinations.'\n    )\n\n    out['system'] = system\n    out['prompt'] = prompt\n    return out\n",
+        "functionName": "transform"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-10",
+      "type": "llm_call",
+      "position": { "x": 1120.0, "y": 224.0 },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "LLM Call",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "provider", "label": "provider", "type": "string" },
+          { "id": "model", "label": "model", "type": "string" },
+          { "id": "system", "label": "system", "type": "string" },
+          { "id": "prompt", "label": "prompt", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "response", "label": "response", "type": "string" }
+        ],
+        "effectConfig": { "provider": "lmstudio", "model": "qwen/qwen3-next-80b", "temperature": 0.2 }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-11",
+      "type": "answer_user",
+      "position": { "x": 1376.0, "y": 224.0 },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "message", "label": "message", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "message", "label": "message", "type": "string" }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-12",
+      "type": "code",
+      "position": { "x": 1632.0, "y": 224.0 },
+      "data": {
+        "nodeType": "code",
+        "label": "Update State",
+        "icon": "&#x1F40D;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "input", "label": "input", "type": "any" },
+          { "id": "answer", "label": "answer", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "output", "label": "output", "type": "any" }
+        ],
+        "code": "def transform(input):\n    d = input if isinstance(input, dict) else {}\n    out = dict(d)\n\n    # Do not persist prompt/system in state.\n    out.pop('prompt', None)\n    out.pop('system', None)\n    out.pop('new_report', None)\n    out.pop('new_dossier', None)\n    out.pop('new_clarifications', None)\n    out.pop('branch', None)\n\n    stop = bool(out.get('stop')) or (out.get('condition') is False)\n\n    if stop:\n        out['condition'] = False\n        out['stop'] = True\n        return out\n\n    def _to_int(v, default):\n        try:\n            if v is None or v == '':\n                return default\n            if isinstance(v, bool):\n                return default\n            return int(float(v))\n        except Exception:\n            return default\n\n    turn = _to_int(out.get('turn'), 0) + 1\n    out['turn'] = turn\n\n    max_turns = _to_int(out.get('max_turns'), 0)\n    if max_turns < 0:\n        max_turns = 0\n    out['max_turns'] = max_turns\n\n    cond = True\n    if max_turns > 0 and turn >= max_turns:\n        cond = False\n    out['condition'] = cond\n\n    user_q = str(out.get('user_question') or '').strip()\n    ans = '' if out.get('answer') is None else str(out.get('answer') or '')\n\n    chat = out.get('chat')\n    if not isinstance(chat, list):\n        chat = []\n    chat = list(chat)\n\n    if user_q:\n        chat.append({'role': 'user', 'content': user_q})\n    if ans.strip():\n        chat.append({'role': 'assistant', 'content': ans})\n\n    # Bound chat to last 40 messages (20 turns)\n    if len(chat) > 40:\n        chat = chat[-40:]\n\n    out['chat'] = chat\n    out['last_user'] = user_q\n    out['last_answer'] = ans\n\n    out.pop('answer', None)\n    out.pop('message', None)\n\n    return out\n",
+        "codeBody": "def transform(input):\n    d = input if isinstance(input, dict) else {}\n    out = dict(d)\n\n    # Do not persist prompt/system in state.\n    out.pop('prompt', None)\n    out.pop('system', None)\n    out.pop('new_report', None)\n    out.pop('new_dossier', None)\n    out.pop('new_clarifications', None)\n    out.pop('branch', None)\n\n    stop = bool(out.get('stop')) or (out.get('condition') is False)\n\n    if stop:\n        out['condition'] = False\n        out['stop'] = True\n        return out\n\n    def _to_int(v, default):\n        try:\n            if v is None or v == '':\n                return default\n            if isinstance(v, bool):\n                return default\n            return int(float(v))\n        except Exception:\n            return default\n\n    turn = _to_int(out.get('turn'), 0) + 1\n    out['turn'] = turn\n\n    max_turns = _to_int(out.get('max_turns'), 0)\n    if max_turns < 0:\n        max_turns = 0\n    out['max_turns'] = max_turns\n\n    cond = True\n    if max_turns > 0 and turn >= max_turns:\n        cond = False\n    out['condition'] = cond\n\n    user_q = str(out.get('user_question') or '').strip()\n    ans = '' if out.get('answer') is None else str(out.get('answer') or '')\n\n    chat = out.get('chat')\n    if not isinstance(chat, list):\n        chat = []\n    chat = list(chat)\n\n    if user_q:\n        chat.append({'role': 'user', 'content': user_q})\n    if ans.strip():\n        chat.append({'role': 'assistant', 'content': ans})\n\n    # Bound chat to last 40 messages (20 turns)\n    if len(chat) > 40:\n        chat = chat[-40:]\n\n    out['chat'] = chat\n    out['last_user'] = user_q\n    out['last_answer'] = ans\n\n    out.pop('answer', None)\n    out.pop('message', None)\n\n    return out\n",
+        "functionName": "transform"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-13",
+      "type": "on_flow_end",
+      "position": { "x": 64.0, "y": 288.0 },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "main_query", "label": "main_query", "type": "string" },
+          { "id": "turn", "label": "turn", "type": "number" },
+          { "id": "knowledge", "label": "knowledge", "type": "array" },
+          { "id": "chat", "label": "chat", "type": "array" }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    { "id": "edge-1", "source": "node-1", "sourceHandle": "exec-out", "target": "node-2", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-2", "source": "node-2", "sourceHandle": "exec-out", "target": "node-3", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-3", "source": "node-3", "sourceHandle": "exec-out", "target": "node-4", "targetHandle": "exec-in", "animated": true },
+
+    { "id": "edge-4", "source": "node-4", "sourceHandle": "loop", "target": "node-5", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-5", "source": "node-5", "sourceHandle": "exec-out", "target": "node-6", "targetHandle": "exec-in", "animated": true },
+
+    { "id": "edge-6", "source": "node-6", "sourceHandle": "true", "target": "node-7", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-7", "source": "node-6", "sourceHandle": "false", "target": "node-14", "targetHandle": "exec-in", "animated": true },
+
+    { "id": "edge-8", "source": "node-14", "sourceHandle": "exec-out", "target": "node-12", "targetHandle": "exec-in", "animated": true },
+
+    { "id": "edge-9", "source": "node-7", "sourceHandle": "true", "target": "node-8", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-10", "source": "node-7", "sourceHandle": "false", "target": "node-9", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-11", "source": "node-8", "sourceHandle": "exec-out", "target": "node-9", "targetHandle": "exec-in", "animated": true },
+
+    { "id": "edge-12", "source": "node-9", "sourceHandle": "exec-out", "target": "node-10", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-13", "source": "node-10", "sourceHandle": "exec-out", "target": "node-11", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-14", "source": "node-11", "sourceHandle": "exec-out", "target": "node-12", "targetHandle": "exec-in", "animated": true },
+
+    { "id": "edge-15", "source": "node-4", "sourceHandle": "done", "target": "node-13", "targetHandle": "exec-in", "animated": true },
+
+    { "id": "edge-20", "source": "node-1", "sourceHandle": "query", "target": "node-2", "targetHandle": "query", "animated": false },
+    { "id": "edge-21", "source": "node-1", "sourceHandle": "follow_up_questions", "target": "node-2", "targetHandle": "follow_up_questions", "animated": false },
+    { "id": "edge-22", "source": "node-1", "sourceHandle": "max_web_search", "target": "node-2", "targetHandle": "max_web_search", "animated": false },
+    { "id": "edge-23", "source": "node-1", "sourceHandle": "max_fetch_url", "target": "node-2", "targetHandle": "max_fetch_url", "animated": false },
+
+    { "id": "edge-24", "source": "node-2", "sourceHandle": "report", "target": "node-3", "targetHandle": "report", "animated": false },
+    { "id": "edge-25", "source": "node-2", "sourceHandle": "dossier", "target": "node-3", "targetHandle": "dossier", "animated": false },
+    { "id": "edge-26", "source": "node-2", "sourceHandle": "clarifications", "target": "node-3", "targetHandle": "clarifications", "animated": false },
+
+    { "id": "edge-27", "source": "node-5", "sourceHandle": "response", "target": "node-6", "targetHandle": "message", "animated": false },
+
+    { "id": "edge-29", "source": "node-8", "sourceHandle": "report", "target": "node-9", "targetHandle": "new_report", "animated": false },
+    { "id": "edge-30", "source": "node-8", "sourceHandle": "dossier", "target": "node-9", "targetHandle": "new_dossier", "animated": false },
+    { "id": "edge-31", "source": "node-8", "sourceHandle": "clarifications", "target": "node-9", "targetHandle": "new_clarifications", "animated": false },
+
+    { "id": "edge-32", "source": "node-10", "sourceHandle": "response", "target": "node-11", "targetHandle": "message", "animated": false },
+    { "id": "edge-33", "source": "node-10", "sourceHandle": "response", "target": "node-12", "targetHandle": "answer", "animated": false }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2025-12-26T23:59:00.000000",
+  "updated_at": "2025-12-26T23:59:00.000000"
+}
