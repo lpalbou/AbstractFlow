@@ -33,6 +33,7 @@ def create_visual_runner(
     run_store: Optional[Any] = None,
     ledger_store: Optional[Any] = None,
     artifact_store: Optional[Any] = None,
+    tool_executor: Optional[Any] = None,
 ) -> FlowRunner:
     """Create a FlowRunner for a visual run with a correctly wired runtime.
 
@@ -381,17 +382,17 @@ def create_visual_runner(
                 "or remove LLM nodes from the flow."
             ) from e
 
-        tool_executor = None
-        if MappingToolExecutor is not None and callable(get_default_tools):
+        effective_tool_executor = tool_executor
+        if effective_tool_executor is None and MappingToolExecutor is not None and callable(get_default_tools):
             try:
-                tool_executor = MappingToolExecutor.from_tools(get_default_tools())  # type: ignore[attr-defined]
+                effective_tool_executor = MappingToolExecutor.from_tools(get_default_tools())  # type: ignore[attr-defined]
             except Exception:
-                tool_executor = None
+                effective_tool_executor = None
 
         runtime = create_local_runtime(
             provider=provider,
             model=model,
-            tool_executor=tool_executor,
+            tool_executor=effective_tool_executor,
             run_store=run_store,
             ledger_store=ledger_store,
             artifact_store=artifact_store,
