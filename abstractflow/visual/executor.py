@@ -556,6 +556,24 @@ def create_visual_runner(
                 return out
 
             all_tool_defs = _tool_defs_from_specs(list_default_tool_specs())
+            # Add schema-only runtime tools (executed as runtime effects by AbstractAgent adapters).
+            try:
+                from abstractagent.logic.builtins import (  # type: ignore
+                    ASK_USER_TOOL,
+                    COMPACT_MEMORY_TOOL,
+                    INSPECT_VARS_TOOL,
+                    RECALL_MEMORY_TOOL,
+                    REMEMBER_TOOL,
+                )
+
+                builtin_defs = [ASK_USER_TOOL, RECALL_MEMORY_TOOL, INSPECT_VARS_TOOL, REMEMBER_TOOL, COMPACT_MEMORY_TOOL]
+                seen_names = {t.name for t in all_tool_defs if getattr(t, "name", None)}
+                for t in builtin_defs:
+                    if getattr(t, "name", None) and t.name not in seen_names:
+                        all_tool_defs.append(t)
+                        seen_names.add(t.name)
+            except Exception:
+                pass
 
             for workflow_id, cfg in agent_nodes:
                 provider_raw = cfg.get("provider")
