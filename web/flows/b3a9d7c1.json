@@ -122,7 +122,7 @@
         "headerColor": "#95A5A6",
         "inputs": [],
         "outputs": [ { "id": "value", "label": "value", "type": "string" } ],
-        "literalValue": "You are a rigorous deep-research agent. Use tools to gather evidence and write a research dossier.\\n\\nMethod:\\n1) plan what you need to learn\\n2) search broadly (web_search)\\n3) fetch a small set of high-signal sources (fetch_url)\\n4) extract key evidence + cite URLs\\n5) synthesize carefully; clearly separate facts vs interpretation\\n\\nHard rules:\\n- Never invent citations.\\n- If evidence is insufficient, say so and explain what’s missing.\\n"
+        "literalValue": "You are a rigorous deep-research agent. Use tools to gather evidence and write a research dossier.\\n\\nMethod:\\n1) plan what you need to learn\\n2) search broadly (web_search; read results from its JSON output)\\n3) fetch a small set of high-signal sources (fetch_url)\\n   - Use include_full_content=true only when you need the full text/JSON/XML (otherwise keep the default preview to save context).\\n4) extract key evidence + cite URLs\\n5) synthesize carefully; clearly separate facts vs interpretation\\n\\nHard rules:\\n- Never invent citations.\\n- If evidence is insufficient, say so and explain what’s missing.\\n"
       },
       "label": null,
       "icon": null,
