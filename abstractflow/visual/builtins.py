@@ -6,7 +6,9 @@ any host that can compile the VisualFlow JSON to a WorkflowSpec.
 
 from __future__ import annotations
 
+import ast
 from datetime import datetime
+import json
 import locale
 import os
 from typing import Any, Callable, Dict, List, Optional
@@ -73,10 +75,51 @@ def string_concat(inputs: Dict[str, Any]) -> str:
 
 
 def string_split(inputs: Dict[str, Any]) -> List[str]:
-    """Split string by delimiter."""
-    text = str(inputs.get("text", ""))
-    delimiter = str(inputs.get("delimiter", ","))
-    return text.split(delimiter)
+    """Split a string by a delimiter (defaults are tuned for real-world workflow usage).
+
+    Notes:
+    - Visual workflows often use human-edited / LLM-generated text where trailing
+      delimiters are common (e.g. "A@@B@@"). A strict `str.split` would produce an
+      empty last element and create a spurious downstream loop iteration.
+    - We therefore support optional normalization flags with sensible defaults:
+      - `trim` (default True): strip whitespace around parts
+      - `drop_empty` (default True): drop empty parts after trimming
+    - Delimiters may be entered as escape sequences (e.g. "\\n") from the UI.
+    """
+
+    raw_text = inputs.get("text", "")
+    text = "" if raw_text is None else str(raw_text)
+
+    raw_delim = inputs.get("delimiter", ",")
+    delimiter = "" if raw_delim is None else str(raw_delim)
+    delimiter = delimiter.replace("\\n", "\n").replace("\\t", "\t").replace("\\r", "\r")
+
+    trim = bool(inputs.get("trim", True))
+    drop_empty = bool(inputs.get("drop_empty", True))
+
+    # Avoid ValueError from Python's `split("")` and keep behavior predictable.
+    if delimiter == "":
+        parts = [text] if text else []
+    else:
+        raw_maxsplit = inputs.get("maxsplit")
+        maxsplit: Optional[int] = None
+        if raw_maxsplit is not None:
+            try:
+                maxsplit = int(raw_maxsplit)
+            except Exception:
+                maxsplit = None
+        if maxsplit is not None and maxsplit >= 0:
+            parts = text.split(delimiter, maxsplit)
+        else:
+            parts = text.split(delimiter)
+
+    if trim:
+        parts = [p.strip() for p in parts]
+
+    if drop_empty:
+        parts = [p for p in parts if p != ""]
+
+    return parts
 
 
 def string_join(inputs: Dict[str, Any]) -> str:
@@ -262,6 +305,93 @@ def system_datetime(_: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def data_parse_json(inputs: Dict[str, Any]) -> Any:
+    """Parse JSON (or JSON-ish) text into a JSON-serializable Python value.
+
+    Primary use-case: turn an LLM string response into an object/array that can be
+    fed into `Break Object` (dynamic pins) or other data nodes.
+
+    Behavior:
+    - If the input is already a dict/list, returns it unchanged (idempotent).
+    - Tries strict `json.loads` first.
+    - If that fails, tries to extract the first JSON object/array substring and parse it.
+    - As a last resort, tries `ast.literal_eval` to handle Python-style dicts/lists
+      (common in LLM output), then converts to JSON-friendly types.
+    - If the parsed value is a scalar, wraps it as `{ "value": <scalar> }` by default,
+      so `Break Object` can still expose it.
+    """
+
+    def _strip_code_fence(text: str) -> str:
+        s = text.strip()
+        if not s.startswith("```"):
+            return s
+        # Opening fence line can be ```json / ```js etc; drop it.
+        nl = s.find("\n")
+        if nl == -1:
+            return s.strip("`").strip()
+        body = s[nl + 1 :]
+        end = body.rfind("```")
+        if end != -1:
+            body = body[:end]
+        return body.strip()
+
+    def _jsonify(value: Any) -> Any:
+        if value is None or isinstance(value, (bool, int, float, str)):
+            return value
+        if isinstance(value, dict):
+            return {str(k): _jsonify(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [_jsonify(v) for v in value]
+        if isinstance(value, tuple):
+            return [_jsonify(v) for v in value]
+        return str(value)
+
+    raw = inputs.get("text")
+    if isinstance(raw, (dict, list)):
+        parsed: Any = raw
+    else:
+        if raw is None:
+            raise ValueError("parse_json requires a non-empty 'text' input.")
+        text = _strip_code_fence(str(raw))
+        if not text.strip():
+            raise ValueError("parse_json requires a non-empty 'text' input.")
+
+        parsed = None
+        text_stripped = text.strip()
+
+        try:
+            parsed = json.loads(text_stripped)
+        except Exception:
+            # Best-effort: find and parse the first JSON object/array substring.
+            decoder = json.JSONDecoder()
+            starts: list[int] = []
+            for i, ch in enumerate(text_stripped):
+                if ch in "{[":
+                    starts.append(i)
+                if len(starts) >= 64:
+                    break
+            for i in starts:
+                try:
+                    parsed, _end = decoder.raw_decode(text_stripped[i:])
+                    break
+                except Exception:
+                    continue
+
+        if parsed is None:
+            # Last resort: tolerate Python-literal dict/list output.
+            try:
+                parsed = ast.literal_eval(text_stripped)
+            except Exception as e:
+                raise ValueError(f"Invalid JSON: {e}") from e
+
+    parsed = _jsonify(parsed)
+
+    wrap_scalar = bool(inputs.get("wrap_scalar", True))
+    if wrap_scalar and not isinstance(parsed, (dict, list)):
+        return {"value": parsed}
+    return parsed
+
+
 # Literal value handlers - return configured constant values
 def literal_string(inputs: Dict[str, Any]) -> str:
     """Return string literal value."""
@@ -330,6 +460,7 @@ BUILTIN_HANDLERS: Dict[str, Callable[[Dict[str, Any]], Any]] = {
     "merge": data_merge,
     "array_map": data_array_map,
     "array_filter": data_array_filter,
+    "parse_json": data_parse_json,
     "system_datetime": system_datetime,
     # Literals
     "literal_string": literal_string,

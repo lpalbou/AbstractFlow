@@ -1059,6 +1059,64 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               sample = sourceNode.data.literalValue;
             } else if (sourceNode?.data.nodeType === 'literal_array') {
               sample = sourceNode.data.literalValue;
+            } else if (sourceNode?.data.nodeType === 'parse_json') {
+              // Best-effort: if Parse JSON is fed by a pinned literal string, parse it so users
+              // can discover fields and expose them as Break Object output pins.
+              //
+              // When Parse JSON is fed by an LLM output at runtime, we cannot know the shape
+              // ahead of time; in that case this section stays empty by design.
+              const parseNode = sourceNode;
+              let candidateText: string | undefined;
+
+              const textEdge = edges.find((e) => e.target === parseNode.id && e.targetHandle === 'text');
+              const textSource = textEdge ? nodes.find((n) => n.id === textEdge.source) : undefined;
+
+              if (textSource?.data.nodeType === 'literal_string') {
+                const v = textSource.data.literalValue;
+                if (typeof v === 'string') candidateText = v;
+              } else {
+                const pinned = parseNode.data.pinDefaults?.text;
+                if (typeof pinned === 'string') candidateText = pinned;
+              }
+
+              const stripFence = (raw: string): string => {
+                const s = raw.trim();
+                if (!s.startsWith('```')) return s;
+                const nl = s.indexOf('\n');
+                if (nl === -1) return s.replace(/```/g, '').trim();
+                const body = s.slice(nl + 1);
+                const end = body.lastIndexOf('```');
+                return (end >= 0 ? body.slice(0, end) : body).trim();
+              };
+
+              const tryParse = (raw: string): unknown | undefined => {
+                const s = stripFence(raw);
+                if (!s) return undefined;
+                try {
+                  return JSON.parse(s);
+                } catch {
+                  // Extract a likely JSON substring: first {/[ ... last }/]
+                  const startObj = s.indexOf('{');
+                  const startArr = s.indexOf('[');
+                  const start =
+                    startObj === -1 ? startArr : startArr === -1 ? startObj : Math.min(startObj, startArr);
+                  if (start === -1) return undefined;
+                  const endObj = s.lastIndexOf('}');
+                  const endArr = s.lastIndexOf(']');
+                  const end = Math.max(endObj, endArr);
+                  if (end <= start) return undefined;
+                  try {
+                    return JSON.parse(s.slice(start, end + 1));
+                  } catch {
+                    return undefined;
+                  }
+                }
+              };
+
+              if (typeof candidateText === 'string' && candidateText.trim()) {
+                const parsed = tryParse(candidateText);
+                if (parsed !== undefined) sample = parsed;
+              }
             } else if (sourceNode?.data.nodeType === 'on_event' && inputEdge?.sourceHandle === 'event') {
               // Best-effort sample of AbstractRuntime's event envelope so users can break it into fields.
               sample = {

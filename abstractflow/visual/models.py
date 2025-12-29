@@ -80,6 +80,7 @@ class NodeType(str, Enum):
     ARRAY_MAP = "array_map"
     ARRAY_FILTER = "array_filter"
     ARRAY_CONCAT = "array_concat"
+    PARSE_JSON = "parse_json"
     BREAK_OBJECT = "break_object"
     SYSTEM_DATETIME = "system_datetime"
     MODEL_CATALOG = "model_catalog"

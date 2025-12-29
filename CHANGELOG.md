@@ -12,11 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - VisualFlow execution now ignores unreachable/disconnected execution nodes (e.g. orphan `llm_call` / `subflow` nodes) so they cannot fail run initialization.
+- `Split` now avoids spurious empty trailing items (common with delimiter-terminated strings like `"A@@B@@"`) so downstream `Loop` nodes don't execute an extra empty iteration.
 
 ### Added
 - Visual custom events (Blueprint-style):
   - `On Event` listeners are compiled into dedicated durable subworkflows and auto-started alongside the main run (session-scoped by default).
   - `Emit Event` node dispatches durable events via AbstractRuntime.
+- `Parse JSON` (`parse_json`) pure data node to convert JSON (or JSON-ish) strings into objects compatible with `Break Object`.
 
 ### Planned
 - Visual workflow editor with drag-and-drop interface
