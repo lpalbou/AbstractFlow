@@ -71,12 +71,49 @@ export const BaseNode = memo(function BaseNode({
   selected,
 }: NodeProps<FlowNodeData>) {
   const { executingNodeId, disconnectPin, updateNodeData } = useFlowStore();
+  const allNodes = useFlowStore((s) => s.nodes);
   const isExecuting = executingNodeId === id;
   const edges = useEdges();
   const updateNodeInternals = useUpdateNodeInternals();
 
   const isTriggerNode = isEntryNodeType(data.nodeType);
   const pinDefaults = data.pinDefaults || {};
+  const isVarNode = data.nodeType === 'get_var' || data.nodeType === 'set_var';
+
+  const variableOptions = useMemo(() => {
+    // Best-effort list of “flow vars” to help users pick names (Blueprint-style).
+    // This is deliberately heuristic: users can still type/create new names.
+    const vars = new Set<string>();
+
+    for (const n of allNodes) {
+      const d = n.data;
+      if (!d) continue;
+
+      // On Flow Start parameters are initial vars.
+      if (d.nodeType === 'on_flow_start') {
+        for (const p of d.outputs || []) {
+          if (p.type === 'execution') continue;
+          if (typeof p.id === 'string' && p.id.trim()) vars.add(p.id.trim());
+        }
+      }
+
+      const ok = typeof d.outputKey === 'string' ? d.outputKey.trim() : '';
+      if (ok) vars.add(ok);
+
+      const ik = typeof d.inputKey === 'string' ? d.inputKey.trim() : '';
+      if (ik) vars.add(ik);
+
+      if ((d.nodeType === 'get_var' || d.nodeType === 'set_var') && typeof d.pinDefaults?.name === 'string') {
+        const vn = d.pinDefaults.name.trim();
+        if (vn) vars.add(vn);
+      }
+    }
+
+    return Array.from(vars)
+      .filter((v) => v.length > 0)
+      .sort((a, b) => a.localeCompare(b))
+      .map((v) => ({ value: v, label: v }));
+  }, [allNodes]);
 
   // ReactFlow needs an explicit nudge when handles change (dynamic pins),
   // otherwise newly created edges can exist in state but fail to render.
@@ -226,6 +263,36 @@ export const BaseNode = memo(function BaseNode({
       updateNodeData(id, { pinDefaults: next });
     },
     [data.pinDefaults, id, updateNodeData]
+  );
+
+  const setVariableName = useCallback(
+    (raw: string | null | undefined) => {
+      if (!isVarNode) return;
+      const name = (raw || '').trim();
+
+      const prevDefaults = data.pinDefaults || {};
+      const nextDefaults: typeof prevDefaults = { ...prevDefaults };
+      if (!name) {
+        delete nextDefaults.name;
+      } else {
+        nextDefaults.name = name;
+      }
+
+      const baseLabel = data.nodeType === 'set_var' ? 'Set Variable' : 'Get Variable';
+      const prefix = data.nodeType === 'set_var' ? 'Set ' : 'Get ';
+
+      // Auto-label for readability, but don't stomp explicit user labels.
+      const prevLabel = data.label || baseLabel;
+      const shouldAuto =
+        prevLabel === baseLabel ||
+        prevLabel === (prefix + (typeof prevDefaults.name === 'string' ? prevDefaults.name.trim() : '')) ||
+        prevLabel.startsWith(prefix);
+
+      const nextLabel = shouldAuto && name ? `${prefix}${name}` : prevLabel;
+
+      updateNodeData(id, { pinDefaults: nextDefaults, label: nextLabel });
+    },
+    [data.label, data.nodeType, data.pinDefaults, id, isVarNode, updateNodeData]
   );
 
   const setEmitEventName = useCallback(
@@ -858,6 +925,37 @@ export const BaseNode = memo(function BaseNode({
                       onChange={(e) => setPinDefault('content', e.target.value)}
                     />
                   );
+                }
+
+                if (isVarNode && pin.id === 'name') {
+                  const raw = pinDefaults.name;
+                  const current = typeof raw === 'string' ? raw : '';
+                  const CREATE = '__af_create_var__';
+
+                  const options = [...variableOptions, { value: CREATE, label: 'Create new…' }];
+
+                  if (!connected) {
+                    controls.push(
+                      <AfSelect
+                        key="var-name"
+                        variant="pin"
+                        value={current}
+                        placeholder="Select…"
+                        options={options}
+                        searchable
+                        clearable
+                        minPopoverWidth={260}
+                        onChange={(v) => {
+                          if (v === CREATE) {
+                            const next = window.prompt('New variable name (dotted paths allowed):', '');
+                            if (typeof next === 'string' && next.trim()) setVariableName(next);
+                            return;
+                          }
+                          setVariableName(v || '');
+                        }}
+                      />
+                    );
+                  }
                 }
 
                 if (!connected && isPrimitive && !hasSpecialControl) {

@@ -7,7 +7,7 @@
       "id": "node-1",
       "type": "on_flow_start",
       "position": {
-        "x": -368.0,
+        "x": -400.0,
         "y": 112.0
       },
       "data": {
@@ -109,7 +109,7 @@
       "id": "node-3",
       "type": "concat",
       "position": {
-        "x": -64.0,
+        "x": -96.0,
         "y": 192.0
       },
       "data": {
@@ -160,7 +160,7 @@
       "type": "split",
       "position": {
         "x": 528.0,
-        "y": 288.0
+        "y": 304.0
       },
       "data": {
         "nodeType": "split",
@@ -201,7 +201,7 @@
       "type": "answer_user",
       "position": {
         "x": 528.0,
-        "y": 96.0
+        "y": 112.0
       },
       "data": {
         "nodeType": "answer_user",
@@ -243,8 +243,8 @@
       "id": "node-9",
       "type": "loop",
       "position": {
-        "x": 848.0,
-        "y": 96.0
+        "x": 864.0,
+        "y": 192.0
       },
       "data": {
         "nodeType": "loop",
@@ -296,8 +296,8 @@
       "id": "node-11",
       "type": "answer_user",
       "position": {
-        "x": 1120.0,
-        "y": 304.0
+        "x": 1136.0,
+        "y": 432.0
       },
       "data": {
         "nodeType": "answer_user",
@@ -342,8 +342,8 @@
       "id": "node-12",
       "type": "agent",
       "position": {
-        "x": 1120.0,
-        "y": -16.0
+        "x": 1536.0,
+        "y": -32.0
       },
       "data": {
         "nodeType": "agent",
@@ -417,7 +417,7 @@
           ]
         },
         "pinDefaults": {
-          "system": "You are an expert software engineer. "
+          "system": "You are an expert software engineer. Work on the CURRENT TASK and use the BACKGROUND INFORMATION to understand your current context"
         }
       },
       "label": null,
@@ -427,11 +427,453 @@
       "outputs": []
     },
     {
-      "id": "node-13",
+      "id": "node-14",
+      "type": "break_object",
+      "position": {
+        "x": 1824.0,
+        "y": 96.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "result",
+            "success"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-15",
+      "type": "if",
+      "position": {
+        "x": 2048.0,
+        "y": -32.0
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "If/Else",
+        "icon": "&#x2753;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-17",
+      "type": "answer_user",
+      "position": {
+        "x": 2384.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "message": "ALL DONE"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-19",
       "type": "concat",
       "position": {
-        "x": 848.0,
-        "y": -176.0
+        "x": 2096.0,
+        "y": 256.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          },
+          {
+            "id": "d",
+            "label": "d",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "a": "WARNING : step \"\"\"",
+          "c": "\"\"\" FAILED !\\n\\n"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-21",
+      "type": "get_var",
+      "position": {
+        "x": 1888.0,
+        "y": -432.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get scratchpad",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "scratchpad"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-22",
+      "type": "set_var",
+      "position": {
+        "x": 2384.0,
+        "y": -112.0
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Set scratchpad",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "scratchpad"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-25",
+      "type": "set_var",
+      "position": {
+        "x": 1136.0,
+        "y": -32.0
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Set scratchpad",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "scratchpad"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-26",
+      "type": "get_var",
+      "position": {
+        "x": 704.0,
+        "y": -272.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get scratchpad",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "scratchpad"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-27",
+      "type": "get_var",
+      "position": {
+        "x": 752.0,
+        "y": 608.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get scratchpad",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "scratchpad"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-28",
+      "type": "concat",
+      "position": {
+        "x": 896.0,
+        "y": 432.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "a": "FINAL SCRATCHPAD : "
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-29",
+      "type": "concat",
+      "position": {
+        "x": 1120.0,
+        "y": -304.0
       },
       "data": {
         "nodeType": "concat",
@@ -481,9 +923,9 @@
           "separator": " "
         },
         "pinDefaults": {
-          "a": "You have been asked to work on the following project : \\n\\nPROJECT : ",
-          "c": "\\n\\nYour current task is : ",
-          "e": "\\n\\nUse the tools at your disposal to accomplish this task. All files and folders must be written in : "
+          "a": "\\nTASK ",
+          "c": ": ",
+          "e": "\\nBACKGROUND INFORMATION : "
         }
       },
       "label": null,
@@ -493,22 +935,42 @@
       "outputs": []
     },
     {
-      "id": "node-14",
-      "type": "break_object",
+      "id": "node-30",
+      "type": "concat",
       "position": {
-        "x": 1408.0,
-        "y": 96.0
+        "x": 2032.0,
+        "y": -320.0
       },
       "data": {
-        "nodeType": "break_object",
-        "label": "Break Object",
-        "icon": "&#x1F9E9;",
-        "headerColor": "#3498DB",
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
         "inputs": [
           {
-            "id": "object",
-            "label": "object",
-            "type": "object"
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          },
+          {
+            "id": "d",
+            "label": "d",
+            "type": "string"
+          },
+          {
+            "id": "e",
+            "label": "e",
+            "type": "string"
           }
         ],
         "outputs": [
@@ -516,62 +978,16 @@
             "id": "result",
             "label": "result",
             "type": "string"
-          },
-          {
-            "id": "success",
-            "label": "success",
-            "type": "boolean"
           }
         ],
-        "breakConfig": {
-          "selectedPaths": [
-            "result",
-            "success"
-          ]
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "a": "\\n\\nTASK ",
+          "c": " COMPLETION : ",
+          "e": ""
         }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
-      "id": "node-15",
-      "type": "if",
-      "position": {
-        "x": 1632.0,
-        "y": -16.0
-      },
-      "data": {
-        "nodeType": "if",
-        "label": "If/Else",
-        "icon": "&#x2753;",
-        "headerColor": "#F39C12",
-        "inputs": [
-          {
-            "id": "exec-in",
-            "label": "",
-            "type": "execution"
-          },
-          {
-            "id": "condition",
-            "label": "condition",
-            "type": "boolean"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "true",
-            "label": "true",
-            "type": "execution"
-          },
-          {
-            "id": "false",
-            "label": "false",
-            "type": "execution"
-          }
-        ]
       },
       "label": null,
       "icon": null,
@@ -654,30 +1070,6 @@
       "animated": true
     },
     {
-      "id": "edge-1766973874172",
-      "source": "node-9",
-      "sourceHandle": "loop",
-      "target": "node-12",
-      "targetHandle": "exec-in",
-      "animated": true
-    },
-    {
-      "id": "edge-1766973936253",
-      "source": "node-1",
-      "sourceHandle": "query",
-      "target": "node-13",
-      "targetHandle": "b",
-      "animated": false
-    },
-    {
-      "id": "edge-1766973991051",
-      "source": "node-7",
-      "sourceHandle": "message",
-      "target": "node-13",
-      "targetHandle": "d",
-      "animated": false
-    },
-    {
       "id": "edge-1766974012125",
       "source": "node-12",
       "sourceHandle": "result",
@@ -702,23 +1094,151 @@
       "animated": false
     },
     {
-      "id": "edge-1766974078057",
-      "source": "node-13",
+      "id": "edge-1766977362744",
+      "source": "node-9",
+      "sourceHandle": "item",
+      "target": "node-19",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-1766977393762",
+      "source": "node-14",
       "sourceHandle": "result",
+      "target": "node-19",
+      "targetHandle": "d",
+      "animated": false
+    },
+    {
+      "id": "edge-1766977396377",
+      "source": "node-19",
+      "sourceHandle": "result",
+      "target": "node-17",
+      "targetHandle": "message",
+      "animated": false
+    },
+    {
+      "id": "edge-1766977398370",
+      "source": "node-15",
+      "sourceHandle": "false",
+      "target": "node-17",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1766980576341",
+      "source": "node-15",
+      "sourceHandle": "true",
+      "target": "node-22",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1766980731553",
+      "source": "node-9",
+      "sourceHandle": "loop",
+      "target": "node-25",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1766980734232",
+      "source": "node-25",
+      "sourceHandle": "exec-out",
+      "target": "node-12",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1766980765707",
+      "source": "node-27",
+      "sourceHandle": "value",
+      "target": "node-28",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-1766980767724",
+      "source": "node-28",
+      "sourceHandle": "result",
+      "target": "node-11",
+      "targetHandle": "message",
+      "animated": false
+    },
+    {
+      "id": "edge-1766980833750",
+      "source": "node-25",
+      "sourceHandle": "value",
       "target": "node-12",
       "targetHandle": "task",
       "animated": false
     },
     {
-      "id": "edge-1766974204452",
-      "source": "node-1",
-      "sourceHandle": "folder",
-      "target": "node-13",
+      "id": "edge-1766980990933",
+      "source": "node-29",
+      "sourceHandle": "result",
+      "target": "node-25",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-1766981315602",
+      "source": "node-9",
+      "sourceHandle": "index",
+      "target": "node-29",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-1766981325585",
+      "source": "node-9",
+      "sourceHandle": "item",
+      "target": "node-29",
+      "targetHandle": "d",
+      "animated": false
+    },
+    {
+      "id": "edge-1766981366517",
+      "source": "node-26",
+      "sourceHandle": "value",
+      "target": "node-29",
       "targetHandle": "f",
+      "animated": false
+    },
+    {
+      "id": "edge-1766981415843",
+      "source": "node-9",
+      "sourceHandle": "index",
+      "target": "node-30",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-1766981424795",
+      "source": "node-14",
+      "sourceHandle": "result",
+      "target": "node-30",
+      "targetHandle": "d",
+      "animated": false
+    },
+    {
+      "id": "edge-1766981483103",
+      "source": "node-21",
+      "sourceHandle": "value",
+      "target": "node-30",
+      "targetHandle": "e",
+      "animated": false
+    },
+    {
+      "id": "edge-1766981490077",
+      "source": "node-30",
+      "sourceHandle": "result",
+      "target": "node-22",
+      "targetHandle": "value",
       "animated": false
     }
   ],
   "entryNode": "node-1",
   "created_at": "2025-12-29T02:02:13.169414",
-  "updated_at": "2025-12-29T02:10:06.732898"
+  "updated_at": "2025-12-29T04:11:55.443629"
 }

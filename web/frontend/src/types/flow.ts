@@ -54,7 +54,9 @@ export type NodeType =
   // Control - if/loop/while have exec, logic gates are pure
   | 'if' | 'switch' | 'loop' | 'while' | 'sequence' | 'parallel' | 'compare' | 'not' | 'and' | 'or'
   // Data - Pure functions (no exec pins)
-  | 'get' | 'set' | 'merge' | 'array_map' | 'array_filter' | 'array_concat' | 'parse_json' | 'break_object' | 'system_datetime'
+  | 'get' | 'set' | 'merge' | 'array_map' | 'array_filter' | 'array_concat'
+  | 'get_var' | 'set_var'
+  | 'parse_json' | 'break_object' | 'system_datetime'
   | 'provider_catalog' | 'provider_models'
   // Backward-compat: deprecated
   | 'model_catalog'

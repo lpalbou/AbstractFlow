@@ -628,6 +628,14 @@ def _sync_effect_results_to_node_outputs(run: Any, flow: Flow) -> None:
     at the result_key. But visual flow data edges read from flow._node_outputs.
     This function syncs those results so data edges resolve correctly.
     """
+    # Attach a live reference to the current run vars so pure nodes (e.g. Get Variable)
+    # can read the up-to-date workflow state during data-edge resolution.
+    try:
+        if hasattr(run, "vars") and isinstance(run.vars, dict):
+            flow._run_vars = run.vars  # type: ignore[attr-defined]
+    except Exception:
+        pass
+
     node_outputs = flow._node_outputs
     temp_data = run.vars.get("_temp", {})
     if not isinstance(temp_data, dict):
@@ -1421,6 +1429,16 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
                 next_node=next_node,
                 input_key=getattr(flow_node, "input_key", None),
                 output_key=getattr(flow_node, "output_key", None),
+            )
+        elif visual_type == "set_var":
+            from .adapters.variable_adapter import create_set_var_node_handler
+
+            data_aware_handler = handler_obj if callable(handler_obj) else None
+            handlers[node_id] = create_set_var_node_handler(
+                node_id=node_id,
+                next_node=next_node,
+                data_aware_handler=data_aware_handler,
+                flow=flow,
             )
         elif callable(handler_obj):
             # Check if this is a visual flow handler (has closure access to node_outputs)

@@ -380,6 +380,35 @@ const DATA_NODES: NodeTemplate[] = [
   },
 ];
 
+// Variable nodes (Blueprint-style)
+const VARIABLE_NODES: NodeTemplate[] = [
+  {
+    type: 'get_var',
+    icon: '&#x1F4E5;', // Reuse "inbox tray" as a getter-ish icon
+    label: 'Get Variable',
+    headerColor: '#16A085', // Teal
+    inputs: [{ id: 'name', label: 'name', type: 'string' }],
+    outputs: [{ id: 'value', label: 'value', type: 'any' }],
+    category: 'variables',
+  },
+  {
+    type: 'set_var',
+    icon: '&#x1F4E4;', // Reuse "outbox tray" as a setter-ish icon
+    label: 'Set Variable',
+    headerColor: '#16A085',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'name', label: 'name', type: 'string' },
+      { id: 'value', label: 'value', type: 'any' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'value', label: 'value', type: 'any' },
+    ],
+    category: 'variables',
+  },
+];
+
 // Literal/Value nodes - Output constant values (no execution pins, no inputs)
 // Colors match the output type for visual consistency
 const LITERAL_NODES: NodeTemplate[] = [
@@ -548,6 +577,11 @@ export const NODE_CATEGORIES: Record<string, NodeCategory> = {
     label: 'Data',
     icon: '&#x1F4CA;', // Chart
     nodes: DATA_NODES,
+  },
+  variables: {
+    label: 'Variables',
+    icon: '&#x1F4E6;', // Package-ish
+    nodes: VARIABLE_NODES,
   },
   literals: {
     label: 'Literals',

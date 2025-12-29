@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `On Event` listeners are compiled into dedicated durable subworkflows and auto-started alongside the main run (session-scoped by default).
   - `Emit Event` node dispatches durable events via AbstractRuntime.
 - `Parse JSON` (`parse_json`) pure data node to convert JSON (or JSON-ish) strings into objects compatible with `Break Object`.
+- Blueprint-style workflow variables:
+  - `Get Variable` (`get_var`) reads a value from durable `run.vars` by dotted path.
+  - `Set Variable` (`set_var`) updates `run.vars` (pass-through, execution pins) to support scratchpads/stateful workflows.
 
 ### Planned
 - Visual workflow editor with drag-and-drop interface

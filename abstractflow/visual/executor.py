@@ -98,6 +98,8 @@ def create_visual_runner(
             "function",
             "code",
             "subflow",
+            # Workflow variables (execution setter)
+            "set_var",
             # Control exec
             "if",
             "switch",
@@ -112,6 +114,8 @@ def create_visual_runner(
             "wait_until",
             "wait_event",
             "emit_event",
+            "read_file",
+            "write_file",
             "memory_note",
             "memory_query",
         }
@@ -637,6 +641,7 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
     flow._node_outputs = {}  # type: ignore[attr-defined]
     flow._data_edge_map = data_edge_map  # type: ignore[attr-defined]
     flow._pure_node_ids = set()  # type: ignore[attr-defined]
+    flow._volatile_pure_node_ids = set()  # type: ignore[attr-defined]
 
     def _normalize_pin_defaults(raw: Any) -> Dict[str, Any]:
         if not isinstance(raw, dict):
@@ -691,9 +696,10 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
         return True
 
     evaluating: set[str] = set()
+    volatile_pure_node_ids: set[str] = getattr(flow, "_volatile_pure_node_ids", set())  # type: ignore[attr-defined]
 
     def _ensure_node_output(node_id: str) -> None:
-        if node_id in flow._node_outputs:  # type: ignore[attr-defined]
+        if node_id in flow._node_outputs and node_id not in volatile_pure_node_ids:  # type: ignore[attr-defined]
             return
 
         handler = pure_base_handlers.get(node_id)
@@ -1005,6 +1011,47 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
             for path in selected_paths:
                 out[path] = _get_path(src_obj, path)
             return out
+
+        return handler
+
+    def _get_by_path(value: Any, path: str) -> Any:
+        """Best-effort dotted-path lookup supporting dicts and numeric list indices."""
+        current = value
+        for part in path.split("."):
+            if current is None:
+                return None
+            if isinstance(current, dict):
+                current = current.get(part)
+                continue
+            if isinstance(current, list) and part.isdigit():
+                idx = int(part)
+                if idx < 0 or idx >= len(current):
+                    return None
+                current = current[idx]
+                continue
+            return None
+        return current
+
+    def _create_get_var_handler(_data: Dict[str, Any]):
+        # Pure node: reads from the current run vars (attached onto the Flow by the compiler).
+        # Mark as volatile so it is recomputed whenever requested (avoids stale cached reads).
+        def handler(input_data: Any) -> Dict[str, Any]:
+            payload = input_data if isinstance(input_data, dict) else {}
+            raw_name = payload.get("name")
+            name = (raw_name if isinstance(raw_name, str) else str(raw_name or "")).strip()
+            run_vars = getattr(flow, "_run_vars", None)  # type: ignore[attr-defined]
+            if not isinstance(run_vars, dict) or not name:
+                return {"value": None}
+            return {"value": _get_by_path(run_vars, name)}
+
+        return handler
+
+    def _create_set_var_handler(_data: Dict[str, Any]):
+        # Execution node: does not mutate run.vars here (handled by compiler adapter).
+        # This handler exists to participate in data-edge resolution and expose outputs.
+        def handler(input_data: Any) -> Dict[str, Any]:
+            payload = input_data if isinstance(input_data, dict) else {}
+            return {"name": payload.get("name"), "value": payload.get("value")}
 
         return handler
 
@@ -1597,6 +1644,12 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
     def _create_handler(node_type: NodeType, data: Dict[str, Any]) -> Any:
         type_str = node_type.value if isinstance(node_type, NodeType) else str(node_type)
 
+        if type_str == "get_var":
+            return _create_get_var_handler(data)
+
+        if type_str == "set_var":
+            return _create_set_var_handler(data)
+
         if type_str == "concat":
             return _create_concat_handler(data)
 
@@ -1679,6 +1732,8 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
         if not _has_execution_pins(type_str, node.data):
             pure_base_handlers[node.id] = base_handler
             pure_node_ids.add(node.id)
+            if type_str == "get_var":
+                volatile_pure_node_ids.add(node.id)
             continue
 
         # Ignore disconnected/unreachable execution nodes.
@@ -1692,6 +1747,7 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
             pin_defaults=pin_defaults_by_node_id.get(node.id),
             node_outputs=flow._node_outputs,  # type: ignore[attr-defined]
             ensure_node_output=_ensure_node_output,
+            volatile_node_ids=volatile_pure_node_ids,
         )
 
         input_key = node.data.get("inputKey")
@@ -1822,8 +1878,11 @@ def _create_data_aware_handler(
     node_outputs: Dict[str, Dict[str, Any]],
     *,
     ensure_node_output=None,
+    volatile_node_ids: Optional[set[str]] = None,
 ):
     """Wrap a handler to resolve data edge inputs before execution."""
+
+    volatile: set[str] = volatile_node_ids if isinstance(volatile_node_ids, set) else set()
 
     def wrapped_handler(input_data):
         resolved_input: Dict[str, Any] = {}
@@ -1832,7 +1891,7 @@ def _create_data_aware_handler(
             resolved_input.update(input_data)
 
         for target_pin, (source_node, source_pin) in data_edges.items():
-            if ensure_node_output is not None and source_node not in node_outputs:
+            if ensure_node_output is not None and (source_node not in node_outputs or source_node in volatile):
                 ensure_node_output(source_node)
             if source_node in node_outputs:
                 source_output = node_outputs[source_node]
