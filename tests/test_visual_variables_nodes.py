@@ -172,3 +172,4 @@ def test_set_var_rejects_reserved_names() -> None:
     assert "reserved" in str(result.get("error", "")).lower() or "reserved" in str(result.get("result", "")).lower()
 
 
+
