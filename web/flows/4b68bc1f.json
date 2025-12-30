@@ -96,7 +96,7 @@
           "model": "qwen/qwen3-next-80b"
         },
         "pinDefaults": {
-          "system": "You are an expert software architect and you design clean, concise and structured plan to resolve a user request"
+          "system": "You are an expert software architect and you design clean, concise and structured plan to resolve requests"
         }
       },
       "label": null,
@@ -145,8 +145,8 @@
           "separator": " "
         },
         "pinDefaults": {
-          "a": "Below is a user request, think about the intent and of the best SOTA practices to accomplish that request with high quality and confidence :\\n\\n",
-          "c": "\\n\\nOnly output an array of strings, where each string is the task required to resolve the user request. the task must be composed of a name, a description and 1+ success criteria to evaluate the task was properly executed. Do not write any comment, only output that array of strings as a concatenation of string1@@string2@@string3"
+          "a": "Below is a user request, think carefully about the intent and of the best SOTA practices to resolve that request with creative critical thinking and constructive skepticism to achieve the highest possible quality :\\n\\n",
+          "c": "\\n\\nCreate a structured plan as a series of self-contained task, each enabling to resolve the request step by step (task by task). Each task should have a name, a clear and concise description and success criteria. Output this series of task as an array of strings separated by @@, eg : task1@@task2@@task3. Do not write any comment, only output that array of strings"
         }
       },
       "label": null,
@@ -417,7 +417,7 @@
           ]
         },
         "pinDefaults": {
-          "system": "You are an expert software engineer. Work on the CURRENT TASK and use the BACKGROUND INFORMATION to understand your current context"
+          "system": ""
         }
       },
       "label": null,
@@ -753,42 +753,6 @@
       "outputs": []
     },
     {
-      "id": "node-26",
-      "type": "get_var",
-      "position": {
-        "x": 704.0,
-        "y": -272.0
-      },
-      "data": {
-        "nodeType": "get_var",
-        "label": "Get scratchpad",
-        "icon": "&#x1F4E5;",
-        "headerColor": "#16A085",
-        "inputs": [
-          {
-            "id": "name",
-            "label": "name",
-            "type": "string"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "value",
-            "label": "value",
-            "type": "any"
-          }
-        ],
-        "pinDefaults": {
-          "name": "scratchpad"
-        }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
       "id": "node-27",
       "type": "get_var",
       "position": {
@@ -872,7 +836,7 @@
       "id": "node-29",
       "type": "concat",
       "position": {
-        "x": 1120.0,
+        "x": 1136.0,
         "y": -304.0
       },
       "data": {
@@ -987,6 +951,133 @@
           "a": "\\n\\nTASK ",
           "c": " COMPLETION : ",
           "e": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-31",
+      "type": "get_var",
+      "position": {
+        "x": 704.0,
+        "y": -304.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get scratchpad",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "scratchpad"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-32",
+      "type": "get_var",
+      "position": {
+        "x": 1136.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get scratchpad",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "scratchpad"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-33",
+      "type": "concat",
+      "position": {
+        "x": 1536.0,
+        "y": -256.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          },
+          {
+            "id": "d",
+            "label": "d",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "a": "You are an expert software engineer. Work on the CURRENT TASK and use the BACKGROUND INFORMATION to understand your current context. The base directory of this project is : ",
+          "c": "\\nCRITICAL : only write project files in "
         }
       },
       "label": null,
@@ -1166,43 +1257,11 @@
       "animated": false
     },
     {
-      "id": "edge-1766980833750",
-      "source": "node-25",
-      "sourceHandle": "value",
-      "target": "node-12",
-      "targetHandle": "task",
-      "animated": false
-    },
-    {
       "id": "edge-1766980990933",
       "source": "node-29",
       "sourceHandle": "result",
       "target": "node-25",
       "targetHandle": "value",
-      "animated": false
-    },
-    {
-      "id": "edge-1766981315602",
-      "source": "node-9",
-      "sourceHandle": "index",
-      "target": "node-29",
-      "targetHandle": "b",
-      "animated": false
-    },
-    {
-      "id": "edge-1766981325585",
-      "source": "node-9",
-      "sourceHandle": "item",
-      "target": "node-29",
-      "targetHandle": "d",
-      "animated": false
-    },
-    {
-      "id": "edge-1766981366517",
-      "source": "node-26",
-      "sourceHandle": "value",
-      "target": "node-29",
-      "targetHandle": "f",
       "animated": false
     },
     {
@@ -1236,9 +1295,65 @@
       "target": "node-22",
       "targetHandle": "value",
       "animated": false
+    },
+    {
+      "id": "edge-1767063299592",
+      "source": "node-31",
+      "sourceHandle": "value",
+      "target": "node-29",
+      "targetHandle": "f",
+      "animated": false
+    },
+    {
+      "id": "edge-1767063707256",
+      "source": "node-9",
+      "sourceHandle": "index",
+      "target": "node-29",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-1767063713388",
+      "source": "node-9",
+      "sourceHandle": "item",
+      "target": "node-29",
+      "targetHandle": "d",
+      "animated": false
+    },
+    {
+      "id": "edge-1767079837056",
+      "source": "node-32",
+      "sourceHandle": "value",
+      "target": "node-12",
+      "targetHandle": "task",
+      "animated": false
+    },
+    {
+      "id": "edge-1767082003128",
+      "source": "node-33",
+      "sourceHandle": "result",
+      "target": "node-12",
+      "targetHandle": "system",
+      "animated": false
+    },
+    {
+      "id": "edge-1767082042484",
+      "source": "node-1",
+      "sourceHandle": "folder",
+      "target": "node-33",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-1767082070684",
+      "source": "node-1",
+      "sourceHandle": "folder",
+      "target": "node-33",
+      "targetHandle": "d",
+      "animated": false
     }
   ],
   "entryNode": "node-1",
   "created_at": "2025-12-29T02:02:13.169414",
-  "updated_at": "2025-12-29T05:56:54.724423"
+  "updated_at": "2025-12-30T08:08:01.212458"
 }

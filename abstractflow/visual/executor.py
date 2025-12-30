@@ -10,6 +10,7 @@ hosts (AbstractCode, CLI) without importing the web backend implementation.
 
 from __future__ import annotations
 
+import os
 from typing import Any, Dict, List, Optional
 
 from ..core.flow import Flow
@@ -393,9 +394,39 @@ def create_visual_runner(
             except Exception:
                 effective_tool_executor = None
 
+        # Web-host safety: avoid infinite hangs when a local model/provider stalls.
+        #
+        # AbstractCore defaults to `timeout=None` (unlimited) for provider HTTP requests.
+        # That is reasonable for some CLI use-cases, but in a visual workflow host it can
+        # permanently block a run (and make pause/cancel feel broken).
+        #
+        # This default can be overridden globally via env:
+        # - ABSTRACTFLOW_LLM_TIMEOUT_S (float seconds)
+        # - ABSTRACTFLOW_LLM_TIMEOUT (alias)
+        #
+        # Set to 0 or a negative value to opt back into "unlimited".
+        llm_kwargs: Dict[str, Any] = {}
+        timeout_raw = os.getenv("ABSTRACTFLOW_LLM_TIMEOUT_S") or os.getenv("ABSTRACTFLOW_LLM_TIMEOUT")
+        timeout_s: Optional[float]
+        if timeout_raw is None or not str(timeout_raw).strip():
+            timeout_s = 300.0
+        else:
+            raw = str(timeout_raw).strip().lower()
+            if raw in {"none", "null", "inf", "infinite", "unlimited"}:
+                timeout_s = None
+            else:
+                try:
+                    timeout_s = float(raw)
+                except Exception:
+                    timeout_s = 300.0
+        if isinstance(timeout_s, (int, float)) and timeout_s <= 0:
+            timeout_s = None
+        llm_kwargs["timeout"] = timeout_s
+
         runtime = create_local_runtime(
             provider=provider,
             model=model,
+            llm_kwargs=llm_kwargs,
             tool_executor=effective_tool_executor,
             run_store=run_store,
             ledger_store=ledger_store,

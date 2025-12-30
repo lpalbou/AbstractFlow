@@ -136,7 +136,12 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
       setConnected(false);
     }
 
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+    // Avoid spawning multiple concurrent sockets for the same flow.
+    if (
+      wsRef.current?.readyState === WebSocket.OPEN ||
+      wsRef.current?.readyState === WebSocket.CONNECTING
+    )
+      return;
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/api/ws/${flowId}`;
@@ -198,6 +203,31 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
     }
   }, []);
 
+  // Best-effort send that reconnects if needed (used by run controls).
+  // This makes Pause/Cancel resilient to transient WS disconnects.
+  const sendWithReconnect = useCallback(
+    (message: object) => {
+      const maxTries = 50; // ~5s with 100ms backoff
+      const delayMs = 100;
+
+      const trySend = (triesLeft: number) => {
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          send(message);
+          return;
+        }
+        if (triesLeft <= 0) {
+          setError('WebSocket is not connected (failed to send control message)');
+          return;
+        }
+        connect();
+        setTimeout(() => trySend(triesLeft - 1), delayMs);
+      };
+
+      trySend(maxTries);
+    },
+    [connect, send]
+  );
+
   // Run the flow via WebSocket
   const runFlow = useCallback(
     (inputData: Record<string, unknown> = {}) => {
@@ -228,22 +258,30 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
   );
 
   const pauseRun = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN && runId) {
-      send({ type: 'control', action: 'pause', run_id: runId });
-    }
-  }, [send, runId]);
+    if (!runId) return;
+    sendWithReconnect({ type: 'control', action: 'pause', run_id: runId });
+  }, [sendWithReconnect, runId]);
 
   const resumeRun = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN && runId) {
-      send({ type: 'control', action: 'resume', run_id: runId });
-    }
-  }, [send, runId]);
+    if (!runId) return;
+    sendWithReconnect({ type: 'control', action: 'resume', run_id: runId });
+  }, [sendWithReconnect, runId]);
 
   const cancelRun = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN && runId) {
-      send({ type: 'control', action: 'cancel', run_id: runId });
-    }
-  }, [send, runId]);
+    if (!runId) return;
+    sendWithReconnect({ type: 'control', action: 'cancel', run_id: runId });
+  }, [sendWithReconnect, runId]);
+
+  // Keepalive ping to reduce idle WS disconnects during long-running nodes (LLM/Agent).
+  useEffect(() => {
+    if (!connected) return;
+    const interval = setInterval(() => {
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        send({ type: 'ping' });
+      }
+    }, 20_000);
+    return () => clearInterval(interval);
+  }, [connected, send]);
 
   // Cleanup on unmount
   useEffect(() => {

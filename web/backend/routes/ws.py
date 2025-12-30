@@ -195,10 +195,15 @@ async def websocket_execution(websocket: WebSocket, flow_id: str):
                 _active_tasks[connection_id] = task
             elif message.get("type") == "control":
                 action = str(message.get("action") or "").strip().lower()
+                # Optional: allow the client to target a specific persisted run id.
+                # This makes controls resilient to transient WS disconnects / UI reloads
+                # (a new connection can still pause/cancel a previously started run).
+                run_id = message.get("run_id") or message.get("runId")
                 await control_run(
                     websocket=websocket,
                     connection_id=connection_id,
                     action=action,
+                    run_id=str(run_id) if isinstance(run_id, str) and run_id.strip() else None,
                 )
             elif message.get("type") == "ping":
                 await websocket.send_json({"type": "pong"})
@@ -263,6 +268,10 @@ async def execute_with_updates(
             await gate.wait()
         await _execute_runner_loop(websocket, runner, connection_id)
 
+    except asyncio.CancelledError:
+        # Cancellation is an expected control-plane operation (Cancel Run / disconnect).
+        # Do not emit `flow_error` for it; the UI will receive `flow_cancelled`.
+        return
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -282,22 +291,46 @@ async def control_run(
     websocket: WebSocket,
     connection_id: str,
     action: str,
+    run_id: Optional[str] = None,
 ) -> None:
     """Handle control operations (pause/resume/cancel) for the current run."""
+    # Prefer an explicit run id from the client, fall back to the active connection run.
     runner = _active_runners.get(connection_id) or _waiting_runners.get(connection_id)
-    run_id = _active_run_ids.get(connection_id) or getattr(runner, "run_id", None)
+    run_id_target = run_id
+    if not isinstance(run_id_target, str) or not run_id_target.strip():
+        run_id_target = _active_run_ids.get(connection_id) or getattr(runner, "run_id", None)
 
-    if not isinstance(run_id, str) or not run_id:
-        await websocket.send_json(ExecutionEvent(type="flow_error", error="No active run to control").model_dump())
+    if not isinstance(run_id_target, str) or not run_id_target.strip():
+        await websocket.send_json(ExecutionEvent(type="flow_error", error="No run_id provided to control").model_dump())
         return
+    run_id_target = run_id_target.strip()
 
+    # Use the runner's runtime when available, otherwise create a minimal runtime over the same stores.
     runtime = getattr(runner, "runtime", None) if runner is not None else None
     if runtime is None:
-        await websocket.send_json(ExecutionEvent(type="flow_error", error="Runner has no runtime").model_dump())
-        return
+        try:
+            run_store, ledger_store, artifact_store = get_runtime_stores()
+            try:
+                from abstractruntime import Runtime  # type: ignore
+            except Exception:  # pragma: no cover
+                from abstractruntime.core.runtime import Runtime  # type: ignore
+            runtime = Runtime(run_store=run_store, ledger_store=ledger_store, artifact_store=artifact_store)
+        except Exception as e:
+            await websocket.send_json(
+                ExecutionEvent(type="flow_error", error=f"Failed to create runtime for control: {e}").model_dump()
+            )
+            return
 
     gate = _control_gates.get(connection_id)
-    lock = _connection_locks.get(connection_id)
+    # IMPORTANT:
+    # Do NOT block on the per-connection lock here. The execution loop may hold it
+    # across a long-running `runner.step()` (e.g. a local LLM HTTP call). If we wait
+    # for the lock, pause/cancel/resume become unresponsive in exactly the scenarios
+    # users need them most.
+    #
+    # Runtime durability is protected by:
+    # - atomic RunStore writes (JsonFileRunStore.save)
+    # - Runtime.tick() honoring externally persisted pause/cancel before saving
 
     action2 = str(action or "").strip().lower()
     if action2 not in {"pause", "resume", "cancel"}:
@@ -306,7 +339,7 @@ async def control_run(
         )
         return
 
-    run_ids = _list_descendant_run_ids(runtime, run_id)
+    run_ids = _list_descendant_run_ids(runtime, run_id_target)
 
     def _apply(fn_name: str, *, reason: Optional[str] = None) -> None:
         fn = getattr(runtime, fn_name, None)
@@ -322,33 +355,23 @@ async def control_run(
         if action2 == "pause":
             if gate is not None:
                 gate.clear()
-            if lock is not None:
-                async with lock:
-                    await asyncio.to_thread(_apply, "pause_run", reason="Paused via AbstractFlow UI")
-            else:
-                await asyncio.to_thread(_apply, "pause_run", reason="Paused via AbstractFlow UI")
-            await websocket.send_json({"type": "flow_paused", "runId": run_id})
+            # Apply synchronously: pause/cancel must remain responsive even if the threadpool
+            # is saturated by long-running `runner.step()` calls.
+            _apply("pause_run", reason="Paused via AbstractFlow UI")
+            await websocket.send_json({"type": "flow_paused", "runId": run_id_target})
             return
 
         if action2 == "resume":
-            if lock is not None:
-                async with lock:
-                    await asyncio.to_thread(_apply, "resume_run")
-            else:
-                await asyncio.to_thread(_apply, "resume_run")
+            _apply("resume_run")
             if gate is not None:
                 gate.set()
-            await websocket.send_json({"type": "flow_resumed", "runId": run_id})
+            await websocket.send_json({"type": "flow_resumed", "runId": run_id_target})
             return
 
         # cancel
         if gate is not None:
             gate.set()
-        if lock is not None:
-            async with lock:
-                await asyncio.to_thread(_apply, "cancel_run", reason="Cancelled via AbstractFlow UI")
-        else:
-            await asyncio.to_thread(_apply, "cancel_run", reason="Cancelled via AbstractFlow UI")
+        _apply("cancel_run", reason="Cancelled via AbstractFlow UI")
 
         # Stop any in-flight execution loop promptly.
         task = _active_tasks.get(connection_id)
@@ -358,7 +381,7 @@ async def control_run(
         _waiting_runners.pop(connection_id, None)
         _waiting_steps.pop(connection_id, None)
 
-        await websocket.send_json({"type": "flow_cancelled", "runId": run_id})
+        await websocket.send_json({"type": "flow_cancelled", "runId": run_id_target})
     except Exception as e:
         await websocket.send_json(
             ExecutionEvent(type="flow_error", error=f"Control action failed: {e}").model_dump()

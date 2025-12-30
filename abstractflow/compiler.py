@@ -295,6 +295,22 @@ def _create_visual_agent_effect_handler(
         bucket = _get_agent_bucket(run)
         phase = str(bucket.get("phase") or "init")
 
+        # IMPORTANT: This visual Agent node can be executed multiple times within a single run
+        # (e.g. inside a Loop/While/Sequence). The per-node bucket is durable and would otherwise
+        # keep `phase="done"` and `resolved_inputs` from the first invocation, causing subsequent
+        # invocations to skip work and reuse stale inputs/results.
+        #
+        # When we re-enter the node after it previously completed, reset the bucket to start a
+        # fresh subworkflow invocation with the current upstream inputs.
+        if phase == "done":
+            try:
+                bucket.clear()
+            except Exception:
+                # Best-effort; if clear fails, overwrite key fields below.
+                pass
+            phase = "init"
+            bucket["phase"] = "init"
+
         resolved_inputs = bucket.get("resolved_inputs")
         if not isinstance(resolved_inputs, dict) or phase == "init":
             resolved_inputs = _resolve_inputs(run)
@@ -1157,6 +1173,15 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
             spec = control_specs.get(node_id) or {}
             loop_data_handler = handler_obj if callable(handler_obj) else None
 
+            # Precompute upstream pure-node ids for cache invalidation (best-effort).
+            #
+            # Pure nodes (e.g. concat/split/break_object) are cached in `flow._node_outputs`.
+            # Inside a Loop, the inputs to those pure nodes often change per-iteration
+            # (index/item, evolving scratchpad vars, etc.). If we don't invalidate, the
+            # loop body may reuse stale values from iteration 0.
+            pure_ids = getattr(flow, "_pure_node_ids", None) if flow is not None else None
+            pure_ids = set(pure_ids) if isinstance(pure_ids, (set, list, tuple)) else set()
+
             def _resolve_items(
                 run: Any,
                 _handler: Any = loop_data_handler,
@@ -1188,12 +1213,30 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
                     return []
                 return [raw]
 
-            handlers[node_id] = create_loop_node_handler(
+            base_loop = create_loop_node_handler(
                 node_id=node_id,
                 loop_target=spec.get("loop_target"),
                 done_target=spec.get("done_target"),
                 resolve_items=_resolve_items,
             )
+
+            def _wrapped_loop(
+                run: Any,
+                ctx: Any,
+                *,
+                _base: Any = base_loop,
+                _pure_ids: set[str] = pure_ids,
+            ) -> StepPlan:
+                # Ensure pure nodes feeding the loop body are re-evaluated per iteration.
+                if flow is not None and _pure_ids and hasattr(flow, "_node_outputs") and hasattr(flow, "_data_edge_map"):
+                    _sync_effect_results_to_node_outputs(run, flow)
+                    node_outputs = getattr(flow, "_node_outputs", None)
+                    if isinstance(node_outputs, dict):
+                        for nid in _pure_ids:
+                            node_outputs.pop(nid, None)
+                return _base(run, ctx)
+
+            handlers[node_id] = _wrapped_loop
         elif effect_type == "agent":
             data_aware_handler = handler_obj if callable(handler_obj) else None
             handlers[node_id] = _create_visual_agent_effect_handler(
