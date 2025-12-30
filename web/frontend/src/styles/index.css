@@ -582,6 +582,176 @@ button.primary:hover:not(:disabled) {
   margin-bottom: 16px;
 }
 
+.run-modal-header-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.run-minimize-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--bg-tertiary);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.05s;
+}
+
+.run-minimize-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: var(--text-primary);
+}
+
+.run-minimize-btn:active {
+  transform: translateY(1px);
+}
+
+.run-minibar {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(18, 22, 40, 0.92);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  padding: 10px;
+}
+
+.run-minibar-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 10px;
+}
+
+.run-minibar-main:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.run-minibar-title {
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 0.2px;
+  color: var(--text-primary);
+}
+
+.run-minibar-status {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.04);
+  white-space: nowrap;
+}
+
+.run-minibar-status.running {
+  border-color: rgba(52, 152, 219, 0.35);
+  background: rgba(52, 152, 219, 0.12);
+  color: rgba(200, 232, 255, 0.95);
+}
+
+.run-minibar-status.waiting {
+  border-color: rgba(241, 196, 15, 0.35);
+  background: rgba(241, 196, 15, 0.12);
+  color: rgba(255, 245, 200, 0.95);
+}
+
+.run-minibar-status.paused {
+  border-color: rgba(155, 89, 182, 0.35);
+  background: rgba(155, 89, 182, 0.12);
+  color: rgba(238, 220, 250, 0.95);
+}
+
+.run-minibar-status.success {
+  border-color: rgba(39, 174, 96, 0.35);
+  background: rgba(39, 174, 96, 0.12);
+  color: rgba(210, 250, 225, 0.95);
+}
+
+.run-minibar-status.failed {
+  border-color: rgba(231, 76, 60, 0.35);
+  background: rgba(231, 76, 60, 0.12);
+  color: rgba(255, 220, 220, 0.95);
+}
+
+.run-minibar-step {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.run-minibar-flow {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.run-minibar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.run-minibar-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.05s;
+}
+
+.run-minibar-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.run-minibar-btn:active {
+  transform: translateY(1px);
+}
+
+.run-minibar-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.run-minibar-btn.danger {
+  border-color: rgba(231, 76, 60, 0.35);
+  background: rgba(231, 76, 60, 0.10);
+}
+
+.run-minibar-btn.danger:hover {
+  background: rgba(231, 76, 60, 0.16);
+}
+
 .run-modal-header h3 {
   margin: 0;
 }
@@ -891,6 +1061,26 @@ button.primary:hover:not(:disabled) {
   color: var(--text-secondary);
 }
 
+.agent-trace-subrun {
+  margin-left: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.agent-trace-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.run-metric-badge.metric-tool {
+  border-color: rgba(52, 152, 219, 0.35);
+  background: rgba(52, 152, 219, 0.10);
+  color: rgba(200, 232, 255, 0.95);
+}
+
 .agent-trace-empty {
   padding: 10px 0 0;
   font-size: 12px;
@@ -1139,6 +1329,7 @@ button.primary:hover:not(:disabled) {
   white-space: normal;
   word-break: break-word;
   display: -webkit-box;
+  line-clamp: 2;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
@@ -1151,6 +1342,7 @@ button.primary:hover:not(:disabled) {
   white-space: normal;
   word-break: break-word;
   display: -webkit-box;
+  line-clamp: 2;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;

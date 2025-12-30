@@ -73,6 +73,7 @@ export function Toolbar() {
   const [showLoadModal, setShowLoadModal] = useState(false);
   const [runResult, setRunResult] = useState<FlowRunResult | null>(null);
   const [executionEvents, setExecutionEvents] = useState<ExecutionEvent[]>([]);
+  const [traceEvents, setTraceEvents] = useState<ExecutionEvent[]>([]);
 
   // Query for listing saved flows
   const flowsQuery = useQuery({
@@ -117,6 +118,11 @@ export function Toolbar() {
       if (event.type === 'flow_start') {
         setRunResult(null);
         setExecutionEvents([event]);
+        setTraceEvents([]);
+        return;
+      }
+      if (event.type === 'trace_update') {
+        setTraceEvents((prev) => [...prev, event]);
         return;
       }
       setExecutionEvents((prev) => [...prev, event]);
@@ -200,6 +206,7 @@ export function Toolbar() {
     setIsRunning(true);
     setRunResult(null);
     setExecutionEvents([]);
+    setTraceEvents([]);
     runFlow(inputData);
   }, [flowId, runFlow, setIsRunning]);
 
@@ -209,6 +216,7 @@ export function Toolbar() {
       setShowRunModal(false);
       setRunResult(null);
       setExecutionEvents([]);
+      setTraceEvents([]);
     }
   }, [isRunning]);
 
@@ -216,6 +224,7 @@ export function Toolbar() {
     if (isRunning) return;
     setRunResult(null);
     setExecutionEvents([]);
+    setTraceEvents([]);
   }, [isRunning]);
 
   // Handle export
@@ -363,6 +372,7 @@ export function Toolbar() {
         isPaused={isPaused}
         result={runResult}
         events={executionEvents}
+        traceEvents={traceEvents}
         isWaiting={isWaiting}
         waitingInfo={waitingInfo}
         onResume={resumeFlow}

@@ -348,6 +348,13 @@
   animation: dash 0.5s linear infinite;
 }
 
+/* Execution highlighting (runtime): pulse the currently active exec edges */
+.react-flow__edge.exec-active .react-flow__edge-path {
+  stroke: var(--success);
+  stroke-width: 3;
+  filter: drop-shadow(0 0 6px rgba(39, 174, 96, 0.55));
+}
+
 @keyframes dash {
   to {
     stroke-dashoffset: -10;

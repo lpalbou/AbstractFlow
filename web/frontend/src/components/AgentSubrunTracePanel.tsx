@@ -18,6 +18,7 @@ type TraceItem = {
 interface AgentSubrunTracePanelProps {
   rootRunId: string | null;
   events: ExecutionEvent[];
+  subRunId?: string | null;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -64,6 +65,56 @@ function resultOf(step: TraceStep): Record<string, unknown> | null {
   const r = step.result;
   if (!r || typeof r !== 'object') return null;
   return r as Record<string, unknown>;
+}
+
+function asNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+function tokenBadgesForStep(step: TraceStep): Array<{ label: string; value: number }> {
+  const t = effectTypeOf(step);
+  if (t !== 'llm_call') return [];
+
+  const res = resultOf(step);
+  const raw = asRecord(res?.raw);
+  const usage = asRecord(res?.usage) || asRecord(raw?.usage) || asRecord(raw?.usage_metadata);
+
+  const inTokens = asNumber(usage?.input_tokens) ?? asNumber(usage?.prompt_tokens) ?? asNumber(res?.input_tokens) ?? asNumber(res?.prompt_tokens);
+  const outTokens =
+    asNumber(usage?.output_tokens) ?? asNumber(usage?.completion_tokens) ?? asNumber(res?.output_tokens) ?? asNumber(res?.completion_tokens);
+  const totalTokens = asNumber(usage?.total_tokens) ?? asNumber(res?.total_tokens);
+
+  const out: Array<{ label: string; value: number }> = [];
+  if (inTokens != null) out.push({ label: 'in', value: inTokens });
+  if (outTokens != null) out.push({ label: 'out', value: outTokens });
+  if (totalTokens != null) out.push({ label: 'total', value: totalTokens });
+  return out;
+}
+
+function toolNamesForStep(step: TraceStep): string[] {
+  const t = effectTypeOf(step);
+  if (t !== 'tool_calls') return [];
+  const payload = payloadOf(step);
+  const candidates =
+    (Array.isArray(payload?.tool_calls) ? payload?.tool_calls : null) ||
+    (Array.isArray(payload?.tool_calls_raw) ? payload?.tool_calls_raw : null) ||
+    (Array.isArray(payload?.calls) ? payload?.calls : null) ||
+    null;
+  if (!candidates) return [];
+
+  const names: string[] = [];
+  for (const c of candidates) {
+    const co = asRecord(c);
+    const name = co && typeof co.name === 'string' ? co.name.trim() : '';
+    if (name) names.push(name);
+  }
+
+  return Array.from(new Set(names));
 }
 
 function errorTextOf(step: TraceStep): string {
@@ -236,7 +287,7 @@ function PanelBody({ item }: { item: TraceItem }) {
   );
 }
 
-export function AgentSubrunTracePanel({ rootRunId, events }: AgentSubrunTracePanelProps) {
+export function AgentSubrunTracePanel({ rootRunId, events, subRunId }: AgentSubrunTracePanelProps) {
   const items = useMemo<TraceItem[]>(() => {
     if (!rootRunId) return [];
     const out: TraceItem[] = [];
@@ -245,6 +296,7 @@ export function AgentSubrunTracePanel({ rootRunId, events }: AgentSubrunTracePan
       const ev = events[i];
       if (ev.type !== 'trace_update') continue;
       if (!ev.runId || ev.runId === rootRunId) continue;
+      if (subRunId && ev.runId !== subRunId) continue;
       const nodeId = ev.nodeId;
       if (!nodeId) continue;
       const steps = Array.isArray(ev.steps) ? ev.steps : [];
@@ -282,7 +334,10 @@ export function AgentSubrunTracePanel({ rootRunId, events }: AgentSubrunTracePan
     <div className="agent-trace-panel">
       <div className="agent-trace-header">
         <div className="agent-trace-title">Agent calls</div>
-        <div className="agent-trace-subtitle">Live per-effect trace (LLM/tool calls).</div>
+        <div className="agent-trace-subtitle">
+          Live per-effect trace (LLM/tool calls).
+          {subRunId ? <span className="agent-trace-subrun"> sub_run_id: {subRunId}</span> : null}
+        </div>
       </div>
 
       {items.length === 0 ? (
@@ -294,11 +349,34 @@ export function AgentSubrunTracePanel({ rootRunId, events }: AgentSubrunTracePan
             const statusLabel = statusRaw === 'completed' ? 'OK' : statusRaw === 'failed' ? 'FAILED' : statusRaw === 'waiting' ? 'WAITING' : statusRaw.toUpperCase();
             const title = titleForStep(item.step);
             const preview = previewForStep(item.step);
+            const tokenBadges = tokenBadgesForStep(item.step);
+            const toolNames = toolNamesForStep(item.step);
             return (
               <details key={item.id} className={`agent-trace-entry ${statusRaw}`} open={false}>
                 <summary className="agent-trace-summary">
                   <span className={`agent-trace-status ${statusRaw}`}>{statusLabel}</span>
                   <span className="agent-trace-kind">{title}</span>
+                  {tokenBadges.length ? (
+                    <span className="agent-trace-badges">
+                      {tokenBadges.map((b) => (
+                        <span key={b.label} className="run-metric-badge metric-tokens">
+                          {b.label}: {b.value}
+                        </span>
+                      ))}
+                    </span>
+                  ) : null}
+                  {toolNames.length ? (
+                    <span className="agent-trace-badges">
+                      {toolNames.slice(0, 6).map((n) => (
+                        <span key={n} className="run-metric-badge metric-tool">
+                          {n}
+                        </span>
+                      ))}
+                      {toolNames.length > 6 ? (
+                        <span className="run-metric-badge metric-tool">+{toolNames.length - 6}</span>
+                      ) : null}
+                    </span>
+                  ) : null}
                   <span className="agent-trace-node">{item.nodeId}</span>
                   <span className="agent-trace-run">{item.runId}</span>
                 </summary>

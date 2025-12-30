@@ -22,6 +22,7 @@ interface RunFlowModalProps {
   isPaused?: boolean;
   result: FlowRunResult | null;
   events?: ExecutionEvent[];
+  traceEvents?: ExecutionEvent[];
   isWaiting?: boolean;
   waitingInfo?: WaitingInfo | null;
   onResume?: (response: string) => void;
@@ -71,6 +72,7 @@ export function RunFlowModal({
   isPaused = false,
   result,
   events = [],
+  traceEvents = [],
   isWaiting = false,
   waitingInfo = null,
   onResume,
@@ -106,6 +108,12 @@ export function RunFlowModal({
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [resumeDraft, setResumeDraft] = useState('');
+  const [isMinimized, setIsMinimized] = useState(false);
+
+  // When the modal is opened, start expanded (predictable UX).
+  useEffect(() => {
+    if (isOpen) setIsMinimized(false);
+  }, [isOpen]);
 
   // Initialize form values when modal opens
   useEffect(() => {
@@ -522,6 +530,36 @@ export function RunFlowModal({
 
   const selectedStep = useMemo(() => steps.find((s) => s.id === selectedStepId) || null, [steps, selectedStepId]);
 
+  const selectedAgentSubRunId = useMemo(() => {
+    if (!selectedStep || selectedStep.nodeType !== 'agent') return null;
+    const out = selectedStep.output;
+    if (out && typeof out === 'object') {
+      const o = out as Record<string, unknown>;
+      const pick = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+      const direct = pick(o.sub_run_id);
+      if (direct) return direct;
+      const scratchpad = o.scratchpad;
+      if (scratchpad && typeof scratchpad === 'object') {
+        const sp = scratchpad as Record<string, unknown>;
+        const sr = pick(sp.sub_run_id);
+        if (sr) return sr;
+      }
+      const resultObj = o.result;
+      if (resultObj && typeof resultObj === 'object') {
+        const ro = resultObj as Record<string, unknown>;
+        const sr = pick(ro.sub_run_id);
+        if (sr) return sr;
+      }
+    }
+    // Running agents don't have final output yet. Best-effort: use the latest sub-run trace_update runId.
+    for (let i = traceEvents.length - 1; i >= 0; i--) {
+      const ev = traceEvents[i];
+      if (ev.type !== 'trace_update') continue;
+      if (typeof ev.runId === 'string' && ev.runId.trim() && ev.runId !== rootRunId) return ev.runId.trim();
+    }
+    return null;
+  }, [selectedStep, traceEvents, rootRunId]);
+
   const hasRunData = isRunning || result != null || events.length > 0;
 
   const showFinalResult = useMemo(() => {
@@ -537,6 +575,84 @@ export function RunFlowModal({
     if (result) return result.success ? 'SUCCESS' : 'FAILED';
     return '';
   }, [isRunning, isWaiting, result]);
+
+  // Minimized view (run minibar): show current step + status and keep the canvas visible.
+  // This uses only local state (isMinimized) so it never affects run execution itself.
+  const lastStep = steps.length > 0 ? steps[steps.length - 1] : null;
+  const currentStepLabel = (lastStep?.nodeLabel || lastStep?.nodeId || 'Starting…') as string;
+  const currentStepStatus = runStatusLabel || (lastStep?.status ? String(lastStep.status).toUpperCase() : 'READY');
+
+  const minibar = (
+    <div className="run-minibar" role="region" aria-label="Run Flow mini bar">
+      <button type="button" className="run-minibar-main" onClick={() => setIsMinimized(false)}>
+        <span className="run-minibar-title">Run</span>
+        <span
+          className={[
+            'run-minibar-status',
+            isRunning ? 'running' : '',
+            isPaused ? 'paused' : '',
+            isWaiting ? 'waiting' : '',
+            result ? (result.success ? 'success' : 'failed') : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          {currentStepStatus}
+        </span>
+        <span className="run-minibar-step" title={currentStepLabel}>
+          {currentStepLabel}
+        </span>
+        <span className="run-minibar-flow" title={flowName || 'Untitled Flow'}>
+          {flowName || 'Untitled Flow'}
+        </span>
+      </button>
+
+      <div className="run-minibar-actions">
+        {onCancelRun ? (
+          <button
+            type="button"
+            className="run-minibar-btn danger"
+            onClick={(e) => {
+              e.stopPropagation();
+              onCancelRun();
+            }}
+            disabled={!(isRunning || isPaused || isWaiting)}
+            title="Cancel"
+            aria-label="Cancel run"
+          >
+            ⏹
+          </button>
+        ) : null}
+
+        {(onPause || onResumeRun) ? (
+          <button
+            type="button"
+            className="run-minibar-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (isPaused) onResumeRun?.();
+              else onPause?.();
+            }}
+            disabled={isPaused ? !isPaused : !(isRunning && !isWaiting)}
+            title={isPaused ? 'Resume' : 'Pause'}
+            aria-label={isPaused ? 'Resume run' : 'Pause run'}
+          >
+            {isPaused ? '▶' : '⏸'}
+          </button>
+        ) : null}
+
+        <button
+          type="button"
+          className="run-minibar-btn"
+          onClick={() => setIsMinimized(false)}
+          title="Expand"
+          aria-label="Expand run modal"
+        >
+          ⬆
+        </button>
+      </div>
+    </div>
+  );
 
   const shouldRenderMarkdown = useCallback(
     (nodeType?: string | null) => {
@@ -812,13 +928,24 @@ export function RunFlowModal({
 
   if (!isOpen) return null;
 
-  return (
+  return isMinimized ? minibar : (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal run-modal" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="run-modal-header">
           <h3>▶ Run Flow</h3>
-          <span className="run-modal-flow-name">{flowName || 'Untitled Flow'}</span>
+          <div className="run-modal-header-right">
+            <span className="run-modal-flow-name">{flowName || 'Untitled Flow'}</span>
+            <button
+              type="button"
+              className="run-minimize-btn"
+              onClick={() => setIsMinimized(true)}
+              title="Minimize"
+              aria-label="Minimize run modal"
+            >
+              ▾
+            </button>
+          </div>
         </div>
 
         {/* Execution (Steps + Details) */}
@@ -952,7 +1079,7 @@ export function RunFlowModal({
                         </div>
                       </div>
                       {selectedStep.nodeType === 'agent' ? (
-                        <AgentSubrunTracePanel rootRunId={rootRunId} events={events} />
+                        <AgentSubrunTracePanel rootRunId={rootRunId} events={traceEvents} subRunId={selectedAgentSubRunId} />
                       ) : null}
                     </>
                   ) : selectedStep.status === 'waiting' && (waitingInfo || selectedStep.waiting) ? (
@@ -1005,7 +1132,7 @@ export function RunFlowModal({
                   ) : selectedStep.output != null ? (
                     <>
                       {selectedStep.nodeType === 'agent' ? (
-                        <AgentSubrunTracePanel rootRunId={rootRunId} events={events} />
+                        <AgentSubrunTracePanel rootRunId={rootRunId} events={traceEvents} subRunId={selectedAgentSubRunId} />
                       ) : null}
                       {selectedStep.metrics ? (
                         <div className="run-details-metrics">

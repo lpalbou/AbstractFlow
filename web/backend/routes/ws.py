@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import time
 from typing import Any, Dict, Optional, Tuple
 
@@ -518,14 +519,35 @@ async def _execute_runner_loop(
     # waiting for the outer visual node to complete.
     trace_cursors: Dict[str, Dict[str, int]] = {}
 
-    async def _emit_trace_deltas(run_id: str) -> None:
+    # Child subworkflow ticks can be configured to trade off granularity vs overhead.
+    # More steps per tick reduces store IO and WS chatter for fast tool loops.
+    try:
+        child_tick_max_steps = int(os.environ.get("ABSTRACTFLOW_CHILD_TICK_MAX_STEPS", "5") or "5")
+    except Exception:
+        child_tick_max_steps = 5
+    if child_tick_max_steps < 1:
+        child_tick_max_steps = 1
+
+    async def _emit_trace_deltas(run_id: str, state: Any) -> None:
         """Emit trace_update events for newly appended runtime node trace entries."""
         if runtime is None:
             return
+        traces: Any = None
         try:
-            traces = runtime.get_node_traces(run_id)
+            vars_obj = getattr(state, "vars", None)
+            if isinstance(vars_obj, dict):
+                runtime_ns = vars_obj.get("_runtime")
+                traces = runtime_ns.get("node_traces") if isinstance(runtime_ns, dict) else None
         except Exception:
-            return
+            traces = None
+
+        # Fallback (slower): load persisted run state from the runtime store.
+        if traces is None:
+            try:
+                traces = runtime.get_node_traces(run_id)
+            except Exception:
+                return
+
         if not isinstance(traces, dict) or not traces:
             return
 
@@ -1062,15 +1084,21 @@ async def _execute_runner_loop(
             wf = _workflow_for_run_id(run_id)
             if lock is not None:
                 async with lock:
-                    state = await asyncio.to_thread(runtime.tick, workflow=wf, run_id=run_id, max_steps=1)
+                    state = await asyncio.to_thread(
+                        runtime.tick, workflow=wf, run_id=run_id, max_steps=child_tick_max_steps
+                    )
             else:
-                state = await asyncio.to_thread(runtime.tick, workflow=wf, run_id=run_id, max_steps=1)
+                state = await asyncio.to_thread(
+                    runtime.tick, workflow=wf, run_id=run_id, max_steps=child_tick_max_steps
+                )
         duration_ms = (time.perf_counter() - t0) * 1000.0
 
         # Emit per-effect trace deltas for this run (including child agent runs).
         # This provides live observability even when node_start/node_complete do not change
         # (e.g. Agent subworkflow stays on a single runtime node while looping effects).
-        await _emit_trace_deltas(run_id)
+        # Root runs are ignored by the UI (Agent trace panel is per sub-run), so don't waste work.
+        if not is_root:
+            await _emit_trace_deltas(run_id, state)
 
         if is_root:
             # Keep root flow outputs in sync for rich previews and metrics.

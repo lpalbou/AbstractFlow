@@ -2,7 +2,7 @@
  * Main canvas component with React Flow.
  */
 
-import { useCallback, useEffect, useRef, DragEvent, MouseEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, DragEvent, MouseEvent } from 'react';
 import ReactFlow, {
   Controls,
   Background,
@@ -42,6 +42,7 @@ export function Canvas() {
   const {
     nodes,
     edges,
+    executingNodeId,
     onNodesChange,
     onEdgesChange,
     onConnect,
@@ -201,6 +202,21 @@ export function Canvas() {
   // Unused currently but can be used for custom edge rendering
   void getEdgeStyleColor;
 
+  // Execution observability:
+  // While a node is executing, highlight the execution edges connected to it
+  // (incoming/outgoing exec pins) so users can visually follow the graph.
+  const decoratedEdges = useMemo(() => {
+    if (!executingNodeId) return edges;
+    const isExec = (e: Edge) => e.sourceHandle === 'exec-out' || e.targetHandle === 'exec-in' || Boolean(e.animated);
+    const isActive = (e: Edge) =>
+      isExec(e) && (e.source === executingNodeId || e.target === executingNodeId);
+    return edges.map((e) => {
+      if (!isActive(e)) return e;
+      const className = [e.className || '', 'exec-active'].filter(Boolean).join(' ');
+      return { ...e, className, animated: true };
+    });
+  }, [edges, executingNodeId]);
+
   return (
     <div
       ref={reactFlowWrapper}
@@ -210,7 +226,7 @@ export function Canvas() {
     >
       <ReactFlow
         nodes={nodes}
-        edges={edges}
+        edges={decoratedEdges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={handleConnect}

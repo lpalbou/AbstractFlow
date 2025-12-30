@@ -31,6 +31,27 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
 
   const { setExecutingNodeId, setIsRunning } = useFlowStore();
 
+  const isExecutionEvent = (value: unknown): value is ExecutionEvent => {
+    if (!value || typeof value !== 'object') return false;
+    const obj = value as Record<string, unknown>;
+    const t = obj.type;
+    if (typeof t !== 'string') return false;
+    // Keepalive messages and unknown message types should never affect UI execution state.
+    if (t === 'pong') return false;
+    return (
+      t === 'node_start' ||
+      t === 'node_complete' ||
+      t === 'flow_start' ||
+      t === 'flow_complete' ||
+      t === 'flow_error' ||
+      t === 'flow_waiting' ||
+      t === 'flow_paused' ||
+      t === 'flow_resumed' ||
+      t === 'flow_cancelled' ||
+      t === 'trace_update'
+    );
+  };
+
   // Handle execution events
   const handleEvent = useCallback(
     (event: ExecutionEvent) => {
@@ -174,7 +195,9 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
       socket.onmessage = (event) => {
         if (wsRef.current !== socket) return;
         try {
-          const data: ExecutionEvent = JSON.parse(event.data);
+          const raw: unknown = JSON.parse(event.data);
+          if (!isExecutionEvent(raw)) return;
+          const data: ExecutionEvent = raw;
           handleEvent(data);
           onEvent?.(data);
         } catch (e) {
