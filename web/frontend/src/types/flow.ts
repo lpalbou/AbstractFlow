@@ -208,10 +208,13 @@ export interface ExecutionEvent {
     | 'flow_waiting'
     | 'flow_paused'
     | 'flow_resumed'
-    | 'flow_cancelled';
+    | 'flow_cancelled'
+    | 'trace_update';
   runId?: string;
   nodeId?: string;
   result?: unknown;
+  // trace_update payload (runtime-owned node traces; streamed as deltas)
+  steps?: unknown[];
   error?: string;
   meta?: ExecutionMetrics;
   // Waiting payload (for ASK_USER / WAIT_EVENT / subworkflow bubbling)

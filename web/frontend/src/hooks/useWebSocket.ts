@@ -43,6 +43,9 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
           setRunId(event.runId || null);
           break;
         case 'node_start':
+          // Only highlight nodes for the root visual run. Child/sub-runs (e.g. Agent subworkflow)
+          // may emit node_start events with internal node ids that don't exist in the visual graph.
+          if (event.runId && runId && event.runId !== runId) break;
           setExecutingNodeId(event.nodeId || null);
           break;
         case 'node_complete':

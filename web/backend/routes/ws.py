@@ -505,11 +505,65 @@ async def _execute_runner_loop(
 
     runtime = getattr(runner, "runtime", None)
 
+    # Runtime-owned node traces (stored in RunState.vars["_runtime"]["node_traces"]) are the
+    # most reliable source of per-effect observability (LLM_CALL / TOOL_CALLS loops), especially
+    # for Agent nodes that may stay on the same runtime node across many effects.
+    #
+    # We stream *deltas* (new entries) over the WS so the UI can render live traces without
+    # waiting for the outer visual node to complete.
+    trace_cursors: Dict[str, Dict[str, int]] = {}
+
+    async def _emit_trace_deltas(run_id: str) -> None:
+        """Emit trace_update events for newly appended runtime node trace entries."""
+        if runtime is None:
+            return
+        try:
+            traces = runtime.get_node_traces(run_id)
+        except Exception:
+            return
+        if not isinstance(traces, dict) or not traces:
+            return
+
+        cursor = trace_cursors.get(run_id)
+        if not isinstance(cursor, dict):
+            cursor = {}
+            trace_cursors[run_id] = cursor
+
+        for node_id, trace_obj in traces.items():
+            if not isinstance(node_id, str) or not node_id:
+                continue
+            if not isinstance(trace_obj, dict):
+                continue
+            steps = trace_obj.get("steps")
+            if not isinstance(steps, list) or not steps:
+                continue
+
+            prev = cursor.get(node_id, 0)
+            if not isinstance(prev, int) or prev < 0:
+                prev = 0
+            if prev >= len(steps):
+                cursor[node_id] = len(steps)
+                continue
+
+            new_steps = steps[prev:]
+            cursor[node_id] = len(steps)
+            # NOTE: The UI expects JSON-safe objects; runtime traces are already JSON-safe,
+            # but we still run through _json_safe to guard against handler bugs.
+            await websocket.send_json(
+                {
+                    "type": "trace_update",
+                    "runId": run_id,
+                    "nodeId": node_id,
+                    "steps": _json_safe(new_steps),
+                }
+            )
+
     # Backward-compat / test support:
     # Some tests patch `create_visual_runner()` with a minimal fake runner that does not
     # expose a Runtime. In that case, fall back to the legacy single-run loop.
     if runtime is None:
         active_node_id: Optional[str] = None
+        root_run_id = getattr(runner, "run_id", None)
         while True:
             if gate is not None:
                 await gate.wait()
@@ -517,7 +571,9 @@ async def _execute_runner_loop(
             node_before = getattr(before, "current_node", None) if before is not None else None
 
             if node_before and node_before != active_node_id:
-                await websocket.send_json(ExecutionEvent(type="node_start", nodeId=node_before).model_dump())
+                await websocket.send_json(
+                    ExecutionEvent(type="node_start", runId=root_run_id, nodeId=node_before).model_dump()
+                )
                 active_node_id = node_before
                 await asyncio.sleep(0)
 
@@ -538,6 +594,7 @@ async def _execute_runner_loop(
                 await websocket.send_json(
                     {
                         "type": "flow_waiting",
+                        "runId": root_run_id,
                         "nodeId": node_before or getattr(state, "current_node", None),
                         "wait_key": wait_key,
                         "reason": reason,
@@ -561,9 +618,10 @@ async def _execute_runner_loop(
                     await websocket.send_json(
                         ExecutionEvent(
                             type="node_complete",
+                            runId=root_run_id,
                             nodeId=active_node_id,
                             result=_node_output(active_node_id),
-                                meta={"duration_ms": round(float(duration_ms), 2)},
+                            meta={"duration_ms": round(float(duration_ms), 2)},
                         ).model_dump()
                     )
                     active_node_id = None
@@ -573,6 +631,7 @@ async def _execute_runner_loop(
                 await websocket.send_json(
                     ExecutionEvent(
                         type="flow_complete",
+                        runId=root_run_id,
                         result=getattr(state, "output", None),
                         meta={"duration_ms": round(float(flow_duration_ms), 2)},
                     ).model_dump()
@@ -586,6 +645,7 @@ async def _execute_runner_loop(
                 await websocket.send_json(
                     ExecutionEvent(
                         type="flow_error",
+                        runId=root_run_id,
                         nodeId=error_node,
                         error=getattr(state, "error", None),
                     ).model_dump()
@@ -810,6 +870,7 @@ async def _execute_runner_loop(
             await websocket.send_json(
                 ExecutionEvent(
                     type="node_start",
+                    runId=run_id,
                     nodeId=wnode,
                 ).model_dump()
             )
@@ -817,6 +878,7 @@ async def _execute_runner_loop(
             await websocket.send_json(
                 ExecutionEvent(
                     type="node_complete",
+                    runId=run_id,
                     nodeId=wnode,
                     result=out0,
                     meta=_node_metrics(wnode, duration_ms=waited_ms, output=out0),
@@ -922,6 +984,7 @@ async def _execute_runner_loop(
                     await websocket.send_json(
                         ExecutionEvent(
                             type="node_complete",
+                            runId=run_id,
                             nodeId=active,
                             result=out0,
                             meta=_node_metrics(active, duration_ms=waited_ms, output=out0),
@@ -974,6 +1037,7 @@ async def _execute_runner_loop(
             await websocket.send_json(
                 ExecutionEvent(
                     type="node_start",
+                    runId=run_id,
                     nodeId=node_before,
                 ).model_dump()
             )
@@ -997,6 +1061,11 @@ async def _execute_runner_loop(
             else:
                 state = await asyncio.to_thread(runtime.tick, workflow=wf, run_id=run_id, max_steps=1)
         duration_ms = (time.perf_counter() - t0) * 1000.0
+
+        # Emit per-effect trace deltas for this run (including child agent runs).
+        # This provides live observability even when node_start/node_complete do not change
+        # (e.g. Agent subworkflow stays on a single runtime node while looping effects).
+        await _emit_trace_deltas(run_id)
 
         if is_root:
             # Keep root flow outputs in sync for rich previews and metrics.
@@ -1053,6 +1122,7 @@ async def _execute_runner_loop(
                 await websocket.send_json(
                     {
                         "type": "flow_waiting",
+                        "runId": run_id,
                         "nodeId": node_before or state.current_node,
                         "wait_key": wait_key,
                         "reason": reason,
@@ -1092,6 +1162,7 @@ async def _execute_runner_loop(
                 await websocket.send_json(
                     ExecutionEvent(
                         type="node_complete",
+                        runId=run_id,
                         nodeId=active,
                         result=out0,
                         meta=metrics,
@@ -1169,6 +1240,7 @@ async def _execute_runner_loop(
             await websocket.send_json(
                 ExecutionEvent(
                     type="flow_error",
+                    runId=root_run_id,
                     nodeId=error_node,
                     error=getattr(root_now, "error", None),
                 ).model_dump()
@@ -1178,7 +1250,9 @@ async def _execute_runner_loop(
         if root_now is not None and str(getattr(root_now, "status", None)) == "RunStatus.CANCELLED":
             if connection_id in _waiting_runners:
                 del _waiting_runners[connection_id]
-            await websocket.send_json({"type": "flow_cancelled", "error": getattr(root_now, "error", None)})
+            await websocket.send_json(
+                {"type": "flow_cancelled", "runId": root_run_id, "error": getattr(root_now, "error", None)}
+            )
             break
 
         # If root completed, keep the websocket open until all children are either:
@@ -1241,6 +1315,7 @@ async def _execute_runner_loop(
                 await websocket.send_json(
                     ExecutionEvent(
                         type="flow_complete",
+                        runId=root_run_id,
                         result=getattr(root_now, "output", None),
                         meta=flow_meta,
                     ).model_dump()
@@ -1325,6 +1400,7 @@ async def resume_waiting_flow(
             await websocket.send_json(
                 ExecutionEvent(
                     type="node_complete",
+                    runId=getattr(runner, "run_id", None),
                     nodeId=waiting_node_id,
                     result=_json_safe(out),
                     meta={"duration_ms": round(float(waited_ms), 2)},

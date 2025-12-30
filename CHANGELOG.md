@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Web run controls are now resilient to transient WebSocket disconnects: pause/resume/cancel can be sent with an explicit `run_id`, and the UI will reconnect-and-send for control actions when needed.
 - `Cancel Run` no longer surfaces as a `flow_error` from an internal `asyncio.CancelledError` (treated as an expected control-plane operation).
 - Visual `Agent` nodes now reset per-node state when re-entered (e.g. inside `Loop` iterations), so each iteration re-resolves inputs and runs the agent with the current scratchpad/task instead of reusing iteration 0.
+- Run modal observability for Agent nodes is improved:
+  - WebSocket `node_start` / `node_complete` events now include `runId`, allowing the UI to distinguish root visual runs from child/sub-runs.
+  - The Agent details panel now renders a live sub-run trace of internal LLM/tool steps (expandable with prompts/responses/errors).
+  - Runtime node trace entries are now streamed incrementally over WebSocket (`trace_update`) so Agent traces update during execution instead of only after the Agent node completes.
 
 ### Added
 - Visual custom events (Blueprint-style):

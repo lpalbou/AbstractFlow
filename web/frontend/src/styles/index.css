@@ -865,6 +865,144 @@ button.primary:hover:not(:disabled) {
   color: var(--text-secondary);
 }
 
+.agent-trace-panel {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.agent-trace-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.agent-trace-title {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.agent-trace-subtitle {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.agent-trace-empty {
+  padding: 10px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.agent-trace-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.agent-trace-entry {
+  border: 1px solid var(--bg-tertiary);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+}
+
+.agent-trace-summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  user-select: none;
+}
+
+.agent-trace-summary::-webkit-details-marker {
+  display: none;
+}
+
+.agent-trace-status {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 800;
+}
+
+.agent-trace-status.completed {
+  color: var(--success);
+}
+
+.agent-trace-status.running {
+  color: var(--warning);
+}
+
+.agent-trace-kind {
+  font-weight: 800;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.agent-trace-node {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.agent-trace-run {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.agent-trace-preview {
+  padding: 0 12px 10px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.agent-trace-body {
+  padding: 0 12px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.agent-trace-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.agent-trace-tab {
+  border: 1px solid var(--bg-tertiary);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-secondary);
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.agent-trace-tab:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  color: var(--text-primary);
+}
+
+.agent-trace-tab.active {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+
 @keyframes run-spin {
   to {
     transform: rotate(360deg);

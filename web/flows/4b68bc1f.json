@@ -996,42 +996,6 @@
       "outputs": []
     },
     {
-      "id": "node-32",
-      "type": "get_var",
-      "position": {
-        "x": 1136.0,
-        "y": 112.0
-      },
-      "data": {
-        "nodeType": "get_var",
-        "label": "Get scratchpad",
-        "icon": "&#x1F4E5;",
-        "headerColor": "#16A085",
-        "inputs": [
-          {
-            "id": "name",
-            "label": "name",
-            "type": "string"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "value",
-            "label": "value",
-            "type": "any"
-          }
-        ],
-        "pinDefaults": {
-          "name": "scratchpad"
-        }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
       "id": "node-33",
       "type": "concat",
       "position": {
@@ -1321,14 +1285,6 @@
       "animated": false
     },
     {
-      "id": "edge-1767079837056",
-      "source": "node-32",
-      "sourceHandle": "value",
-      "target": "node-12",
-      "targetHandle": "task",
-      "animated": false
-    },
-    {
       "id": "edge-1767082003128",
       "source": "node-33",
       "sourceHandle": "result",
@@ -1351,9 +1307,17 @@
       "target": "node-33",
       "targetHandle": "d",
       "animated": false
+    },
+    {
+      "id": "edge-1767082972646",
+      "source": "node-25",
+      "sourceHandle": "value",
+      "target": "node-12",
+      "targetHandle": "task",
+      "animated": false
     }
   ],
   "entryNode": "node-1",
   "created_at": "2025-12-29T02:02:13.169414",
-  "updated_at": "2025-12-30T08:08:01.212458"
+  "updated_at": "2025-12-30T16:48:19.580850"
 }

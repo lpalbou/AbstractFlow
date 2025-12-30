@@ -11,6 +11,7 @@ import type { ExecutionEvent, ExecutionMetrics, Pin, FlowRunResult } from '../ty
 import { isEntryNodeType } from '../types/flow';
 import type { WaitingInfo } from '../hooks/useWebSocket';
 import { MarkdownRenderer } from './MarkdownRenderer';
+import { AgentSubrunTracePanel } from './AgentSubrunTracePanel';
 
 interface RunFlowModalProps {
   isOpen: boolean;
@@ -250,6 +251,14 @@ export function RunFlowModal({
     const out: Step[] = [];
     const openByNode = new Map<string, number>();
 
+    const rootRunId = (() => {
+      for (let i = events.length - 1; i >= 0; i--) {
+        const ev = events[i];
+        if (ev.type === 'flow_start' && ev.runId) return ev.runId;
+      }
+      return null;
+    })();
+
     const safeString = (value: unknown) => (typeof value === 'string' ? value : value == null ? '' : String(value));
 
     const extractModelInfo = (value: unknown): { provider?: string; model?: string } => {
@@ -356,7 +365,19 @@ export function RunFlowModal({
       // We show only node steps in the left timeline; flow-level status is surfaced in the header / final result.
       if (ev.type === 'flow_start' || ev.type === 'flow_complete') continue;
 
+      // Hide internal/sub-run node events from the main (visual) timeline.
+      // These will be rendered in the Agent details panel instead.
+      if (
+        rootRunId &&
+        ev.runId &&
+        ev.runId !== rootRunId &&
+        (ev.type === 'node_start' || ev.type === 'node_complete' || ev.type === 'flow_waiting')
+      ) {
+        continue;
+      }
+
       if (ev.type === 'node_start') {
+        const key = `${ev.runId || ''}:${ev.nodeId || ''}`;
         const meta = nodeMeta(ev.nodeId);
         const step: Step = {
           id: `node_start:${ev.nodeId || 'unknown'}:${i}`,
@@ -368,13 +389,14 @@ export function RunFlowModal({
           nodeColor: meta?.color,
         };
         out.push(step);
-        if (ev.nodeId) openByNode.set(ev.nodeId, out.length - 1);
+        if (ev.nodeId) openByNode.set(key, out.length - 1);
         continue;
       }
 
       if (ev.type === 'node_complete') {
         const nodeId = ev.nodeId;
-        const idx = nodeId ? openByNode.get(nodeId) : undefined;
+        const key = `${ev.runId || ''}:${nodeId || ''}`;
+        const idx = nodeId ? openByNode.get(key) : undefined;
         const mi = extractModelInfo(ev.result);
         if (typeof idx === 'number') {
           out[idx] = {
@@ -386,7 +408,7 @@ export function RunFlowModal({
             provider: mi.provider,
             model: mi.model,
           };
-          openByNode.delete(nodeId!);
+          openByNode.delete(key);
           continue;
         }
         const meta = nodeMeta(nodeId);
@@ -409,7 +431,8 @@ export function RunFlowModal({
 
       if (ev.type === 'flow_waiting') {
         const nodeId = ev.nodeId;
-        const idx = nodeId ? openByNode.get(nodeId) : undefined;
+        const key = `${ev.runId || ''}:${nodeId || ''}`;
+        const idx = nodeId ? openByNode.get(key) : undefined;
 
         const waiting = {
           prompt: ev.prompt || 'Please respond:',
@@ -435,7 +458,7 @@ export function RunFlowModal({
           nodeColor: meta?.color,
           waiting,
         });
-        if (nodeId) openByNode.set(nodeId, out.length - 1);
+        if (nodeId) openByNode.set(key, out.length - 1);
         continue;
       }
 
@@ -457,6 +480,14 @@ export function RunFlowModal({
 
     return out;
   }, [events, nodeById]);
+
+  const rootRunId = useMemo<string | null>(() => {
+    for (let i = events.length - 1; i >= 0; i--) {
+      const ev = events[i];
+      if (ev.type === 'flow_start' && ev.runId) return ev.runId;
+    }
+    return null;
+  }, [events]);
 
   const flowSummary = useMemo<ExecutionMetrics | null>(() => {
     if (!events || events.length === 0) return null;
@@ -912,13 +943,18 @@ export function RunFlowModal({
               {selectedStep ? (
                 <div className="run-details-body">
                   {selectedStep.status === 'running' ? (
-                    <div className="run-working">
-                      <span className="run-spinner" aria-label="working" />
-                      <div>
-                        <div className="run-working-title">Working…</div>
-                        <div className="run-working-note">This node is still processing. The output will appear when it completes.</div>
+                    <>
+                      <div className="run-working">
+                        <span className="run-spinner" aria-label="working" />
+                        <div>
+                          <div className="run-working-title">Working…</div>
+                          <div className="run-working-note">This node is still processing. The output will appear when it completes.</div>
+                        </div>
                       </div>
-                    </div>
+                      {selectedStep.nodeType === 'agent' ? (
+                        <AgentSubrunTracePanel rootRunId={rootRunId} events={events} />
+                      ) : null}
+                    </>
                   ) : selectedStep.status === 'waiting' && (waitingInfo || selectedStep.waiting) ? (
                     <div className="run-waiting">
                       <div className="run-waiting-prompt">
@@ -968,6 +1004,9 @@ export function RunFlowModal({
                     <div className="run-details-error">{selectedStep.error}</div>
                   ) : selectedStep.output != null ? (
                     <>
+                      {selectedStep.nodeType === 'agent' ? (
+                        <AgentSubrunTracePanel rootRunId={rootRunId} events={events} />
+                      ) : null}
                       {selectedStep.metrics ? (
                         <div className="run-details-metrics">
                           <div className="run-details-metrics-row">
