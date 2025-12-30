@@ -1106,7 +1106,9 @@ export function RunFlowModal({
                             </div>
                           ) : null}
 
-                          {traceSteps ? (
+                          {/* Agent nodes have a dedicated live trace panel (AgentSubrunTracePanel) fed by trace_update events.
+                              The legacy Trace/Scratchpad section is redundant for agents and can be confusing. */}
+                          {selectedStep?.nodeType !== 'agent' && traceSteps ? (
                             <div className="run-output-section">
                               <div className="run-output-title">Trace</div>
                               <div className="run-trace">
@@ -1133,7 +1135,7 @@ export function RunFlowModal({
                                 <pre className="run-details-output">{formatValue(outputPreview.scratchpad)}</pre>
                               </details>
                             </div>
-                          ) : outputPreview.scratchpad != null ? (
+                          ) : selectedStep?.nodeType !== 'agent' && outputPreview.scratchpad != null ? (
                             <details className="run-raw-details">
                               <summary>Scratchpad</summary>
                               <pre className="run-details-output">{formatValue(outputPreview.scratchpad)}</pre>

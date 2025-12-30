@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - WebSocket `node_start` / `node_complete` events now include `runId`, allowing the UI to distinguish root visual runs from child/sub-runs.
   - The Agent details panel now renders a live sub-run trace of internal LLM/tool steps (expandable with prompts/responses/errors).
   - Runtime node trace entries are now streamed incrementally over WebSocket (`trace_update`) so Agent traces update during execution instead of only after the Agent node completes.
+  - Visual Agent nodes now start their ReAct subworkflow in **async+wait** mode so the WebSocket runner can tick the child run incrementally (required for real-time `trace_update` streaming).
 
 ### Added
 - Visual custom events (Blueprint-style):

@@ -403,7 +403,11 @@ def _create_visual_agent_effect_handler(
                             system_prompt=system_prompt,
                             allowed_tools=allowed_tools,
                         ),
-                        "async": False,
+                        # Run Agent as a durable async subworkflow so the host can:
+                        # - tick the child incrementally (real-time observability of each effect)
+                        # - resume the parent once the child completes (async+wait mode)
+                        "async": True,
+                        "wait": True,
                         "include_traces": True,
                     },
                     result_key=f"_temp.agent.{node_id}.sub",

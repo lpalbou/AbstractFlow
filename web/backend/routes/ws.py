@@ -431,6 +431,11 @@ async def _execute_runner_loop(
             return wait_key.split("subworkflow:", 1)[1] or None
         return None
 
+    def _utc_now_iso() -> str:
+        from datetime import datetime, timezone
+
+        return datetime.now(timezone.utc).isoformat()
+
     def _resolve_waiting_info(state: Any) -> Tuple[str, list, bool, Optional[str], Optional[str]]:
         """Return (prompt, choices, allow_free_text, wait_key, reason)."""
         wait = getattr(state, "waiting", None)
@@ -1111,26 +1116,29 @@ async def _execute_runner_loop(
                 track["active_duration_ms"] = 0.0
                 return state
 
-            # Root waits (or non-event waits) are surfaced to the UI.
+            # Root waits (or non-event waits) are surfaced to the UI *only* when the deepest
+            # waiting reason requires user input. A root waiting on SUBWORKFLOW completion
+            # must keep running so we can tick the child and stream live trace updates.
             if is_root:
-                _waiting_runners[connection_id] = runner
-                _waiting_steps[connection_id] = {
-                    "node_id": node_before or getattr(state, "current_node", None),
-                    "started_at": time.perf_counter(),
-                }
                 prompt, choices, allow_free_text, wait_key, reason = _resolve_waiting_info(state)
-                await websocket.send_json(
-                    {
-                        "type": "flow_waiting",
-                        "runId": run_id,
-                        "nodeId": node_before or state.current_node,
-                        "wait_key": wait_key,
-                        "reason": reason,
-                        "prompt": prompt,
-                        "choices": choices,
-                        "allow_free_text": allow_free_text,
+                if reason != "subworkflow":
+                    _waiting_runners[connection_id] = runner
+                    _waiting_steps[connection_id] = {
+                        "node_id": node_before or getattr(state, "current_node", None),
+                        "started_at": time.perf_counter(),
                     }
-                )
+                    await websocket.send_json(
+                        {
+                            "type": "flow_waiting",
+                            "runId": run_id,
+                            "nodeId": node_before or state.current_node,
+                            "wait_key": wait_key,
+                            "reason": reason,
+                            "prompt": prompt,
+                            "choices": choices,
+                            "allow_free_text": allow_free_text,
+                        }
+                    )
             return state
 
         # Completed step: emit node_complete for the node we just executed.
@@ -1217,6 +1225,76 @@ async def _execute_runner_loop(
                     await _tick_run(rid, is_root=False)
             except Exception:
                 continue
+
+        # Bubble async subworkflow completions back into any waiting parents (root or children).
+        #
+        # This is required for async+wait START_SUBWORKFLOW (Agent nodes): the parent stays in
+        # WAITING(reason=SUBWORKFLOW) while the host drives the child run incrementally.
+        try:
+            if runtime is not None and getattr(runtime, "workflow_registry", None) is not None:
+                from abstractruntime.core.models import RunStatus, WaitReason
+
+                registry = runtime.workflow_registry
+
+                def _spec_for(run_state: Any):
+                    spec = registry.get(run_state.workflow_id)
+                    if spec is None:
+                        raise RuntimeError(f"Workflow '{run_state.workflow_id}' not found in registry")
+                    return spec
+
+                for parent_id in list(run_ids):
+                    try:
+                        parent_state = runtime.get_state(parent_id)
+                    except Exception:
+                        continue
+                    if parent_state is None:
+                        continue
+                    if parent_state.status != RunStatus.WAITING or parent_state.waiting is None:
+                        continue
+                    if parent_state.waiting.reason != WaitReason.SUBWORKFLOW:
+                        continue
+                    sub_run_id = _extract_sub_run_id(parent_state.waiting)
+                    if not sub_run_id:
+                        continue
+
+                    try:
+                        sub_state = runtime.get_state(sub_run_id)
+                    except Exception:
+                        continue
+
+                    if sub_state.status == RunStatus.COMPLETED:
+                        runtime.resume(
+                            workflow=_spec_for(parent_state),
+                            run_id=parent_state.run_id,
+                            wait_key=None,
+                            payload={
+                                "sub_run_id": sub_state.run_id,
+                                "output": sub_state.output,
+                                "node_traces": runtime.get_node_traces(sub_state.run_id),
+                            },
+                            max_steps=0,
+                        )
+                        continue
+
+                    if sub_state.status == RunStatus.FAILED:
+                        # Preserve the durable failure semantics of sync START_SUBWORKFLOW.
+                        parent_state.status = RunStatus.FAILED
+                        parent_state.waiting = None
+                        parent_state.error = f"Subworkflow '{parent_state.workflow_id}' failed: {sub_state.error}"
+                        parent_state.updated_at = _utc_now_iso()
+                        runtime.run_store.save(parent_state)
+                        continue
+
+                    if sub_state.status == RunStatus.CANCELLED:
+                        parent_state.status = RunStatus.CANCELLED
+                        parent_state.waiting = None
+                        parent_state.error = f"Subworkflow '{parent_state.workflow_id}' cancelled"
+                        parent_state.updated_at = _utc_now_iso()
+                        runtime.run_store.save(parent_state)
+                        continue
+        except Exception:
+            # Best-effort; never let bubbling break the execution loop.
+            pass
 
         # Check session completion:
         # - If root failed: error immediately (best-effort: include node id if available).
