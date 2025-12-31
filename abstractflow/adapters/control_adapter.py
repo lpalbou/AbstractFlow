@@ -292,6 +292,9 @@ def create_loop_node_handler(
             out = {"input": base}
         out["item"] = current_item
         out["index"] = idx
+        # Helpful for UI observability: show progress as (index+1)/total for Foreach loops.
+        # This is purely additive and does not change loop semantics.
+        out["total"] = len(items)
 
         run.vars["_last_output"] = out
         _persist_node_output(run.vars, out)

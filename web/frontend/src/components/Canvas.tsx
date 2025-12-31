@@ -43,6 +43,7 @@ export function Canvas() {
     nodes,
     edges,
     executingNodeId,
+    recentEdgeIds,
     onNodesChange,
     onEdgesChange,
     onConnect,
@@ -206,16 +207,29 @@ export function Canvas() {
   // While a node is executing, highlight the execution edges connected to it
   // (incoming/outgoing exec pins) so users can visually follow the graph.
   const decoratedEdges = useMemo(() => {
-    if (!executingNodeId) return edges;
+    const hasActive = Boolean(executingNodeId);
+    const hasRecent = Boolean(recentEdgeIds && Object.keys(recentEdgeIds).length > 0);
+    if (!hasActive && !hasRecent) return edges;
     const isExec = (e: Edge) => e.sourceHandle === 'exec-out' || e.targetHandle === 'exec-in' || Boolean(e.animated);
     const isActive = (e: Edge) =>
       isExec(e) && (e.source === executingNodeId || e.target === executingNodeId);
     return edges.map((e) => {
-      if (!isActive(e)) return e;
-      const className = [e.className || '', 'exec-active'].filter(Boolean).join(' ');
-      return { ...e, className, animated: true };
+      const classes = [e.className || ''].filter(Boolean);
+
+      if (hasRecent && recentEdgeIds && recentEdgeIds[e.id]) {
+        classes.push('exec-recent');
+      }
+
+      let animated = Boolean(e.animated);
+      if (hasActive && isActive(e)) {
+        classes.push('exec-active');
+        animated = true;
+      }
+
+      if (classes.length === 0 && animated === Boolean(e.animated)) return e;
+      return { ...e, className: classes.join(' '), animated };
     });
-  }, [edges, executingNodeId]);
+  }, [edges, executingNodeId, recentEdgeIds]);
 
   return (
     <div

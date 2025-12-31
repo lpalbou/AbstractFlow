@@ -702,6 +702,37 @@ button.primary:hover:not(:disabled) {
   text-overflow: ellipsis;
 }
 
+.run-minibar-loop {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(241, 196, 15, 0.35);
+  background: rgba(241, 196, 15, 0.12);
+  color: rgba(255, 245, 200, 0.95);
+  white-space: nowrap;
+}
+
+.run-minibar-agent-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  max-width: 44vw;
+  overflow: hidden;
+}
+
+.run-minibar-effect {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
 .run-minibar-flow {
   font-size: 11px;
   color: var(--text-muted);

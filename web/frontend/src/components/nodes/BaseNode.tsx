@@ -70,15 +70,20 @@ export const BaseNode = memo(function BaseNode({
   data,
   selected,
 }: NodeProps<FlowNodeData>) {
-  const { executingNodeId, disconnectPin, updateNodeData } = useFlowStore();
+  const { executingNodeId, disconnectPin, updateNodeData, recentNodeIds, loopProgressByNodeId } = useFlowStore();
   const allNodes = useFlowStore((s) => s.nodes);
   const isExecuting = executingNodeId === id;
+  const isRecent = Boolean(recentNodeIds && (recentNodeIds as Record<string, true>)[id]);
   const edges = useEdges();
   const updateNodeInternals = useUpdateNodeInternals();
 
   const isTriggerNode = isEntryNodeType(data.nodeType);
   const pinDefaults = data.pinDefaults || {};
   const isVarNode = data.nodeType === 'get_var' || data.nodeType === 'set_var';
+  const loopProgress = data.nodeType === 'loop' ? (loopProgressByNodeId ? loopProgressByNodeId[id] : undefined) : undefined;
+  const loopBadge = loopProgress && typeof loopProgress.total === 'number' && loopProgress.total > 0
+    ? `${Math.min(loopProgress.index + 1, loopProgress.total)}/${loopProgress.total}`
+    : null;
 
   const variableOptions = useMemo(() => {
     // Best-effort list of “flow vars” to help users pick names (Blueprint-style).
@@ -530,7 +535,8 @@ export const BaseNode = memo(function BaseNode({
       className={clsx(
         'flow-node',
         selected && 'selected',
-        isExecuting && 'executing'
+        isExecuting && 'executing',
+        isRecent && !isExecuting && 'recent'
       )}
     >
       {/* Header with execution pins */}
@@ -567,6 +573,7 @@ export const BaseNode = memo(function BaseNode({
           dangerouslySetInnerHTML={{ __html: data.icon }}
         />
         <span className="node-title">{data.label}</span>
+        {loopBadge ? <span className="node-progress-badge" title="Loop progress">{loopBadge}</span> : null}
 
         {/* Execution output pins (right side of header) */}
         {outputExecs.length === 1 && !isSwitchNode && (

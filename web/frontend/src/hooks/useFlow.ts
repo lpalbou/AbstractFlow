@@ -31,6 +31,11 @@ interface FlowState {
   // Execution state
   executingNodeId: string | null;
   isRunning: boolean;
+  // Execution observability (visual “afterglow” + progress)
+  recentNodeIds: Record<string, true>;
+  recentEdgeIds: Record<string, true>;
+  loopProgressByNodeId: Record<string, { index: number; total: number }>;
+  lastLoopProgress: { nodeId: string; index: number; total: number } | null;
 
   // Editor clipboard (nodes only; edges are intentionally excluded)
   clipboard: NodeClipboard | null;
@@ -56,6 +61,12 @@ interface FlowState {
   duplicateSelection: () => number;
   setExecutingNodeId: (nodeId: string | null) => void;
   setIsRunning: (running: boolean) => void;
+  resetExecutionDecorations: () => void;
+  markRecentNode: (nodeId: string) => void;
+  unmarkRecentNode: (nodeId: string) => void;
+  markRecentEdge: (edgeId: string) => void;
+  unmarkRecentEdge: (edgeId: string) => void;
+  setLoopProgress: (nodeId: string, index: number, total: number) => void;
   loadFlow: (flow: VisualFlow) => void;
   getFlow: () => VisualFlow;
   clearFlow: () => void;
@@ -127,6 +138,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   selectedEdge: null,
   executingNodeId: null,
   isRunning: false,
+  recentNodeIds: {},
+  recentEdgeIds: {},
+  loopProgressByNodeId: {},
+  lastLoopProgress: null,
   clipboard: null,
   clipboardPasteCount: 0,
 
@@ -431,6 +446,37 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   setExecutingNodeId: (nodeId) => set({ executingNodeId: nodeId }),
   setIsRunning: (running) =>
     set({ isRunning: running, executingNodeId: running ? null : null }),
+  resetExecutionDecorations: () =>
+    set({
+      recentNodeIds: {},
+      recentEdgeIds: {},
+      loopProgressByNodeId: {},
+      lastLoopProgress: null,
+    }),
+  markRecentNode: (nodeId) =>
+    set((s) => (nodeId ? { recentNodeIds: { ...s.recentNodeIds, [nodeId]: true } } : s)),
+  unmarkRecentNode: (nodeId) =>
+    set((s) => {
+      if (!nodeId || !s.recentNodeIds[nodeId]) return s;
+      const next = { ...s.recentNodeIds };
+      delete next[nodeId];
+      return { recentNodeIds: next };
+    }),
+  markRecentEdge: (edgeId) =>
+    set((s) => (edgeId ? { recentEdgeIds: { ...s.recentEdgeIds, [edgeId]: true } } : s)),
+  unmarkRecentEdge: (edgeId) =>
+    set((s) => {
+      if (!edgeId || !s.recentEdgeIds[edgeId]) return s;
+      const next = { ...s.recentEdgeIds };
+      delete next[edgeId];
+      return { recentEdgeIds: next };
+    }),
+  setLoopProgress: (nodeId, index, total) =>
+    set((s) => {
+      if (!nodeId) return s;
+      const next = { ...s.loopProgressByNodeId, [nodeId]: { index, total } };
+      return { loopProgressByNodeId: next, lastLoopProgress: { nodeId, index, total } };
+    }),
 
   // Load a flow from API
   loadFlow: (flow) => {

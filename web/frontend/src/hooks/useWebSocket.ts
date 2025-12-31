@@ -2,7 +2,7 @@
  * WebSocket hook for real-time flow execution updates.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ExecutionEvent } from '../types/flow';
 import { useFlowStore } from './useFlow';
 
@@ -30,6 +30,57 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
   const [error, setError] = useState<string | null>(null);
 
   const { setExecutingNodeId, setIsRunning } = useFlowStore();
+  const nodes = useFlowStore((s) => s.nodes);
+  const edges = useFlowStore((s) => s.edges);
+  const resetExecutionDecorations = useFlowStore((s) => s.resetExecutionDecorations);
+  const markRecentNode = useFlowStore((s) => s.markRecentNode);
+  const unmarkRecentNode = useFlowStore((s) => s.unmarkRecentNode);
+  const markRecentEdge = useFlowStore((s) => s.markRecentEdge);
+  const unmarkRecentEdge = useFlowStore((s) => s.unmarkRecentEdge);
+  const setLoopProgress = useFlowStore((s) => s.setLoopProgress);
+
+  const nodeIdSet = useMemo(() => new Set(nodes.map((n) => n.id)), [nodes]);
+  const nodeById = useMemo(() => new Map(nodes.map((n) => [n.id, n] as const)), [nodes]);
+
+  const AFTERGLOW_MS = 2500;
+  const recentNodeTimersRef = useRef<Record<string, number>>({});
+  const recentEdgeTimersRef = useRef<Record<string, number>>({});
+  const lastRootNodeIdRef = useRef<string | null>(null);
+
+  const markNodeAfterglow = useCallback(
+    (nodeId: string) => {
+      if (!nodeId) return;
+      markRecentNode(nodeId);
+      const prev = recentNodeTimersRef.current[nodeId];
+      if (prev) window.clearTimeout(prev);
+      recentNodeTimersRef.current[nodeId] = window.setTimeout(() => {
+        unmarkRecentNode(nodeId);
+        delete recentNodeTimersRef.current[nodeId];
+      }, AFTERGLOW_MS);
+    },
+    [markRecentNode, unmarkRecentNode]
+  );
+
+  const markEdgeAfterglow = useCallback(
+    (edgeId: string) => {
+      if (!edgeId) return;
+      markRecentEdge(edgeId);
+      const prev = recentEdgeTimersRef.current[edgeId];
+      if (prev) window.clearTimeout(prev);
+      recentEdgeTimersRef.current[edgeId] = window.setTimeout(() => {
+        unmarkRecentEdge(edgeId);
+        delete recentEdgeTimersRef.current[edgeId];
+      }, AFTERGLOW_MS);
+    },
+    [markRecentEdge, unmarkRecentEdge]
+  );
+
+  const clearAfterglowTimers = useCallback(() => {
+    for (const t of Object.values(recentNodeTimersRef.current)) window.clearTimeout(t);
+    for (const t of Object.values(recentEdgeTimersRef.current)) window.clearTimeout(t);
+    recentNodeTimersRef.current = {};
+    recentEdgeTimersRef.current = {};
+  }, []);
 
   const isExecutionEvent = (value: unknown): value is ExecutionEvent => {
     if (!value || typeof value !== 'object') return false;
@@ -62,16 +113,54 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
           setIsPaused(false);
           setWaitingInfo(null);
           setRunId(event.runId || null);
+          lastRootNodeIdRef.current = null;
+          clearAfterglowTimers();
+          resetExecutionDecorations();
           break;
         case 'node_start':
           // Only highlight nodes for the root visual run. Child/sub-runs (e.g. Agent subworkflow)
           // may emit node_start events with internal node ids that don't exist in the visual graph.
           if (event.runId && runId && event.runId !== runId) break;
-          setExecutingNodeId(event.nodeId || null);
+          if (!event.nodeId || !nodeIdSet.has(event.nodeId)) break;
+
+          // Mark the execution edge from the previously executing root node → current node.
+          // This gives a “trail” that makes fast flows readable.
+          const prev = lastRootNodeIdRef.current;
+          if (prev && prev !== event.nodeId) {
+            for (const e of edges) {
+              const isExecEdge =
+                e.sourceHandle === 'exec-out' ||
+                e.targetHandle === 'exec-in' ||
+                Boolean(e.animated);
+              if (!isExecEdge) continue;
+              if (e.source === prev && e.target === event.nodeId) markEdgeAfterglow(e.id);
+            }
+          }
+
+          lastRootNodeIdRef.current = event.nodeId;
+          setExecutingNodeId(event.nodeId);
           break;
         case 'node_complete':
           // Keep the last executed node highlighted until the next node_start.
           // This makes fast-running flows observable (Blueprint-style).
+          if (event.runId && runId && event.runId !== runId) break;
+          if (event.nodeId && nodeIdSet.has(event.nodeId)) {
+            markNodeAfterglow(event.nodeId);
+
+            // Loop progress badge (Foreach): show (index+1)/total.
+            const n = nodeById.get(event.nodeId);
+            const nodeType = n?.data?.nodeType;
+            if (nodeType === 'loop' && event.result && typeof event.result === 'object') {
+              const r = event.result as Record<string, unknown>;
+              const idxRaw = r.index;
+              const totalRaw = r.total;
+              const idx = typeof idxRaw === 'number' ? idxRaw : typeof idxRaw === 'string' ? Number(idxRaw) : NaN;
+              const total = typeof totalRaw === 'number' ? totalRaw : typeof totalRaw === 'string' ? Number(totalRaw) : NaN;
+              if (Number.isFinite(idx) && Number.isFinite(total) && total > 0) {
+                setLoopProgress(event.nodeId, Math.max(0, Math.floor(idx)), Math.max(1, Math.floor(total)));
+              }
+            }
+          }
           break;
         case 'flow_waiting':
           // Flow is paused waiting for user input
@@ -104,6 +193,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
           setIsWaiting(false);
           setWaitingInfo(null);
           setExecutingNodeId(null);
+          lastRootNodeIdRef.current = null;
           break;
         case 'flow_complete':
         case 'flow_error':
@@ -112,10 +202,24 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
           setIsPaused(false);
           setWaitingInfo(null);
           setExecutingNodeId(null);
+          lastRootNodeIdRef.current = null;
           break;
       }
     },
-    [setExecutingNodeId, setIsRunning, onWaiting, runId]
+    [
+      setExecutingNodeId,
+      setIsRunning,
+      onWaiting,
+      runId,
+      nodeIdSet,
+      edges,
+      markEdgeAfterglow,
+      markNodeAfterglow,
+      nodeById,
+      setLoopProgress,
+      clearAfterglowTimers,
+      resetExecutionDecorations,
+    ]
   );
 
   // Ensure strict isolation: when switching flows, disconnect the old socket and
@@ -312,9 +416,10 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      clearAfterglowTimers();
       disconnect();
     };
-  }, [disconnect]);
+  }, [disconnect, clearAfterglowTimers]);
 
   return {
     connected,

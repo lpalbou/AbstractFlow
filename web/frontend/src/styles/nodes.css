@@ -26,6 +26,12 @@
   animation: pulse 1s infinite;
 }
 
+/* Afterglow: keep a subtle highlight for recently executed nodes to visualize fast flows. */
+.flow-node.recent {
+  border-color: rgba(52, 152, 219, 0.55);
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.35), 0 8px 18px rgba(52, 152, 219, 0.18);
+}
+
 @keyframes pulse {
   0%,
   100% {
@@ -50,6 +56,20 @@
   color: #fff;
   position: relative;
   min-width: 0;
+}
+
+.node-progress-badge {
+  position: absolute;
+  top: 6px;
+  right: 34px; /* leave space for exec-out pin on the far right */
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.22);
+  color: rgba(255, 255, 255, 0.9);
+  pointer-events: none;
 }
 
 /* Execution pins in header (UE4 Blueprint style) */
@@ -353,6 +373,13 @@
   stroke: var(--success);
   stroke-width: 3;
   filter: drop-shadow(0 0 6px rgba(39, 174, 96, 0.55));
+}
+
+/* Afterglow for recently executed exec edges (helps visualize fast flows). */
+.react-flow__edge.exec-recent .react-flow__edge-path {
+  stroke: rgba(52, 152, 219, 0.85);
+  stroke-width: 3;
+  filter: drop-shadow(0 0 6px rgba(52, 152, 219, 0.35));
 }
 
 @keyframes dash {

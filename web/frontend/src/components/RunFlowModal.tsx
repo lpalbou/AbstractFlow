@@ -80,7 +80,7 @@ export function RunFlowModal({
   onResumeRun,
   onCancelRun,
 }: RunFlowModalProps) {
-  const { nodes, flowName } = useFlowStore();
+  const { nodes, flowName, lastLoopProgress } = useFlowStore();
 
   const nodeById = useMemo(() => {
     const map = new Map<string, (typeof nodes)[number]>();
@@ -582,6 +582,79 @@ export function RunFlowModal({
   const currentStepLabel = (lastStep?.nodeLabel || lastStep?.nodeId || 'Starting…') as string;
   const currentStepStatus = runStatusLabel || (lastStep?.status ? String(lastStep.status).toUpperCase() : 'READY');
 
+  const minibarAgentMeta = useMemo(() => {
+    if (!selectedStep || selectedStep.nodeType !== 'agent') return null;
+    if (!selectedAgentSubRunId) return null;
+
+    // Find the latest trace step for this Agent execution instance.
+    let lastTraceStep: Record<string, unknown> | null = null;
+    for (let i = traceEvents.length - 1; i >= 0; i--) {
+      const ev = traceEvents[i];
+      if (ev.type !== 'trace_update') continue;
+      if (!ev.runId || ev.runId !== selectedAgentSubRunId) continue;
+      const steps = Array.isArray(ev.steps) ? ev.steps : [];
+      for (let j = steps.length - 1; j >= 0; j--) {
+        const st = steps[j];
+        if (st && typeof st === 'object') {
+          lastTraceStep = st as Record<string, unknown>;
+          break;
+        }
+      }
+      if (lastTraceStep) break;
+    }
+    if (!lastTraceStep) return null;
+
+    const effect = lastTraceStep.effect && typeof lastTraceStep.effect === 'object' ? (lastTraceStep.effect as Record<string, unknown>) : null;
+    const effectType = effect && typeof effect.type === 'string' ? effect.type : '';
+    const effectLabel = effectType ? effectType.toUpperCase() : 'EFFECT';
+
+    // Token badges (LLM_CALL)
+    const res = lastTraceStep.result && typeof lastTraceStep.result === 'object' ? (lastTraceStep.result as Record<string, unknown>) : null;
+    const raw = res && res.raw && typeof res.raw === 'object' ? (res.raw as Record<string, unknown>) : null;
+    const usage =
+      (res && res.usage && typeof res.usage === 'object' ? (res.usage as Record<string, unknown>) : null) ||
+      (raw && raw.usage && typeof raw.usage === 'object' ? (raw.usage as Record<string, unknown>) : null) ||
+      (raw && raw.usage_metadata && typeof raw.usage_metadata === 'object' ? (raw.usage_metadata as Record<string, unknown>) : null) ||
+      null;
+
+    const toNum = (v: unknown): number | null => {
+      if (typeof v === 'number' && Number.isFinite(v)) return v;
+      if (typeof v === 'string') {
+        const n = Number(v);
+        if (Number.isFinite(n)) return n;
+      }
+      return null;
+    };
+
+    const inTokens = toNum(usage?.input_tokens) ?? toNum(usage?.prompt_tokens) ?? toNum(res?.input_tokens) ?? toNum(res?.prompt_tokens);
+    const outTokens = toNum(usage?.output_tokens) ?? toNum(usage?.completion_tokens) ?? toNum(res?.output_tokens) ?? toNum(res?.completion_tokens);
+    const totalTokens = toNum(usage?.total_tokens) ?? toNum(res?.total_tokens);
+
+    const tokenBadges: Array<{ label: string; value: number }> = [];
+    if (inTokens != null) tokenBadges.push({ label: 'in', value: inTokens });
+    if (outTokens != null) tokenBadges.push({ label: 'out', value: outTokens });
+    if (totalTokens != null) tokenBadges.push({ label: 'total', value: totalTokens });
+
+    // Tool badges (TOOL_CALLS)
+    const payload = effect && effect.payload && typeof effect.payload === 'object' ? (effect.payload as Record<string, unknown>) : null;
+    const toolCalls =
+      (payload && Array.isArray(payload.tool_calls) ? payload.tool_calls : null) ||
+      (payload && Array.isArray(payload.tool_calls_raw) ? payload.tool_calls_raw : null) ||
+      (payload && Array.isArray(payload.calls) ? payload.calls : null) ||
+      null;
+    const toolNames: string[] = [];
+    if (toolCalls) {
+      for (const c of toolCalls) {
+        if (!c || typeof c !== 'object') continue;
+        const name = typeof (c as any).name === 'string' ? String((c as any).name).trim() : '';
+        if (name) toolNames.push(name);
+      }
+    }
+    const uniqueToolNames = Array.from(new Set(toolNames));
+
+    return { effectLabel, tokenBadges, toolNames: uniqueToolNames };
+  }, [selectedStep, selectedAgentSubRunId, traceEvents]);
+
   const minibar = (
     <div className="run-minibar" role="region" aria-label="Run Flow mini bar">
       <button type="button" className="run-minibar-main" onClick={() => setIsMinimized(false)}>
@@ -602,6 +675,29 @@ export function RunFlowModal({
         <span className="run-minibar-step" title={currentStepLabel}>
           {currentStepLabel}
         </span>
+          {lastLoopProgress ? (
+            <span className="run-minibar-loop" title={`Loop progress (${lastLoopProgress.nodeId})`}>
+              {Math.min(lastLoopProgress.index + 1, lastLoopProgress.total)}/{lastLoopProgress.total}
+            </span>
+          ) : null}
+          {lastStep?.nodeType === 'agent' && minibarAgentMeta ? (
+            <span className="run-minibar-agent-meta" title={minibarAgentMeta.effectLabel}>
+              <span className="run-minibar-effect">{minibarAgentMeta.effectLabel}</span>
+              {minibarAgentMeta.tokenBadges.map((b) => (
+                <span key={b.label} className="run-metric-badge metric-tokens">
+                  {b.label}: {b.value}
+                </span>
+              ))}
+              {minibarAgentMeta.toolNames.slice(0, 3).map((n) => (
+                <span key={n} className="run-metric-badge metric-tool">
+                  {n}
+                </span>
+              ))}
+              {minibarAgentMeta.toolNames.length > 3 ? (
+                <span className="run-metric-badge metric-tool">+{minibarAgentMeta.toolNames.length - 3}</span>
+              ) : null}
+            </span>
+          ) : null}
         <span className="run-minibar-flow" title={flowName || 'Untitled Flow'}>
           {flowName || 'Untitled Flow'}
         </span>
