@@ -428,6 +428,30 @@ def literal_array(inputs: Dict[str, Any]) -> List[Any]:
     return []
 
 
+def tools_allowlist(inputs: Dict[str, Any]) -> Dict[str, Any]:
+    """Return a workflow-scope tool allowlist as a named output.
+
+    The visual editor stores the selected tools as a JSON array of strings in the
+    node's `literalValue`. The executor injects it as `_literalValue`.
+    """
+    value = inputs.get("_literalValue", [])
+    if not isinstance(value, list):
+        return {"tools": []}
+    out: list[str] = []
+    for x in value:
+        if isinstance(x, str) and x.strip():
+            out.append(x.strip())
+    # Preserve order; remove duplicates.
+    seen: set[str] = set()
+    uniq: list[str] = []
+    for t in out:
+        if t in seen:
+            continue
+        seen.add(t)
+        uniq.append(t)
+    return {"tools": uniq}
+
+
 # Handler registry
 BUILTIN_HANDLERS: Dict[str, Callable[[Dict[str, Any]], Any]] = {
     # Math
@@ -468,5 +492,6 @@ BUILTIN_HANDLERS: Dict[str, Callable[[Dict[str, Any]], Any]] = {
     "literal_boolean": literal_boolean,
     "literal_json": literal_json,
     "literal_array": literal_array,
+    "tools_allowlist": tools_allowlist,
 }
 

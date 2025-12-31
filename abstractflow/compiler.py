@@ -1068,6 +1068,35 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
             next_node_map[node_id] = None
             continue
 
+        # For: structured scheduling via `loop` (body) and `done` (completed),
+        # over a numeric range resolved via data edges (start/end/step).
+        if node_effect_type == "for":
+            handles = []
+            targets_by_handle = {}
+            for e in outs:
+                h = getattr(e, "source_handle", None)
+                if not isinstance(h, str) or not h:
+                    raise ValueError(
+                        f"Control node '{node_id}' has an execution edge with no source_handle."
+                    )
+                handles.append(h)
+                targets_by_handle[h] = e.target
+
+            allowed = {"loop", "done"}
+            unknown = [h for h in handles if h not in allowed]
+            if unknown:
+                raise ValueError(
+                    f"Control node '{node_id}' has unsupported execution outputs: {unknown}"
+                )
+
+            control_specs[node_id] = {
+                "kind": "for",
+                "loop_target": targets_by_handle.get("loop"),
+                "done_target": targets_by_handle.get("done"),
+            }
+            next_node_map[node_id] = None
+            continue
+
         if len(outs) == 1:
             h = getattr(outs[0], "source_handle", None)
             if isinstance(h, str) and h and h != "exec-out":
@@ -1357,6 +1386,61 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
                 done_target=spec.get("done_target"),
                 resolve_condition=_resolve_condition,
             )
+        elif effect_type == "for":
+            from .adapters.control_adapter import create_for_node_handler
+
+            spec = control_specs.get(node_id) or {}
+            for_data_handler = handler_obj if callable(handler_obj) else None
+
+            # Precompute upstream pure-node ids for cache invalidation (best-effort).
+            pure_ids = getattr(flow, "_pure_node_ids", None) if flow is not None else None
+            pure_ids = set(pure_ids) if isinstance(pure_ids, (set, list, tuple)) else set()
+
+            def _resolve_range(
+                run: Any,
+                _handler: Any = for_data_handler,
+                _node_id: str = node_id,
+            ) -> Dict[str, Any]:
+                if flow is not None and hasattr(flow, "_node_outputs") and hasattr(flow, "_data_edge_map"):
+                    _sync_effect_results_to_node_outputs(run, flow)
+                if not callable(_handler):
+                    return {}
+                last_output = run.vars.get("_last_output", {})
+                try:
+                    resolved = _handler(last_output)
+                except Exception as e:
+                    try:
+                        run.vars["_flow_error"] = f"For range resolution failed: {e}"
+                        run.vars["_flow_error_node"] = _node_id
+                    except Exception:
+                        pass
+                    raise
+                return resolved if isinstance(resolved, dict) else {}
+
+            base_for = create_for_node_handler(
+                node_id=node_id,
+                loop_target=spec.get("loop_target"),
+                done_target=spec.get("done_target"),
+                resolve_range=_resolve_range,
+            )
+
+            def _wrapped_for(
+                run: Any,
+                ctx: Any,
+                *,
+                _base: Any = base_for,
+                _pure_ids: set[str] = pure_ids,
+            ) -> StepPlan:
+                # Ensure pure nodes feeding the loop body are re-evaluated per iteration.
+                if flow is not None and _pure_ids and hasattr(flow, "_node_outputs") and hasattr(flow, "_data_edge_map"):
+                    _sync_effect_results_to_node_outputs(run, flow)
+                    node_outputs = getattr(flow, "_node_outputs", None)
+                    if isinstance(node_outputs, dict):
+                        for nid in _pure_ids:
+                            node_outputs.pop(nid, None)
+                return _base(run, ctx)
+
+            handlers[node_id] = _wrapped_for
         elif effect_type == "on_event":
             from .adapters.event_adapter import create_on_event_node_handler
 

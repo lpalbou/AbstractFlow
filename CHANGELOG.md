@@ -39,6 +39,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Visual `LLM Call` nodes now support optional **tool calling** via a `tools` allowlist input (pin or node config) and expose a structured `result` output object (normalized LLM response including `tool_calls`, `usage`, and `trace_id`). Tool execution remains runtime-owned and must be modeled explicitly in the workflow (no agent loop/scratchpad).
 - Visual `LLM Call` now also exposes an **inline tools dropdown** in the node UI (when the `tools` pin is not connected), matching the Agent node UX for quickly selecting an allowlist.
 - Visual `Tool Calls` node (`tool_calls`) to execute one or many tool call requests via AbstractRuntime `EffectType.TOOL_CALLS`, outputting `results[]` (per-call output/error) and an aggregate `success` boolean.
+- New pure node `Tools Allowlist` (`tools_allowlist`) that outputs a workflow-scope `tools: string[]` list (configured via inline multi-select), so one allowlist can be fed into `LLM Call.tools`, `Agent.tools`, and `Tool Calls.allowed_tools`.
+- New pure node `Bool Variable` (`bool_var`) to declare a workflow-scope boolean variable (name + default) with typed outputs (`value:boolean`, `name:string`) so flows can branch and mutate it cleanly via `Set Variable`.
+- New control node `For` (`for`) for numeric loops with inputs (`start`, `end`, `step`) and outputs (`i`, `index`) plus `loop`/`done` execution pins.
+- `While` (`while`) now exposes an `index` output pin (0-based iteration count) like `ForEach`.
+- New pure node `Variable` (`var_decl`) to declare a workflow-scope persistent variable with an explicit type (dropdown) and default; its `value` output pin updates to the selected type, and `Get/Set Variable` nodes now auto-adopt that type when the selected name matches a declaration.
 
 ### Planned
 - Visual workflow editor with drag-and-drop interface

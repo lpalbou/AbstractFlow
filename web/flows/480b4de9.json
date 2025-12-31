@@ -1,0 +1,318 @@
+{
+  "id": "480b4de9",
+  "name": "azaz",
+  "description": "",
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": {
+        "x": -48.0,
+        "y": 64.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "query",
+            "label": "query",
+            "type": "string"
+          },
+          {
+            "id": "max_search",
+            "label": "max_search",
+            "type": "number"
+          },
+          {
+            "id": "max_fetch",
+            "label": "max_fetch",
+            "type": "number"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-3",
+      "type": "for",
+      "position": {
+        "x": 240.0,
+        "y": 64.0
+      },
+      "data": {
+        "nodeType": "for",
+        "label": "For",
+        "icon": "&#x1F522;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "start",
+            "label": "start",
+            "type": "number"
+          },
+          {
+            "id": "end",
+            "label": "end",
+            "type": "number"
+          },
+          {
+            "id": "step",
+            "label": "step",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "loop",
+            "label": "loop",
+            "type": "execution"
+          },
+          {
+            "id": "done",
+            "label": "done",
+            "type": "execution"
+          },
+          {
+            "id": "i",
+            "label": "i",
+            "type": "number"
+          },
+          {
+            "id": "index",
+            "label": "index",
+            "type": "number"
+          }
+        ],
+        "pinDefaults": {
+          "start": 0,
+          "step": 1
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-4",
+      "type": "llm_call",
+      "position": {
+        "x": 528.0,
+        "y": 64.0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "LLM Call",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "string"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "string"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "effectConfig": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b"
+        },
+        "pinDefaults": {
+          "system": "You are an expert investigator and writer. Your task is to analyze the user request and create a deep research report. To do so, you will look at existing search results, aggregate with more refined queries. Your output is a list of the best URLs that we can then read to deepen our knowledge. Only respond with an array of relevant URLs separated by @@"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-5",
+      "type": "tools_allowlist",
+      "position": {
+        "x": 240.0,
+        "y": 336.0
+      },
+      "data": {
+        "nodeType": "tools_allowlist",
+        "label": "Tools Allowlist",
+        "icon": "&#x1F9F0;",
+        "headerColor": "#FF8800",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          }
+        ],
+        "literalValue": [
+          "web_search"
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-6",
+      "type": "concat",
+      "position": {
+        "x": 528.0,
+        "y": 304.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "a": "User Request : "
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1767211286941",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-3",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767211317896",
+      "source": "node-1",
+      "sourceHandle": "max_search",
+      "target": "node-3",
+      "targetHandle": "end",
+      "animated": false
+    },
+    {
+      "id": "edge-1767211332027",
+      "source": "node-3",
+      "sourceHandle": "loop",
+      "target": "node-4",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767211367091",
+      "source": "node-5",
+      "sourceHandle": "tools",
+      "target": "node-4",
+      "targetHandle": "tools",
+      "animated": false
+    },
+    {
+      "id": "edge-1767211518033",
+      "source": "node-6",
+      "sourceHandle": "result",
+      "target": "node-4",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "edge-1767211527915",
+      "source": "node-1",
+      "sourceHandle": "query",
+      "target": "node-6",
+      "targetHandle": "b",
+      "animated": false
+    }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2025-12-31T20:01:51.867216",
+  "updated_at": "2025-12-31T20:05:44.794233"
+}

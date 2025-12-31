@@ -68,6 +68,7 @@ class NodeType(str, Enum):
     SWITCH = "switch"
     LOOP = "loop"
     WHILE = "while"
+    FOR = "for"
     SEQUENCE = "sequence"
     PARALLEL = "parallel"
     COMPARE = "compare"
@@ -107,6 +108,9 @@ class NodeType(str, Enum):
     MEMORY_NOTE = "memory_note"
     MEMORY_QUERY = "memory_query"
     TOOL_CALLS = "tool_calls"
+    TOOLS_ALLOWLIST = "tools_allowlist"
+    BOOL_VAR = "bool_var"
+    VAR_DECL = "var_decl"
 
 
 class Pin(BaseModel):

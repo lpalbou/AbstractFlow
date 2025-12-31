@@ -1,0 +1,331 @@
+{
+  "id": "4c8e6f48",
+  "name": "test-search",
+  "description": "",
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": {
+        "x": -16.0,
+        "y": 80.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "query",
+            "label": "query",
+            "type": "string"
+          },
+          {
+            "id": "max_search",
+            "label": "max_search",
+            "type": "number"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-2",
+      "type": "var_decl",
+      "position": {
+        "x": -16.0,
+        "y": 192.0
+      },
+      "data": {
+        "nodeType": "var_decl",
+        "label": "Variable",
+        "icon": "𝑥",
+        "headerColor": "#16A085",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "boolean"
+          }
+        ],
+        "literalValue": {
+          "name": "b_continue",
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-3",
+      "type": "while",
+      "position": {
+        "x": 336.0,
+        "y": 80.0
+      },
+      "data": {
+        "nodeType": "while",
+        "label": "While",
+        "icon": "&#x267B;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "loop",
+            "label": "loop",
+            "type": "execution"
+          },
+          {
+            "id": "done",
+            "label": "done",
+            "type": "execution"
+          },
+          {
+            "id": "index",
+            "label": "index",
+            "type": "number"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-4",
+      "type": "llm_call",
+      "position": {
+        "x": 608.0,
+        "y": 64.0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "LLM Call",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "string"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "string"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "effectConfig": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b"
+        },
+        "pinDefaults": {
+          "system": "You are an expert investigator who do web search to select the most relevant sources to deepen your knowledge and answer the user request"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-5",
+      "type": "tools_allowlist",
+      "position": {
+        "x": 320.0,
+        "y": 272.0
+      },
+      "data": {
+        "nodeType": "tools_allowlist",
+        "label": "Tools Allowlist",
+        "icon": "&#x1F9F0;",
+        "headerColor": "#FF8800",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          }
+        ],
+        "literalValue": [
+          "search_files"
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-6",
+      "type": "concat",
+      "position": {
+        "x": 608.0,
+        "y": 320.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "a": "User Request : "
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1767213825693",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-3",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767213830469",
+      "source": "node-2",
+      "sourceHandle": "value",
+      "target": "node-3",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "edge-1767213858826",
+      "source": "node-3",
+      "sourceHandle": "loop",
+      "target": "node-4",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767213891224",
+      "source": "node-5",
+      "sourceHandle": "tools",
+      "target": "node-4",
+      "targetHandle": "tools",
+      "animated": false
+    },
+    {
+      "id": "edge-1767213921775",
+      "source": "node-1",
+      "sourceHandle": "query",
+      "target": "node-6",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-1767213924660",
+      "source": "node-6",
+      "sourceHandle": "result",
+      "target": "node-4",
+      "targetHandle": "prompt",
+      "animated": false
+    }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2025-12-31T20:46:40.208920",
+  "updated_at": "2025-12-31T20:46:40.208920"
+}

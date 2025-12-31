@@ -147,10 +147,10 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
           if (event.nodeId && nodeIdSet.has(event.nodeId)) {
             markNodeAfterglow(event.nodeId);
 
-            // Loop progress badge (Foreach): show (index+1)/total.
+            // Loop progress badge (Foreach / For): show (index+1)/total.
             const n = nodeById.get(event.nodeId);
             const nodeType = n?.data?.nodeType;
-            if (nodeType === 'loop' && event.result && typeof event.result === 'object') {
+            if ((nodeType === 'loop' || nodeType === 'for') && event.result && typeof event.result === 'object') {
               const r = event.result as Record<string, unknown>;
               const idxRaw = r.index;
               const totalRaw = r.total;

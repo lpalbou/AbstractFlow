@@ -9,7 +9,7 @@
 import { memo, type MouseEvent, type ReactNode, useCallback, useEffect, useMemo } from 'react';
 import { Handle, Position, NodeProps, useEdges, useUpdateNodeInternals } from 'reactflow';
 import { clsx } from 'clsx';
-import type { FlowNodeData } from '../../types/flow';
+import type { FlowNodeData, PinType } from '../../types/flow';
 import { PIN_COLORS, isEntryNodeType } from '../../types/flow';
 import { PinShape } from '../pins/PinShape';
 import { useFlowStore } from '../../hooks/useFlow';
@@ -65,6 +65,255 @@ const OnEventNameInline = memo(function OnEventNameInline({
   );
 });
 
+const ToolsAllowlistInline = memo(function ToolsAllowlistInline({
+  tools,
+  toolOptions,
+  loading,
+  onChange,
+}: {
+  tools: string[];
+  toolOptions: Array<{ value: string; label: string }>;
+  loading: boolean;
+  onChange: (next: string[]) => void;
+}) {
+  return (
+    <div className="node-inline-config nodrag">
+      <div className="node-config-row">
+        <span className="node-config-label">tools</span>
+        <AfMultiSelect
+          variant="pin"
+          values={tools}
+          placeholder={loading ? 'Loading…' : 'Select…'}
+          options={toolOptions}
+          disabled={loading}
+          loading={loading}
+          searchable
+          searchPlaceholder="Search tools…"
+          clearable
+          minPopoverWidth={340}
+          onChange={onChange}
+        />
+      </div>
+    </div>
+  );
+});
+
+const BoolVarInline = memo(function BoolVarInline({
+  nodeId,
+  name,
+  defaultValue,
+  options,
+  onChange,
+}: {
+  nodeId: string;
+  name: string;
+  defaultValue: boolean;
+  options: string[];
+  onChange: (next: { name: string; default: boolean }) => void;
+}) {
+  const listId = `af-bool-var-names-${nodeId}`;
+  return (
+    <div className="node-inline-config nodrag">
+      {options.length > 0 ? (
+        <datalist id={listId}>
+          {options.map((n) => (
+            <option key={n} value={n} />
+          ))}
+        </datalist>
+      ) : null}
+
+      <div className="node-config-row">
+        <span className="node-config-label">name</span>
+        <input
+          className="af-pin-input nodrag"
+          type="text"
+          value={name}
+          list={options.length > 0 ? listId : undefined}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => onChange({ name: e.target.value, default: defaultValue })}
+          placeholder="e.g., is_ready"
+        />
+      </div>
+
+      <div className="node-config-row">
+        <span className="node-config-label">default</span>
+        <label
+          className="af-pin-checkbox nodrag"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <input
+            className="af-pin-checkbox-input"
+            type="checkbox"
+            checked={defaultValue}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => onChange({ name, default: e.target.checked })}
+          />
+          <span className="af-pin-checkbox-box" aria-hidden="true" />
+        </label>
+      </div>
+    </div>
+  );
+});
+
+const VarDeclInline = memo(function VarDeclInline({
+  nodeId,
+  name,
+  varType,
+  defaultValue,
+  nameOptions,
+  onChange,
+}: {
+  nodeId: string;
+  name: string;
+  varType: Exclude<PinType, 'execution'>;
+  defaultValue: unknown;
+  nameOptions: string[];
+  onChange: (next: { name: string; type: Exclude<PinType, 'execution'>; default: unknown }) => void;
+}) {
+  const listId = `af-var-decl-names-${nodeId}`;
+
+  const typeOptions: Array<{ value: string; label: string }> = [
+    { value: 'boolean', label: 'boolean' },
+    { value: 'number', label: 'number' },
+    { value: 'string', label: 'string' },
+    { value: 'object', label: 'object' },
+    { value: 'array', label: 'array' },
+    { value: 'any', label: 'any' },
+  ];
+
+  const defaultUi = (() => {
+    if (varType === 'boolean') {
+      return (
+        <label
+          className="af-pin-checkbox nodrag"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <input
+            className="af-pin-checkbox-input"
+            type="checkbox"
+            checked={typeof defaultValue === 'boolean' ? defaultValue : false}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => onChange({ name, type: varType, default: e.target.checked })}
+          />
+          <span className="af-pin-checkbox-box" aria-hidden="true" />
+        </label>
+      );
+    }
+
+    if (varType === 'number') {
+      const v = typeof defaultValue === 'number' && Number.isFinite(defaultValue) ? String(defaultValue) : '';
+      return (
+        <input
+          className="af-pin-input nodrag"
+          type="number"
+          value={v}
+          placeholder="0"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => {
+            const raw = e.target.value;
+            if (!raw) {
+              onChange({ name, type: varType, default: 0 });
+              return;
+            }
+            const n = Number(raw);
+            if (!Number.isFinite(n)) return;
+            onChange({ name, type: varType, default: n });
+          }}
+        />
+      );
+    }
+
+    if (varType === 'string') {
+      return (
+        <input
+          className="af-pin-input nodrag"
+          type="text"
+          value={typeof defaultValue === 'string' ? defaultValue : ''}
+          placeholder=""
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => onChange({ name, type: varType, default: e.target.value })}
+        />
+      );
+    }
+
+    const preview = varType === 'array' ? '[]' : varType === 'object' ? '{}' : 'null';
+    return (
+      <input
+        className="af-pin-input nodrag"
+        type="text"
+        value={preview}
+        disabled
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+        readOnly
+      />
+    );
+  })();
+
+  return (
+    <div className="node-inline-config nodrag">
+      {nameOptions.length > 0 ? (
+        <datalist id={listId}>
+          {nameOptions.map((n) => (
+            <option key={n} value={n} />
+          ))}
+        </datalist>
+      ) : null}
+
+      <div className="node-config-row">
+        <span className="node-config-label">name</span>
+        <input
+          className="af-pin-input nodrag"
+          type="text"
+          value={name}
+          list={nameOptions.length > 0 ? listId : undefined}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => onChange({ name: e.target.value, type: varType, default: defaultValue })}
+          placeholder="e.g., is_ready"
+        />
+      </div>
+
+      <div className="node-config-row">
+        <span className="node-config-label">type</span>
+        <AfSelect
+          variant="pin"
+          value={varType}
+          options={typeOptions}
+          onChange={(v) => {
+            const nextType = (v || 'any') as Exclude<PinType, 'execution'>;
+            const nextDefault =
+              nextType === 'boolean'
+                ? false
+                : nextType === 'number'
+                  ? 0
+                  : nextType === 'string'
+                    ? ''
+                    : nextType === 'array'
+                      ? []
+                      : nextType === 'object'
+                        ? {}
+                        : null;
+            onChange({ name, type: nextType, default: nextDefault });
+          }}
+        />
+      </div>
+
+      <div className="node-config-row">
+        <span className="node-config-label">default</span>
+        {defaultUi}
+      </div>
+    </div>
+  );
+});
+
 export const BaseNode = memo(function BaseNode({
   id,
   data,
@@ -80,15 +329,18 @@ export const BaseNode = memo(function BaseNode({
   const isTriggerNode = isEntryNodeType(data.nodeType);
   const pinDefaults = data.pinDefaults || {};
   const isVarNode = data.nodeType === 'get_var' || data.nodeType === 'set_var';
-  const loopProgress = data.nodeType === 'loop' ? (loopProgressByNodeId ? loopProgressByNodeId[id] : undefined) : undefined;
+  const loopProgress = (data.nodeType === 'loop' || data.nodeType === 'for')
+    ? (loopProgressByNodeId ? loopProgressByNodeId[id] : undefined)
+    : undefined;
   const loopBadge = loopProgress && typeof loopProgress.total === 'number' && loopProgress.total > 0
     ? `${Math.min(loopProgress.index + 1, loopProgress.total)}/${loopProgress.total}`
     : null;
 
-  const variableOptions = useMemo(() => {
+  const variableMeta = useMemo(() => {
     // Best-effort list of “flow vars” to help users pick names (Blueprint-style).
     // This is deliberately heuristic: users can still type/create new names.
     const vars = new Set<string>();
+    const declaredTypes = new Map<string, Exclude<PinType, 'execution'>>();
 
     for (const n of allNodes) {
       const d = n.data;
@@ -112,13 +364,48 @@ export const BaseNode = memo(function BaseNode({
         const vn = d.pinDefaults.name.trim();
         if (vn) vars.add(vn);
       }
+
+      if (d.nodeType === 'bool_var') {
+        const raw = d.literalValue;
+        let vn = '';
+        if (typeof raw === 'string') vn = raw.trim();
+        else if (raw && typeof raw === 'object' && typeof (raw as any).name === 'string') vn = String((raw as any).name).trim();
+        if (vn) {
+          vars.add(vn);
+          declaredTypes.set(vn, 'boolean');
+        }
+      }
+
+      if (d.nodeType === 'var_decl') {
+        const raw = d.literalValue;
+        if (raw && typeof raw === 'object') {
+          const vn = typeof (raw as any).name === 'string' ? String((raw as any).name).trim() : '';
+          const t = typeof (raw as any).type === 'string' ? String((raw as any).type).trim() : '';
+          const vt =
+            t === 'boolean' || t === 'number' || t === 'string' || t === 'object' || t === 'array' || t === 'any'
+              ? (t as Exclude<PinType, 'execution'>)
+              : 'any';
+          if (vn) {
+            vars.add(vn);
+            declaredTypes.set(vn, vt);
+          }
+        }
+      }
     }
 
-    return Array.from(vars)
+    const options = Array.from(vars)
       .filter((v) => v.length > 0)
       .sort((a, b) => a.localeCompare(b))
-      .map((v) => ({ value: v, label: v }));
+      .map((v) => {
+        const t = declaredTypes.get(v);
+        return { value: v, label: t ? `${v} (${t})` : v };
+      });
+
+    return { options, declaredTypes };
   }, [allNodes]);
+
+  const variableOptions = variableMeta.options;
+  const declaredVarTypes = variableMeta.declaredTypes;
 
   // ReactFlow needs an explicit nudge when handles change (dynamic pins),
   // otherwise newly created edges can exist in state but fail to render.
@@ -174,6 +461,9 @@ export const BaseNode = memo(function BaseNode({
 
   const isLlmNode = data.nodeType === 'llm_call';
   const isAgentNode = data.nodeType === 'agent';
+  const isToolsAllowlistNode = data.nodeType === 'tools_allowlist';
+  const isBoolVarNode = data.nodeType === 'bool_var';
+  const isVarDeclNode = data.nodeType === 'var_decl';
   const isProviderModelsNode = data.nodeType === 'provider_models';
   const isDelayNode = data.nodeType === 'wait_until';
   const isOnEventNode = data.nodeType === 'on_event';
@@ -196,7 +486,7 @@ export const BaseNode = memo(function BaseNode({
 
   const providersQuery = useProviders(hasProviderDropdown && (!providerConnected || !modelConnected));
   const modelsQuery = useModels(selectedProvider, hasModelControls && !modelConnected);
-  const toolsQuery = useTools((isAgentNode || isLlmNode) && !toolsConnected);
+  const toolsQuery = useTools((isAgentNode || isLlmNode || isToolsAllowlistNode) && !toolsConnected);
 
   const providers = Array.isArray(providersQuery.data) ? providersQuery.data : [];
   const models = Array.isArray(modelsQuery.data) ? modelsQuery.data : [];
@@ -232,8 +522,17 @@ export const BaseNode = memo(function BaseNode({
       return Array.from(new Set(cleaned));
     }
 
+    if (isToolsAllowlistNode) {
+      const raw = data.literalValue;
+      if (!Array.isArray(raw)) return [];
+      const cleaned = raw
+        .filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
+        .map((t) => t.trim());
+      return Array.from(new Set(cleaned));
+    }
+
     return [];
-  }, [data.agentConfig?.tools, data.effectConfig?.tools, isAgentNode, isLlmNode]);
+  }, [data.agentConfig?.tools, data.effectConfig?.tools, data.literalValue, isAgentNode, isLlmNode, isToolsAllowlistNode]);
 
   const setProviderModel = useCallback(
     (provider: string | undefined, model: string | undefined) => {
@@ -271,9 +570,59 @@ export const BaseNode = memo(function BaseNode({
       if (isLlmNode) {
         const prev = data.effectConfig || {};
         updateNodeData(id, { effectConfig: { ...prev, tools: unique.length > 0 ? unique : undefined } });
+        return;
+      }
+
+      if (isToolsAllowlistNode) {
+        updateNodeData(id, { literalValue: unique });
       }
     },
-    [data.agentConfig, data.effectConfig, id, isAgentNode, isLlmNode, updateNodeData]
+    [data.agentConfig, data.effectConfig, id, isAgentNode, isLlmNode, isToolsAllowlistNode, updateNodeData]
+  );
+
+  const boolVarConfig = useMemo(() => {
+    if (!isBoolVarNode) return { name: '', default: false };
+    const raw = data.literalValue;
+    if (typeof raw === 'string') return { name: raw.trim(), default: false };
+    if (raw && typeof raw === 'object') {
+      const name = typeof (raw as any).name === 'string' ? String((raw as any).name).trim() : '';
+      const def = typeof (raw as any).default === 'boolean' ? Boolean((raw as any).default) : false;
+      return { name, default: def };
+    }
+    return { name: '', default: false };
+  }, [data.literalValue, isBoolVarNode]);
+
+  const setBoolVarConfig = useCallback(
+    (next: { name: string; default: boolean }) => {
+      if (!isBoolVarNode) return;
+      updateNodeData(id, { literalValue: { name: next.name, default: next.default } });
+    },
+    [id, isBoolVarNode, updateNodeData]
+  );
+
+  const varDeclConfig = useMemo(() => {
+    if (!isVarDeclNode) return { name: '', type: 'any' as const, default: null as unknown };
+    const raw = data.literalValue;
+    if (raw && typeof raw === 'object') {
+      const name = typeof (raw as any).name === 'string' ? String((raw as any).name).trim() : '';
+      const t = typeof (raw as any).type === 'string' ? String((raw as any).type).trim() : '';
+      const type =
+        t === 'boolean' || t === 'number' || t === 'string' || t === 'object' || t === 'array' || t === 'any'
+          ? (t as Exclude<PinType, 'execution'>)
+          : ('any' as const);
+      const def = (raw as any).default as unknown;
+      return { name, type, default: def };
+    }
+    return { name: '', type: 'any' as const, default: null as unknown };
+  }, [data.literalValue, isVarDeclNode]);
+
+  const setVarDeclConfig = useCallback(
+    (next: { name: string; type: Exclude<PinType, 'execution'>; default: unknown }) => {
+      if (!isVarDeclNode) return;
+      const nextOutputs = data.outputs.map((p) => (p.id === 'value' ? { ...p, type: next.type } : p));
+      updateNodeData(id, { literalValue: { name: next.name, type: next.type, default: next.default }, outputs: nextOutputs });
+    },
+    [data.outputs, id, isVarDeclNode, updateNodeData]
   );
 
   const setPinDefault = useCallback(
@@ -314,10 +663,20 @@ export const BaseNode = memo(function BaseNode({
         prevLabel.startsWith(prefix);
 
       const nextLabel = shouldAuto && name ? `${prefix}${name}` : prevLabel;
+      const declaredType = name ? declaredVarTypes.get(name) : undefined;
+      const nextType = declaredType ?? ('any' as const);
 
-      updateNodeData(id, { pinDefaults: nextDefaults, label: nextLabel });
+      const nextData: Partial<FlowNodeData> = { pinDefaults: nextDefaults, label: nextLabel };
+      if (data.nodeType === 'get_var') {
+        nextData.outputs = data.outputs.map((p) => (p.id === 'value' ? { ...p, type: nextType } : p));
+      } else if (data.nodeType === 'set_var') {
+        nextData.inputs = data.inputs.map((p) => (p.id === 'value' ? { ...p, type: nextType } : p));
+        nextData.outputs = data.outputs.map((p) => (p.id === 'value' ? { ...p, type: nextType } : p));
+      }
+
+      updateNodeData(id, nextData);
     },
-    [data.label, data.nodeType, data.pinDefaults, id, isVarNode, updateNodeData]
+    [data.inputs, data.label, data.nodeType, data.outputs, data.pinDefaults, declaredVarTypes, id, isVarNode, updateNodeData]
   );
 
   const setEmitEventName = useCallback(
@@ -803,6 +1162,36 @@ export const BaseNode = memo(function BaseNode({
             value={data.eventConfig?.name || ''}
             eventConfig={data.eventConfig}
             updateNodeData={updateNodeData}
+          />
+        )}
+
+        {data.nodeType === 'tools_allowlist' && (
+          <ToolsAllowlistInline
+            tools={selectedTools}
+            toolOptions={toolOptions}
+            loading={toolsQuery.isLoading}
+            onChange={setNodeTools}
+          />
+        )}
+
+        {data.nodeType === 'bool_var' && (
+          <BoolVarInline
+            nodeId={id}
+            name={boolVarConfig.name}
+            defaultValue={boolVarConfig.default}
+            options={variableOptions.map((o) => o.value)}
+            onChange={setBoolVarConfig}
+          />
+        )}
+
+        {data.nodeType === 'var_decl' && (
+          <VarDeclInline
+            nodeId={id}
+            name={varDeclConfig.name}
+            varType={varDeclConfig.type}
+            defaultValue={varDeclConfig.default}
+            nameOptions={variableOptions.map((o) => o.value)}
+            onChange={setVarDeclConfig}
           />
         )}
 

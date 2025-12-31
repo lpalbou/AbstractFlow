@@ -752,6 +752,10 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
 
         if type_str in LITERAL_NODE_TYPES:
             return False
+        # These nodes are pure (data-only) even if the JSON document omitted template pins.
+        # This keeps programmatic tests and host-built VisualFlows portable.
+        if type_str in {"get_var", "bool_var", "var_decl"}:
+            return False
         if type_str == "break_object":
             return False
         if get_builtin_handler(type_str) is not None:
@@ -1110,6 +1114,110 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
 
         return handler
 
+    def _create_bool_var_handler(data: Dict[str, Any]):
+        """Pure node: reads a workflow-level boolean variable from run.vars with a default.
+
+        Config is stored in the visual node's `literalValue` as either:
+        - a string: variable name
+        - an object: { "name": "...", "default": true|false }
+        """
+        raw_cfg = data.get("literalValue")
+        name_cfg = ""
+        default_cfg = False
+        if isinstance(raw_cfg, str):
+            name_cfg = raw_cfg.strip()
+        elif isinstance(raw_cfg, dict):
+            n = raw_cfg.get("name")
+            if isinstance(n, str):
+                name_cfg = n.strip()
+            d = raw_cfg.get("default")
+            if isinstance(d, bool):
+                default_cfg = d
+
+        def handler(input_data: Any) -> Dict[str, Any]:
+            del input_data
+            run_vars = getattr(flow, "_run_vars", None)  # type: ignore[attr-defined]
+            if not isinstance(run_vars, dict) or not name_cfg:
+                return {"name": name_cfg, "value": bool(default_cfg)}
+
+            raw = _get_by_path(run_vars, name_cfg)
+            if isinstance(raw, bool):
+                return {"name": name_cfg, "value": raw}
+            return {"name": name_cfg, "value": bool(default_cfg)}
+
+        return handler
+
+    def _create_var_decl_handler(data: Dict[str, Any]):
+        """Pure node: typed workflow variable declaration (name + type + default).
+
+        Config is stored in `literalValue`:
+          { "name": "...", "type": "boolean|number|string|object|array|any", "default": ... }
+
+        Runtime semantics:
+        - Read `run.vars[name]` (via `flow._run_vars`), and return it if it matches the declared type.
+        - Otherwise fall back to the declared default.
+        """
+        raw_cfg = data.get("literalValue")
+        name_cfg = ""
+        type_cfg = "any"
+        default_cfg: Any = None
+        if isinstance(raw_cfg, dict):
+            n = raw_cfg.get("name")
+            if isinstance(n, str):
+                name_cfg = n.strip()
+            t = raw_cfg.get("type")
+            if isinstance(t, str) and t.strip():
+                type_cfg = t.strip()
+            default_cfg = raw_cfg.get("default")
+
+        allowed_types = {"boolean", "number", "string", "object", "array", "any"}
+        if type_cfg not in allowed_types:
+            type_cfg = "any"
+
+        def _matches(v: Any) -> bool:
+            if type_cfg == "any":
+                return True
+            if type_cfg == "boolean":
+                return isinstance(v, bool)
+            if type_cfg == "number":
+                return isinstance(v, (int, float)) and not isinstance(v, bool)
+            if type_cfg == "string":
+                return isinstance(v, str)
+            if type_cfg == "array":
+                return isinstance(v, list)
+            if type_cfg == "object":
+                return isinstance(v, dict)
+            return True
+
+        def _default_for_type() -> Any:
+            if type_cfg == "boolean":
+                return False
+            if type_cfg == "number":
+                return 0
+            if type_cfg == "string":
+                return ""
+            if type_cfg == "array":
+                return []
+            if type_cfg == "object":
+                return {}
+            return None
+
+        def handler(input_data: Any) -> Dict[str, Any]:
+            del input_data
+            run_vars = getattr(flow, "_run_vars", None)  # type: ignore[attr-defined]
+            if not isinstance(run_vars, dict) or not name_cfg:
+                v = default_cfg if _matches(default_cfg) else _default_for_type()
+                return {"name": name_cfg, "value": v}
+
+            raw = _get_by_path(run_vars, name_cfg)
+            if _matches(raw):
+                return {"name": name_cfg, "value": raw}
+
+            v = default_cfg if _matches(default_cfg) else _default_for_type()
+            return {"name": name_cfg, "value": v}
+
+        return handler
+
     def _create_set_var_handler(_data: Dict[str, Any]):
         # Execution node: does not mutate run.vars here (handled by compiler adapter).
         # This handler exists to participate in data-edge resolution and expose outputs.
@@ -1352,6 +1460,16 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
         def handler(input_data):
             condition = input_data.get("condition") if isinstance(input_data, dict) else bool(input_data)
             return {"condition": bool(condition)}
+
+        return handler
+
+    def _create_for_handler(data: Dict[str, Any]):
+        def handler(input_data):
+            payload = input_data if isinstance(input_data, dict) else {}
+            start = payload.get("start")
+            end = payload.get("end")
+            step = payload.get("step")
+            return {"start": start, "end": end, "step": step}
 
         return handler
 
@@ -1873,6 +1991,12 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
         if type_str == "get_var":
             return _create_get_var_handler(data)
 
+        if type_str == "bool_var":
+            return _create_bool_var_handler(data)
+
+        if type_str == "var_decl":
+            return _create_var_decl_handler(data)
+
         if type_str == "set_var":
             return _create_set_var_handler(data)
 
@@ -1939,6 +2063,8 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
             return _create_switch_handler(data)
         if type_str == "while":
             return _create_while_handler(data)
+        if type_str == "for":
+            return _create_for_handler(data)
         if type_str == "loop":
             return _create_loop_handler(data)
 
@@ -1958,7 +2084,7 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
         if not _has_execution_pins(type_str, node.data):
             pure_base_handlers[node.id] = base_handler
             pure_node_ids.add(node.id)
-            if type_str == "get_var":
+            if type_str in {"get_var", "bool_var", "var_decl"}:
                 volatile_pure_node_ids.add(node.id)
             continue
 
@@ -2039,6 +2165,11 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
             effect_config = {}
         elif type_str == "while":
             # Control-flow scheduler node (Blueprint-style while).
+            # Runtime semantics are handled in `abstractflow.adapters.control_adapter`.
+            effect_type = type_str
+            effect_config = {}
+        elif type_str == "for":
+            # Control-flow scheduler node (Blueprint-style numeric for).
             # Runtime semantics are handled in `abstractflow.adapters.control_adapter`.
             effect_type = type_str
             effect_config = {}

@@ -276,7 +276,8 @@ const STRING_NODES: NodeTemplate[] = [
 const CONTROL_NODES: NodeTemplate[] = [
   // Execution nodes - control the flow
   { type: 'if', icon: '&#x2753;', label: 'If/Else', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'condition', label: 'condition', type: 'boolean' }], outputs: [{ id: 'true', label: 'true', type: 'execution' }, { id: 'false', label: 'false', type: 'execution' }], category: 'control' },
-  { type: 'while', icon: '&#x267B;', label: 'While', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'condition', label: 'condition', type: 'boolean' }], outputs: [{ id: 'loop', label: 'loop', type: 'execution' }, { id: 'done', label: 'done', type: 'execution' }], category: 'control' },
+  { type: 'while', icon: '&#x267B;', label: 'While', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'condition', label: 'condition', type: 'boolean' }], outputs: [{ id: 'loop', label: 'loop', type: 'execution' }, { id: 'done', label: 'done', type: 'execution' }, { id: 'index', label: 'index', type: 'number' }], category: 'control' },
+  { type: 'for', icon: '&#x1F522;', label: 'For', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'start', label: 'start', type: 'number' }, { id: 'end', label: 'end', type: 'number' }, { id: 'step', label: 'step', type: 'number' }], outputs: [{ id: 'loop', label: 'loop', type: 'execution' }, { id: 'done', label: 'done', type: 'execution' }, { id: 'i', label: 'i', type: 'number' }, { id: 'index', label: 'index', type: 'number' }], category: 'control' },
 	  {
 	    type: 'switch',
 	    icon: '&#x1F500;', // Shuffle
@@ -385,6 +386,30 @@ const DATA_NODES: NodeTemplate[] = [
 // Variable nodes (Blueprint-style)
 const VARIABLE_NODES: NodeTemplate[] = [
   {
+    type: 'var_decl',
+    icon: '𝑥',
+    label: 'Variable',
+    headerColor: '#16A085', // Teal
+    inputs: [],
+    outputs: [
+      { id: 'name', label: 'name', type: 'string' },
+      { id: 'value', label: 'value', type: 'any' },
+    ],
+    category: 'variables',
+  },
+  {
+    type: 'bool_var',
+    icon: '&#x1F7E5;', // Red square (boolean-ish)
+    label: 'Bool Variable',
+    headerColor: '#16A085', // Teal (variables)
+    inputs: [],
+    outputs: [
+      { id: 'name', label: 'name', type: 'string' },
+      { id: 'value', label: 'value', type: 'boolean' },
+    ],
+    category: 'variables',
+  },
+  {
     type: 'get_var',
     icon: '&#x1F4E5;', // Reuse "inbox tray" as a getter-ish icon
     label: 'Get Variable',
@@ -457,6 +482,15 @@ const LITERAL_NODES: NodeTemplate[] = [
     headerColor: '#FF8800', // Orange - matches array pin color
     inputs: [],
     outputs: [{ id: 'value', label: 'value', type: 'array' }],
+    category: 'literals',
+  },
+  {
+    type: 'tools_allowlist',
+    icon: '&#x1F9F0;', // Toolbox
+    label: 'Tools Allowlist',
+    headerColor: '#FF8800', // Orange - array output
+    inputs: [],
+    outputs: [{ id: 'tools', label: 'tools', type: 'array' }],
     category: 'literals',
   },
 ];

@@ -53,6 +53,7 @@ export type NodeType =
   | 'concat' | 'split' | 'join' | 'format' | 'uppercase' | 'lowercase' | 'trim' | 'substring' | 'length'
   // Control - if/loop/while have exec, logic gates are pure
   | 'if' | 'switch' | 'loop' | 'while' | 'sequence' | 'parallel' | 'compare' | 'not' | 'and' | 'or'
+  | 'for'
   // Data - Pure functions (no exec pins)
   | 'get' | 'set' | 'merge' | 'array_map' | 'array_filter' | 'array_concat'
   | 'get_var' | 'set_var'
@@ -73,7 +74,10 @@ export type NodeType =
   | 'write_file'
   | 'memory_note'
   | 'memory_query'
-  | 'tool_calls';
+  | 'tool_calls'
+  | 'tools_allowlist'
+  | 'bool_var'
+  | 'var_decl';
 
 export const ENTRY_NODE_TYPES: NodeType[] = [
   'on_flow_start',
