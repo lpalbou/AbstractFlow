@@ -44,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New control node `For` (`for`) for numeric loops with inputs (`start`, `end`, `step`) and outputs (`i`, `index`) plus `loop`/`done` execution pins.
 - `While` (`while`) now exposes an `index` output pin (0-based iteration count) like `ForEach`.
 - New pure node `Variable` (`var_decl`) to declare a workflow-scope persistent variable with an explicit type (dropdown) and default; its `value` output pin updates to the selected type, and `Get/Set Variable` nodes now auto-adopt that type when the selected name matches a declaration.
+- Moved `Tool Calls` (`tool_calls`) from the `Effects` palette category to `Core`, and reordered core nodes to: Subflow, Agent, LLM Call, Tool Calls, Ask User, Answer User.
 
 ### Planned
 - Visual workflow editor with drag-and-drop interface

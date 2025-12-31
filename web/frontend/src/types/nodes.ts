@@ -147,6 +147,21 @@ const EVENT_NODES: NodeTemplate[] = [
 // Core nodes
 const CORE_NODES: NodeTemplate[] = [
   {
+    type: 'subflow',
+    icon: '&#x1F4E6;', // Package
+    label: 'Subflow',
+    headerColor: '#00CCCC',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'input', label: 'input', type: 'object' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'output', label: 'output', type: 'object' },
+    ],
+    category: 'core',
+  },
+  {
     type: 'agent',
     icon: '&#x1F916;', // Robot
     label: 'Agent',
@@ -164,6 +179,43 @@ const CORE_NODES: NodeTemplate[] = [
       { id: 'exec-out', label: '', type: 'execution' },
       { id: 'result', label: 'result', type: 'object' },
       { id: 'scratchpad', label: 'scratchpad', type: 'object' },
+    ],
+    category: 'core',
+  },
+  {
+    type: 'llm_call',
+    icon: '&#x1F4AD;', // Thought bubble
+    label: 'LLM Call',
+    headerColor: '#3498DB', // Blue - AI
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'provider', label: 'provider', type: 'string' },
+      { id: 'model', label: 'model', type: 'string' },
+      { id: 'system', label: 'system', type: 'string' },
+      { id: 'prompt', label: 'prompt', type: 'string' },
+      { id: 'tools', label: 'tools', type: 'array' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'response', label: 'response', type: 'string' },
+      { id: 'result', label: 'result', type: 'object' },
+    ],
+    category: 'core',
+  },
+  {
+    type: 'tool_calls',
+    icon: '&#x1F528;', // Hammer
+    label: 'Tool Calls',
+    headerColor: '#16A085', // Teal - IO/tools
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'tool_calls', label: 'tool_calls', type: 'array' },
+      { id: 'allowed_tools', label: 'allowed_tools', type: 'array' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'results', label: 'results', type: 'array' },
+      { id: 'success', label: 'success', type: 'boolean' },
     ],
     category: 'core',
   },
@@ -195,41 +247,6 @@ const CORE_NODES: NodeTemplate[] = [
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
       { id: 'message', label: 'message', type: 'string' },
-    ],
-    category: 'core',
-  },
-  {
-    type: 'llm_call',
-    icon: '&#x1F4AD;', // Thought bubble
-    label: 'LLM Call',
-    headerColor: '#3498DB', // Blue - AI
-    inputs: [
-      { id: 'exec-in', label: '', type: 'execution' },
-      { id: 'provider', label: 'provider', type: 'string' },
-      { id: 'model', label: 'model', type: 'string' },
-      { id: 'system', label: 'system', type: 'string' },
-      { id: 'prompt', label: 'prompt', type: 'string' },
-      { id: 'tools', label: 'tools', type: 'array' },
-    ],
-    outputs: [
-      { id: 'exec-out', label: '', type: 'execution' },
-      { id: 'response', label: 'response', type: 'string' },
-      { id: 'result', label: 'result', type: 'object' },
-    ],
-    category: 'core',
-  },
-  {
-    type: 'subflow',
-    icon: '&#x1F4E6;', // Package
-    label: 'Subflow',
-    headerColor: '#00CCCC',
-    inputs: [
-      { id: 'exec-in', label: '', type: 'execution' },
-      { id: 'input', label: 'input', type: 'object' },
-    ],
-    outputs: [
-      { id: 'exec-out', label: '', type: 'execution' },
-      { id: 'output', label: 'output', type: 'object' },
     ],
     category: 'core',
   },
@@ -498,23 +515,6 @@ const LITERAL_NODES: NodeTemplate[] = [
 // Effect nodes - Side effects that integrate with AbstractRuntime
 // These nodes have execution pins and can pause/resume flows
 const EFFECT_NODES: NodeTemplate[] = [
-  {
-    type: 'tool_calls',
-    icon: '&#x1F528;', // Hammer
-    label: 'Tool Calls',
-    headerColor: '#16A085', // Teal - IO/tools
-    inputs: [
-      { id: 'exec-in', label: '', type: 'execution' },
-      { id: 'tool_calls', label: 'tool_calls', type: 'array' },
-      { id: 'allowed_tools', label: 'allowed_tools', type: 'array' },
-    ],
-    outputs: [
-      { id: 'exec-out', label: '', type: 'execution' },
-      { id: 'results', label: 'results', type: 'array' },
-      { id: 'success', label: 'success', type: 'boolean' },
-    ],
-    category: 'effects',
-  },
   {
     type: 'wait_until',
     icon: '&#x23F3;', // Hourglass
