@@ -20,6 +20,7 @@ from .adapters.effect_adapter import (
 )
 
 if TYPE_CHECKING:
+    from abstractruntime.core.models import StepPlan
     from abstractruntime.core.spec import WorkflowSpec
 
 
@@ -729,6 +730,12 @@ def _sync_effect_results_to_node_outputs(run: Any, flow: Flow) -> None:
         elif effect_type == "llm_call":
             if isinstance(raw, dict):
                 current["response"] = raw.get("content")
+                # Expose the full normalized LLM result as an object output pin (`result`).
+                # This enables deterministic state-machine workflows to branch on:
+                # - tool_calls
+                # - usage / model / finish_reason
+                # - trace_id / metadata for observability
+                current["result"] = raw
                 current["raw"] = raw
                 mapped_value = current["response"]
         elif effect_type == "agent":

@@ -65,7 +65,15 @@ def create_agent_node_handler(
         # Build initial vars for the agent subworkflow
         max_iterations = getattr(agent, "_max_iterations", 25)
         max_history_messages = getattr(agent, "_max_history_messages", -1)
-        max_tokens = getattr(agent, "_max_tokens", 32768)
+        max_tokens = getattr(agent, "_max_tokens", None)
+        if not isinstance(max_tokens, int) or max_tokens <= 0:
+            try:
+                runtime = getattr(agent, "runtime", None)
+                config = getattr(runtime, "config", None)
+                base = config.to_limits_dict() if config is not None else {}
+                max_tokens = int(base.get("max_tokens", 32768) or 32768)
+            except Exception:
+                max_tokens = 32768
 
         agent_vars = {
             "context": {

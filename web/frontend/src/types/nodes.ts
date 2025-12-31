@@ -209,10 +209,12 @@ const CORE_NODES: NodeTemplate[] = [
       { id: 'model', label: 'model', type: 'string' },
       { id: 'system', label: 'system', type: 'string' },
       { id: 'prompt', label: 'prompt', type: 'string' },
+      { id: 'tools', label: 'tools', type: 'array' },
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
       { id: 'response', label: 'response', type: 'string' },
+      { id: 'result', label: 'result', type: 'object' },
     ],
     category: 'core',
   },

@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - A default **LLM HTTP timeout** for workflow execution (default 7200s, per `LLM_CALL`/Agent step) enforced by the **AbstractRuntime orchestrator** and overrideable via `ABSTRACTFLOW_LLM_TIMEOUT_S` / `ABSTRACTFLOW_LLM_TIMEOUT`.
   - A default **max output token cap** (4096; configurable via `ABSTRACTFLOW_LLM_MAX_OUTPUT_TOKENS` / `ABSTRACTFLOW_MAX_OUTPUT_TOKENS`) to keep agent generations bounded and avoid late-loop slowdowns/timeouts.
 - WebSocket execution events now include a JSON-safe ISO timestamp (`ts`) for clearer observability in the UI and logs.
+- Visual `LLM Call` nodes now support optional **tool calling** via a `tools` allowlist input (pin or node config) and expose a structured `result` output object (normalized LLM response including `tool_calls`, `usage`, and `trace_id`). Tool execution remains runtime-owned and must be modeled explicitly in the workflow (no agent loop/scratchpad).
 
 ### Planned
 - Visual workflow editor with drag-and-drop interface

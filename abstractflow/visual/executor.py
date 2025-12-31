@@ -1417,10 +1417,102 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
         provider_default = config.get("provider", "")
         model_default = config.get("model", "")
         temperature = config.get("temperature", 0.7)
+        tools_default_raw = config.get("tools")
+
+        # Tool definitions (ToolSpecs) are required for tool calling. In the visual editor we
+        # store tools as a portable `string[]` allowlist; at execution time we translate to
+        # strict ToolSpecs `{name, description, parameters}` expected by AbstractCore.
+        def _strip_tool_spec(raw: Any) -> Optional[Dict[str, Any]]:
+            if not isinstance(raw, dict):
+                return None
+            name = raw.get("name")
+            if not isinstance(name, str) or not name.strip():
+                return None
+            desc = raw.get("description")
+            params = raw.get("parameters")
+            out: Dict[str, Any] = {
+                "name": name.strip(),
+                "description": str(desc or ""),
+                "parameters": dict(params) if isinstance(params, dict) else {},
+            }
+            return out
+
+        def _normalize_tool_names(raw: Any) -> list[str]:
+            if not isinstance(raw, list):
+                return []
+            out: list[str] = []
+            for t in raw:
+                if isinstance(t, str) and t.strip():
+                    out.append(t.strip())
+            return out
+
+        # Precompute a best-effort "available ToolSpecs by name" map so we can turn tool names
+        # into ToolSpecs without going through the web backend.
+        tool_specs_by_name: Dict[str, Dict[str, Any]] = {}
+        try:
+            from abstractruntime.integrations.abstractcore.default_tools import list_default_tool_specs
+
+            base_specs = list_default_tool_specs()
+            if not isinstance(base_specs, list):
+                base_specs = []
+            for s in base_specs:
+                stripped = _strip_tool_spec(s)
+                if stripped is not None:
+                    tool_specs_by_name[stripped["name"]] = stripped
+        except Exception:
+            pass
+
+        # Optional schema-only runtime tools (used by AbstractAgent). These are useful for
+        # "state machine" autonomy where the graph can route tool-like requests to effect nodes.
+        try:
+            from abstractagent.logic.builtins import (  # type: ignore
+                ASK_USER_TOOL,
+                COMPACT_MEMORY_TOOL,
+                INSPECT_VARS_TOOL,
+                RECALL_MEMORY_TOOL,
+                REMEMBER_TOOL,
+            )
+
+            builtin_defs = [ASK_USER_TOOL, RECALL_MEMORY_TOOL, INSPECT_VARS_TOOL, REMEMBER_TOOL, COMPACT_MEMORY_TOOL]
+            for tool_def in builtin_defs:
+                try:
+                    d = tool_def.to_dict()
+                except Exception:
+                    d = None
+                stripped = _strip_tool_spec(d)
+                if stripped is not None and stripped["name"] not in tool_specs_by_name:
+                    tool_specs_by_name[stripped["name"]] = stripped
+        except Exception:
+            pass
+
+        def _normalize_tools(raw: Any) -> list[Dict[str, Any]]:
+            # Already ToolSpecs (from pins): accept and strip UI-only fields.
+            if isinstance(raw, list) and raw and all(isinstance(x, dict) for x in raw):
+                out: list[Dict[str, Any]] = []
+                for x in raw:
+                    stripped = _strip_tool_spec(x)
+                    if stripped is not None:
+                        out.append(stripped)
+                return out
+
+            # Tool names (portable representation): resolve against known tool specs.
+            names = _normalize_tool_names(raw)
+            out: list[Dict[str, Any]] = []
+            for name in names:
+                spec = tool_specs_by_name.get(name)
+                if spec is not None:
+                    out.append(spec)
+            return out
 
         def handler(input_data):
             prompt = input_data.get("prompt", "") if isinstance(input_data, dict) else str(input_data)
             system = input_data.get("system", "") if isinstance(input_data, dict) else ""
+
+            tools_specified = isinstance(input_data, dict) and "tools" in input_data
+            tools_raw = input_data.get("tools") if isinstance(input_data, dict) else None
+            tools = _normalize_tools(tools_raw) if tools_specified else []
+            if not tools_specified:
+                tools = _normalize_tools(tools_default_raw)
 
             provider = (
                 input_data.get("provider")
@@ -1440,6 +1532,7 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
                         "type": "llm_call",
                         "prompt": prompt,
                         "system_prompt": system,
+                        "tools": tools,
                         "params": {"temperature": temperature},
                     },
                     "error": "Missing provider or model configuration",
@@ -1451,6 +1544,7 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
                     "type": "llm_call",
                     "prompt": prompt,
                     "system_prompt": system,
+                    "tools": tools,
                     "params": {"temperature": temperature},
                     "provider": provider,
                     "model": model,

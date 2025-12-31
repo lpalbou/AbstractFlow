@@ -649,6 +649,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const { data } = node;
   const providerPinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'provider');
   const modelPinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'model');
+  const toolsPinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'tools');
   const emitEventNamePinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'name');
   const scopePinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'scope');
   const emitEventScopePinConnected = scopePinConnected && data.nodeType === 'emit_event';
@@ -666,9 +667,28 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     });
   };
 
-  const selectedTools = Array.isArray(data.agentConfig?.tools)
-    ? data.agentConfig?.tools.filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
-    : [];
+  const updateLlmCallEffectConfig = (patch: Record<string, unknown>) => {
+    updateNodeData(node.id, {
+      effectConfig: {
+        ...(data.effectConfig || {}),
+        ...patch,
+      },
+    });
+  };
+
+  const selectedTools = (() => {
+    if (data.nodeType === 'agent') {
+      return Array.isArray(data.agentConfig?.tools)
+        ? data.agentConfig?.tools.filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
+        : [];
+    }
+    if (data.nodeType === 'llm_call') {
+      return Array.isArray((data.effectConfig as any)?.tools)
+        ? ((data.effectConfig as any).tools as unknown[]).filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
+        : [];
+    }
+    return [];
+  })();
 
   const filteredToolSpecs = (() => {
     const q = toolSearch.trim().toLowerCase();
@@ -1190,6 +1210,31 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                   },
                 };
               }
+            } else if (sourceNode?.data.nodeType === 'llm_call') {
+              // Best-effort schema for AbstractRuntime normalized LLM_CALL result payload.
+              sample = {
+                content: '',
+                reasoning: '',
+                data: null,
+                tool_calls: [
+                  {
+                    name: '',
+                    arguments: {},
+                    call_id: '',
+                  },
+                ],
+                usage: {
+                  input_tokens: 0,
+                  output_tokens: 0,
+                  total_tokens: 0,
+                  prompt_tokens: 0,
+                  completion_tokens: 0,
+                },
+                model: '',
+                finish_reason: '',
+                metadata: {},
+                trace_id: '',
+              };
             }
 
             const available = schema
@@ -2749,6 +2794,114 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               step={0.1}
             />
             <span className="property-hint">0 = deterministic, 2 = creative</span>
+          </div>
+
+          <div className="property-group">
+            <label className="property-sublabel">Tools (optional)</label>
+            {toolsPinConnected ? (
+              <span className="property-hint">Provided by connected pin.</span>
+            ) : (
+              <>
+                <input
+                  className="property-input"
+                  value={toolSearch}
+                  onChange={(e) => setToolSearch(e.target.value)}
+                  placeholder={loadingTools ? 'Loading tools…' : 'Search tools…'}
+                  disabled={loadingTools}
+                />
+
+                {selectedTools.length > 0 && (
+                  <div className="tool-chips">
+                    {selectedTools.map((name) => (
+                      <button
+                        key={name}
+                        type="button"
+                        className="tool-chip"
+                        onClick={() => {
+                          const next = selectedTools.filter((t) => t !== name);
+                          updateLlmCallEffectConfig({ tools: next.length > 0 ? next : undefined });
+                        }}
+                        title="Remove tool"
+                      >
+                        {name}
+                        <span className="tool-chip-x">×</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {toolsError && (
+                  <span className="property-error">
+                    Failed to load tools: {toolsError}
+                  </span>
+                )}
+
+                {!loadingTools && !toolsError && toolSpecs.length === 0 && (
+                  <span className="property-hint">
+                    No tools available from the runtime.
+                  </span>
+                )}
+
+                {!loadingTools && toolSpecs.length > 0 && (
+                  <div className="toolset-list">
+                    {Object.entries(toolSpecsByToolset).map(([toolset, tools]) => {
+                      const names = tools.map((t) => t.name);
+                      const allSelected = names.length > 0 && names.every((n) => selectedTools.includes(n));
+
+                      const toggleAll = () => {
+                        const next = new Set(selectedTools);
+                        if (!allSelected) {
+                          for (const n of names) next.add(n);
+                        } else {
+                          for (const n of names) next.delete(n);
+                        }
+                        const asList = Array.from(next);
+                        updateLlmCallEffectConfig({ tools: asList.length > 0 ? asList : undefined });
+                      };
+
+                      return (
+                        <div key={toolset} className="toolset-group">
+                          <div className="toolset-header">
+                            <span className="toolset-title">{toolset}</span>
+                            <button
+                              type="button"
+                              className="toolset-toggle"
+                              onClick={toggleAll}
+                              disabled={names.length === 0}
+                              title={allSelected ? 'Deselect all' : 'Select all'}
+                            >
+                              {allSelected ? 'None' : 'All'}
+                            </button>
+                          </div>
+                          <div className="checkbox-list tool-checkboxes">
+                            {tools.map((t) => (
+                              <label key={t.name} className="checkbox-item tool-item">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedTools.includes(t.name)}
+                                  onChange={() => {
+                                    const next = selectedTools.includes(t.name)
+                                      ? selectedTools.filter((x) => x !== t.name)
+                                      : [...selectedTools, t.name];
+                                    updateLlmCallEffectConfig({ tools: next.length > 0 ? next : undefined });
+                                  }}
+                                />
+                                <span className="checkbox-label">{t.name}</span>
+                                {t.description && <span className="tool-desc">{t.description}</span>}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <span className="property-hint">
+                  Selected tools are the only tools the model may request (tool calls are not executed automatically by this node).
+                </span>
+              </>
+            )}
           </div>
         </div>
       )}
