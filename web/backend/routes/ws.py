@@ -1144,11 +1144,33 @@ async def _execute_runner_loop(
                 return state
 
             if reason_value == "event" and not is_root:
-                # Listener waits are silent; we close the step when the event resumes.
-                if isinstance(node_before, str) and node_before:
-                    if track.get("wait_event_started_at") is None or track.get("wait_event_node_id") != node_before:
+                # Listener waits are silent; we close the node we just executed (if any),
+                # then track the WAIT_EVENT node so we can emit it only when resumed.
+                #
+                # Without this, a listener that runs a normal node (e.g. ANSWER_USER)
+                # and then returns to WAITING(event) would drop the final `node_complete`.
+                wait_node = getattr(state, "current_node", None)
+                wait_node_id = str(wait_node) if isinstance(wait_node, str) else (str(node_before) if isinstance(node_before, str) else "")
+
+                active0 = track.get("active_node_id")
+                if isinstance(active0, str) and active0 and active0 != wait_node_id:
+                    out0 = _run_node_output(state, active0)
+                    total_node_ms = float(track.get("active_duration_ms") or duration_ms)
+                    metrics = _node_metrics(active0, duration_ms=total_node_ms, output=out0)
+                    await websocket.send_json(
+                        ExecutionEvent(
+                            type="node_complete",
+                            runId=run_id,
+                            nodeId=active0,
+                            result=out0,
+                            meta=metrics,
+                        ).model_dump()
+                    )
+
+                if wait_node_id:
+                    if track.get("wait_event_started_at") is None or track.get("wait_event_node_id") != wait_node_id:
                         track["wait_event_started_at"] = time.perf_counter()
-                        track["wait_event_node_id"] = node_before
+                        track["wait_event_node_id"] = wait_node_id
                 track["active_node_id"] = None
                 track["active_duration_ms"] = 0.0
                 return state

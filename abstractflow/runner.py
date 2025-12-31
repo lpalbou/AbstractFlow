@@ -119,7 +119,7 @@ class FlowRunner:
         Raises:
             RuntimeError: If the flow fails
         """
-        from abstractruntime.core.models import RunStatus
+        from abstractruntime.core.models import RunStatus, WaitReason
 
         self.start(input_data)
 
@@ -136,6 +136,62 @@ class FlowRunner:
                 raise RuntimeError(f"Flow failed: {state.error}")
 
             if state.status == RunStatus.WAITING:
+                # Convenience: when waiting on a SUBWORKFLOW, FlowRunner.run() can
+                # auto-drive the child to completion and resume the parent.
+                #
+                # Visual Agent nodes use async+wait START_SUBWORKFLOW so web hosts
+                # can stream traces. In non-interactive contexts (unit tests, CLI),
+                # we still want a synchronous `run()` to complete when possible.
+                wait = getattr(state, "waiting", None)
+                if (
+                    wait is not None
+                    and getattr(wait, "reason", None) == WaitReason.SUBWORKFLOW
+                    and getattr(self.runtime, "workflow_registry", None) is not None
+                ):
+                    details = getattr(wait, "details", None)
+                    sub_run_id = None
+                    if isinstance(details, dict):
+                        rid = details.get("sub_run_id")
+                        if isinstance(rid, str) and rid:
+                            sub_run_id = rid
+                    wait_key = getattr(wait, "wait_key", None)
+                    if sub_run_id is None and isinstance(wait_key, str) and wait_key.startswith("subworkflow:"):
+                        sub_run_id = wait_key.split("subworkflow:", 1)[1] or None
+
+                    if isinstance(sub_run_id, str) and sub_run_id:
+                        sub_state = self.runtime.get_state(sub_run_id)
+                        registry = self.runtime.workflow_registry
+                        sub_workflow = registry.get(sub_state.workflow_id) if registry is not None else None
+                        if sub_workflow is None:
+                            return {
+                                "waiting": True,
+                                "state": state,
+                                "wait_key": state.waiting.wait_key if state.waiting else None,
+                            }
+
+                        # Drive the child until it completes or blocks.
+                        while sub_state.status == RunStatus.RUNNING:
+                            sub_state = self.runtime.tick(workflow=sub_workflow, run_id=sub_run_id)
+
+                        if sub_state.status == RunStatus.COMPLETED:
+                            node_traces = None
+                            try:
+                                node_traces = self.runtime.get_node_traces(sub_run_id)
+                            except Exception:
+                                node_traces = None
+
+                            self.runtime.resume(
+                                workflow=self.workflow,
+                                run_id=self._current_run_id,  # type: ignore[arg-type]
+                                wait_key=None,
+                                payload={"sub_run_id": sub_state.run_id, "output": sub_state.output, "node_traces": node_traces},
+                                max_steps=0,
+                            )
+                            continue
+
+                        if sub_state.status == RunStatus.FAILED:
+                            raise RuntimeError(f"Subworkflow failed: {sub_state.error}")
+
                 # Flow is waiting for external input
                 return {
                     "waiting": True,
