@@ -44,8 +44,8 @@
       "id": "node-2",
       "type": "var_decl",
       "position": {
-        "x": -16.0,
-        "y": 192.0
+        "x": -176.0,
+        "y": 272.0
       },
       "data": {
         "nodeType": "var_decl",
@@ -513,44 +513,6 @@
       "outputs": []
     },
     {
-      "id": "node-12",
-      "type": "compare",
-      "position": {
-        "x": 1616.0,
-        "y": 176.0
-      },
-      "data": {
-        "nodeType": "compare",
-        "label": "Compare",
-        "icon": "=?",
-        "headerColor": "#F39C12",
-        "inputs": [
-          {
-            "id": "a",
-            "label": "a",
-            "type": "any"
-          },
-          {
-            "id": "b",
-            "label": "b",
-            "type": "any"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "result",
-            "label": "result",
-            "type": "boolean"
-          }
-        ]
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
       "id": "node-13",
       "type": "if",
       "position": {
@@ -681,6 +643,88 @@
       "headerColor": null,
       "inputs": [],
       "outputs": []
+    },
+    {
+      "id": "node-16",
+      "type": "compare",
+      "position": {
+        "x": 1616.0,
+        "y": 176.0
+      },
+      "data": {
+        "nodeType": "compare",
+        "label": "Compare",
+        "icon": "=?",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "any"
+          },
+          {
+            "id": "op",
+            "label": "op",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "boolean"
+          }
+        ],
+        "pinDefaults": {
+          "op": ">="
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-17",
+      "type": "get_var",
+      "position": {
+        "x": 32.0,
+        "y": 496.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get b_continue",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "boolean"
+          }
+        ],
+        "pinDefaults": {
+          "name": "b_continue"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
     }
   ],
   "edges": [
@@ -691,14 +735,6 @@
       "target": "node-3",
       "targetHandle": "exec-in",
       "animated": true
-    },
-    {
-      "id": "edge-1767213830469",
-      "source": "node-2",
-      "sourceHandle": "value",
-      "target": "node-3",
-      "targetHandle": "condition",
-      "animated": false
     },
     {
       "id": "edge-1767213858826",
@@ -797,36 +833,12 @@
       "animated": false
     },
     {
-      "id": "edge-1767214477489",
-      "source": "node-3",
-      "sourceHandle": "index",
-      "target": "node-12",
-      "targetHandle": "a",
-      "animated": false
-    },
-    {
-      "id": "edge-1767214483898",
-      "source": "node-1",
-      "sourceHandle": "max_search",
-      "target": "node-12",
-      "targetHandle": "b",
-      "animated": false
-    },
-    {
       "id": "edge-1767214508350",
       "source": "node-10",
       "sourceHandle": "done",
       "target": "node-13",
       "targetHandle": "exec-in",
       "animated": true
-    },
-    {
-      "id": "edge-1767214510975",
-      "source": "node-12",
-      "sourceHandle": "result",
-      "target": "node-13",
-      "targetHandle": "condition",
-      "animated": false
     },
     {
       "id": "edge-1767214536683",
@@ -859,9 +871,41 @@
       "target": "node-15",
       "targetHandle": "exec-in",
       "animated": true
+    },
+    {
+      "id": "edge-1767215156386",
+      "source": "node-3",
+      "sourceHandle": "index",
+      "target": "node-16",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-1767215164992",
+      "source": "node-1",
+      "sourceHandle": "max_search",
+      "target": "node-16",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-1767215169700",
+      "source": "node-16",
+      "sourceHandle": "result",
+      "target": "node-13",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "edge-1767218587995",
+      "source": "node-17",
+      "sourceHandle": "value",
+      "target": "node-3",
+      "targetHandle": "condition",
+      "animated": false
     }
   ],
   "entryNode": "node-1",
   "created_at": "2025-12-31T20:46:40.208920",
-  "updated_at": "2025-12-31T20:56:41.179945"
+  "updated_at": "2025-12-31T22:32:31.232316"
 }

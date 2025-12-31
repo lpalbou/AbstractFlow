@@ -45,6 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `While` (`while`) now exposes an `index` output pin (0-based iteration count) like `ForEach`.
 - New pure node `Variable` (`var_decl`) to declare a workflow-scope persistent variable with an explicit type (dropdown) and default; its `value` output pin updates to the selected type, and `Get/Set Variable` nodes now auto-adopt that type when the selected name matches a declaration.
 - Moved `Tool Calls` (`tool_calls`) from the `Effects` palette category to `Core`, and reordered core nodes to: Subflow, Agent, LLM Call, Tool Calls, Ask User, Answer User.
+- Improved `Compare` (`compare`) node with an `op` input pin (dropdown in the UI) supporting `==`, `>=`, `>`, `<=`, `<` (defaults to `==` for backward compatibility).
+- Fixed scheduler-node outputs in WebSocket `node_complete`: Loop/While/For now sync their persisted `{index,...}` outputs into `flow._node_outputs` after scheduling, so the UI no longer shows a stale index (often stuck at 0).
 
 ### Planned
 - Visual workflow editor with drag-and-drop interface

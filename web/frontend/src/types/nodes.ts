@@ -336,7 +336,19 @@ const CONTROL_NODES: NodeTemplate[] = [
   },
   { type: 'loop', icon: '&#x1F501;', label: 'ForEach', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'items', label: 'items', type: 'array' }], outputs: [{ id: 'loop', label: 'loop', type: 'execution' }, { id: 'done', label: 'done', type: 'execution' }, { id: 'item', label: 'item', type: 'any' }, { id: 'index', label: 'index', type: 'number' }], category: 'control' },
   // Pure functions - just produce data
-  { type: 'compare', icon: '=?', label: 'Compare', headerColor: '#F39C12', inputs: [{ id: 'a', label: 'a', type: 'any' }, { id: 'b', label: 'b', type: 'any' }], outputs: [{ id: 'result', label: 'result', type: 'boolean' }], category: 'control' },
+  {
+    type: 'compare',
+    icon: '=?',
+    label: 'Compare',
+    headerColor: '#F39C12',
+    inputs: [
+      { id: 'a', label: 'a', type: 'any' },
+      { id: 'op', label: 'op', type: 'string' },
+      { id: 'b', label: 'b', type: 'any' },
+    ],
+    outputs: [{ id: 'result', label: 'result', type: 'boolean' }],
+    category: 'control',
+  },
   { type: 'not', icon: '!', label: 'NOT', headerColor: '#F39C12', inputs: [{ id: 'value', label: 'value', type: 'boolean' }], outputs: [{ id: 'result', label: 'result', type: 'boolean' }], category: 'control' },
   { type: 'and', icon: '&&', label: 'AND', headerColor: '#F39C12', inputs: [{ id: 'a', label: 'a', type: 'boolean' }, { id: 'b', label: 'b', type: 'boolean' }], outputs: [{ id: 'result', label: 'result', type: 'boolean' }], category: 'control' },
   { type: 'or', icon: '||', label: 'OR', headerColor: '#F39C12', inputs: [{ id: 'a', label: 'a', type: 'boolean' }, { id: 'b', label: 'b', type: 'boolean' }], outputs: [{ id: 'result', label: 'result', type: 'boolean' }], category: 'control' },

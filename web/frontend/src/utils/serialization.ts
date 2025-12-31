@@ -64,6 +64,22 @@ export function fromVisualFlow(flow: VisualFlow): {
       ? { ...createNodeData(template), ...vn.data }
       : vn.data;
 
+    // Best-effort migrations for legacy nodes (keep flows usable across versions).
+    if (data.nodeType === 'compare') {
+      const hasOp = Array.isArray(data.inputs) && data.inputs.some((p) => p.id === 'op');
+      if (!hasOp && Array.isArray(data.inputs)) {
+        const nextInputs = [...data.inputs];
+        const opPin = { id: 'op', label: 'op', type: 'string' as const };
+        const aIdx = nextInputs.findIndex((p) => p.id === 'a');
+        if (aIdx >= 0) {
+          nextInputs.splice(aIdx + 1, 0, opPin);
+        } else {
+          nextInputs.push(opPin);
+        }
+        (data as any).inputs = nextInputs;
+      }
+    }
+
     return {
       id: vn.id,
       type: vn.type === 'code' ? 'code' : 'custom',

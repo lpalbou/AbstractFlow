@@ -1300,7 +1300,13 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
                     if isinstance(node_outputs, dict):
                         for nid in _pure_ids:
                             node_outputs.pop(nid, None)
-                return _base(run, ctx)
+                plan = _base(run, ctx)
+                # The loop scheduler persists `{item,index,total}` into run.vars, but
+                # UI node_complete events read from `flow._node_outputs`. Sync after
+                # scheduling so observability reflects the current iteration.
+                if flow is not None and hasattr(flow, "_node_outputs") and hasattr(flow, "_data_edge_map"):
+                    _sync_effect_results_to_node_outputs(run, flow)
+                return plan
 
             handlers[node_id] = _wrapped_loop
         elif effect_type == "agent":
@@ -1380,12 +1386,27 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
                     return bool(resolved.get("condition"))
                 return bool(resolved)
 
-            handlers[node_id] = create_while_node_handler(
+            base_while = create_while_node_handler(
                 node_id=node_id,
                 loop_target=spec.get("loop_target"),
                 done_target=spec.get("done_target"),
                 resolve_condition=_resolve_condition,
             )
+
+            def _wrapped_while(
+                run: Any,
+                ctx: Any,
+                *,
+                _base: Any = base_while,
+            ) -> StepPlan:
+                plan = _base(run, ctx)
+                # While scheduler persists `index` into run.vars; sync so WS/UI
+                # node_complete events show the latest iteration count.
+                if flow is not None and hasattr(flow, "_node_outputs") and hasattr(flow, "_data_edge_map"):
+                    _sync_effect_results_to_node_outputs(run, flow)
+                return plan
+
+            handlers[node_id] = _wrapped_while
         elif effect_type == "for":
             from .adapters.control_adapter import create_for_node_handler
 
@@ -1438,7 +1459,12 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
                     if isinstance(node_outputs, dict):
                         for nid in _pure_ids:
                             node_outputs.pop(nid, None)
-                return _base(run, ctx)
+                plan = _base(run, ctx)
+                # For scheduler persists `{i,index,total}` into run.vars; sync so
+                # WS/UI node_complete events show the current iteration.
+                if flow is not None and hasattr(flow, "_node_outputs") and hasattr(flow, "_data_edge_map"):
+                    _sync_effect_results_to_node_outputs(run, flow)
+                return plan
 
             handlers[node_id] = _wrapped_for
         elif effect_type == "on_event":

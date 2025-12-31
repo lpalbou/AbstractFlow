@@ -751,6 +751,7 @@ export const BaseNode = memo(function BaseNode({
   const isSequenceLike = data.nodeType === 'sequence';
   const isParallelLike = data.nodeType === 'parallel';
   const isSwitchNode = data.nodeType === 'switch';
+  const isCompareNode = data.nodeType === 'compare';
   const isConcatNode = data.nodeType === 'concat';
   const isArrayConcatNode = data.nodeType === 'array_concat';
 
@@ -1233,10 +1234,12 @@ export const BaseNode = memo(function BaseNode({
                 const isOnScheduleTimestampPin = isOnScheduleNode && pin.id === 'schedule';
                 const isOnScheduleRecurrentPin = isOnScheduleNode && pin.id === 'recurrent';
                 const isWriteFileContentPin = isWriteFileNode && pin.id === 'content';
+                const isCompareOpPin = isCompareNode && pin.id === 'op';
                 const hasSpecialControl =
                   (hasProviderDropdown && pin.id === 'provider') ||
                   (hasModelControls && pin.id === 'model') ||
                   ((isAgentNode || isLlmNode) && pin.id === 'tools') ||
+                  isCompareOpPin ||
                   isEmitEventName ||
                   isEmitEventScopePin ||
                   isOnEventScopePin ||
@@ -1287,6 +1290,29 @@ export const BaseNode = memo(function BaseNode({
                       searchable={false}
                       minPopoverWidth={180}
                       onChange={onChange}
+                    />
+                  );
+                }
+
+                if (isCompareOpPin && !connected) {
+                  const raw = pinDefaults.op;
+                  const currentOp = typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : '==';
+                  controls.push(
+                    <AfSelect
+                      key="compare-op"
+                      variant="pin"
+                      value={currentOp}
+                      placeholder="=="
+                      options={[
+                        { value: '==', label: '==' },
+                        { value: '>=', label: '>=' },
+                        { value: '>', label: '>' },
+                        { value: '<=', label: '<=' },
+                        { value: '<', label: '<' },
+                      ]}
+                      searchable={false}
+                      minPopoverWidth={120}
+                      onChange={(v) => setPinDefault('op', (v || '==') as any)}
                     />
                   );
                 }
