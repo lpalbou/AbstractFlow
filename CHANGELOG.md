@@ -32,7 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Blueprint-style workflow variables:
   - `Get Variable` (`get_var`) reads a value from durable `run.vars` by dotted path.
   - `Set Variable` (`set_var`) updates `run.vars` (pass-through, execution pins) to support scratchpads/stateful workflows.
-- Visual runs now apply a safe default **local LLM HTTP timeout** (configurable via `ABSTRACTFLOW_LLM_TIMEOUT_S` / `ABSTRACTFLOW_LLM_TIMEOUT`) to prevent infinite hangs when a local provider stalls.
+- Visual runs now apply safe defaults for local LLM execution in the web host:
+  - A default **LLM HTTP timeout** for workflow execution (default 7200s, per `LLM_CALL`/Agent step) enforced by the **AbstractRuntime orchestrator** and overrideable via `ABSTRACTFLOW_LLM_TIMEOUT_S` / `ABSTRACTFLOW_LLM_TIMEOUT`.
+  - A default **max output token cap** (4096; configurable via `ABSTRACTFLOW_LLM_MAX_OUTPUT_TOKENS` / `ABSTRACTFLOW_MAX_OUTPUT_TOKENS`) to keep agent generations bounded and avoid late-loop slowdowns/timeouts.
+- WebSocket execution events now include a JSON-safe ISO timestamp (`ts`) for clearer observability in the UI and logs.
 
 ### Planned
 - Visual workflow editor with drag-and-drop interface

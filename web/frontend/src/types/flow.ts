@@ -210,6 +210,8 @@ export interface ExecutionEvent {
     | 'flow_resumed'
     | 'flow_cancelled'
     | 'trace_update';
+  // ISO 8601 UTC timestamp for event emission (host-side observability).
+  ts?: string;
   runId?: string;
   nodeId?: string;
   result?: unknown;

@@ -8,6 +8,7 @@ AbstractCode, servers), not only the web backend.
 from __future__ import annotations
 
 from enum import Enum
+from datetime import datetime, timezone
 import uuid
 from typing import Any, Dict, List, Optional
 
@@ -217,6 +218,8 @@ class ExecutionEvent(BaseModel):
     """Real-time execution event for WebSocket."""
 
     type: str  # "node_start", "node_complete", "flow_complete", "flow_error"
+    # ISO 8601 UTC timestamp for event emission (host-side observability).
+    ts: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     runId: Optional[str] = None
     nodeId: Optional[str] = None
     result: Optional[Any] = None

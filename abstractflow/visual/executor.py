@@ -394,34 +394,64 @@ def create_visual_runner(
             except Exception:
                 effective_tool_executor = None
 
-        # Web-host safety: avoid infinite hangs when a local model/provider stalls.
+        # LLM timeout policy (web-hosted workflow execution).
         #
-        # AbstractCore defaults to `timeout=None` (unlimited) for provider HTTP requests.
-        # That is reasonable for some CLI use-cases, but in a visual workflow host it can
-        # permanently block a run (and make pause/cancel feel broken).
+        # Contract:
+        # - AbstractRuntime (the orchestrator) is the authority for execution policy such as timeouts.
+        # - This host can *override* that policy via env for deployments that want a different SLO.
         #
-        # This default can be overridden globally via env:
+        # Env overrides:
         # - ABSTRACTFLOW_LLM_TIMEOUT_S (float seconds)
         # - ABSTRACTFLOW_LLM_TIMEOUT (alias)
         #
-        # Set to 0 or a negative value to opt back into "unlimited".
+        # Set to 0 or a negative value to opt into "unlimited".
         llm_kwargs: Dict[str, Any] = {}
         timeout_raw = os.getenv("ABSTRACTFLOW_LLM_TIMEOUT_S") or os.getenv("ABSTRACTFLOW_LLM_TIMEOUT")
-        timeout_s: Optional[float]
         if timeout_raw is None or not str(timeout_raw).strip():
-            timeout_s = 300.0
+            # No override: let the orchestrator (AbstractRuntime) apply its default.
+            pass
         else:
             raw = str(timeout_raw).strip().lower()
             if raw in {"none", "null", "inf", "infinite", "unlimited"}:
-                timeout_s = None
+                # Explicit override: opt back into unlimited HTTP requests.
+                llm_kwargs["timeout"] = None
             else:
                 try:
                     timeout_s = float(raw)
                 except Exception:
-                    timeout_s = 300.0
-        if isinstance(timeout_s, (int, float)) and timeout_s <= 0:
-            timeout_s = None
-        llm_kwargs["timeout"] = timeout_s
+                    timeout_s = None
+                # Only override when parsing succeeded; otherwise fall back to AbstractCore config default.
+                if timeout_s is None:
+                    pass
+                elif isinstance(timeout_s, (int, float)) and timeout_s <= 0:
+                    # Consistent with the documented behavior: <=0 => unlimited.
+                    llm_kwargs["timeout"] = None
+                else:
+                    llm_kwargs["timeout"] = timeout_s
+
+        # Default output token cap for web-hosted runs.
+        #
+        # Without an explicit max_output_tokens, agent-style loops can produce very long
+        # responses that are both slow (local inference) and unhelpful for a visual UI
+        # (tools should write files; the model should not dump huge blobs into chat).
+        max_out_raw = os.getenv("ABSTRACTFLOW_LLM_MAX_OUTPUT_TOKENS") or os.getenv("ABSTRACTFLOW_MAX_OUTPUT_TOKENS")
+        max_out: Optional[int] = None
+        if max_out_raw is None or not str(max_out_raw).strip():
+            max_out = 4096
+        else:
+            try:
+                max_out = int(str(max_out_raw).strip())
+            except Exception:
+                max_out = 4096
+        if isinstance(max_out, int) and max_out <= 0:
+            max_out = None
+
+        # Pass runtime config to initialize `_limits.max_output_tokens`.
+        try:
+            from abstractruntime.core.config import RuntimeConfig
+            runtime_config = RuntimeConfig(max_output_tokens=max_out)
+        except Exception:  # pragma: no cover
+            runtime_config = None
 
         runtime = create_local_runtime(
             provider=provider,
@@ -431,6 +461,7 @@ def create_visual_runner(
             run_store=run_store,
             ledger_store=ledger_store,
             artifact_store=artifact_store,
+            config=runtime_config,
         )
     else:
         runtime_kwargs: Dict[str, Any] = {

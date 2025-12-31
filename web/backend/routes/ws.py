@@ -6,6 +6,7 @@ import asyncio
 import json
 import os
 import time
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -15,6 +16,11 @@ from ..services.executor import create_visual_runner
 from ..services.runtime_stores import get_runtime_stores
 
 router = APIRouter(tags=["websocket"])
+
+
+def _ws_utc_now_iso() -> str:
+    """UTC ISO timestamp for WS event payloads (JSON-serializable)."""
+    return datetime.now(timezone.utc).isoformat()
 
 # Active WebSocket connections
 _connections: Dict[str, WebSocket] = {}
@@ -207,7 +213,8 @@ async def websocket_execution(websocket: WebSocket, flow_id: str):
                     run_id=str(run_id) if isinstance(run_id, str) and run_id.strip() else None,
                 )
             elif message.get("type") == "ping":
-                await websocket.send_json({"type": "pong"})
+                # Keepalive pong (ignored by the UI) - still includes a timestamp for observability.
+                await websocket.send_json(ExecutionEvent(type="pong").model_dump())
 
     except WebSocketDisconnect:
         pass
@@ -262,7 +269,7 @@ async def execute_with_updates(
         run_id = runner.start(input_data)
         if isinstance(run_id, str) and run_id:
             _active_run_ids[connection_id] = run_id
-        await websocket.send_json({"type": "flow_start", "runId": run_id})
+        await websocket.send_json(ExecutionEvent(type="flow_start", runId=run_id).model_dump())
 
         # Execute and handle waiting
         if gate is not None:
@@ -359,14 +366,14 @@ async def control_run(
             # Apply synchronously: pause/cancel must remain responsive even if the threadpool
             # is saturated by long-running `runner.step()` calls.
             _apply("pause_run", reason="Paused via AbstractFlow UI")
-            await websocket.send_json({"type": "flow_paused", "runId": run_id_target})
+            await websocket.send_json(ExecutionEvent(type="flow_paused", runId=run_id_target).model_dump())
             return
 
         if action2 == "resume":
             _apply("resume_run")
             if gate is not None:
                 gate.set()
-            await websocket.send_json({"type": "flow_resumed", "runId": run_id_target})
+            await websocket.send_json(ExecutionEvent(type="flow_resumed", runId=run_id_target).model_dump())
             return
 
         # cancel
@@ -382,7 +389,7 @@ async def control_run(
         _waiting_runners.pop(connection_id, None)
         _waiting_steps.pop(connection_id, None)
 
-        await websocket.send_json({"type": "flow_cancelled", "runId": run_id_target})
+        await websocket.send_json(ExecutionEvent(type="flow_cancelled", runId=run_id_target).model_dump())
     except Exception as e:
         await websocket.send_json(
             ExecutionEvent(type="flow_error", error=f"Control action failed: {e}").model_dump()
@@ -579,6 +586,7 @@ async def _execute_runner_loop(
             await websocket.send_json(
                 {
                     "type": "trace_update",
+                    "ts": _utc_now_iso(),
                     "runId": run_id,
                     "nodeId": node_id,
                     "steps": _json_safe(new_steps),
@@ -621,6 +629,7 @@ async def _execute_runner_loop(
                 await websocket.send_json(
                     {
                         "type": "flow_waiting",
+                        "ts": _utc_now_iso(),
                         "runId": root_run_id,
                         "nodeId": node_before or getattr(state, "current_node", None),
                         "wait_key": wait_key,
@@ -1158,6 +1167,7 @@ async def _execute_runner_loop(
                     await websocket.send_json(
                         {
                             "type": "flow_waiting",
+                            "ts": _utc_now_iso(),
                             "runId": run_id,
                             "nodeId": node_before or state.current_node,
                             "wait_key": wait_key,
@@ -1357,7 +1367,11 @@ async def _execute_runner_loop(
             if connection_id in _waiting_runners:
                 del _waiting_runners[connection_id]
             await websocket.send_json(
-                {"type": "flow_cancelled", "runId": root_run_id, "error": getattr(root_now, "error", None)}
+                ExecutionEvent(
+                    type="flow_cancelled",
+                    runId=root_run_id,
+                    error=getattr(root_now, "error", None),
+                ).model_dump()
             )
             break
 
@@ -1662,6 +1676,7 @@ async def resume_waiting_flow(
             await websocket.send_json(
                 {
                     "type": "flow_waiting",
+                    "ts": _ws_utc_now_iso(),
                     "nodeId": top_state.current_node if top_state else None,
                     "wait_key": wait_key,
                     "reason": reason,
