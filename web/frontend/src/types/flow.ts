@@ -72,7 +72,8 @@ export type NodeType =
   | 'read_file'
   | 'write_file'
   | 'memory_note'
-  | 'memory_query';
+  | 'memory_query'
+  | 'tool_calls';
 
 export const ENTRY_NODE_TYPES: NodeType[] = [
   'on_flow_start',
@@ -146,8 +147,10 @@ export interface FlowNodeData {
     provider?: string;     // For llm_call
     model?: string;        // For llm_call
     temperature?: number;  // For llm_call
+    tools?: string[];      // For llm_call (tool allowlist; resolved to ToolSpecs at execution)
     allowFreeText?: boolean; // For ask_user
     durationType?: 'seconds' | 'minutes' | 'hours' | 'timestamp'; // For wait_until
+    allowed_tools?: string[]; // For tool_calls (tool name allowlist; empty => allow none)
     // For emit_event
     name?: string;
     scope?: 'session' | 'workflow' | 'run' | 'global';

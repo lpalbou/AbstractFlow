@@ -112,6 +112,7 @@ def create_visual_runner(
             "ask_user",
             "answer_user",
             "llm_call",
+            "tool_calls",
             "wait_until",
             "wait_event",
             "emit_event",
@@ -250,7 +251,7 @@ def create_visual_runner(
             node_type = _node_type(n)
             if reachable and n.id not in reachable:
                 continue
-            if node_type in {"llm_call", "agent"}:
+            if node_type in {"llm_call", "agent", "tool_calls"}:
                 has_llm_nodes = True
 
             if node_type == "llm_call":
@@ -800,6 +801,7 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
         "ask_user",
         "answer_user",
         "llm_call",
+        "tool_calls",
         "wait_until",
         "wait_event",
         "emit_event",
@@ -1374,6 +1376,8 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
             return _create_answer_user_handler(data, effect_config)
         if effect_type == "llm_call":
             return _create_llm_call_handler(data, effect_config)
+        if effect_type == "tool_calls":
+            return _create_tool_calls_handler(data, effect_config)
         if effect_type == "wait_until":
             return _create_wait_until_handler(data, effect_config)
         if effect_type == "wait_event":
@@ -1384,6 +1388,72 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
             return _create_memory_query_handler(data, effect_config)
 
         return lambda x: x
+
+    def _create_tool_calls_handler(data: Dict[str, Any], config: Dict[str, Any]):
+        import json
+
+        allowed_default = None
+        if isinstance(config, dict):
+            raw = config.get("allowed_tools")
+            if raw is None:
+                raw = config.get("allowedTools")
+            allowed_default = raw
+
+        def _normalize_str_list(raw: Any) -> list[str]:
+            if not isinstance(raw, list):
+                return []
+            out: list[str] = []
+            for x in raw:
+                if isinstance(x, str) and x.strip():
+                    out.append(x.strip())
+            return out
+
+        def _normalize_tool_calls(raw: Any) -> list[Dict[str, Any]]:
+            if raw is None:
+                return []
+            if isinstance(raw, dict):
+                return [dict(raw)]
+            if isinstance(raw, list):
+                out: list[Dict[str, Any]] = []
+                for x in raw:
+                    if isinstance(x, dict):
+                        out.append(dict(x))
+                return out
+            if isinstance(raw, str) and raw.strip():
+                # Best-effort: tolerate JSON strings coming from parse_json/text nodes.
+                try:
+                    parsed = json.loads(raw)
+                except Exception:
+                    return []
+                return _normalize_tool_calls(parsed)
+            return []
+
+        def handler(input_data: Any):
+            payload = input_data if isinstance(input_data, dict) else {}
+
+            tool_calls_raw = payload.get("tool_calls")
+            tool_calls = _normalize_tool_calls(tool_calls_raw)
+
+            allow_specified = "allowed_tools" in payload or "allowedTools" in payload
+            allowed_raw = payload.get("allowed_tools")
+            if allowed_raw is None:
+                allowed_raw = payload.get("allowedTools")
+            allowed_tools = _normalize_str_list(allowed_raw) if allow_specified else []
+            if not allow_specified:
+                allowed_tools = _normalize_str_list(allowed_default)
+
+            pending: Dict[str, Any] = {"type": "tool_calls", "tool_calls": tool_calls}
+            # Only include allowlist when explicitly provided (empty list means "allow none").
+            if allow_specified or isinstance(allowed_default, list):
+                pending["allowed_tools"] = allowed_tools
+
+            return {
+                "results": None,
+                "success": None,
+                "_pending_effect": pending,
+            }
+
+        return handler
 
     def _create_ask_user_handler(data: Dict[str, Any], config: Dict[str, Any]):
         def handler(input_data):

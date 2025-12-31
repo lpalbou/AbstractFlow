@@ -16,6 +16,7 @@ from .adapters.effect_adapter import (
     create_memory_note_handler,
     create_memory_query_handler,
     create_llm_call_handler,
+    create_tool_calls_handler,
     create_start_subworkflow_handler,
 )
 
@@ -109,6 +110,14 @@ def _create_effect_node_handler(
             provider=effect_config.get("provider"),
             model=effect_config.get("model"),
             temperature=effect_config.get("temperature", 0.7),
+        )
+    elif effect_type == "tool_calls":
+        base_handler = create_tool_calls_handler(
+            node_id=node_id,
+            next_node=next_node,
+            input_key=input_key,
+            output_key=output_key,
+            allowed_tools=effect_config.get("allowed_tools") if isinstance(effect_config, dict) else None,
         )
     elif effect_type == "start_subworkflow":
         base_handler = create_start_subworkflow_handler(
@@ -738,6 +747,23 @@ def _sync_effect_results_to_node_outputs(run: Any, flow: Flow) -> None:
                 current["result"] = raw
                 current["raw"] = raw
                 mapped_value = current["response"]
+        elif effect_type == "tool_calls":
+            # Effect outcome is produced by AbstractRuntime TOOL_CALLS handler:
+            # - executed: {"mode":"executed","results":[{call_id,name,success,output,error}, ...]}
+            # - passthrough/untrusted: {"mode": "...", "tool_calls": [...]}
+            if isinstance(raw, dict):
+                mode = raw.get("mode")
+                results = raw.get("results")
+                if not isinstance(results, list):
+                    results = []
+                current["results"] = results
+                # Only treat non-executed modes as failure (results are unavailable).
+                if isinstance(mode, str) and mode.strip() and mode != "executed":
+                    current["success"] = False
+                else:
+                    current["success"] = all(isinstance(r, dict) and r.get("success") is True for r in results)
+                current["raw"] = raw
+                mapped_value = current["results"]
         elif effect_type == "agent":
             current["result"] = raw
             scratchpad = None

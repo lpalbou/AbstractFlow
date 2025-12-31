@@ -185,7 +185,7 @@ export const BaseNode = memo(function BaseNode({
 
   const providerConnected = hasProviderDropdown ? isPinConnected('provider', true) : false;
   const modelConnected = hasModelControls ? isPinConnected('model', true) : false;
-  const toolsConnected = isAgentNode ? isPinConnected('tools', true) : false;
+  const toolsConnected = (isAgentNode || isLlmNode) ? isPinConnected('tools', true) : false;
 
   const selectedProvider = isAgentNode
     ? data.agentConfig?.provider
@@ -196,7 +196,7 @@ export const BaseNode = memo(function BaseNode({
 
   const providersQuery = useProviders(hasProviderDropdown && (!providerConnected || !modelConnected));
   const modelsQuery = useModels(selectedProvider, hasModelControls && !modelConnected);
-  const toolsQuery = useTools(isAgentNode && !toolsConnected);
+  const toolsQuery = useTools((isAgentNode || isLlmNode) && !toolsConnected);
 
   const providers = Array.isArray(providersQuery.data) ? providersQuery.data : [];
   const models = Array.isArray(modelsQuery.data) ? modelsQuery.data : [];
@@ -214,14 +214,26 @@ export const BaseNode = memo(function BaseNode({
   }, [tools]);
 
   const selectedTools = useMemo(() => {
-    if (!isAgentNode) return [];
-    const raw = data.agentConfig?.tools;
-    if (!Array.isArray(raw)) return [];
-    const cleaned = raw
-      .filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
-      .map((t) => t.trim());
-    return Array.from(new Set(cleaned));
-  }, [data.agentConfig?.tools, isAgentNode]);
+    if (isAgentNode) {
+      const raw = data.agentConfig?.tools;
+      if (!Array.isArray(raw)) return [];
+      const cleaned = raw
+        .filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
+        .map((t) => t.trim());
+      return Array.from(new Set(cleaned));
+    }
+
+    if (isLlmNode) {
+      const raw = data.effectConfig?.tools;
+      if (!Array.isArray(raw)) return [];
+      const cleaned = raw
+        .filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
+        .map((t) => t.trim());
+      return Array.from(new Set(cleaned));
+    }
+
+    return [];
+  }, [data.agentConfig?.tools, data.effectConfig?.tools, isAgentNode, isLlmNode]);
 
   const setProviderModel = useCallback(
     (provider: string | undefined, model: string | undefined) => {
@@ -243,17 +255,25 @@ export const BaseNode = memo(function BaseNode({
     [data.agentConfig, data.effectConfig, data.providerModelsConfig, id, isAgentNode, isLlmNode, isProviderModelsNode, updateNodeData]
   );
 
-  const setAgentTools = useCallback(
+  const setNodeTools = useCallback(
     (nextTools: string[]) => {
-      if (!isAgentNode) return;
       const cleaned = nextTools
         .filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
         .map((t) => t.trim());
       const unique = Array.from(new Set(cleaned));
-      const prev = data.agentConfig || {};
-      updateNodeData(id, { agentConfig: { ...prev, tools: unique.length > 0 ? unique : undefined } });
+
+      if (isAgentNode) {
+        const prev = data.agentConfig || {};
+        updateNodeData(id, { agentConfig: { ...prev, tools: unique.length > 0 ? unique : undefined } });
+        return;
+      }
+
+      if (isLlmNode) {
+        const prev = data.effectConfig || {};
+        updateNodeData(id, { effectConfig: { ...prev, tools: unique.length > 0 ? unique : undefined } });
+      }
     },
-    [data.agentConfig, id, isAgentNode, updateNodeData]
+    [data.agentConfig, data.effectConfig, id, isAgentNode, isLlmNode, updateNodeData]
   );
 
   const setPinDefault = useCallback(
@@ -827,7 +847,7 @@ export const BaseNode = memo(function BaseNode({
                 const hasSpecialControl =
                   (hasProviderDropdown && pin.id === 'provider') ||
                   (hasModelControls && pin.id === 'model') ||
-                  (isAgentNode && pin.id === 'tools') ||
+                  ((isAgentNode || isLlmNode) && pin.id === 'tools') ||
                   isEmitEventName ||
                   isEmitEventScopePin ||
                   isOnEventScopePin ||
@@ -1086,7 +1106,7 @@ export const BaseNode = memo(function BaseNode({
                   );
                 }
 
-                if (isAgentNode && pin.id === 'tools' && !toolsConnected) {
+                if ((isAgentNode || isLlmNode) && pin.id === 'tools' && !toolsConnected) {
                   controls.push(
                     <AfMultiSelect
                       key="tools"
@@ -1100,7 +1120,7 @@ export const BaseNode = memo(function BaseNode({
                       searchPlaceholder="Search tools…"
                       clearable
                       minPopoverWidth={340}
-                      onChange={setAgentTools}
+                      onChange={setNodeTools}
                     />
                   );
                 }

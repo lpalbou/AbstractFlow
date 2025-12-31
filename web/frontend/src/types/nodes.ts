@@ -465,6 +465,23 @@ const LITERAL_NODES: NodeTemplate[] = [
 // These nodes have execution pins and can pause/resume flows
 const EFFECT_NODES: NodeTemplate[] = [
   {
+    type: 'tool_calls',
+    icon: '&#x1F528;', // Hammer
+    label: 'Tool Calls',
+    headerColor: '#16A085', // Teal - IO/tools
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'tool_calls', label: 'tool_calls', type: 'array' },
+      { id: 'allowed_tools', label: 'allowed_tools', type: 'array' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'results', label: 'results', type: 'array' },
+      { id: 'success', label: 'success', type: 'boolean' },
+    ],
+    category: 'effects',
+  },
+  {
     type: 'wait_until',
     icon: '&#x23F3;', // Hourglass
     label: 'Delay',

@@ -37,6 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - A default **max output token cap** (4096; configurable via `ABSTRACTFLOW_LLM_MAX_OUTPUT_TOKENS` / `ABSTRACTFLOW_MAX_OUTPUT_TOKENS`) to keep agent generations bounded and avoid late-loop slowdowns/timeouts.
 - WebSocket execution events now include a JSON-safe ISO timestamp (`ts`) for clearer observability in the UI and logs.
 - Visual `LLM Call` nodes now support optional **tool calling** via a `tools` allowlist input (pin or node config) and expose a structured `result` output object (normalized LLM response including `tool_calls`, `usage`, and `trace_id`). Tool execution remains runtime-owned and must be modeled explicitly in the workflow (no agent loop/scratchpad).
+- Visual `LLM Call` now also exposes an **inline tools dropdown** in the node UI (when the `tools` pin is not connected), matching the Agent node UX for quickly selecting an allowlist.
+- Visual `Tool Calls` node (`tool_calls`) to execute one or many tool call requests via AbstractRuntime `EffectType.TOOL_CALLS`, outputting `results[]` (per-call output/error) and an aggregate `success` boolean.
 
 ### Planned
 - Visual workflow editor with drag-and-drop interface

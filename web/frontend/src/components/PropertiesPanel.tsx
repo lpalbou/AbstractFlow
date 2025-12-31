@@ -687,6 +687,13 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         ? ((data.effectConfig as any).tools as unknown[]).filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
         : [];
     }
+    if (data.nodeType === 'tool_calls') {
+      return Array.isArray((data.effectConfig as any)?.allowed_tools)
+        ? ((data.effectConfig as any).allowed_tools as unknown[]).filter(
+            (t): t is string => typeof t === 'string' && t.trim().length > 0
+          )
+        : [];
+    }
     return [];
   })();
 
@@ -2899,6 +2906,124 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
                 <span className="property-hint">
                   Selected tools are the only tools the model may request (tool calls are not executed automatically by this node).
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Tool Calls effect properties */}
+      {data.nodeType === 'tool_calls' && (
+        <div className="property-section">
+          <label className="property-label">Tool Execution</label>
+
+          <div className="property-group">
+            <label className="property-sublabel">Allowed Tools (optional)</label>
+            {edges.some((e) => e.target === node.id && e.targetHandle === 'allowed_tools') ? (
+              <span className="property-hint">Provided by connected pin.</span>
+            ) : (
+              <>
+                <input
+                  className="property-input"
+                  value={toolSearch}
+                  onChange={(e) => setToolSearch(e.target.value)}
+                  placeholder={loadingTools ? 'Loading tools…' : 'Search tools…'}
+                  disabled={loadingTools}
+                />
+
+                {selectedTools.length > 0 && (
+                  <div className="tool-chips">
+                    {selectedTools.map((name) => (
+                      <button
+                        key={name}
+                        type="button"
+                        className="tool-chip"
+                        onClick={() => {
+                          const next = selectedTools.filter((t) => t !== name);
+                          updateNodeData(node.id, {
+                            effectConfig: {
+                              ...(data.effectConfig || {}),
+                              allowed_tools: next.length > 0 ? next : undefined,
+                            },
+                          });
+                        }}
+                        title="Remove tool"
+                      >
+                        {name}
+                        <span className="tool-chip-x">×</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {!loadingTools && !toolsError && toolSpecs.length > 0 && (
+                  <div className="toolset-list">
+                    {Object.entries(toolSpecsByToolset).map(([toolset, tools]) => {
+                      const names = tools.map((t) => t.name);
+                      const allSelected = names.length > 0 && names.every((n) => selectedTools.includes(n));
+
+                      const toggleAll = () => {
+                        const next = new Set(selectedTools);
+                        if (!allSelected) {
+                          for (const n of names) next.add(n);
+                        } else {
+                          for (const n of names) next.delete(n);
+                        }
+                        const asList = Array.from(next);
+                        updateNodeData(node.id, {
+                          effectConfig: {
+                            ...(data.effectConfig || {}),
+                            allowed_tools: asList.length > 0 ? asList : undefined,
+                          },
+                        });
+                      };
+
+                      return (
+                        <div key={toolset} className="toolset-group">
+                          <div className="toolset-header">
+                            <span className="toolset-title">{toolset}</span>
+                            <button
+                              type="button"
+                              className="toolset-toggle"
+                              onClick={toggleAll}
+                              disabled={names.length === 0}
+                              title={allSelected ? 'Deselect all' : 'Select all'}
+                            >
+                              {allSelected ? 'None' : 'All'}
+                            </button>
+                          </div>
+                          <div className="checkbox-list tool-checkboxes">
+                            {tools.map((t) => (
+                              <label key={t.name} className="checkbox-item tool-item">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedTools.includes(t.name)}
+                                  onChange={() => {
+                                    const next = selectedTools.includes(t.name)
+                                      ? selectedTools.filter((x) => x !== t.name)
+                                      : [...selectedTools, t.name];
+                                    updateNodeData(node.id, {
+                                      effectConfig: {
+                                        ...(data.effectConfig || {}),
+                                        allowed_tools: next.length > 0 ? next : undefined,
+                                      },
+                                    });
+                                  }}
+                                />
+                                <span className="checkbox-label">{t.name}</span>
+                                {t.description && <span className="tool-desc">{t.description}</span>}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <span className="property-hint">
+                  If set, only these tools may be executed. If unset, all runtime tools are allowed.
                 </span>
               </>
             )}
