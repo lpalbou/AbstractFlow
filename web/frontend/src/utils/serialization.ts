@@ -80,6 +80,22 @@ export function fromVisualFlow(flow: VisualFlow): {
       }
     }
 
+    // Agent node: add max_iterations input pin (runtime budget control) for legacy flows.
+    if (data.nodeType === 'agent') {
+      const hasMax = Array.isArray(data.inputs) && data.inputs.some((p) => p.id === 'max_iterations');
+      if (!hasMax && Array.isArray(data.inputs)) {
+        const nextInputs = [...data.inputs];
+        const maxPin = { id: 'max_iterations', label: 'max_iterations', type: 'number' as const };
+        const modelIdx = nextInputs.findIndex((p) => p.id === 'model');
+        if (modelIdx >= 0) {
+          nextInputs.splice(modelIdx + 1, 0, maxPin);
+        } else {
+          nextInputs.push(maxPin);
+        }
+        (data as any).inputs = nextInputs;
+      }
+    }
+
     return {
       id: vn.id,
       type: vn.type === 'code' ? 'code' : 'custom',

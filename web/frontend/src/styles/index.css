@@ -562,6 +562,303 @@ button.primary:hover:not(:disabled) {
   color: var(--text-secondary);
 }
 
+/* Flow Library (SOTA load/manage UX) */
+.flow-library-modal {
+  width: min(980px, 94vw);
+  max-width: 94vw;
+  height: min(72vh, 720px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.flow-library-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.flow-library-title h3 {
+  margin: 0;
+}
+
+.flow-library-subtitle {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.flow-library-link {
+  background: transparent;
+  border: none;
+  color: rgba(233, 69, 96, 0.9);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.flow-library-link:hover {
+  text-decoration: underline;
+}
+
+.flow-library-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.flow-library-search {
+  width: min(460px, 44vw);
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--bg-tertiary);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-primary);
+}
+
+.flow-library-search:focus {
+  outline: none;
+  border-color: rgba(233, 69, 96, 0.6);
+  box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.18);
+}
+
+.flow-library-sort {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--bg-tertiary);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-primary);
+}
+
+.flow-library-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 14px;
+}
+
+.flow-library-list {
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--bg-tertiary);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 10px;
+}
+
+.flow-library-item {
+  width: 100%;
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 12px 12px;
+  cursor: pointer;
+  color: var(--text-primary);
+  transition: background 120ms ease, border-color 120ms ease, transform 60ms ease;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.flow-library-item + .flow-library-item {
+  margin-top: 8px;
+}
+
+.flow-library-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.flow-library-item:active {
+  transform: translateY(1px);
+}
+
+.flow-library-item.selected {
+  border-color: rgba(233, 69, 96, 0.6);
+  box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.14);
+}
+
+.flow-library-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.flow-library-item-name {
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.2px;
+}
+
+.flow-library-item-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.flow-library-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.22);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.flow-library-badge.current {
+  border-color: rgba(39, 174, 96, 0.55);
+  color: rgba(39, 174, 96, 0.95);
+}
+
+.flow-library-item-sub {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.flow-library-item-desc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flow-library-item-updated {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.55);
+  white-space: nowrap;
+}
+
+.flow-library-preview {
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--bg-tertiary);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.flow-library-preview-name {
+  font-weight: 800;
+  font-size: 16px;
+}
+
+.flow-library-preview-id {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 4px;
+}
+
+.flow-library-preview-meta {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.flow-library-preview-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.flow-library-preview-key {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.flow-library-preview-val {
+  color: rgba(255, 255, 255, 0.9);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.flow-library-preview-desc {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.flow-library-preview-actions {
+  margin-top: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.flow-library-rename {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--bg-tertiary);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.flow-library-rename:focus {
+  outline: none;
+  border-color: rgba(233, 69, 96, 0.6);
+  box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.18);
+}
+
+.flow-library-description {
+  width: 100%;
+  resize: vertical;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--bg-tertiary);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  line-height: 1.35;
+}
+
+.flow-library-description:focus {
+  outline: none;
+  border-color: rgba(233, 69, 96, 0.6);
+  box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.18);
+}
+
+.modal-button.danger {
+  border-color: rgba(231, 76, 60, 0.55);
+  background: rgba(231, 76, 60, 0.88);
+  color: rgba(255, 255, 255, 0.96);
+}
+
+.flow-library-empty {
+  padding: 18px 14px;
+  color: var(--text-secondary);
+}
+
+.flow-library-empty-title {
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 4px;
+}
+
+.flow-library-empty-sub {
+  font-size: 12px;
+}
+
 .error-text {
   color: var(--danger);
 }

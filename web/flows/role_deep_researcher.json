@@ -1,0 +1,341 @@
+{
+  "id": "role_deep_researcher",
+  "name": "role_deep_researcher",
+  "description": "Role subflow: deep researcher. Self-contained deep research pipeline producing (clarifications, dossier, report) for orchestration.",
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": { "x": -640.0, "y": 64.0 },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "request", "label": "request", "type": "string" },
+          { "id": "provider", "label": "provider", "type": "string" },
+          { "id": "model", "label": "model", "type": "string" },
+          { "id": "skip_clarifications", "label": "skip_clarifications", "type": "boolean" },
+          { "id": "max_web_search", "label": "max_web_search", "type": "number" },
+          { "id": "max_fetch_url", "label": "max_fetch_url", "type": "number" },
+          { "id": "max_iterations", "label": "max_iterations", "type": "number" }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    
+    {
+      "id": "node-3",
+      "type": "tools_allowlist",
+      "position": { "x": -160.0, "y": 192.0 },
+      "data": {
+        "nodeType": "tools_allowlist",
+        "label": "Tools Allowlist",
+        "icon": "&#x1F9F0;",
+        "headerColor": "#F39C12",
+        "inputs": [],
+        "outputs": [
+          { "id": "tools", "label": "tools", "type": "array" }
+        ],
+        "literalValue": ["web_search", "fetch_url"]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-4",
+      "type": "concat",
+      "position": { "x": -160.0, "y": 64.0 },
+      "data": {
+        "nodeType": "concat",
+        "label": "Clarifications Prompt",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          { "id": "a", "label": "a", "type": "string" },
+          { "id": "b", "label": "b", "type": "string" },
+          { "id": "c", "label": "c", "type": "string" },
+          { "id": "d", "label": "d", "type": "boolean" }
+        ],
+        "outputs": [
+          { "id": "result", "label": "result", "type": "string" }
+        ],
+        "concatConfig": { "separator": "\n\n" },
+        "pinDefaults": {
+          "a": "Given the USER REQUEST below, propose 3-6 clarifying questions ONLY if clarifications are needed.\\n\\nIf skip_clarifications is true, output an empty string.\\n\\nReturn format:\\n- If needed: a bullet list\\n- Else: empty string\\n\\n## USER REQUEST",
+          "c": "## skip_clarifications"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-5",
+      "type": "llm_call",
+      "position": { "x": 96.0, "y": 64.0 },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Clarifications",
+        "icon": "&#x1F9E0;",
+        "headerColor": "#2C3E50",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "provider", "label": "provider", "type": "string" },
+          { "id": "model", "label": "model", "type": "string" },
+          { "id": "system", "label": "system", "type": "string" },
+          { "id": "prompt", "label": "prompt", "type": "string" },
+          { "id": "tools", "label": "tools", "type": "array" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "response", "label": "response", "type": "string" },
+          { "id": "tool_calls", "label": "tool_calls", "type": "array" },
+          { "id": "result", "label": "result", "type": "object" }
+        ],
+        "effectConfig": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b"
+        },
+        "pinDefaults": {
+          "system": "You are a rigorous deep researcher. Prefer asking targeted clarifying questions when the request is underspecified."
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-6",
+      "type": "code",
+      "position": { "x": 352.0, "y": 64.0 },
+      "data": {
+        "nodeType": "code",
+        "label": "Build Dossier Task",
+        "icon": "&#x1F40D;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "input", "label": "input", "type": "any" },
+          { "id": "request", "label": "request", "type": "string" },
+          { "id": "clarifications", "label": "clarifications", "type": "string" },
+          { "id": "max_web_search", "label": "max_web_search", "type": "number" },
+          { "id": "max_fetch_url", "label": "max_fetch_url", "type": "number" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "output", "label": "output", "type": "any" }
+        ],
+        "code": "def _to_int(v, default):\n    try:\n        if v is None:\n            return default\n        if isinstance(v, bool):\n            return default\n        if isinstance(v, (int, float)) and float(v) <= 0:\n            return default\n        return int(float(v))\n    except Exception:\n        return default\n\n\ndef transform(input):\n    d = input if isinstance(input, dict) else {}\n    request = str(d.get('request') or '').strip()\n    clar = str(d.get('clarifications') or '').strip()\n    max_web = _to_int(d.get('max_web_search'), 3)\n    max_fetch = _to_int(d.get('max_fetch_url'), 6)\n\n    parts = []\n    parts.append(\n        \"You are the DEEP RESEARCHER. Produce a research DOSSIER with citations, sources, and explicit uncertainty.\\n\\n\"\n        \"Output format (Markdown):\\n\"\n        \"1) Executive summary\\n2) Key findings (with citations)\\n3) Evidence table (source -> claim)\\n4) Risks / unknowns\\n5) Suggested next steps\"\n    )\n    parts.append(f\"Budgets:\\n- max_web_search: {max_web}\\n- max_fetch_url: {max_fetch}\")\n    if clar:\n        parts.append(\"Clarifications (may be empty):\\n\" + clar)\n    parts.append(\"USER REQUEST:\\n\" + request)\n    return \"\\n\\n\".join(parts)\n",
+        "codeBody": "def _to_int(v, default):\n    try:\n        if v is None:\n            return default\n        if isinstance(v, bool):\n            return default\n        if isinstance(v, (int, float)) and float(v) <= 0:\n            return default\n        return int(float(v))\n    except Exception:\n        return default\n\n\ndef transform(input):\n    d = input if isinstance(input, dict) else {}\n    request = str(d.get('request') or '').strip()\n    clar = str(d.get('clarifications') or '').strip()\n    max_web = _to_int(d.get('max_web_search'), 3)\n    max_fetch = _to_int(d.get('max_fetch_url'), 6)\n\n    parts = []\n    parts.append(\n        \"You are the DEEP RESEARCHER. Produce a research DOSSIER with citations, sources, and explicit uncertainty.\\n\\n\"\n        \"Output format (Markdown):\\n\"\n        \"1) Executive summary\\n2) Key findings (with citations)\\n3) Evidence table (source -> claim)\\n4) Risks / unknowns\\n5) Suggested next steps\"\n    )\n    parts.append(f\"Budgets:\\n- max_web_search: {max_web}\\n- max_fetch_url: {max_fetch}\")\n    if clar:\n        parts.append(\"Clarifications (may be empty):\\n\" + clar)\n    parts.append(\"USER REQUEST:\\n\" + request)\n    return \"\\n\\n\".join(parts)\n",
+        "functionName": "transform"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-7",
+      "type": "agent",
+      "position": { "x": 608.0, "y": 64.0 },
+      "data": {
+        "nodeType": "agent",
+        "label": "Research Dossier",
+        "icon": "&#x1F916;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "provider", "label": "provider", "type": "string" },
+          { "id": "model", "label": "model", "type": "string" },
+          { "id": "max_iterations", "label": "max_iterations", "type": "number" },
+          { "id": "system", "label": "system", "type": "string" },
+          { "id": "task", "label": "prompt", "type": "string" },
+          { "id": "tools", "label": "tools", "type": "array" },
+          { "id": "context", "label": "context", "type": "object" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "result", "label": "result", "type": "object" },
+          { "id": "scratchpad", "label": "scratchpad", "type": "object" }
+        ],
+        "agentConfig": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b",
+          "tools": ["web_search", "fetch_url"],
+          "system": "You are the DEEP RESEARCHER. Use tools when needed. Always cite sources. Be explicit about uncertainty.",
+          "max_iterations": 40
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-8",
+      "type": "break_object",
+      "position": { "x": 864.0, "y": 64.0 },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#34495E",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" }
+        ],
+        "outputs": [
+          { "id": "result", "label": "result", "type": "string" }
+        ],
+        "breakConfig": { "selectedPaths": ["result"] }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-9",
+      "type": "concat",
+      "position": { "x": 864.0, "y": 224.0 },
+      "data": {
+        "nodeType": "concat",
+        "label": "Report Prompt",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          { "id": "a", "label": "a", "type": "string" },
+          { "id": "b", "label": "b", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "result", "label": "result", "type": "string" }
+        ],
+        "concatConfig": { "separator": "\n\n" },
+        "pinDefaults": {
+          "a": "Transform the DOSSIER below into a polished final REPORT for the user. Keep citations where possible. Keep it concise but complete.\\n\\n## DOSSIER"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-10",
+      "type": "llm_call",
+      "position": { "x": 1120.0, "y": 224.0 },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Final Report",
+        "icon": "&#x1F9E0;",
+        "headerColor": "#2C3E50",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "provider", "label": "provider", "type": "string" },
+          { "id": "model", "label": "model", "type": "string" },
+          { "id": "system", "label": "system", "type": "string" },
+          { "id": "prompt", "label": "prompt", "type": "string" },
+          { "id": "tools", "label": "tools", "type": "array" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "response", "label": "response", "type": "string" },
+          { "id": "tool_calls", "label": "tool_calls", "type": "array" },
+          { "id": "result", "label": "result", "type": "object" }
+        ],
+        "effectConfig": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b"
+        },
+        "pinDefaults": {
+          "system": "You are a concise technical writer. Preserve factuality and cite sources when provided."
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-11",
+      "type": "on_flow_end",
+      "position": { "x": 1376.0, "y": 160.0 },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "report", "label": "report", "type": "string" },
+          { "id": "dossier", "label": "dossier", "type": "string" },
+          { "id": "clarifications", "label": "clarifications", "type": "string" }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    { "id": "edge-1", "source": "node-1", "sourceHandle": "exec-out", "target": "node-5", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-4", "source": "node-1", "sourceHandle": "provider", "target": "node-5", "targetHandle": "provider", "animated": false },
+    { "id": "edge-5", "source": "node-1", "sourceHandle": "model", "target": "node-5", "targetHandle": "model", "animated": false },
+    { "id": "edge-6", "source": "node-4", "sourceHandle": "result", "target": "node-5", "targetHandle": "prompt", "animated": false },
+    { "id": "edge-7", "source": "node-1", "sourceHandle": "request", "target": "node-4", "targetHandle": "b", "animated": false },
+    { "id": "edge-8", "source": "node-1", "sourceHandle": "skip_clarifications", "target": "node-4", "targetHandle": "d", "animated": false },
+
+    { "id": "edge-9", "source": "node-5", "sourceHandle": "exec-out", "target": "node-6", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-10", "source": "node-1", "sourceHandle": "request", "target": "node-6", "targetHandle": "request", "animated": false },
+    { "id": "edge-11", "source": "node-5", "sourceHandle": "response", "target": "node-6", "targetHandle": "clarifications", "animated": false },
+    { "id": "edge-12", "source": "node-1", "sourceHandle": "max_web_search", "target": "node-6", "targetHandle": "max_web_search", "animated": false },
+    { "id": "edge-13", "source": "node-1", "sourceHandle": "max_fetch_url", "target": "node-6", "targetHandle": "max_fetch_url", "animated": false },
+
+    { "id": "edge-14-exec", "source": "node-6", "sourceHandle": "exec-out", "target": "node-7", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-14", "source": "node-1", "sourceHandle": "provider", "target": "node-7", "targetHandle": "provider", "animated": false },
+    { "id": "edge-15", "source": "node-1", "sourceHandle": "model", "target": "node-7", "targetHandle": "model", "animated": false },
+    { "id": "edge-15b", "source": "node-1", "sourceHandle": "max_iterations", "target": "node-7", "targetHandle": "max_iterations", "animated": false },
+    { "id": "edge-16", "source": "node-6", "sourceHandle": "output", "target": "node-7", "targetHandle": "task", "animated": false },
+    { "id": "edge-17", "source": "node-3", "sourceHandle": "tools", "target": "node-7", "targetHandle": "tools", "animated": false },
+
+    { "id": "edge-18", "source": "node-7", "sourceHandle": "exec-out", "target": "node-10", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-19", "source": "node-7", "sourceHandle": "result", "target": "node-8", "targetHandle": "object", "animated": false },
+
+    { "id": "edge-20", "source": "node-8", "sourceHandle": "result", "target": "node-9", "targetHandle": "b", "animated": false },
+    { "id": "edge-21", "source": "node-9", "sourceHandle": "result", "target": "node-10", "targetHandle": "prompt", "animated": false },
+    { "id": "edge-22", "source": "node-1", "sourceHandle": "provider", "target": "node-10", "targetHandle": "provider", "animated": false },
+    { "id": "edge-23", "source": "node-1", "sourceHandle": "model", "target": "node-10", "targetHandle": "model", "animated": false },
+
+    { "id": "edge-24", "source": "node-10", "sourceHandle": "exec-out", "target": "node-11", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-25", "source": "node-10", "sourceHandle": "response", "target": "node-11", "targetHandle": "report", "animated": false },
+    { "id": "edge-26", "source": "node-8", "sourceHandle": "result", "target": "node-11", "targetHandle": "dossier", "animated": false },
+    { "id": "edge-27", "source": "node-5", "sourceHandle": "response", "target": "node-11", "targetHandle": "clarifications", "animated": false }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2026-01-01T00:00:00Z",
+  "updated_at": "2026-01-01T00:00:00Z"
+}
+
+

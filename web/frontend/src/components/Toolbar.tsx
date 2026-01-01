@@ -3,12 +3,13 @@
  */
 
 import { useCallback, useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { useFlowStore } from '../hooks/useFlow';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { RunFlowModal } from './RunFlowModal';
 import { UserPromptModal } from './UserPromptModal';
+import { FlowLibraryModal } from './FlowLibraryModal';
 import type { ExecutionEvent, FlowRunResult, VisualFlow } from '../types/flow';
 
 // Fetch list of saved flows
@@ -25,6 +26,59 @@ async function fetchFlow(flowId: string): Promise<VisualFlow> {
   const response = await fetch(`/api/flows/${flowId}`);
   if (!response.ok) {
     throw new Error('Failed to load flow');
+  }
+  return response.json();
+}
+
+async function deleteFlow(flowId: string): Promise<void> {
+  const response = await fetch(`/api/flows/${flowId}`, { method: 'DELETE' });
+  if (!response.ok) throw new Error('Failed to delete flow');
+}
+
+async function renameFlow(flowId: string, name: string): Promise<VisualFlow> {
+  const response = await fetch(`/api/flows/${flowId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    const message = error.detail ? String(error.detail) : `HTTP ${response.status}`;
+    throw new Error(message);
+  }
+  return response.json();
+}
+
+async function updateFlowDescription(flowId: string, description: string): Promise<VisualFlow> {
+  const response = await fetch(`/api/flows/${flowId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ description }),
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    const message = error.detail ? String(error.detail) : `HTTP ${response.status}`;
+    throw new Error(message);
+  }
+  return response.json();
+}
+
+async function duplicateFlow(source: VisualFlow, newName: string): Promise<VisualFlow> {
+  const response = await fetch('/api/flows', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: newName,
+      description: source.description || '',
+      nodes: source.nodes,
+      edges: source.edges,
+      entryNode: source.entryNode,
+    }),
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    const message = error.detail ? String(error.detail) : `HTTP ${response.status}`;
+    throw new Error(message);
   }
   return response.json();
 }
@@ -66,11 +120,12 @@ async function saveFlow(
 }
 
 export function Toolbar() {
-  const { flowId, flowName, setFlowName, getFlow, loadFlow, clearFlow, isRunning, setIsRunning } =
+  const queryClient = useQueryClient();
+  const { flowId, flowName, setFlowName, setFlowId, getFlow, loadFlow, clearFlow, isRunning, setIsRunning } =
     useFlowStore();
 
   const [showRunModal, setShowRunModal] = useState(false);
-  const [showLoadModal, setShowLoadModal] = useState(false);
+  const [showFlowLibrary, setShowFlowLibrary] = useState(false);
   const [runResult, setRunResult] = useState<FlowRunResult | null>(null);
   const [executionEvents, setExecutionEvents] = useState<ExecutionEvent[]>([]);
   const [traceEvents, setTraceEvents] = useState<ExecutionEvent[]>([]);
@@ -79,7 +134,7 @@ export function Toolbar() {
   const flowsQuery = useQuery({
     queryKey: ['flows'],
     queryFn: listFlows,
-    enabled: showLoadModal, // Only fetch when modal is open
+    enabled: showFlowLibrary, // Only fetch when modal is open
   });
 
   // Handle loading a flow
@@ -88,13 +143,70 @@ export function Toolbar() {
       try {
         const flow = await fetchFlow(selectedFlowId);
         loadFlow(flow);
-        setShowLoadModal(false);
+        setShowFlowLibrary(false);
         toast.success(`Loaded "${flow.name}"`);
       } catch (error) {
         toast.error('Failed to load flow');
       }
     },
     [loadFlow]
+  );
+
+  const handleRenameFlow = useCallback(
+    async (id: string, nextName: string) => {
+      const name = nextName.trim();
+      if (!name) return;
+      const updated = await renameFlow(id, name);
+      if (flowId && id === flowId) setFlowName(updated.name);
+      queryClient.invalidateQueries({ queryKey: ['flows'] });
+      toast.success('Renamed');
+    },
+    [flowId, queryClient, setFlowName]
+  );
+
+  const handleUpdateDescription = useCallback(
+    async (id: string, nextDescription: string) => {
+      const updated = await updateFlowDescription(id, nextDescription);
+      // If we are currently editing that flow, keep the in-editor description in sync by reloading.
+      if (flowId && id === flowId) {
+        // We only have the flow name in store; description lives in the saved flow object.
+        // Loading is the simplest way to keep all metadata consistent.
+        loadFlow(updated);
+      }
+      queryClient.invalidateQueries({ queryKey: ['flows'] });
+      toast.success('Description updated');
+    },
+    [flowId, loadFlow, queryClient]
+  );
+
+  const handleDeleteFlow = useCallback(
+    async (id: string) => {
+      await deleteFlow(id);
+      if (flowId && id === flowId) {
+        // Keep the current graph but mark it as unsaved.
+        setFlowId(null);
+        toast.success('Deleted (editor is now unsaved)');
+      } else {
+        toast.success('Deleted');
+      }
+      queryClient.invalidateQueries({ queryKey: ['flows'] });
+    },
+    [flowId, queryClient, setFlowId]
+  );
+
+  const handleDuplicateFlow = useCallback(
+    async (id: string) => {
+      const all = flowsQuery.data || [];
+      const src = all.find((f) => f.id === id);
+      if (!src) return;
+      const base = (src.name || 'Untitled').trim() || 'Untitled';
+      const created = await duplicateFlow(src, `${base} (copy)`);
+      queryClient.invalidateQueries({ queryKey: ['flows'] });
+      loadFlow(created);
+      setShowFlowLibrary(false);
+      toast.success(`Duplicated as "${created.name}"`);
+    },
+    [flowsQuery.data, loadFlow, queryClient]
   );
 
   // Save mutation
@@ -303,7 +415,7 @@ export function Toolbar() {
 
         <button
           className="toolbar-button"
-          onClick={() => setShowLoadModal(true)}
+          onClick={() => setShowFlowLibrary(true)}
           title="Load Flow"
         >
           📂 Load
@@ -381,45 +493,20 @@ export function Toolbar() {
         onCancelRun={cancelRun}
       />
 
-      {/* Load flows modal */}
-      {showLoadModal && (
-        <div className="modal-overlay" onClick={() => setShowLoadModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Load Flow</h3>
-            {flowsQuery.isLoading ? (
-              <p>Loading saved flows...</p>
-            ) : flowsQuery.error ? (
-              <p className="error-text">Failed to load flows</p>
-            ) : flowsQuery.data?.length === 0 ? (
-              <p>No saved flows found.</p>
-            ) : (
-              <ul className="flow-list">
-                {flowsQuery.data?.map((flow) => (
-                  <li key={flow.id} className="flow-list-item">
-                    <button
-                      className="flow-list-button"
-                      onClick={() => handleLoadFlow(flow.id)}
-                    >
-                      <span className="flow-list-name">{flow.name}</span>
-                      <span className="flow-list-meta">
-                        {flow.nodes.length} nodes &bull; {flow.edges.length} edges
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="modal-actions">
-              <button
-                className="modal-button cancel"
-                onClick={() => setShowLoadModal(false)}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <FlowLibraryModal
+        isOpen={showFlowLibrary}
+        currentFlowId={flowId}
+        flows={flowsQuery.data || []}
+        isLoading={flowsQuery.isLoading}
+        error={flowsQuery.error}
+        onClose={() => setShowFlowLibrary(false)}
+        onRefresh={() => flowsQuery.refetch()}
+        onLoadFlow={handleLoadFlow}
+        onRenameFlow={handleRenameFlow}
+        onUpdateDescription={handleUpdateDescription}
+        onDuplicateFlow={handleDuplicateFlow}
+        onDeleteFlow={handleDeleteFlow}
+      />
 
       {/* User Prompt Modal (fallback) */}
       <UserPromptModal

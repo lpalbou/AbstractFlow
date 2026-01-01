@@ -1,0 +1,548 @@
+{
+  "id": "multi_agent_state_machine",
+  "name": "multi_agent_state_machine",
+  "description": "High-level orchestrator: Deep Researcher -> Architect -> Manager -> iterative Coder/Reviewer loop (bounded by max_cycles). This is a first multi-agent state machine built from subflows.",
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": { "x": -1024.0, "y": 64.0 },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "request", "label": "request", "type": "string" },
+          { "id": "provider", "label": "provider", "type": "string" },
+          { "id": "model", "label": "model", "type": "string" },
+          { "id": "max_cycles", "label": "max_cycles", "type": "number" },
+          { "id": "max_iterations", "label": "max_iterations", "type": "number" },
+          { "id": "skip_clarifications", "label": "skip_clarifications", "type": "boolean" },
+          { "id": "max_web_search", "label": "max_web_search", "type": "number" },
+          { "id": "max_fetch_url", "label": "max_fetch_url", "type": "number" }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-2",
+      "type": "code",
+      "position": { "x": -768.0, "y": 64.0 },
+      "data": {
+        "nodeType": "code",
+        "label": "Init State",
+        "icon": "&#x1F40D;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "input", "label": "input", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "output", "label": "output", "type": "any" }
+        ],
+        "code": "def _to_int(v, default):\n    try:\n        if v is None:\n            return default\n        if isinstance(v, bool):\n            return default\n        # UI number inputs default to 0 when left blank.\n        if isinstance(v, (int, float)) and float(v) <= 0:\n            return default\n        return int(float(v))\n    except Exception:\n        return default\n\n\ndef transform(input):\n    d = input if isinstance(input, dict) else {}\n\n    request = str(d.get('request') or '').strip()\n    provider = str(d.get('provider') or '').strip().lower()\n    model = str(d.get('model') or '').strip()\n\n    if not provider:\n        provider = 'lmstudio'\n    if not model:\n        model = 'qwen/qwen3-next-80b'\n\n    max_cycles = _to_int(d.get('max_cycles'), 2)\n    max_iterations = _to_int(d.get('max_iterations'), 60)\n\n    skip_clarifications = bool(d.get('skip_clarifications', False))\n    max_web_search = _to_int(d.get('max_web_search'), 3)\n    max_fetch_url = _to_int(d.get('max_fetch_url'), 6)\n\n    # Pipeline state lives in the visual runtime payload (`_last_output`).\n    # Effects (subflows) do not clobber it; code nodes update it.\n    return {\n        'request': request,\n        'provider': provider,\n        'model': model,\n        'max_cycles': max_cycles,\n        'max_iterations': max_iterations,\n        'skip_clarifications': skip_clarifications,\n        'max_web_search': max_web_search,\n        'max_fetch_url': max_fetch_url,\n\n        # Outputs progressively filled by subflows\n        'research_report': '',\n        'research_dossier': '',\n        'research_clarifications': '',\n        'architecture_spec': {},\n        'requirements_md': '',\n        'plan': {},\n        'plan_md': '',\n        'tasks': [],\n        'test_plan': [],\n        'coder': {},\n        'coder_summary_md': '',\n        'review': {},\n        'review_findings_md': '',\n\n        # State machine controls\n        'cycle': 0,\n        'approved': False,\n        'feedback': '',\n        'condition': True,\n        'final_message': '',\n    }\n",
+        "codeBody": "def _to_int(v, default):\n    try:\n        if v is None:\n            return default\n        if isinstance(v, bool):\n            return default\n        # UI number inputs default to 0 when left blank.\n        if isinstance(v, (int, float)) and float(v) <= 0:\n            return default\n        return int(float(v))\n    except Exception:\n        return default\n\n\ndef transform(input):\n    d = input if isinstance(input, dict) else {}\n\n    request = str(d.get('request') or '').strip()\n    provider = str(d.get('provider') or '').strip().lower()\n    model = str(d.get('model') or '').strip()\n\n    if not provider:\n        provider = 'lmstudio'\n    if not model:\n        model = 'qwen/qwen3-next-80b'\n\n    max_cycles = _to_int(d.get('max_cycles'), 2)\n    max_iterations = _to_int(d.get('max_iterations'), 60)\n\n    skip_clarifications = bool(d.get('skip_clarifications', False))\n    max_web_search = _to_int(d.get('max_web_search'), 3)\n    max_fetch_url = _to_int(d.get('max_fetch_url'), 6)\n\n    # Pipeline state lives in the visual runtime payload (`_last_output`).\n    # Effects (subflows) do not clobber it; code nodes update it.\n    return {\n        'request': request,\n        'provider': provider,\n        'model': model,\n        'max_cycles': max_cycles,\n        'max_iterations': max_iterations,\n        'skip_clarifications': skip_clarifications,\n        'max_web_search': max_web_search,\n        'max_fetch_url': max_fetch_url,\n\n        # Outputs progressively filled by subflows\n        'research_report': '',\n        'research_dossier': '',\n        'research_clarifications': '',\n        'architecture_spec': {},\n        'requirements_md': '',\n        'plan': {},\n        'plan_md': '',\n        'tasks': [],\n        'test_plan': [],\n        'coder': {},\n        'coder_summary_md': '',\n        'review': {},\n        'review_findings_md': '',\n\n        # State machine controls\n        'cycle': 0,\n        'approved': False,\n        'feedback': '',\n        'condition': True,\n        'final_message': '',\n    }\n",
+        "functionName": "transform"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+
+    {
+      "id": "node-3",
+      "type": "subflow",
+      "position": { "x": -512.0, "y": 64.0 },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Deep Researcher",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "request", "label": "request", "type": "string" },
+          { "id": "provider", "label": "provider", "type": "string" },
+          { "id": "model", "label": "model", "type": "string" },
+          { "id": "skip_clarifications", "label": "skip_clarifications", "type": "boolean" },
+          { "id": "max_web_search", "label": "max_web_search", "type": "number" },
+          { "id": "max_fetch_url", "label": "max_fetch_url", "type": "number" },
+          { "id": "max_iterations", "label": "max_iterations", "type": "number" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "report", "label": "report", "type": "string" },
+          { "id": "dossier", "label": "dossier", "type": "string" },
+          { "id": "clarifications", "label": "clarifications", "type": "string" }
+        ],
+        "subflowId": "role_deep_researcher"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-4",
+      "type": "code",
+      "position": { "x": -256.0, "y": 64.0 },
+      "data": {
+        "nodeType": "code",
+        "label": "Merge Research",
+        "icon": "&#x1F40D;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "input", "label": "input", "type": "any" },
+          { "id": "report", "label": "report", "type": "string" },
+          { "id": "dossier", "label": "dossier", "type": "string" },
+          { "id": "clarifications", "label": "clarifications", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "output", "label": "output", "type": "any" }
+        ],
+        "code": "def transform(input):\n    d = input if isinstance(input, dict) else {}\n    out = dict(d)\n    out['research_report'] = '' if d.get('report') is None else str(d.get('report') or '')\n    out['research_dossier'] = '' if d.get('dossier') is None else str(d.get('dossier') or '')\n    out['research_clarifications'] = '' if d.get('clarifications') is None else str(d.get('clarifications') or '')\n    return out\n",
+        "codeBody": "def transform(input):\n    d = input if isinstance(input, dict) else {}\n    out = dict(d)\n    out['research_report'] = '' if d.get('report') is None else str(d.get('report') or '')\n    out['research_dossier'] = '' if d.get('dossier') is None else str(d.get('dossier') or '')\n    out['research_clarifications'] = '' if d.get('clarifications') is None else str(d.get('clarifications') or '')\n    return out\n",
+        "functionName": "transform"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+
+    {
+      "id": "node-5",
+      "type": "subflow",
+      "position": { "x": 32.0, "y": 64.0 },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Architect",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "request", "label": "request", "type": "string" },
+          { "id": "research_report", "label": "research_report", "type": "string" },
+          { "id": "research_dossier", "label": "research_dossier", "type": "string" },
+          { "id": "provider", "label": "provider", "type": "string" },
+          { "id": "model", "label": "model", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "spec", "label": "spec", "type": "object" },
+          { "id": "requirements_md", "label": "requirements_md", "type": "string" }
+        ],
+        "subflowId": "role_architect"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-6",
+      "type": "code",
+      "position": { "x": 288.0, "y": 64.0 },
+      "data": {
+        "nodeType": "code",
+        "label": "Merge Architect",
+        "icon": "&#x1F40D;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "input", "label": "input", "type": "any" },
+          { "id": "spec", "label": "spec", "type": "object" },
+          { "id": "requirements_md", "label": "requirements_md", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "output", "label": "output", "type": "any" }
+        ],
+        "code": "def transform(input):\n    d = input if isinstance(input, dict) else {}\n    out = dict(d)\n    spec = d.get('spec')\n    out['architecture_spec'] = spec if isinstance(spec, dict) else {}\n    out['requirements_md'] = '' if d.get('requirements_md') is None else str(d.get('requirements_md') or '')\n    return out\n",
+        "codeBody": "def transform(input):\n    d = input if isinstance(input, dict) else {}\n    out = dict(d)\n    spec = d.get('spec')\n    out['architecture_spec'] = spec if isinstance(spec, dict) else {}\n    out['requirements_md'] = '' if d.get('requirements_md') is None else str(d.get('requirements_md') or '')\n    return out\n",
+        "functionName": "transform"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+
+    {
+      "id": "node-7",
+      "type": "subflow",
+      "position": { "x": 576.0, "y": 64.0 },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Manager",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "request", "label": "request", "type": "string" },
+          { "id": "requirements_md", "label": "requirements_md", "type": "string" },
+          { "id": "provider", "label": "provider", "type": "string" },
+          { "id": "model", "label": "model", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "plan", "label": "plan", "type": "object" },
+          { "id": "plan_md", "label": "plan_md", "type": "string" },
+          { "id": "tasks", "label": "tasks", "type": "array" },
+          { "id": "test_plan", "label": "test_plan", "type": "array" }
+        ],
+        "subflowId": "role_manager"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-8",
+      "type": "code",
+      "position": { "x": 864.0, "y": 64.0 },
+      "data": {
+        "nodeType": "code",
+        "label": "Merge Plan + Init Loop",
+        "icon": "&#x1F40D;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "input", "label": "input", "type": "any" },
+          { "id": "plan", "label": "plan", "type": "object" },
+          { "id": "plan_md", "label": "plan_md", "type": "string" },
+          { "id": "tasks", "label": "tasks", "type": "array" },
+          { "id": "test_plan", "label": "test_plan", "type": "array" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "output", "label": "output", "type": "any" }
+        ],
+        "code": "def transform(input):\n    d = input if isinstance(input, dict) else {}\n    out = dict(d)\n\n    plan = d.get('plan')\n    out['plan'] = plan if isinstance(plan, dict) else {}\n    out['plan_md'] = '' if d.get('plan_md') is None else str(d.get('plan_md') or '')\n\n    tasks = d.get('tasks')\n    out['tasks'] = list(tasks) if isinstance(tasks, list) else []\n\n    test_plan = d.get('test_plan')\n    out['test_plan'] = list(test_plan) if isinstance(test_plan, list) else []\n\n    # Initialize the coder/reviewer state machine.\n    out['cycle'] = 0\n    out['approved'] = False\n    out['feedback'] = ''\n    out['coder_summary_md'] = ''\n    out['review_findings_md'] = ''\n    out['condition'] = True\n\n    return out\n",
+        "codeBody": "def transform(input):\n    d = input if isinstance(input, dict) else {}\n    out = dict(d)\n\n    plan = d.get('plan')\n    out['plan'] = plan if isinstance(plan, dict) else {}\n    out['plan_md'] = '' if d.get('plan_md') is None else str(d.get('plan_md') or '')\n\n    tasks = d.get('tasks')\n    out['tasks'] = list(tasks) if isinstance(tasks, list) else []\n\n    test_plan = d.get('test_plan')\n    out['test_plan'] = list(test_plan) if isinstance(test_plan, list) else []\n\n    # Initialize the coder/reviewer state machine.\n    out['cycle'] = 0\n    out['approved'] = False\n    out['feedback'] = ''\n    out['coder_summary_md'] = ''\n    out['review_findings_md'] = ''\n    out['condition'] = True\n\n    return out\n",
+        "functionName": "transform"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+
+    {
+      "id": "node-9",
+      "type": "while",
+      "position": { "x": 1152.0, "y": 64.0 },
+      "data": {
+        "nodeType": "while",
+        "label": "While",
+        "icon": "&#x267B;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "condition", "label": "condition", "type": "boolean" }
+        ],
+        "outputs": [
+          { "id": "loop", "label": "loop", "type": "execution" },
+          { "id": "done", "label": "done", "type": "execution" },
+          { "id": "index", "label": "index", "type": "number" }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+
+    {
+      "id": "node-10",
+      "type": "subflow",
+      "position": { "x": 1408.0, "y": 64.0 },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Coder",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "request", "label": "request", "type": "string" },
+          { "id": "requirements_md", "label": "requirements_md", "type": "string" },
+          { "id": "plan_md", "label": "plan_md", "type": "string" },
+          { "id": "tasks", "label": "tasks", "type": "array" },
+          { "id": "feedback", "label": "feedback", "type": "string" },
+          { "id": "provider", "label": "provider", "type": "string" },
+          { "id": "model", "label": "model", "type": "string" },
+          { "id": "max_iterations", "label": "max_iterations", "type": "number" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "coder", "label": "coder", "type": "object" },
+          { "id": "summary_md", "label": "summary_md", "type": "string" },
+          { "id": "raw_result", "label": "raw_result", "type": "string" }
+        ],
+        "subflowId": "role_coder"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-11",
+      "type": "code",
+      "position": { "x": 1696.0, "y": 64.0 },
+      "data": {
+        "nodeType": "code",
+        "label": "Merge Coder",
+        "icon": "&#x1F40D;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "input", "label": "input", "type": "any" },
+          { "id": "coder", "label": "coder", "type": "object" },
+          { "id": "summary_md", "label": "summary_md", "type": "string" },
+          { "id": "raw_result", "label": "raw_result", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "output", "label": "output", "type": "any" }
+        ],
+        "code": "def transform(input):\n    d = input if isinstance(input, dict) else {}\n    out = dict(d)\n    coder = d.get('coder')\n    out['coder'] = coder if isinstance(coder, dict) else {}\n    out['coder_summary_md'] = '' if d.get('summary_md') is None else str(d.get('summary_md') or '')\n    return out\n",
+        "codeBody": "def transform(input):\n    d = input if isinstance(input, dict) else {}\n    out = dict(d)\n    coder = d.get('coder')\n    out['coder'] = coder if isinstance(coder, dict) else {}\n    out['coder_summary_md'] = '' if d.get('summary_md') is None else str(d.get('summary_md') or '')\n    return out\n",
+        "functionName": "transform"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+
+    {
+      "id": "node-12",
+      "type": "subflow",
+      "position": { "x": 1952.0, "y": 64.0 },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Reviewer",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "request", "label": "request", "type": "string" },
+          { "id": "requirements_md", "label": "requirements_md", "type": "string" },
+          { "id": "plan_md", "label": "plan_md", "type": "string" },
+          { "id": "tasks", "label": "tasks", "type": "array" },
+          { "id": "test_plan", "label": "test_plan", "type": "array" },
+          { "id": "coder_summary_md", "label": "coder_summary_md", "type": "string" },
+          { "id": "provider", "label": "provider", "type": "string" },
+          { "id": "model", "label": "model", "type": "string" },
+          { "id": "max_iterations", "label": "max_iterations", "type": "number" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "approved", "label": "approved", "type": "boolean" },
+          { "id": "findings_md", "label": "findings_md", "type": "string" },
+          { "id": "review", "label": "review", "type": "object" }
+        ],
+        "subflowId": "role_reviewer"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-13",
+      "type": "code",
+      "position": { "x": 2240.0, "y": 64.0 },
+      "data": {
+        "nodeType": "code",
+        "label": "Merge Review + Update Condition",
+        "icon": "&#x1F40D;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "input", "label": "input", "type": "any" },
+          { "id": "approved", "label": "approved", "type": "boolean" },
+          { "id": "findings_md", "label": "findings_md", "type": "string" },
+          { "id": "review", "label": "review", "type": "object" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "output", "label": "output", "type": "any" }
+        ],
+        "code": "def _to_int(v, default):\n    try:\n        if v is None:\n            return default\n        if isinstance(v, bool):\n            return default\n        return int(float(v))\n    except Exception:\n        return default\n\n\ndef transform(input):\n    d = input if isinstance(input, dict) else {}\n    out = dict(d)\n\n    approved = bool(d.get('approved', False))\n    findings = '' if d.get('findings_md') is None else str(d.get('findings_md') or '')\n\n    out['approved'] = approved\n    out['review_findings_md'] = findings\n    out['review'] = d.get('review') if isinstance(d.get('review'), dict) else {}\n\n    cycle = _to_int(out.get('cycle'), 0) + 1\n    out['cycle'] = cycle\n\n    max_cycles = _to_int(out.get('max_cycles'), 2)\n    if max_cycles < 1:\n        max_cycles = 1\n\n    # If not approved, feed findings back into the coder.\n    out['feedback'] = '' if approved else findings\n\n    # Continue while we are not approved and we still have budget.\n    out['condition'] = (not approved) and (cycle < max_cycles)\n    return out\n",
+        "codeBody": "def _to_int(v, default):\n    try:\n        if v is None:\n            return default\n        if isinstance(v, bool):\n            return default\n        return int(float(v))\n    except Exception:\n        return default\n\n\ndef transform(input):\n    d = input if isinstance(input, dict) else {}\n    out = dict(d)\n\n    approved = bool(d.get('approved', False))\n    findings = '' if d.get('findings_md') is None else str(d.get('findings_md') or '')\n\n    out['approved'] = approved\n    out['review_findings_md'] = findings\n    out['review'] = d.get('review') if isinstance(d.get('review'), dict) else {}\n\n    cycle = _to_int(out.get('cycle'), 0) + 1\n    out['cycle'] = cycle\n\n    max_cycles = _to_int(out.get('max_cycles'), 2)\n    if max_cycles < 1:\n        max_cycles = 1\n\n    # If not approved, feed findings back into the coder.\n    out['feedback'] = '' if approved else findings\n\n    # Continue while we are not approved and we still have budget.\n    out['condition'] = (not approved) and (cycle < max_cycles)\n    return out\n",
+        "functionName": "transform"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+
+    {
+      "id": "node-14",
+      "type": "code",
+      "position": { "x": 1408.0, "y": 272.0 },
+      "data": {
+        "nodeType": "code",
+        "label": "Build Final Message",
+        "icon": "&#x1F40D;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "input", "label": "input", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "output", "label": "output", "type": "any" }
+        ],
+        "code": "def transform(input):\n    d = input if isinstance(input, dict) else {}\n    out = dict(d)\n\n    approved = bool(out.get('approved', False))\n    cycles = out.get('cycle', 0)\n    request = str(out.get('request') or '').strip()\n\n    req_md = str(out.get('requirements_md') or '').strip()\n    plan_md = str(out.get('plan_md') or '').strip()\n    coder_sum = str(out.get('coder_summary_md') or '').strip()\n    review_findings = str(out.get('review_findings_md') or '').strip()\n\n    status = 'APPROVED' if approved else 'NOT APPROVED'\n\n    parts = []\n    parts.append(f'# Multi-Agent Result ({status})')\n    parts.append(f'**Cycles:** {cycles}')\n\n    if request:\n        parts.append('## Request\\n' + request)\n\n    if req_md:\n        parts.append('## Requirements (Architect)\\n' + req_md)\n\n    if plan_md:\n        parts.append('## Plan (Manager)\\n' + plan_md)\n\n    if coder_sum:\n        parts.append('## Implementation Summary (Coder)\\n' + coder_sum)\n\n    if review_findings:\n        parts.append('## Review Findings (Reviewer)\\n' + review_findings)\n\n    parts.append('---\\n\\nTip: open the Agent trace panels on the Coder/Reviewer runs to inspect tool calls and errors.')\n\n    out['final_message'] = '\\n\\n'.join([p for p in parts if p.strip()])\n    return out\n",
+        "codeBody": "def transform(input):\n    d = input if isinstance(input, dict) else {}\n    out = dict(d)\n\n    approved = bool(out.get('approved', False))\n    cycles = out.get('cycle', 0)\n    request = str(out.get('request') or '').strip()\n\n    req_md = str(out.get('requirements_md') or '').strip()\n    plan_md = str(out.get('plan_md') or '').strip()\n    coder_sum = str(out.get('coder_summary_md') or '').strip()\n    review_findings = str(out.get('review_findings_md') or '').strip()\n\n    status = 'APPROVED' if approved else 'NOT APPROVED'\n\n    parts = []\n    parts.append(f'# Multi-Agent Result ({status})')\n    parts.append(f'**Cycles:** {cycles}')\n\n    if request:\n        parts.append('## Request\\n' + request)\n\n    if req_md:\n        parts.append('## Requirements (Architect)\\n' + req_md)\n\n    if plan_md:\n        parts.append('## Plan (Manager)\\n' + plan_md)\n\n    if coder_sum:\n        parts.append('## Implementation Summary (Coder)\\n' + coder_sum)\n\n    if review_findings:\n        parts.append('## Review Findings (Reviewer)\\n' + review_findings)\n\n    parts.append('---\\n\\nTip: open the Agent trace panels on the Coder/Reviewer runs to inspect tool calls and errors.')\n\n    out['final_message'] = '\\n\\n'.join([p for p in parts if p.strip()])\n    return out\n",
+        "functionName": "transform"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-15",
+      "type": "break_object",
+      "position": { "x": 1696.0, "y": 272.0 },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [{ "id": "object", "label": "object", "type": "object" }],
+        "outputs": [{ "id": "final_message", "label": "final_message", "type": "string" }],
+        "breakConfig": { "selectedPaths": ["final_message"] }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-16",
+      "type": "answer_user",
+      "position": { "x": 1952.0, "y": 272.0 },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "message", "label": "message", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "message", "label": "message", "type": "string" }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-17",
+      "type": "on_flow_end",
+      "position": { "x": 2240.0, "y": 272.0 },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "final_message", "label": "final_message", "type": "string" },
+          { "id": "state", "label": "state", "type": "object" }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    { "id": "edge-1", "source": "node-1", "sourceHandle": "exec-out", "target": "node-2", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-2", "source": "node-2", "sourceHandle": "exec-out", "target": "node-3", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-3", "source": "node-3", "sourceHandle": "exec-out", "target": "node-4", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-4", "source": "node-4", "sourceHandle": "exec-out", "target": "node-5", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-5", "source": "node-5", "sourceHandle": "exec-out", "target": "node-6", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-6", "source": "node-6", "sourceHandle": "exec-out", "target": "node-7", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-7", "source": "node-7", "sourceHandle": "exec-out", "target": "node-8", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-8", "source": "node-8", "sourceHandle": "exec-out", "target": "node-9", "targetHandle": "exec-in", "animated": true },
+
+    { "id": "edge-9", "source": "node-9", "sourceHandle": "loop", "target": "node-10", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-10", "source": "node-10", "sourceHandle": "exec-out", "target": "node-11", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-11", "source": "node-11", "sourceHandle": "exec-out", "target": "node-12", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-12", "source": "node-12", "sourceHandle": "exec-out", "target": "node-13", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-13", "source": "node-13", "sourceHandle": "exec-out", "target": "node-9", "targetHandle": "exec-in", "animated": true },
+
+    { "id": "edge-14", "source": "node-9", "sourceHandle": "done", "target": "node-14", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-15", "source": "node-14", "sourceHandle": "exec-out", "target": "node-16", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-16", "source": "node-16", "sourceHandle": "exec-out", "target": "node-17", "targetHandle": "exec-in", "animated": true },
+
+    { "id": "edge-20", "source": "node-3", "sourceHandle": "report", "target": "node-4", "targetHandle": "report", "animated": false },
+    { "id": "edge-21", "source": "node-3", "sourceHandle": "dossier", "target": "node-4", "targetHandle": "dossier", "animated": false },
+    { "id": "edge-22", "source": "node-3", "sourceHandle": "clarifications", "target": "node-4", "targetHandle": "clarifications", "animated": false },
+
+    { "id": "edge-23", "source": "node-5", "sourceHandle": "spec", "target": "node-6", "targetHandle": "spec", "animated": false },
+    { "id": "edge-24", "source": "node-5", "sourceHandle": "requirements_md", "target": "node-6", "targetHandle": "requirements_md", "animated": false },
+
+    { "id": "edge-25", "source": "node-7", "sourceHandle": "plan", "target": "node-8", "targetHandle": "plan", "animated": false },
+    { "id": "edge-26", "source": "node-7", "sourceHandle": "plan_md", "target": "node-8", "targetHandle": "plan_md", "animated": false },
+    { "id": "edge-27", "source": "node-7", "sourceHandle": "tasks", "target": "node-8", "targetHandle": "tasks", "animated": false },
+    { "id": "edge-28", "source": "node-7", "sourceHandle": "test_plan", "target": "node-8", "targetHandle": "test_plan", "animated": false },
+
+    { "id": "edge-29", "source": "node-10", "sourceHandle": "coder", "target": "node-11", "targetHandle": "coder", "animated": false },
+    { "id": "edge-30", "source": "node-10", "sourceHandle": "summary_md", "target": "node-11", "targetHandle": "summary_md", "animated": false },
+
+    { "id": "edge-31", "source": "node-12", "sourceHandle": "approved", "target": "node-13", "targetHandle": "approved", "animated": false },
+    { "id": "edge-32", "source": "node-12", "sourceHandle": "findings_md", "target": "node-13", "targetHandle": "findings_md", "animated": false },
+    { "id": "edge-33", "source": "node-12", "sourceHandle": "review", "target": "node-13", "targetHandle": "review", "animated": false },
+
+    { "id": "edge-40", "source": "node-14", "sourceHandle": "output", "target": "node-15", "targetHandle": "object", "animated": false },
+    { "id": "edge-41", "source": "node-15", "sourceHandle": "final_message", "target": "node-16", "targetHandle": "message", "animated": false },
+    { "id": "edge-42", "source": "node-15", "sourceHandle": "final_message", "target": "node-17", "targetHandle": "final_message", "animated": false },
+    { "id": "edge-43", "source": "node-14", "sourceHandle": "output", "target": "node-17", "targetHandle": "state", "animated": false }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2026-01-01T00:00:00Z",
+  "updated_at": "2026-01-01T00:00:00Z"
+}
+
+

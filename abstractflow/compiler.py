@@ -262,6 +262,7 @@ def _create_visual_agent_effect_handler(
         model: str,
         system_prompt: str,
         allowed_tools: list[str],
+        max_iterations: Optional[int] = None,
     ) -> Dict[str, Any]:
         parent_limits = run.vars.get("_limits")
         limits = dict(parent_limits) if isinstance(parent_limits, dict) else {}
@@ -273,6 +274,9 @@ def _create_visual_agent_effect_handler(
         limits.setdefault("estimated_tokens_used", 0)
         limits.setdefault("warn_iterations_pct", 80)
         limits.setdefault("warn_tokens_pct", 80)
+
+        if isinstance(max_iterations, int) and max_iterations > 0:
+            limits["max_iterations"] = int(max_iterations)
 
         ctx_ns: Dict[str, Any] = {"task": str(task or ""), "messages": []}
         if isinstance(context, dict) and context:
@@ -294,6 +298,22 @@ def _create_visual_agent_effect_handler(
             "_temp": {},
             "_limits": limits,
         }
+
+    def _coerce_max_iterations(value: Any) -> Optional[int]:
+        try:
+            if value is None:
+                return None
+            if isinstance(value, bool):
+                return None
+            if isinstance(value, (int, float)):
+                iv = int(float(value))
+                return iv if iv > 0 else None
+            if isinstance(value, str) and value.strip():
+                iv = int(float(value.strip()))
+                return iv if iv > 0 else None
+        except Exception:
+            return None
+        return None
 
     def handler(run: Any, ctx: Any) -> "StepPlan":
         del ctx
@@ -342,6 +362,12 @@ def _create_visual_agent_effect_handler(
         context = context_raw if isinstance(context_raw, dict) else {}
         system_raw = resolved_inputs.get("system") if isinstance(resolved_inputs, dict) else None
         system_prompt = system_raw if isinstance(system_raw, str) else str(system_raw or "")
+
+        # Agent loop budget (max_iterations) can come from a data-edge pin or from config.
+        max_iterations_raw = resolved_inputs.get("max_iterations") if isinstance(resolved_inputs, dict) else None
+        max_iterations_override = _coerce_max_iterations(max_iterations_raw)
+        if max_iterations_override is None:
+            max_iterations_override = _coerce_max_iterations(agent_config.get("max_iterations"))
 
         # Tools selection:
         # - If the resolved inputs explicitly include `tools` (e.g. tools pin connected),
@@ -412,6 +438,7 @@ def _create_visual_agent_effect_handler(
                             model=model,
                             system_prompt=system_prompt,
                             allowed_tools=allowed_tools,
+                            max_iterations=max_iterations_override,
                         ),
                         # Run Agent as a durable async subworkflow so the host can:
                         # - tick the child incrementally (real-time observability of each effect)

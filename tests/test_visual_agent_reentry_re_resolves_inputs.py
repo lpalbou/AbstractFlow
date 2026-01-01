@@ -32,6 +32,7 @@ def test_visual_agent_node_reentry_resets_bucket_and_reruns_with_new_inputs() ->
             "task": task,
             "provider": "lmstudio",
             "model": "qwen/qwen3-next-80b",
+            "max_iterations": 42,
             "system": "",
             "context": {},
             "tools": [],
@@ -53,6 +54,15 @@ def test_visual_agent_node_reentry_resets_bucket_and_reruns_with_new_inputs() ->
     assert plan1.effect.type == EffectType.START_SUBWORKFLOW
     assert plan1.next_node == "agent"
     assert run.vars["_temp"]["agent"]["agent"]["phase"] == "subworkflow"
+
+    payload_vars1 = plan1.effect.payload.get("vars")
+    assert isinstance(payload_vars1, dict)
+    limits1 = payload_vars1.get("_limits")
+    assert isinstance(limits1, dict)
+    assert limits1.get("max_iterations") == 42
+    scratchpad1 = payload_vars1.get("scratchpad")
+    assert isinstance(scratchpad1, dict)
+    assert scratchpad1.get("max_iterations") == 42
 
     # Simulate the runtime writing the subworkflow result into the specified result_key.
     run.vars["_temp"]["agent"]["agent"]["sub"] = {
