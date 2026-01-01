@@ -1221,9 +1221,40 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
     def _create_set_var_handler(_data: Dict[str, Any]):
         # Execution node: does not mutate run.vars here (handled by compiler adapter).
         # This handler exists to participate in data-edge resolution and expose outputs.
+        #
+        # Important UX contract:
+        # - In the visual editor, primitive pins (boolean/number/string) show default UI controls
+        #   even when the user hasn't explicitly edited them.
+        # - If we treat "missing" as None here, `Set Variable` would write None and this can
+        #   cause typed `Variable` (`var_decl`) to fall back to its default (e.g. staying True).
+        # - Therefore we default missing primitive values to their natural defaults.
+        pins = _data.get("inputs") if isinstance(_data, dict) else None
+        value_pin_type: Optional[str] = None
+        if isinstance(pins, list):
+            for p in pins:
+                if not isinstance(p, dict):
+                    continue
+                if p.get("id") != "value":
+                    continue
+                t = p.get("type")
+                if isinstance(t, str) and t:
+                    value_pin_type = t
+                break
+
         def handler(input_data: Any) -> Dict[str, Any]:
             payload = input_data if isinstance(input_data, dict) else {}
-            return {"name": payload.get("name"), "value": payload.get("value")}
+            value_specified = isinstance(payload, dict) and "value" in payload
+            value = payload.get("value")
+
+            if not value_specified:
+                if value_pin_type == "boolean":
+                    value = False
+                elif value_pin_type == "number":
+                    value = 0
+                elif value_pin_type == "string":
+                    value = ""
+
+            return {"name": payload.get("name"), "value": value}
 
         return handler
 

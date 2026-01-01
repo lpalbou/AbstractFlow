@@ -44,8 +44,8 @@
       "id": "node-2",
       "type": "var_decl",
       "position": {
-        "x": -176.0,
-        "y": 272.0
+        "x": 0.0,
+        "y": 256.0
       },
       "data": {
         "nodeType": "var_decl",
@@ -691,33 +691,43 @@
       "outputs": []
     },
     {
-      "id": "node-17",
-      "type": "get_var",
+      "id": "node-18",
+      "type": "answer_user",
       "position": {
-        "x": 32.0,
-        "y": 496.0
+        "x": 1616.0,
+        "y": 400.0
       },
       "data": {
-        "nodeType": "get_var",
-        "label": "Get b_continue",
-        "icon": "&#x1F4E5;",
-        "headerColor": "#16A085",
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
         "inputs": [
           {
-            "id": "name",
-            "label": "name",
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
             "type": "string"
           }
         ],
         "outputs": [
           {
-            "id": "value",
-            "label": "value",
-            "type": "boolean"
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
           }
         ],
         "pinDefaults": {
-          "name": "b_continue"
+          "message": "TOOL CALLS FAILED !"
         }
       },
       "label": null,
@@ -897,8 +907,16 @@
       "animated": false
     },
     {
-      "id": "edge-1767218587995",
-      "source": "node-17",
+      "id": "edge-1767229882581",
+      "source": "node-9",
+      "sourceHandle": "false",
+      "target": "node-18",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767229902795",
+      "source": "node-2",
       "sourceHandle": "value",
       "target": "node-3",
       "targetHandle": "condition",
@@ -907,5 +925,5 @@
   ],
   "entryNode": "node-1",
   "created_at": "2025-12-31T20:46:40.208920",
-  "updated_at": "2025-12-31T22:32:31.232316"
+  "updated_at": "2026-01-01T01:22:28.939801"
 }

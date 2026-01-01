@@ -47,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Moved `Tool Calls` (`tool_calls`) from the `Effects` palette category to `Core`, and reordered core nodes to: Subflow, Agent, LLM Call, Tool Calls, Ask User, Answer User.
 - Improved `Compare` (`compare`) node with an `op` input pin (dropdown in the UI) supporting `==`, `>=`, `>`, `<=`, `<` (defaults to `==` for backward compatibility).
 - Fixed scheduler-node outputs in WebSocket `node_complete`: Loop/While/For now sync their persisted `{index,...}` outputs into `flow._node_outputs` after scheduling, so the UI no longer shows a stale index (often stuck at 0).
+- Fixed `Set Variable` defaulting for typed primitive pins: when the `value` pin is `boolean/number/string` and left unset, it now defaults to `false/0/""` instead of writing `None` (which could make typed `Variable` (`var_decl`) reads fall back to their defaults unexpectedly).
 
 ### Planned
 - Visual workflow editor with drag-and-drop interface
