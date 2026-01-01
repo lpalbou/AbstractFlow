@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Runtime node trace entries are now streamed incrementally over WebSocket (`trace_update`) so Agent traces update during execution instead of only after the Agent node completes.
   - Visual Agent nodes now start their ReAct subworkflow in **async+wait** mode so the WebSocket runner can tick the child run incrementally (required for real-time `trace_update` streaming).
 - Web run “afterglow” execution highlighting now decays smoothly (3s) and highlights only the execution edges actually taken (prev → next), avoiding misleading branch highlighting on conditional/control nodes.
+- Data edges are now colored by their data type (based on the source pin type) to improve readability in dense graphs.
 
 ### Added
 - Visual custom events (Blueprint-style):

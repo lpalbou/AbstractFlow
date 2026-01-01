@@ -397,6 +397,12 @@
   filter: drop-shadow(0 0 8px rgba(39, 174, 96, 0.65));
 }
 
+/* Base styling for execution edges (control-flow). */
+.react-flow__edge.exec-base .react-flow__edge-path {
+  stroke-width: 3;
+  opacity: 0.85;
+}
+
 /* Afterglow for recently executed exec edges (helps visualize fast flows). */
 .react-flow__edge.exec-recent .react-flow__edge-path {
   stroke-width: 4;

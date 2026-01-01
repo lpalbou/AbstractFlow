@@ -54,6 +54,22 @@ export function Canvas() {
     duplicateSelection,
   } = useFlowStore();
 
+  // Map pin handle ids → pin types so we can color data edges by their data type.
+  const pinTypesByNodeId = useMemo(() => {
+    const outputsByNode = new Map<string, Map<string, PinType>>();
+    const inputsByNode = new Map<string, Map<string, PinType>>();
+    for (const n of nodes) {
+      const data = n.data;
+      const out = new Map<string, PinType>();
+      const inp = new Map<string, PinType>();
+      for (const p of data.outputs || []) out.set(p.id, p.type as PinType);
+      for (const p of data.inputs || []) inp.set(p.id, p.type as PinType);
+      outputsByNode.set(n.id, out);
+      inputsByNode.set(n.id, inp);
+    }
+    return { outputsByNode, inputsByNode };
+  }, [nodes]);
+
   const isEditableTarget = (target: EventTarget | null): boolean => {
     if (!target) return false;
     if (!(target instanceof HTMLElement)) return false;
@@ -187,39 +203,68 @@ export function Canvas() {
   }, []);
 
   // Get edge style based on source handle type
-  const getEdgeStyleColor = (edge: Edge): string => {
-    const sourceNode = nodes.find((n) => n.id === edge.source);
-    if (!sourceNode) return '#888';
-
-    const sourcePin = sourceNode.data.outputs.find(
-      (p) => p.id === edge.sourceHandle
-    );
-    if (!sourcePin) return '#888';
-
-    return PIN_COLORS[sourcePin.type as PinType] || '#888';
+  const getEdgeStyleColor = (edge: Edge): string | null => {
+    const sourceHandle = edge.sourceHandle || '';
+    const outMap = pinTypesByNodeId.outputsByNode.get(edge.source);
+    const sourceType = outMap?.get(sourceHandle);
+    if (!sourceType || sourceType === 'execution') return null;
+    return PIN_COLORS[sourceType] || null;
   };
-
-  // Unused currently but can be used for custom edge rendering
-  void getEdgeStyleColor;
 
   // Execution observability:
   // Highlight only the *taken* execution edges (prev → next) via an afterglow class
   // driven by execution events. Do NOT highlight all outgoing edges of the active node,
   // otherwise conditional/control nodes would light up branches that are not taken.
+  const baseStyledEdges = useMemo(() => {
+    return edges.map((e) => {
+      const sourceHandle = e.sourceHandle || '';
+      const targetHandle = e.targetHandle || '';
+      const sourceType = pinTypesByNodeId.outputsByNode.get(e.source)?.get(sourceHandle);
+      const targetType = pinTypesByNodeId.inputsByNode.get(e.target)?.get(targetHandle);
+      const isExecEdge = sourceType === 'execution' || targetType === 'execution';
+
+      // ---- classes -------------------------------------------------------
+      // This class is used only for baseline styling (slightly thicker exec edges).
+      // Runtime "path taken" highlighting is handled separately via `exec-recent`.
+      const prevClassName = e.className || '';
+      const parts = prevClassName
+        .split(/\s+/)
+        .filter(Boolean)
+        .filter((c) => c !== 'exec-recent' && c !== 'exec-active');
+      const hadExecBase = parts.includes('exec-base');
+      const nextParts = isExecEdge
+        ? hadExecBase
+          ? parts
+          : [...parts, 'exec-base']
+        : parts.filter((c) => c !== 'exec-base');
+      const nextClassName = nextParts.length > 0 ? nextParts.join(' ') : undefined;
+
+      // ---- style ---------------------------------------------------------
+      // Data edges: color by the source pin data type for better readability.
+      // Exec edges: keep neutral colors; UX uses stroke width + runtime afterglow.
+      const desiredStroke = !isExecEdge ? getEdgeStyleColor(e) : null;
+      const prevStroke = (e.style as Record<string, unknown> | undefined)?.stroke as string | undefined;
+      const shouldSetStroke = Boolean(desiredStroke) && desiredStroke !== prevStroke;
+      const nextStyle = shouldSetStroke ? ({ ...(e.style || {}), stroke: desiredStroke } as Edge['style']) : e.style;
+
+      const classChanged = nextClassName !== (e.className || undefined);
+      const styleChanged = nextStyle !== e.style;
+      if (!classChanged && !styleChanged) return e;
+      return { ...e, className: nextClassName, style: nextStyle };
+    });
+  }, [edges, pinTypesByNodeId]);
+
   const decoratedEdges = useMemo(() => {
     const hasRecent = Boolean(recentEdgeIds && Object.keys(recentEdgeIds).length > 0);
-    if (!hasRecent) return edges;
-    return edges.map((e) => {
-      const classes = [e.className || ''].filter(Boolean);
-
-      if (hasRecent && recentEdgeIds && recentEdgeIds[e.id]) {
-        classes.push('exec-recent');
-      }
-
-      if (classes.length === 0) return e;
-      return { ...e, className: classes.join(' ') };
+    if (!hasRecent) return baseStyledEdges;
+    return baseStyledEdges.map((e) => {
+      if (!recentEdgeIds || !recentEdgeIds[e.id]) return e;
+      const prev = e.className || '';
+      if (prev.split(/\s+/).includes('exec-recent')) return e;
+      const next = (prev ? `${prev} ` : '') + 'exec-recent';
+      return { ...e, className: next };
     });
-  }, [edges, recentEdgeIds]);
+  }, [baseStyledEdges, recentEdgeIds]);
 
   return (
     <div
