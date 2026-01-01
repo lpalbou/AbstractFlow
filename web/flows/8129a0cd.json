@@ -230,66 +230,11 @@
       "outputs": []
     },
     {
-      "id": "node-5",
-      "type": "concat",
-      "position": {
-        "x": 736.0,
-        "y": 832.0
-      },
-      "data": {
-        "nodeType": "concat",
-        "label": "Concat",
-        "icon": "&#x2795;",
-        "headerColor": "#E74C3C",
-        "inputs": [
-          {
-            "id": "a",
-            "label": "a",
-            "type": "string"
-          },
-          {
-            "id": "b",
-            "label": "b",
-            "type": "string"
-          },
-          {
-            "id": "c",
-            "label": "c",
-            "type": "string"
-          },
-          {
-            "id": "d",
-            "label": "d",
-            "type": "string"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "result",
-            "label": "result",
-            "type": "string"
-          }
-        ],
-        "concatConfig": {
-          "separator": " "
-        },
-        "pinDefaults": {
-          "a": "User Query : ",
-          "c": "Additional Inferred Context : "
-        }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
       "id": "node-7",
       "type": "llm_call",
       "position": {
         "x": 992.0,
-        "y": 1184.0
+        "y": 1168.0
       },
       "data": {
         "nodeType": "llm_call",
@@ -350,7 +295,7 @@
           "model": "qwen/qwen3-next-80b"
         },
         "pinDefaults": {
-          "system": "Did we forget anything relevant to that answer ? Did we misrerepresent antyhing ? See if there is a way to improve the answer to the User Query. Provide the final high quality, direct answer. ONLY PROVIDE YOUR ANSWER WITHOUT COMMENTING ON PREVIOUS RESEARCH"
+          "system": "Is the answer complete ? Did we forget anything ? Did we misrepresent anything ? Is there any other way to improve the answer to the User Query ? Think about it, then provide the final high quality revised answer to the user. CRITICAL : answer the user directly without commenting on previous research and intermediary results"
         }
       },
       "label": null,
@@ -444,7 +389,7 @@
       "type": "concat",
       "position": {
         "x": 752.0,
-        "y": 1152.0
+        "y": 1168.0
       },
       "data": {
         "nodeType": "concat",
@@ -487,6 +432,55 @@
       "headerColor": null,
       "inputs": [],
       "outputs": []
+    },
+    {
+      "id": "node-11",
+      "type": "concat",
+      "position": {
+        "x": 736.0,
+        "y": 864.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "b": "Additional Inferred Context and Intent :\\n"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
     }
   ],
   "edges": [
@@ -503,30 +497,6 @@
       "source": "node-3",
       "sourceHandle": "result",
       "target": "node-2",
-      "targetHandle": "prompt",
-      "animated": false
-    },
-    {
-      "id": "edge-1767275206256",
-      "source": "node-1",
-      "sourceHandle": "query",
-      "target": "node-5",
-      "targetHandle": "b",
-      "animated": false
-    },
-    {
-      "id": "edge-1767275225747",
-      "source": "node-2",
-      "sourceHandle": "response",
-      "target": "node-5",
-      "targetHandle": "d",
-      "animated": false
-    },
-    {
-      "id": "edge-1767275232164",
-      "source": "node-5",
-      "sourceHandle": "result",
-      "target": "node-4",
       "targetHandle": "prompt",
       "animated": false
     },
@@ -587,23 +557,39 @@
       "animated": false
     },
     {
-      "id": "edge-1767275751729",
-      "source": "node-5",
-      "sourceHandle": "result",
-      "target": "node-10",
-      "targetHandle": "a",
-      "animated": false
-    },
-    {
       "id": "edge-1767275766400",
       "source": "node-4",
       "sourceHandle": "response",
       "target": "node-10",
       "targetHandle": "c",
       "animated": false
+    },
+    {
+      "id": "edge-1767291476333",
+      "source": "node-3",
+      "sourceHandle": "result",
+      "target": "node-11",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-1767291492074",
+      "source": "node-2",
+      "sourceHandle": "response",
+      "target": "node-11",
+      "targetHandle": "c",
+      "animated": false
+    },
+    {
+      "id": "edge-1767291495573",
+      "source": "node-11",
+      "sourceHandle": "result",
+      "target": "node-4",
+      "targetHandle": "prompt",
+      "animated": false
     }
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-01T13:51:55.726980",
-  "updated_at": "2026-01-01T17:51:25.615782"
+  "updated_at": "2026-01-01T18:22:29.674593"
 }

@@ -1244,18 +1244,16 @@ async def _execute_runner_loop(
     while True:
         if gate is not None:
             await gate.wait()
-        # Discover current session children (event listeners + any async descendants).
-        run_ids: list[str] = [root_run_id]
-        try:
-            run_store = getattr(runtime, "run_store", None)
-            if run_store is not None and hasattr(run_store, "list_children"):
-                children = run_store.list_children(parent_run_id=root_run_id)  # type: ignore[attr-defined]
-                for c in children:
-                    rid = getattr(c, "run_id", None)
-                    if isinstance(rid, str) and rid and rid not in run_ids:
-                        run_ids.append(rid)
-        except Exception:
-            pass
+        # Discover all descendant runs (root + children + grandchildren...).
+        #
+        # This is critical for nested subworkflow composition:
+        # - Root run may wait on a Subflow child
+        # - That child may itself wait on an Agent sub-run (grandchild)
+        # If we only tick direct children of the root, the grandchild never progresses
+        # and the session deadlocks (UI shows "running" but nothing is computing).
+        run_ids: list[str] = _list_descendant_run_ids(runtime, root_run_id)
+        if not run_ids:
+            run_ids = [root_run_id]
 
         # Tick root first, then children.
         root_state = await _tick_run(root_run_id, is_root=True)
