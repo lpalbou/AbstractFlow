@@ -28,8 +28,10 @@
 
 /* Afterglow: keep a subtle highlight for recently executed nodes to visualize fast flows. */
 .flow-node.recent {
-  border-color: rgba(52, 152, 219, 0.55);
+  /* Smooth, progressive decay (3s) so fast flows still show an understandable trajectory. */
+  border-color: rgba(52, 152, 219, 0.62);
   box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.35), 0 8px 18px rgba(52, 152, 219, 0.18);
+  animation: recentNodeAfterglow 3s ease-out forwards;
 }
 
 @keyframes pulse {
@@ -39,6 +41,18 @@
   }
   50% {
     box-shadow: 0 0 0 4px var(--success), 0 4px 16px rgba(39, 174, 96, 0.6);
+  }
+}
+
+@keyframes recentNodeAfterglow {
+  0% {
+    border-color: rgba(52, 152, 219, 0.72);
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.42), 0 10px 22px rgba(52, 152, 219, 0.22);
+  }
+  100% {
+    /* Match `.flow-node` base visuals to avoid a visible “snap” when the class is removed. */
+    border-color: #444;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   }
 }
 
@@ -385,10 +399,23 @@
 
 /* Afterglow for recently executed exec edges (helps visualize fast flows). */
 .react-flow__edge.exec-recent .react-flow__edge-path {
-  stroke: rgba(52, 152, 219, 0.92);
   stroke-width: 4;
-  opacity: 0.9;
-  filter: drop-shadow(0 0 8px rgba(52, 152, 219, 0.42));
+  opacity: 0.95;
+  filter: drop-shadow(0 0 10px rgba(52, 152, 219, 0.5));
+  animation: recentEdgeAfterglow 3s ease-out forwards;
+}
+
+@keyframes recentEdgeAfterglow {
+  0% {
+    stroke-width: 4;
+    opacity: 0.95;
+    filter: drop-shadow(0 0 10px rgba(52, 152, 219, 0.5));
+  }
+  100% {
+    stroke-width: 2;
+    opacity: 1;
+    filter: none;
+  }
 }
 
 @keyframes dash {

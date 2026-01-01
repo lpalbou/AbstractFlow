@@ -42,7 +42,6 @@ export function Canvas() {
   const {
     nodes,
     edges,
-    executingNodeId,
     recentEdgeIds,
     onNodesChange,
     onEdgesChange,
@@ -204,15 +203,12 @@ export function Canvas() {
   void getEdgeStyleColor;
 
   // Execution observability:
-  // While a node is executing, highlight the execution edges connected to it
-  // (incoming/outgoing exec pins) so users can visually follow the graph.
+  // Highlight only the *taken* execution edges (prev → next) via an afterglow class
+  // driven by execution events. Do NOT highlight all outgoing edges of the active node,
+  // otherwise conditional/control nodes would light up branches that are not taken.
   const decoratedEdges = useMemo(() => {
-    const hasActive = Boolean(executingNodeId);
     const hasRecent = Boolean(recentEdgeIds && Object.keys(recentEdgeIds).length > 0);
-    if (!hasActive && !hasRecent) return edges;
-    const isExec = (e: Edge) => e.sourceHandle === 'exec-out' || e.targetHandle === 'exec-in' || Boolean(e.animated);
-    const isActive = (e: Edge) =>
-      isExec(e) && (e.source === executingNodeId || e.target === executingNodeId);
+    if (!hasRecent) return edges;
     return edges.map((e) => {
       const classes = [e.className || ''].filter(Boolean);
 
@@ -220,16 +216,10 @@ export function Canvas() {
         classes.push('exec-recent');
       }
 
-      let animated = Boolean(e.animated);
-      if (hasActive && isActive(e)) {
-        classes.push('exec-active');
-        animated = true;
-      }
-
-      if (classes.length === 0 && animated === Boolean(e.animated)) return e;
-      return { ...e, className: classes.join(' '), animated };
+      if (classes.length === 0) return e;
+      return { ...e, className: classes.join(' ') };
     });
-  }, [edges, executingNodeId, recentEdgeIds]);
+  }, [edges, recentEdgeIds]);
 
   return (
     <div

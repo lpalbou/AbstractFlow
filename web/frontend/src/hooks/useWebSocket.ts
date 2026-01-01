@@ -45,7 +45,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
   // Execution observability afterglow:
   // Keep recently executed nodes/edges highlighted long enough to be readable when flows run fast.
   // UX note: tuned for human scan time when the run modal is minimized.
-  const AFTERGLOW_MS = 4000;
+  const AFTERGLOW_MS = 3000;
   const recentNodeTimersRef = useRef<Record<string, number>>({});
   const recentEdgeTimersRef = useRef<Record<string, number>>({});
   const lastRootNodeIdRef = useRef<string | null>(null);
@@ -53,13 +53,19 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
   const markNodeAfterglow = useCallback(
     (nodeId: string) => {
       if (!nodeId) return;
-      markRecentNode(nodeId);
       const prev = recentNodeTimersRef.current[nodeId];
       if (prev) window.clearTimeout(prev);
-      recentNodeTimersRef.current[nodeId] = window.setTimeout(() => {
-        unmarkRecentNode(nodeId);
-        delete recentNodeTimersRef.current[nodeId];
-      }, AFTERGLOW_MS);
+
+      // Ensure the CSS afterglow animation restarts if this node executes again quickly.
+      // (CSS keyframes won't restart if the class stays applied.)
+      unmarkRecentNode(nodeId);
+      window.requestAnimationFrame(() => {
+        markRecentNode(nodeId);
+        recentNodeTimersRef.current[nodeId] = window.setTimeout(() => {
+          unmarkRecentNode(nodeId);
+          delete recentNodeTimersRef.current[nodeId];
+        }, AFTERGLOW_MS);
+      });
     },
     [markRecentNode, unmarkRecentNode]
   );
@@ -67,13 +73,18 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
   const markEdgeAfterglow = useCallback(
     (edgeId: string) => {
       if (!edgeId) return;
-      markRecentEdge(edgeId);
       const prev = recentEdgeTimersRef.current[edgeId];
       if (prev) window.clearTimeout(prev);
-      recentEdgeTimersRef.current[edgeId] = window.setTimeout(() => {
-        unmarkRecentEdge(edgeId);
-        delete recentEdgeTimersRef.current[edgeId];
-      }, AFTERGLOW_MS);
+
+      // Ensure the CSS afterglow animation restarts if this edge is traversed again quickly.
+      unmarkRecentEdge(edgeId);
+      window.requestAnimationFrame(() => {
+        markRecentEdge(edgeId);
+        recentEdgeTimersRef.current[edgeId] = window.setTimeout(() => {
+          unmarkRecentEdge(edgeId);
+          delete recentEdgeTimersRef.current[edgeId];
+        }, AFTERGLOW_MS);
+      });
     },
     [markRecentEdge, unmarkRecentEdge]
   );
