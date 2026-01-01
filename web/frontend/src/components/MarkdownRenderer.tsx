@@ -28,6 +28,9 @@ function safeLang(raw: string): string {
 export function MarkdownRenderer({ markdown, className }: MarkdownRendererProps) {
   const monaco = useMonaco();
   const rootRef = useRef<HTMLDivElement | null>(null);
+  // Keep the original (pre-highlight) code text so copy works even after Monaco replaces
+  // newlines with <br> and indentation with &nbsp;.
+  const rawCodeByElRef = useRef<WeakMap<HTMLElement, string>>(new WeakMap());
 
   const sanitizedHtml = useMemo(() => {
     const md = typeof markdown === 'string' ? markdown : String(markdown ?? '');
@@ -83,6 +86,9 @@ export function MarkdownRenderer({ markdown, className }: MarkdownRendererProps)
         const text = node.textContent || '';
         if (!text.trim()) continue;
 
+        // Store the raw text for reliable copy-to-clipboard (preserve newlines/indentation).
+        rawCodeByElRef.current.set(node, text);
+
         try {
           const html = await monaco.editor.colorize(text, lang, { tabSize: 2 });
           if (cancelled) return;
@@ -105,7 +111,8 @@ export function MarkdownRenderer({ markdown, className }: MarkdownRendererProps)
 
     const block = btn.closest('.md-code-block');
     const codeEl = block?.querySelector('pre code') as HTMLElement | null;
-    const text = codeEl?.textContent || '';
+    // Prefer the raw, pre-colorized code (Monaco HTML loses literal newlines on textContent).
+    const text = (codeEl ? rawCodeByElRef.current.get(codeEl) : null) || codeEl?.textContent || '';
     if (!text) return;
 
     try {
