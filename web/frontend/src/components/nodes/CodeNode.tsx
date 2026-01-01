@@ -15,8 +15,9 @@ export const CodeNode = memo(function CodeNode({
   data,
   selected,
 }: NodeProps<FlowNodeData>) {
-  const { updateNodeData, executingNodeId } = useFlowStore();
+  const { updateNodeData, executingNodeId, recentNodeIds } = useFlowStore();
   const isExecuting = executingNodeId === id;
+  const isRecent = Boolean(recentNodeIds && recentNodeIds[id]);
 
   const [code, setCode] = useState(
     data.code || 'def transform(input):\n    return input'
@@ -37,7 +38,8 @@ export const CodeNode = memo(function CodeNode({
       className={clsx(
         'flow-node code-node',
         selected && 'selected',
-        isExecuting && 'executing'
+        isExecuting && 'executing',
+        isRecent && !isExecuting && 'recent'
       )}
     >
       {/* Header */}

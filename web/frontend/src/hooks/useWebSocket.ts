@@ -42,7 +42,10 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
   const nodeIdSet = useMemo(() => new Set(nodes.map((n) => n.id)), [nodes]);
   const nodeById = useMemo(() => new Map(nodes.map((n) => [n.id, n] as const)), [nodes]);
 
-  const AFTERGLOW_MS = 2500;
+  // Execution observability afterglow:
+  // Keep recently executed nodes/edges highlighted long enough to be readable when flows run fast.
+  // UX note: tuned for human scan time when the run modal is minimized.
+  const AFTERGLOW_MS = 4000;
   const recentNodeTimersRef = useRef<Record<string, number>>({});
   const recentEdgeTimersRef = useRef<Record<string, number>>({});
   const lastRootNodeIdRef = useRef<string | null>(null);
