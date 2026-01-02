@@ -577,7 +577,7 @@ const EFFECT_NODES: NodeTemplate[] = [
   {
     type: 'memory_note',
     icon: '&#x1F4DD;', // Memo
-    label: 'Add Note',
+    label: 'Remember',
     headerColor: '#2ECC71', // Green - memory
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
@@ -595,7 +595,7 @@ const EFFECT_NODES: NodeTemplate[] = [
   {
     type: 'memory_query',
     icon: '&#x1F50D;', // Magnifying glass
-    label: 'Query Memory',
+    label: 'Recall',
     headerColor: '#2ECC71', // Green - memory
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
@@ -616,7 +616,7 @@ const EFFECT_NODES: NodeTemplate[] = [
   {
     type: 'memory_rehydrate',
     icon: '&#x1F4AC;', // Speech balloon
-    label: 'Memory Rehydrate',
+    label: 'Recall into context',
     headerColor: '#2ECC71', // Green - memory
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },

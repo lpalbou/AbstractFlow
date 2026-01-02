@@ -49,7 +49,7 @@
       },
       "data": {
         "nodeType": "memory_note",
-        "label": "Add Note",
+        "label": "Remember",
         "icon": "&#x1F4DD;",
         "headerColor": "#2ECC71",
         "inputs": [
@@ -92,7 +92,7 @@
       },
       "data": {
         "nodeType": "memory_note",
-        "label": "Add Note",
+        "label": "Remember",
         "icon": "&#x1F4DD;",
         "headerColor": "#2ECC71",
         "inputs": [
@@ -135,7 +135,7 @@
       },
       "data": {
         "nodeType": "memory_query",
-        "label": "Query Memory",
+        "label": "Recall",
         "icon": "&#x1F50D;",
         "headerColor": "#2ECC71",
         "inputs": [

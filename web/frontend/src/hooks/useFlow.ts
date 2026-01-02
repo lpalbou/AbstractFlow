@@ -557,6 +557,99 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         data = { ...data, inputs: [...canonicalInputs, ...extras] };
       }
 
+      // Backward-compat + canonical ordering for memory nodes.
+      //
+      // Keep pins addressable by id (edges), so reordering/adding pins is safe.
+      if (data.nodeType === 'memory_note' || data.nodeType === 'memory_query' || data.nodeType === 'memory_rehydrate') {
+        const existingInputs = Array.isArray(data.inputs) ? data.inputs : [];
+        const byInputId = new Map(existingInputs.map((p) => [p.id, p] as const));
+        const usedInputs = new Set<string>();
+
+        const wantInput = (pin: Pin): Pin => {
+          const prev = byInputId.get(pin.id);
+          usedInputs.add(pin.id);
+          if (!prev) return pin;
+          if (prev.label === pin.label && prev.type === pin.type) return prev;
+          return { ...prev, label: pin.label, type: pin.type };
+        };
+
+        const canonicalInputs: Pin[] =
+          data.nodeType === 'memory_note'
+            ? [
+                wantInput({ id: 'exec-in', label: '', type: 'execution' }),
+                wantInput({ id: 'content', label: 'content', type: 'string' }),
+                wantInput({ id: 'tags', label: 'tags', type: 'object' }),
+                wantInput({ id: 'sources', label: 'sources', type: 'object' }),
+                wantInput({ id: 'scope', label: 'scope', type: 'string' }),
+              ]
+            : data.nodeType === 'memory_query'
+              ? [
+                  wantInput({ id: 'exec-in', label: '', type: 'execution' }),
+                  wantInput({ id: 'query', label: 'query', type: 'string' }),
+                  wantInput({ id: 'limit', label: 'limit', type: 'number' }),
+                  wantInput({ id: 'tags', label: 'tags', type: 'object' }),
+                  wantInput({ id: 'since', label: 'since', type: 'string' }),
+                  wantInput({ id: 'until', label: 'until', type: 'string' }),
+                  wantInput({ id: 'scope', label: 'scope', type: 'string' }),
+                ]
+              : [
+                  wantInput({ id: 'exec-in', label: '', type: 'execution' }),
+                  wantInput({ id: 'span_ids', label: 'span_ids', type: 'array' }),
+                  wantInput({ id: 'placement', label: 'placement', type: 'string' }),
+                  wantInput({ id: 'max_messages', label: 'max_messages', type: 'number' }),
+                ];
+
+        const inputExtras = existingInputs.filter((p) => !usedInputs.has(p.id));
+
+        const existingOutputs = Array.isArray(data.outputs) ? data.outputs : [];
+        const byOutputId = new Map(existingOutputs.map((p) => [p.id, p] as const));
+        const usedOutputs = new Set<string>();
+
+        const wantOutput = (pin: Pin): Pin => {
+          const prev = byOutputId.get(pin.id);
+          usedOutputs.add(pin.id);
+          if (!prev) return pin;
+          if (prev.label === pin.label && prev.type === pin.type) return prev;
+          return { ...prev, label: pin.label, type: pin.type };
+        };
+
+        const canonicalOutputs: Pin[] =
+          data.nodeType === 'memory_note'
+            ? [
+                wantOutput({ id: 'exec-out', label: '', type: 'execution' }),
+                wantOutput({ id: 'note_id', label: 'note_id', type: 'string' }),
+              ]
+            : data.nodeType === 'memory_query'
+              ? [
+                  wantOutput({ id: 'exec-out', label: '', type: 'execution' }),
+                  wantOutput({ id: 'results', label: 'results', type: 'array' }),
+                  wantOutput({ id: 'rendered', label: 'rendered', type: 'string' }),
+                ]
+              : [
+                  wantOutput({ id: 'exec-out', label: '', type: 'execution' }),
+                  wantOutput({ id: 'inserted', label: 'inserted', type: 'number' }),
+                  wantOutput({ id: 'skipped', label: 'skipped', type: 'number' }),
+                ];
+
+        const outputExtras = existingOutputs.filter((p) => !usedOutputs.has(p.id));
+
+        // UX label migration (don’t stomp user-custom labels).
+        const legacyLabel =
+          data.nodeType === 'memory_note'
+            ? 'Add Note'
+            : data.nodeType === 'memory_query'
+              ? 'Query Memory'
+              : 'Memory Rehydrate';
+        if (template && typeof data.label === 'string') {
+          const cur = data.label.trim();
+          if (!cur || cur === legacyLabel) {
+            data = { ...data, label: template.label };
+          }
+        }
+
+        data = { ...data, inputs: [...canonicalInputs, ...inputExtras], outputs: [...canonicalOutputs, ...outputExtras] };
+      }
+
       // Backward-compat: On Schedule pins (schedule/recurrent inputs, time output).
       if (data.nodeType === 'on_schedule') {
         const existingInputs = Array.isArray(data.inputs) ? data.inputs : [];
