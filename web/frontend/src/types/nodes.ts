@@ -628,6 +628,7 @@ const EFFECT_NODES: NodeTemplate[] = [
       { id: 'content', label: 'content', type: 'string' },
       { id: 'tags', label: 'tags', type: 'object' },
       { id: 'sources', label: 'sources', type: 'object' },
+      { id: 'location', label: 'location', type: 'string' },
       { id: 'scope', label: 'scope', type: 'string' },
     ],
     outputs: [
@@ -647,6 +648,9 @@ const EFFECT_NODES: NodeTemplate[] = [
       { id: 'query', label: 'query', type: 'string' },
       { id: 'limit', label: 'limit', type: 'number' },
       { id: 'tags', label: 'tags', type: 'object' },
+      { id: 'tags_mode', label: 'tags_mode', type: 'string' },
+      { id: 'usernames', label: 'usernames', type: 'array' },
+      { id: 'locations', label: 'locations', type: 'array' },
       { id: 'since', label: 'since', type: 'string' },
       { id: 'until', label: 'until', type: 'string' },
       { id: 'scope', label: 'scope', type: 'string' },

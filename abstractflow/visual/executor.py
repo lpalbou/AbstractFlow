@@ -2069,11 +2069,14 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
             content = input_data.get("content", "") if isinstance(input_data, dict) else str(input_data)
             tags = input_data.get("tags") if isinstance(input_data, dict) else None
             sources = input_data.get("sources") if isinstance(input_data, dict) else None
+            location = input_data.get("location") if isinstance(input_data, dict) else None
             scope = input_data.get("scope") if isinstance(input_data, dict) else None
 
             pending: Dict[str, Any] = {"type": "memory_note", "note": content, "tags": tags if isinstance(tags, dict) else {}}
             if isinstance(sources, dict):
                 pending["sources"] = sources
+            if isinstance(location, str) and location.strip():
+                pending["location"] = location.strip()
             if isinstance(scope, str) and scope.strip():
                 pending["scope"] = scope.strip()
 
@@ -2086,6 +2089,9 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
             query = input_data.get("query", "") if isinstance(input_data, dict) else str(input_data)
             limit = input_data.get("limit", 10) if isinstance(input_data, dict) else 10
             tags = input_data.get("tags") if isinstance(input_data, dict) else None
+            tags_mode = input_data.get("tags_mode") if isinstance(input_data, dict) else None
+            usernames = input_data.get("usernames") if isinstance(input_data, dict) else None
+            locations = input_data.get("locations") if isinstance(input_data, dict) else None
             since = input_data.get("since") if isinstance(input_data, dict) else None
             until = input_data.get("until") if isinstance(input_data, dict) else None
             scope = input_data.get("scope") if isinstance(input_data, dict) else None
@@ -2097,6 +2103,12 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
             pending: Dict[str, Any] = {"type": "memory_query", "query": query, "limit_spans": limit_int, "return": "both"}
             if isinstance(tags, dict):
                 pending["tags"] = tags
+            if isinstance(tags_mode, str) and tags_mode.strip():
+                pending["tags_mode"] = tags_mode.strip()
+            if isinstance(usernames, list):
+                pending["usernames"] = [str(x).strip() for x in usernames if isinstance(x, str) and str(x).strip()]
+            if isinstance(locations, list):
+                pending["locations"] = [str(x).strip() for x in locations if isinstance(x, str) and str(x).strip()]
             if since is not None:
                 pending["since"] = since
             if until is not None:

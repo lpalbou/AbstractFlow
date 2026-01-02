@@ -1322,6 +1322,7 @@ export const BaseNode = memo(function BaseNode({
                 const isWriteFileContentPin = isWriteFileNode && pin.id === 'content';
                 const isCompareOpPin = isCompareNode && pin.id === 'op';
                 const isMemoryScopePin = (isMemoryNoteNode || isMemoryQueryNode) && pin.id === 'scope';
+                const isMemoryTagsModePin = isMemoryQueryNode && pin.id === 'tags_mode';
                 const isMemoryPlacementPin = isMemoryRehydrateNode && pin.id === 'placement';
                 const hasSpecialControl =
                   (hasProviderDropdown && pin.id === 'provider') ||
@@ -1336,6 +1337,7 @@ export const BaseNode = memo(function BaseNode({
                   isOnScheduleRecurrentPin ||
                   isWriteFileContentPin ||
                   isMemoryScopePin ||
+                  isMemoryTagsModePin ||
                   isMemoryPlacementPin;
 
                 if (isEmitEventName) {
@@ -1413,6 +1415,27 @@ export const BaseNode = memo(function BaseNode({
                       searchable={false}
                       minPopoverWidth={180}
                       onChange={(v) => setPinDefault('scope', (v || 'run') as any)}
+                    />
+                  );
+                }
+
+                if (isMemoryTagsModePin && !connected) {
+                  const raw = pinDefaults.tags_mode;
+                  const current =
+                    typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : 'all';
+                  controls.push(
+                    <AfSelect
+                      key="memory-tags-mode"
+                      variant="pin"
+                      value={current}
+                      placeholder="all"
+                      options={[
+                        { value: 'all', label: 'all (AND)' },
+                        { value: 'any', label: 'any (OR)' },
+                      ]}
+                      searchable={false}
+                      minPopoverWidth={180}
+                      onChange={(v) => setPinDefault('tags_mode', (v || 'all') as any)}
                     />
                   );
                 }
