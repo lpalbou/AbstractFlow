@@ -991,7 +991,7 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
                     pin_order.append(pid)
 
         if not pin_order:
-            pin_order = ["a", "b"]
+            pin_order = ["a"]
 
         def handler(input_data: Any) -> str:
             if not isinstance(input_data, dict):
@@ -1003,6 +1003,52 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
                     v = input_data.get(pid)
                     parts.append("" if v is None else str(v))
             return separator.join(parts)
+
+        return handler
+
+    def _create_make_array_handler(data: Dict[str, Any]):
+        """Build an array from 1+ inputs in pin order.
+
+        Design:
+        - We treat missing/unset pins as absent (skip None) to avoid surprising `null`
+          elements when a pin is present but unconnected.
+        - We do NOT flatten arrays/tuples; if you want flattening/concatenation,
+          use `array_concat`.
+        """
+        pin_order: list[str] = []
+        pins = data.get("inputs") if isinstance(data, dict) else None
+        if isinstance(pins, list):
+            for p in pins:
+                if not isinstance(p, dict):
+                    continue
+                if p.get("type") == "execution":
+                    continue
+                pid = p.get("id")
+                if isinstance(pid, str) and pid:
+                    pin_order.append(pid)
+
+        if not pin_order:
+            pin_order = ["a", "b"]
+
+        def handler(input_data: Any) -> list[Any]:
+            if not isinstance(input_data, dict):
+                if input_data is None:
+                    return []
+                if isinstance(input_data, list):
+                    return list(input_data)
+                if isinstance(input_data, tuple):
+                    return list(input_data)
+                return [input_data]
+
+            out: list[Any] = []
+            for pid in pin_order:
+                if pid not in input_data:
+                    continue
+                v = input_data.get(pid)
+                if v is None:
+                    continue
+                out.append(v)
+            return out
 
         return handler
 
@@ -2100,6 +2146,9 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
 
         if type_str == "concat":
             return _create_concat_handler(data)
+
+        if type_str == "make_array":
+            return _create_make_array_handler(data)
 
         if type_str == "array_concat":
             return _create_array_concat_handler(data)

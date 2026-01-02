@@ -179,8 +179,8 @@ const CORE_NODES: NodeTemplate[] = [
     headerColor: '#4488FF',
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
-      { id: 'provider', label: 'provider', type: 'string' },
-      { id: 'model', label: 'model', type: 'string' },
+      { id: 'provider', label: 'provider', type: 'provider' },
+      { id: 'model', label: 'model', type: 'model' },
       { id: 'max_iterations', label: 'max_iterations', type: 'number' },
       { id: 'system', label: 'system', type: 'string' },
       { id: 'task', label: 'prompt', type: 'string' },
@@ -202,8 +202,8 @@ const CORE_NODES: NodeTemplate[] = [
     headerColor: '#3498DB', // Blue - AI
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
-      { id: 'provider', label: 'provider', type: 'string' },
-      { id: 'model', label: 'model', type: 'string' },
+      { id: 'provider', label: 'provider', type: 'provider' },
+      { id: 'model', label: 'model', type: 'model' },
       { id: 'system', label: 'system', type: 'string' },
       { id: 'prompt', label: 'prompt', type: 'string' },
       { id: 'tools', label: 'tools', type: 'array' },
@@ -382,6 +382,7 @@ const DATA_NODES: NodeTemplate[] = [
   { type: 'get', icon: '&#x1F4E5;', label: 'Get Property', description: 'Safely read a nested path from an object (dot/bracket path) with an optional default.', headerColor: '#3498DB', inputs: [{ id: 'object', label: 'object', type: 'object' }, { id: 'key', label: 'key', type: 'string' }, { id: 'default', label: 'default', type: 'any' }], outputs: [{ id: 'value', label: 'value', type: 'any' }], category: 'data' },
   { type: 'set', icon: '&#x1F4E4;', label: 'Set Property', description: 'Set a nested property on an object (returns a new object).', headerColor: '#3498DB', inputs: [{ id: 'object', label: 'object', type: 'object' }, { id: 'key', label: 'key', type: 'string' }, { id: 'value', label: 'value', type: 'any' }], outputs: [{ id: 'result', label: 'result', type: 'object' }], category: 'data' },
   { type: 'merge', icon: '&#x1F517;', label: 'Merge Objects', description: 'Shallow merge two objects (b overrides a).', headerColor: '#3498DB', inputs: [{ id: 'a', label: 'a', type: 'object' }, { id: 'b', label: 'b', type: 'object' }], outputs: [{ id: 'result', label: 'result', type: 'object' }], category: 'data' },
+  { type: 'make_array', icon: '[]', label: 'Make Array', description: 'Build an array from 1+ inputs in pin order (Blueprint-style). Skips null/unset inputs.', headerColor: '#3498DB', inputs: [{ id: 'a', label: 'a', type: 'any' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'data' },
   { type: 'array_length', icon: '#', label: 'Array Length', description: 'Return the length of an array.', headerColor: '#3498DB', inputs: [{ id: 'array', label: 'array', type: 'array' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'data' },
   { type: 'array_append', icon: '&#x2795;', label: 'Array Append', description: 'Append an item to an array (returns a new array).', headerColor: '#3498DB', inputs: [{ id: 'array', label: 'array', type: 'array' }, { id: 'item', label: 'item', type: 'any' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'data' },
   { type: 'array_dedup', icon: '&#x1F5C3;', label: 'Array Dedup', description: 'Stable-order dedup for arrays (optionally by key path).', headerColor: '#3498DB', inputs: [{ id: 'array', label: 'array', type: 'array' }, { id: 'key', label: 'key', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'data' },
@@ -431,11 +432,11 @@ const DATA_NODES: NodeTemplate[] = [
     description: 'List models for a provider (optionally filtered by an allowlist).',
     headerColor: '#3498DB',
     inputs: [
-      { id: 'provider', label: 'provider', type: 'string' },
+      { id: 'provider', label: 'provider', type: 'provider' },
       { id: 'allowed_models', label: 'allowed_models', type: 'array' },
     ],
     outputs: [
-      { id: 'provider', label: 'provider', type: 'string' },
+      { id: 'provider', label: 'provider', type: 'provider' },
       { id: 'models', label: 'models', type: 'array' },
     ],
     category: 'data',

@@ -24,6 +24,8 @@ class PinType(str, Enum):
     BOOLEAN = "boolean"  # Red #FF0000 - True/False
     OBJECT = "object"  # Cyan #00FFFF - JSON objects
     ARRAY = "array"  # Orange #FF8800 - Collections
+    PROVIDER = "provider"  # Cyan-blue - LLM provider id/name (string-like)
+    MODEL = "model"  # Purple - LLM model id/name (string-like)
     AGENT = "agent"  # Blue #4488FF - Agent reference
     ANY = "any"  # Gray #888888 - Accepts any type
 
@@ -81,6 +83,7 @@ class NodeType(str, Enum):
     GET = "get"
     SET = "set"
     MERGE = "merge"
+    MAKE_ARRAY = "make_array"
     ARRAY_MAP = "array_map"
     ARRAY_FILTER = "array_filter"
     ARRAY_CONCAT = "array_concat"

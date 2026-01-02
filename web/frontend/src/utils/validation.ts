@@ -89,6 +89,11 @@ export function areTypesCompatible(
     return true;
   }
 
+  // Provider/model are string-like (but we keep them as distinct types for UX).
+  if (sourceType === 'provider' && (targetType === 'provider' || targetType === 'string')) return true;
+  if (sourceType === 'model' && (targetType === 'model' || targetType === 'string')) return true;
+  if (sourceType === 'string' && (targetType === 'provider' || targetType === 'model')) return true;
+
   // Exact type match
   return sourceType === targetType;
 }

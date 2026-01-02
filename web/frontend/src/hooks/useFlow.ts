@@ -507,15 +507,15 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           data.nodeType === 'llm_call'
             ? [
                 execIn,
-                want({ id: 'provider', label: 'provider', type: 'string' }),
-                want({ id: 'model', label: 'model', type: 'string' }),
+                want({ id: 'provider', label: 'provider', type: 'provider' }),
+                want({ id: 'model', label: 'model', type: 'model' }),
                 want({ id: 'system', label: 'system', type: 'string' }),
                 want({ id: 'prompt', label: 'prompt', type: 'string' }),
               ]
             : [
                 execIn,
-                want({ id: 'provider', label: 'provider', type: 'string' }),
-                want({ id: 'model', label: 'model', type: 'string' }),
+                want({ id: 'provider', label: 'provider', type: 'provider' }),
+                want({ id: 'model', label: 'model', type: 'model' }),
                 want({ id: 'system', label: 'system', type: 'string' }),
                 want({ id: 'task', label: 'prompt', type: 'string' }),
                 want({ id: 'tools', label: 'tools', type: 'array' }),
@@ -703,6 +703,34 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           outputs: [...canonicalOutputs, ...extras],
           eventConfig: { ...(prevCfg || {}), schedule, recurrent },
         };
+      }
+
+      // UX migration: promote well-known LLM routing pins to dedicated types.
+      // (Provider/model are string-like, but typed pins enable dropdowns + edge coloring.)
+      const upgradePins = (pins: Pin[] | undefined): Pin[] | undefined => {
+        if (!Array.isArray(pins) || pins.length === 0) return pins;
+        let changed = false;
+        const next = pins.map((p) => {
+          if (p && p.type === 'string') {
+            const id = String(p.id || '').trim();
+            const label = String(p.label || '').trim();
+            if (id === 'provider' && label === 'provider') {
+              changed = true;
+              return { ...p, type: 'provider' as const };
+            }
+            if (id === 'model' && label === 'model') {
+              changed = true;
+              return { ...p, type: 'model' as const };
+            }
+          }
+          return p;
+        });
+        return changed ? next : pins;
+      };
+      const upgradedInputs = upgradePins(data.inputs);
+      const upgradedOutputs = upgradePins(data.outputs);
+      if (upgradedInputs !== data.inputs || upgradedOutputs !== data.outputs) {
+        data = { ...data, inputs: upgradedInputs || data.inputs, outputs: upgradedOutputs || data.outputs };
       }
 
       // Backward-compat + canonical ordering for file IO nodes (remove deprecated `file_type` pin).

@@ -165,6 +165,36 @@ def _create_effect_node_handler(
             except ValueError:
                 pass  # Unknown effect type
             if eff_type:
+                # Visual LLM Call UX: include the run's active context messages when possible.
+                #
+                # Why here (compiler) and not in AbstractRuntime:
+                # - LLM_CALL is a generic runtime effect; not all callers want implicit context.
+                # - Visual LLM Call nodes expect "Recall into context" to affect subsequent calls.
+                if eff_type == EffectType.LLM_CALL and isinstance(pending, dict) and "messages" not in pending:
+                    try:
+                        from abstractruntime.memory.active_context import ActiveContextPolicy
+
+                        base = ActiveContextPolicy.select_active_messages_for_llm_from_run(run)
+                        messages = [dict(m) for m in base if isinstance(m, dict)]
+
+                        sys_raw = pending.get("system_prompt") or pending.get("system")
+                        sys_text = str(sys_raw).strip() if isinstance(sys_raw, str) else ""
+                        if sys_text:
+                            messages.append({"role": "system", "content": sys_text})
+
+                        prompt_raw = pending.get("prompt")
+                        prompt_text = prompt_raw if isinstance(prompt_raw, str) else str(prompt_raw or "")
+                        messages.append({"role": "user", "content": prompt_text})
+
+                        pending["messages"] = messages
+                        # Avoid double-including prompt/system_prompt if the LLM client also
+                        # builds messages from them.
+                        pending.pop("prompt", None)
+                        pending.pop("system_prompt", None)
+                        pending.pop("system", None)
+                    except Exception:
+                        pass
+
                 # Build the Effect with resolved values from data edges
                 effect = Effect(
                     type=eff_type,

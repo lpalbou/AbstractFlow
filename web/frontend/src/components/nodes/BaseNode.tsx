@@ -181,6 +181,8 @@ const VarDeclInline = memo(function VarDeclInline({
     { value: 'boolean', label: 'boolean' },
     { value: 'number', label: 'number' },
     { value: 'string', label: 'string' },
+    { value: 'provider', label: 'provider' },
+    { value: 'model', label: 'model' },
     { value: 'object', label: 'object' },
     { value: 'array', label: 'array' },
     { value: 'any', label: 'any' },
@@ -231,7 +233,7 @@ const VarDeclInline = memo(function VarDeclInline({
       );
     }
 
-    if (varType === 'string') {
+    if (varType === 'string' || varType === 'provider' || varType === 'model') {
       return (
         <input
           className="af-pin-input nodrag"
@@ -296,7 +298,7 @@ const VarDeclInline = memo(function VarDeclInline({
                 ? false
                 : nextType === 'number'
                   ? 0
-                  : nextType === 'string'
+                  : nextType === 'string' || nextType === 'provider' || nextType === 'model'
                     ? ''
                     : nextType === 'array'
                       ? []
@@ -362,7 +364,11 @@ export const BaseNode = memo(function BaseNode({
       if (d.nodeType === 'on_flow_start') {
         for (const p of d.outputs || []) {
           if (p.type === 'execution') continue;
-          if (typeof p.id === 'string' && p.id.trim()) vars.add(p.id.trim());
+          const pid = typeof p.id === 'string' ? p.id.trim() : '';
+          if (!pid) continue;
+          vars.add(pid);
+          // Prefer explicit declarations (var_decl/bool_var) over entrypoint pins.
+          if (!declaredTypes.has(pid)) declaredTypes.set(pid, p.type as Exclude<PinType, 'execution'>);
         }
       }
 
@@ -394,7 +400,14 @@ export const BaseNode = memo(function BaseNode({
           const vn = typeof (raw as any).name === 'string' ? String((raw as any).name).trim() : '';
           const t = typeof (raw as any).type === 'string' ? String((raw as any).type).trim() : '';
           const vt =
-            t === 'boolean' || t === 'number' || t === 'string' || t === 'object' || t === 'array' || t === 'any'
+            t === 'boolean' ||
+            t === 'number' ||
+            t === 'string' ||
+            t === 'provider' ||
+            t === 'model' ||
+            t === 'object' ||
+            t === 'array' ||
+            t === 'any'
               ? (t as Exclude<PinType, 'execution'>)
               : 'any';
           if (vn) {
@@ -622,7 +635,14 @@ export const BaseNode = memo(function BaseNode({
       const name = typeof (raw as any).name === 'string' ? String((raw as any).name).trim() : '';
       const t = typeof (raw as any).type === 'string' ? String((raw as any).type).trim() : '';
       const type =
-        t === 'boolean' || t === 'number' || t === 'string' || t === 'object' || t === 'array' || t === 'any'
+        t === 'boolean' ||
+        t === 'number' ||
+        t === 'string' ||
+        t === 'provider' ||
+        t === 'model' ||
+        t === 'object' ||
+        t === 'array' ||
+        t === 'any'
           ? (t as Exclude<PinType, 'execution'>)
           : ('any' as const);
       const def = (raw as any).default as unknown;
@@ -769,6 +789,7 @@ export const BaseNode = memo(function BaseNode({
   const isCompareNode = data.nodeType === 'compare';
   const isConcatNode = data.nodeType === 'concat';
   const isArrayConcatNode = data.nodeType === 'array_concat';
+  const isMakeArrayNode = data.nodeType === 'make_array';
 
   const delayDurationType = (data.effectConfig?.durationType ?? 'seconds') as
     | 'seconds'
@@ -890,7 +911,7 @@ export const BaseNode = memo(function BaseNode({
     (e: MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      if (!isConcatNode && !isArrayConcatNode) return;
+      if (!isConcatNode && !isArrayConcatNode && !isMakeArrayNode) return;
 
       const pins = data.inputs.filter((p) => p.type !== 'execution');
       const ids = new Set(pins.map((p) => p.id));
@@ -909,12 +930,12 @@ export const BaseNode = memo(function BaseNode({
         nextId = `p${idx}`;
       }
 
-      const nextPinType = isArrayConcatNode ? ('array' as const) : ('string' as const);
+      const nextPinType = isConcatNode ? ('string' as const) : isArrayConcatNode ? ('array' as const) : ('any' as const);
       updateNodeData(id, {
         inputs: [...data.inputs, { id: nextId, label: nextId, type: nextPinType }],
       });
     },
-    [data.inputs, id, isArrayConcatNode, isConcatNode, updateNodeData]
+    [data.inputs, id, isArrayConcatNode, isConcatNode, isMakeArrayNode, updateNodeData]
   );
 
   const overlayHandleStyle = {
@@ -1243,7 +1264,12 @@ export const BaseNode = memo(function BaseNode({
                 const connected = isPinConnected(pin.id, true);
                 const controls: ReactNode[] = [];
 
-                const isPrimitive = pin.type === 'string' || pin.type === 'number' || pin.type === 'boolean';
+                const isPrimitive =
+                  pin.type === 'string' ||
+                  pin.type === 'number' ||
+                  pin.type === 'boolean' ||
+                  pin.type === 'provider' ||
+                  pin.type === 'model';
                 const isEmitEventName = isEmitEventNode && pin.id === 'name';
                 const isEmitEventScopePin = isEmitEventNode && pin.id === 'scope';
                 const isOnEventScopePin = isOnEventNode && pin.id === 'scope';
@@ -1257,6 +1283,7 @@ export const BaseNode = memo(function BaseNode({
                   (hasProviderDropdown && pin.id === 'provider') ||
                   (hasModelControls && pin.id === 'model') ||
                   ((isAgentNode || isLlmNode) && pin.id === 'tools') ||
+                  (isVarNode && pin.id === 'name') ||
                   isCompareOpPin ||
                   isEmitEventName ||
                   isEmitEventScopePin ||
@@ -1476,7 +1503,7 @@ export const BaseNode = memo(function BaseNode({
 
                 if (!connected && isPrimitive && !hasSpecialControl) {
                   const raw = pinDefaults[pin.id];
-                  if (pin.type === 'string') {
+                  if (pin.type === 'string' || pin.type === 'provider' || pin.type === 'model') {
                     controls.push(
                       <input
                         key="pin-default"
@@ -1620,7 +1647,7 @@ export const BaseNode = memo(function BaseNode({
             </div>
           ))}
 
-          {(isConcatNode || isArrayConcatNode) && (
+          {(isConcatNode || isArrayConcatNode || isMakeArrayNode) && (
             <div className="pin-row exec-add-pin nodrag" onClick={addConcatInputPin}>
               <span className="pin-shape" style={{ opacity: 0 }} aria-hidden="true" />
               <span className="pin-label">Add pin</span>

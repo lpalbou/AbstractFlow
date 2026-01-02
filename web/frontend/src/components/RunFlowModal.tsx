@@ -12,6 +12,8 @@ import { isEntryNodeType } from '../types/flow';
 import type { WaitingInfo } from '../hooks/useWebSocket';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { AgentSubrunTracePanel } from './AgentSubrunTracePanel';
+import AfSelect from './inputs/AfSelect';
+import { useProviders, useModels } from '../hooks/useProviders';
 
 interface RunFlowModalProps {
   isOpen: boolean;
@@ -58,6 +60,10 @@ function getPlaceholderForPin(pin: Pin): string {
       return '{ }';
     case 'array':
       return '[ ]';
+    case 'provider':
+      return 'Select provider…';
+    case 'model':
+      return 'Select model…';
     default:
       return '';
   }
@@ -80,7 +86,7 @@ export function RunFlowModal({
   onResumeRun,
   onCancelRun,
 }: RunFlowModalProps) {
-  const { nodes, flowName, lastLoopProgress } = useFlowStore();
+  const { nodes, edges, flowName, lastLoopProgress } = useFlowStore();
 
   const nodeById = useMemo(() => {
     const map = new Map<string, (typeof nodes)[number]>();
@@ -109,6 +115,22 @@ export function RunFlowModal({
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [resumeDraft, setResumeDraft] = useState('');
   const [isMinimized, setIsMinimized] = useState(false);
+
+  const providerPinId = useMemo(() => {
+    const pin = inputPins.find((p) => p.type === 'provider' || p.id === 'provider');
+    return pin?.id || null;
+  }, [inputPins]);
+
+  const selectedProvider = useMemo(() => {
+    return providerPinId ? (formValues[providerPinId] || '') : '';
+  }, [formValues, providerPinId]);
+
+  const wantProviderDropdown = Boolean(isOpen && inputPins.some((p) => p.type === 'provider' || p.id === 'provider'));
+  const wantModelDropdown = Boolean(isOpen && inputPins.some((p) => p.type === 'model' || p.id === 'model'));
+  const providersQuery = useProviders(wantProviderDropdown);
+  const modelsQuery = useModels(selectedProvider || undefined, wantModelDropdown);
+  const providers = Array.isArray(providersQuery.data) ? providersQuery.data : [];
+  const models = Array.isArray(modelsQuery.data) ? modelsQuery.data : [];
 
   // When the modal is opened, start expanded (predictable UX).
   useEffect(() => {
@@ -880,6 +902,73 @@ export function RunFlowModal({
     return { task, previewText, scratchpad, provider, model, usage, raw: value, cleaned };
   }, [selectedStep?.output]);
 
+  const selectedEventIndex = useMemo(() => {
+    if (!selectedStep?.id) return null;
+    const parts = selectedStep.id.split(':');
+    const raw = parts.length > 0 ? parts[parts.length - 1] : '';
+    const n = Number.parseInt(raw, 10);
+    return Number.isFinite(n) ? n : null;
+  }, [selectedStep?.id]);
+
+  const memorizeContentPreview = useMemo(() => {
+    if (!selectedStep || selectedStep.nodeType !== 'memory_note') return null;
+    if (!selectedStep.nodeId) return null;
+
+    const targetNodeId = selectedStep.nodeId;
+    const edge = edges.find((e) => e.target === targetNodeId && e.targetHandle === 'content');
+    if (!edge || !edge.source) return null;
+
+    const sourceNodeId = edge.source;
+    const sourceHandle = edge.sourceHandle || '';
+
+    const startAt = Math.max(0, (typeof selectedEventIndex === 'number' ? selectedEventIndex : events.length) - 1);
+    for (let i = startAt; i >= 0; i--) {
+      const ev = events[i];
+      if (ev.type !== 'node_complete') continue;
+      if (rootRunId && ev.runId && ev.runId !== rootRunId) continue;
+      if (ev.nodeId !== sourceNodeId) continue;
+
+      const r = ev.result as unknown;
+      let value: unknown = r;
+      if (sourceHandle && r && typeof r === 'object' && !Array.isArray(r)) {
+        value = (r as Record<string, unknown>)[sourceHandle];
+      }
+      if (value == null) return null;
+      const text = typeof value === 'string' ? value : formatValue(value);
+      const trimmed = text.trim();
+      return trimmed ? trimmed : null;
+    }
+
+    return null;
+  }, [edges, events, formatValue, rootRunId, selectedEventIndex, selectedStep]);
+
+  const onFlowStartParams = useMemo(() => {
+    if (!selectedStep || selectedStep.nodeType !== 'on_flow_start') return null;
+    const out = selectedStep.output;
+    if (!out || typeof out !== 'object') return null;
+    if (Array.isArray(out)) return null;
+
+    const obj = out as Record<string, unknown>;
+    const entries = Object.entries(obj).filter(([k]) => k && k !== 'exec-out' && !k.startsWith('_'));
+    if (entries.length === 0) return null;
+
+    const weight = (k: string) => {
+      if (k === 'request') return 0;
+      if (k === 'provider') return 1;
+      if (k === 'model') return 2;
+      return 10;
+    };
+
+    entries.sort((a, b) => {
+      const wa = weight(a[0]);
+      const wb = weight(b[0]);
+      if (wa !== wb) return wa - wb;
+      return a[0].localeCompare(b[0]);
+    });
+
+    return entries;
+  }, [selectedStep]);
+
   const usageBadges = useMemo(() => getUsageBadges(outputPreview?.usage), [outputPreview?.usage]);
 
   const traceSteps = useMemo(() => {
@@ -1254,6 +1343,11 @@ export function RunFlowModal({
                         <button type="button" className="modal-button" onClick={() => copyToClipboard(selectedStep.output)}>
                           Copy raw
                         </button>
+                        {memorizeContentPreview ? (
+                          <button type="button" className="modal-button" onClick={() => copyToClipboard(memorizeContentPreview)}>
+                            Copy content
+                          </button>
+                        ) : null}
                         {outputPreview?.previewText ? (
                           <button type="button" className="modal-button" onClick={() => copyToClipboard(outputPreview.previewText)}>
                             Copy preview
@@ -1266,35 +1360,86 @@ export function RunFlowModal({
                         ) : null}
                       </div>
 
-                      {outputPreview ? (
+                      {(outputPreview || memorizeContentPreview || (selectedStep?.nodeType === 'on_flow_start' && onFlowStartParams)) ? (
                         <div className="run-output-preview">
-                          {outputPreview.task ? (
+                          {selectedStep?.nodeType === 'on_flow_start' && onFlowStartParams ? (
+                            <div className="run-output-section">
+                              <div className="run-output-title">Run parameters</div>
+                              <div className="run-param-grid">
+                                {onFlowStartParams.map(([k, v]) => {
+                                  const isProvider = k === 'provider' && typeof v === 'string' && v.trim();
+                                  const isModel = k === 'model' && typeof v === 'string' && v.trim();
+                                  const isRequest = k === 'request' && typeof v === 'string' && v.trim();
+
+                                  return (
+                                    <div key={k} className="run-param-row">
+                                      <div className="run-param-key">{k}</div>
+                                      <div className="run-param-val">
+                                        {isProvider ? (
+                                          <span className="run-metric-badge metric-provider">{String(v).trim()}</span>
+                                        ) : isModel ? (
+                                          <span className="run-metric-badge metric-model">{String(v).trim()}</span>
+                                        ) : typeof v === 'boolean' ? (
+                                          <span className="run-metric-badge metric-bool">{v ? 'true' : 'false'}</span>
+                                        ) : typeof v === 'number' ? (
+                                          <span className="run-metric-badge metric-number">{String(v)}</span>
+                                        ) : isRequest ? (
+                                          <div className="run-details-markdown run-param-markdown">
+                                            <MarkdownRenderer markdown={String(v).trim()} />
+                                          </div>
+                                        ) : typeof v === 'string' ? (
+                                          <span className="run-param-text">{v}</span>
+                                        ) : (
+                                          <pre className="run-details-output run-param-json">{formatValue(v)}</pre>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ) : null}
+
+                          {selectedStep?.nodeType === 'memory_note' ? (
+                            <div className="run-output-section">
+                              <div className="run-output-title">Memorized content</div>
+                              {memorizeContentPreview ? (
+                                <div className="run-details-markdown run-param-markdown">
+                                  <MarkdownRenderer markdown={memorizeContentPreview} />
+                                </div>
+                              ) : (
+                                <div className="run-details-empty">No preview available (content pin not connected).</div>
+                              )}
+                            </div>
+                          ) : null}
+
+                          {outputPreview?.task ? (
                             <div className="run-output-section">
                               <div className="run-output-title">Task</div>
                               <pre className="run-details-output">{outputPreview.task}</pre>
                             </div>
                           ) : null}
 
-                          {(outputPreview.provider || outputPreview.model || outputPreview.usage) ? (
+                          {(outputPreview?.provider || outputPreview?.model || outputPreview?.usage) ? (
                             <div className="run-output-section">
                               <div className="run-output-title">Meta</div>
                               <div className="run-output-meta">
-                                {(outputPreview.provider || outputPreview.model) ? (
+                                {(outputPreview?.provider || outputPreview?.model) ? (
                                   <div>
                                     <span className="run-output-meta-key">Model</span>
                                     <span className="run-output-meta-val">
                                       <span className="run-output-meta-badges">
-                                        {outputPreview.provider ? (
+                                        {outputPreview?.provider ? (
                                           <span className="run-metric-badge metric-provider">{outputPreview.provider}</span>
                                         ) : null}
-                                        {outputPreview.model ? (
+                                        {outputPreview?.model ? (
                                           <span className="run-metric-badge metric-model">{outputPreview.model}</span>
                                         ) : null}
                                       </span>
                                     </span>
                                   </div>
                                 ) : null}
-                                {outputPreview.usage ? (
+                                {outputPreview?.usage ? (
                                   <div>
                                     <span className="run-output-meta-key">Usage</span>
                                     <span className="run-output-meta-val">
@@ -1316,7 +1461,7 @@ export function RunFlowModal({
                             </div>
                           ) : null}
 
-                          {outputPreview.previewText ? (
+                          {outputPreview?.previewText ? (
                             <div className="run-output-section">
                               <div className="run-output-title">Preview</div>
                               {shouldRenderMarkdown(selectedStep?.nodeType) ? (
@@ -1355,13 +1500,13 @@ export function RunFlowModal({
 
                               <details className="run-raw-details">
                                 <summary>Trace JSON</summary>
-                                <pre className="run-details-output">{formatValue(outputPreview.scratchpad)}</pre>
+                                <pre className="run-details-output">{formatValue(outputPreview?.scratchpad)}</pre>
                               </details>
                             </div>
-                          ) : selectedStep?.nodeType !== 'agent' && outputPreview.scratchpad != null ? (
+                          ) : selectedStep?.nodeType !== 'agent' && outputPreview?.scratchpad != null ? (
                             <details className="run-raw-details">
                               <summary>Scratchpad</summary>
-                              <pre className="run-details-output">{formatValue(outputPreview.scratchpad)}</pre>
+                              <pre className="run-details-output">{formatValue(outputPreview?.scratchpad)}</pre>
                             </details>
                           ) : null}
                         </div>
@@ -1420,6 +1565,51 @@ export function RunFlowModal({
                   <div className="run-form-fields">
                     {inputPins.map(pin => {
                       const inputType = getInputTypeForPin(pin.type);
+                      const value = formValues[pin.id] || '';
+
+                      if (pin.type === 'provider' || pin.id === 'provider') {
+                        return (
+                          <div key={pin.id} className="run-form-field">
+                            <label className="run-form-label">
+                              {pin.label}
+                              <span className="run-form-type">({pin.type})</span>
+                            </label>
+                            <AfSelect
+                              value={value}
+                              placeholder={providersQuery.isLoading ? 'Loading…' : 'Select…'}
+                              options={providers.map((p) => ({ value: p.name, label: p.display_name || p.name }))}
+                              disabled={providersQuery.isLoading}
+                              loading={providersQuery.isLoading}
+                              searchable
+                              searchPlaceholder="Search providers…"
+                              onChange={(v) => handleFieldChange(pin.id, v)}
+                            />
+                          </div>
+                        );
+                      }
+
+                      if (pin.type === 'model' || pin.id === 'model') {
+                        return (
+                          <div key={pin.id} className="run-form-field">
+                            <label className="run-form-label">
+                              {pin.label}
+                              <span className="run-form-type">({pin.type})</span>
+                            </label>
+                            <AfSelect
+                              value={value}
+                              placeholder={
+                                !selectedProvider ? 'Pick provider…' : modelsQuery.isLoading ? 'Loading…' : 'Select…'
+                              }
+                              options={models.map((m) => ({ value: m, label: m }))}
+                              disabled={!selectedProvider || modelsQuery.isLoading}
+                              loading={modelsQuery.isLoading}
+                              searchable
+                              searchPlaceholder="Search models…"
+                              onChange={(v) => handleFieldChange(pin.id, v)}
+                            />
+                          </div>
+                        );
+                      }
 
                       return (
                         <div key={pin.id} className="run-form-field">
@@ -1431,7 +1621,7 @@ export function RunFlowModal({
                           {inputType === 'textarea' ? (
                             <textarea
                               className="run-form-input"
-                              value={formValues[pin.id] || ''}
+                              value={value}
                               onChange={(e) => handleFieldChange(pin.id, e.target.value)}
                               placeholder={getPlaceholderForPin(pin)}
                               rows={pin.type === 'string' ? 4 : 5}
@@ -1441,7 +1631,7 @@ export function RunFlowModal({
                             <label className="run-form-checkbox">
                               <input
                                 type="checkbox"
-                                checked={formValues[pin.id] === 'true'}
+                                checked={value === 'true'}
                                 onChange={(e) => handleFieldChange(pin.id, e.target.checked ? 'true' : 'false')}
                                 disabled={isRunning}
                               />
@@ -1451,7 +1641,7 @@ export function RunFlowModal({
                             <input
                               type={inputType}
                               className="run-form-input"
-                              value={formValues[pin.id] || ''}
+                              value={value}
                               onChange={(e) => handleFieldChange(pin.id, e.target.value)}
                               placeholder={getPlaceholderForPin(pin)}
                               disabled={isRunning}

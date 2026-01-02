@@ -15,6 +15,12 @@
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
+/* Tooltips are rendered inside node DOM; ensure hovered nodes float above neighbors
+   so tooltip bubbles don't get occluded by nearby nodes with higher z-index. */
+.react-flow__node:hover {
+  z-index: 9999 !important;
+}
+
 .flow-node.selected {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent), 0 4px 12px rgba(0, 0, 0, 0.4);

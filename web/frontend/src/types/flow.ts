@@ -10,6 +10,8 @@ export type PinType =
   | 'boolean'   // Red #FF0000 - True/False
   | 'object'    // Cyan #00FFFF - JSON objects
   | 'array'     // Orange #FF8800 - Collections
+  | 'provider'  // Cyan-blue - LLM provider id/name (string-like)
+  | 'model'     // Purple - LLM model id/name (string-like)
   | 'agent'     // Blue #4488FF - Agent reference
   | 'any';      // Gray #888888 - Accepts any type
 
@@ -21,6 +23,8 @@ export const PIN_COLORS: Record<PinType, string> = {
   boolean: '#FF0000',
   object: '#00FFFF',
   array: '#FF8800',
+  provider: '#00D2FF',
+  model: '#9D4EDD',
   agent: '#4488FF',
   any: '#888888',
 };
@@ -55,7 +59,7 @@ export type NodeType =
   | 'if' | 'switch' | 'loop' | 'while' | 'sequence' | 'parallel' | 'compare' | 'not' | 'and' | 'or' | 'coalesce'
   | 'for'
   // Data - Pure functions (no exec pins)
-  | 'get' | 'set' | 'merge' | 'array_map' | 'array_filter' | 'array_concat' | 'array_length' | 'array_append' | 'array_dedup'
+  | 'get' | 'set' | 'merge' | 'make_array' | 'array_map' | 'array_filter' | 'array_concat' | 'array_length' | 'array_append' | 'array_dedup'
   | 'get_var' | 'set_var'
   | 'parse_json' | 'break_object' | 'system_datetime'
   | 'provider_catalog' | 'provider_models'

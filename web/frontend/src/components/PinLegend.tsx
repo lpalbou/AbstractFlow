@@ -21,6 +21,8 @@ const PIN_INFO: PinInfo[] = [
   { type: 'boolean', label: 'Boolean', shape: '\u25C7', description: 'True/False' },
   { type: 'object', label: 'Object', shape: '\u25CF', description: 'JSON objects' },
   { type: 'array', label: 'Array', shape: '\u25A0', description: 'Collections' },
+  { type: 'provider', label: 'Provider', shape: '\u25CF', description: 'LLM provider id/name (string-like)' },
+  { type: 'model', label: 'Model', shape: '\u25CF', description: 'LLM model id/name (string-like)' },
   { type: 'agent', label: 'Agent', shape: '\u2B22', description: 'Agent reference' },
   { type: 'any', label: 'Any', shape: '\u25CF', description: 'Accepts any type' },
 ];

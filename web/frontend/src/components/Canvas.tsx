@@ -30,11 +30,11 @@ export function Canvas() {
   // React Flow uses a multiplicative zoom factor of 1.2 per zoom step.
   // We define our own "zoom positions" relative to max zoom:
   // - Default: 2 zoom-out steps from max
-  // - Min: 10 zoom-out steps from max
+  // - Min: 13 zoom-out steps from max
   const ZOOM_STEP = 1.2;
   const MAX_ZOOM = 2;
   const DEFAULT_ZOOM_OUT_STEPS = 2;
-  const MIN_ZOOM_OUT_STEPS = 10;
+  const MIN_ZOOM_OUT_STEPS = 13;
 
   const DEFAULT_ZOOM = MAX_ZOOM / (ZOOM_STEP ** DEFAULT_ZOOM_OUT_STEPS);
   const MIN_ZOOM = MAX_ZOOM / (ZOOM_STEP ** MIN_ZOOM_OUT_STEPS);

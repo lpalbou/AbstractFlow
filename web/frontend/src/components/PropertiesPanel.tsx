@@ -45,6 +45,8 @@ const DATA_PIN_TYPES: DataPinType[] = [
   'boolean',
   'object',
   'array',
+  'provider',
+  'model',
   'agent',
   'any',
 ];

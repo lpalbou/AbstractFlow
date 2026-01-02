@@ -231,6 +231,68 @@ def test_visual_array_concat_flattens_arrays_in_pin_order() -> None:
     assert result.get("result") == ["hello", "world", "!"]
 
 
+def test_visual_make_array_collects_values_in_pin_order_and_skips_null() -> None:
+    flow_id = "test-visual-make-array"
+    visual = VisualFlow(
+        id=flow_id,
+        name="make array",
+        entryNode="code",
+        nodes=[
+            VisualNode(
+                id="a",
+                type=NodeType.LITERAL_STRING,
+                position=Position(x=0, y=0),
+                data={"literalValue": "hello"},
+            ),
+            VisualNode(
+                id="b",
+                type=NodeType.LITERAL_JSON,
+                position=Position(x=0, y=0),
+                data={"literalValue": None},
+            ),
+            VisualNode(
+                id="c",
+                type=NodeType.LITERAL_STRING,
+                position=Position(x=0, y=0),
+                data={"literalValue": "world"},
+            ),
+            VisualNode(
+                id="make",
+                type=NodeType.MAKE_ARRAY,
+                position=Position(x=0, y=0),
+                data={
+                    "inputs": [
+                        {"id": "a", "label": "a", "type": "any"},
+                        {"id": "b", "label": "b", "type": "any"},
+                        {"id": "c", "label": "c", "type": "any"},
+                    ],
+                    "outputs": [{"id": "result", "label": "result", "type": "array"}],
+                },
+            ),
+            VisualNode(
+                id="code",
+                type=NodeType.CODE,
+                position=Position(x=0, y=0),
+                data={
+                    "code": "def transform(input):\n    return input.get('input')\n",
+                    "functionName": "transform",
+                },
+            ),
+        ],
+        edges=[
+            VisualEdge(id="d1", source="a", sourceHandle="value", target="make", targetHandle="a"),
+            VisualEdge(id="d2", source="b", sourceHandle="value", target="make", targetHandle="b"),
+            VisualEdge(id="d3", source="c", sourceHandle="value", target="make", targetHandle="c"),
+            VisualEdge(id="d4", source="make", sourceHandle="result", target="code", targetHandle="input"),
+        ],
+    )
+
+    runner = create_visual_runner(visual, flows={flow_id: visual})
+    result = runner.run({})
+    assert result.get("success") is True
+    assert result.get("result") == ["hello", "world"]
+
+
 def test_visual_get_property_supports_default_value() -> None:
     flow_id = "test-visual-get-default"
     visual = VisualFlow(

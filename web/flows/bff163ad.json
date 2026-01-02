@@ -1,0 +1,674 @@
+{
+  "id": "bff163ad",
+  "name": "todel",
+  "description": "",
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": {
+        "x": 176.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-3",
+      "type": "llm_call",
+      "position": {
+        "x": 384.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "LLM Call",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "effectConfig": {
+          "provider": "lmstudio",
+          "model": "devstral-2-123b-instruct-2512"
+        },
+        "pinDefaults": {
+          "prompt": "do you have anything in active context ?"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-4",
+      "type": "memory_note",
+      "position": {
+        "x": 672.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "memory_note",
+        "label": "Memorize",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#2ECC71",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "content",
+            "label": "content",
+            "type": "string"
+          },
+          {
+            "id": "tags",
+            "label": "tags",
+            "type": "object"
+          },
+          {
+            "id": "sources",
+            "label": "sources",
+            "type": "object"
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "note_id",
+            "label": "note_id",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-6",
+      "type": "memory_rehydrate",
+      "position": {
+        "x": 1216.0,
+        "y": 240.0
+      },
+      "data": {
+        "nodeType": "memory_rehydrate",
+        "label": "Recall into context",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#2ECC71",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "span_ids",
+            "label": "span_ids",
+            "type": "array"
+          },
+          {
+            "id": "placement",
+            "label": "placement",
+            "type": "string"
+          },
+          {
+            "id": "max_messages",
+            "label": "max_messages",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inserted",
+            "label": "inserted",
+            "type": "number"
+          },
+          {
+            "id": "skipped",
+            "label": "skipped",
+            "type": "number"
+          }
+        ],
+        "pinDefaults": {
+          "placement": "end"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-8",
+      "type": "make_array",
+      "position": {
+        "x": 976.0,
+        "y": 336.0
+      },
+      "data": {
+        "nodeType": "make_array",
+        "label": "Make Array",
+        "icon": "[]",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "any"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "array"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-9",
+      "type": "sequence",
+      "position": {
+        "x": 896.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "sequence",
+        "label": "Sequence",
+        "icon": "&#x21E5;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "then:0",
+            "label": "Then 0",
+            "type": "execution"
+          },
+          {
+            "id": "then:1",
+            "label": "Then 1",
+            "type": "execution"
+          },
+          {
+            "id": "then:2",
+            "label": "Then 2",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-12",
+      "type": "literal_string",
+      "position": {
+        "x": 672.0,
+        "y": 288.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "String",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "i am laurent-philippe, a research scientist"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-13",
+      "type": "llm_call",
+      "position": {
+        "x": 1216.0,
+        "y": -32.0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "No Recall",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "effectConfig": {
+          "provider": "lmstudio",
+          "model": "gemma-3-1b-it"
+        },
+        "pinDefaults": {
+          "system": "",
+          "prompt": "do you know who i am ?"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-14",
+      "type": "llm_call",
+      "position": {
+        "x": 1488.0,
+        "y": 240.0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Branch After Recall",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "effectConfig": {
+          "provider": "lmstudio",
+          "model": "gemma-3-1b-it"
+        },
+        "pinDefaults": {
+          "prompt": "do you know who i am ?"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-15",
+      "type": "llm_call",
+      "position": {
+        "x": 1216.0,
+        "y": 464.0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Other branch, no recall",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "effectConfig": {
+          "provider": "lmstudio",
+          "model": "gemma-3-1b-it"
+        },
+        "pinDefaults": {
+          "prompt": "do you know who i am ?"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1767380748253",
+      "source": "node-1",
+      "sourceHandle": "provider",
+      "target": "node-3",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1767380750180",
+      "source": "node-1",
+      "sourceHandle": "model",
+      "target": "node-3",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-1767380751967",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-3",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767382323835",
+      "source": "node-3",
+      "sourceHandle": "exec-out",
+      "target": "node-4",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767384346952",
+      "source": "node-4",
+      "sourceHandle": "exec-out",
+      "target": "node-9",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767384381685",
+      "source": "node-9",
+      "sourceHandle": "then:1",
+      "target": "node-6",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767384393877",
+      "source": "node-8",
+      "sourceHandle": "result",
+      "target": "node-6",
+      "targetHandle": "span_ids",
+      "animated": false
+    },
+    {
+      "id": "edge-1767384401885",
+      "source": "node-4",
+      "sourceHandle": "note_id",
+      "target": "node-8",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-1767384560004",
+      "source": "node-12",
+      "sourceHandle": "value",
+      "target": "node-4",
+      "targetHandle": "content",
+      "animated": false
+    },
+    {
+      "id": "edge-1767384655421",
+      "source": "node-9",
+      "sourceHandle": "then:0",
+      "target": "node-13",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767384682173",
+      "source": "node-6",
+      "sourceHandle": "exec-out",
+      "target": "node-14",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767386271905",
+      "source": "node-9",
+      "sourceHandle": "then:2",
+      "target": "node-15",
+      "targetHandle": "exec-in",
+      "animated": true
+    }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2026-01-02T19:06:00.895671",
+  "updated_at": "2026-01-02T20:38:45.175974"
+}
