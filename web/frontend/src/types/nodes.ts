@@ -577,7 +577,7 @@ const EFFECT_NODES: NodeTemplate[] = [
   {
     type: 'memory_note',
     icon: '&#x1F4DD;', // Memo
-    label: 'Remember',
+    label: 'Memorize',
     headerColor: '#2ECC71', // Green - memory
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },

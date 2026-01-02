@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Data edges are now colored by their data type (based on the source pin type) to improve readability in dense graphs.
 - Markdown code block “Copy” now copies the original raw code (preserving newlines/indentation) even after syntax highlighting is applied.
 
+### Changed
+- Memory nodes UX naming: `memory_note` is now labeled **Memorize** (was Remember) to align with AbstractCode `/memorize` and reduce ambiguity with span tagging.
+
 ### Added
 - Visual custom events (Blueprint-style):
   - `On Event` listeners are compiled into dedicated durable subworkflows and auto-started alongside the main run (session-scoped by default).

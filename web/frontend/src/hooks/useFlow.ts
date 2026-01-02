@@ -634,15 +634,18 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         const outputExtras = existingOutputs.filter((p) => !usedOutputs.has(p.id));
 
         // UX label migration (don’t stomp user-custom labels).
-        const legacyLabel =
+        //
+        // We only update labels if they are empty OR still one of our historical defaults
+        // (so user-renamed nodes stay user-renamed).
+        const legacyLabels =
           data.nodeType === 'memory_note'
-            ? 'Add Note'
+            ? new Set(['Add Note', 'Remember'])
             : data.nodeType === 'memory_query'
-              ? 'Query Memory'
-              : 'Memory Rehydrate';
+              ? new Set(['Query Memory'])
+              : new Set(['Memory Rehydrate']);
         if (template && typeof data.label === 'string') {
           const cur = data.label.trim();
-          if (!cur || cur === legacyLabel) {
+          if (!cur || legacyLabels.has(cur)) {
             data = { ...data, label: template.label };
           }
         }
