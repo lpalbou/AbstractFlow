@@ -7,7 +7,7 @@
       "id": "node-1",
       "type": "on_flow_start",
       "position": {
-        "x": 176.0,
+        "x": 160.0,
         "y": 112.0
       },
       "data": {
@@ -238,8 +238,8 @@
       "id": "node-8",
       "type": "make_array",
       "position": {
-        "x": 976.0,
-        "y": 336.0
+        "x": 896.0,
+        "y": 320.0
       },
       "data": {
         "nodeType": "make_array",
@@ -306,6 +306,11 @@
             "id": "then:2",
             "label": "Then 2",
             "type": "execution"
+          },
+          {
+            "id": "then:3",
+            "label": "Then 3",
+            "type": "execution"
           }
         ]
       },
@@ -324,7 +329,7 @@
       },
       "data": {
         "nodeType": "literal_string",
-        "label": "String",
+        "label": "Info About Me",
         "icon": "\"",
         "headerColor": "#FF00FF",
         "inputs": [],
@@ -348,11 +353,11 @@
       "type": "llm_call",
       "position": {
         "x": 1216.0,
-        "y": -32.0
+        "y": -64.0
       },
       "data": {
         "nodeType": "llm_call",
-        "label": "No Recall",
+        "label": "NO Recall + Context",
         "icon": "&#x1F4AD;",
         "headerColor": "#3498DB",
         "inputs": [
@@ -428,7 +433,7 @@
       },
       "data": {
         "nodeType": "llm_call",
-        "label": "Branch After Recall",
+        "label": "Recall + Context",
         "icon": "&#x1F4AD;",
         "headerColor": "#3498DB",
         "inputs": [
@@ -495,15 +500,107 @@
       "outputs": []
     },
     {
-      "id": "node-15",
+      "id": "node-17",
+      "type": "memory_query",
+      "position": {
+        "x": 1216.0,
+        "y": 800.0
+      },
+      "data": {
+        "nodeType": "memory_query",
+        "label": "Recall (who)",
+        "icon": "&#x1F50D;",
+        "headerColor": "#2ECC71",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "query",
+            "label": "query",
+            "type": "string"
+          },
+          {
+            "id": "limit",
+            "label": "limit",
+            "type": "number"
+          },
+          {
+            "id": "tags",
+            "label": "tags",
+            "type": "object"
+          },
+          {
+            "id": "since",
+            "label": "since",
+            "type": "string"
+          },
+          {
+            "id": "until",
+            "label": "until",
+            "type": "string"
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string"
+          },
+          {
+            "id": "tags_mode",
+            "label": "tags_mode",
+            "type": "string"
+          },
+          {
+            "id": "usernames",
+            "label": "usernames",
+            "type": "array"
+          },
+          {
+            "id": "locations",
+            "label": "locations",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "results",
+            "label": "results",
+            "type": "array"
+          },
+          {
+            "id": "rendered",
+            "label": "rendered",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "query": "who person user",
+          "tags_mode": "any"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-18",
       "type": "llm_call",
       "position": {
         "x": 1216.0,
-        "y": 464.0
+        "y": 496.0
       },
       "data": {
         "nodeType": "llm_call",
-        "label": "Other branch, no recall",
+        "label": "Recall + NO Context",
         "icon": "&#x1F4AD;",
         "headerColor": "#3498DB",
         "inputs": [
@@ -557,10 +654,117 @@
         ],
         "effectConfig": {
           "provider": "lmstudio",
-          "model": "gemma-3-1b-it"
+          "model": "gemma-3-1b-it",
+          "include_context": false
         },
         "pinDefaults": {
           "prompt": "do you know who i am ?"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-19",
+      "type": "llm_call",
+      "position": {
+        "x": 1504.0,
+        "y": 800.0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Direct Recall + No Context",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "effectConfig": {
+          "provider": "lmstudio",
+          "model": "gemma-3-1b-it",
+          "include_context": false
+        },
+        "pinDefaults": {
+          "prompt": "do you know who i am ?"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-20",
+      "type": "literal_json",
+      "position": {
+        "x": 672.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "literal_json",
+        "label": "Tag Who",
+        "icon": "{}",
+        "headerColor": "#00FFFF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "object"
+          }
+        ],
+        "literalValue": {
+          "who": "who"
         }
       },
       "label": null,
@@ -660,15 +864,47 @@
       "animated": true
     },
     {
-      "id": "edge-1767386271905",
+      "id": "edge-1767395723269",
       "source": "node-9",
       "sourceHandle": "then:2",
-      "target": "node-15",
+      "target": "node-18",
       "targetHandle": "exec-in",
       "animated": true
+    },
+    {
+      "id": "edge-1767395745661",
+      "source": "node-9",
+      "sourceHandle": "then:3",
+      "target": "node-17",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767395757402",
+      "source": "node-17",
+      "sourceHandle": "exec-out",
+      "target": "node-19",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767395818142",
+      "source": "node-17",
+      "sourceHandle": "rendered",
+      "target": "node-19",
+      "targetHandle": "system",
+      "animated": false
+    },
+    {
+      "id": "edge-1767395931177",
+      "source": "node-20",
+      "sourceHandle": "value",
+      "target": "node-4",
+      "targetHandle": "tags",
+      "animated": false
     }
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-02T19:06:00.895671",
-  "updated_at": "2026-01-02T20:38:45.175974"
+  "updated_at": "2026-01-02T23:25:39.634004"
 }

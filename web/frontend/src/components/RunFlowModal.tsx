@@ -962,14 +962,11 @@ export function RunFlowModal({
 
     // Fallback for pure/literal nodes: no node_complete event exists.
     const srcNode = nodes.find((n) => n.id === sourceNodeId);
-    const srcData = srcNode && srcNode.data && typeof srcNode.data === 'object' ? (srcNode.data as Record<string, unknown>) : null;
-    if (srcData && 'literalValue' in srcData) {
-      const lv = (srcData as any).literalValue as unknown;
-      if (lv != null) {
-        const text = typeof lv === 'string' ? lv : formatValue(lv);
-        const trimmed = text.trim();
-        return trimmed ? trimmed : null;
-      }
+    const lv = srcNode?.data?.literalValue;
+    if (lv != null) {
+      const text = typeof lv === 'string' ? lv : formatValue(lv);
+      const trimmed = text.trim();
+      return trimmed ? trimmed : null;
     }
 
     return null;
