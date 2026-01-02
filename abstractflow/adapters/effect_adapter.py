@@ -265,13 +265,25 @@ def create_memory_note_handler(
         # Extract content
         if isinstance(input_data, dict):
             content = input_data.get("content", "")
+            tags = input_data.get("tags") if isinstance(input_data.get("tags"), dict) else {}
+            sources = input_data.get("sources") if isinstance(input_data.get("sources"), dict) else None
+            scope = input_data.get("scope") if isinstance(input_data.get("scope"), str) else None
         else:
             content = str(input_data) if input_data else ""
+            tags = {}
+            sources = None
+            scope = None
 
         # Create the effect
+        payload: Dict[str, Any] = {"note": content, "tags": tags}
+        if sources is not None:
+            payload["sources"] = sources
+        if scope:
+            payload["scope"] = scope
+
         effect = Effect(
             type=EffectType.MEMORY_NOTE,
-            payload={"note": content, "tags": {}},
+            payload=payload,
             result_key=output_key or "_temp.note_id",
         )
 
@@ -315,20 +327,90 @@ def create_memory_query_handler(
         if isinstance(input_data, dict):
             query = input_data.get("query", "")
             limit = input_data.get("limit", 10)
+            tags = input_data.get("tags") if isinstance(input_data.get("tags"), dict) else None
+            since = input_data.get("since")
+            until = input_data.get("until")
+            scope = input_data.get("scope") if isinstance(input_data.get("scope"), str) else None
         else:
             query = str(input_data) if input_data else ""
             limit = 10
+            tags = None
+            since = None
+            until = None
+            scope = None
 
         # Create the effect
+        payload: Dict[str, Any] = {"query": query, "limit_spans": limit, "return": "both"}
+        if tags is not None:
+            payload["tags"] = tags
+        if since is not None:
+            payload["since"] = since
+        if until is not None:
+            payload["until"] = until
+        if scope:
+            payload["scope"] = scope
+
         effect = Effect(
             type=EffectType.MEMORY_QUERY,
-            payload={"query": query, "limit_spans": limit},
+            payload=payload,
             result_key=output_key or "_temp.memory_results",
         )
 
         return StepPlan(
             node_id=node_id,
             effect=effect,
+            next_node=next_node,
+        )
+
+    return handler
+
+
+def create_memory_rehydrate_handler(
+    node_id: str,
+    next_node: Optional[str],
+    input_key: Optional[str] = None,
+    output_key: Optional[str] = None,
+) -> Callable:
+    """Create a node handler that rehydrates recalled spans into context.messages.
+
+    This produces a runtime-owned `EffectType.MEMORY_REHYDRATE` so rehydration is durable and host-agnostic.
+    """
+    from abstractruntime.core.models import StepPlan, Effect, EffectType
+
+    def handler(run: "RunState", ctx: Any) -> "StepPlan":
+        del ctx
+        if input_key:
+            input_data = run.vars.get(input_key, {})
+        else:
+            input_data = run.vars
+
+        span_ids = []
+        placement = "after_summary"
+        max_messages = None
+        if isinstance(input_data, dict):
+            raw = input_data.get("span_ids")
+            if raw is None:
+                raw = input_data.get("span_id")
+            if isinstance(raw, list):
+                span_ids = list(raw)
+            elif raw is not None:
+                span_ids = [raw]
+            if isinstance(input_data.get("placement"), str):
+                placement = str(input_data.get("placement") or "").strip() or placement
+            if input_data.get("max_messages") is not None:
+                max_messages = input_data.get("max_messages")
+
+        payload: Dict[str, Any] = {"span_ids": span_ids, "placement": placement}
+        if max_messages is not None:
+            payload["max_messages"] = max_messages
+
+        return StepPlan(
+            node_id=node_id,
+            effect=Effect(
+                type=EffectType.MEMORY_REHYDRATE,
+                payload=payload,
+                result_key=output_key or "_temp.memory_rehydrate",
+            ),
             next_node=next_node,
         )
 

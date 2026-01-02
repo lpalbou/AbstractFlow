@@ -1,6 +1,6 @@
 # AbstractFlow — Architecture (Current)
 
-> Updated: 2025-12-27  
+> Updated: 2026-01-02  
 > Scope: this describes **what is implemented today** in this monorepo (no “future” design claims).
 
 AbstractFlow is the **workflow authoring + orchestration** layer of the AbstractFramework:
@@ -38,6 +38,9 @@ The visual editor saves workflows as `VisualFlow` JSON (Pydantic models in `abst
 - `VisualNode`: `id`, `type` (`NodeType`), `position`, `data` (pins + node config).
 - `VisualEdge`: `source`, `sourceHandle`, `target`, `targetHandle`.
 
+Recent additions (portable node types):
+- `memory_rehydrate`: runtime-owned mutation that rehydrates archived `conversation_span` messages into `context.messages`.
+
 **Important constraint:** the workflow must remain **portable** across hosts:
 - the JSON includes node configuration (`data`) needed to execute outside the web backend
 - execution semantics are expressed via AbstractRuntime effects + pure functions
@@ -60,6 +63,7 @@ Programmatic flows compile to AbstractRuntime the same way as visual flows (via 
 `abstractflow.compiler.compile_flow()` converts a `Flow` to `abstractruntime.WorkflowSpec`:
 - function nodes → `create_function_node_handler(...)` (sync compute)
 - effect nodes (ask_user/llm_call/wait_event/…) → `Effect` requests (durable waits/side effects)
+  - memory effect nodes (`memory_note`, `memory_query`, `memory_rehydrate`) → runtime memory effects (require `ArtifactStore`)
 - control nodes (sequence/parallel/while/loop) → scheduler handlers in `abstractflow.adapters.control_adapter`
 - agent nodes (programmatic agents) → `abstractflow.adapters.agent_adapter`
 - visual agent nodes (`type: "agent"`) → a **START_SUBWORKFLOW** wrapper that delegates to `abstractagent` ReAct workflows (implemented in `abstractflow.compiler._create_visual_agent_effect_handler`)
@@ -86,6 +90,9 @@ When a visual flow contains LLM nodes (`llm_call` / `agent`), `abstractflow.visu
 This wires:
 - `EffectType.LLM_CALL` via an AbstractCore-backed LLM client
 - `EffectType.TOOL_CALLS` via a host-configured `ToolExecutor` (typically `MappingToolExecutor.from_tools(...)`)
+
+When a visual flow contains memory nodes, the host must also configure:
+- an `ArtifactStore` (for archived spans, notes, and rehydration source artifacts)
 
 ## Events and Schedules (Durable)
 

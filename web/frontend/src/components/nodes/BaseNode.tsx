@@ -469,6 +469,9 @@ export const BaseNode = memo(function BaseNode({
   const isOnEventNode = data.nodeType === 'on_event';
   const isOnScheduleNode = data.nodeType === 'on_schedule';
   const isWriteFileNode = data.nodeType === 'write_file';
+  const isMemoryNoteNode = data.nodeType === 'memory_note';
+  const isMemoryQueryNode = data.nodeType === 'memory_query';
+  const isMemoryRehydrateNode = data.nodeType === 'memory_rehydrate';
 
   const hasModelControls = isLlmNode || isAgentNode;
   const hasProviderDropdown = hasModelControls || isProviderModelsNode;
@@ -1235,6 +1238,8 @@ export const BaseNode = memo(function BaseNode({
                 const isOnScheduleRecurrentPin = isOnScheduleNode && pin.id === 'recurrent';
                 const isWriteFileContentPin = isWriteFileNode && pin.id === 'content';
                 const isCompareOpPin = isCompareNode && pin.id === 'op';
+                const isMemoryScopePin = (isMemoryNoteNode || isMemoryQueryNode) && pin.id === 'scope';
+                const isMemoryPlacementPin = isMemoryRehydrateNode && pin.id === 'placement';
                 const hasSpecialControl =
                   (hasProviderDropdown && pin.id === 'provider') ||
                   (hasModelControls && pin.id === 'model') ||
@@ -1245,7 +1250,9 @@ export const BaseNode = memo(function BaseNode({
                   isOnEventScopePin ||
                   isOnScheduleTimestampPin ||
                   isOnScheduleRecurrentPin ||
-                  isWriteFileContentPin;
+                  isWriteFileContentPin ||
+                  isMemoryScopePin ||
+                  isMemoryPlacementPin;
 
                 if (isEmitEventName) {
                   const pinned = pinDefaults.name;
@@ -1290,6 +1297,60 @@ export const BaseNode = memo(function BaseNode({
                       searchable={false}
                       minPopoverWidth={180}
                       onChange={onChange}
+                    />
+                  );
+                }
+
+                if (isMemoryScopePin && !connected) {
+                  const raw = pinDefaults.scope;
+                  const currentScope =
+                    typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : 'run';
+
+                  const options = isMemoryQueryNode
+                    ? [
+                        { value: 'run', label: 'run' },
+                        { value: 'session', label: 'session' },
+                        { value: 'global', label: 'global' },
+                        { value: 'all', label: 'all' },
+                      ]
+                    : [
+                        { value: 'run', label: 'run' },
+                        { value: 'session', label: 'session' },
+                        { value: 'global', label: 'global' },
+                      ];
+
+                  controls.push(
+                    <AfSelect
+                      key="memory-scope"
+                      variant="pin"
+                      value={currentScope}
+                      placeholder="run"
+                      options={options}
+                      searchable={false}
+                      minPopoverWidth={180}
+                      onChange={(v) => setPinDefault('scope', (v || 'run') as any)}
+                    />
+                  );
+                }
+
+                if (isMemoryPlacementPin && !connected) {
+                  const raw = pinDefaults.placement;
+                  const currentPlacement =
+                    typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : 'after_summary';
+                  controls.push(
+                    <AfSelect
+                      key="memory-placement"
+                      variant="pin"
+                      value={currentPlacement}
+                      placeholder="after_summary"
+                      options={[
+                        { value: 'after_summary', label: 'after_summary' },
+                        { value: 'after_system', label: 'after_system' },
+                        { value: 'end', label: 'end' },
+                      ]}
+                      searchable={false}
+                      minPopoverWidth={200}
+                      onChange={(v) => setPinDefault('placement', (v || 'after_summary') as any)}
                     />
                   );
                 }

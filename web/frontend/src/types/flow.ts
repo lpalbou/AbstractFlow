@@ -74,6 +74,7 @@ export type NodeType =
   | 'write_file'
   | 'memory_note'
   | 'memory_query'
+  | 'memory_rehydrate'
   | 'tool_calls'
   | 'tools_allowlist'
   | 'bool_var'

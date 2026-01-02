@@ -15,6 +15,7 @@ from .adapters.effect_adapter import (
     create_wait_event_handler,
     create_memory_note_handler,
     create_memory_query_handler,
+    create_memory_rehydrate_handler,
     create_llm_call_handler,
     create_tool_calls_handler,
     create_start_subworkflow_handler,
@@ -96,6 +97,13 @@ def _create_effect_node_handler(
         )
     elif effect_type == "memory_query":
         base_handler = create_memory_query_handler(
+            node_id=node_id,
+            next_node=next_node,
+            input_key=input_key,
+            output_key=output_key,
+        )
+    elif effect_type == "memory_rehydrate":
+        base_handler = create_memory_rehydrate_handler(
             node_id=node_id,
             next_node=next_node,
             input_key=input_key,
@@ -870,12 +878,44 @@ def _sync_effect_results_to_node_outputs(run: Any, flow: Flow) -> None:
             current["raw"] = raw
             mapped_value = span_id
         elif effect_type == "memory_query":
-            if isinstance(raw, dict) and isinstance(raw.get("results"), list):
-                current["results"] = raw.get("results")
-            else:
-                current["results"] = []
+            # Runtime returns a tool-results envelope:
+            #   {"mode":"executed","results":[{call_id,name,success,output,error,meta?}, ...]}
+            rendered = ""
+            matches: list[Any] = []
+            span_ids: list[Any] = []
+            if isinstance(raw, dict):
+                results_list = raw.get("results")
+                if isinstance(results_list, list) and results_list:
+                    first = results_list[0]
+                    if isinstance(first, dict):
+                        out = first.get("output")
+                        if isinstance(out, str):
+                            rendered = out
+                        meta = first.get("meta")
+                        if isinstance(meta, dict):
+                            m = meta.get("matches")
+                            if isinstance(m, list):
+                                matches = m
+                            sids = meta.get("span_ids")
+                            if isinstance(sids, list):
+                                span_ids = sids
+
+            current["rendered"] = rendered
+            current["results"] = matches
+            current["span_ids"] = span_ids
             current["raw"] = raw
             mapped_value = current["results"]
+        elif effect_type == "memory_rehydrate":
+            if isinstance(raw, dict):
+                current["inserted"] = raw.get("inserted")
+                current["skipped"] = raw.get("skipped")
+                current["artifacts"] = raw.get("artifacts")
+            else:
+                current["inserted"] = 0
+                current["skipped"] = 0
+                current["artifacts"] = []
+            current["raw"] = raw
+            mapped_value = raw
         elif effect_type == "start_subworkflow":
             if isinstance(raw, dict):
                 current["sub_run_id"] = raw.get("sub_run_id")

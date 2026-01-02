@@ -582,6 +582,9 @@ const EFFECT_NODES: NodeTemplate[] = [
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
       { id: 'content', label: 'content', type: 'string' },
+      { id: 'tags', label: 'tags', type: 'object' },
+      { id: 'sources', label: 'sources', type: 'object' },
+      { id: 'scope', label: 'scope', type: 'string' },
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
@@ -598,10 +601,33 @@ const EFFECT_NODES: NodeTemplate[] = [
       { id: 'exec-in', label: '', type: 'execution' },
       { id: 'query', label: 'query', type: 'string' },
       { id: 'limit', label: 'limit', type: 'number' },
+      { id: 'tags', label: 'tags', type: 'object' },
+      { id: 'since', label: 'since', type: 'string' },
+      { id: 'until', label: 'until', type: 'string' },
+      { id: 'scope', label: 'scope', type: 'string' },
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
       { id: 'results', label: 'results', type: 'array' },
+      { id: 'rendered', label: 'rendered', type: 'string' },
+    ],
+    category: 'effects',
+  },
+  {
+    type: 'memory_rehydrate',
+    icon: '&#x1F4AC;', // Speech balloon
+    label: 'Memory Rehydrate',
+    headerColor: '#2ECC71', // Green - memory
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'span_ids', label: 'span_ids', type: 'array' },
+      { id: 'placement', label: 'placement', type: 'string' },
+      { id: 'max_messages', label: 'max_messages', type: 'number' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'inserted', label: 'inserted', type: 'number' },
+      { id: 'skipped', label: 'skipped', type: 'number' },
     ],
     category: 'effects',
   },

@@ -107,6 +107,7 @@ class NodeType(str, Enum):
     WRITE_FILE = "write_file"
     MEMORY_NOTE = "memory_note"
     MEMORY_QUERY = "memory_query"
+    MEMORY_REHYDRATE = "memory_rehydrate"
     TOOL_CALLS = "tool_calls"
     TOOLS_ALLOWLIST = "tools_allowlist"
     BOOL_VAR = "bool_var"

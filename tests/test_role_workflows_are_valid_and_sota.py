@@ -72,7 +72,8 @@ def test_role_and_orchestrator_workflows_compile_and_have_basic_invariants() -> 
     """
     from abstractflow.visual.executor import create_visual_runner
 
-    flows_dir = Path("web/flows")
+    # Resolve relative to the AbstractFlow package root, not the process CWD.
+    flows_dir = Path(__file__).resolve().parents[1] / "web" / "flows"
     targets = [
         "role_deep_researcher.json",
         "role_architect.json",

@@ -120,6 +120,7 @@ def create_visual_runner(
             "write_file",
             "memory_note",
             "memory_query",
+            "memory_rehydrate",
         }
 
         node_types: Dict[str, str] = {n.id: _node_type(n) for n in vf.nodes}
@@ -215,7 +216,7 @@ def create_visual_runner(
                 needs_registry = True
             if t in {"on_event", "emit_event"}:
                 needs_registry = True
-            if t in {"memory_note", "memory_query"}:
+            if t in {"memory_note", "memory_query", "memory_rehydrate"}:
                 needs_artifacts = True
 
     # Detect whether this flow tree needs AbstractCore LLM integration.
@@ -811,6 +812,7 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
         "emit_event",
         "memory_note",
         "memory_query",
+        "memory_rehydrate",
     }
 
     literal_node_ids: set[str] = set()
@@ -1535,6 +1537,8 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
             return _create_memory_note_handler(data, effect_config)
         if effect_type == "memory_query":
             return _create_memory_query_handler(data, effect_config)
+        if effect_type == "memory_rehydrate":
+            return _create_memory_rehydrate_handler(data, effect_config)
 
         return lambda x: x
 
@@ -1999,7 +2003,17 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
     def _create_memory_note_handler(data: Dict[str, Any], config: Dict[str, Any]):
         def handler(input_data):
             content = input_data.get("content", "") if isinstance(input_data, dict) else str(input_data)
-            return {"note_id": None, "_pending_effect": {"type": "memory_note", "note": content, "tags": {}}}
+            tags = input_data.get("tags") if isinstance(input_data, dict) else None
+            sources = input_data.get("sources") if isinstance(input_data, dict) else None
+            scope = input_data.get("scope") if isinstance(input_data, dict) else None
+
+            pending: Dict[str, Any] = {"type": "memory_note", "note": content, "tags": tags if isinstance(tags, dict) else {}}
+            if isinstance(sources, dict):
+                pending["sources"] = sources
+            if isinstance(scope, str) and scope.strip():
+                pending["scope"] = scope.strip()
+
+            return {"note_id": None, "_pending_effect": pending}
 
         return handler
 
@@ -2007,12 +2021,51 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
         def handler(input_data):
             query = input_data.get("query", "") if isinstance(input_data, dict) else str(input_data)
             limit = input_data.get("limit", 10) if isinstance(input_data, dict) else 10
+            tags = input_data.get("tags") if isinstance(input_data, dict) else None
+            since = input_data.get("since") if isinstance(input_data, dict) else None
+            until = input_data.get("until") if isinstance(input_data, dict) else None
+            scope = input_data.get("scope") if isinstance(input_data, dict) else None
             try:
                 limit_int = int(limit) if limit is not None else 10
             except Exception:
                 limit_int = 10
 
-            return {"results": [], "_pending_effect": {"type": "memory_query", "query": query, "limit_spans": limit_int}}
+            pending: Dict[str, Any] = {"type": "memory_query", "query": query, "limit_spans": limit_int, "return": "both"}
+            if isinstance(tags, dict):
+                pending["tags"] = tags
+            if since is not None:
+                pending["since"] = since
+            if until is not None:
+                pending["until"] = until
+            if isinstance(scope, str) and scope.strip():
+                pending["scope"] = scope.strip()
+
+            return {"results": [], "rendered": "", "_pending_effect": pending}
+
+        return handler
+
+    def _create_memory_rehydrate_handler(data: Dict[str, Any], config: Dict[str, Any]):
+        def handler(input_data):
+            raw = input_data.get("span_ids") if isinstance(input_data, dict) else None
+            if raw is None and isinstance(input_data, dict):
+                raw = input_data.get("span_id")
+            span_ids: list[Any] = []
+            if isinstance(raw, list):
+                span_ids = list(raw)
+            elif raw is not None:
+                span_ids = [raw]
+
+            placement = input_data.get("placement") if isinstance(input_data, dict) else None
+            placement_str = str(placement).strip() if isinstance(placement, str) else "after_summary"
+            if placement_str not in {"after_summary", "after_system", "end"}:
+                placement_str = "after_summary"
+
+            max_messages = input_data.get("max_messages") if isinstance(input_data, dict) else None
+
+            pending: Dict[str, Any] = {"type": "memory_rehydrate", "span_ids": span_ids, "placement": placement_str}
+            if max_messages is not None:
+                pending["max_messages"] = max_messages
+            return {"inserted": 0, "skipped": 0, "_pending_effect": pending}
 
         return handler
 
