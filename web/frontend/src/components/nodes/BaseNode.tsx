@@ -512,6 +512,28 @@ export const BaseNode = memo(function BaseNode({
       : data.providerModelsConfig?.provider;
   const selectedModel = isAgentNode ? data.agentConfig?.model : data.effectConfig?.model;
 
+  const includeContext = (isAgentNode
+    ? (data.agentConfig?.include_context ?? true)
+    : isLlmNode
+      ? (data.effectConfig?.include_context ?? true)
+      : true) as boolean;
+
+  const setIncludeContext = useCallback(
+    (next: boolean) => {
+      const v = Boolean(next);
+      if (isAgentNode) {
+        const prev = data.agentConfig || {};
+        updateNodeData(id, { agentConfig: { ...prev, include_context: v } });
+        return;
+      }
+      if (isLlmNode) {
+        const prev = data.effectConfig || {};
+        updateNodeData(id, { effectConfig: { ...prev, include_context: v } });
+      }
+    },
+    [data.agentConfig, data.effectConfig, id, isAgentNode, isLlmNode, updateNodeData]
+  );
+
   const providersQuery = useProviders(hasProviderDropdown && (!providerConnected || !modelConnected));
   const modelsQuery = useModels(selectedProvider, hasModelControls && !modelConnected);
   const toolsQuery = useTools((isAgentNode || isLlmNode || isToolsAllowlistNode) && !toolsConnected);
@@ -1210,6 +1232,28 @@ export const BaseNode = memo(function BaseNode({
             loading={toolsQuery.isLoading}
             onChange={setNodeTools}
           />
+        )}
+
+        {(isLlmNode || isAgentNode) && (
+          <div className="node-inline-config nodrag">
+            <div className="node-config-row">
+              <span className="node-config-label">Use context</span>
+              <label
+                className="af-pin-checkbox"
+                title="When enabled, this node includes the run's active context (including Recall into context inserts). Disable to isolate this call."
+              >
+                <input
+                  className="af-pin-checkbox-input"
+                  type="checkbox"
+                  checked={includeContext}
+                  onChange={(e) => setIncludeContext(e.target.checked)}
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                />
+                <span className="af-pin-checkbox-box" aria-hidden="true" />
+              </label>
+            </div>
+          </div>
         )}
 
         {data.nodeType === 'bool_var' && (

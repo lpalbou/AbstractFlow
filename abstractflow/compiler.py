@@ -170,7 +170,12 @@ def _create_effect_node_handler(
                 # Why here (compiler) and not in AbstractRuntime:
                 # - LLM_CALL is a generic runtime effect; not all callers want implicit context.
                 # - Visual LLM Call nodes expect "Recall into context" to affect subsequent calls.
-                if eff_type == EffectType.LLM_CALL and isinstance(pending, dict) and "messages" not in pending:
+                if (
+                    eff_type == EffectType.LLM_CALL
+                    and isinstance(pending, dict)
+                    and "messages" not in pending
+                    and pending.get("include_context") is not False
+                ):
                     try:
                         from abstractruntime.memory.active_context import ActiveContextPolicy
 
@@ -180,7 +185,14 @@ def _create_effect_node_handler(
                         sys_raw = pending.get("system_prompt") or pending.get("system")
                         sys_text = str(sys_raw).strip() if isinstance(sys_raw, str) else ""
                         if sys_text:
-                            messages.append({"role": "system", "content": sys_text})
+                            # Insert after existing system messages (system must precede user/assistant).
+                            insert_at = 0
+                            while insert_at < len(messages):
+                                m = messages[insert_at]
+                                if not isinstance(m, dict) or m.get("role") != "system":
+                                    break
+                                insert_at += 1
+                            messages.insert(insert_at, {"role": "system", "content": sys_text})
 
                         prompt_raw = pending.get("prompt")
                         prompt_text = prompt_raw if isinstance(prompt_raw, str) else str(prompt_raw or "")
@@ -300,6 +312,7 @@ def _create_visual_agent_effect_handler(
         model: str,
         system_prompt: str,
         allowed_tools: list[str],
+        include_context: bool = True,
         max_iterations: Optional[int] = None,
     ) -> Dict[str, Any]:
         parent_limits = run.vars.get("_limits")
@@ -317,6 +330,26 @@ def _create_visual_agent_effect_handler(
             limits["max_iterations"] = int(max_iterations)
 
         ctx_ns: Dict[str, Any] = {"task": str(task or ""), "messages": []}
+
+        # Optional: inherit the parent's active context as agent history (including Recall into context inserts).
+        # This is a visual-editor UX feature; callers can disable it via agentConfig.include_context.
+        if bool(include_context):
+            try:
+                from abstractruntime.memory.active_context import ActiveContextPolicy
+
+                base = ActiveContextPolicy.select_active_messages_for_llm_from_run(run)
+                if isinstance(base, list):
+                    ctx_ns["messages"] = [dict(m) for m in base if isinstance(m, dict)]
+            except Exception:
+                pass
+
+        # Explicit context.messages from a pin overrides the inherited run context.
+        raw_msgs = context.get("messages") if isinstance(context, dict) else None
+        if isinstance(raw_msgs, list):
+            msgs = [dict(m) for m in raw_msgs if isinstance(m, dict)]
+            if msgs:
+                ctx_ns["messages"] = msgs
+
         if isinstance(context, dict) and context:
             for k, v in context.items():
                 if k in ("task", "messages"):
@@ -401,6 +434,9 @@ def _create_visual_agent_effect_handler(
         system_raw = resolved_inputs.get("system") if isinstance(resolved_inputs, dict) else None
         system_prompt = system_raw if isinstance(system_raw, str) else str(system_raw or "")
 
+        include_context_cfg = agent_config.get("include_context")
+        include_context = True if include_context_cfg is None else bool(include_context_cfg)
+
         # Agent loop budget (max_iterations) can come from a data-edge pin or from config.
         max_iterations_raw = resolved_inputs.get("max_iterations") if isinstance(resolved_inputs, dict) else None
         max_iterations_override = _coerce_max_iterations(max_iterations_raw)
@@ -476,6 +512,7 @@ def _create_visual_agent_effect_handler(
                             model=model,
                             system_prompt=system_prompt,
                             allowed_tools=allowed_tools,
+                            include_context=include_context,
                             max_iterations=max_iterations_override,
                         ),
                         # Run Agent as a durable async subworkflow so the host can:

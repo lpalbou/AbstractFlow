@@ -1701,6 +1701,8 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
         model_default = config.get("model", "")
         temperature = config.get("temperature", 0.7)
         tools_default_raw = config.get("tools")
+        include_context_cfg = config.get("include_context")
+        include_context_default = True if include_context_cfg is None else bool(include_context_cfg)
 
         # Tool definitions (ToolSpecs) are required for tool calling. In the visual editor we
         # store tools as a portable `string[]` allowlist; at execution time we translate to
@@ -1817,6 +1819,7 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
                         "system_prompt": system,
                         "tools": tools,
                         "params": {"temperature": temperature},
+                        "include_context": include_context_default,
                     },
                     "error": "Missing provider or model configuration",
                 }
@@ -1831,6 +1834,7 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
                     "params": {"temperature": temperature},
                     "provider": provider,
                     "model": model,
+                    "include_context": include_context_default,
                 },
             }
 

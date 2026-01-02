@@ -914,6 +914,27 @@ export function RunFlowModal({
     if (!selectedStep || selectedStep.nodeType !== 'memory_note') return null;
     if (!selectedStep.nodeId) return null;
 
+    // Prefer the runtime-owned preview when available (works even when `content` comes from pure/literal nodes).
+    const out = selectedStep.output;
+    if (out && typeof out === 'object' && !Array.isArray(out)) {
+      const obj = out as Record<string, unknown>;
+      const raw = obj.raw;
+      if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+        const rawObj = raw as Record<string, unknown>;
+        const results = rawObj.results;
+        if (Array.isArray(results) && results.length > 0) {
+          const first = results[0];
+          if (first && typeof first === 'object') {
+            const meta = (first as Record<string, unknown>).meta;
+            if (meta && typeof meta === 'object') {
+              const notePreview = (meta as Record<string, unknown>).note_preview;
+              if (typeof notePreview === 'string' && notePreview.trim()) return notePreview.trim();
+            }
+          }
+        }
+      }
+    }
+
     const targetNodeId = selectedStep.nodeId;
     const edge = edges.find((e) => e.target === targetNodeId && e.targetHandle === 'content');
     if (!edge || !edge.source) return null;
@@ -939,8 +960,43 @@ export function RunFlowModal({
       return trimmed ? trimmed : null;
     }
 
+    // Fallback for pure/literal nodes: no node_complete event exists.
+    const srcNode = nodes.find((n) => n.id === sourceNodeId);
+    const srcData = srcNode && srcNode.data && typeof srcNode.data === 'object' ? (srcNode.data as Record<string, unknown>) : null;
+    if (srcData && 'literalValue' in srcData) {
+      const lv = (srcData as any).literalValue as unknown;
+      if (lv != null) {
+        const text = typeof lv === 'string' ? lv : formatValue(lv);
+        const trimmed = text.trim();
+        return trimmed ? trimmed : null;
+      }
+    }
+
     return null;
-  }, [edges, events, formatValue, rootRunId, selectedEventIndex, selectedStep]);
+  }, [edges, events, formatValue, nodes, rootRunId, selectedEventIndex, selectedStep]);
+
+  const recallIntoContextPreview = useMemo(() => {
+    if (!selectedStep || selectedStep.nodeType !== 'memory_rehydrate') return null;
+    const out = selectedStep.output;
+    if (!out || typeof out !== 'object' || Array.isArray(out)) return null;
+    const obj = out as Record<string, unknown>;
+    const artifactsRaw = obj.artifacts;
+    const artifacts = Array.isArray(artifactsRaw) ? artifactsRaw : [];
+    if (!artifacts.length) return null;
+
+    const blocks: string[] = [];
+    for (const a of artifacts) {
+      if (!a || typeof a !== 'object') continue;
+      const ao = a as Record<string, unknown>;
+      const kind = typeof ao.kind === 'string' ? ao.kind.trim() : '';
+      const preview = typeof ao.preview === 'string' ? ao.preview.trim() : '';
+      if (!preview) continue;
+      const title = kind ? `**${kind}**` : '**memory**';
+      blocks.push(`${title}\n${preview}`);
+    }
+    const text = blocks.join('\n\n').trim();
+    return text ? text : null;
+  }, [selectedStep]);
 
   const onFlowStartParams = useMemo(() => {
     if (!selectedStep || selectedStep.nodeType !== 'on_flow_start') return null;
@@ -1408,7 +1464,20 @@ export function RunFlowModal({
                                   <MarkdownRenderer markdown={memorizeContentPreview} />
                                 </div>
                               ) : (
-                                <div className="run-details-empty">No preview available (content pin not connected).</div>
+                                <div className="run-details-empty">No preview available.</div>
+                              )}
+                            </div>
+                          ) : null}
+
+                          {selectedStep?.nodeType === 'memory_rehydrate' ? (
+                            <div className="run-output-section">
+                              <div className="run-output-title">Recalled content</div>
+                              {recallIntoContextPreview ? (
+                                <div className="run-details-markdown run-param-markdown">
+                                  <MarkdownRenderer markdown={recallIntoContextPreview} />
+                                </div>
+                              ) : (
+                                <div className="run-details-empty">No preview available.</div>
                               )}
                             </div>
                           ) : null}

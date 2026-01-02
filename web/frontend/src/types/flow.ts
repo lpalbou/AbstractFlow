@@ -119,6 +119,7 @@ export interface FlowNodeData {
     provider?: string;
     model?: string;
     tools?: string[];      // Allowlisted tool names (0..N)
+    include_context?: boolean; // When true, include run context/messages as history (Recall into context)
     outputSchema?: {       // Optional structured output schema
       enabled?: boolean;
       mode?: 'fields' | 'json';
@@ -157,6 +158,7 @@ export interface FlowNodeData {
     model?: string;        // For llm_call
     temperature?: number;  // For llm_call
     tools?: string[];      // For llm_call (tool allowlist; resolved to ToolSpecs at execution)
+    include_context?: boolean; // For llm_call: include run context/messages as history (Recall into context)
     allowFreeText?: boolean; // For ask_user
     durationType?: 'seconds' | 'minutes' | 'hours' | 'timestamp'; // For wait_until
     allowed_tools?: string[]; // For tool_calls (tool name allowlist; empty => allow none)
