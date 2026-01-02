@@ -50,12 +50,12 @@ export type NodeType =
   // Math - Pure functions (no exec pins)
   | 'add' | 'subtract' | 'multiply' | 'divide' | 'modulo' | 'power' | 'abs' | 'round'
   // String - Pure functions (no exec pins)
-  | 'concat' | 'split' | 'join' | 'format' | 'uppercase' | 'lowercase' | 'trim' | 'substring' | 'length'
+  | 'concat' | 'split' | 'join' | 'format' | 'string_template' | 'uppercase' | 'lowercase' | 'trim' | 'substring' | 'length'
   // Control - if/loop/while have exec, logic gates are pure
-  | 'if' | 'switch' | 'loop' | 'while' | 'sequence' | 'parallel' | 'compare' | 'not' | 'and' | 'or'
+  | 'if' | 'switch' | 'loop' | 'while' | 'sequence' | 'parallel' | 'compare' | 'not' | 'and' | 'or' | 'coalesce'
   | 'for'
   // Data - Pure functions (no exec pins)
-  | 'get' | 'set' | 'merge' | 'array_map' | 'array_filter' | 'array_concat'
+  | 'get' | 'set' | 'merge' | 'array_map' | 'array_filter' | 'array_concat' | 'array_length' | 'array_append' | 'array_dedup'
   | 'get_var' | 'set_var'
   | 'parse_json' | 'break_object' | 'system_datetime'
   | 'provider_catalog' | 'provider_models'

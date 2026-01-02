@@ -1,0 +1,65 @@
+/**
+ * Simple, delayed tooltips (used in palette and on-canvas nodes).
+ *
+ * Design goals:
+ * - no JS timers (CSS delay is enough and cheaper)
+ * - consistent across palette + graph
+ * - non-interactive (pointer-events: none) so it can't break drag/connect UX
+ */
+
+.af-tooltip-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.af-tooltip-wrap.af-tooltip-block {
+  display: block;
+}
+
+.af-tooltip-bubble {
+  position: absolute;
+  left: 50%;
+  top: -10px;
+  transform: translate(-50%, -100%) translateY(-4px);
+
+  min-width: 260px;
+  max-width: var(--af-tooltip-max-width, 520px);
+  padding: 10px 12px;
+  border-radius: 8px;
+
+  background: rgba(0, 0, 0, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.94);
+
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+  z-index: 9999;
+  pointer-events: none;
+
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  transition-delay: 0ms;
+}
+
+.af-tooltip-bubble::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: rgba(0, 0, 0, 0.92);
+}
+
+.af-tooltip-wrap:hover .af-tooltip-bubble {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, -100%) translateY(0);
+  transition-delay: var(--af-tooltip-delay, 1000ms);
+}
+
+

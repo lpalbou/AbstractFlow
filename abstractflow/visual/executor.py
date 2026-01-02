@@ -1262,6 +1262,18 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
 
     def _wrap_builtin(handler, data: Dict[str, Any]):
         literal_value = data.get("literalValue")
+        # Preserve pin order for builtins that need deterministic input selection (e.g. coalesce).
+        pin_order: list[str] = []
+        pins = data.get("inputs") if isinstance(data, dict) else None
+        if isinstance(pins, list):
+            for p in pins:
+                if not isinstance(p, dict):
+                    continue
+                if p.get("type") == "execution":
+                    continue
+                pid = p.get("id")
+                if isinstance(pid, str) and pid:
+                    pin_order.append(pid)
 
         def wrapped(input_data):
             if isinstance(input_data, dict):
@@ -1271,6 +1283,8 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
 
             if literal_value is not None:
                 inputs["_literalValue"] = literal_value
+            if pin_order:
+                inputs["_pin_order"] = list(pin_order)
 
             return handler(inputs)
 

@@ -231,6 +231,263 @@ def test_visual_array_concat_flattens_arrays_in_pin_order() -> None:
     assert result.get("result") == ["hello", "world", "!"]
 
 
+def test_visual_get_property_supports_default_value() -> None:
+    flow_id = "test-visual-get-default"
+    visual = VisualFlow(
+        id=flow_id,
+        name="get default",
+        entryNode="code",
+        nodes=[
+            VisualNode(
+                id="obj",
+                type=NodeType.LITERAL_JSON,
+                position=Position(x=0, y=0),
+                data={"literalValue": {}},
+            ),
+            VisualNode(
+                id="fallback",
+                type=NodeType.LITERAL_STRING,
+                position=Position(x=0, y=0),
+                data={"literalValue": "fallback"},
+            ),
+            VisualNode(
+                id="get",
+                type=NodeType.GET,
+                position=Position(x=0, y=0),
+                data={"pinDefaults": {"key": "missing"}},
+            ),
+            VisualNode(
+                id="code",
+                type=NodeType.CODE,
+                position=Position(x=0, y=0),
+                data={
+                    "code": "def transform(input):\n    return input.get('value')\n",
+                    "functionName": "transform",
+                },
+            ),
+        ],
+        edges=[
+            VisualEdge(id="d1", source="obj", sourceHandle="value", target="get", targetHandle="object"),
+            VisualEdge(id="d2", source="fallback", sourceHandle="value", target="get", targetHandle="default"),
+            VisualEdge(id="d3", source="get", sourceHandle="value", target="code", targetHandle="value"),
+        ],
+    )
+
+    runner = create_visual_runner(visual, flows={flow_id: visual})
+    result = runner.run({})
+    assert result.get("success") is True
+    assert result.get("result") == "fallback"
+
+
+def test_visual_coalesce_returns_first_non_none_in_pin_order() -> None:
+    flow_id = "test-visual-coalesce"
+    visual = VisualFlow(
+        id=flow_id,
+        name="coalesce",
+        entryNode="code",
+        nodes=[
+            VisualNode(
+                id="obj",
+                type=NodeType.LITERAL_JSON,
+                position=Position(x=0, y=0),
+                data={"literalValue": {}},
+            ),
+            VisualNode(
+                id="get",
+                type=NodeType.GET,
+                position=Position(x=0, y=0),
+                data={"pinDefaults": {"key": "missing"}},
+            ),
+            VisualNode(
+                id="fallback",
+                type=NodeType.LITERAL_STRING,
+                position=Position(x=0, y=0),
+                data={"literalValue": "fallback"},
+            ),
+            VisualNode(
+                id="coalesce",
+                type=NodeType.COALESCE,
+                position=Position(x=0, y=0),
+                data={},
+            ),
+            VisualNode(
+                id="code",
+                type=NodeType.CODE,
+                position=Position(x=0, y=0),
+                data={
+                    "code": "def transform(input):\n    return input.get('input')\n",
+                    "functionName": "transform",
+                },
+            ),
+        ],
+        edges=[
+            VisualEdge(id="d1", source="obj", sourceHandle="value", target="get", targetHandle="object"),
+            VisualEdge(id="d2", source="get", sourceHandle="value", target="coalesce", targetHandle="a"),
+            VisualEdge(id="d3", source="fallback", sourceHandle="value", target="coalesce", targetHandle="b"),
+            VisualEdge(id="d4", source="coalesce", sourceHandle="result", target="code", targetHandle="input"),
+        ],
+    )
+
+    runner = create_visual_runner(visual, flows={flow_id: visual})
+    result = runner.run({})
+    assert result.get("success") is True
+    assert result.get("result") == "fallback"
+
+
+def test_visual_string_template_renders_paths_and_filters() -> None:
+    flow_id = "test-visual-string-template"
+    visual = VisualFlow(
+        id=flow_id,
+        name="string template",
+        entryNode="code",
+        nodes=[
+            VisualNode(
+                id="tpl",
+                type=NodeType.LITERAL_STRING,
+                position=Position(x=0, y=0),
+                data={
+                    "literalValue": "Hello {{ user.name | trim }} age={{user.age}} tags={{tags|join(\", \")}} json={{user|json}} missing={{missing}}",
+                },
+            ),
+            VisualNode(
+                id="vars",
+                type=NodeType.LITERAL_JSON,
+                position=Position(x=0, y=0),
+                data={"literalValue": {"user": {"name": " Alice ", "age": 30}, "tags": ["a", "b"]}},
+            ),
+            VisualNode(
+                id="render",
+                type=NodeType.STRING_TEMPLATE,
+                position=Position(x=0, y=0),
+                data={},
+            ),
+            VisualNode(
+                id="code",
+                type=NodeType.CODE,
+                position=Position(x=0, y=0),
+                data={
+                    "code": "def transform(input):\n    return input.get('input')\n",
+                    "functionName": "transform",
+                },
+            ),
+        ],
+        edges=[
+            VisualEdge(id="d1", source="tpl", sourceHandle="value", target="render", targetHandle="template"),
+            VisualEdge(id="d2", source="vars", sourceHandle="value", target="render", targetHandle="vars"),
+            VisualEdge(id="d3", source="render", sourceHandle="result", target="code", targetHandle="input"),
+        ],
+    )
+
+    runner = create_visual_runner(visual, flows={flow_id: visual})
+    result = runner.run({})
+    assert result.get("success") is True
+    assert result.get("result") == 'Hello Alice age=30 tags=a, b json={"age": 30, "name": " Alice "} missing='
+
+
+def test_visual_array_helpers_length_append_dedup() -> None:
+    flow_id = "test-visual-array-helpers"
+    visual = VisualFlow(
+        id=flow_id,
+        name="array helpers",
+        entryNode="code",
+        nodes=[
+            VisualNode(
+                id="arr",
+                type=NodeType.LITERAL_ARRAY,
+                position=Position(x=0, y=0),
+                data={"literalValue": [1, 1, 2, 1, 3]},
+            ),
+            VisualNode(
+                id="dedup",
+                type=NodeType.ARRAY_DEDUP,
+                position=Position(x=0, y=0),
+                data={},
+            ),
+            VisualNode(
+                id="append_item",
+                type=NodeType.LITERAL_NUMBER,
+                position=Position(x=0, y=0),
+                data={"literalValue": 4},
+            ),
+            VisualNode(
+                id="append",
+                type=NodeType.ARRAY_APPEND,
+                position=Position(x=0, y=0),
+                data={},
+            ),
+            VisualNode(
+                id="len",
+                type=NodeType.ARRAY_LENGTH,
+                position=Position(x=0, y=0),
+                data={},
+            ),
+            VisualNode(
+                id="code",
+                type=NodeType.CODE,
+                position=Position(x=0, y=0),
+                data={
+                    "code": "def transform(input):\n    return {'dedup': input.get('dedup'), 'len': input.get('len')}\n",
+                    "functionName": "transform",
+                },
+            ),
+        ],
+        edges=[
+            VisualEdge(id="d1", source="arr", sourceHandle="value", target="dedup", targetHandle="array"),
+            VisualEdge(id="d2", source="dedup", sourceHandle="result", target="append", targetHandle="array"),
+            VisualEdge(id="d3", source="append_item", sourceHandle="value", target="append", targetHandle="item"),
+            VisualEdge(id="d4", source="append", sourceHandle="result", target="len", targetHandle="array"),
+            VisualEdge(id="d5", source="append", sourceHandle="result", target="code", targetHandle="dedup"),
+            VisualEdge(id="d6", source="len", sourceHandle="result", target="code", targetHandle="len"),
+        ],
+    )
+
+    runner = create_visual_runner(visual, flows={flow_id: visual})
+    result = runner.run({})
+    assert result.get("success") is True
+    assert result.get("result") == {"dedup": [1, 2, 3, 4.0], "len": 4}
+
+
+def test_visual_array_dedup_by_key_path() -> None:
+    flow_id = "test-visual-array-dedup-key"
+    visual = VisualFlow(
+        id=flow_id,
+        name="array dedup by key",
+        entryNode="code",
+        nodes=[
+            VisualNode(
+                id="arr",
+                type=NodeType.LITERAL_ARRAY,
+                position=Position(x=0, y=0),
+                data={"literalValue": [{"id": "a"}, {"id": "a"}, {"id": "b"}]},
+            ),
+            VisualNode(
+                id="dedup",
+                type=NodeType.ARRAY_DEDUP,
+                position=Position(x=0, y=0),
+                data={"pinDefaults": {"key": "id"}},
+            ),
+            VisualNode(
+                id="code",
+                type=NodeType.CODE,
+                position=Position(x=0, y=0),
+                data={
+                    "code": "def transform(input):\n    return input.get('input')\n",
+                    "functionName": "transform",
+                },
+            ),
+        ],
+        edges=[
+            VisualEdge(id="d1", source="arr", sourceHandle="value", target="dedup", targetHandle="array"),
+            VisualEdge(id="d2", source="dedup", sourceHandle="result", target="code", targetHandle="input"),
+        ],
+    )
+
+    runner = create_visual_runner(visual, flows={flow_id: visual})
+    result = runner.run({})
+    assert result.get("success") is True
+    assert result.get("result") == [{"id": "a"}, {"id": "b"}]
+
+
 def test_visual_data_pin_fanout_from_single_output() -> None:
     """Regression: a single data output can feed multiple downstream nodes (1:N)."""
     flow_id = "test-visual-data-fanout"

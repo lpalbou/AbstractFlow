@@ -4,6 +4,7 @@
 
 import { useState, useCallback, DragEvent } from 'react';
 import { NODE_CATEGORIES, NodeTemplate } from '../types/nodes';
+import { AfTooltip } from './AfTooltip';
 
 export function NodePalette() {
   const [expandedCategories, setExpandedCategories] = useState<
@@ -86,19 +87,20 @@ export function NodePalette() {
               {(expandedCategories[key] || searchTerm) && (
                 <div className="category-nodes">
                   {filteredNodes.map((template) => (
-                    <div
-                      key={template.type}
-                      className="palette-node"
-                      draggable
-                      onDragStart={(e) => onDragStart(e, template)}
-                    >
-                      <span
-                        className="node-icon"
-                        style={{ color: template.headerColor }}
-                        dangerouslySetInnerHTML={{ __html: template.icon }}
-                      />
-                      <span className="node-label">{template.label}</span>
-                    </div>
+                    <AfTooltip key={template.type} content={template.description} delayMs={1000} block>
+                      <div
+                        className="palette-node"
+                        draggable
+                        onDragStart={(e) => onDragStart(e, template)}
+                      >
+                        <span
+                          className="node-icon"
+                          style={{ color: template.headerColor }}
+                          dangerouslySetInnerHTML={{ __html: template.icon }}
+                        />
+                        <span className="node-label">{template.label}</span>
+                      </div>
+                    </AfTooltip>
                   ))}
                 </div>
               )}

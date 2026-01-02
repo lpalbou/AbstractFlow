@@ -19,6 +19,64 @@ def get_builtin_handler(node_type: str) -> Optional[Callable[[Any], Any]]:
     return BUILTIN_HANDLERS.get(node_type)
 
 
+def _path_tokens(path: str) -> list[Any]:
+    """Parse a dotted/bracket path into tokens.
+
+    Supported:
+    - `a.b.c`
+    - `a[0].b`
+
+    Returns tokens as str keys and int indices.
+    """
+    import re
+
+    p = str(path or "").strip()
+    if not p:
+        return []
+    token_re = re.compile(r"([^\.\[\]]+)|\[(\d+)\]")
+    out: list[Any] = []
+    for m in token_re.finditer(p):
+        key = m.group(1)
+        if key is not None:
+            k = key.strip()
+            if k:
+                out.append(k)
+            continue
+        idx = m.group(2)
+        if idx is not None:
+            try:
+                out.append(int(idx))
+            except Exception:
+                continue
+    return out
+
+
+def _get_path(value: Any, path: str) -> Any:
+    """Best-effort nested lookup (dict keys + list indices)."""
+    tokens = _path_tokens(path)
+    if not tokens:
+        return None
+    current: Any = value
+    for tok in tokens:
+        if isinstance(current, dict) and isinstance(tok, str):
+            current = current.get(tok)
+            continue
+        if isinstance(current, list):
+            idx: Optional[int] = None
+            if isinstance(tok, int):
+                idx = tok
+            elif isinstance(tok, str) and tok.isdigit():
+                idx = int(tok)
+            if idx is None:
+                return None
+            if idx < 0 or idx >= len(current):
+                return None
+            current = current[idx]
+            continue
+        return None
+    return current
+
+
 # Math operations
 def math_add(inputs: Dict[str, Any]) -> float:
     """Add two numbers."""
@@ -168,6 +226,69 @@ def string_length(inputs: Dict[str, Any]) -> int:
     return len(str(inputs.get("text", "")))
 
 
+def string_template(inputs: Dict[str, Any]) -> str:
+    """Render a template with placeholders like `{{path.to.value}}`.
+
+    Supported filters:
+    - `| json`            -> json.dumps(value)
+    - `| join(", ")`      -> join array values with delimiter
+    - `| trim` / `| lower` / `| upper`
+    """
+    import re
+
+    template = str(inputs.get("template", "") or "")
+    vars_raw = inputs.get("vars")
+    vars_obj = vars_raw if isinstance(vars_raw, dict) else {}
+
+    pat = re.compile(r"\{\{\s*(.*?)\s*\}\}")
+
+    def _apply_filters(value: Any, filters: list[str]) -> Any:
+        cur = value
+        for f in filters:
+            f = f.strip()
+            if not f:
+                continue
+            if f == "json":
+                cur = json.dumps(cur, ensure_ascii=False, sort_keys=True)
+                continue
+            if f.startswith("join"):
+                m = re.match(r"join\((.*)\)$", f)
+                delim = ", "
+                if m:
+                    raw = m.group(1).strip()
+                    if (raw.startswith('"') and raw.endswith('"')) or (raw.startswith("'") and raw.endswith("'")):
+                        raw = raw[1:-1]
+                    delim = raw
+                if isinstance(cur, list):
+                    cur = delim.join("" if x is None else str(x) for x in cur)
+                else:
+                    cur = "" if cur is None else str(cur)
+                continue
+            if f == "trim":
+                cur = ("" if cur is None else str(cur)).strip()
+                continue
+            if f == "lower":
+                cur = ("" if cur is None else str(cur)).lower()
+                continue
+            if f == "upper":
+                cur = ("" if cur is None else str(cur)).upper()
+                continue
+            # Unknown filters are ignored (best-effort, stable).
+        return cur
+
+    def _render_expr(expr: str) -> str:
+        parts = [p.strip() for p in str(expr or "").split("|")]
+        path = parts[0] if parts else ""
+        filters = parts[1:] if len(parts) > 1 else []
+        value = _get_path(vars_obj, path)
+        if value is None:
+            return ""
+        value = _apply_filters(value, filters)
+        return "" if value is None else str(value)
+
+    return pat.sub(lambda m: _render_expr(m.group(1)), template)
+
+
 # Control flow helpers (these return decision values, not execution control)
 def control_compare(inputs: Dict[str, Any]) -> bool:
     """Compare two values."""
@@ -180,13 +301,25 @@ def control_compare(inputs: Dict[str, Any]) -> bool:
     if op == "!=":
         return a != b
     if op == "<":
-        return a < b
+        try:
+            return a < b
+        except Exception:
+            return False
     if op == "<=":
-        return a <= b
+        try:
+            return a <= b
+        except Exception:
+            return False
     if op == ">":
-        return a > b
+        try:
+            return a > b
+        except Exception:
+            return False
     if op == ">=":
-        return a >= b
+        try:
+            return a >= b
+        except Exception:
+            return False
     raise ValueError(f"Unknown comparison operator: {op}")
 
 
@@ -205,23 +338,41 @@ def control_or(inputs: Dict[str, Any]) -> bool:
     return bool(inputs.get("a", False)) or bool(inputs.get("b", False))
 
 
+def control_coalesce(inputs: Dict[str, Any]) -> Any:
+    """Return the first non-None input in pin order.
+
+    Pin order is injected by the visual executor as `_pin_order` based on the node's
+    input pin list, so selection is deterministic and matches the visual layout.
+    """
+    order = inputs.get("_pin_order")
+    pin_order: list[str] = []
+    if isinstance(order, list):
+        for x in order:
+            if isinstance(x, str) and x:
+                pin_order.append(x)
+    if not pin_order:
+        pin_order = ["a", "b"]
+
+    for pid in pin_order:
+        if pid not in inputs:
+            continue
+        v = inputs.get(pid)
+        if v is not None:
+            return v
+    return None
+
+
 # Data operations
 def data_get(inputs: Dict[str, Any]) -> Any:
     """Get property from object."""
     obj = inputs.get("object", {})
     key = str(inputs.get("key", ""))
+    default = inputs.get("default")
 
-    # Support dot notation
-    parts = key.split(".")
-    current: Any = obj
-    for part in parts:
-        if isinstance(current, dict):
-            current = current.get(part)
-        elif isinstance(current, list) and part.isdigit():
-            current = current[int(part)]
-        else:
-            return None
-    return current
+    value = _get_path(obj, key)
+    if value is None:
+        return {"value": default}
+    return {"value": value}
 
 
 def data_set(inputs: Dict[str, Any]) -> Dict[str, Any]:
@@ -278,6 +429,71 @@ def data_array_filter(inputs: Dict[str, Any]) -> List[Any]:
         elif item == value:
             result.append(item)
     return result
+
+
+def data_array_length(inputs: Dict[str, Any]) -> int:
+    """Return array length (0 if not an array)."""
+    items = inputs.get("array")
+    if isinstance(items, list):
+        return len(items)
+    if isinstance(items, tuple):
+        return len(list(items))
+    return 0
+
+
+def data_array_append(inputs: Dict[str, Any]) -> List[Any]:
+    """Append an item to an array (returns a new array)."""
+    items = inputs.get("array")
+    item = inputs.get("item")
+    out: list[Any]
+    if isinstance(items, list):
+        out = list(items)
+    elif isinstance(items, tuple):
+        out = list(items)
+    elif items is None:
+        out = []
+    else:
+        out = [items]
+    out.append(item)
+    return out
+
+
+def data_array_dedup(inputs: Dict[str, Any]) -> List[Any]:
+    """Stable-order dedup for arrays.
+
+    If `key` is provided (string path), dedup objects by that path value.
+    """
+    items = inputs.get("array")
+    if not isinstance(items, list):
+        if isinstance(items, tuple):
+            items = list(items)
+        else:
+            return []
+
+    key = inputs.get("key")
+    key_path = str(key or "").strip()
+
+    def _fingerprint(v: Any) -> str:
+        if v is None or isinstance(v, (bool, int, float, str)):
+            return f"{type(v).__name__}:{v}"
+        try:
+            return json.dumps(v, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+        except Exception:
+            return str(v)
+
+    seen: set[str] = set()
+    out: list[Any] = []
+    for item in items:
+        if key_path:
+            k = _get_path(item, key_path)
+            fp = _fingerprint(k) if k is not None else _fingerprint(item)
+        else:
+            fp = _fingerprint(item)
+        if fp in seen:
+            continue
+        seen.add(fp)
+        out.append(item)
+    return out
 
 
 def system_datetime(_: Dict[str, Any]) -> Dict[str, Any]:
@@ -468,6 +684,7 @@ BUILTIN_HANDLERS: Dict[str, Callable[[Dict[str, Any]], Any]] = {
     "split": string_split,
     "join": string_join,
     "format": string_format,
+    "string_template": string_template,
     "uppercase": string_uppercase,
     "lowercase": string_lowercase,
     "trim": string_trim,
@@ -478,12 +695,16 @@ BUILTIN_HANDLERS: Dict[str, Callable[[Dict[str, Any]], Any]] = {
     "not": control_not,
     "and": control_and,
     "or": control_or,
+    "coalesce": control_coalesce,
     # Data
     "get": data_get,
     "set": data_set,
     "merge": data_merge,
     "array_map": data_array_map,
     "array_filter": data_array_filter,
+    "array_length": data_array_length,
+    "array_append": data_array_append,
+    "array_dedup": data_array_dedup,
     "parse_json": data_parse_json,
     "system_datetime": system_datetime,
     # Literals

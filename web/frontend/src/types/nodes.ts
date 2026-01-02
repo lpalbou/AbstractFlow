@@ -10,6 +10,7 @@ export interface NodeTemplate {
   type: NodeType;
   icon: string;
   label: string;
+  description: string;
   headerColor: string;
   inputs: Pin[];
   outputs: Pin[];
@@ -30,6 +31,7 @@ const EVENT_NODES: NodeTemplate[] = [
     type: 'on_flow_start',
     icon: '&#x1F3C1;', // Checkered flag
     label: 'On Flow Start',
+    description: 'Entry point for a workflow run. Emits exec-out and any configured inputs as outputs.',
     headerColor: '#C0392B', // Red for events (like UE4)
     inputs: [], // No inputs - this is the entry point
     outputs: [
@@ -41,6 +43,7 @@ const EVENT_NODES: NodeTemplate[] = [
     type: 'on_flow_end',
     icon: '&#x23F9;', // Stop button
     label: 'On Flow End',
+    description: 'Terminal node. End execution and expose the flow result via upstream data wiring.',
     headerColor: '#C0392B',
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
@@ -52,6 +55,7 @@ const EVENT_NODES: NodeTemplate[] = [
     type: 'on_user_request',
     icon: '&#x1F4AC;', // Speech bubble
     label: 'On User Request',
+    description: 'Entry point for a run started from a user prompt. Outputs the user message and initial context.',
     headerColor: '#C0392B', // Red for events (like UE4)
     inputs: [], // No inputs - this is the entry point
     outputs: [
@@ -65,6 +69,7 @@ const EVENT_NODES: NodeTemplate[] = [
     type: 'on_agent_message',
     icon: '&#x1F4E8;', // Incoming envelope
     label: 'On Agent Message',
+    description: 'Entry point triggered by an agent-to-agent message (broadcast or direct).',
     headerColor: '#C0392B',
     inputs: [], // No inputs - triggered by external event
     outputs: [
@@ -79,6 +84,7 @@ const EVENT_NODES: NodeTemplate[] = [
     type: 'on_schedule',
     icon: '&#x23F0;', // Alarm clock
     label: 'On Schedule',
+    description: 'Entry point triggered by a schedule (timestamp or recurring). Outputs the trigger time.',
     headerColor: '#C0392B',
     inputs: [
       // Configuration pins (Blueprint-style): configurable via inline quick access when unconnected.
@@ -95,6 +101,7 @@ const EVENT_NODES: NodeTemplate[] = [
     type: 'on_event',
     icon: '&#x1F4E3;', // Megaphone
     label: 'On Event',
+    description: 'Entry point triggered by a durable custom event. Outputs event metadata + payload.',
     headerColor: '#C0392B', // Red for events (like UE4)
     inputs: [
       // Configuration pins (Blueprint-style): configurable via inline quick access when unconnected.
@@ -111,6 +118,7 @@ const EVENT_NODES: NodeTemplate[] = [
     type: 'wait_event',
     icon: '&#x1F514;', // Bell
     label: 'Wait Event',
+    description: 'Pause the workflow until an event matching event_key is received, then resume with event_data.',
     headerColor: '#C0392B',
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
@@ -126,6 +134,7 @@ const EVENT_NODES: NodeTemplate[] = [
     type: 'emit_event',
     icon: '&#x1F4E3;', // Megaphone
     label: 'Emit Event',
+    description: 'Emit a durable event (scope/session) with payload. Useful for cross-node or cross-agent signaling.',
     headerColor: '#C0392B',
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
@@ -150,6 +159,7 @@ const CORE_NODES: NodeTemplate[] = [
     type: 'subflow',
     icon: '&#x1F4E6;', // Package
     label: 'Subflow',
+    description: 'Run another saved workflow (subflow) and return its output object.',
     headerColor: '#00CCCC',
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
@@ -165,6 +175,7 @@ const CORE_NODES: NodeTemplate[] = [
     type: 'agent',
     icon: '&#x1F916;', // Robot
     label: 'Agent',
+    description: 'Run an agent (ReAct) that can call tools. Outputs a structured result and scratchpad.',
     headerColor: '#4488FF',
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
@@ -187,6 +198,7 @@ const CORE_NODES: NodeTemplate[] = [
     type: 'llm_call',
     icon: '&#x1F4AD;', // Thought bubble
     label: 'LLM Call',
+    description: 'Single LLM call (no autonomous loop). Can optionally request tool calls via the tools allowlist.',
     headerColor: '#3498DB', // Blue - AI
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
@@ -207,6 +219,7 @@ const CORE_NODES: NodeTemplate[] = [
     type: 'tool_calls',
     icon: '&#x1F528;', // Hammer
     label: 'Tool Calls',
+    description: 'Execute one or more tool calls via the runtime. Outputs per-call results and a success boolean.',
     headerColor: '#16A085', // Teal - IO/tools
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
@@ -224,6 +237,7 @@ const CORE_NODES: NodeTemplate[] = [
     type: 'ask_user',
     icon: '&#x2753;', // Question mark
     label: 'Ask User',
+    description: 'Pause execution and ask the user for input (free text or choices).',
     headerColor: '#9B59B6', // Purple - human interaction
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
@@ -240,6 +254,7 @@ const CORE_NODES: NodeTemplate[] = [
     type: 'answer_user',
     icon: '&#x1F4AC;', // Speech bubble
     label: 'Answer User',
+    description: 'Display a message to the user (UI output).',
     headerColor: '#9B59B6', // Purple - human interaction
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
@@ -255,6 +270,7 @@ const CORE_NODES: NodeTemplate[] = [
     type: 'code',
     icon: '&#x1F40D;', // Python snake
     label: 'Python Code',
+    description: 'Run a Python transform function `transform(input)` (portable only when a Python host is available).',
     headerColor: '#9B59B6',
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
@@ -270,22 +286,23 @@ const CORE_NODES: NodeTemplate[] = [
 
 // Math nodes - Pure functions (no execution pins, just data in/out)
 const MATH_NODES: NodeTemplate[] = [
-  { type: 'add', icon: '+', label: 'Add', headerColor: '#27AE60', inputs: [{ id: 'a', label: 'a', type: 'number' }, { id: 'b', label: 'b', type: 'number' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'math' },
-  { type: 'subtract', icon: '-', label: 'Subtract', headerColor: '#27AE60', inputs: [{ id: 'a', label: 'a', type: 'number' }, { id: 'b', label: 'b', type: 'number' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'math' },
-  { type: 'multiply', icon: '&#xD7;', label: 'Multiply', headerColor: '#27AE60', inputs: [{ id: 'a', label: 'a', type: 'number' }, { id: 'b', label: 'b', type: 'number' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'math' },
-  { type: 'divide', icon: '&#xF7;', label: 'Divide', headerColor: '#27AE60', inputs: [{ id: 'a', label: 'a', type: 'number' }, { id: 'b', label: 'b', type: 'number' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'math' },
-  { type: 'abs', icon: '|x|', label: 'Absolute', headerColor: '#27AE60', inputs: [{ id: 'value', label: 'value', type: 'number' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'math' },
-  { type: 'round', icon: '&#x223C;', label: 'Round', headerColor: '#27AE60', inputs: [{ id: 'value', label: 'value', type: 'number' }, { id: 'decimals', label: 'decimals', type: 'number' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'math' },
+  { type: 'add', icon: '+', label: 'Add', description: 'Add two numbers.', headerColor: '#27AE60', inputs: [{ id: 'a', label: 'a', type: 'number' }, { id: 'b', label: 'b', type: 'number' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'math' },
+  { type: 'subtract', icon: '-', label: 'Subtract', description: 'Compute a - b.', headerColor: '#27AE60', inputs: [{ id: 'a', label: 'a', type: 'number' }, { id: 'b', label: 'b', type: 'number' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'math' },
+  { type: 'multiply', icon: '&#xD7;', label: 'Multiply', description: 'Multiply two numbers.', headerColor: '#27AE60', inputs: [{ id: 'a', label: 'a', type: 'number' }, { id: 'b', label: 'b', type: 'number' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'math' },
+  { type: 'divide', icon: '&#xF7;', label: 'Divide', description: 'Compute a / b (error on division by zero).', headerColor: '#27AE60', inputs: [{ id: 'a', label: 'a', type: 'number' }, { id: 'b', label: 'b', type: 'number' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'math' },
+  { type: 'abs', icon: '|x|', label: 'Absolute', description: 'Absolute value of a number.', headerColor: '#27AE60', inputs: [{ id: 'value', label: 'value', type: 'number' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'math' },
+  { type: 'round', icon: '&#x223C;', label: 'Round', description: 'Round a number to N decimals.', headerColor: '#27AE60', inputs: [{ id: 'value', label: 'value', type: 'number' }, { id: 'decimals', label: 'decimals', type: 'number' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'math' },
 ];
 
 // String nodes - Pure functions (no execution pins, just data in/out)
 const STRING_NODES: NodeTemplate[] = [
-  { type: 'concat', icon: '&#x2795;', label: 'Concat', headerColor: '#E74C3C', inputs: [{ id: 'a', label: 'a', type: 'string' }, { id: 'b', label: 'b', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
-  { type: 'split', icon: '&#x2702;', label: 'Split', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }, { id: 'delimiter', label: 'delimiter', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'string' },
-  { type: 'join', icon: '&#x1F517;', label: 'Join', headerColor: '#E74C3C', inputs: [{ id: 'items', label: 'items', type: 'array' }, { id: 'delimiter', label: 'delimiter', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
-  { type: 'uppercase', icon: 'AA', label: 'Uppercase', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
-  { type: 'lowercase', icon: 'aa', label: 'Lowercase', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
-  { type: 'length', icon: '#', label: 'Length', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'string' },
+  { type: 'concat', icon: '&#x2795;', label: 'Concat', description: 'Concatenate two strings.', headerColor: '#E74C3C', inputs: [{ id: 'a', label: 'a', type: 'string' }, { id: 'b', label: 'b', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
+  { type: 'split', icon: '&#x2702;', label: 'Split', description: 'Split text by a delimiter into an array (with trimming/drop-empty defaults).', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }, { id: 'delimiter', label: 'delimiter', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'string' },
+  { type: 'join', icon: '&#x1F517;', label: 'Join', description: 'Join array items into a string using a delimiter.', headerColor: '#E74C3C', inputs: [{ id: 'items', label: 'items', type: 'array' }, { id: 'delimiter', label: 'delimiter', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
+  { type: 'string_template', icon: '&#x1F9FE;', label: 'String Template', description: 'Render a template like \"Hello {{user.name}}\" using a vars object (supports filters).', headerColor: '#E74C3C', inputs: [{ id: 'template', label: 'template', type: 'string' }, { id: 'vars', label: 'vars', type: 'object' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
+  { type: 'uppercase', icon: 'AA', label: 'Uppercase', description: 'Convert text to UPPERCASE.', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
+  { type: 'lowercase', icon: 'aa', label: 'Lowercase', description: 'Convert text to lowercase.', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
+  { type: 'length', icon: '#', label: 'Length', description: 'String length (number of characters).', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'string' },
 ];
 
 // Control flow nodes
@@ -293,13 +310,14 @@ const STRING_NODES: NodeTemplate[] = [
 // Compare and logic gates (NOT, AND, OR) are pure functions (no execution pins)
 const CONTROL_NODES: NodeTemplate[] = [
   // Execution nodes - control the flow
-  { type: 'if', icon: '&#x2753;', label: 'If/Else', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'condition', label: 'condition', type: 'boolean' }], outputs: [{ id: 'true', label: 'true', type: 'execution' }, { id: 'false', label: 'false', type: 'execution' }], category: 'control' },
-  { type: 'while', icon: '&#x267B;', label: 'While', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'condition', label: 'condition', type: 'boolean' }], outputs: [{ id: 'loop', label: 'loop', type: 'execution' }, { id: 'done', label: 'done', type: 'execution' }, { id: 'index', label: 'index', type: 'number' }], category: 'control' },
-  { type: 'for', icon: '&#x1F522;', label: 'For', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'start', label: 'start', type: 'number' }, { id: 'end', label: 'end', type: 'number' }, { id: 'step', label: 'step', type: 'number' }], outputs: [{ id: 'loop', label: 'loop', type: 'execution' }, { id: 'done', label: 'done', type: 'execution' }, { id: 'i', label: 'i', type: 'number' }, { id: 'index', label: 'index', type: 'number' }], category: 'control' },
+  { type: 'if', icon: '&#x2753;', label: 'If/Else', description: 'Branch execution based on a boolean condition.', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'condition', label: 'condition', type: 'boolean' }], outputs: [{ id: 'true', label: 'true', type: 'execution' }, { id: 'false', label: 'false', type: 'execution' }], category: 'control' },
+  { type: 'while', icon: '&#x267B;', label: 'While', description: 'Loop while condition is true. Outputs a 0-based iteration index.', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'condition', label: 'condition', type: 'boolean' }], outputs: [{ id: 'loop', label: 'loop', type: 'execution' }, { id: 'done', label: 'done', type: 'execution' }, { id: 'index', label: 'index', type: 'number' }], category: 'control' },
+  { type: 'for', icon: '&#x1F522;', label: 'For', description: 'Numeric loop from start to end with step. Outputs i and a 0-based index.', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'start', label: 'start', type: 'number' }, { id: 'end', label: 'end', type: 'number' }, { id: 'step', label: 'step', type: 'number' }], outputs: [{ id: 'loop', label: 'loop', type: 'execution' }, { id: 'done', label: 'done', type: 'execution' }, { id: 'i', label: 'i', type: 'number' }, { id: 'index', label: 'index', type: 'number' }], category: 'control' },
 	  {
 	    type: 'switch',
 	    icon: '&#x1F500;', // Shuffle
 	    label: 'Switch',
+      description: 'Branch execution by matching a string value to configured cases (default branch always exists).',
 	    headerColor: '#F39C12',
 	    inputs: [
 	      { id: 'exec-in', label: '', type: 'execution' },
@@ -314,6 +332,7 @@ const CONTROL_NODES: NodeTemplate[] = [
     type: 'sequence',
     icon: '&#x21E5;', // Rightwards arrow to bar (sequence-ish)
     label: 'Sequence',
+    description: 'Run multiple branches in order (Then 0, Then 1, ...).',
     headerColor: '#F39C12',
     inputs: [{ id: 'exec-in', label: '', type: 'execution' }],
     outputs: [
@@ -326,6 +345,7 @@ const CONTROL_NODES: NodeTemplate[] = [
     type: 'parallel',
     icon: '&#x2225;', // Parallel lines
     label: 'Parallel',
+    description: 'Run multiple branches concurrently and emit Completed when all finish.',
     headerColor: '#F39C12',
     inputs: [{ id: 'exec-in', label: '', type: 'execution' }],
     outputs: [
@@ -335,12 +355,13 @@ const CONTROL_NODES: NodeTemplate[] = [
     ],
     category: 'control',
   },
-  { type: 'loop', icon: '&#x1F501;', label: 'ForEach', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'items', label: 'items', type: 'array' }], outputs: [{ id: 'loop', label: 'loop', type: 'execution' }, { id: 'done', label: 'done', type: 'execution' }, { id: 'item', label: 'item', type: 'any' }, { id: 'index', label: 'index', type: 'number' }], category: 'control' },
+  { type: 'loop', icon: '&#x1F501;', label: 'ForEach', description: 'Iterate over an array. Outputs current item and 0-based index.', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'items', label: 'items', type: 'array' }], outputs: [{ id: 'loop', label: 'loop', type: 'execution' }, { id: 'done', label: 'done', type: 'execution' }, { id: 'item', label: 'item', type: 'any' }, { id: 'index', label: 'index', type: 'number' }], category: 'control' },
   // Pure functions - just produce data
   {
     type: 'compare',
     icon: '=?',
     label: 'Compare',
+    description: 'Compare a and b using operator op (==, !=, <, <=, >, >=).',
     headerColor: '#F39C12',
     inputs: [
       { id: 'a', label: 'a', type: 'any' },
@@ -350,24 +371,29 @@ const CONTROL_NODES: NodeTemplate[] = [
     outputs: [{ id: 'result', label: 'result', type: 'boolean' }],
     category: 'control',
   },
-  { type: 'not', icon: '!', label: 'NOT', headerColor: '#F39C12', inputs: [{ id: 'value', label: 'value', type: 'boolean' }], outputs: [{ id: 'result', label: 'result', type: 'boolean' }], category: 'control' },
-  { type: 'and', icon: '&&', label: 'AND', headerColor: '#F39C12', inputs: [{ id: 'a', label: 'a', type: 'boolean' }, { id: 'b', label: 'b', type: 'boolean' }], outputs: [{ id: 'result', label: 'result', type: 'boolean' }], category: 'control' },
-  { type: 'or', icon: '||', label: 'OR', headerColor: '#F39C12', inputs: [{ id: 'a', label: 'a', type: 'boolean' }, { id: 'b', label: 'b', type: 'boolean' }], outputs: [{ id: 'result', label: 'result', type: 'boolean' }], category: 'control' },
+  { type: 'not', icon: '!', label: 'NOT', description: 'Logical NOT.', headerColor: '#F39C12', inputs: [{ id: 'value', label: 'value', type: 'boolean' }], outputs: [{ id: 'result', label: 'result', type: 'boolean' }], category: 'control' },
+  { type: 'and', icon: '&&', label: 'AND', description: 'Logical AND.', headerColor: '#F39C12', inputs: [{ id: 'a', label: 'a', type: 'boolean' }, { id: 'b', label: 'b', type: 'boolean' }], outputs: [{ id: 'result', label: 'result', type: 'boolean' }], category: 'control' },
+  { type: 'or', icon: '||', label: 'OR', description: 'Logical OR.', headerColor: '#F39C12', inputs: [{ id: 'a', label: 'a', type: 'boolean' }, { id: 'b', label: 'b', type: 'boolean' }], outputs: [{ id: 'result', label: 'result', type: 'boolean' }], category: 'control' },
 ];
 
 // Data nodes - Pure functions (no execution pins, just data in/out)
 const DATA_NODES: NodeTemplate[] = [
-  { type: 'get', icon: '&#x1F4E5;', label: 'Get Property', headerColor: '#3498DB', inputs: [{ id: 'object', label: 'object', type: 'object' }, { id: 'key', label: 'key', type: 'string' }], outputs: [{ id: 'value', label: 'value', type: 'any' }], category: 'data' },
-  { type: 'set', icon: '&#x1F4E4;', label: 'Set Property', headerColor: '#3498DB', inputs: [{ id: 'object', label: 'object', type: 'object' }, { id: 'key', label: 'key', type: 'string' }, { id: 'value', label: 'value', type: 'any' }], outputs: [{ id: 'result', label: 'result', type: 'object' }], category: 'data' },
-  { type: 'merge', icon: '&#x1F517;', label: 'Merge Objects', headerColor: '#3498DB', inputs: [{ id: 'a', label: 'a', type: 'object' }, { id: 'b', label: 'b', type: 'object' }], outputs: [{ id: 'result', label: 'result', type: 'object' }], category: 'data' },
-  { type: 'array_map', icon: '&#x1F5FA;', label: 'Map Array', headerColor: '#3498DB', inputs: [{ id: 'items', label: 'items', type: 'array' }, { id: 'key', label: 'key', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'data' },
-  { type: 'array_filter', icon: '&#x1F50D;', label: 'Filter Array', headerColor: '#3498DB', inputs: [{ id: 'items', label: 'items', type: 'array' }, { id: 'key', label: 'key', type: 'string' }, { id: 'value', label: 'value', type: 'any' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'data' },
-  { type: 'array_concat', icon: '&#x2795;', label: 'Array Concat', headerColor: '#3498DB', inputs: [{ id: 'a', label: 'a', type: 'array' }, { id: 'b', label: 'b', type: 'array' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'data' },
-  { type: 'parse_json', icon: '&#x1F5C2;', label: 'Parse JSON', headerColor: '#3498DB', inputs: [{ id: 'text', label: 'text', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'object' }], category: 'data' },
+  { type: 'coalesce', icon: '&#x21C4;', label: 'Coalesce', description: 'Return the first non-null value (A, then B, ...).', headerColor: '#3498DB', inputs: [{ id: 'a', label: 'a', type: 'any' }, { id: 'b', label: 'b', type: 'any' }], outputs: [{ id: 'result', label: 'result', type: 'any' }], category: 'data' },
+  { type: 'get', icon: '&#x1F4E5;', label: 'Get Property', description: 'Safely read a nested path from an object (dot/bracket path) with an optional default.', headerColor: '#3498DB', inputs: [{ id: 'object', label: 'object', type: 'object' }, { id: 'key', label: 'key', type: 'string' }, { id: 'default', label: 'default', type: 'any' }], outputs: [{ id: 'value', label: 'value', type: 'any' }], category: 'data' },
+  { type: 'set', icon: '&#x1F4E4;', label: 'Set Property', description: 'Set a nested property on an object (returns a new object).', headerColor: '#3498DB', inputs: [{ id: 'object', label: 'object', type: 'object' }, { id: 'key', label: 'key', type: 'string' }, { id: 'value', label: 'value', type: 'any' }], outputs: [{ id: 'result', label: 'result', type: 'object' }], category: 'data' },
+  { type: 'merge', icon: '&#x1F517;', label: 'Merge Objects', description: 'Shallow merge two objects (b overrides a).', headerColor: '#3498DB', inputs: [{ id: 'a', label: 'a', type: 'object' }, { id: 'b', label: 'b', type: 'object' }], outputs: [{ id: 'result', label: 'result', type: 'object' }], category: 'data' },
+  { type: 'array_length', icon: '#', label: 'Array Length', description: 'Return the length of an array.', headerColor: '#3498DB', inputs: [{ id: 'array', label: 'array', type: 'array' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'data' },
+  { type: 'array_append', icon: '&#x2795;', label: 'Array Append', description: 'Append an item to an array (returns a new array).', headerColor: '#3498DB', inputs: [{ id: 'array', label: 'array', type: 'array' }, { id: 'item', label: 'item', type: 'any' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'data' },
+  { type: 'array_dedup', icon: '&#x1F5C3;', label: 'Array Dedup', description: 'Stable-order dedup for arrays (optionally by key path).', headerColor: '#3498DB', inputs: [{ id: 'array', label: 'array', type: 'array' }, { id: 'key', label: 'key', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'data' },
+  { type: 'array_map', icon: '&#x1F5FA;', label: 'Map Array', description: 'Map array items by extracting a field (key) from objects.', headerColor: '#3498DB', inputs: [{ id: 'items', label: 'items', type: 'array' }, { id: 'key', label: 'key', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'data' },
+  { type: 'array_filter', icon: '&#x1F50D;', label: 'Filter Array', description: 'Filter array items where item[key] == value (or item == value).', headerColor: '#3498DB', inputs: [{ id: 'items', label: 'items', type: 'array' }, { id: 'key', label: 'key', type: 'string' }, { id: 'value', label: 'value', type: 'any' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'data' },
+  { type: 'array_concat', icon: '&#x2795;', label: 'Array Concat', description: 'Concatenate arrays (a then b).', headerColor: '#3498DB', inputs: [{ id: 'a', label: 'a', type: 'array' }, { id: 'b', label: 'b', type: 'array' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'data' },
+  { type: 'parse_json', icon: '&#x1F5C2;', label: 'Parse JSON', description: 'Parse JSON (or JSON-ish) text into an object/array suitable for downstream nodes.', headerColor: '#3498DB', inputs: [{ id: 'text', label: 'text', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'object' }], category: 'data' },
   {
     type: 'system_datetime',
     icon: '&#x1F552;', // Clock
     label: 'System Date/Time',
+    description: 'Return current time metadata (ISO string, timezone, UTC offset, locale).',
     headerColor: '#3498DB',
     inputs: [],
     outputs: [
@@ -382,6 +408,7 @@ const DATA_NODES: NodeTemplate[] = [
     type: 'break_object',
     icon: '&#x1F9E9;', // Puzzle piece
     label: 'Break Object',
+    description: 'Expose selected fields of an object as individual output pins (configured paths).',
     headerColor: '#3498DB',
     inputs: [{ id: 'object', label: 'object', type: 'object' }],
     outputs: [], // Dynamic pins based on selected paths
@@ -391,6 +418,7 @@ const DATA_NODES: NodeTemplate[] = [
     type: 'provider_catalog',
     icon: '&#x1F4E6;', // Package-ish (catalog)
     label: 'Provider Catalog',
+    description: 'List available LLM providers (optionally filtered by an allowlist).',
     headerColor: '#3498DB',
     inputs: [{ id: 'allowed_providers', label: 'allowed_providers', type: 'array' }],
     outputs: [{ id: 'providers', label: 'providers', type: 'array' }],
@@ -400,6 +428,7 @@ const DATA_NODES: NodeTemplate[] = [
     type: 'provider_models',
     icon: '&#x1F4DA;', // Books
     label: 'Provider Models',
+    description: 'List models for a provider (optionally filtered by an allowlist).',
     headerColor: '#3498DB',
     inputs: [
       { id: 'provider', label: 'provider', type: 'string' },
@@ -419,6 +448,7 @@ const VARIABLE_NODES: NodeTemplate[] = [
     type: 'var_decl',
     icon: '𝑥',
     label: 'Variable',
+    description: 'Declare a workflow-scope typed variable (name/type/default) and output its current value.',
     headerColor: '#16A085', // Teal
     inputs: [],
     outputs: [
@@ -431,6 +461,7 @@ const VARIABLE_NODES: NodeTemplate[] = [
     type: 'bool_var',
     icon: '&#x1F7E5;', // Red square (boolean-ish)
     label: 'Bool Variable',
+    description: 'Declare a workflow-scope boolean variable (name + default).',
     headerColor: '#16A085', // Teal (variables)
     inputs: [],
     outputs: [
@@ -443,6 +474,7 @@ const VARIABLE_NODES: NodeTemplate[] = [
     type: 'get_var',
     icon: '&#x1F4E5;', // Reuse "inbox tray" as a getter-ish icon
     label: 'Get Variable',
+    description: 'Read a variable from workflow state by name.',
     headerColor: '#16A085', // Teal
     inputs: [{ id: 'name', label: 'name', type: 'string' }],
     outputs: [{ id: 'value', label: 'value', type: 'any' }],
@@ -452,6 +484,7 @@ const VARIABLE_NODES: NodeTemplate[] = [
     type: 'set_var',
     icon: '&#x1F4E4;', // Reuse "outbox tray" as a setter-ish icon
     label: 'Set Variable',
+    description: 'Write a variable into workflow state by name (updates run vars).',
     headerColor: '#16A085',
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
@@ -473,6 +506,7 @@ const LITERAL_NODES: NodeTemplate[] = [
     type: 'literal_string',
     icon: '"',
     label: 'String',
+    description: 'String literal value.',
     headerColor: '#FF00FF', // Magenta - matches string pin color
     inputs: [],
     outputs: [{ id: 'value', label: 'value', type: 'string' }],
@@ -482,6 +516,7 @@ const LITERAL_NODES: NodeTemplate[] = [
     type: 'literal_number',
     icon: '#',
     label: 'Number',
+    description: 'Number literal value.',
     headerColor: '#00FF00', // Green - matches number pin color
     inputs: [],
     outputs: [{ id: 'value', label: 'value', type: 'number' }],
@@ -491,6 +526,7 @@ const LITERAL_NODES: NodeTemplate[] = [
     type: 'literal_boolean',
     icon: '?',
     label: 'Boolean',
+    description: 'Boolean literal value.',
     headerColor: '#FF0000', // Red - matches boolean pin color
     inputs: [],
     outputs: [{ id: 'value', label: 'value', type: 'boolean' }],
@@ -500,6 +536,7 @@ const LITERAL_NODES: NodeTemplate[] = [
     type: 'literal_json',
     icon: '{}',
     label: 'JSON',
+    description: 'Object (JSON) literal value.',
     headerColor: '#00FFFF', // Cyan - matches object pin color
     inputs: [],
     outputs: [{ id: 'value', label: 'value', type: 'object' }],
@@ -509,6 +546,7 @@ const LITERAL_NODES: NodeTemplate[] = [
     type: 'literal_array',
     icon: '[]',
     label: 'Array',
+    description: 'Array literal value.',
     headerColor: '#FF8800', // Orange - matches array pin color
     inputs: [],
     outputs: [{ id: 'value', label: 'value', type: 'array' }],
@@ -518,6 +556,7 @@ const LITERAL_NODES: NodeTemplate[] = [
     type: 'tools_allowlist',
     icon: '&#x1F9F0;', // Toolbox
     label: 'Tools Allowlist',
+    description: 'Select an allowlist of tool names once and reuse it across LLM/Agent/Tool Calls nodes.',
     headerColor: '#FF8800', // Orange - array output
     inputs: [],
     outputs: [{ id: 'tools', label: 'tools', type: 'array' }],
@@ -532,6 +571,7 @@ const EFFECT_NODES: NodeTemplate[] = [
     type: 'wait_until',
     icon: '&#x23F3;', // Hourglass
     label: 'Delay',
+    description: 'Pause execution for a duration (seconds), then continue.',
     headerColor: '#F39C12', // Orange - timing
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
@@ -546,6 +586,7 @@ const EFFECT_NODES: NodeTemplate[] = [
     type: 'read_file',
     icon: '&#x1F4C4;', // Page facing up
     label: 'Read File',
+    description: 'Read a file from disk and output its content.',
     headerColor: '#16A085', // Teal - IO
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
@@ -561,6 +602,7 @@ const EFFECT_NODES: NodeTemplate[] = [
     type: 'write_file',
     icon: '&#x1F4BE;', // Floppy disk
     label: 'Write File',
+    description: 'Write content to a file on disk (creates parent folders if needed).',
     headerColor: '#16A085', // Teal - IO
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
@@ -578,6 +620,7 @@ const EFFECT_NODES: NodeTemplate[] = [
     type: 'memory_note',
     icon: '&#x1F4DD;', // Memo
     label: 'Memorize',
+    description: 'Store a durable memory note with optional tags/sources and a scope (run/session/global).',
     headerColor: '#2ECC71', // Green - memory
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
@@ -596,6 +639,7 @@ const EFFECT_NODES: NodeTemplate[] = [
     type: 'memory_query',
     icon: '&#x1F50D;', // Magnifying glass
     label: 'Recall',
+    description: 'Query memory by text/tags and return structured results plus a rendered summary.',
     headerColor: '#2ECC71', // Green - memory
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
@@ -617,6 +661,7 @@ const EFFECT_NODES: NodeTemplate[] = [
     type: 'memory_rehydrate',
     icon: '&#x1F4AC;', // Speech balloon
     label: 'Recall into context',
+    description: 'Insert recalled message spans into the active context so future LLM/Agent calls can “see” them.',
     headerColor: '#2ECC71', // Green - memory
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
@@ -682,14 +727,19 @@ export const NODE_CATEGORIES: Record<string, NodeCategory> = {
   },
 };
 
+const ALL_NODE_TEMPLATES: NodeTemplate[] = Object.values(NODE_CATEGORIES).flatMap((cat) => cat.nodes);
+const NODE_TEMPLATE_BY_TYPE: Map<NodeType, NodeTemplate> = new Map(
+  ALL_NODE_TEMPLATES.map((t) => [t.type, t])
+);
+
 // Get all node templates flattened
 export function getAllNodeTemplates(): NodeTemplate[] {
-  return Object.values(NODE_CATEGORIES).flatMap(cat => cat.nodes);
+  return ALL_NODE_TEMPLATES;
 }
 
 // Get template by type
 export function getNodeTemplate(type: NodeType): NodeTemplate | undefined {
-  return getAllNodeTemplates().find(t => t.type === type);
+  return NODE_TEMPLATE_BY_TYPE.get(type);
 }
 
 // Create default node data from template

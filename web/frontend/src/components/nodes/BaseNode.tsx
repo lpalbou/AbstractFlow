@@ -18,6 +18,8 @@ import { useTools } from '../../hooks/useTools';
 import { collectCustomEventNames } from '../../utils/events';
 import AfSelect from '../inputs/AfSelect';
 import AfMultiSelect from '../inputs/AfMultiSelect';
+import { getNodeTemplate } from '../../types/nodes';
+import { AfTooltip } from '../AfTooltip';
 
 const OnEventNameInline = memo(function OnEventNameInline({
   nodeId,
@@ -319,6 +321,16 @@ export const BaseNode = memo(function BaseNode({
   data,
   selected,
 }: NodeProps<FlowNodeData>) {
+  const nodeDescription = useMemo(() => {
+    try {
+      const t = getNodeTemplate(data.nodeType);
+      const raw = t?.description;
+      return typeof raw === 'string' ? raw.trim() : '';
+    } catch {
+      return '';
+    }
+  }, [data.nodeType]);
+
   const { executingNodeId, disconnectPin, updateNodeData, recentNodeIds, loopProgressByNodeId } = useFlowStore();
   const allNodes = useFlowStore((s) => s.nodes);
   const isExecuting = executingNodeId === id;
@@ -914,14 +926,15 @@ export const BaseNode = memo(function BaseNode({
   };
 
   return (
-    <div
-      className={clsx(
-        'flow-node',
-        selected && 'selected',
-        isExecuting && 'executing',
-        isRecent && !isExecuting && 'recent'
-      )}
-    >
+    <AfTooltip content={nodeDescription} delayMs={1000}>
+      <div
+        className={clsx(
+          'flow-node',
+          selected && 'selected',
+          isExecuting && 'executing',
+          isRecent && !isExecuting && 'recent'
+        )}
+      >
       {/* Header with execution pins */}
       <div
         className="node-header"
@@ -1645,7 +1658,8 @@ export const BaseNode = memo(function BaseNode({
           ))}
         </div>
       </div>
-    </div>
+      </div>
+    </AfTooltip>
   );
 });
 

@@ -121,28 +121,33 @@
     },
     {
       "id": "node-6",
-      "type": "code",
+      "type": "concat",
       "position": { "x": 352.0, "y": 64.0 },
       "data": {
-        "nodeType": "code",
+        "nodeType": "concat",
         "label": "Build Dossier Task",
-        "icon": "&#x1F40D;",
-        "headerColor": "#9B59B6",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "input", "label": "input", "type": "any" },
-          { "id": "request", "label": "request", "type": "string" },
-          { "id": "clarifications", "label": "clarifications", "type": "string" },
-          { "id": "max_web_search", "label": "max_web_search", "type": "number" },
-          { "id": "max_fetch_url", "label": "max_fetch_url", "type": "number" }
+          { "id": "a", "label": "a", "type": "string" },
+          { "id": "b", "label": "b", "type": "number" },
+          { "id": "c", "label": "c", "type": "string" },
+          { "id": "d", "label": "d", "type": "number" },
+          { "id": "e", "label": "e", "type": "string" },
+          { "id": "f", "label": "f", "type": "string" },
+          { "id": "g", "label": "g", "type": "string" },
+          { "id": "h", "label": "h", "type": "string" }
         ],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "output", "label": "output", "type": "any" }
+          { "id": "result", "label": "result", "type": "string" }
         ],
-        "code": "def _to_int(v, default):\n    try:\n        if v is None:\n            return default\n        if isinstance(v, bool):\n            return default\n        if isinstance(v, (int, float)) and float(v) <= 0:\n            return default\n        return int(float(v))\n    except Exception:\n        return default\n\n\ndef transform(input):\n    d = input if isinstance(input, dict) else {}\n    request = str(d.get('request') or '').strip()\n    clar = str(d.get('clarifications') or '').strip()\n    max_web = _to_int(d.get('max_web_search'), 3)\n    max_fetch = _to_int(d.get('max_fetch_url'), 6)\n\n    parts = []\n    parts.append(\n        \"You are the DEEP RESEARCHER. Produce a research DOSSIER with citations, sources, and explicit uncertainty.\\n\\n\"\n        \"Output format (Markdown):\\n\"\n        \"1) Executive summary\\n2) Key findings (with citations)\\n3) Evidence table (source -> claim)\\n4) Risks / unknowns\\n5) Suggested next steps\"\n    )\n    parts.append(f\"Budgets:\\n- max_web_search: {max_web}\\n- max_fetch_url: {max_fetch}\")\n    if clar:\n        parts.append(\"Clarifications (may be empty):\\n\" + clar)\n    parts.append(\"USER REQUEST:\\n\" + request)\n    return \"\\n\\n\".join(parts)\n",
-        "codeBody": "def _to_int(v, default):\n    try:\n        if v is None:\n            return default\n        if isinstance(v, bool):\n            return default\n        if isinstance(v, (int, float)) and float(v) <= 0:\n            return default\n        return int(float(v))\n    except Exception:\n        return default\n\n\ndef transform(input):\n    d = input if isinstance(input, dict) else {}\n    request = str(d.get('request') or '').strip()\n    clar = str(d.get('clarifications') or '').strip()\n    max_web = _to_int(d.get('max_web_search'), 3)\n    max_fetch = _to_int(d.get('max_fetch_url'), 6)\n\n    parts = []\n    parts.append(\n        \"You are the DEEP RESEARCHER. Produce a research DOSSIER with citations, sources, and explicit uncertainty.\\n\\n\"\n        \"Output format (Markdown):\\n\"\n        \"1) Executive summary\\n2) Key findings (with citations)\\n3) Evidence table (source -> claim)\\n4) Risks / unknowns\\n5) Suggested next steps\"\n    )\n    parts.append(f\"Budgets:\\n- max_web_search: {max_web}\\n- max_fetch_url: {max_fetch}\")\n    if clar:\n        parts.append(\"Clarifications (may be empty):\\n\" + clar)\n    parts.append(\"USER REQUEST:\\n\" + request)\n    return \"\\n\\n\".join(parts)\n",
-        "functionName": "transform"
+        "concatConfig": { "separator": "" },
+        "pinDefaults": {
+          "a": "You are the DEEP RESEARCHER. Produce a research DOSSIER with citations, sources, and explicit uncertainty.\\n\\nOutput format (Markdown):\\n1) Executive summary\\n2) Key findings (with citations)\\n3) Evidence table (source -> claim)\\n4) Risks / unknowns\\n5) Suggested next steps\\n\\nBudgets:\\n- max_web_search: ",
+          "c": "\\n- max_fetch_url: ",
+          "e": "\\n\\nClarifications (may be empty):\\n",
+          "g": "\\n\\nUSER REQUEST:\\n"
+        }
       },
       "label": null,
       "icon": null,
@@ -307,17 +312,16 @@
     { "id": "edge-7", "source": "node-1", "sourceHandle": "request", "target": "node-4", "targetHandle": "b", "animated": false },
     { "id": "edge-8", "source": "node-1", "sourceHandle": "skip_clarifications", "target": "node-4", "targetHandle": "d", "animated": false },
 
-    { "id": "edge-9", "source": "node-5", "sourceHandle": "exec-out", "target": "node-6", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-10", "source": "node-1", "sourceHandle": "request", "target": "node-6", "targetHandle": "request", "animated": false },
-    { "id": "edge-11", "source": "node-5", "sourceHandle": "response", "target": "node-6", "targetHandle": "clarifications", "animated": false },
-    { "id": "edge-12", "source": "node-1", "sourceHandle": "max_web_search", "target": "node-6", "targetHandle": "max_web_search", "animated": false },
-    { "id": "edge-13", "source": "node-1", "sourceHandle": "max_fetch_url", "target": "node-6", "targetHandle": "max_fetch_url", "animated": false },
+    { "id": "edge-10", "source": "node-1", "sourceHandle": "max_web_search", "target": "node-6", "targetHandle": "b", "animated": false },
+    { "id": "edge-11", "source": "node-1", "sourceHandle": "max_fetch_url", "target": "node-6", "targetHandle": "d", "animated": false },
+    { "id": "edge-12", "source": "node-5", "sourceHandle": "response", "target": "node-6", "targetHandle": "f", "animated": false },
+    { "id": "edge-13", "source": "node-1", "sourceHandle": "request", "target": "node-6", "targetHandle": "h", "animated": false },
 
-    { "id": "edge-14-exec", "source": "node-6", "sourceHandle": "exec-out", "target": "node-7", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-14-exec", "source": "node-5", "sourceHandle": "exec-out", "target": "node-7", "targetHandle": "exec-in", "animated": true },
     { "id": "edge-14", "source": "node-1", "sourceHandle": "provider", "target": "node-7", "targetHandle": "provider", "animated": false },
     { "id": "edge-15", "source": "node-1", "sourceHandle": "model", "target": "node-7", "targetHandle": "model", "animated": false },
     { "id": "edge-15b", "source": "node-1", "sourceHandle": "max_iterations", "target": "node-7", "targetHandle": "max_iterations", "animated": false },
-    { "id": "edge-16", "source": "node-6", "sourceHandle": "output", "target": "node-7", "targetHandle": "task", "animated": false },
+    { "id": "edge-16", "source": "node-6", "sourceHandle": "result", "target": "node-7", "targetHandle": "task", "animated": false },
     { "id": "edge-17", "source": "node-3", "sourceHandle": "tools", "target": "node-7", "targetHandle": "tools", "animated": false },
 
     { "id": "edge-18", "source": "node-7", "sourceHandle": "exec-out", "target": "node-10", "targetHandle": "exec-in", "animated": true },

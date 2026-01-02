@@ -6,6 +6,7 @@ import App from './App';
 import './styles/index.css';
 import './styles/nodes.css';
 import './styles/palette.css';
+import './styles/tooltip.css';
 
 const queryClient = new QueryClient({
   defaultOptions: {
