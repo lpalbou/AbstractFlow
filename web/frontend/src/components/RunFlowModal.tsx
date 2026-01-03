@@ -1413,7 +1413,7 @@ export function RunFlowModal({
                         ) : null}
                       </div>
 
-                      {(outputPreview || memorizeContentPreview || (selectedStep?.nodeType === 'on_flow_start' && onFlowStartParams)) ? (
+                      {(outputPreview || memorizeContentPreview || recallIntoContextPreview || (selectedStep?.nodeType === 'on_flow_start' && onFlowStartParams)) ? (
                         <div className="run-output-preview">
                           {selectedStep?.nodeType === 'on_flow_start' && onFlowStartParams ? (
                             <div className="run-output-section">

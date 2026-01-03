@@ -581,7 +581,7 @@
           }
         ],
         "pinDefaults": {
-          "query": "who person user",
+          "query": "laurent",
           "tags_mode": "any"
         }
       },
@@ -906,5 +906,5 @@
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-02T19:06:00.895671",
-  "updated_at": "2026-01-02T23:25:39.634004"
+  "updated_at": "2026-01-03T00:45:09.401614"
 }
