@@ -74,7 +74,7 @@ export function ProviderModelsPanel({ node, edges, updateNodeData }: ProviderMod
 
   return (
     <div className="property-section">
-      <label className="property-label">Provider Models</label>
+      <label className="property-label">Models Catalog</label>
 
       <div className="property-group">
         <label className="property-sublabel">Provider</label>

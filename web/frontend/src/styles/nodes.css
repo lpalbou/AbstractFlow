@@ -251,6 +251,23 @@
   margin-bottom: 8px;
 }
 
+.node-code-edit-row {
+  display: flex;
+  justify-content: center;
+  margin: 6px 0 10px;
+}
+
+.node-code-edit-button {
+  padding: 6px 10px;
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.node-code-edit-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+}
+
 .node-config-row {
   display: flex;
   align-items: center;

@@ -3033,7 +3033,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         </div>
       )}
 
-      {/* Provider Models (catalog helper) */}
+      {/* Models Catalog (catalog helper) */}
       {data.nodeType === 'provider_models' && (
         <ProviderModelsPanel node={node} edges={edges} updateNodeData={updateNodeData} />
       )}

@@ -81,6 +81,21 @@ const EVENT_NODES: NodeTemplate[] = [
     category: 'events',
   },
   {
+    type: 'system_datetime',
+    icon: '&#x1F552;', // Clock
+    label: 'System Date/Time',
+    description: 'Return current time metadata (ISO string, timezone, UTC offset, locale).',
+    headerColor: '#3498DB',
+    inputs: [],
+    outputs: [
+      { id: 'iso', label: 'iso', type: 'string' },
+      { id: 'timezone', label: 'timezone', type: 'string' },
+      { id: 'utc_offset_minutes', label: 'utc_offset_minutes', type: 'number' },
+      { id: 'locale', label: 'locale', type: 'string' },
+    ],
+    category: 'events',
+  },
+  {
     type: 'on_schedule',
     icon: '&#x23F0;', // Alarm clock
     label: 'On Schedule',
@@ -410,21 +425,6 @@ const DATA_NODES: NodeTemplate[] = [
   { type: 'array_concat', icon: '&#x2795;', label: 'Array Concat', description: 'Concatenate arrays (a then b).', headerColor: '#3498DB', inputs: [{ id: 'a', label: 'a', type: 'array' }, { id: 'b', label: 'b', type: 'array' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'data' },
   { type: 'parse_json', icon: '&#x1F5C2;', label: 'Parse JSON', description: 'Parse JSON (or JSON-ish) text into an object/array suitable for downstream nodes.', headerColor: '#3498DB', inputs: [{ id: 'text', label: 'text', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'object' }], category: 'data' },
   {
-    type: 'system_datetime',
-    icon: '&#x1F552;', // Clock
-    label: 'System Date/Time',
-    description: 'Return current time metadata (ISO string, timezone, UTC offset, locale).',
-    headerColor: '#3498DB',
-    inputs: [],
-    outputs: [
-      { id: 'iso', label: 'iso', type: 'string' },
-      { id: 'timezone', label: 'timezone', type: 'string' },
-      { id: 'utc_offset_minutes', label: 'utc_offset_minutes', type: 'number' },
-      { id: 'locale', label: 'locale', type: 'string' },
-    ],
-    category: 'data',
-  },
-  {
     type: 'break_object',
     icon: '&#x1F9E9;', // Puzzle piece
     label: 'Break Object',
@@ -432,32 +432,6 @@ const DATA_NODES: NodeTemplate[] = [
     headerColor: '#3498DB',
     inputs: [{ id: 'object', label: 'object', type: 'object' }],
     outputs: [], // Dynamic pins based on selected paths
-    category: 'data',
-  },
-  {
-    type: 'provider_catalog',
-    icon: '&#x1F4E6;', // Package-ish (catalog)
-    label: 'Provider Catalog',
-    description: 'List available LLM providers (optionally filtered by an allowlist).',
-    headerColor: '#3498DB',
-    inputs: [{ id: 'allowed_providers', label: 'allowed_providers', type: 'array' }],
-    outputs: [{ id: 'providers', label: 'providers', type: 'array' }],
-    category: 'data',
-  },
-  {
-    type: 'provider_models',
-    icon: '&#x1F4DA;', // Books
-    label: 'Provider Models',
-    description: 'List models for a provider (optionally filtered by an allowlist).',
-    headerColor: '#3498DB',
-    inputs: [
-      { id: 'provider', label: 'provider', type: 'provider' },
-      { id: 'allowed_models', label: 'allowed_models', type: 'array' },
-    ],
-    outputs: [
-      { id: 'provider', label: 'provider', type: 'provider' },
-      { id: 'models', label: 'models', type: 'array' },
-    ],
     category: 'data',
   },
 ];
@@ -604,6 +578,32 @@ const LITERAL_NODES: NodeTemplate[] = [
     headerColor: '#FF8800', // Orange - matches array pin color
     inputs: [],
     outputs: [{ id: 'value', label: 'value', type: 'array' }],
+    category: 'literals',
+  },
+  {
+    type: 'provider_catalog',
+    icon: '&#x1F4E6;', // Package-ish (catalog)
+    label: 'Provider Catalog',
+    description: 'List available LLM providers (optionally filtered by an allowlist).',
+    headerColor: '#3498DB',
+    inputs: [{ id: 'allowed_providers', label: 'allowed_providers', type: 'array' }],
+    outputs: [{ id: 'providers', label: 'providers', type: 'array' }],
+    category: 'literals',
+  },
+  {
+    type: 'provider_models',
+    icon: '&#x1F4DA;', // Books
+    label: 'Models Catalog',
+    description: 'List models for a provider (optionally filtered by an allowlist).',
+    headerColor: '#3498DB',
+    inputs: [
+      { id: 'provider', label: 'provider', type: 'provider' },
+      { id: 'allowed_models', label: 'allowed_models', type: 'array' },
+    ],
+    outputs: [
+      { id: 'provider', label: 'provider', type: 'provider' },
+      { id: 'models', label: 'models', type: 'array' },
+    ],
     category: 'literals',
   },
   {

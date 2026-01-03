@@ -6,7 +6,7 @@
  * - Empty shapes = not connected, Filled = connected
  */
 
-import { memo, type MouseEvent, type ReactNode, useCallback, useEffect, useMemo } from 'react';
+import { memo, type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { Handle, Position, NodeProps, useEdges, useUpdateNodeInternals } from 'reactflow';
 import { clsx } from 'clsx';
 import type { FlowNodeData, PinType } from '../../types/flow';
@@ -16,10 +16,12 @@ import { useFlowStore } from '../../hooks/useFlow';
 import { useModels, useProviders } from '../../hooks/useProviders';
 import { useTools } from '../../hooks/useTools';
 import { collectCustomEventNames } from '../../utils/events';
+import { extractFunctionBody, generatePythonTransformCode } from '../../utils/codegen';
 import AfSelect from '../inputs/AfSelect';
 import AfMultiSelect from '../inputs/AfMultiSelect';
 import { getNodeTemplate } from '../../types/nodes';
 import { AfTooltip } from '../AfTooltip';
+import { CodeEditorModal } from '../CodeEditorModal';
 
 const OnEventNameInline = memo(function OnEventNameInline({
   nodeId,
@@ -343,6 +345,8 @@ export const BaseNode = memo(function BaseNode({
   const isTriggerNode = isEntryNodeType(data.nodeType);
   const pinDefaults = data.pinDefaults || {};
   const isVarNode = data.nodeType === 'get_var' || data.nodeType === 'set_var';
+  const isCodeNode = data.nodeType === 'code';
+  const [showCodeEditor, setShowCodeEditor] = useState(false);
   const loopProgress = (data.nodeType === 'loop' || data.nodeType === 'for')
     ? (loopProgressByNodeId ? loopProgressByNodeId[id] : undefined)
     : undefined;
@@ -483,6 +487,13 @@ export const BaseNode = memo(function BaseNode({
     return true;
   });
   const outputData = data.outputs.filter((p) => p.type !== 'execution');
+
+  const codeParams = useMemo(() => data.inputs.filter((p) => p.type !== 'execution'), [data.inputs]);
+  const currentCodeBody = useMemo(() => {
+    if (typeof data.codeBody === 'string') return data.codeBody;
+    if (typeof data.code === 'string') return extractFunctionBody(data.code, data.functionName || 'transform') ?? '';
+    return '';
+  }, [data.code, data.codeBody, data.functionName]);
 
   const isLlmNode = data.nodeType === 'llm_call';
   const isAgentNode = data.nodeType === 'agent';
@@ -1344,6 +1355,23 @@ export const BaseNode = memo(function BaseNode({
           </div>
         )}
 
+        {isCodeNode && (
+          <div className="node-code-edit-row nodrag">
+            <button
+              type="button"
+              className="node-code-edit-button nodrag"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowCodeEditor(true);
+              }}
+              title="Edit Python code"
+            >
+              ✍️ Edit Code
+            </button>
+          </div>
+        )}
+
         {/* Data input pins */}
         <div className="pins-left" style={{ ['--pin-label-width' as any]: inputLabelWidth }}>
           {inputData.map((pin) => (
@@ -1822,6 +1850,24 @@ export const BaseNode = memo(function BaseNode({
         </div>
       </div>
       </div>
+
+      {isCodeNode && (
+        <CodeEditorModal
+          isOpen={showCodeEditor}
+          title="Python Code"
+          body={currentCodeBody}
+          params={codeParams.map((p) => p.id)}
+          onClose={() => setShowCodeEditor(false)}
+          onSave={(nextBody) => {
+            updateNodeData(id, {
+              codeBody: nextBody,
+              code: generatePythonTransformCode(data.inputs, nextBody),
+              functionName: 'transform',
+            });
+            setShowCodeEditor(false);
+          }}
+        />
+      )}
     </AfTooltip>
   );
 });
