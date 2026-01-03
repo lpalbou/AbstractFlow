@@ -22,6 +22,7 @@ export interface WaitingInfo {
 export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions) {
   const wsRef = useRef<WebSocket | null>(null);
   const wsFlowIdRef = useRef<string>(flowId);
+  const pingTimerRef = useRef<number | null>(null);
   const [connected, setConnected] = useState(false);
   const [isWaiting, setIsWaiting] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -275,6 +276,10 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
       wsRef.current.onmessage = null;
       wsRef.current.close();
       wsRef.current = null;
+      if (pingTimerRef.current) {
+        window.clearInterval(pingTimerRef.current);
+        pingTimerRef.current = null;
+      }
       setConnected(false);
     }
 
@@ -297,11 +302,28 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
         if (wsRef.current !== socket) return;
         setConnected(true);
         setError(null);
+
+        // Keepalive: some dev proxies (and some networks) will drop idle WS connections.
+        // We already ignore `pong` events in UI state, so this is purely transport health.
+        if (pingTimerRef.current) window.clearInterval(pingTimerRef.current);
+        pingTimerRef.current = window.setInterval(() => {
+          try {
+            if (wsRef.current?.readyState === WebSocket.OPEN) {
+              wsRef.current.send(JSON.stringify({ type: 'ping' }));
+            }
+          } catch {
+            // ignore
+          }
+        }, 15000);
       };
 
       socket.onclose = () => {
         if (wsRef.current !== socket) return;
         setConnected(false);
+        if (pingTimerRef.current) {
+          window.clearInterval(pingTimerRef.current);
+          pingTimerRef.current = null;
+        }
       };
 
       socket.onerror = () => {
@@ -336,6 +358,10 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
       wsRef.current.onmessage = null;
       wsRef.current.close();
       wsRef.current = null;
+    }
+    if (pingTimerRef.current) {
+      window.clearInterval(pingTimerRef.current);
+      pingTimerRef.current = null;
     }
     setConnected(false);
   }, []);

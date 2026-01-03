@@ -113,6 +113,8 @@ def test_visual_llm_call_node_outputs_include_result_object_after_effect_complet
         "content": "pong",
         "tool_calls": [{"name": "read_file", "arguments": {"file_path": "/tmp/x"}, "call_id": "1"}],
         "usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2},
+        "gen_time": 12.3,
+        "ttft_ms": 4.5,
         "trace_id": "trace-1",
         "metadata": {},
     }
@@ -131,6 +133,7 @@ def test_visual_llm_call_node_outputs_include_result_object_after_effect_complet
     assert isinstance(out, dict)
     assert out.get("response") == "pong"
     assert out.get("result") == raw_result
+    assert out.get("gen_time") == 12.3
+    assert out.get("ttft_ms") == 4.5
     assert out.get("raw") == raw_result
-
 

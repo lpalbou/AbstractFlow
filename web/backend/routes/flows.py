@@ -18,7 +18,9 @@ from ..models import (
     FlowRunRequest,
     FlowRunResult,
 )
-from ..services.executor import execute_visual_flow, visual_to_flow
+from ..services.executor import create_visual_runner, visual_to_flow
+from ..services.runtime_stores import get_runtime_stores
+from abstractflow.visual.workspace_scoped_tools import WorkspaceScope, build_scoped_tool_executor
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/flows", tags=["flows"])
@@ -139,18 +141,55 @@ async def run_flow(flow_id: str, request: FlowRunRequest):
     visual_flow = _flows[flow_id]
 
     try:
-        result = execute_visual_flow(visual_flow, request.input_data, flows=_flows)
+        input_data = dict(request.input_data or {})
+        scope = WorkspaceScope.from_input_data(input_data)
+        tool_executor = build_scoped_tool_executor(scope=scope) if scope is not None else None
+
+        run_store, ledger_store, artifact_store = get_runtime_stores()
+        runner = create_visual_runner(
+            visual_flow,
+            flows=_flows,
+            run_store=run_store,
+            ledger_store=ledger_store,
+            artifact_store=artifact_store,
+            tool_executor=tool_executor,
+        )
+        result = runner.run(input_data)
+
+        if isinstance(result, dict) and result.get("waiting"):
+            state = runner.get_state()
+            wait = state.waiting if state else None
+            payload = {
+                "success": False,
+                "waiting": True,
+                "error": "Flow is waiting for input. Use WebSocket (/api/ws/{flow_id}) to resume.",
+                "run_id": runner.run_id,
+                "wait_key": wait.wait_key if wait else None,
+                "prompt": wait.prompt if wait else None,
+                "choices": list(wait.choices) if wait and isinstance(wait.choices, list) else [],
+                "allow_free_text": bool(wait.allow_free_text) if wait else None,
+            }
+        elif isinstance(result, dict):
+            payload = {
+                "success": bool(result.get("success", True)),
+                "waiting": False,
+                "result": result.get("result"),
+                "error": result.get("error"),
+                "run_id": runner.run_id,
+            }
+        else:
+            payload = {"success": True, "waiting": False, "result": result, "run_id": runner.run_id}
 
         return FlowRunResult(
-            success=bool(result.get("success", False)),
-            result=result.get("result"),
-            error=result.get("error"),
-            run_id=result.get("run_id"),
-            waiting=bool(result.get("waiting", False)),
-            wait_key=result.get("wait_key"),
-            prompt=result.get("prompt"),
-            choices=result.get("choices"),
-            allow_free_text=result.get("allow_free_text"),
+            success=bool(payload.get("success", False)),
+            result=payload.get("result"),
+            error=payload.get("error"),
+            run_id=payload.get("run_id"),
+            waiting=bool(payload.get("waiting", False)),
+            wait_key=payload.get("wait_key"),
+            prompt=payload.get("prompt"),
+            choices=payload.get("choices"),
+            allow_free_text=payload.get("allow_free_text"),
         )
     except Exception as e:
         return FlowRunResult(

@@ -22,7 +22,8 @@
           { "id": "max_iterations", "label": "max_iterations", "type": "number" },
           { "id": "skip_clarifications", "label": "skip_clarifications", "type": "boolean" },
           { "id": "max_web_search", "label": "max_web_search", "type": "number" },
-          { "id": "max_fetch_url", "label": "max_fetch_url", "type": "number" }
+          { "id": "max_fetch_url", "label": "max_fetch_url", "type": "number" },
+          { "id": "workspace_root", "label": "workspace_root", "type": "string" }
         ]
       },
       "label": null,

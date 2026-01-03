@@ -1174,6 +1174,17 @@ export function RunFlowModal({
           <h3>▶ Run Flow</h3>
           <div className="run-modal-header-right">
             <span className="run-modal-flow-name">{flowName || 'Untitled Flow'}</span>
+            {rootRunId ? (
+              <button
+                type="button"
+                className="run-modal-runid"
+                onClick={() => copyToClipboard(rootRunId)}
+                title={`Click to copy run id: ${rootRunId}`}
+                aria-label="Copy run id"
+              >
+                run:{rootRunId}
+              </button>
+            ) : null}
             <button
               type="button"
               className="run-minimize-btn"

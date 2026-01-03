@@ -1,0 +1,2644 @@
+{
+  "id": "4050e15e",
+  "name": "benchmark",
+  "description": "",
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": {
+        "x": -368.0,
+        "y": -16.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-2",
+      "type": "llm_call",
+      "position": {
+        "x": 224.0,
+        "y": -608.0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "LLM Call",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "effectConfig": {
+          "include_context": false,
+          "provider": "lmstudio",
+          "model": "gemma-3n-e2b-it-mlx"
+        },
+        "pinDefaults": {
+          "prompt": "write a scifi story in 10 sentences"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-3",
+      "type": "sequence",
+      "position": {
+        "x": -160.0,
+        "y": -16.0
+      },
+      "data": {
+        "nodeType": "sequence",
+        "label": "Sequence",
+        "icon": "&#x21E5;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "then:0",
+            "label": "Then 0",
+            "type": "execution"
+          },
+          {
+            "id": "then:1",
+            "label": "Then 1",
+            "type": "execution"
+          },
+          {
+            "id": "then:2",
+            "label": "Then 2",
+            "type": "execution"
+          },
+          {
+            "id": "then:3",
+            "label": "Then 3",
+            "type": "execution"
+          },
+          {
+            "id": "then:4",
+            "label": "Then 4",
+            "type": "execution"
+          },
+          {
+            "id": "then:5",
+            "label": "Then 5",
+            "type": "execution"
+          },
+          {
+            "id": "then:6",
+            "label": "Then 6",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-5",
+      "type": "llm_call",
+      "position": {
+        "x": 224.0,
+        "y": 624.0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "LLM Call",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "effectConfig": {
+          "include_context": false,
+          "provider": "lmstudio",
+          "model": "nvidia/nemotron-3-nano"
+        },
+        "pinDefaults": {
+          "prompt": "write a scifi story in 10 sentences"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-6",
+      "type": "llm_call",
+      "position": {
+        "x": 592.0,
+        "y": -288.0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "LLM Call",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "effectConfig": {
+          "include_context": false,
+          "provider": "lmstudio",
+          "model": "google/gemma-3n-e4b"
+        },
+        "pinDefaults": {
+          "prompt": "write a scifi story in 10 sentences"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-7",
+      "type": "llm_call",
+      "position": {
+        "x": 656.0,
+        "y": 64.0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "LLM Call",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "effectConfig": {
+          "include_context": false,
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-4b-2507"
+        },
+        "pinDefaults": {
+          "prompt": "write a scifi story in 10 sentences"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-8",
+      "type": "llm_call",
+      "position": {
+        "x": 528.0,
+        "y": 384.0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "LLM Call",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "effectConfig": {
+          "include_context": false,
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-coder-30b"
+        },
+        "pinDefaults": {
+          "prompt": "write a scifi story in 10 sentences"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-9",
+      "type": "llm_call",
+      "position": {
+        "x": -192.0,
+        "y": 688.0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "LLM Call",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "effectConfig": {
+          "include_context": false,
+          "provider": "lmstudio",
+          "model": "zai-org/glm-4.6v-flash"
+        },
+        "pinDefaults": {
+          "prompt": "write a scifi story in 10 sentences"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-10",
+      "type": "llm_call",
+      "position": {
+        "x": -176.0,
+        "y": -832.0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "LLM Call",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "effectConfig": {
+          "include_context": false,
+          "provider": "lmstudio",
+          "model": "gemma-3-1b-it"
+        },
+        "pinDefaults": {
+          "prompt": "write a scifi story in 10 sentences"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-11",
+      "type": "break_object",
+      "position": {
+        "x": 160.0,
+        "y": -1040.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "content",
+            "label": "content",
+            "type": "string"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "usage.output_tokens",
+            "label": "output_tokens",
+            "type": "number"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "content",
+            "model",
+            "usage.output_tokens"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-12",
+      "type": "split",
+      "position": {
+        "x": 352.0,
+        "y": -1024.0
+      },
+      "data": {
+        "nodeType": "split",
+        "label": "Split",
+        "icon": "&#x2702;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "text",
+            "label": "text",
+            "type": "string"
+          },
+          {
+            "id": "delimiter",
+            "label": "delimiter",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "delimiter": "."
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-14",
+      "type": "array_length",
+      "position": {
+        "x": 624.0,
+        "y": -1008.0
+      },
+      "data": {
+        "nodeType": "array_length",
+        "label": "Array Length",
+        "icon": "#",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "array",
+            "label": "array",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "number"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-15",
+      "type": "answer_user",
+      "position": {
+        "x": 832.0,
+        "y": -1008.0
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-16",
+      "type": "concat",
+      "position": {
+        "x": 608.0,
+        "y": -1232.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          },
+          {
+            "id": "d",
+            "label": "d",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "b": " has ",
+          "d": " sentences"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-17",
+      "type": "break_object",
+      "position": {
+        "x": 816.0,
+        "y": -784.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "content",
+            "label": "content",
+            "type": "string"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "usage.output_tokens",
+            "label": "output_tokens",
+            "type": "number"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "content",
+            "model",
+            "usage.output_tokens"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-18",
+      "type": "split",
+      "position": {
+        "x": 1008.0,
+        "y": -768.0
+      },
+      "data": {
+        "nodeType": "split",
+        "label": "Split",
+        "icon": "&#x2702;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "text",
+            "label": "text",
+            "type": "string"
+          },
+          {
+            "id": "delimiter",
+            "label": "delimiter",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "delimiter": "."
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-19",
+      "type": "array_length",
+      "position": {
+        "x": 1280.0,
+        "y": -752.0
+      },
+      "data": {
+        "nodeType": "array_length",
+        "label": "Array Length",
+        "icon": "#",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "array",
+            "label": "array",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "number"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-20",
+      "type": "answer_user",
+      "position": {
+        "x": 1488.0,
+        "y": -752.0
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-21",
+      "type": "concat",
+      "position": {
+        "x": 1264.0,
+        "y": -976.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          },
+          {
+            "id": "d",
+            "label": "d",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "b": " has ",
+          "d": " sentences"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-22",
+      "type": "break_object",
+      "position": {
+        "x": 1008.0,
+        "y": -416.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "content",
+            "label": "content",
+            "type": "string"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "usage.output_tokens",
+            "label": "output_tokens",
+            "type": "number"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "content",
+            "model",
+            "usage.output_tokens"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-23",
+      "type": "split",
+      "position": {
+        "x": 1200.0,
+        "y": -400.0
+      },
+      "data": {
+        "nodeType": "split",
+        "label": "Split",
+        "icon": "&#x2702;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "text",
+            "label": "text",
+            "type": "string"
+          },
+          {
+            "id": "delimiter",
+            "label": "delimiter",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "delimiter": "."
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-24",
+      "type": "array_length",
+      "position": {
+        "x": 1472.0,
+        "y": -384.0
+      },
+      "data": {
+        "nodeType": "array_length",
+        "label": "Array Length",
+        "icon": "#",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "array",
+            "label": "array",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "number"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-25",
+      "type": "answer_user",
+      "position": {
+        "x": 1680.0,
+        "y": -384.0
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-26",
+      "type": "concat",
+      "position": {
+        "x": 1456.0,
+        "y": -608.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          },
+          {
+            "id": "d",
+            "label": "d",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "b": " has ",
+          "d": " sentences"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-27",
+      "type": "break_object",
+      "position": {
+        "x": 1216.0,
+        "y": -32.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "content",
+            "label": "content",
+            "type": "string"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "usage.output_tokens",
+            "label": "output_tokens",
+            "type": "number"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "content",
+            "model",
+            "usage.output_tokens"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-28",
+      "type": "split",
+      "position": {
+        "x": 1408.0,
+        "y": -16.0
+      },
+      "data": {
+        "nodeType": "split",
+        "label": "Split",
+        "icon": "&#x2702;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "text",
+            "label": "text",
+            "type": "string"
+          },
+          {
+            "id": "delimiter",
+            "label": "delimiter",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "delimiter": "."
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-29",
+      "type": "array_length",
+      "position": {
+        "x": 1680.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "array_length",
+        "label": "Array Length",
+        "icon": "#",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "array",
+            "label": "array",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "number"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-30",
+      "type": "answer_user",
+      "position": {
+        "x": 1888.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-31",
+      "type": "concat",
+      "position": {
+        "x": 1664.0,
+        "y": -224.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          },
+          {
+            "id": "d",
+            "label": "d",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "b": " has ",
+          "d": " sentences"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-32",
+      "type": "break_object",
+      "position": {
+        "x": 1328.0,
+        "y": 400.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "content",
+            "label": "content",
+            "type": "string"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "usage.output_tokens",
+            "label": "output_tokens",
+            "type": "number"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "content",
+            "model",
+            "usage.output_tokens"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-33",
+      "type": "split",
+      "position": {
+        "x": 1520.0,
+        "y": 416.0
+      },
+      "data": {
+        "nodeType": "split",
+        "label": "Split",
+        "icon": "&#x2702;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "text",
+            "label": "text",
+            "type": "string"
+          },
+          {
+            "id": "delimiter",
+            "label": "delimiter",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "delimiter": "."
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-34",
+      "type": "array_length",
+      "position": {
+        "x": 1792.0,
+        "y": 432.0
+      },
+      "data": {
+        "nodeType": "array_length",
+        "label": "Array Length",
+        "icon": "#",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "array",
+            "label": "array",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "number"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-35",
+      "type": "answer_user",
+      "position": {
+        "x": 2000.0,
+        "y": 432.0
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-36",
+      "type": "concat",
+      "position": {
+        "x": 1776.0,
+        "y": 208.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          },
+          {
+            "id": "d",
+            "label": "d",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "b": " has ",
+          "d": " sentences"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-37",
+      "type": "break_object",
+      "position": {
+        "x": 880.0,
+        "y": 896.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "content",
+            "label": "content",
+            "type": "string"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "usage.output_tokens",
+            "label": "output_tokens",
+            "type": "number"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "content",
+            "model",
+            "usage.output_tokens"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-38",
+      "type": "split",
+      "position": {
+        "x": 1072.0,
+        "y": 912.0
+      },
+      "data": {
+        "nodeType": "split",
+        "label": "Split",
+        "icon": "&#x2702;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "text",
+            "label": "text",
+            "type": "string"
+          },
+          {
+            "id": "delimiter",
+            "label": "delimiter",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "delimiter": "."
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-39",
+      "type": "array_length",
+      "position": {
+        "x": 1344.0,
+        "y": 928.0
+      },
+      "data": {
+        "nodeType": "array_length",
+        "label": "Array Length",
+        "icon": "#",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "array",
+            "label": "array",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "number"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-40",
+      "type": "answer_user",
+      "position": {
+        "x": 1552.0,
+        "y": 928.0
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-41",
+      "type": "concat",
+      "position": {
+        "x": 1328.0,
+        "y": 704.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          },
+          {
+            "id": "d",
+            "label": "d",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "b": " has ",
+          "d": " sentences"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-42",
+      "type": "break_object",
+      "position": {
+        "x": 112.0,
+        "y": 1312.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "content",
+            "label": "content",
+            "type": "string"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "usage.output_tokens",
+            "label": "output_tokens",
+            "type": "number"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "content",
+            "model",
+            "usage.output_tokens"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-43",
+      "type": "split",
+      "position": {
+        "x": 304.0,
+        "y": 1328.0
+      },
+      "data": {
+        "nodeType": "split",
+        "label": "Split",
+        "icon": "&#x2702;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "text",
+            "label": "text",
+            "type": "string"
+          },
+          {
+            "id": "delimiter",
+            "label": "delimiter",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "delimiter": "."
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-44",
+      "type": "array_length",
+      "position": {
+        "x": 576.0,
+        "y": 1344.0
+      },
+      "data": {
+        "nodeType": "array_length",
+        "label": "Array Length",
+        "icon": "#",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "array",
+            "label": "array",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "number"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-45",
+      "type": "answer_user",
+      "position": {
+        "x": 784.0,
+        "y": 1344.0
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-46",
+      "type": "concat",
+      "position": {
+        "x": 560.0,
+        "y": 1120.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          },
+          {
+            "id": "d",
+            "label": "d",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "b": " has ",
+          "d": " sentences"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1767427988999",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-3",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767428397911",
+      "source": "node-3",
+      "sourceHandle": "then:1",
+      "target": "node-2",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767428412001",
+      "source": "node-3",
+      "sourceHandle": "then:0",
+      "target": "node-10",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767428425505",
+      "source": "node-3",
+      "sourceHandle": "then:2",
+      "target": "node-6",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767428428536",
+      "source": "node-3",
+      "sourceHandle": "then:3",
+      "target": "node-7",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767428434196",
+      "source": "node-3",
+      "sourceHandle": "then:4",
+      "target": "node-8",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767428437313",
+      "source": "node-3",
+      "sourceHandle": "then:5",
+      "target": "node-5",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767428439702",
+      "source": "node-3",
+      "sourceHandle": "then:6",
+      "target": "node-9",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767429156563",
+      "source": "node-10",
+      "sourceHandle": "result",
+      "target": "node-11",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429177294",
+      "source": "node-11",
+      "sourceHandle": "content",
+      "target": "node-12",
+      "targetHandle": "text",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429197402",
+      "source": "node-12",
+      "sourceHandle": "result",
+      "target": "node-14",
+      "targetHandle": "array",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429236374",
+      "source": "node-10",
+      "sourceHandle": "exec-out",
+      "target": "node-15",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767429278040",
+      "source": "node-11",
+      "sourceHandle": "model",
+      "target": "node-16",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429299382",
+      "source": "node-14",
+      "sourceHandle": "result",
+      "target": "node-16",
+      "targetHandle": "c",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429305961",
+      "source": "node-16",
+      "sourceHandle": "result",
+      "target": "node-15",
+      "targetHandle": "message",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429358019",
+      "source": "node-2",
+      "sourceHandle": "exec-out",
+      "target": "node-20",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767429361611",
+      "source": "node-21",
+      "sourceHandle": "result",
+      "target": "node-20",
+      "targetHandle": "message",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429364644",
+      "source": "node-19",
+      "sourceHandle": "result",
+      "target": "node-21",
+      "targetHandle": "c",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429367853",
+      "source": "node-17",
+      "sourceHandle": "model",
+      "target": "node-21",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429369917",
+      "source": "node-17",
+      "sourceHandle": "content",
+      "target": "node-18",
+      "targetHandle": "text",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429373019",
+      "source": "node-18",
+      "sourceHandle": "result",
+      "target": "node-19",
+      "targetHandle": "array",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429378110",
+      "source": "node-2",
+      "sourceHandle": "result",
+      "target": "node-17",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429427503",
+      "source": "node-6",
+      "sourceHandle": "exec-out",
+      "target": "node-25",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767429434219",
+      "source": "node-6",
+      "sourceHandle": "result",
+      "target": "node-22",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429436894",
+      "source": "node-22",
+      "sourceHandle": "content",
+      "target": "node-23",
+      "targetHandle": "text",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429439102",
+      "source": "node-22",
+      "sourceHandle": "model",
+      "target": "node-26",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429442294",
+      "source": "node-26",
+      "sourceHandle": "result",
+      "target": "node-25",
+      "targetHandle": "message",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429444078",
+      "source": "node-23",
+      "sourceHandle": "result",
+      "target": "node-24",
+      "targetHandle": "array",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429448828",
+      "source": "node-7",
+      "sourceHandle": "exec-out",
+      "target": "node-30",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767429450836",
+      "source": "node-31",
+      "sourceHandle": "result",
+      "target": "node-30",
+      "targetHandle": "message",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429453384",
+      "source": "node-29",
+      "sourceHandle": "result",
+      "target": "node-31",
+      "targetHandle": "c",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429457745",
+      "source": "node-28",
+      "sourceHandle": "result",
+      "target": "node-29",
+      "targetHandle": "array",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429460536",
+      "source": "node-27",
+      "sourceHandle": "content",
+      "target": "node-28",
+      "targetHandle": "text",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429464453",
+      "source": "node-27",
+      "sourceHandle": "model",
+      "target": "node-31",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429478020",
+      "source": "node-7",
+      "sourceHandle": "result",
+      "target": "node-27",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429481827",
+      "source": "node-8",
+      "sourceHandle": "result",
+      "target": "node-32",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429484436",
+      "source": "node-32",
+      "sourceHandle": "content",
+      "target": "node-33",
+      "targetHandle": "text",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429486678",
+      "source": "node-32",
+      "sourceHandle": "model",
+      "target": "node-36",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429488810",
+      "source": "node-33",
+      "sourceHandle": "result",
+      "target": "node-34",
+      "targetHandle": "array",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429491536",
+      "source": "node-36",
+      "sourceHandle": "result",
+      "target": "node-35",
+      "targetHandle": "message",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429494661",
+      "source": "node-34",
+      "sourceHandle": "result",
+      "target": "node-36",
+      "targetHandle": "c",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429500437",
+      "source": "node-5",
+      "sourceHandle": "result",
+      "target": "node-37",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429502496",
+      "source": "node-37",
+      "sourceHandle": "content",
+      "target": "node-38",
+      "targetHandle": "text",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429505788",
+      "source": "node-38",
+      "sourceHandle": "result",
+      "target": "node-39",
+      "targetHandle": "array",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429510239",
+      "source": "node-39",
+      "sourceHandle": "result",
+      "target": "node-41",
+      "targetHandle": "c",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429514417",
+      "source": "node-37",
+      "sourceHandle": "model",
+      "target": "node-41",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429516425",
+      "source": "node-41",
+      "sourceHandle": "result",
+      "target": "node-40",
+      "targetHandle": "message",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429530810",
+      "source": "node-9",
+      "sourceHandle": "result",
+      "target": "node-42",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429533110",
+      "source": "node-42",
+      "sourceHandle": "content",
+      "target": "node-43",
+      "targetHandle": "text",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429537626",
+      "source": "node-42",
+      "sourceHandle": "model",
+      "target": "node-46",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429540120",
+      "source": "node-43",
+      "sourceHandle": "result",
+      "target": "node-44",
+      "targetHandle": "array",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429543184",
+      "source": "node-44",
+      "sourceHandle": "result",
+      "target": "node-46",
+      "targetHandle": "c",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429546592",
+      "source": "node-46",
+      "sourceHandle": "result",
+      "target": "node-45",
+      "targetHandle": "message",
+      "animated": false
+    },
+    {
+      "id": "edge-1767429551018",
+      "source": "node-9",
+      "sourceHandle": "exec-out",
+      "target": "node-45",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767429556410",
+      "source": "node-5",
+      "sourceHandle": "exec-out",
+      "target": "node-40",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767429561343",
+      "source": "node-8",
+      "sourceHandle": "exec-out",
+      "target": "node-35",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767429653412",
+      "source": "node-24",
+      "sourceHandle": "result",
+      "target": "node-26",
+      "targetHandle": "c",
+      "animated": false
+    }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2026-01-03T08:17:50.108280",
+  "updated_at": "2026-01-03T08:41:00.579498"
+}

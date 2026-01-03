@@ -847,6 +847,8 @@ def _sync_effect_results_to_node_outputs(run: Any, flow: Flow) -> None:
                 # - usage / model / finish_reason
                 # - trace_id / metadata for observability
                 current["result"] = raw
+                current["gen_time"] = raw.get("gen_time")
+                current["ttft_ms"] = raw.get("ttft_ms")
                 current["raw"] = raw
                 mapped_value = current["response"]
         elif effect_type == "tool_calls":

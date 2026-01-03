@@ -14,8 +14,30 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from ..models import ExecutionEvent, VisualFlow
 from ..services.executor import create_visual_runner
 from ..services.runtime_stores import get_runtime_stores
+from abstractflow.visual.workspace_scoped_tools import WorkspaceScope, build_scoped_tool_executor
 
 router = APIRouter(tags=["websocket"])
+
+class _SafeSendWebSocket:
+    """Send-only WebSocket wrapper that never raises on send.
+
+    Why:
+    - In dev (Vite proxy) and in real networks, WebSockets can drop unexpectedly.
+    - We do NOT want a transient UI disconnect to abort or corrupt a long-running run.
+    - The durable source-of-truth is the RunStore/LedgerStore, not the socket.
+
+    This wrapper makes `send_json` a best-effort no-op once the connection is gone.
+    """
+
+    def __init__(self, websocket: WebSocket):
+        self._ws = websocket
+
+    async def send_json(self, data: Any) -> None:  # type: ignore[override]
+        try:
+            await self._ws.send_json(data)
+        except Exception:
+            # Swallow errors: the execution loop should keep progressing even if the UI disconnects.
+            return None
 
 
 def _ws_utc_now_iso() -> str:
@@ -176,9 +198,10 @@ async def websocket_execution(websocket: WebSocket, flow_id: str):
                         ExecutionEvent(type="flow_error", error="A run is already in progress on this connection").model_dump()
                     )
                     continue
+                safe_ws = _SafeSendWebSocket(websocket)
                 task = asyncio.create_task(
                     execute_with_updates(
-                        websocket=websocket,
+                        websocket=safe_ws,  # type: ignore[arg-type]
                         flow_id=flow_id,
                         input_data=message.get("input_data", {}),
                         connection_id=connection_id,
@@ -192,9 +215,10 @@ async def websocket_execution(websocket: WebSocket, flow_id: str):
                         ExecutionEvent(type="flow_error", error="Cannot resume while a run is in progress").model_dump()
                     )
                     continue
+                safe_ws = _SafeSendWebSocket(websocket)
                 task = asyncio.create_task(
                     resume_waiting_flow(
-                        websocket=websocket,
+                        websocket=safe_ws,  # type: ignore[arg-type]
                         connection_id=connection_id,
                         response=message.get("response", ""),
                     )
@@ -219,9 +243,11 @@ async def websocket_execution(websocket: WebSocket, flow_id: str):
     except WebSocketDisconnect:
         pass
     finally:
-        task = _active_tasks.pop(connection_id, None)
-        if task is not None and not task.done():
-            task.cancel()
+        # IMPORTANT:
+        # Do NOT cancel in-flight run tasks when the UI disconnects.
+        # The UI socket is an observability/control channel; execution is durable and should
+        # continue (or remain waiting) independently of that socket.
+        _active_tasks.pop(connection_id, None)
         if connection_id in _connections:
             del _connections[connection_id]
         _waiting_runners.pop(connection_id, None)
@@ -256,12 +282,15 @@ async def execute_with_updates(
             gate.set()
 
         run_store, ledger_store, artifact_store = get_runtime_stores()
+        scope = WorkspaceScope.from_input_data(input_data)
+        tool_executor = build_scoped_tool_executor(scope=scope) if scope is not None else None
         runner = create_visual_runner(
             visual_flow,
             flows=_flows,
             run_store=run_store,
             ledger_store=ledger_store,
             artifact_store=artifact_store,
+            tool_executor=tool_executor,
         )
         _active_runners[connection_id] = runner
 

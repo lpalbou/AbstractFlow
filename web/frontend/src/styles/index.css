@@ -1149,6 +1149,42 @@ button.primary:hover:not(:disabled) {
   border-radius: 4px;
 }
 
+.run-modal-runid {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.70);
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.run-modal-runid:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.run-modal-runid:active {
+  transform: translateY(1px);
+}
+
+.run-modal-runid:focus {
+  outline: none;
+}
+
+.run-modal-runid:focus-visible {
+  outline: none;
+  border-color: rgba(233, 69, 96, 0.6);
+  box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.18);
+}
+
 .run-form-intro {
   font-size: 13px;
   color: var(--text-secondary);

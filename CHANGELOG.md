@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Loop` (Foreach) now invalidates cached pure-node outputs (e.g. `concat`) per-iteration so loop bodies don't reuse stale values from iteration 0 (fixes scratchpad accumulation workflows).
 - WebSocket run controls are now responsive during long-running steps: pause/resume/cancel no longer block on the per-connection execution lock (important when LLM/Agent nodes stall).
 - Web run controls are now resilient to transient WebSocket disconnects: pause/resume/cancel can be sent with an explicit `run_id`, and the UI will reconnect-and-send for control actions when needed.
+- WebSocket execution is now resilient to transient UI disconnects: a dropped WebSocket connection no longer cancels the in-flight run task (execution continues durably; the UI is an observability/control channel).
 - `Cancel Run` no longer surfaces as a `flow_error` from an internal `asyncio.CancelledError` (treated as an expected control-plane operation).
 - Visual `Agent` nodes now reset per-node state when re-entered (e.g. inside `Loop` iterations), so each iteration re-resolves inputs and runs the agent with the current scratchpad/task instead of reusing iteration 0.
 - Run modal observability for Agent nodes is improved:
@@ -30,8 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Memory nodes UX naming: `memory_note` is now labeled **Memorize** (was Remember) to align with AbstractCode `/memorize` and reduce ambiguity with span tagging.
 - Flow Library modal UX: flow name/description are now edited via inline edit icons (pencil) and the action row is simplified (removed `Rename` / `Edit Description` buttons).
+- Run modal now shows a discreet, clickable **run id** pill (hover → click to copy to clipboard) for better observability/debugging.
 
 ### Added
+- `multi_agent_state_machine` now accepts a `workspace_root` run parameter; when set, agent file/system tools are scoped to that folder (paths resolve under the workspace root and escapes are rejected).
 - Visual custom events (Blueprint-style):
   - `On Event` listeners are compiled into dedicated durable subworkflows and auto-started alongside the main run (session-scoped by default).
   - `Emit Event` node dispatches durable events via AbstractRuntime.
