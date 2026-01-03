@@ -520,6 +520,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                 want({ id: 'model', label: 'model', type: 'model' }),
                 want({ id: 'system', label: 'system', type: 'string' }),
                 want({ id: 'prompt', label: 'prompt', type: 'string' }),
+                want({ id: 'tools', label: 'tools', type: 'array' }),
               ]
             : [
                 execIn,
@@ -531,7 +532,12 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                 want({ id: 'context', label: 'context', type: 'object' }),
               ];
 
-        const extras = existingInputs.filter((p) => !used.has(p.id));
+        // Drop legacy/experimental pins that were converted to inline node config.
+        const dropIds =
+          data.nodeType === 'llm_call'
+            ? new Set(['include_context', 'use_context', 'write_context', 'writeContext'])
+            : new Set<string>();
+        const extras = existingInputs.filter((p) => !used.has(p.id) && !dropIds.has(p.id));
         data = { ...data, inputs: [...canonicalInputs, ...extras] };
       }
 
@@ -586,10 +592,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           data.nodeType === 'memory_note'
             ? [
                 wantInput({ id: 'exec-in', label: '', type: 'execution' }),
+                wantInput({ id: 'scope', label: 'scope', type: 'string' }),
                 wantInput({ id: 'content', label: 'content', type: 'string' }),
+                wantInput({ id: 'location', label: 'location', type: 'string' }),
                 wantInput({ id: 'tags', label: 'tags', type: 'object' }),
                 wantInput({ id: 'sources', label: 'sources', type: 'object' }),
-                wantInput({ id: 'scope', label: 'scope', type: 'string' }),
               ]
             : data.nodeType === 'memory_query'
               ? [
@@ -597,6 +604,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                   wantInput({ id: 'query', label: 'query', type: 'string' }),
                   wantInput({ id: 'limit', label: 'limit', type: 'number' }),
                   wantInput({ id: 'tags', label: 'tags', type: 'object' }),
+                  wantInput({ id: 'tags_mode', label: 'tags_mode', type: 'string' }),
+                  wantInput({ id: 'usernames', label: 'usernames', type: 'array' }),
+                  wantInput({ id: 'locations', label: 'locations', type: 'array' }),
                   wantInput({ id: 'since', label: 'since', type: 'string' }),
                   wantInput({ id: 'until', label: 'until', type: 'string' }),
                   wantInput({ id: 'scope', label: 'scope', type: 'string' }),
@@ -608,7 +618,12 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                   wantInput({ id: 'max_messages', label: 'max_messages', type: 'number' }),
                 ];
 
-        const inputExtras = existingInputs.filter((p) => !usedInputs.has(p.id));
+        // Drop legacy/experimental pins that were converted to inline node config.
+        const dropIds =
+          data.nodeType === 'memory_note'
+            ? new Set(['keep_in_context', 'keepInContext'])
+            : new Set<string>();
+        const inputExtras = existingInputs.filter((p) => !usedInputs.has(p.id) && !dropIds.has(p.id));
 
         const existingOutputs = Array.isArray(data.outputs) ? data.outputs : [];
         const byOutputId = new Map(existingOutputs.map((p) => [p.id, p] as const));

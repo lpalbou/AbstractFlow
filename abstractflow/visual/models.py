@@ -93,6 +93,7 @@ class NodeType(str, Enum):
     GET_VAR = "get_var"
     SET_VAR = "set_var"
     SET_VARS = "set_vars"
+    SET_VAR_PROPERTY = "set_var_property"
     PARSE_JSON = "parse_json"
     BREAK_OBJECT = "break_object"
     SYSTEM_DATETIME = "system_datetime"

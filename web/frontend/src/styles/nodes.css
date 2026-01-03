@@ -15,6 +15,13 @@
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
+/* Slightly wider nodes for common “agentic” steps so inline toggles and pin labels don’t truncate. */
+.flow-node.flow-node--memory_note,
+.flow-node.flow-node--llm_call,
+.flow-node.flow-node--agent {
+  min-width: 210px;
+}
+
 /* Tooltips are rendered inside node DOM; ensure hovered nodes float above neighbors
    so tooltip bubbles don't get occluded by nearby nodes with higher z-index. */
 .react-flow__node:hover {

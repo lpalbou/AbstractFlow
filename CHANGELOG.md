@@ -37,6 +37,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Run modal UX: string inputs now default to a 3-line textarea, and modal actions are always pinned in the footer (the body scrolls).
 - Run modal observability no longer truncates sub-run (Agent) step previews or memory previews; full recalled content is displayed (loaded on demand).
 - In-run execution highlighting (nodes/edges) now has a stronger, more diffuse bloom to improve readability while flows are running.
+- Node palette UX is simplified for discoverability:
+  - removed **Effects**
+  - added **Memory** (memories + file IO)
+  - moved **Delay** to **Events**
+  - split “values/state vs transforms” into **Literals**, **Variables**, and **Data**
+  - reordered **Control** nodes (loops → branching → conditions)
+- Node/pin tooltips now appear after **2s** hover and are rendered in an overlay layer so they are not clipped by scroll containers.
 
 ### Added
 - Run history for the current workflow:
@@ -44,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - UI “Run History” picker (🕘) to open past runs in the Run modal and apply pause/resume/cancel controls to that run.
 - New web API endpoint to fetch persisted artifacts for a run (`/api/runs/{run_id}/artifacts/{artifact_id}`) so the UI can render full Recall-into-context payloads without relying on truncated previews.
 - New execution node `Set Variables` (`set_vars`) to update multiple workflow variables in a single step (reduces timeline clutter vs chaining many `set_var` nodes).
+- New execution node `Set Variable Property` (`set_var_property`) to update a nested property on an object variable in workflow state (durable, pass-through semantics).
 - Run preflight validation panel: when attempting to run with missing required node config (e.g. `LLM Call` / `Agent` provider/model), the UI shows an itemized “Fix before running” panel and clicking an item focuses + highlights the offending node.
 - `multi_agent_state_machine` now accepts a `workspace_root` run parameter; when set, agent file/system tools are scoped to that folder (paths resolve under the workspace root and escapes are rejected).
 - Visual custom events (Blueprint-style):

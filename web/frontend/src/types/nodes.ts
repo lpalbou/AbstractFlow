@@ -151,6 +151,21 @@ const EVENT_NODES: NodeTemplate[] = [
     ],
     category: 'events',
   },
+  {
+    type: 'wait_until',
+    icon: '&#x23F3;', // Hourglass
+    label: 'Delay',
+    description: 'Pause execution for a duration (seconds), then continue.',
+    headerColor: '#F39C12', // Orange - timing
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'duration', label: 'duration', type: 'number' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+    ],
+    category: 'events',
+  },
 ];
 
 // Core nodes
@@ -179,18 +194,18 @@ const CORE_NODES: NodeTemplate[] = [
     headerColor: '#4488FF',
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
-      { id: 'provider', label: 'provider', type: 'provider' },
-      { id: 'model', label: 'model', type: 'model' },
-      { id: 'max_iterations', label: 'max_iterations', type: 'number' },
-      { id: 'system', label: 'system', type: 'string' },
-      { id: 'task', label: 'prompt', type: 'string' },
-      { id: 'tools', label: 'tools', type: 'array' },
-      { id: 'context', label: 'context', type: 'object' },
+      { id: 'provider', label: 'provider', type: 'provider', description: 'LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider.' },
+      { id: 'model', label: 'model', type: 'model', description: 'LLM model id/name. If unset, uses the node’s configured model.' },
+      { id: 'max_iterations', label: 'max_iterations', type: 'number', description: 'Maximum internal ReAct iterations (safety cap). Higher values allow more tool-use steps.' },
+      { id: 'system', label: 'system', type: 'string', description: 'Optional system prompt for this agent instance (high priority instructions).' },
+      { id: 'task', label: 'prompt', type: 'string', description: 'The task/user prompt for the agent to solve.' },
+      { id: 'tools', label: 'tools', type: 'array', description: 'Allowlist of tool names this agent can call (defense-in-depth; runtime still enforces allowlists).' },
+      { id: 'context', label: 'context', type: 'object', description: 'Optional explicit context object for the agent (e.g. {messages:[...]}). If provided, it can override inherited run context.' },
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
-      { id: 'result', label: 'result', type: 'object' },
-      { id: 'scratchpad', label: 'scratchpad', type: 'object' },
+      { id: 'result', label: 'result', type: 'object', description: 'Structured final agent result (answer + metadata/tool calls depending on agent).' },
+      { id: 'scratchpad', label: 'scratchpad', type: 'object', description: 'Runtime-owned execution trace/scratchpad for observability (LLM/tool steps, timings).' },
     ],
     category: 'core',
   },
@@ -202,16 +217,16 @@ const CORE_NODES: NodeTemplate[] = [
     headerColor: '#3498DB', // Blue - AI
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
-      { id: 'provider', label: 'provider', type: 'provider' },
-      { id: 'model', label: 'model', type: 'model' },
-      { id: 'system', label: 'system', type: 'string' },
-      { id: 'prompt', label: 'prompt', type: 'string' },
-      { id: 'tools', label: 'tools', type: 'array' },
+      { id: 'provider', label: 'provider', type: 'provider', description: 'LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider.' },
+      { id: 'model', label: 'model', type: 'model', description: 'LLM model id/name. If unset, uses the node’s configured model.' },
+      { id: 'system', label: 'system', type: 'string', description: 'Optional system prompt for this single call.' },
+      { id: 'prompt', label: 'prompt', type: 'string', description: 'User prompt/content for this single call.' },
+      { id: 'tools', label: 'tools', type: 'array', description: 'Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node).' },
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
-      { id: 'response', label: 'response', type: 'string' },
-      { id: 'result', label: 'result', type: 'object' },
+      { id: 'response', label: 'response', type: 'string', description: 'Assistant text content (best-effort). For tool calls, content may be empty.' },
+      { id: 'result', label: 'result', type: 'object', description: 'Full normalized LLM result (content, tool_calls, usage, provider/model metadata, trace_id).' },
     ],
     category: 'core',
   },
@@ -309,25 +324,29 @@ const STRING_NODES: NodeTemplate[] = [
 // If/Else and ForEach need execution pins (they control flow)
 // Compare and logic gates (NOT, AND, OR) are pure functions (no execution pins)
 const CONTROL_NODES: NodeTemplate[] = [
-  // Execution nodes - control the flow
-  { type: 'if', icon: '&#x2753;', label: 'If/Else', description: 'Branch execution based on a boolean condition.', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'condition', label: 'condition', type: 'boolean' }], outputs: [{ id: 'true', label: 'true', type: 'execution' }, { id: 'false', label: 'false', type: 'execution' }], category: 'control' },
-  { type: 'while', icon: '&#x267B;', label: 'While', description: 'Loop while condition is true. Outputs a 0-based iteration index.', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'condition', label: 'condition', type: 'boolean' }], outputs: [{ id: 'loop', label: 'loop', type: 'execution' }, { id: 'done', label: 'done', type: 'execution' }, { id: 'index', label: 'index', type: 'number' }], category: 'control' },
+  // Execution nodes - ordered by intent: loops → branching → conditions
+  // Loops
+  { type: 'loop', icon: '&#x1F501;', label: 'ForEach', description: 'Iterate over an array. Outputs current item and 0-based index.', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'items', label: 'items', type: 'array' }], outputs: [{ id: 'loop', label: 'loop', type: 'execution' }, { id: 'done', label: 'done', type: 'execution' }, { id: 'item', label: 'item', type: 'any' }, { id: 'index', label: 'index', type: 'number' }], category: 'control' },
   { type: 'for', icon: '&#x1F522;', label: 'For', description: 'Numeric loop from start to end with step. Outputs i and a 0-based index.', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'start', label: 'start', type: 'number' }, { id: 'end', label: 'end', type: 'number' }, { id: 'step', label: 'step', type: 'number' }], outputs: [{ id: 'loop', label: 'loop', type: 'execution' }, { id: 'done', label: 'done', type: 'execution' }, { id: 'i', label: 'i', type: 'number' }, { id: 'index', label: 'index', type: 'number' }], category: 'control' },
-	  {
-	    type: 'switch',
-	    icon: '&#x1F500;', // Shuffle
-	    label: 'Switch',
-      description: 'Branch execution by matching a string value to configured cases (default branch always exists).',
-	    headerColor: '#F39C12',
-	    inputs: [
-	      { id: 'exec-in', label: '', type: 'execution' },
-	      { id: 'value', label: 'value', type: 'string' },
-	    ],
-	    outputs: [
-	      { id: 'default', label: 'default', type: 'execution' },
-	    ],
-	    category: 'control',
-	  },
+  { type: 'while', icon: '&#x267B;', label: 'While', description: 'Loop while condition is true. Outputs a 0-based iteration index.', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'condition', label: 'condition', type: 'boolean' }], outputs: [{ id: 'loop', label: 'loop', type: 'execution' }, { id: 'done', label: 'done', type: 'execution' }, { id: 'index', label: 'index', type: 'number' }], category: 'control' },
+
+  // Branching
+  { type: 'if', icon: '&#x2753;', label: 'If/Else', description: 'Branch execution based on a boolean condition.', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'condition', label: 'condition', type: 'boolean' }], outputs: [{ id: 'true', label: 'true', type: 'execution' }, { id: 'false', label: 'false', type: 'execution' }], category: 'control' },
+  {
+    type: 'switch',
+    icon: '&#x1F500;', // Shuffle
+    label: 'Switch',
+    description: 'Branch execution by matching a string value to configured cases (default branch always exists).',
+    headerColor: '#F39C12',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'value', label: 'value', type: 'string' },
+    ],
+    outputs: [
+      { id: 'default', label: 'default', type: 'execution' },
+    ],
+    category: 'control',
+  },
   {
     type: 'sequence',
     icon: '&#x21E5;', // Rightwards arrow to bar (sequence-ish)
@@ -355,7 +374,7 @@ const CONTROL_NODES: NodeTemplate[] = [
     ],
     category: 'control',
   },
-  { type: 'loop', icon: '&#x1F501;', label: 'ForEach', description: 'Iterate over an array. Outputs current item and 0-based index.', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'items', label: 'items', type: 'array' }], outputs: [{ id: 'loop', label: 'loop', type: 'execution' }, { id: 'done', label: 'done', type: 'execution' }, { id: 'item', label: 'item', type: 'any' }, { id: 'index', label: 'index', type: 'number' }], category: 'control' },
+
   // Pure functions - just produce data
   {
     type: 'compare',
@@ -371,16 +390,16 @@ const CONTROL_NODES: NodeTemplate[] = [
     outputs: [{ id: 'result', label: 'result', type: 'boolean' }],
     category: 'control',
   },
-  { type: 'not', icon: '!', label: 'NOT', description: 'Logical NOT.', headerColor: '#F39C12', inputs: [{ id: 'value', label: 'value', type: 'boolean' }], outputs: [{ id: 'result', label: 'result', type: 'boolean' }], category: 'control' },
   { type: 'and', icon: '&&', label: 'AND', description: 'Logical AND.', headerColor: '#F39C12', inputs: [{ id: 'a', label: 'a', type: 'boolean' }, { id: 'b', label: 'b', type: 'boolean' }], outputs: [{ id: 'result', label: 'result', type: 'boolean' }], category: 'control' },
   { type: 'or', icon: '||', label: 'OR', description: 'Logical OR.', headerColor: '#F39C12', inputs: [{ id: 'a', label: 'a', type: 'boolean' }, { id: 'b', label: 'b', type: 'boolean' }], outputs: [{ id: 'result', label: 'result', type: 'boolean' }], category: 'control' },
+  { type: 'not', icon: '!', label: 'NOT', description: 'Logical NOT.', headerColor: '#F39C12', inputs: [{ id: 'value', label: 'value', type: 'boolean' }], outputs: [{ id: 'result', label: 'result', type: 'boolean' }], category: 'control' },
 ];
 
 // Data nodes - Pure functions (no execution pins, just data in/out)
 const DATA_NODES: NodeTemplate[] = [
   { type: 'coalesce', icon: '&#x21C4;', label: 'Coalesce', description: 'Return the first non-null value (A, then B, ...).', headerColor: '#3498DB', inputs: [{ id: 'a', label: 'a', type: 'any' }, { id: 'b', label: 'b', type: 'any' }], outputs: [{ id: 'result', label: 'result', type: 'any' }], category: 'data' },
   { type: 'get', icon: '&#x1F4E5;', label: 'Get Property', description: 'Safely read a nested path from an object (dot/bracket path) with an optional default.', headerColor: '#3498DB', inputs: [{ id: 'object', label: 'object', type: 'object' }, { id: 'key', label: 'key', type: 'string' }, { id: 'default', label: 'default', type: 'any' }], outputs: [{ id: 'value', label: 'value', type: 'any' }], category: 'data' },
-  { type: 'set', icon: '&#x1F4E4;', label: 'Set Property', description: 'Set a nested property on an object (returns a new object).', headerColor: '#3498DB', inputs: [{ id: 'object', label: 'object', type: 'object' }, { id: 'key', label: 'key', type: 'string' }, { id: 'value', label: 'value', type: 'any' }], outputs: [{ id: 'result', label: 'result', type: 'object' }], category: 'data' },
+  { type: 'set', icon: '&#x1F4E4;', label: 'Set Property', description: 'Pure transform: return a new object with key set. To persist state, use Set Variable (dotted path) or Set Variable Property.', headerColor: '#3498DB', inputs: [{ id: 'object', label: 'object', type: 'object' }, { id: 'key', label: 'key', type: 'string' }, { id: 'value', label: 'value', type: 'any' }], outputs: [{ id: 'result', label: 'result', type: 'object' }], category: 'data' },
   { type: 'merge', icon: '&#x1F517;', label: 'Merge Objects', description: 'Shallow merge two objects (b overrides a).', headerColor: '#3498DB', inputs: [{ id: 'a', label: 'a', type: 'object' }, { id: 'b', label: 'b', type: 'object' }], outputs: [{ id: 'result', label: 'result', type: 'object' }], category: 'data' },
   { type: 'make_array', icon: '[]', label: 'Make Array', description: 'Build an array from 1+ inputs in pin order (Blueprint-style). Skips null/unset inputs.', headerColor: '#3498DB', inputs: [{ id: 'a', label: 'a', type: 'any' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'data' },
   { type: 'array_length', icon: '#', label: 'Array Length', description: 'Return the length of an array.', headerColor: '#3498DB', inputs: [{ id: 'array', label: 'array', type: 'array' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'data' },
@@ -485,7 +504,7 @@ const VARIABLE_NODES: NodeTemplate[] = [
     type: 'set_var',
     icon: '&#x1F4E4;', // Reuse "outbox tray" as a setter-ish icon
     label: 'Set Variable',
-    description: 'Write a variable into workflow state by name (updates run vars).',
+    description: 'Write a variable into workflow state by name (supports dotted paths for nested updates; updates run vars).',
     headerColor: '#16A085',
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
@@ -495,6 +514,24 @@ const VARIABLE_NODES: NodeTemplate[] = [
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
       { id: 'value', label: 'value', type: 'any' },
+    ],
+    category: 'variables',
+  },
+  {
+    type: 'set_var_property',
+    icon: '&#x1F4E4;', // Setter-ish
+    label: 'Set Variable Property',
+    description: 'Update a nested property on an object variable in workflow state (name + key), then continue.',
+    headerColor: '#16A085',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'name', label: 'name', type: 'string' },
+      { id: 'key', label: 'key', type: 'string' },
+      { id: 'value', label: 'value', type: 'any' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'value', label: 'value', type: 'object' },
     ],
     category: 'variables',
   },
@@ -581,24 +618,9 @@ const LITERAL_NODES: NodeTemplate[] = [
   },
 ];
 
-// Effect nodes - Side effects that integrate with AbstractRuntime
-// These nodes have execution pins and can pause/resume flows
-const EFFECT_NODES: NodeTemplate[] = [
-  {
-    type: 'wait_until',
-    icon: '&#x23F3;', // Hourglass
-    label: 'Delay',
-    description: 'Pause execution for a duration (seconds), then continue.',
-    headerColor: '#F39C12', // Orange - timing
-    inputs: [
-      { id: 'exec-in', label: '', type: 'execution' },
-      { id: 'duration', label: 'duration', type: 'number' },
-    ],
-    outputs: [
-      { id: 'exec-out', label: '', type: 'execution' },
-    ],
-    category: 'effects',
-  },
+// Memory nodes - Durable memory operations + file IO.
+// These nodes have execution pins and represent side effects users conceptually associate with "Memory / IO".
+const MEMORY_NODES: NodeTemplate[] = [
   {
     type: 'read_file',
     icon: '&#x1F4C4;', // Page facing up
@@ -613,7 +635,7 @@ const EFFECT_NODES: NodeTemplate[] = [
       { id: 'exec-out', label: '', type: 'execution' },
       { id: 'content', label: 'content', type: 'any' },
     ],
-    category: 'effects',
+    category: 'memory',
   },
   {
     type: 'write_file',
@@ -631,7 +653,7 @@ const EFFECT_NODES: NodeTemplate[] = [
       { id: 'bytes', label: 'bytes', type: 'number' },
       { id: 'file_path', label: 'file_path', type: 'string' },
     ],
-    category: 'effects',
+    category: 'memory',
   },
   {
     type: 'memory_note',
@@ -641,17 +663,17 @@ const EFFECT_NODES: NodeTemplate[] = [
     headerColor: '#2ECC71', // Green - memory
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
-      { id: 'content', label: 'content', type: 'string' },
-      { id: 'tags', label: 'tags', type: 'object' },
-      { id: 'sources', label: 'sources', type: 'object' },
-      { id: 'location', label: 'location', type: 'string' },
-      { id: 'scope', label: 'scope', type: 'string' },
+      { id: 'scope', label: 'scope', type: 'string', description: 'Where to store/index the note: run (this run), session (root run of this run-tree), or global (shared global memory run).' },
+      { id: 'content', label: 'content', type: 'string', description: 'The note text to store durably (keep it short; prefer references in sources for large payloads).' },
+      { id: 'location', label: 'location', type: 'string', description: 'Optional location label (where the note was produced, e.g. "flow:my_flow/node-12"). Useful for filtering.' },
+      { id: 'tags', label: 'tags', type: 'object', description: 'Key/value tags for filtering (e.g. {topic:"memory", person:"laurent"}). Values must be strings.' },
+      { id: 'sources', label: 'sources', type: 'object', description: 'Optional provenance refs (e.g. {run_id, span_ids, message_ids}). The note stores refs, not the full source content.' },
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
-      { id: 'note_id', label: 'note_id', type: 'string' },
+      { id: 'note_id', label: 'note_id', type: 'string', description: 'The stored note’s span_id / artifact_id. Use it for Recall into context (span_ids) or for precise Recall.' },
     ],
-    category: 'effects',
+    category: 'memory',
   },
   {
     type: 'memory_query',
@@ -661,22 +683,22 @@ const EFFECT_NODES: NodeTemplate[] = [
     headerColor: '#2ECC71', // Green - memory
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
-      { id: 'query', label: 'query', type: 'string' },
-      { id: 'limit', label: 'limit', type: 'number' },
-      { id: 'tags', label: 'tags', type: 'object' },
-      { id: 'tags_mode', label: 'tags_mode', type: 'string' },
-      { id: 'usernames', label: 'usernames', type: 'array' },
-      { id: 'locations', label: 'locations', type: 'array' },
-      { id: 'since', label: 'since', type: 'string' },
-      { id: 'until', label: 'until', type: 'string' },
-      { id: 'scope', label: 'scope', type: 'string' },
+      { id: 'query', label: 'query', type: 'string', description: 'Keyword query (substring match over span metadata and small previews). Combined with tags/authors/locations using AND semantics.' },
+      { id: 'limit', label: 'limit', type: 'number', description: 'Maximum number of spans to return (limit_spans). Default: 5.' },
+      { id: 'tags', label: 'tags', type: 'object', description: 'Tag filters as key→string or key→list[string]. Reserved key "kind" is ignored.' },
+      { id: 'tags_mode', label: 'tags_mode', type: 'string', description: 'How to combine tag keys: all (AND) or any (OR). Within a single key, list values are OR.' },
+      { id: 'usernames', label: 'usernames', type: 'array', description: 'Filter by created_by (actor id). Case-insensitive exact match. Empty means no filter.' },
+      { id: 'locations', label: 'locations', type: 'array', description: 'Filter by location metadata (or tags.location). Case-insensitive exact match.' },
+      { id: 'since', label: 'since', type: 'string', description: 'ISO8601 start time. Matches spans whose [from,to] intersects this range.' },
+      { id: 'until', label: 'until', type: 'string', description: 'ISO8601 end time. Matches spans whose [from,to] intersects this range.' },
+      { id: 'scope', label: 'scope', type: 'string', description: 'Which span index to query: run | session | global | all. (all queries run+session-root+global; indices require non-all scopes).' },
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
-      { id: 'results', label: 'results', type: 'array' },
-      { id: 'rendered', label: 'rendered', type: 'string' },
+      { id: 'results', label: 'results', type: 'array', description: 'Structured match list (meta.matches). Use it to extract span_ids for Recall into context.' },
+      { id: 'rendered', label: 'rendered', type: 'string', description: 'Human-readable recall summary (tool-style output string).' },
     ],
-    category: 'effects',
+    category: 'memory',
   },
   {
     type: 'memory_rehydrate',
@@ -686,17 +708,25 @@ const EFFECT_NODES: NodeTemplate[] = [
     headerColor: '#2ECC71', // Green - memory
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
-      { id: 'span_ids', label: 'span_ids', type: 'array' },
-      { id: 'placement', label: 'placement', type: 'string' },
-      { id: 'max_messages', label: 'max_messages', type: 'number' },
+      { id: 'span_ids', label: 'span_ids', type: 'array', description: 'List of span_ids (artifact_ids) to insert into context.messages. Typically comes from Recall results.' },
+      { id: 'placement', label: 'placement', type: 'string', description: 'Where to insert: after_summary | after_system | end.' },
+      { id: 'max_messages', label: 'max_messages', type: 'number', description: 'Optional cap on inserted messages across all spans (None/empty = unlimited). Useful to avoid huge contexts.' },
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
-      { id: 'inserted', label: 'inserted', type: 'number' },
-      { id: 'skipped', label: 'skipped', type: 'number' },
+      { id: 'inserted', label: 'inserted', type: 'number', description: 'Number of messages inserted into context.messages.' },
+      { id: 'skipped', label: 'skipped', type: 'number', description: 'Number of messages skipped (usually due to dedup).' },
     ],
-    category: 'effects',
+    category: 'memory',
   },
+];
+
+// Data (Transforms) nodes - pure utilities for manipulating values.
+// Keep literals + variables as separate categories for palette scanability.
+const PALETTE_DATA_NODES: NodeTemplate[] = [
+  ...STRING_NODES.map((n) => ({ ...n, category: 'data' })),
+  ...MATH_NODES.map((n) => ({ ...n, category: 'data' })),
+  ...DATA_NODES.map((n) => ({ ...n, category: 'data' })),
 ];
 
 // All categories
@@ -711,40 +741,30 @@ export const NODE_CATEGORIES: Record<string, NodeCategory> = {
     icon: '&#x26A1;', // Lightning
     nodes: CORE_NODES,
   },
-  effects: {
-    label: 'Effects',
-    icon: '&#x26A1;', // Lightning bolt - side effects
-    nodes: EFFECT_NODES,
+  memory: {
+    label: 'Memory',
+    icon: '&#x1F9E0;', // Brain
+    nodes: MEMORY_NODES,
   },
   control: {
     label: 'Control',
     icon: '&#x1F500;', // Shuffle
     nodes: CONTROL_NODES,
   },
-  string: {
-    label: 'String',
-    icon: '&#x1F4DD;', // Memo
-    nodes: STRING_NODES,
-  },
-  math: {
-    label: 'Math',
-    icon: '&#x1F522;', // Numbers
-    nodes: MATH_NODES,
-  },
-  data: {
-    label: 'Data',
-    icon: '&#x1F4CA;', // Chart
-    nodes: DATA_NODES,
+  literals: {
+    label: 'Literals',
+    icon: '&#x270F;', // Pencil - constants/values
+    nodes: LITERAL_NODES,
   },
   variables: {
     label: 'Variables',
     icon: '&#x1F4E6;', // Package-ish
     nodes: VARIABLE_NODES,
   },
-  literals: {
-    label: 'Literals',
-    icon: '&#x270F;', // Pencil - for constants/values
-    nodes: LITERAL_NODES,
+  data: {
+    label: 'Data',
+    icon: '&#x1F4CA;', // Chart
+    nodes: PALETTE_DATA_NODES,
   },
 };
 

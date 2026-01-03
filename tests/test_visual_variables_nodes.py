@@ -286,4 +286,104 @@ def test_set_vars_rejects_reserved_names() -> None:
     assert "reserved" in str(result.get("error", "")).lower() or "reserved" in str(result.get("result", "")).lower()
 
 
+def test_set_var_property_updates_nested_object_value() -> None:
+    """Set a nested property on an object variable durably (single exec node).
+
+    Scenario:
+    - Set `state = {"a": 1}`
+    - Set `state.b = "B"` via Set Variable Property
+    - Read `state` via Get Variable
+    """
+    flow = VisualFlow(
+        id="flow-vars-set-prop",
+        name="vars set property",
+        entryNode="start",
+        nodes=[
+            VisualNode(id="start", type=NodeType.ON_FLOW_START, position=Position(x=0, y=0), data={}),
+            VisualNode(
+                id="initial",
+                type=NodeType.LITERAL_JSON,
+                position=Position(x=0, y=0),
+                data={"literalValue": {"a": 1}},
+            ),
+            VisualNode(
+                id="val",
+                type=NodeType.LITERAL_STRING,
+                position=Position(x=0, y=0),
+                data={"literalValue": "B"},
+            ),
+            VisualNode(
+                id="set_state",
+                type=NodeType.SET_VAR,
+                position=Position(x=0, y=0),
+                data={
+                    "inputs": [
+                        {"id": "exec-in", "label": "", "type": "execution"},
+                        {"id": "name", "label": "name", "type": "string"},
+                        {"id": "value", "label": "value", "type": "any"},
+                    ],
+                    "outputs": [
+                        {"id": "exec-out", "label": "", "type": "execution"},
+                        {"id": "value", "label": "value", "type": "any"},
+                    ],
+                    "pinDefaults": {"name": "state"},
+                },
+            ),
+            VisualNode(
+                id="set_prop",
+                type=NodeType.SET_VAR_PROPERTY,
+                position=Position(x=0, y=0),
+                data={
+                    "inputs": [
+                        {"id": "exec-in", "label": "", "type": "execution"},
+                        {"id": "name", "label": "name", "type": "string"},
+                        {"id": "key", "label": "key", "type": "string"},
+                        {"id": "value", "label": "value", "type": "any"},
+                    ],
+                    "outputs": [
+                        {"id": "exec-out", "label": "", "type": "execution"},
+                        {"id": "value", "label": "value", "type": "object"},
+                    ],
+                    "pinDefaults": {"name": "state", "key": "b"},
+                },
+            ),
+            VisualNode(
+                id="get",
+                type=NodeType.GET_VAR,
+                position=Position(x=0, y=0),
+                data={
+                    "inputs": [{"id": "name", "label": "name", "type": "string"}],
+                    "outputs": [{"id": "value", "label": "value", "type": "any"}],
+                    "pinDefaults": {"name": "state"},
+                },
+            ),
+            VisualNode(
+                id="read",
+                type=NodeType.CODE,
+                position=Position(x=0, y=0),
+                data={
+                    "code": (
+                        "def transform(input):\n"
+                        "    state = input.get('state') if isinstance(input, dict) else None\n"
+                        "    return {'state': state}\n"
+                    ),
+                    "functionName": "transform",
+                },
+            ),
+        ],
+        edges=[
+            VisualEdge(id="e1", source="start", sourceHandle="exec-out", target="set_state", targetHandle="exec-in"),
+            VisualEdge(id="e2", source="set_state", sourceHandle="exec-out", target="set_prop", targetHandle="exec-in"),
+            VisualEdge(id="e3", source="set_prop", sourceHandle="exec-out", target="read", targetHandle="exec-in"),
+            VisualEdge(id="d1", source="initial", sourceHandle="value", target="set_state", targetHandle="value"),
+            VisualEdge(id="d2", source="val", sourceHandle="value", target="set_prop", targetHandle="value"),
+            VisualEdge(id="d3", source="get", sourceHandle="value", target="read", targetHandle="state"),
+        ],
+    )
+
+    result = execute_visual_flow(flow, {}, flows={flow.id: flow})
+    assert result["success"] is True
+    assert result["result"] == {"state": {"a": 1, "b": "B"}}
+
+
 

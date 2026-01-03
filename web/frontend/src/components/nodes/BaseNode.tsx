@@ -991,10 +991,11 @@ export const BaseNode = memo(function BaseNode({
   };
 
   return (
-    <AfTooltip content={nodeDescription} delayMs={1000}>
+    <AfTooltip content={nodeDescription} delayMs={2000}>
       <div
         className={clsx(
           'flow-node',
+          `flow-node--${data.nodeType}`,
           selected && 'selected',
           isExecuting && 'executing',
           isRecent && !isExecuting && 'recent'
@@ -1347,28 +1348,29 @@ export const BaseNode = memo(function BaseNode({
         <div className="pins-left" style={{ ['--pin-label-width' as any]: inputLabelWidth }}>
           {inputData.map((pin) => (
             <div key={pin.id} className="pin-row input">
-              <span
-                className="pin-shape"
-                style={{ color: PIN_COLORS[pin.type] }}
-                title={`Type: ${pin.type}`}
-                onClick={(e) => handlePinClick(e, pin.id, true)}
-                onMouseDownCapture={(e) => handlePinClick(e, pin.id, true)}
-              >
-                <PinShape
-                  type={pin.type}
-                  size={10}
-                  filled={isPinConnected(pin.id, true)}
-                />
-                <Handle
-                  type="target"
-                  position={Position.Left}
-                  id={pin.id}
-                  className={`pin ${pin.type}`}
-                  style={overlayHandleStyle}
-                  onMouseDownCapture={(e) => handlePinClick(e, pin.id, true)}
+              <AfTooltip content={pin.description} delayMs={2000}>
+                <span
+                  className="pin-shape"
+                  style={{ color: PIN_COLORS[pin.type] }}
                   onClick={(e) => handlePinClick(e, pin.id, true)}
-                />
-              </span>
+                  onMouseDownCapture={(e) => handlePinClick(e, pin.id, true)}
+                >
+                  <PinShape
+                    type={pin.type}
+                    size={10}
+                    filled={isPinConnected(pin.id, true)}
+                  />
+                  <Handle
+                    type="target"
+                    position={Position.Left}
+                    id={pin.id}
+                    className={`pin ${pin.type}`}
+                    style={overlayHandleStyle}
+                    onMouseDownCapture={(e) => handlePinClick(e, pin.id, true)}
+                    onClick={(e) => handlePinClick(e, pin.id, true)}
+                  />
+                </span>
+              </AfTooltip>
               <span className="pin-label">{pin.label}</span>
               {(() => {
                 const connected = isPinConnected(pin.id, true);
@@ -1794,26 +1796,27 @@ export const BaseNode = memo(function BaseNode({
           {outputData.map((pin) => (
             <div key={pin.id} className="pin-row output">
               <span className="pin-label">{pin.label}</span>
-              <span
-                className="pin-shape"
-                style={{ color: PIN_COLORS[pin.type] }}
-                title={`Type: ${pin.type}`}
-                onClick={(e) => handlePinClick(e, pin.id, false)}
-              >
-                <PinShape
-                  type={pin.type}
-                  size={10}
-                  filled={isPinConnected(pin.id, false)}
-                />
-                <Handle
-                  type="source"
-                  position={Position.Right}
-                  id={pin.id}
-                  className={`pin ${pin.type}`}
-                  style={overlayHandleStyle}
+              <AfTooltip content={pin.description} delayMs={2000}>
+                <span
+                  className="pin-shape"
+                  style={{ color: PIN_COLORS[pin.type] }}
                   onClick={(e) => handlePinClick(e, pin.id, false)}
-                />
-              </span>
+                >
+                  <PinShape
+                    type={pin.type}
+                    size={10}
+                    filled={isPinConnected(pin.id, false)}
+                  />
+                  <Handle
+                    type="source"
+                    position={Position.Right}
+                    id={pin.id}
+                    className={`pin ${pin.type}`}
+                    style={overlayHandleStyle}
+                    onClick={(e) => handlePinClick(e, pin.id, false)}
+                  />
+                </span>
+              </AfTooltip>
             </div>
           ))}
         </div>

@@ -27,6 +27,38 @@ def _set_by_path(target: Dict[str, Any], dotted_key: str, value: Any) -> None:
     cur[parts[-1]] = value
 
 
+def _get_by_path(source: Dict[str, Any], dotted_key: str) -> Any:
+    """Best-effort dotted-path lookup supporting dicts (and nested dicts).
+
+    This is intentionally conservative: workflow variables (`run.vars`) are dict-like state.
+    """
+    parts = [p for p in str(dotted_key or "").split(".") if p]
+    if not parts:
+        return None
+    current: Any = source
+    for part in parts:
+        if not isinstance(current, dict):
+            return None
+        current = current.get(part)
+    return current
+
+
+def _set_on_object(obj: Dict[str, Any], dotted_key: str, value: Any) -> Dict[str, Any]:
+    """Set a nested key on an object dict (mutates the given dict) and return it."""
+    parts = [p for p in str(dotted_key or "").split(".") if p]
+    if not parts:
+        return obj
+    cur: Dict[str, Any] = obj
+    for part in parts[:-1]:
+        nxt = cur.get(part)
+        if not isinstance(nxt, dict):
+            nxt = {}
+            cur[part] = nxt
+        cur = nxt
+    cur[parts[-1]] = value
+    return obj
+
+
 def _persist_node_output(run_vars: Dict[str, Any], node_id: str, value: Dict[str, Any]) -> None:
     temp = run_vars.get("_temp")
     if not isinstance(temp, dict):
@@ -99,6 +131,96 @@ def create_set_var_node_handler(
         if next_node:
             return StepPlan(node_id=node_id, next_node=next_node)
         return StepPlan(node_id=node_id, complete_output={"success": True, "result": run.vars.get("_last_output")})
+
+    return handler
+
+
+def create_set_var_property_node_handler(
+    *,
+    node_id: str,
+    next_node: Optional[str],
+    data_aware_handler: Optional[Callable[[Any], Any]],
+    flow: Any,
+) -> Callable:
+    """Create a handler for `set_var_property` visual nodes.
+
+    Contract:
+    - Inputs:
+      - `name`: base variable path (e.g. "state" or "state.player")
+      - `key`: nested key path inside that variable's object (e.g. "hp" or "stats.hp")
+      - `value`: value to set at `key`
+    - Behavior:
+      - reads current object at `name` (defaults to `{}` if missing/not an object)
+      - applies the update to a copy
+      - writes the updated object back into `run.vars[name]` (durable)
+      - persists node outputs for pause/resume
+      - does NOT clobber `_last_output` (pass-through)
+    """
+    from abstractruntime.core.models import StepPlan
+    from abstractflow.compiler import _sync_effect_results_to_node_outputs
+
+    def handler(run: Any, ctx: Any) -> "StepPlan":
+        del ctx
+        if flow is not None and hasattr(flow, "_node_outputs") and hasattr(flow, "_data_edge_map"):
+            _sync_effect_results_to_node_outputs(run, flow)
+
+        last_output = run.vars.get("_last_output", {})
+        resolved = data_aware_handler(last_output) if callable(data_aware_handler) else {}
+        payload = resolved if isinstance(resolved, dict) else {}
+
+        raw_name = payload.get("name")
+        name = (raw_name if isinstance(raw_name, str) else str(raw_name or "")).strip()
+        if not name:
+            run.vars["_flow_error"] = "Set Variable Property requires a non-empty variable name."
+            run.vars["_flow_error_node"] = node_id
+            return StepPlan(
+                node_id=node_id,
+                complete_output={"success": False, "error": run.vars["_flow_error"], "node": node_id},
+            )
+        if name.startswith("_"):
+            run.vars["_flow_error"] = f"Invalid variable name '{name}': names starting with '_' are reserved."
+            run.vars["_flow_error_node"] = node_id
+            return StepPlan(
+                node_id=node_id,
+                complete_output={"success": False, "error": run.vars["_flow_error"], "node": node_id},
+            )
+
+        raw_key = payload.get("key")
+        key = (raw_key if isinstance(raw_key, str) else str(raw_key or "")).strip()
+        if not key:
+            run.vars["_flow_error"] = "Set Variable Property requires a non-empty key."
+            run.vars["_flow_error_node"] = node_id
+            return StepPlan(
+                node_id=node_id,
+                complete_output={"success": False, "error": run.vars["_flow_error"], "node": node_id},
+            )
+
+        value = payload.get("value")
+
+        try:
+            if not isinstance(run.vars, dict):
+                raise ValueError("run.vars is not a dict")
+
+            current = _get_by_path(run.vars, name)
+            base_obj: Dict[str, Any] = dict(current) if isinstance(current, dict) else {}
+            _set_on_object(base_obj, key, value)
+            _set_by_path(run.vars, name, base_obj)
+        except Exception as e:
+            run.vars["_flow_error"] = f"Failed to set variable property '{name}.{key}': {e}"
+            run.vars["_flow_error_node"] = node_id
+            return StepPlan(
+                node_id=node_id,
+                complete_output={"success": False, "error": run.vars["_flow_error"], "node": node_id},
+            )
+
+        # Persist this node's outputs for pause/resume (data edges may depend on them).
+        _persist_node_output(run.vars, node_id, {"value": base_obj})
+
+        # IMPORTANT: pass-through semantics (do NOT clobber the pipeline output).
+        # `_last_output` stays as-is.
+        if next_node:
+            return StepPlan(node_id=node_id, next_node=next_node)
+        return StepPlan(node_id=node_id, complete_output={"success": True, "value": base_obj, "result": run.vars.get("_last_output")})
 
     return handler
 

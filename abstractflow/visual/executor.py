@@ -101,11 +101,14 @@ def create_visual_runner(
             "subflow",
             # Workflow variables (execution setter)
             "set_var",
+            "set_vars",
+            "set_var_property",
             # Control exec
             "if",
             "switch",
             "loop",
             "while",
+            "for",
             "sequence",
             "parallel",
             # Effects
