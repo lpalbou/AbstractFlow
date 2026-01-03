@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Memory nodes UX naming: `memory_note` is now labeled **Memorize** (was Remember) to align with AbstractCode `/memorize` and reduce ambiguity with span tagging.
+- Flow Library modal UX: flow name/description are now edited via inline edit icons (pencil) and the action row is simplified (removed `Rename` / `Edit Description` buttons).
 
 ### Added
 - Visual custom events (Blueprint-style):

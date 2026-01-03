@@ -754,9 +754,17 @@ button.primary:hover:not(:disabled) {
   gap: 10px;
 }
 
+.flow-library-preview-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .flow-library-preview-name {
   font-weight: 800;
   font-size: 16px;
+  flex: 1;
+  min-width: 0;
 }
 
 .flow-library-preview-id {
@@ -792,10 +800,58 @@ button.primary:hover:not(:disabled) {
 }
 
 .flow-library-preview-desc {
+  position: relative;
+  padding-top: 2px;
+}
+
+.flow-library-preview-desc-text {
   color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.4;
   white-space: pre-wrap;
+  padding-right: 30px; /* make room for the edit icon */
+}
+
+.flow-library-edit-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.02);
+  color: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+  padding: 0;
+  flex: 0 0 auto;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.flow-library-edit-icon:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.flow-library-edit-icon:focus {
+  outline: none;
+}
+
+.flow-library-edit-icon:focus-visible {
+  outline: none;
+  border-color: rgba(233, 69, 96, 0.6);
+  box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.18);
+}
+
+.flow-library-edit-icon svg {
+  display: block;
+}
+
+.flow-library-edit-icon.desc {
+  position: absolute;
+  top: 0;
+  right: 0;
 }
 
 .flow-library-preview-actions {
