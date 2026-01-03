@@ -146,7 +146,7 @@ function previewForStep(step: TraceStep): string {
   if (t === 'llm_call') {
     const content = res?.content;
     const text = typeof content === 'string' ? content.replace(/\s+/g, ' ').trim() : '';
-    return text.length > 160 ? `${text.slice(0, 160)}…` : text;
+    return text;
   }
 
   if (t === 'tool_calls') {
@@ -159,7 +159,7 @@ function previewForStep(step: TraceStep): string {
 
   if (t === 'ask_user') {
     const prompt = payload && typeof payload.prompt === 'string' ? payload.prompt.trim() : '';
-    return prompt.length > 160 ? `${prompt.slice(0, 160)}…` : prompt;
+    return prompt;
   }
 
   return '';

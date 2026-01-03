@@ -2,15 +2,17 @@
  * Toolbar component with Run, Save, Export, Import actions.
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { useFlowStore } from '../hooks/useFlow';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { RunFlowModal } from './RunFlowModal';
+import { RunHistoryModal } from './RunHistoryModal';
 import { UserPromptModal } from './UserPromptModal';
 import { FlowLibraryModal } from './FlowLibraryModal';
-import type { ExecutionEvent, FlowRunResult, VisualFlow } from '../types/flow';
+import type { ExecutionEvent, FlowRunResult, VisualFlow, RunHistoryResponse, RunSummary } from '../types/flow';
+import { computeRunPreflightIssues } from '../utils/preflight';
 
 // Fetch list of saved flows
 async function listFlows(): Promise<VisualFlow[]> {
@@ -121,14 +123,72 @@ async function saveFlow(
 
 export function Toolbar() {
   const queryClient = useQueryClient();
-  const { flowId, flowName, setFlowName, setFlowId, getFlow, loadFlow, clearFlow, isRunning, setIsRunning } =
-    useFlowStore();
+  const {
+    flowId,
+    flowName,
+    setFlowName,
+    setFlowId,
+    getFlow,
+    loadFlow,
+    clearFlow,
+    isRunning,
+    setIsRunning,
+    nodes,
+    edges,
+    setPreflightIssues,
+    clearPreflightIssues,
+  } = useFlowStore();
 
   const [showRunModal, setShowRunModal] = useState(false);
   const [showFlowLibrary, setShowFlowLibrary] = useState(false);
+  const [showRunHistory, setShowRunHistory] = useState(false);
   const [runResult, setRunResult] = useState<FlowRunResult | null>(null);
   const [executionEvents, setExecutionEvents] = useState<ExecutionEvent[]>([]);
   const [traceEvents, setTraceEvents] = useState<ExecutionEvent[]>([]);
+  const [inspectedRun, setInspectedRun] = useState<RunSummary | null>(null);
+  const [inspectedEvents, setInspectedEvents] = useState<ExecutionEvent[]>([]);
+  const [inspectedTraceEvents, setInspectedTraceEvents] = useState<ExecutionEvent[]>([]);
+
+  async function fetchRunHistory(runId: string): Promise<RunHistoryResponse> {
+    const response = await fetch(`/api/runs/${runId}/history`);
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const message = error.detail ? String(error.detail) : `HTTP ${response.status}`;
+      throw new Error(message);
+    }
+    return response.json();
+  }
+
+  // When viewing a persisted run that is still active (running/waiting), keep the UI fresh by
+  // polling its durable ledger state. This provides "reattach" behavior even if the original
+  // WebSocket session was interrupted.
+  useEffect(() => {
+    if (!showRunModal) return;
+    if (!inspectedRun?.run_id) return;
+
+    const st = (inspectedRun.status || '').toLowerCase();
+    if (st === 'completed' || st === 'failed' || st === 'cancelled') return;
+
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const data = await fetchRunHistory(inspectedRun.run_id);
+        if (cancelled) return;
+        setInspectedRun(data.run);
+        setInspectedEvents(Array.isArray(data.events) ? data.events : []);
+      } catch {
+        // ignore transient errors (user may be offline / server restarting)
+      }
+    };
+
+    // Immediate refresh + then poll.
+    void tick();
+    const interval = window.setInterval(tick, 2000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [inspectedRun?.run_id, inspectedRun?.status, showRunModal]);
 
   // Query for listing saved flows
   const flowsQuery = useQuery({
@@ -228,6 +288,10 @@ export function Toolbar() {
     onEvent: (event) => {
       console.log('Execution event:', event);
       if (event.type === 'flow_start') {
+        // Switching back to live mode.
+        setInspectedRun(null);
+        setInspectedEvents([]);
+        setInspectedTraceEvents([]);
         setRunResult(null);
         setExecutionEvents([event]);
         setTraceEvents([]);
@@ -308,14 +372,24 @@ export function Toolbar() {
       toast.error('Please save the flow first');
       return;
     }
+    const issues = computeRunPreflightIssues(nodes, edges);
+    if (issues.length > 0) {
+      setPreflightIssues(issues);
+      setShowRunModal(false);
+      return;
+    }
+    clearPreflightIssues();
     setRunResult(null); // Clear previous result
     setShowRunModal(true);
-  }, [flowId]);
+  }, [clearPreflightIssues, edges, flowId, nodes, setPreflightIssues]);
 
   // Handle run from modal
   const handleRunExecute = useCallback((inputData: Record<string, unknown>) => {
     if (!flowId) return;
     setIsRunning(true);
+    setInspectedRun(null);
+    setInspectedEvents([]);
+    setInspectedTraceEvents([]);
     setRunResult(null);
     setExecutionEvents([]);
     setTraceEvents([]);
@@ -324,20 +398,49 @@ export function Toolbar() {
 
   // Handle modal close
   const handleRunModalClose = useCallback(() => {
+    if (inspectedRun) {
+      setShowRunModal(false);
+      setInspectedRun(null);
+      setInspectedEvents([]);
+      setInspectedTraceEvents([]);
+      return;
+    }
     if (!isRunning) {
       setShowRunModal(false);
       setRunResult(null);
       setExecutionEvents([]);
       setTraceEvents([]);
     }
-  }, [isRunning]);
+  }, [inspectedRun, isRunning]);
 
   const handleRunAgain = useCallback(() => {
     if (isRunning) return;
+    if (inspectedRun) {
+      setInspectedRun(null);
+      setInspectedEvents([]);
+      setInspectedTraceEvents([]);
+    }
     setRunResult(null);
     setExecutionEvents([]);
     setTraceEvents([]);
-  }, [isRunning]);
+  }, [inspectedRun, isRunning]);
+
+  const handleSelectHistoryRun = useCallback(
+    async (runId: string) => {
+      try {
+        const data = await fetchRunHistory(runId);
+        setInspectedRun(data.run);
+        setInspectedEvents(Array.isArray(data.events) ? data.events : []);
+        setInspectedTraceEvents([]);
+        setRunResult(null);
+        setShowRunHistory(false);
+        setShowRunModal(true);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Failed to load run history');
+      }
+    },
+    []
+  );
 
   // Handle export
   const handleExport = useCallback(() => {
@@ -439,6 +542,16 @@ export function Toolbar() {
           {isRunning ? '⏳ Running...' : '▶ Run'}
         </button>
 
+        <button
+          className="toolbar-button"
+          onClick={() => setShowRunHistory(true)}
+          disabled={!flowId}
+          title="Run history"
+          aria-label="Open run history"
+        >
+          🕘
+        </button>
+
         <div className="toolbar-divider" />
 
         <button
@@ -475,22 +588,52 @@ export function Toolbar() {
       </div>
 
       {/* Smart Run Modal */}
+      {(() => {
+        const viewing = inspectedRun !== null;
+        const evs = viewing ? inspectedEvents : executionEvents;
+        const traces = viewing ? inspectedTraceEvents : traceEvents;
+        const status = inspectedRun?.status || '';
+        const runningLike =
+          status === 'running' ||
+          (status === 'waiting' && inspectedRun?.wait_reason === 'subworkflow' && !inspectedRun?.paused);
+        const waitingLike =
+          status === 'waiting' && !inspectedRun?.paused && inspectedRun?.wait_reason !== 'subworkflow';
+        const pausedLike = Boolean(inspectedRun?.paused);
+        const waitingInfo2 = waitingLike
+          ? {
+              prompt: inspectedRun?.prompt || 'Please respond:',
+              choices: inspectedRun?.choices || [],
+              allowFreeText: inspectedRun?.allow_free_text !== false,
+              nodeId: inspectedRun?.current_node || null,
+            }
+          : waitingInfo;
+
+        return (
       <RunFlowModal
         isOpen={showRunModal}
         onClose={handleRunModalClose}
         onRun={handleRunExecute}
         onRunAgain={handleRunAgain}
-        isRunning={isRunning}
-        isPaused={isPaused}
-        result={runResult}
-        events={executionEvents}
-        traceEvents={traceEvents}
-        isWaiting={isWaiting}
-        waitingInfo={waitingInfo}
+        isRunning={viewing ? runningLike : isRunning}
+        isPaused={viewing ? pausedLike : isPaused}
+        result={viewing ? null : runResult}
+        events={evs}
+        traceEvents={traces}
+        isWaiting={viewing ? waitingLike : isWaiting}
+        waitingInfo={viewing ? waitingInfo2 : waitingInfo}
         onResume={resumeFlow}
-        onPause={pauseRun}
-        onResumeRun={resumeRun}
-        onCancelRun={cancelRun}
+        onPause={() => pauseRun(inspectedRun?.run_id)}
+        onResumeRun={() => resumeRun(inspectedRun?.run_id)}
+        onCancelRun={() => cancelRun(inspectedRun?.run_id)}
+      />
+        );
+      })()}
+
+      <RunHistoryModal
+        isOpen={showRunHistory}
+        workflowId={flowId || ''}
+        onClose={() => setShowRunHistory(false)}
+        onSelectRun={handleSelectHistoryRun}
       />
 
       <FlowLibraryModal

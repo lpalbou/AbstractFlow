@@ -92,6 +92,7 @@ class NodeType(str, Enum):
     ARRAY_DEDUP = "array_dedup"
     GET_VAR = "get_var"
     SET_VAR = "set_var"
+    SET_VARS = "set_vars"
     PARSE_JSON = "parse_json"
     BREAK_OBJECT = "break_object"
     SYSTEM_DATETIME = "system_datetime"

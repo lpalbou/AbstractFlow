@@ -18,7 +18,8 @@ from typing import Any, Tuple
 
 _IS_TEST = bool(os.getenv("PYTEST_CURRENT_TEST") or "pytest" in sys.modules)
 
-_PERSIST_DIR = Path(os.getenv("ABSTRACTFLOW_RUNTIME_DIR", "./runtime"))
+_DEFAULT_PERSIST_DIR = Path(__file__).resolve().parents[2] / "runtime"
+_PERSIST_DIR = Path(os.getenv("ABSTRACTFLOW_RUNTIME_DIR", str(_DEFAULT_PERSIST_DIR)))
 _PERSIST_DIR.mkdir(parents=True, exist_ok=True)
 
 

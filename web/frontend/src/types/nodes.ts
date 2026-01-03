@@ -498,6 +498,22 @@ const VARIABLE_NODES: NodeTemplate[] = [
     ],
     category: 'variables',
   },
+  {
+    type: 'set_vars',
+    icon: '&#x1F4E4;&#xFE0F;', // Outbox tray (plural setter)
+    label: 'Set Variables',
+    description: 'Write multiple variables into workflow state in a single step (updates is an object of name→value).',
+    headerColor: '#16A085',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'updates', label: 'updates', type: 'object' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'updates', label: 'updates', type: 'object' },
+    ],
+    category: 'variables',
+  },
 ];
 
 // Literal/Value nodes - Output constant values (no execution pins, no inputs)

@@ -37,6 +37,9 @@ interface FlowState {
   loopProgressByNodeId: Record<string, { index: number; total: number }>;
   lastLoopProgress: { nodeId: string; index: number; total: number } | null;
 
+  // Preflight validation (before starting a run)
+  preflightIssues: Array<{ id: string; nodeId: string; nodeLabel: string; message: string }>;
+
   // Editor clipboard (nodes only; edges are intentionally excluded)
   clipboard: NodeClipboard | null;
   clipboardPasteCount: number;
@@ -67,6 +70,8 @@ interface FlowState {
   markRecentEdge: (edgeId: string) => void;
   unmarkRecentEdge: (edgeId: string) => void;
   setLoopProgress: (nodeId: string, index: number, total: number) => void;
+  setPreflightIssues: (issues: Array<{ id: string; nodeId: string; nodeLabel: string; message: string }>) => void;
+  clearPreflightIssues: () => void;
   loadFlow: (flow: VisualFlow) => void;
   getFlow: () => VisualFlow;
   clearFlow: () => void;
@@ -142,6 +147,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   recentEdgeIds: {},
   loopProgressByNodeId: {},
   lastLoopProgress: null,
+  preflightIssues: [],
   clipboard: null,
   clipboardPasteCount: 0,
 
@@ -477,6 +483,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       const next = { ...s.loopProgressByNodeId, [nodeId]: { index, total } };
       return { loopProgressByNodeId: next, lastLoopProgress: { nodeId, index, total } };
     }),
+
+  setPreflightIssues: (issues) => set({ preflightIssues: Array.isArray(issues) ? issues : [] }),
+  clearPreflightIssues: () => set({ preflightIssues: [] }),
 
   // Load a flow from API
   loadFlow: (flow) => {

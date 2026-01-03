@@ -991,14 +991,26 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
                     pin_order.append(pid)
 
         if not pin_order:
-            pin_order = ["a"]
+            # Backward-compat: programmatic/test-created VisualNodes may omit template pins.
+            # In that case, infer a stable pin order from the provided input keys at runtime
+            # (prefer a..z single-letter pins), so `a`, `b`, ... behave as expected.
+            pin_order = []
 
         def handler(input_data: Any) -> str:
             if not isinstance(input_data, dict):
                 return str(input_data or "")
 
             parts: list[str] = []
-            for pid in pin_order:
+            if pin_order:
+                order = pin_order
+            else:
+                # Stable inference for missing pin metadata.
+                keys = [k for k in input_data.keys() if isinstance(k, str)]
+                letter = sorted([k for k in keys if len(k) == 1 and "a" <= k <= "z"])
+                other = sorted([k for k in keys if k not in set(letter)])
+                order = letter + other
+
+            for pid in order:
                 if pid in input_data:
                     v = input_data.get(pid)
                     parts.append("" if v is None else str(v))
@@ -1412,6 +1424,15 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
                 if isinstance(pid, str) and pid:
                     input_pin_ids.append(pid)
 
+        inherit_cfg = None
+        if isinstance(data, dict):
+            cfg = data.get("effectConfig")
+            if isinstance(cfg, dict):
+                inherit_cfg = cfg.get("inherit_context")
+                if inherit_cfg is None:
+                    inherit_cfg = cfg.get("inheritContext")
+        inherit_context_default = bool(inherit_cfg) if inherit_cfg is not None else False
+
         def handler(input_data):
             subflow_id = (
                 data.get("subflowId")
@@ -1448,12 +1469,15 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
 
             return {
                 "output": None,
-                "_pending_effect": {
-                    "type": "start_subworkflow",
-                    "workflow_id": subflow_id,
-                    "vars": sub_vars_dict,
-                    "async": False,
-                },
+                "_pending_effect": (
+                    {
+                        "type": "start_subworkflow",
+                        "workflow_id": subflow_id,
+                        "vars": sub_vars_dict,
+                        "async": False,
+                        **({"inherit_context": True} if inherit_context_default else {}),
+                    }
+                ),
             }
 
         return handler
@@ -2065,6 +2089,24 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
         return handler
 
     def _create_memory_note_handler(data: Dict[str, Any], config: Dict[str, Any]):
+        def _as_bool(value: Any) -> bool:
+            if isinstance(value, bool):
+                return bool(value)
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                try:
+                    return float(value) != 0.0
+                except Exception:
+                    return False
+            if isinstance(value, str):
+                s = value.strip().lower()
+                if not s:
+                    return False
+                if s in {"false", "0", "no", "off"}:
+                    return False
+                if s in {"true", "1", "yes", "on"}:
+                    return True
+            return False
+
         def handler(input_data):
             content = input_data.get("content", "") if isinstance(input_data, dict) else str(input_data)
             tags = input_data.get("tags") if isinstance(input_data, dict) else None
@@ -2079,6 +2121,16 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
                 pending["location"] = location.strip()
             if isinstance(scope, str) and scope.strip():
                 pending["scope"] = scope.strip()
+
+            # Visual-editor config: optionally rehydrate the stored note into context.messages.
+            keep_cfg = None
+            if isinstance(config, dict):
+                keep_cfg = config.get("keep_in_context")
+                if keep_cfg is None:
+                    keep_cfg = config.get("keepInContext")
+            keep_in_context = _as_bool(keep_cfg)
+            if keep_in_context:
+                pending["keep_in_context"] = True
 
             return {"note_id": None, "_pending_effect": pending}
 

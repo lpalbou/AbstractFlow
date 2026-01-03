@@ -115,6 +115,9 @@ export function RunFlowModal({
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [resumeDraft, setResumeDraft] = useState('');
   const [isMinimized, setIsMinimized] = useState(false);
+  const [rehydrateArtifactMarkdown, setRehydrateArtifactMarkdown] = useState<string | null>(null);
+  const [rehydrateArtifactError, setRehydrateArtifactError] = useState<string | null>(null);
+  const [rehydrateArtifactLoading, setRehydrateArtifactLoading] = useState(false);
 
   const providerPinId = useMemo(() => {
     const pin = inputPins.find((p) => p.type === 'provider' || p.id === 'provider');
@@ -790,7 +793,7 @@ export function RunFlowModal({
     return `rgba(${r},${g},${b},${alpha})`;
   };
 
-  const formatValue = (value: unknown) => {
+  const formatValue = useCallback((value: unknown) => {
     if (value == null) return '';
     if (typeof value === 'string') return value;
     try {
@@ -798,7 +801,7 @@ export function RunFlowModal({
     } catch {
       return String(value);
     }
-  };
+  }, []);
 
   const copyToClipboard = async (value: unknown) => {
     const text = formatValue(value);
@@ -914,7 +917,10 @@ export function RunFlowModal({
     if (!selectedStep || selectedStep.nodeType !== 'memory_note') return null;
     if (!selectedStep.nodeId) return null;
 
-    // Prefer the runtime-owned preview when available (works even when `content` comes from pure/literal nodes).
+    // Prefer the *actual* content wired into the node (full fidelity).
+    // The runtime meta `note_preview` is intentionally shortened for observability,
+    // so we only use it as a fallback.
+    let fallbackPreview: string | null = null;
     const out = selectedStep.output;
     if (out && typeof out === 'object' && !Array.isArray(out)) {
       const obj = out as Record<string, unknown>;
@@ -928,7 +934,7 @@ export function RunFlowModal({
             const meta = (first as Record<string, unknown>).meta;
             if (meta && typeof meta === 'object') {
               const notePreview = (meta as Record<string, unknown>).note_preview;
-              if (typeof notePreview === 'string' && notePreview.trim()) return notePreview.trim();
+              if (typeof notePreview === 'string' && notePreview.trim()) fallbackPreview = notePreview.trim();
             }
           }
         }
@@ -969,31 +975,138 @@ export function RunFlowModal({
       return trimmed ? trimmed : null;
     }
 
-    return null;
+    return fallbackPreview;
   }, [edges, events, formatValue, nodes, rootRunId, selectedEventIndex, selectedStep]);
 
-  const recallIntoContextPreview = useMemo(() => {
-    if (!selectedStep || selectedStep.nodeType !== 'memory_rehydrate') return null;
+  const recallIntoContextArtifacts = useMemo(() => {
+    if (!selectedStep || selectedStep.nodeType !== 'memory_rehydrate') return [];
     const out = selectedStep.output;
-    if (!out || typeof out !== 'object' || Array.isArray(out)) return null;
+    if (!out || typeof out !== 'object' || Array.isArray(out)) return [];
     const obj = out as Record<string, unknown>;
     const artifactsRaw = obj.artifacts;
     const artifacts = Array.isArray(artifactsRaw) ? artifactsRaw : [];
-    if (!artifacts.length) return null;
+    if (!artifacts.length) return [];
 
-    const blocks: string[] = [];
+    const entries: Array<{ artifact_id: string; inserted?: number; skipped?: number; preview?: string; error?: string }> = [];
     for (const a of artifacts) {
       if (!a || typeof a !== 'object') continue;
       const ao = a as Record<string, unknown>;
-      const kind = typeof ao.kind === 'string' ? ao.kind.trim() : '';
-      const preview = typeof ao.preview === 'string' ? ao.preview.trim() : '';
+      const artifact_id = typeof ao.artifact_id === 'string' ? ao.artifact_id.trim() : '';
+      if (!artifact_id) continue;
+      const inserted = typeof ao.inserted === 'number' ? ao.inserted : undefined;
+      const skipped = typeof ao.skipped === 'number' ? ao.skipped : undefined;
+      const preview = typeof ao.preview === 'string' ? ao.preview : undefined;
+      const error = typeof ao.error === 'string' ? ao.error : undefined;
+      entries.push({ artifact_id, inserted, skipped, preview, error });
+    }
+    return entries;
+  }, [selectedStep]);
+
+  const recallIntoContextPreview = useMemo(() => {
+    if (!selectedStep || selectedStep.nodeType !== 'memory_rehydrate') return null;
+    if (!recallIntoContextArtifacts.length) return null;
+
+    const blocks: string[] = [];
+    for (const a of recallIntoContextArtifacts) {
+      const preview = typeof a.preview === 'string' ? a.preview.trim() : '';
       if (!preview) continue;
-      const title = kind ? `**${kind}**` : '**memory**';
+      const title = `**artifact** \`${a.artifact_id}\``;
       blocks.push(`${title}\n${preview}`);
     }
     const text = blocks.join('\n\n').trim();
     return text ? text : null;
-  }, [selectedStep]);
+  }, [recallIntoContextArtifacts, selectedStep]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!selectedStep || selectedStep.nodeType !== 'memory_rehydrate' || !rootRunId) {
+      setRehydrateArtifactMarkdown(null);
+      setRehydrateArtifactError(null);
+      setRehydrateArtifactLoading(false);
+      return;
+    }
+    if (!recallIntoContextArtifacts.length) {
+      setRehydrateArtifactMarkdown(null);
+      setRehydrateArtifactError(null);
+      setRehydrateArtifactLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const artifactIds = recallIntoContextArtifacts.map((a) => a.artifact_id);
+
+    setRehydrateArtifactLoading(true);
+    setRehydrateArtifactError(null);
+    setRehydrateArtifactMarkdown(null);
+
+    (async () => {
+      const fetched = await Promise.all(
+        artifactIds.map(async (aid) => {
+          const res = await fetch(`/api/runs/${encodeURIComponent(rootRunId)}/artifacts/${encodeURIComponent(aid)}`);
+          if (!res.ok) throw new Error(`Failed to fetch artifact ${aid} (HTTP ${res.status})`);
+          return res.json() as Promise<{ artifact_id: string; payload: unknown }>;
+        })
+      );
+
+      const blocks: string[] = [];
+      for (const entry of recallIntoContextArtifacts) {
+        const found = fetched.find((x) => x && x.artifact_id === entry.artifact_id);
+        const payload = found ? found.payload : null;
+
+        const metaLines: string[] = [];
+        if (typeof entry.inserted === 'number') metaLines.push(`- inserted: ${entry.inserted}`);
+        if (typeof entry.skipped === 'number') metaLines.push(`- skipped: ${entry.skipped}`);
+        if (typeof entry.error === 'string' && entry.error.trim()) metaLines.push(`- error: ${entry.error.trim()}`);
+
+        let body = '';
+        if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+          const obj = payload as Record<string, unknown>;
+          const note = typeof obj.note === 'string' ? obj.note : '';
+          const messages = Array.isArray(obj.messages) ? obj.messages : null;
+          if (note && note.trim()) {
+            body = note.trim();
+          } else if (messages) {
+            const lines: string[] = [];
+            for (const m of messages) {
+              if (!m || typeof m !== 'object') continue;
+              const mo = m as Record<string, unknown>;
+              const role = typeof mo.role === 'string' ? mo.role : 'unknown';
+              const ts = typeof mo.timestamp === 'string' ? mo.timestamp : '';
+              const content = typeof mo.content === 'string' ? mo.content : '';
+              const prefix = ts ? `${ts} ${role}: ` : `${role}: `;
+              lines.push(prefix + content);
+            }
+            body = `\`\`\`text\n${lines.join('\n\n')}\n\`\`\``;
+          } else {
+            body = `\`\`\`json\n${formatValue(payload)}\n\`\`\``;
+          }
+        } else if (payload != null) {
+          body = `\`\`\`json\n${formatValue(payload)}\n\`\`\``;
+        }
+
+        const header = `**artifact** \`${entry.artifact_id}\``;
+        const block = [header, metaLines.join('\n'), body].filter((s) => s && s.trim()).join('\n\n');
+        blocks.push(block);
+      }
+
+      const markdown = blocks.join('\n\n---\n\n').trim();
+      if (!cancelled) {
+        setRehydrateArtifactMarkdown(markdown || null);
+        setRehydrateArtifactLoading(false);
+      }
+    })().catch((e) => {
+      if (cancelled) return;
+      setRehydrateArtifactMarkdown(null);
+      setRehydrateArtifactError(e instanceof Error ? e.message : 'Failed to fetch artifacts');
+      setRehydrateArtifactLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [formatValue, isOpen, recallIntoContextArtifacts, rootRunId, selectedStep]);
+
+  const recallIntoContextDisplay = rehydrateArtifactMarkdown || recallIntoContextPreview;
 
   const onFlowStartParams = useMemo(() => {
     if (!selectedStep || selectedStep.nodeType !== 'on_flow_start') return null;
@@ -1197,9 +1310,11 @@ export function RunFlowModal({
           </div>
         </div>
 
-        {/* Execution (Steps + Details) */}
-        {hasRunData && (
-          <div className="run-modal-execution">
+        {/* Body (scrollable) */}
+        <div className="run-modal-body">
+          {/* Execution (Steps + Details) */}
+          {hasRunData && (
+            <div className="run-modal-execution">
             <div className="run-steps">
               <div className="run-steps-header">
                 <div className="run-steps-title">Execution</div>
@@ -1424,7 +1539,7 @@ export function RunFlowModal({
                         ) : null}
                       </div>
 
-                      {(outputPreview || memorizeContentPreview || recallIntoContextPreview || (selectedStep?.nodeType === 'on_flow_start' && onFlowStartParams)) ? (
+                      {(outputPreview || memorizeContentPreview || recallIntoContextDisplay || (selectedStep?.nodeType === 'on_flow_start' && onFlowStartParams)) ? (
                         <div className="run-output-preview">
                           {selectedStep?.nodeType === 'on_flow_start' && onFlowStartParams ? (
                             <div className="run-output-section">
@@ -1480,9 +1595,13 @@ export function RunFlowModal({
                           {selectedStep?.nodeType === 'memory_rehydrate' ? (
                             <div className="run-output-section">
                               <div className="run-output-title">Recalled content</div>
-                              {recallIntoContextPreview ? (
+                              {rehydrateArtifactLoading ? (
+                                <div className="run-details-empty">Loading recalled content…</div>
+                              ) : rehydrateArtifactError ? (
+                                <div className="run-details-error">{rehydrateArtifactError}</div>
+                              ) : recallIntoContextDisplay ? (
                                 <div className="run-details-markdown run-param-markdown">
-                                  <MarkdownRenderer markdown={recallIntoContextPreview} />
+                                  <MarkdownRenderer markdown={recallIntoContextDisplay} />
                                 </div>
                               ) : (
                                 <div className="run-details-empty">No preview available.</div>
@@ -1623,24 +1742,24 @@ export function RunFlowModal({
               )}
             </div>
           </div>
-        )}
+          )}
 
-        {/* Input form */}
-        {!hasRunData && !result && (
-          <>
-            {entryNode ? (
-              <div className="run-form">
-                <p className="run-form-intro">
-                  Entry point: <strong>{entryNode.data.label}</strong>
-                </p>
-
-                {inputPins.length === 0 ? (
-                  <p className="run-form-note">
-                    This flow has no input parameters. Click Run to execute.
+          {/* Input form */}
+          {!hasRunData && !result && (
+            <>
+              {entryNode ? (
+                <div className="run-form">
+                  <p className="run-form-intro">
+                    Entry point: <strong>{entryNode.data.label}</strong>
                   </p>
-                ) : (
-                  <div className="run-form-fields">
-                    {inputPins.map(pin => {
+
+                  {inputPins.length === 0 ? (
+                    <p className="run-form-note">
+                      This flow has no input parameters. Click Run to execute.
+                    </p>
+                  ) : (
+                    <div className="run-form-fields">
+                      {inputPins.map(pin => {
                       const inputType = getInputTypeForPin(pin.type);
                       const value = formValues[pin.id] || '';
 
@@ -1689,57 +1808,58 @@ export function RunFlowModal({
                       }
 
                       return (
-                        <div key={pin.id} className="run-form-field">
-                          <label className="run-form-label">
-                            {pin.label}
-                            <span className="run-form-type">({pin.type})</span>
-                          </label>
+                          <div key={pin.id} className="run-form-field">
+                            <label className="run-form-label">
+                              {pin.label}
+                              <span className="run-form-type">({pin.type})</span>
+                            </label>
 
-                          {inputType === 'textarea' ? (
-                            <textarea
-                              className="run-form-input"
-                              value={value}
-                              onChange={(e) => handleFieldChange(pin.id, e.target.value)}
-                              placeholder={getPlaceholderForPin(pin)}
-                              rows={pin.type === 'string' ? 4 : 5}
-                              disabled={isRunning}
-                            />
-                          ) : inputType === 'checkbox' ? (
-                            <label className="run-form-checkbox">
-                              <input
-                                type="checkbox"
-                                checked={value === 'true'}
-                                onChange={(e) => handleFieldChange(pin.id, e.target.checked ? 'true' : 'false')}
+                            {inputType === 'textarea' ? (
+                              <textarea
+                                className="run-form-input"
+                                value={value}
+                                onChange={(e) => handleFieldChange(pin.id, e.target.value)}
+                                placeholder={getPlaceholderForPin(pin)}
+                                rows={pin.type === 'string' ? 3 : 5}
                                 disabled={isRunning}
                               />
-                              <span>{pin.label}</span>
-                            </label>
-                          ) : (
-                            <input
-                              type={inputType}
-                              className="run-form-input"
-                              value={value}
-                              onChange={(e) => handleFieldChange(pin.id, e.target.value)}
-                              placeholder={getPlaceholderForPin(pin)}
-                              disabled={isRunning}
-                            />
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p className="run-form-note">
-                No nodes in this flow. Add an entry node to run.
-              </p>
-            )}
-          </>
-        )}
+                            ) : inputType === 'checkbox' ? (
+                              <label className="run-form-checkbox">
+                                <input
+                                  type="checkbox"
+                                  checked={value === 'true'}
+                                  onChange={(e) => handleFieldChange(pin.id, e.target.checked ? 'true' : 'false')}
+                                  disabled={isRunning}
+                                />
+                                <span>{pin.label}</span>
+                              </label>
+                            ) : (
+                              <input
+                                type={inputType}
+                                className="run-form-input"
+                                value={value}
+                                onChange={(e) => handleFieldChange(pin.id, e.target.value)}
+                                placeholder={getPlaceholderForPin(pin)}
+                                disabled={isRunning}
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="run-form-note">
+                  No nodes in this flow. Add an entry node to run.
+                </p>
+              )}
+            </>
+          )}
+        </div>
 
-        {/* Actions */}
-        <div className="modal-actions">
+        {/* Footer */}
+        <div className="modal-actions run-modal-footer">
           {onCancelRun && (
             <button
               className="modal-button cancel"

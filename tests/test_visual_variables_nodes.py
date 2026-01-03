@@ -172,4 +172,118 @@ def test_set_var_rejects_reserved_names() -> None:
     assert "reserved" in str(result.get("error", "")).lower() or "reserved" in str(result.get("result", "")).lower()
 
 
+def test_set_vars_updates_multiple_run_vars_in_one_step() -> None:
+    flow = VisualFlow(
+        id="flow-vars-batch",
+        name="vars batch",
+        entryNode="start",
+        nodes=[
+            VisualNode(id="start", type=NodeType.ON_FLOW_START, position=Position(x=0, y=0), data={}),
+            VisualNode(
+                id="updates",
+                type=NodeType.LITERAL_JSON,
+                position=Position(x=0, y=0),
+                data={"literalValue": {"a": "A", "b": 2}},
+            ),
+            VisualNode(
+                id="set",
+                type=NodeType.SET_VARS,
+                position=Position(x=0, y=0),
+                data={
+                    "inputs": [
+                        {"id": "exec-in", "label": "", "type": "execution"},
+                        {"id": "updates", "label": "updates", "type": "object"},
+                    ],
+                    "outputs": [
+                        {"id": "exec-out", "label": "", "type": "execution"},
+                        {"id": "updates", "label": "updates", "type": "object"},
+                    ],
+                },
+            ),
+            VisualNode(
+                id="get_a",
+                type=NodeType.GET_VAR,
+                position=Position(x=0, y=0),
+                data={
+                    "inputs": [{"id": "name", "label": "name", "type": "string"}],
+                    "outputs": [{"id": "value", "label": "value", "type": "any"}],
+                    "pinDefaults": {"name": "a"},
+                },
+            ),
+            VisualNode(
+                id="get_b",
+                type=NodeType.GET_VAR,
+                position=Position(x=0, y=0),
+                data={
+                    "inputs": [{"id": "name", "label": "name", "type": "string"}],
+                    "outputs": [{"id": "value", "label": "value", "type": "any"}],
+                    "pinDefaults": {"name": "b"},
+                },
+            ),
+            VisualNode(
+                id="read",
+                type=NodeType.CODE,
+                position=Position(x=0, y=0),
+                data={
+                    "code": (
+                        "def transform(input):\n"
+                        "    if not isinstance(input, dict):\n"
+                        "        return {'a': None, 'b': None}\n"
+                        "    return {'a': input.get('a'), 'b': input.get('b')}\n"
+                    ),
+                    "functionName": "transform",
+                },
+            ),
+        ],
+        edges=[
+            VisualEdge(id="e1", source="start", sourceHandle="exec-out", target="set", targetHandle="exec-in"),
+            VisualEdge(id="e2", source="set", sourceHandle="exec-out", target="read", targetHandle="exec-in"),
+            VisualEdge(id="d1", source="updates", sourceHandle="value", target="set", targetHandle="updates"),
+            VisualEdge(id="d2", source="get_a", sourceHandle="value", target="read", targetHandle="a"),
+            VisualEdge(id="d3", source="get_b", sourceHandle="value", target="read", targetHandle="b"),
+        ],
+    )
+
+    result = execute_visual_flow(flow, {}, flows={flow.id: flow})
+    assert result["success"] is True
+    assert result["result"] == {"a": "A", "b": 2}
+
+
+def test_set_vars_rejects_reserved_names() -> None:
+    flow = VisualFlow(
+        id="flow-vars-batch-reserved",
+        name="vars batch reserved",
+        entryNode="start",
+        nodes=[
+            VisualNode(id="start", type=NodeType.ON_FLOW_START, position=Position(x=0, y=0), data={}),
+            VisualNode(
+                id="updates",
+                type=NodeType.LITERAL_JSON,
+                position=Position(x=0, y=0),
+                data={"literalValue": {"_private": 1}},
+            ),
+            VisualNode(
+                id="set",
+                type=NodeType.SET_VARS,
+                position=Position(x=0, y=0),
+                data={
+                    "inputs": [
+                        {"id": "exec-in", "label": "", "type": "execution"},
+                        {"id": "updates", "label": "updates", "type": "object"},
+                    ],
+                    "outputs": [{"id": "exec-out", "label": "", "type": "execution"}],
+                },
+            ),
+        ],
+        edges=[
+            VisualEdge(id="e1", source="start", sourceHandle="exec-out", target="set", targetHandle="exec-in"),
+            VisualEdge(id="d1", source="updates", sourceHandle="value", target="set", targetHandle="updates"),
+        ],
+    )
+
+    result = execute_visual_flow(flow, {}, flows={flow.id: flow})
+    assert result["success"] is False
+    assert "reserved" in str(result.get("error", "")).lower() or "reserved" in str(result.get("result", "")).lower()
+
+
 

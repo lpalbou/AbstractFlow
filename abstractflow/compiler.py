@@ -207,6 +207,39 @@ def _create_effect_node_handler(
                     except Exception:
                         pass
 
+                # Visual Subflow UX: optionally seed the child run's `context.messages` from the
+                # parent run's active context view (so LLM/Agent nodes inside the subflow can
+                # "Use context" without extra wiring).
+                if (
+                    eff_type == EffectType.START_SUBWORKFLOW
+                    and isinstance(pending, dict)
+                    and pending.get("inherit_context") is True
+                ):
+                    try:
+                        from abstractruntime.memory.active_context import ActiveContextPolicy
+
+                        inherited = ActiveContextPolicy.select_active_messages_for_llm_from_run(run)
+                        inherited_msgs = [dict(m) for m in inherited if isinstance(m, dict)]
+                        if inherited_msgs:
+                            sub_vars = pending.get("vars")
+                            if not isinstance(sub_vars, dict):
+                                sub_vars = {}
+                            sub_ctx = sub_vars.get("context")
+                            if not isinstance(sub_ctx, dict):
+                                sub_ctx = {}
+                                sub_vars["context"] = sub_ctx
+
+                            # Explicit child context wins (do not override).
+                            existing = sub_ctx.get("messages")
+                            if not isinstance(existing, list) or not existing:
+                                sub_ctx["messages"] = inherited_msgs
+
+                            pending["vars"] = sub_vars
+                    except Exception:
+                        pass
+                    # Keep payload clean (runtime ignores it, but it clutters traces).
+                    pending.pop("inherit_context", None)
+
                 # Build the Effect with resolved values from data edges
                 effect = Effect(
                     type=eff_type,
@@ -1761,6 +1794,16 @@ def compile_flow(flow: Flow) -> "WorkflowSpec":
 
             data_aware_handler = handler_obj if callable(handler_obj) else None
             handlers[node_id] = create_set_var_node_handler(
+                node_id=node_id,
+                next_node=next_node,
+                data_aware_handler=data_aware_handler,
+                flow=flow,
+            )
+        elif visual_type == "set_vars":
+            from .adapters.variable_adapter import create_set_vars_node_handler
+
+            data_aware_handler = handler_obj if callable(handler_obj) else None
+            handlers[node_id] = create_set_vars_node_handler(
                 node_id=node_id,
                 next_node=next_node,
                 data_aware_handler=data_aware_handler,

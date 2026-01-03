@@ -28,8 +28,12 @@
 
 .flow-node.executing {
   border-color: var(--success);
-  box-shadow: 0 0 0 2px var(--success), 0 4px 12px rgba(39, 174, 96, 0.4);
-  animation: pulse 1s infinite;
+  /* Stronger, softer “bloom” (more like emissive glow than a hard outline). */
+  box-shadow:
+    0 0 0 2px rgba(39, 174, 96, 0.55),
+    0 0 22px 8px rgba(39, 174, 96, 0.18),
+    0 12px 28px rgba(39, 174, 96, 0.22);
+  animation: pulse 1.05s ease-in-out infinite;
 }
 
 /* Afterglow: keep a subtle highlight for recently executed nodes to visualize fast flows. */
@@ -43,10 +47,16 @@
 @keyframes pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 2px var(--success), 0 4px 12px rgba(39, 174, 96, 0.4);
+    box-shadow:
+      0 0 0 2px rgba(39, 174, 96, 0.55),
+      0 0 22px 8px rgba(39, 174, 96, 0.18),
+      0 12px 28px rgba(39, 174, 96, 0.22);
   }
   50% {
-    box-shadow: 0 0 0 4px var(--success), 0 4px 16px rgba(39, 174, 96, 0.6);
+    box-shadow:
+      0 0 0 3px rgba(39, 174, 96, 0.70),
+      0 0 34px 14px rgba(39, 174, 96, 0.22),
+      0 18px 40px rgba(39, 174, 96, 0.28);
   }
 }
 
@@ -400,7 +410,10 @@
   stroke: var(--success);
   stroke-width: 4;
   opacity: 0.95;
-  filter: drop-shadow(0 0 8px rgba(39, 174, 96, 0.65));
+  /* More prominent + diffuse bloom for active control-flow edges. */
+  filter:
+    drop-shadow(0 0 10px rgba(39, 174, 96, 0.55))
+    drop-shadow(0 0 22px rgba(39, 174, 96, 0.35));
 }
 
 /* Base styling for execution edges (control-flow). */

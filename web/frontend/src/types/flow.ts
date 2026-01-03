@@ -60,7 +60,7 @@ export type NodeType =
   | 'for'
   // Data - Pure functions (no exec pins)
   | 'get' | 'set' | 'merge' | 'make_array' | 'array_map' | 'array_filter' | 'array_concat' | 'array_length' | 'array_append' | 'array_dedup'
-  | 'get_var' | 'set_var'
+  | 'get_var' | 'set_var' | 'set_vars'
   | 'parse_json' | 'break_object' | 'system_datetime'
   | 'provider_catalog' | 'provider_models'
   // Backward-compat: deprecated
@@ -166,6 +166,10 @@ export interface FlowNodeData {
     name?: string;
     scope?: 'session' | 'workflow' | 'run' | 'global';
     sessionId?: string; // Optional target session id when not connected via pin
+    // For memory_note
+    keep_in_context?: boolean; // When true, store the note AND rehydrate it into context.messages (as a synthetic system message).
+    // For subflow
+    inherit_context?: boolean; // When true, seed the child run's context.messages from the parent run's active context view.
   };
 
   // Model Catalog node configuration
@@ -254,6 +258,30 @@ export interface FlowRunResult {
   result?: unknown;
   error?: string;
   run_id?: string;
+}
+
+// Persisted run summary (for run history UX)
+export interface RunSummary {
+  run_id: string;
+  workflow_id?: string | null;
+  status: string;
+  current_node?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  parent_run_id?: string | null;
+  error?: string | null;
+  wait_reason?: string | null;
+  wait_key?: string | null;
+  paused?: boolean;
+  // Present only when the run is waiting for real user input (not pause/subworkflow)
+  prompt?: string | null;
+  choices?: string[] | null;
+  allow_free_text?: boolean | null;
+}
+
+export interface RunHistoryResponse {
+  run: RunSummary;
+  events: ExecutionEvent[];
 }
 
 // Provider information from AbstractCore

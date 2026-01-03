@@ -22,6 +22,7 @@ import { NodeTemplate } from '../types/nodes';
 import type { FlowNodeData, PinType } from '../types/flow';
 import { PIN_COLORS } from '../types/flow';
 import { PinLegend } from './PinLegend';
+import { RunPreflightPanel } from './RunPreflightPanel';
 
 export function Canvas() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
@@ -202,6 +203,21 @@ export function Canvas() {
     reactFlowInstance.current = instance;
   }, []);
 
+  const focusNode = useCallback(
+    (nodeId: string) => {
+      const inst = reactFlowInstance.current;
+      if (!inst) return;
+      const node = nodes.find((n) => n.id === nodeId);
+      if (!node) return;
+      try {
+        inst.fitView({ nodes: [node], padding: 0.35, duration: 250, maxZoom: DEFAULT_ZOOM });
+      } catch {
+        // best-effort; ignore
+      }
+    },
+    [nodes, DEFAULT_ZOOM]
+  );
+
   // Get edge style based on source handle type
   const getEdgeStyleColor = (edge: Edge): string | null => {
     const sourceHandle = edge.sourceHandle || '';
@@ -315,6 +331,7 @@ export function Canvas() {
           maskColor="rgba(0, 0, 0, 0.7)"
         />
       </ReactFlow>
+      <RunPreflightPanel onFocusNode={focusNode} />
       <PinLegend />
     </div>
   );

@@ -293,3 +293,106 @@ def test_ws_subflow_child_ask_user_waits_then_resume_completes() -> None:
     finally:
         _flows.pop(child_id, None)
         _flows.pop(parent_id, None)
+
+
+def test_ws_subflow_can_inherit_parent_context_messages_when_configured() -> None:
+    child_id = "child-flow-inherit-context"
+    parent_id = "parent-flow-inherit-context"
+
+    child = VisualFlow(
+        id=child_id,
+        name="child inherit context",
+        entryNode="c1",
+        nodes=[
+            VisualNode(
+                id="c1",
+                type=NodeType.CODE,
+                position=Position(x=0, y=0),
+                data={
+                    "inputKey": "context",
+                    "code": (
+                        "def transform(input):\n"
+                        "    msgs = input.get('messages') if isinstance(input, dict) else []\n"
+                        "    if not isinstance(msgs, list):\n"
+                        "        return {'inherited': False}\n"
+                        "    for m in msgs:\n"
+                        "        if not isinstance(m, dict):\n"
+                        "            continue\n"
+                        "        if str(m.get('content') or '') == 'PARENT_CTX':\n"
+                        "            return {'inherited': True}\n"
+                        "    return {'inherited': False}\n"
+                    ),
+                    "functionName": "transform",
+                },
+            )
+        ],
+        edges=[],
+    )
+
+    parent = VisualFlow(
+        id=parent_id,
+        name="parent inherit context",
+        entryNode="p1",
+        nodes=[
+            VisualNode(
+                id="p1",
+                type=NodeType.ON_USER_REQUEST,
+                position=Position(x=0, y=0),
+                data={},
+            ),
+            VisualNode(
+                id="p2",
+                type=NodeType.SUBFLOW,
+                position=Position(x=0, y=0),
+                data={"subflowId": child_id, "effectConfig": {"inherit_context": True}},
+            ),
+            VisualNode(
+                id="p3",
+                type=NodeType.CODE,
+                position=Position(x=0, y=0),
+                data={
+                    "code": (
+                        "def transform(input):\n"
+                        "    out = input.get('input') if isinstance(input, dict) else None\n"
+                        "    return {'inherited': (out or {}).get('inherited') if isinstance(out, dict) else False}\n"
+                    ),
+                    "functionName": "transform",
+                },
+            ),
+        ],
+        edges=[
+            VisualEdge(id="e1", source="p1", sourceHandle="exec-out", target="p2", targetHandle="exec-in"),
+            VisualEdge(id="e2", source="p2", sourceHandle="exec-out", target="p3", targetHandle="exec-in"),
+            VisualEdge(id="d1", source="p2", sourceHandle="output", target="p3", targetHandle="input"),
+        ],
+    )
+
+    _flows[child_id] = child
+    _flows[parent_id] = parent
+    try:
+        with TestClient(app) as client:
+            with client.websocket_connect(f"/api/ws/{parent_id}") as ws:
+                ws.send_text(
+                    json.dumps(
+                        {
+                            "type": "run",
+                            "input_data": {
+                                "context": {"messages": [{"role": "system", "content": "PARENT_CTX"}]},
+                            },
+                        }
+                    )
+                )
+
+                completed = None
+                for _ in range(200):
+                    msg = ws.receive_json()
+                    if msg.get("type") == "flow_complete":
+                        completed = msg
+                        break
+
+                assert completed is not None
+                assert completed["result"]["success"] is True
+                assert completed["result"]["result"]["inherited"] is True
+    finally:
+        _flows.pop(child_id, None)
+        _flows.pop(parent_id, None)

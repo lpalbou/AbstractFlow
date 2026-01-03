@@ -497,6 +497,28 @@ export const BaseNode = memo(function BaseNode({
   const isMemoryNoteNode = data.nodeType === 'memory_note';
   const isMemoryQueryNode = data.nodeType === 'memory_query';
   const isMemoryRehydrateNode = data.nodeType === 'memory_rehydrate';
+  const isSubflowNode = data.nodeType === 'subflow';
+
+  const keepInContext = (isMemoryNoteNode ? (data.effectConfig?.keep_in_context ?? false) : false) as boolean;
+  const inheritSubflowContext = (isSubflowNode ? (data.effectConfig?.inherit_context ?? false) : false) as boolean;
+
+  const setKeepInContext = useCallback(
+    (next: boolean) => {
+      if (!isMemoryNoteNode) return;
+      const prev = data.effectConfig || {};
+      updateNodeData(id, { effectConfig: { ...prev, keep_in_context: Boolean(next) } });
+    },
+    [data.effectConfig, id, isMemoryNoteNode, updateNodeData]
+  );
+
+  const setInheritSubflowContext = useCallback(
+    (next: boolean) => {
+      if (!isSubflowNode) return;
+      const prev = data.effectConfig || {};
+      updateNodeData(id, { effectConfig: { ...prev, inherit_context: Boolean(next) } });
+    },
+    [data.effectConfig, id, isSubflowNode, updateNodeData]
+  );
 
   const hasModelControls = isLlmNode || isAgentNode;
   const hasProviderDropdown = hasModelControls || isProviderModelsNode;
@@ -1275,6 +1297,50 @@ export const BaseNode = memo(function BaseNode({
             nameOptions={variableOptions.map((o) => o.value)}
             onChange={setVarDeclConfig}
           />
+        )}
+
+        {isMemoryNoteNode && (
+          <div className="node-config">
+            <div className="node-config-row">
+              <span className="node-config-label">Keep in context</span>
+              <label
+                className="af-pin-checkbox"
+                title="When enabled, this Memorize node also inserts the stored note into context.messages so downstream LLM/Agent nodes with Use context enabled can see it."
+              >
+                <input
+                  className="af-pin-checkbox-input"
+                  type="checkbox"
+                  checked={keepInContext}
+                  onChange={(e) => setKeepInContext(e.target.checked)}
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                />
+                <span className="af-pin-checkbox-box" aria-hidden="true" />
+              </label>
+            </div>
+          </div>
+        )}
+
+        {isSubflowNode && (
+          <div className="node-config">
+            <div className="node-config-row">
+              <span className="node-config-label">Inherit context</span>
+              <label
+                className="af-pin-checkbox"
+                title="When enabled, the subflow run starts with the parent run's active context messages. This makes downstream LLM/Agent nodes inside the subflow (with Use context enabled) see the parent context without extra Recall/Rehydrate glue."
+              >
+                <input
+                  className="af-pin-checkbox-input"
+                  type="checkbox"
+                  checked={inheritSubflowContext}
+                  onChange={(e) => setInheritSubflowContext(e.target.checked)}
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                />
+                <span className="af-pin-checkbox-box" aria-hidden="true" />
+              </label>
+            </div>
+          </div>
         )}
 
         {/* Data input pins */}

@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from .routes import flows_router, providers_router, tools_router, ws_router
+from .routes import flows_router, providers_router, runs_router, tools_router, ws_router
 
 # Create FastAPI app
 app = FastAPI(
@@ -31,6 +31,7 @@ app.add_middleware(
 # Include routers
 app.include_router(flows_router, prefix="/api")
 app.include_router(providers_router, prefix="/api")
+app.include_router(runs_router, prefix="/api")
 app.include_router(tools_router, prefix="/api")
 app.include_router(ws_router, prefix="/api")
 

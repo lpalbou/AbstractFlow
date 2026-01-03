@@ -427,31 +427,32 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
     [send, isWaiting, isPaused]
   );
 
-  const pauseRun = useCallback(() => {
-    if (!runId) return;
-    sendWithReconnect({ type: 'control', action: 'pause', run_id: runId });
-  }, [sendWithReconnect, runId]);
+  const pauseRun = useCallback(
+    (targetRunId?: string) => {
+      const rid = targetRunId || runId;
+      if (!rid) return;
+      sendWithReconnect({ type: 'control', action: 'pause', run_id: rid });
+    },
+    [sendWithReconnect, runId]
+  );
 
-  const resumeRun = useCallback(() => {
-    if (!runId) return;
-    sendWithReconnect({ type: 'control', action: 'resume', run_id: runId });
-  }, [sendWithReconnect, runId]);
+  const resumeRun = useCallback(
+    (targetRunId?: string) => {
+      const rid = targetRunId || runId;
+      if (!rid) return;
+      sendWithReconnect({ type: 'control', action: 'resume', run_id: rid });
+    },
+    [sendWithReconnect, runId]
+  );
 
-  const cancelRun = useCallback(() => {
-    if (!runId) return;
-    sendWithReconnect({ type: 'control', action: 'cancel', run_id: runId });
-  }, [sendWithReconnect, runId]);
-
-  // Keepalive ping to reduce idle WS disconnects during long-running nodes (LLM/Agent).
-  useEffect(() => {
-    if (!connected) return;
-    const interval = setInterval(() => {
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        send({ type: 'ping' });
-      }
-    }, 20_000);
-    return () => clearInterval(interval);
-  }, [connected, send]);
+  const cancelRun = useCallback(
+    (targetRunId?: string) => {
+      const rid = targetRunId || runId;
+      if (!rid) return;
+      sendWithReconnect({ type: 'control', action: 'cancel', run_id: rid });
+    },
+    [sendWithReconnect, runId]
+  );
 
   // Cleanup on unmount
   useEffect(() => {
