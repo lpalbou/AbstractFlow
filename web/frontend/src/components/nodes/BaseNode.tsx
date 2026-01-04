@@ -102,6 +102,52 @@ const ToolsAllowlistInline = memo(function ToolsAllowlistInline({
   );
 });
 
+const ProviderModelsInline = memo(function ProviderModelsInline({
+  provider,
+  providerConnected,
+  models,
+  loading,
+  values,
+  onChange,
+}: {
+  provider: string;
+  providerConnected: boolean;
+  models: string[];
+  loading: boolean;
+  values: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const options = useMemo(() => models.map((m) => ({ value: m, label: m })), [models]);
+  const placeholder = providerConnected
+    ? 'Provider from pin…'
+    : !provider
+      ? 'Pick provider…'
+      : loading
+        ? 'Loading…'
+        : 'Select…';
+
+  return (
+    <div className="node-inline-config nodrag">
+      <div className="node-config-row">
+        <span className="node-config-label">models</span>
+        <AfMultiSelect
+          variant="pin"
+          values={values}
+          placeholder={placeholder}
+          options={options}
+          disabled={providerConnected || !provider || loading}
+          loading={loading}
+          searchable
+          searchPlaceholder="Search models…"
+          clearable
+          minPopoverWidth={360}
+          onChange={onChange}
+        />
+      </div>
+    </div>
+  );
+});
+
 const BoolVarInline = memo(function BoolVarInline({
   nodeId,
   name,
@@ -527,7 +573,10 @@ export const BaseNode = memo(function BaseNode({
 
 
   const providersQuery = useProviders(hasProviderDropdown && (!providerConnected || !modelConnected));
-  const modelsQuery = useModels(selectedProvider, hasModelControls && !modelConnected);
+  const modelsQuery = useModels(
+    selectedProvider,
+    (hasModelControls && !modelConnected) || (isProviderModelsNode && !providerConnected)
+  );
   const toolsQuery = useTools((isAgentNode || isLlmNode || isToolsAllowlistNode) && !toolsConnected);
 
   const providers = Array.isArray(providersQuery.data) ? providersQuery.data : [];
@@ -575,6 +624,29 @@ export const BaseNode = memo(function BaseNode({
 
     return [];
   }, [data.agentConfig?.tools, data.effectConfig?.tools, data.literalValue, isAgentNode, isLlmNode, isToolsAllowlistNode]);
+
+  const selectedProviderModels = useMemo(() => {
+    if (!isProviderModelsNode) return [];
+    const raw = data.providerModelsConfig?.allowedModels;
+    if (!Array.isArray(raw)) return [];
+    const cleaned = raw
+      .filter((m): m is string => typeof m === 'string' && m.trim().length > 0)
+      .map((m) => m.trim());
+    return Array.from(new Set(cleaned));
+  }, [data.providerModelsConfig?.allowedModels, isProviderModelsNode]);
+
+  const setProviderModelsAllowedModels = useCallback(
+    (nextModels: string[]) => {
+      if (!isProviderModelsNode) return;
+      const cleaned = nextModels
+        .filter((m): m is string => typeof m === 'string' && m.trim().length > 0)
+        .map((m) => m.trim());
+      const unique = Array.from(new Set(cleaned));
+      const prev = data.providerModelsConfig || {};
+      updateNodeData(id, { providerModelsConfig: { ...prev, allowedModels: unique } });
+    },
+    [data.providerModelsConfig, id, isProviderModelsNode, updateNodeData]
+  );
 
   const setProviderModel = useCallback(
     (provider: string | undefined, model: string | undefined) => {
@@ -1224,6 +1296,17 @@ export const BaseNode = memo(function BaseNode({
             toolOptions={toolOptions}
             loading={toolsQuery.isLoading}
             onChange={setNodeTools}
+          />
+        )}
+
+        {data.nodeType === 'provider_models' && (
+          <ProviderModelsInline
+            provider={String(selectedProvider || '')}
+            providerConnected={providerConnected}
+            models={models}
+            loading={modelsQuery.isLoading}
+            values={selectedProviderModels}
+            onChange={setProviderModelsAllowedModels}
           />
         )}
 

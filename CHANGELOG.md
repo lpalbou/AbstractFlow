@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Palette organization tweaks:
   - `System Date/Time` is now in **Events** (near `On Schedule`).
   - `Provider Catalog` + `Models Catalog` (was Provider Models) are now in **Literals** (above `Tools Allowlist`).
+- Models Catalog UX: removed the deprecated `allowed_models` input pin; model allowlisting is now edited via an in-node multi-select synced with the right panel.
 - Node/pin tooltips now appear after **2s** hover and are rendered in an overlay layer so they are not clipped by scroll containers.
 - `Python Code` nodes now include an in-node **Edit Code** button (same editor as the right panel).
 

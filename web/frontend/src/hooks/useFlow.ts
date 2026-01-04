@@ -873,6 +873,25 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         data = { ...data, inputs: upgradedInputs || data.inputs, outputs: upgradedOutputs || data.outputs };
       }
 
+      // Backward-compat + canonical ordering for Models Catalog node.
+      // Remove deprecated `allowed_models` pin (selection is now stored in providerModelsConfig.allowedModels).
+      if (data.nodeType === 'provider_models') {
+        const existingInputs = Array.isArray(data.inputs) ? data.inputs : [];
+        const byId = new Map(existingInputs.map((p) => [p.id, p] as const));
+
+        const dropIds = new Set(['allowed_models', 'allowedModels']);
+        const extras = existingInputs.filter((p) => p.id !== 'provider' && !dropIds.has(p.id));
+
+        const prevProvider = byId.get('provider');
+        const providerPin: Pin = !prevProvider
+          ? { id: 'provider', label: 'provider', type: 'provider' }
+          : prevProvider.label === 'provider' && prevProvider.type === 'provider'
+            ? prevProvider
+            : { ...prevProvider, label: 'provider', type: 'provider' };
+
+        data = { ...data, inputs: [providerPin, ...extras] };
+      }
+
       // Backward-compat + canonical ordering for file IO nodes (remove deprecated `file_type` pin).
       if (data.nodeType === 'read_file' || data.nodeType === 'write_file') {
         const existingInputs = Array.isArray(data.inputs) ? data.inputs : [];

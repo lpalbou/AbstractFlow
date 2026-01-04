@@ -19,13 +19,9 @@ export function ProviderModelsPanel({ node, edges, updateNodeData }: ProviderMod
     () => edges.some((e) => e.target === node.id && e.targetHandle === 'provider'),
     [edges, node.id]
   );
-  const allowedModelsConnected = useMemo(
-    () => edges.some((e) => e.target === node.id && e.targetHandle === 'allowed_models'),
-    [edges, node.id]
-  );
 
   const providersQuery = useProviders(!providerConnected);
-  const modelsQuery = useModels(provider, Boolean(provider) && !allowedModelsConnected);
+  const modelsQuery = useModels(provider, Boolean(provider) && !providerConnected);
 
   const providers = Array.isArray(providersQuery.data) ? providersQuery.data : [];
   const models = Array.isArray(modelsQuery.data) ? modelsQuery.data : [];
@@ -99,8 +95,10 @@ export function ProviderModelsPanel({ node, edges, updateNodeData }: ProviderMod
 
       <div className="property-group">
         <label className="property-sublabel">Allowed models (optional)</label>
-        {allowedModelsConnected ? (
-          <div className="property-hint">Provided by connected pin.</div>
+        {providerConnected ? (
+          <div className="property-hint">
+            Provider is provided by a connected pin. Disconnect it to browse and select models here.
+          </div>
         ) : !provider ? (
           <div className="property-hint">Pick a provider to browse models.</div>
         ) : (

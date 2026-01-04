@@ -638,15 +638,24 @@ const LITERAL_NODES: NodeTemplate[] = [
     type: 'provider_models',
     icon: '&#x1F4DA;', // Books
     label: 'Models Catalog',
-    description: 'List models for a provider (optionally filtered by an allowlist).',
+    description: 'List models for a provider. Optionally restrict the list by selecting allowed models in the node config.',
     headerColor: '#3498DB',
     inputs: [
-      { id: 'provider', label: 'provider', type: 'provider' },
-      { id: 'allowed_models', label: 'allowed_models', type: 'array' },
+      {
+        id: 'provider',
+        label: 'provider',
+        type: 'provider',
+        description: 'Provider id to list models for. If this pin is not connected, the node’s selected provider is used.',
+      },
     ],
     outputs: [
-      { id: 'provider', label: 'provider', type: 'provider' },
-      { id: 'models', label: 'models', type: 'array' },
+      { id: 'provider', label: 'provider', type: 'provider', description: 'Resolved provider id used to compute the models list.' },
+      {
+        id: 'models',
+        label: 'models',
+        type: 'array',
+        description: 'Array of model ids/names for the provider (filtered to the selected allowed models when set).',
+      },
     ],
     category: 'literals',
   },
