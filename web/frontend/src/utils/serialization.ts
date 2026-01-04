@@ -4,7 +4,7 @@
 
 import type { Node, Edge } from 'reactflow';
 import type { FlowNodeData, VisualFlow, VisualNode, VisualEdge } from '../types/flow';
-import { getNodeTemplate, createNodeData } from '../types/nodes';
+import { getNodeTemplate, createNodeData, mergePinDocsFromTemplate } from '../types/nodes';
 
 /**
  * Convert React Flow nodes/edges to VisualFlow format for API.
@@ -60,9 +60,11 @@ export function fromVisualFlow(flow: VisualFlow): {
     const template = getNodeTemplate(vn.type);
 
     // Create node data from template, merged with saved data
-    const data: FlowNodeData = template
+    const dataBase: FlowNodeData = template
       ? { ...createNodeData(template), ...vn.data }
       : vn.data;
+    const data: FlowNodeData =
+      template ? mergePinDocsFromTemplate(createNodeData(template), dataBase) : dataBase;
 
     // Best-effort migrations for legacy nodes (keep flows usable across versions).
     if (data.nodeType === 'compare') {

@@ -961,7 +961,7 @@ export const BaseNode = memo(function BaseNode({
   };
 
   return (
-    <AfTooltip content={nodeDescription} delayMs={2000}>
+    <AfTooltip content={nodeDescription} delayMs={2000} priority={0}>
       <div
         className={clsx(
           'flow-node',
@@ -1269,7 +1269,7 @@ export const BaseNode = memo(function BaseNode({
         <div className="pins-left" style={{ ['--pin-label-width' as any]: inputLabelWidth }}>
           {inputData.map((pin) => (
             <div key={pin.id} className="pin-row input">
-              <AfTooltip content={pin.description} delayMs={2000}>
+              <AfTooltip content={pin.description} delayMs={2000} priority={2}>
                 <span
                   className="pin-shape"
                   style={{ color: PIN_COLORS[pin.type] }}
@@ -1717,7 +1717,7 @@ export const BaseNode = memo(function BaseNode({
           {outputData.map((pin) => (
             <div key={pin.id} className="pin-row output">
               <span className="pin-label">{pin.label}</span>
-              <AfTooltip content={pin.description} delayMs={2000}>
+              <AfTooltip content={pin.description} delayMs={2000} priority={2}>
                 <span
                   className="pin-shape"
                   style={{ color: PIN_COLORS[pin.type] }}

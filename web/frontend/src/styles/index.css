@@ -1173,6 +1173,13 @@ button.primary:hover:not(:disabled) {
   margin-bottom: 16px;
 }
 
+.run-modal-header-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
 .run-modal-header-right {
   display: inline-flex;
   align-items: center;
@@ -1384,6 +1391,10 @@ button.primary:hover:not(:disabled) {
   background: var(--bg-primary);
   padding: 4px 8px;
   border-radius: 4px;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .run-modal-runid {
@@ -1420,6 +1431,122 @@ button.primary:hover:not(:disabled) {
   outline: none;
   border-color: rgba(233, 69, 96, 0.6);
   box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.18);
+}
+
+.run-switcher {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.run-switcher-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.run-switcher-caret {
+  opacity: 0.85;
+}
+
+.run-switcher-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+  width: 440px;
+  max-width: min(88vw, 440px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(18, 22, 40, 0.96);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  z-index: 1100;
+  padding: 10px;
+}
+
+.run-switcher-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.run-switcher-search input {
+  flex: 1;
+  min-width: 0;
+}
+
+.run-switcher-error {
+  color: var(--error);
+  margin-bottom: 10px;
+  font-size: 12px;
+}
+
+.run-switcher-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 360px;
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+}
+
+.run-switcher-item {
+  position: relative;
+  display: flex;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.run-switcher-item:last-child {
+  border-bottom: none;
+}
+
+.run-switcher-item.selected {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.run-switcher-item-button {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 40px 12px 12px;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.run-switcher-item-button:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.run-switcher-copy {
+  position: absolute;
+  right: 8px;
+  top: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.72);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.run-switcher-copy:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.run-switcher-empty {
+  margin-top: 10px;
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
 .run-form-intro {

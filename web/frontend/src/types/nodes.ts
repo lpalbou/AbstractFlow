@@ -274,13 +274,36 @@ const CORE_NODES: NodeTemplate[] = [
     headerColor: '#16A085', // Teal - IO/tools
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
-      { id: 'tool_calls', label: 'tool_calls', type: 'array' },
-      { id: 'allowed_tools', label: 'allowed_tools', type: 'array' },
+      {
+        id: 'tool_calls',
+        label: 'tool_calls',
+        type: 'array',
+        description:
+          'List of tool call requests (or a single call). Typical shape: {name, arguments, call_id?}. Often comes from LLM Call.result.tool_calls.',
+      },
+      {
+        id: 'allowed_tools',
+        label: 'allowed_tools',
+        type: 'array',
+        description:
+          'Optional allowlist of tool names enforced by the runtime effect handler (empty list => allow none). If not connected, the node config (if any) is used.',
+      },
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
-      { id: 'results', label: 'results', type: 'array' },
-      { id: 'success', label: 'success', type: 'boolean' },
+      {
+        id: 'results',
+        label: 'results',
+        type: 'array',
+        description:
+          'Per-call results in input order (each entry includes output/error metadata). Use this for debugging or to feed structured tool outputs into the graph.',
+      },
+      {
+        id: 'success',
+        label: 'success',
+        type: 'boolean',
+        description: 'True if all tool calls succeeded (no per-call error).',
+      },
     ],
     category: 'core',
   },
@@ -842,5 +865,39 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
     ...(template.type === 'model_catalog' && { modelCatalogConfig: { allowedProviders: [], allowedModels: [], index: 0 } }),
     ...(template.type === 'provider_models' && { providerModelsConfig: { provider: '', allowedModels: [] } }),
     ...(template.type === 'emit_event' && { effectConfig: { name: 'my_event', scope: 'session', sessionId: '' } }),
+  };
+}
+
+/**
+ * Best-effort: merge template pin documentation into a node's pins.
+ *
+ * Why:
+ * - Older saved flows may have `inputs/outputs` persisted without `description`.
+ * - We want tooltips to appear reliably even for legacy flows, without forcing migrations.
+ *
+ * Rules:
+ * - Never overwrite an explicit pin.description already stored on the node.
+ * - Only merge by pin id; dynamic pins remain untouched.
+ */
+export function mergePinDocsFromTemplate(
+  templateData: FlowNodeData,
+  nodeData: FlowNodeData
+): FlowNodeData {
+  const mergePins = (templatePins: Pin[], pins: Pin[]): Pin[] => {
+    const byId = new Map(templatePins.map((p) => [p.id, p] as const));
+    return pins.map((p) => {
+      const t = byId.get(p.id);
+      if (!t) return p;
+      const hasOwn = typeof p.description === 'string' && p.description.trim().length > 0;
+      if (hasOwn) return p;
+      const templ = typeof t.description === 'string' && t.description.trim().length > 0 ? t.description : undefined;
+      return templ ? { ...p, description: templ } : p;
+    });
+  };
+
+  return {
+    ...nodeData,
+    inputs: mergePins(templateData.inputs, nodeData.inputs),
+    outputs: mergePins(templateData.outputs, nodeData.outputs),
   };
 }

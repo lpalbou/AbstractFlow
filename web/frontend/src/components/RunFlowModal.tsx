@@ -14,6 +14,7 @@ import { MarkdownRenderer } from './MarkdownRenderer';
 import { AgentSubrunTracePanel } from './AgentSubrunTracePanel';
 import AfSelect from './inputs/AfSelect';
 import { useProviders, useModels } from '../hooks/useProviders';
+import { RunSwitcherDropdown } from './RunSwitcherDropdown';
 
 interface RunFlowModalProps {
   isOpen: boolean;
@@ -31,6 +32,7 @@ interface RunFlowModalProps {
   onPause?: () => void;
   onResumeRun?: () => void;
   onCancelRun?: () => void;
+  onSelectRunId?: (runId: string) => void;
 }
 
 // Map pin types to input field types
@@ -85,8 +87,9 @@ export function RunFlowModal({
   onPause,
   onResumeRun,
   onCancelRun,
+  onSelectRunId,
 }: RunFlowModalProps) {
-  const { nodes, edges, flowName, lastLoopProgress } = useFlowStore();
+  const { nodes, edges, flowName, flowId, lastLoopProgress } = useFlowStore();
 
   const nodeById = useMemo(() => {
     const map = new Map<string, (typeof nodes)[number]>();
@@ -1284,19 +1287,13 @@ export function RunFlowModal({
       <div className="modal run-modal" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="run-modal-header">
-          <h3>▶ Run Flow</h3>
-          <div className="run-modal-header-right">
+          <div className="run-modal-header-left">
+            <h3>▶ Run Flow</h3>
             <span className="run-modal-flow-name">{flowName || 'Untitled Flow'}</span>
-            {rootRunId ? (
-              <button
-                type="button"
-                className="run-modal-runid"
-                onClick={() => copyToClipboard(rootRunId)}
-                title={`Click to copy run id: ${rootRunId}`}
-                aria-label="Copy run id"
-              >
-                run:{rootRunId}
-              </button>
+          </div>
+          <div className="run-modal-header-right">
+            {flowId && onSelectRunId ? (
+              <RunSwitcherDropdown workflowId={flowId} currentRunId={rootRunId} onSelectRun={onSelectRunId} />
             ) : null}
             <button
               type="button"

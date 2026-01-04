@@ -425,15 +425,17 @@ export function Toolbar() {
     setTraceEvents([]);
   }, [inspectedRun, isRunning]);
 
-  const handleSelectHistoryRun = useCallback(
-    async (runId: string) => {
+  const inspectRunById = useCallback(
+    async (runId: string, opts?: { closeHistory?: boolean }) => {
+      const rid = String(runId || '').trim();
+      if (!rid) return;
       try {
-        const data = await fetchRunHistory(runId);
+        const data = await fetchRunHistory(rid);
         setInspectedRun(data.run);
         setInspectedEvents(Array.isArray(data.events) ? data.events : []);
         setInspectedTraceEvents([]);
         setRunResult(null);
-        setShowRunHistory(false);
+        if (opts?.closeHistory) setShowRunHistory(false);
         setShowRunModal(true);
       } catch (e) {
         toast.error(e instanceof Error ? e.message : 'Failed to load run history');
@@ -441,6 +443,14 @@ export function Toolbar() {
     },
     []
   );
+
+  const handleSelectHistoryRun = useCallback((runId: string) => {
+    void inspectRunById(runId, { closeHistory: true });
+  }, [inspectRunById]);
+
+  const handleSelectRunFromModal = useCallback((runId: string) => {
+    void inspectRunById(runId, { closeHistory: false });
+  }, [inspectRunById]);
 
   // Handle export
   const handleExport = useCallback(() => {
@@ -625,6 +635,7 @@ export function Toolbar() {
         onPause={() => pauseRun(inspectedRun?.run_id)}
         onResumeRun={() => resumeRun(inspectedRun?.run_id)}
         onCancelRun={() => cancelRun(inspectedRun?.run_id)}
+        onSelectRunId={handleSelectRunFromModal}
       />
         );
       })()}

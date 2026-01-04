@@ -660,6 +660,33 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
   const availableEventNames = collectCustomEventNames(nodes);
 
+  // Pin default values are the single source of truth for unconnected *data pins*.
+  // This is important for programmatic workflows: users can drive pins via edges, or
+  // set pin defaults (via the inline pin editor on nodes, or here in the right panel).
+  const isInputPinConnected = (pinId: string) =>
+    edges.some((e) => e.target === node.id && e.targetHandle === pinId);
+
+  const setPinDefault = (pinId: string, value: string | number | boolean | undefined) => {
+    const prevDefaults = data.pinDefaults || {};
+    const nextDefaults = { ...prevDefaults } as Record<string, string | number | boolean>;
+
+    // Keep booleans explicit (false is a meaningful default that should be visible).
+    if (typeof value === 'boolean') {
+      nextDefaults[pinId] = value;
+    } else if (typeof value === 'number') {
+      if (Number.isFinite(value)) nextDefaults[pinId] = value;
+      else delete nextDefaults[pinId];
+    } else if (typeof value === 'string') {
+      const v = value;
+      if (!v) delete nextDefaults[pinId];
+      else nextDefaults[pinId] = v;
+    } else {
+      delete nextDefaults[pinId];
+    }
+
+    updateNodeData(node.id, { pinDefaults: nextDefaults });
+  };
+
   const updateAgentConfig = (patch: Partial<NonNullable<FlowNodeData['agentConfig']>>) => {
     updateNodeData(node.id, {
       agentConfig: {
@@ -831,6 +858,169 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
             ))}
         </ul>
       </div>
+
+      {/* Pin default values (unconnected primitive pins).
+          This keeps the right panel consistent with inline pin editors on nodes. */}
+      {(() => {
+        const skipIds = new Set(['provider', 'model', 'tools']); // shown in dedicated sections (agent/llm_call) for better UX
+        const inputPins = data.inputs.filter((p) => p.type !== 'execution' && !skipIds.has(p.id));
+
+        const editable = inputPins.filter((p) => {
+          if (p.type === 'boolean' || p.type === 'number' || p.type === 'string') return true;
+          // Known "string-select" pins that have inline dropdowns in the node UI.
+          if (p.id === 'scope' && (data.nodeType === 'memory_note' || data.nodeType === 'memory_query')) return true;
+          if (p.id === 'tags_mode' && data.nodeType === 'memory_query') return true;
+          if (p.id === 'placement' && data.nodeType === 'memory_rehydrate') return true;
+          return false;
+        });
+
+        if (editable.length === 0) return null;
+
+        return (
+          <div className="property-section">
+            <label className="property-label">Input values</label>
+            <span className="property-hint">
+              These are <code>pinDefaults</code> for unconnected pins. Connected pins always override.
+            </span>
+
+            {editable.map((pin) => {
+              const connected = isInputPinConnected(pin.id);
+              const raw = data.pinDefaults ? (data.pinDefaults as any)[pin.id] : undefined;
+
+              const rowLabel = pin.label || pin.id;
+
+              if (connected) {
+                return (
+                  <div key={pin.id} className="property-group">
+                    <label className="property-sublabel">{rowLabel}</label>
+                    <span className="property-hint">Provided by connected pin.</span>
+                  </div>
+                );
+              }
+
+              // Special dropdown pins (match node inline controls).
+              if (pin.id === 'scope' && (data.nodeType === 'memory_note' || data.nodeType === 'memory_query')) {
+                const current = typeof raw === 'string' && raw.trim() ? raw.trim() : 'run';
+                const options =
+                  data.nodeType === 'memory_query'
+                    ? ['run', 'session', 'global', 'all']
+                    : ['run', 'session', 'global'];
+                return (
+                  <div key={pin.id} className="property-group">
+                    <label className="property-sublabel">{rowLabel}</label>
+                    <select
+                      className="property-select"
+                      value={options.includes(current) ? current : 'run'}
+                      onChange={(e) => setPinDefault(pin.id, e.target.value)}
+                    >
+                      {options.map((v) => (
+                        <option key={v} value={v}>
+                          {v}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              }
+
+              if (pin.id === 'tags_mode' && data.nodeType === 'memory_query') {
+                const current = typeof raw === 'string' && raw.trim() ? raw.trim() : 'all';
+                return (
+                  <div key={pin.id} className="property-group">
+                    <label className="property-sublabel">{rowLabel}</label>
+                    <select
+                      className="property-select"
+                      value={current === 'any' ? 'any' : 'all'}
+                      onChange={(e) => setPinDefault(pin.id, e.target.value)}
+                    >
+                      <option value="all">all (AND)</option>
+                      <option value="any">any (OR)</option>
+                    </select>
+                  </div>
+                );
+              }
+
+              if (pin.id === 'placement' && data.nodeType === 'memory_rehydrate') {
+                const current = typeof raw === 'string' && raw.trim() ? raw.trim() : 'after_summary';
+                const options = ['after_summary', 'after_system', 'end'];
+                return (
+                  <div key={pin.id} className="property-group">
+                    <label className="property-sublabel">{rowLabel}</label>
+                    <select
+                      className="property-select"
+                      value={options.includes(current) ? current : 'after_summary'}
+                      onChange={(e) => setPinDefault(pin.id, e.target.value)}
+                    >
+                      {options.map((v) => (
+                        <option key={v} value={v}>
+                          {v}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              }
+
+              if (pin.type === 'boolean') {
+                const checked = typeof raw === 'boolean' ? raw : false;
+                return (
+                  <div key={pin.id} className="property-group">
+                    <label className="property-sublabel">{rowLabel}</label>
+                    <label className="toggle-container">
+                      <input
+                        type="checkbox"
+                        className="toggle-checkbox"
+                        checked={checked}
+                        onChange={(e) => setPinDefault(pin.id, e.target.checked)}
+                      />
+                      <span className="toggle-label">{checked ? 'True' : 'False'}</span>
+                    </label>
+                  </div>
+                );
+              }
+
+              if (pin.type === 'number') {
+                const value = typeof raw === 'number' && Number.isFinite(raw) ? raw : '';
+                return (
+                  <div key={pin.id} className="property-group">
+                    <label className="property-sublabel">{rowLabel}</label>
+                    <input
+                      type="number"
+                      className="property-input"
+                      value={value}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (!v) {
+                          setPinDefault(pin.id, undefined);
+                          return;
+                        }
+                        const n = Number(v);
+                        if (!Number.isFinite(n)) return;
+                        setPinDefault(pin.id, n);
+                      }}
+                      step="any"
+                    />
+                  </div>
+                );
+              }
+
+              // Default: string (use textarea for better visibility).
+              const text = typeof raw === 'string' ? raw : '';
+              return (
+                <div key={pin.id} className="property-group">
+                  <label className="property-sublabel">{rowLabel}</label>
+                  <textarea
+                    className="property-input property-textarea"
+                    value={text}
+                    onChange={(e) => setPinDefault(pin.id, e.target.value)}
+                    rows={Math.min(6, Math.max(2, text.split('\n').length || 2))}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       {/* Concat node properties */}
       {data.nodeType === 'concat' && (

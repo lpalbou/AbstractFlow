@@ -14,7 +14,7 @@ import {
   EdgeChange,
 } from 'reactflow';
 import type { FlowNodeData, VisualFlow, Pin } from '../types/flow';
-import { createNodeData, getNodeTemplate, NodeTemplate } from '../types/nodes';
+import { createNodeData, getNodeTemplate, mergePinDocsFromTemplate, NodeTemplate } from '../types/nodes';
 import { validateConnection } from '../utils/validation';
 
 interface FlowState {
@@ -540,6 +540,58 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         const dropIds = data.nodeType === 'llm_call' ? new Set(['write_context', 'writeContext']) : new Set<string>();
         const extras = existingInputs.filter((p) => !used.has(p.id) && !dropIds.has(p.id));
         data = { ...data, inputs: [...canonicalInputs, ...extras] };
+
+        // Migration: legacy config booleans -> pinDefaults
+        //
+        // These booleans are now represented as *input pins* so they can be driven by the graph
+        // (programmatic control) and still edited via the pin-default checkbox when unconnected.
+        //
+        // Older flows may have stored the value inside agentConfig/effectConfig. If we don't
+        // migrate it, the UI would show an unchecked pin (default false) while execution would
+        // still follow the legacy config (surprising and unsafe).
+        const prevDefaults = data.pinDefaults && typeof data.pinDefaults === 'object' ? data.pinDefaults : undefined;
+        const nextDefaults: Record<string, string | number | boolean> = { ...(prevDefaults || {}) };
+
+        if (data.nodeType === 'llm_call') {
+          const cfg = data.effectConfig && typeof data.effectConfig === 'object' ? (data.effectConfig as any) : null;
+          const legacy =
+            cfg && typeof cfg.include_context === 'boolean'
+              ? cfg.include_context
+              : cfg && typeof cfg.use_context === 'boolean'
+                ? cfg.use_context
+                : cfg && typeof cfg.useContext === 'boolean'
+                  ? cfg.useContext
+                  : undefined;
+          if (typeof nextDefaults.include_context !== 'boolean' && typeof legacy === 'boolean') {
+            nextDefaults.include_context = legacy;
+          }
+          if (cfg && ('include_context' in cfg || 'use_context' in cfg || 'useContext' in cfg)) {
+            // Remove legacy key to keep a single source of truth (pinDefaults).
+            const { include_context, use_context, useContext, ...rest } = cfg;
+            data = { ...data, effectConfig: rest, pinDefaults: nextDefaults };
+          } else if (prevDefaults !== nextDefaults) {
+            data = { ...data, pinDefaults: nextDefaults };
+          }
+        } else {
+          const cfg = data.agentConfig && typeof data.agentConfig === 'object' ? (data.agentConfig as any) : null;
+          const legacy =
+            cfg && typeof cfg.include_context === 'boolean'
+              ? cfg.include_context
+              : cfg && typeof cfg.use_context === 'boolean'
+                ? cfg.use_context
+                : cfg && typeof cfg.useContext === 'boolean'
+                  ? cfg.useContext
+                  : undefined;
+          if (typeof nextDefaults.include_context !== 'boolean' && typeof legacy === 'boolean') {
+            nextDefaults.include_context = legacy;
+          }
+          if (cfg && ('include_context' in cfg || 'use_context' in cfg || 'useContext' in cfg)) {
+            const { include_context, use_context, useContext, ...rest } = cfg;
+            data = { ...data, agentConfig: rest, pinDefaults: nextDefaults };
+          } else if (prevDefaults !== nextDefaults) {
+            data = { ...data, pinDefaults: nextDefaults };
+          }
+        }
       }
 
       // Backward-compat + canonical ordering for Subflow nodes.
@@ -565,6 +617,26 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
         const extras = existingInputs.filter((p) => !used.has(p.id));
         data = { ...data, inputs: [...canonicalInputs, ...extras] };
+
+        // Migration: legacy effectConfig.inherit_context -> pinDefaults.inherit_context
+        const prevDefaults = data.pinDefaults && typeof data.pinDefaults === 'object' ? data.pinDefaults : undefined;
+        const nextDefaults: Record<string, string | number | boolean> = { ...(prevDefaults || {}) };
+        const cfg = data.effectConfig && typeof data.effectConfig === 'object' ? (data.effectConfig as any) : null;
+        const legacy =
+          cfg && typeof cfg.inherit_context === 'boolean'
+            ? cfg.inherit_context
+            : cfg && typeof cfg.inheritContext === 'boolean'
+              ? cfg.inheritContext
+              : undefined;
+        if (typeof nextDefaults.inherit_context !== 'boolean' && typeof legacy === 'boolean') {
+          nextDefaults.inherit_context = legacy;
+        }
+        if (cfg && ('inherit_context' in cfg || 'inheritContext' in cfg)) {
+          const { inherit_context, inheritContext, ...rest } = cfg;
+          data = { ...data, effectConfig: rest, pinDefaults: nextDefaults };
+        } else if (prevDefaults !== nextDefaults) {
+          data = { ...data, pinDefaults: nextDefaults };
+        }
       }
 
       // Backward-compat + canonical ordering for durable custom event nodes.
@@ -697,6 +769,28 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         }
 
         data = { ...data, inputs: [...canonicalInputs, ...inputExtras], outputs: [...canonicalOutputs, ...outputExtras] };
+
+        // Migration: legacy memory_note keep_in_context -> pinDefaults.keep_in_context
+        if (data.nodeType === 'memory_note') {
+          const prevDefaults = data.pinDefaults && typeof data.pinDefaults === 'object' ? data.pinDefaults : undefined;
+          const nextDefaults: Record<string, string | number | boolean> = { ...(prevDefaults || {}) };
+          const cfg = data.effectConfig && typeof data.effectConfig === 'object' ? (data.effectConfig as any) : null;
+          const legacy =
+            cfg && typeof cfg.keep_in_context === 'boolean'
+              ? cfg.keep_in_context
+              : cfg && typeof cfg.keepInContext === 'boolean'
+                ? cfg.keepInContext
+                : undefined;
+          if (typeof nextDefaults.keep_in_context !== 'boolean' && typeof legacy === 'boolean') {
+            nextDefaults.keep_in_context = legacy;
+          }
+          if (cfg && ('keep_in_context' in cfg || 'keepInContext' in cfg)) {
+            const { keep_in_context, keepInContext, ...rest } = cfg;
+            data = { ...data, effectConfig: rest, pinDefaults: nextDefaults };
+          } else if (prevDefaults !== nextDefaults) {
+            data = { ...data, pinDefaults: nextDefaults };
+          }
+        }
       }
 
       // Backward-compat: On Schedule pins (schedule/recurrent inputs, time output).
@@ -852,6 +946,12 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           ...data,
           outputs: [...nextCasePins, nextDefaultPin, ...extraExecPins],
         };
+      }
+
+      // Backfill template pin documentation (tooltip text) for legacy flows.
+      // This intentionally runs after all canonical ordering / pin insertion above.
+      if (template) {
+        data = mergePinDocsFromTemplate(createNodeData(template), data);
       }
 
       return {

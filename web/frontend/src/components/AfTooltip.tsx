@@ -4,11 +4,57 @@ import { createPortal } from 'react-dom';
 
 export type AfTooltipPlacement = 'top';
 
+// Global hover arbitration so only one tooltip is visible at a time.
+// Pins should take precedence over node-level tooltips.
+let _nextTooltipId = 0;
+let _hoverSeq = 0;
+const _hovered = new Map<string, { priority: number; seq: number }>();
+let _topHoveredId: string | null = null;
+const _subscribers = new Set<(topId: string | null) => void>();
+
+function _recomputeTopHovered() {
+  let bestId: string | null = null;
+  let bestPriority = -Infinity;
+  let bestSeq = -Infinity;
+
+  for (const [id, meta] of _hovered.entries()) {
+    if (meta.priority > bestPriority || (meta.priority === bestPriority && meta.seq > bestSeq)) {
+      bestId = id;
+      bestPriority = meta.priority;
+      bestSeq = meta.seq;
+    }
+  }
+
+  if (bestId === _topHoveredId) return;
+  _topHoveredId = bestId;
+  for (const cb of _subscribers) cb(_topHoveredId);
+}
+
+function _hoverEnter(id: string, priority: number) {
+  _hovered.set(id, { priority, seq: ++_hoverSeq });
+  _recomputeTopHovered();
+}
+
+function _hoverLeave(id: string) {
+  _hovered.delete(id);
+  _recomputeTopHovered();
+}
+
+function _subscribeTopHovered(cb: (topId: string | null) => void) {
+  _subscribers.add(cb);
+  // Fire immediately so late subscribers sync.
+  cb(_topHoveredId);
+  return () => {
+    _subscribers.delete(cb);
+  };
+}
+
 export function AfTooltip({
   content,
   delayMs = 2000,
   maxWidthPx = 520,
   placement = 'top',
+  priority = 0,
   block = false,
   children,
 }: {
@@ -16,6 +62,7 @@ export function AfTooltip({
   delayMs?: number;
   maxWidthPx?: number;
   placement?: AfTooltipPlacement;
+  priority?: number;
   block?: boolean;
   children: ReactNode;
 }) {
@@ -26,8 +73,12 @@ export function AfTooltip({
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const bubbleRef = useRef<HTMLDivElement | null>(null);
   const timerRef = useRef<number | null>(null);
+  const idRef = useRef<string | null>(null);
+  if (idRef.current === null) idRef.current = `af-tooltip-${++_nextTooltipId}`;
+  const tooltipId = idRef.current;
 
   const [open, setOpen] = useState(false);
+  const [hovering, setHovering] = useState(false);
   const [pos, setPos] = useState<{
     left: number;
     top: number;
@@ -52,13 +103,23 @@ export function AfTooltip({
     if (!show) return;
     clearTimer();
     timerRef.current = window.setTimeout(() => {
+      // Only the currently hovered "top" tooltip may open.
+      if (!hovering) return;
+      if (_topHoveredId !== tooltipId) return;
       setOpen(true);
     }, Math.max(0, delayMs));
-  }, [clearTimer, delayMs, show]);
+  }, [clearTimer, delayMs, hovering, show, tooltipId]);
 
   useEffect(() => {
     return () => clearTimer();
   }, [clearTimer]);
+
+  useEffect(() => {
+    // Ensure global hover state is cleaned up if the component unmounts mid-hover.
+    return () => {
+      if (show) _hoverLeave(tooltipId);
+    };
+  }, [show, tooltipId]);
 
   const computePosition = useCallback(() => {
     const wrap = wrapRef.current;
@@ -148,13 +209,48 @@ export function AfTooltip({
     );
   }, [maxWidthPx, open, pos, show, text]);
 
+  // Track global hover precedence: when another tooltip becomes "top hovered",
+  // close this tooltip and cancel pending timers.
+  useEffect(() => {
+    if (!show) return;
+    return _subscribeTopHovered((topId) => {
+      if (!topId) {
+        // No active hover target.
+        close();
+        return;
+      }
+      if (topId !== tooltipId) {
+        close();
+        return;
+      }
+      // We are the top hovered tooltip.
+      if (hovering && !open) {
+        scheduleOpen();
+      }
+    });
+  }, [close, hovering, open, scheduleOpen, show, tooltipId]);
+
   return (
     <div
       className={block ? 'af-tooltip-wrap af-tooltip-block' : 'af-tooltip-wrap'}
       ref={wrapRef}
-      onMouseEnter={scheduleOpen}
-      onMouseLeave={close}
-      onMouseDown={close}
+      onMouseEnter={() => {
+        if (!show) return;
+        setHovering(true);
+        _hoverEnter(tooltipId, priority);
+        // If we're already the top hovered tooltip, start the timer.
+        if (_topHoveredId === tooltipId) scheduleOpen();
+      }}
+      onMouseLeave={() => {
+        if (!show) return;
+        setHovering(false);
+        _hoverLeave(tooltipId);
+        close();
+      }}
+      onMouseDown={() => {
+        if (!show) return;
+        close();
+      }}
     >
       {children}
       {bubble}
