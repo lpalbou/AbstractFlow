@@ -364,6 +364,8 @@ const MATH_NODES: NodeTemplate[] = [
   { type: 'subtract', icon: '-', label: 'Subtract', description: 'Compute a - b.', headerColor: '#27AE60', inputs: [{ id: 'a', label: 'a', type: 'number' }, { id: 'b', label: 'b', type: 'number' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'math' },
   { type: 'multiply', icon: '&#xD7;', label: 'Multiply', description: 'Multiply two numbers.', headerColor: '#27AE60', inputs: [{ id: 'a', label: 'a', type: 'number' }, { id: 'b', label: 'b', type: 'number' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'math' },
   { type: 'divide', icon: '&#xF7;', label: 'Divide', description: 'Compute a / b (error on division by zero).', headerColor: '#27AE60', inputs: [{ id: 'a', label: 'a', type: 'number' }, { id: 'b', label: 'b', type: 'number' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'math' },
+  { type: 'modulo', icon: '%', label: 'Modulo', description: 'Compute a % b (error on modulo by zero).', headerColor: '#27AE60', inputs: [{ id: 'a', label: 'a', type: 'number' }, { id: 'b', label: 'b', type: 'number' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'math' },
+  { type: 'power', icon: 'x^y', label: 'Power', description: 'Compute base ** exp.', headerColor: '#27AE60', inputs: [{ id: 'base', label: 'base', type: 'number' }, { id: 'exp', label: 'exp', type: 'number' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'math' },
   { type: 'abs', icon: '|x|', label: 'Absolute', description: 'Absolute value of a number.', headerColor: '#27AE60', inputs: [{ id: 'value', label: 'value', type: 'number' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'math' },
   { type: 'round', icon: '&#x223C;', label: 'Round', description: 'Round a number to N decimals.', headerColor: '#27AE60', inputs: [{ id: 'value', label: 'value', type: 'number' }, { id: 'decimals', label: 'decimals', type: 'number' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'math' },
 ];
@@ -373,9 +375,12 @@ const STRING_NODES: NodeTemplate[] = [
   { type: 'concat', icon: '&#x2795;', label: 'Concat', description: 'Concatenate two strings.', headerColor: '#E74C3C', inputs: [{ id: 'a', label: 'a', type: 'string' }, { id: 'b', label: 'b', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
   { type: 'split', icon: '&#x2702;', label: 'Split', description: 'Split text by a delimiter into an array (with trimming/drop-empty defaults).', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }, { id: 'delimiter', label: 'delimiter', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'string' },
   { type: 'join', icon: '&#x1F517;', label: 'Join', description: 'Join array items into a string using a delimiter.', headerColor: '#E74C3C', inputs: [{ id: 'items', label: 'items', type: 'array' }, { id: 'delimiter', label: 'delimiter', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
+  { type: 'format', icon: '&#x1F4DD;', label: 'Format', description: 'Python-style string format: template.format(**values).', headerColor: '#E74C3C', inputs: [{ id: 'template', label: 'template', type: 'string' }, { id: 'values', label: 'values', type: 'object' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
   { type: 'string_template', icon: '&#x1F9FE;', label: 'String Template', description: 'Render a template like \"Hello {{user.name}}\" using a vars object (supports filters).', headerColor: '#E74C3C', inputs: [{ id: 'template', label: 'template', type: 'string' }, { id: 'vars', label: 'vars', type: 'object' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
   { type: 'uppercase', icon: 'AA', label: 'Uppercase', description: 'Convert text to UPPERCASE.', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
   { type: 'lowercase', icon: 'aa', label: 'Lowercase', description: 'Convert text to lowercase.', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
+  { type: 'trim', icon: '&#x2702;', label: 'Trim', description: 'Trim whitespace from both ends of a string.', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
+  { type: 'substring', icon: '&#x1F4CC;', label: 'Substring', description: 'Extract a substring by start/end indices (end is optional).', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }, { id: 'start', label: 'start', type: 'number' }, { id: 'end', label: 'end', type: 'number' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
   { type: 'length', icon: '#', label: 'Length', description: 'String length (number of characters).', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'string' },
 ];
 
@@ -781,11 +786,15 @@ const MEMORY_NODES: NodeTemplate[] = [
   },
 ];
 
-// Data (Transforms) nodes - pure utilities for manipulating values.
+// Math nodes - keep as a dedicated category for scanability.
+const PALETTE_MATH_NODES: NodeTemplate[] = [
+  ...MATH_NODES.map((n) => ({ ...n, category: 'math' })),
+];
+
+// Data/Utils nodes - pure utilities for manipulating values.
 // Keep literals + variables as separate categories for palette scanability.
 const PALETTE_DATA_NODES: NodeTemplate[] = [
   ...STRING_NODES.map((n) => ({ ...n, category: 'data' })),
-  ...MATH_NODES.map((n) => ({ ...n, category: 'data' })),
   ...DATA_NODES.map((n) => ({ ...n, category: 'data' })),
 ];
 
@@ -821,9 +830,14 @@ export const NODE_CATEGORIES: Record<string, NodeCategory> = {
     icon: '&#x1F4E6;', // Package-ish
     nodes: VARIABLE_NODES,
   },
+  math: {
+    label: 'Math',
+    icon: '&#x1F522;', // 123
+    nodes: PALETTE_MATH_NODES,
+  },
   data: {
-    label: 'Data',
-    icon: '&#x1F4CA;', // Chart
+    label: 'Transforms',
+    icon: '&#x1F6E0;', // Hammer & wrench
     nodes: PALETTE_DATA_NODES,
   },
 };

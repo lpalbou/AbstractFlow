@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Node/pin tooltips now appear after **2s** hover and are rendered in an overlay layer so they are not clipped by scroll containers.
 - `Python Code` nodes now include an in-node **Edit Code** button (same editor as the right panel).
 - `Python Code` editor now injects an “Available variables” comment block in the code body (one line per variable with type) to make pin-derived variables discoverable while editing.
+- Node palette: exposed additional built-in transforms (`trim`, `substring`, `format`) and math ops (`modulo`, `power`). Added a dedicated **Math** category (after Variables) and renamed the former “Data” transforms category label to **Transforms**.
 
 ### Added
 - Run history for the current workflow:
