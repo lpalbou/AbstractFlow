@@ -147,12 +147,35 @@ export function RunFlowModal({
   useEffect(() => {
     if (isOpen && inputPins.length > 0) {
       const initialValues: Record<string, string> = {};
+      const defaults =
+        entryNode && entryNode.data && typeof (entryNode.data as any).pinDefaults === 'object'
+          ? ((entryNode.data as any).pinDefaults as Record<string, unknown>)
+          : null;
       inputPins.forEach(pin => {
+        const raw = defaults && pin.id in defaults ? defaults[pin.id] : undefined;
+        if (raw === undefined) {
+          initialValues[pin.id] = '';
+          return;
+        }
+        if (typeof raw === 'boolean') {
+          initialValues[pin.id] = raw ? 'true' : 'false';
+          return;
+        }
+        if (typeof raw === 'number' && Number.isFinite(raw)) {
+          initialValues[pin.id] = String(raw);
+          return;
+        }
+        // Strings (provider/model/workspace_root/etc.)
+        if (typeof raw === 'string') {
+          initialValues[pin.id] = raw;
+          return;
+        }
+        // Fallback: preserve existing behavior (empty).
         initialValues[pin.id] = '';
       });
       setFormValues(initialValues);
     }
-  }, [isOpen, inputPins]);
+  }, [isOpen, inputPins, entryNode]);
 
   // Clear resume draft when leaving waiting state
   useEffect(() => {
