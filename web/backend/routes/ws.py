@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import threading
 import time
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
@@ -749,7 +750,8 @@ async def _execute_runner_loop(
     total_duration_ms: float = 0.0
     total_input_tokens: int = 0
     total_output_tokens: int = 0
-    token_duration_ms: float = 0.0
+    _token_lock = threading.Lock()
+    _seen_token_step_ids: set[str] = set()
 
     def _extract_usage_tokens(usage_raw: Any) -> Tuple[Optional[int], Optional[int]]:
         """Return (input_tokens, output_tokens) from a usage object (best-effort)."""
@@ -832,9 +834,75 @@ async def _execute_runner_loop(
 
         return metrics
 
+    def _count_tokens_from_usage(usage: Any, *, key: Optional[str] = None) -> None:
+        """Accumulate session token totals from an LLM `usage` object (best-effort)."""
+        nonlocal total_input_tokens, total_output_tokens
+        i, o = _extract_usage_tokens(usage)
+        if i is None and o is None:
+            return
+        with _token_lock:
+            if key and key in _seen_token_step_ids:
+                return
+            if key:
+                _seen_token_step_ids.add(key)
+            if i is not None:
+                total_input_tokens += int(i)
+            if o is not None:
+                total_output_tokens += int(o)
+
+    def _on_ledger_record(rec: Any) -> None:
+        """Ledger subscriber callback: count tokens for completed LLM_CALL effects."""
+        if not isinstance(rec, dict):
+            return
+        if rec.get("status") != "completed":
+            return
+        eff = rec.get("effect")
+        if not isinstance(eff, dict) or eff.get("type") != "llm_call":
+            return
+        step_id = rec.get("step_id")
+        step_key = step_id.strip() if isinstance(step_id, str) and step_id.strip() else None
+        result = rec.get("result")
+        usage = None
+        if isinstance(result, dict):
+            usage = result.get("usage")
+            if usage is None:
+                raw = result.get("raw")
+                if isinstance(raw, dict):
+                    usage = raw.get("usage")
+        _count_tokens_from_usage(usage, key=step_key)
+
     root_run_id = getattr(runner, "run_id", None)
     if not isinstance(root_run_id, str) or not root_run_id:
         return
+
+    # Aggregate token totals from durable ledger records (LLM_CALL usage).
+    #
+    # Why ledger:
+    # - It captures *every* completed LLM call (including loops, agents, subflows).
+    # - `_temp.effects` only stores the *latest* result per node id and would undercount loops.
+    unsubscribe_ledger: Optional[Any] = None
+    try:
+        ledger_store = runtime.ledger_store if runtime is not None else None  # type: ignore[union-attr]
+    except Exception:
+        ledger_store = None
+
+    if ledger_store is not None and hasattr(ledger_store, "subscribe"):
+        def _ledger_cb(payload: Any) -> None:
+            _on_ledger_record(payload)
+
+        try:
+            unsubscribe_ledger = ledger_store.subscribe(_ledger_cb)  # type: ignore[attr-defined]
+        except Exception:
+            unsubscribe_ledger = None
+
+        # Prime totals from already persisted records (handles resume/reconnect).
+        try:
+            if hasattr(ledger_store, "list") and runtime is not None:
+                for rid in _list_descendant_run_ids(runtime, root_run_id):
+                    for rec in ledger_store.list(rid):  # type: ignore[attr-defined]
+                        _on_ledger_record(rec)
+        except Exception:
+            pass
 
     # Helper: get a durable output for a node from a given RunState (works for listener runs).
     def _run_node_output(state: Any, node_id: str) -> Any:
@@ -896,7 +964,7 @@ async def _execute_runner_loop(
 
         Returns the updated state (or None if unchanged).
         """
-        nonlocal total_duration_ms, total_input_tokens, total_output_tokens, token_duration_ms
+        nonlocal total_duration_ms
         if runtime is None:
             return None
         if gate is not None:
@@ -1308,16 +1376,8 @@ async def _execute_runner_loop(
                 out0 = _node_output(active) if is_root else _run_node_output(state, active)
                 total_node_ms = float(track.get("active_duration_ms") or duration_ms)
                 metrics = _node_metrics(active, duration_ms=total_node_ms, output=out0)
-                # Aggregate totals (best-effort). We only count tokens on nodes that report them.
+                # Best-effort wall time (kept for future aggregation/diagnostics).
                 total_duration_ms += float(total_node_ms)
-                in_tok = metrics.get("input_tokens")
-                out_tok = metrics.get("output_tokens")
-                if isinstance(in_tok, int) and in_tok >= 0:
-                    total_input_tokens += int(in_tok)
-                if isinstance(out_tok, int) and out_tok >= 0:
-                    total_output_tokens += int(out_tok)
-                if isinstance(in_tok, int) or isinstance(out_tok, int):
-                    token_duration_ms += float(total_node_ms)
                 await websocket.send_json(
                     ExecutionEvent(
                         type="node_complete",
@@ -1537,12 +1597,18 @@ async def _execute_runner_loop(
                 flow_duration_ms = (time.perf_counter() - flow_started_at) * 1000.0
                 flow_meta: Dict[str, Any] = {"duration_ms": round(float(flow_duration_ms), 2)}
                 # Include aggregate token totals when available (best-effort).
-                flow_meta["input_tokens"] = int(total_input_tokens)
-                flow_meta["output_tokens"] = int(total_output_tokens)
-                if token_duration_ms > 0:
-                    flow_meta["tokens_per_s"] = round(
-                        float(total_output_tokens) / (float(token_duration_ms) / 1000.0), 2
-                    )
+                #
+                # NOTE: We count tokens from durable ledger records (LLM_CALL completions), so this
+                # remains correct across loops, subflows, and agent subruns.
+                with _token_lock:
+                    in_total = int(total_input_tokens)
+                    out_total = int(total_output_tokens)
+                if in_total > 0 or out_total > 0:
+                    flow_meta["input_tokens"] = in_total
+                    flow_meta["output_tokens"] = out_total
+                    # Throughput (overall) is best-effort; use total wall time.
+                    if flow_duration_ms > 0 and out_total > 0:
+                        flow_meta["tokens_per_s"] = round(float(out_total) / (float(flow_duration_ms) / 1000.0), 2)
                 await websocket.send_json(
                     ExecutionEvent(
                         type="flow_complete",
@@ -1555,6 +1621,13 @@ async def _execute_runner_loop(
 
         # Avoid overwhelming the WebSocket / event loop.
         await asyncio.sleep(0.01)
+
+    # Clean up ledger subscription (best-effort).
+    if callable(unsubscribe_ledger):
+        try:
+            unsubscribe_ledger()
+        except Exception:
+            pass
 
 
 async def resume_waiting_flow(

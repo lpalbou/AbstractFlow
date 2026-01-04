@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Web run “afterglow” execution highlighting now decays smoothly (3s) and highlights only the execution edges actually taken (prev → next), avoiding misleading branch highlighting on conditional/control nodes.
 - Data edges are now colored by their data type (based on the source pin type) to improve readability in dense graphs.
 - Markdown code block “Copy” now copies the original raw code (preserving newlines/indentation) even after syntax highlighting is applied.
+- Run modal header token badge now reflects cumulative LLM usage across the entire run tree (including loops, subflows, and agent subruns) by aggregating `llm_call` usage from the durable ledger.
 
 ### Changed
 - Memory nodes UX naming: `memory_note` is now labeled **Memorize** (was Remember) to align with AbstractCode `/memorize` and reduce ambiguity with span tagging.

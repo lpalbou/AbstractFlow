@@ -125,6 +125,91 @@ def _best_effort_node_output_from_run(run: Any, node_id: str) -> Any:
     return None
 
 
+def _sum_llm_usage_from_ledger_tree(*, run_store: Any, ledger_store: Any, run_id: str) -> tuple[int, int]:
+    """Return cumulative (input_tokens, output_tokens) for the run tree rooted at run_id.
+
+    Source of truth is the durable ledger:
+    - each completed `llm_call` effect is appended as a record with `result.usage`
+
+    This is the only robust way to count:
+    - loops (same node id executed many times)
+    - subflows / agent subruns (different workflow graphs)
+    """
+    seen_runs: set[str] = set()
+    seen_steps: set[str] = set()
+    queue: list[str] = [run_id]
+    total_in = 0
+    total_out = 0
+
+    def _as_int(v: Any) -> int:
+        try:
+            n = int(v)
+            return n if n >= 0 else 0
+        except Exception:
+            return 0
+
+    def _extract_usage_tokens(usage_raw: Any) -> tuple[int, int]:
+        if not isinstance(usage_raw, dict):
+            return (0, 0)
+        i = usage_raw.get("prompt_tokens")
+        if i is None:
+            i = usage_raw.get("input_tokens")
+        o = usage_raw.get("completion_tokens")
+        if o is None:
+            o = usage_raw.get("output_tokens")
+        return (_as_int(i), _as_int(o))
+
+    while queue:
+        rid = queue.pop(0)
+        if rid in seen_runs:
+            continue
+        seen_runs.add(rid)
+
+        # Sum LLM_CALL usage for this run.
+        try:
+            records = ledger_store.list(rid) if hasattr(ledger_store, "list") else []
+        except Exception:
+            records = []
+        for rec in records or []:
+            if not isinstance(rec, dict):
+                continue
+            if rec.get("status") != "completed":
+                continue
+            eff = rec.get("effect")
+            if not isinstance(eff, dict) or eff.get("type") != "llm_call":
+                continue
+            step_id = rec.get("step_id")
+            if isinstance(step_id, str) and step_id:
+                if step_id in seen_steps:
+                    continue
+                seen_steps.add(step_id)
+            result = rec.get("result")
+            usage = None
+            if isinstance(result, dict):
+                usage = result.get("usage")
+                if usage is None:
+                    raw = result.get("raw")
+                    if isinstance(raw, dict):
+                        usage = raw.get("usage")
+            i, o = _extract_usage_tokens(usage)
+            total_in += i
+            total_out += o
+
+        # Enqueue children if supported.
+        list_children = getattr(run_store, "list_children", None)
+        if callable(list_children):
+            try:
+                children = list_children(parent_run_id=rid) or []
+            except Exception:
+                children = []
+            for c in children:
+                cid = getattr(c, "run_id", None)
+                if isinstance(cid, str) and cid and cid not in seen_runs:
+                    queue.append(cid)
+
+    return (total_in, total_out)
+
+
 @router.get("")
 async def list_runs(
     workflow_id: str = Query(..., description="Workflow id to filter runs (e.g. 'multi_agent_state_machine')."),
@@ -306,7 +391,28 @@ async def get_run_history(run_id: str) -> Dict[str, Any]:
     updated_at = summary.get("updated_at") or _utc_now_iso()
 
     if status == "completed":
-        events.append({"type": "flow_complete", "ts": updated_at, "runId": run_id, "result": getattr(run, "output", None)})
+        meta: Dict[str, Any] = {}
+        dur_total = _duration_ms(created_at, updated_at)
+        if dur_total is not None:
+            meta["duration_ms"] = round(float(dur_total), 2)
+
+        # Include cumulative token totals for the entire run tree (root + descendants).
+        in_sum, out_sum = _sum_llm_usage_from_ledger_tree(run_store=run_store, ledger_store=ledger_store, run_id=run_id)
+        if in_sum > 0 or out_sum > 0:
+            meta["input_tokens"] = int(in_sum)
+            meta["output_tokens"] = int(out_sum)
+            if dur_total is not None and dur_total > 0 and out_sum > 0:
+                meta["tokens_per_s"] = round(float(out_sum) / (float(dur_total) / 1000.0), 2)
+
+        events.append(
+            {
+                "type": "flow_complete",
+                "ts": updated_at,
+                "runId": run_id,
+                "result": getattr(run, "output", None),
+                "meta": meta or None,
+            }
+        )
     elif status == "cancelled":
         events.append({"type": "flow_cancelled", "ts": updated_at, "runId": run_id})
     elif status == "failed":
