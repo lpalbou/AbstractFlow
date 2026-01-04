@@ -235,6 +235,8 @@ export function RunFlowModal({
     output?: unknown;
     error?: string;
     metrics?: ExecutionMetrics;
+    startedAt?: string;
+    endedAt?: string;
     waiting?: {
       prompt: string;
       choices: string[];
@@ -243,6 +245,16 @@ export function RunFlowModal({
       reason?: string;
     };
   };
+
+  const formatStepTime = useCallback((ts?: string) => {
+    const raw = typeof ts === 'string' ? ts.trim() : '';
+    if (!raw) return '';
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return '';
+    // Discreet, local time with seconds.
+    // Prefer a compact HH:MM:SS (avoid locale AM/PM width churn).
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  }, []);
 
   const formatDuration = (rawMs: unknown): string => {
     const ms = typeof rawMs === 'number' ? rawMs : rawMs == null ? NaN : Number(rawMs);
@@ -447,6 +459,7 @@ export function RunFlowModal({
           nodeType: meta?.type,
           nodeIcon: meta?.icon,
           nodeColor: meta?.color,
+          startedAt: typeof ev.ts === 'string' ? ev.ts : undefined,
         };
         out.push(step);
         if (ev.nodeId) openByNode.set(key, out.length - 1);
@@ -467,6 +480,7 @@ export function RunFlowModal({
             metrics: ev.meta,
             provider: mi.provider,
             model: mi.model,
+            endedAt: typeof ev.ts === 'string' ? ev.ts : out[idx].endedAt,
           };
           openByNode.delete(key);
           continue;
@@ -485,6 +499,8 @@ export function RunFlowModal({
           output: ev.result,
           summary: summarize(ev.result),
           metrics: ev.meta,
+          startedAt: typeof ev.ts === 'string' ? ev.ts : undefined,
+          endedAt: typeof ev.ts === 'string' ? ev.ts : undefined,
         });
         continue;
       }
@@ -1368,6 +1384,11 @@ export function RunFlowModal({
                     const bg = hexToRgba(color, 0.12);
                     const statusLabel =
                       s.status === 'running' ? 'RUNNING' : s.status === 'completed' ? 'OK' : s.status === 'waiting' ? 'WAITING' : 'FAILED';
+                    const startedAtLabel = formatStepTime(s.startedAt);
+                    const durationLabel =
+                      s.status === 'completed' && s.metrics && s.metrics.duration_ms != null
+                        ? formatDuration(s.metrics.duration_ms)
+                        : '';
 
                     return (
                       <button
@@ -1379,15 +1400,35 @@ export function RunFlowModal({
                         <div className="run-step-border" style={{ background: color }} />
                         <div className="run-step-main">
                           <div className="run-step-top">
-                            <span className="run-step-index">#{idx + 1}</span>
-                            {s.nodeIcon ? (
-                              <span
-                                className="run-step-icon"
-                                style={{ color }}
-                                dangerouslySetInnerHTML={{ __html: s.nodeIcon }}
-                              />
-                            ) : null}
-                            <span className="run-step-label">{s.nodeLabel || s.nodeId || 'node'}</span>
+                            <div className="run-step-left">
+                              <span className="run-step-index">#{idx + 1}</span>
+                              {s.nodeIcon ? (
+                                <span
+                                  className="run-step-icon"
+                                  style={{ color }}
+                                  dangerouslySetInnerHTML={{ __html: s.nodeIcon }}
+                                />
+                              ) : null}
+                              <span className="run-step-label">{s.nodeLabel || s.nodeId || 'node'}</span>
+                            </div>
+                            <span className="run-step-right">
+                              <span className={`run-step-status ${s.status}`}>
+                                {s.status === 'running' ? <span className="run-spinner" aria-label="running" /> : null}
+                                {statusLabel}
+                              </span>
+                              {durationLabel ? (
+                                <span className="run-metric-badge metric-duration" title="Duration">
+                                  {durationLabel}
+                                </span>
+                              ) : null}
+                              {startedAtLabel ? (
+                                <span className="run-step-time" title={`Started at ${startedAtLabel}`}>
+                                  {startedAtLabel}
+                                </span>
+                              ) : null}
+                            </span>
+                          </div>
+                          <div className="run-step-meta">
                             <span className="run-step-type" style={{ background: bg, borderColor: color }}>
                               {s.nodeType || 'node'}
                             </span>
@@ -1396,9 +1437,6 @@ export function RunFlowModal({
                             {s.nodeId ? <span className="run-step-id">{s.nodeId}</span> : null}
                             {s.status === 'completed' && s.metrics ? (
                               <span className="run-step-metrics">
-                                {s.metrics.duration_ms != null ? (
-                                  <span className="run-metric-badge metric-duration">{formatDuration(s.metrics.duration_ms)}</span>
-                                ) : null}
                                 {formatTokenBadge(s.metrics) ? (
                                   <span className="run-metric-badge metric-tokens">{formatTokenBadge(s.metrics)}</span>
                                 ) : null}
@@ -1407,10 +1445,6 @@ export function RunFlowModal({
                                 ) : null}
                               </span>
                             ) : null}
-                            <span className={`run-step-status ${s.status}`}>
-                              {s.status === 'running' ? <span className="run-spinner" aria-label="running" /> : null}
-                              {statusLabel}
-                            </span>
                           </div>
                           {s.status === 'failed' && s.error ? (
                             <div className="run-step-error">{s.error}</div>

@@ -2060,8 +2060,17 @@ button.primary:hover:not(:disabled) {
 .run-step-top {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: nowrap;
+}
+
+.run-step-left {
+  display: flex;
+  align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  min-width: 0;
+  flex: 1;
 }
 
 .run-step-index {
@@ -2079,8 +2088,18 @@ button.primary:hover:not(:disabled) {
   font-weight: 700;
   font-size: 12px;
   color: var(--text-primary);
-  white-space: normal;
-  word-break: break-word;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.run-step-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
 }
 
 .run-step-type {
@@ -2092,14 +2111,32 @@ button.primary:hover:not(:disabled) {
   white-space: nowrap;
 }
 
+.run-step-time {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.02);
+  white-space: nowrap;
+}
+
 .run-step-id {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-muted);
 }
 
-.run-step-status {
+.run-step-right {
   margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.run-step-status {
   font-size: 11px;
   color: var(--text-secondary);
   text-transform: uppercase;
