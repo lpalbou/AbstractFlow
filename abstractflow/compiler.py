@@ -174,7 +174,7 @@ def _create_effect_node_handler(
                     eff_type == EffectType.LLM_CALL
                     and isinstance(pending, dict)
                     and "messages" not in pending
-                    and pending.get("include_context") is not False
+                    and pending.get("include_context") is True
                 ):
                     try:
                         from abstractruntime.memory.active_context import ActiveContextPolicy
@@ -345,7 +345,7 @@ def _create_visual_agent_effect_handler(
         model: str,
         system_prompt: str,
         allowed_tools: list[str],
-        include_context: bool = True,
+        include_context: bool = False,
         max_iterations: Optional[int] = None,
     ) -> Dict[str, Any]:
         parent_limits = run.vars.get("_limits")
@@ -365,7 +365,8 @@ def _create_visual_agent_effect_handler(
         ctx_ns: Dict[str, Any] = {"task": str(task or ""), "messages": []}
 
         # Optional: inherit the parent's active context as agent history (including Recall into context inserts).
-        # This is a visual-editor UX feature; callers can disable it via agentConfig.include_context.
+        # This is a visual-editor UX feature; it is disabled by default and can be enabled via
+        # agentConfig.include_context or the include_context input pin.
         if bool(include_context):
             try:
                 from abstractruntime.memory.active_context import ActiveContextPolicy
@@ -467,8 +468,16 @@ def _create_visual_agent_effect_handler(
         system_raw = resolved_inputs.get("system") if isinstance(resolved_inputs, dict) else None
         system_prompt = system_raw if isinstance(system_raw, str) else str(system_raw or "")
 
-        include_context_cfg = agent_config.get("include_context")
-        include_context = True if include_context_cfg is None else bool(include_context_cfg)
+        # Include parent run context (as agent history):
+        # - Pin override wins when connected (resolved_inputs contains include_context)
+        # - Otherwise fall back to node config (checkbox)
+        # - Default: false
+        include_context: bool
+        if isinstance(resolved_inputs, dict) and "include_context" in resolved_inputs:
+            include_context = bool(resolved_inputs.get("include_context"))
+        else:
+            include_context_cfg = agent_config.get("include_context")
+            include_context = bool(include_context_cfg) if include_context_cfg is not None else False
 
         # Agent loop budget (max_iterations) can come from a data-edge pin or from config.
         max_iterations_raw = resolved_inputs.get("max_iterations") if isinstance(resolved_inputs, dict) else None

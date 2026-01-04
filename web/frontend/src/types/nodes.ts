@@ -193,6 +193,13 @@ const CORE_NODES: NodeTemplate[] = [
     headerColor: '#00CCCC',
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
+      {
+        id: 'inherit_context',
+        label: 'inherit_context',
+        type: 'boolean',
+        description:
+          "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false.",
+      },
       { id: 'input', label: 'input', type: 'object' },
     ],
     outputs: [
@@ -209,6 +216,13 @@ const CORE_NODES: NodeTemplate[] = [
     headerColor: '#4488FF',
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
+      {
+        id: 'include_context',
+        label: 'use_context',
+        type: 'boolean',
+        description:
+          "When true, include this run's active context messages (context.messages) as agent history. If the pin is not connected, the node checkbox is used. Default: false.",
+      },
       { id: 'provider', label: 'provider', type: 'provider', description: 'LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider.' },
       { id: 'model', label: 'model', type: 'model', description: 'LLM model id/name. If unset, uses the node’s configured model.' },
       { id: 'max_iterations', label: 'max_iterations', type: 'number', description: 'Maximum internal ReAct iterations (safety cap). Higher values allow more tool-use steps.' },
@@ -232,6 +246,13 @@ const CORE_NODES: NodeTemplate[] = [
     headerColor: '#3498DB', // Blue - AI
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
+      {
+        id: 'include_context',
+        label: 'use_context',
+        type: 'boolean',
+        description:
+          "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false.",
+      },
       { id: 'provider', label: 'provider', type: 'provider', description: 'LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider.' },
       { id: 'model', label: 'model', type: 'model', description: 'LLM model id/name. If unset, uses the node’s configured model.' },
       { id: 'system', label: 'system', type: 'string', description: 'Optional system prompt for this single call.' },
@@ -663,6 +684,13 @@ const MEMORY_NODES: NodeTemplate[] = [
     headerColor: '#2ECC71', // Green - memory
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
+      {
+        id: 'keep_in_context',
+        label: 'keep_in_context',
+        type: 'boolean',
+        description:
+          "When true, also insert the stored note into this run's context.messages (synthetic system message). If the pin is not connected, the node checkbox is used. Default: false.",
+      },
       { id: 'scope', label: 'scope', type: 'string', description: 'Where to store/index the note: run (this run), session (root run of this run-tree), or global (shared global memory run).' },
       { id: 'content', label: 'content', type: 'string', description: 'The note text to store durably (keep it short; prefer references in sources for large payloads).' },
       { id: 'location', label: 'location', type: 'string', description: 'Optional location label (where the note was produced, e.g. "flow:my_flow/node-12"). Useful for filtering.' },

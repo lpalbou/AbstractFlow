@@ -1403,7 +1403,7 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
             if not tools_specified:
                 tools = _normalize_tool_names(cfg.get("tools"))
 
-            return {
+            out: Dict[str, Any] = {
                 "task": task,
                 "context": context,
                 "provider": provider if isinstance(provider, str) else None,
@@ -1411,6 +1411,23 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
                 "system": system,
                 "tools": tools,
             }
+
+            # Optional pin overrides (passed through for compiler/runtime consumption).
+            if isinstance(input_data, dict) and "max_iterations" in input_data:
+                out["max_iterations"] = input_data.get("max_iterations")
+
+            include_context_specified = isinstance(input_data, dict) and (
+                "include_context" in input_data or "use_context" in input_data
+            )
+            if include_context_specified:
+                raw_inc = (
+                    input_data.get("include_context")
+                    if isinstance(input_data, dict) and "include_context" in input_data
+                    else input_data.get("use_context") if isinstance(input_data, dict) else None
+                )
+                out["include_context"] = _coerce_bool(raw_inc)
+
+            return out
 
         return handler
 
@@ -1425,6 +1442,9 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
                     continue
                 pid = p.get("id")
                 if isinstance(pid, str) and pid:
+                    # Control pin (not forwarded into child vars).
+                    if pid in {"inherit_context", "inheritContext"}:
+                        continue
                     input_pin_ids.append(pid)
 
         inherit_cfg = None
@@ -1470,6 +1490,23 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
                 else:
                     sub_vars_dict = {"input": input_data}
 
+            # Never forward control pins into the child run vars.
+            sub_vars_dict.pop("inherit_context", None)
+            sub_vars_dict.pop("inheritContext", None)
+
+            inherit_context_specified = isinstance(input_data, dict) and (
+                "inherit_context" in input_data or "inheritContext" in input_data
+            )
+            if inherit_context_specified:
+                raw_inherit = (
+                    input_data.get("inherit_context")
+                    if isinstance(input_data, dict) and "inherit_context" in input_data
+                    else input_data.get("inheritContext") if isinstance(input_data, dict) else None
+                )
+                inherit_context_value = _coerce_bool(raw_inherit)
+            else:
+                inherit_context_value = inherit_context_default
+
             return {
                 "output": None,
                 "_pending_effect": (
@@ -1478,7 +1515,7 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
                         "workflow_id": subflow_id,
                         "vars": sub_vars_dict,
                         "async": False,
-                        **({"inherit_context": True} if inherit_context_default else {}),
+                        **({"inherit_context": True} if inherit_context_value else {}),
                     }
                 ),
             }
@@ -1605,6 +1642,27 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
 
         return handler
 
+    def _coerce_bool(value: Any) -> bool:
+        """Best-effort boolean parsing (handles common string forms)."""
+        if value is None:
+            return False
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            try:
+                return float(value) != 0.0
+            except Exception:
+                return False
+        if isinstance(value, str):
+            s = value.strip().lower()
+            if not s:
+                return False
+            if s in {"false", "0", "no", "off"}:
+                return False
+            if s in {"true", "1", "yes", "on"}:
+                return True
+        return False
+
     def _create_effect_handler(effect_type: str, data: Dict[str, Any]):
         effect_config = data.get("effectConfig", {})
 
@@ -1729,7 +1787,9 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
         temperature = config.get("temperature", 0.7)
         tools_default_raw = config.get("tools")
         include_context_cfg = config.get("include_context")
-        include_context_default = True if include_context_cfg is None else bool(include_context_cfg)
+        if include_context_cfg is None:
+            include_context_cfg = config.get("use_context")
+        include_context_default = _coerce_bool(include_context_cfg) if include_context_cfg is not None else False
 
         # Tool definitions (ToolSpecs) are required for tool calling. In the visual editor we
         # store tools as a portable `string[]` allowlist; at execution time we translate to
@@ -1826,6 +1886,19 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
             if not tools_specified:
                 tools = _normalize_tools(tools_default_raw)
 
+            include_context_specified = isinstance(input_data, dict) and (
+                "include_context" in input_data or "use_context" in input_data
+            )
+            if include_context_specified:
+                raw_inc = (
+                    input_data.get("include_context")
+                    if isinstance(input_data, dict) and "include_context" in input_data
+                    else input_data.get("use_context") if isinstance(input_data, dict) else None
+                )
+                include_context_value = _coerce_bool(raw_inc)
+            else:
+                include_context_value = include_context_default
+
             provider = (
                 input_data.get("provider")
                 if isinstance(input_data, dict) and isinstance(input_data.get("provider"), str)
@@ -1846,7 +1919,7 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
                         "system_prompt": system,
                         "tools": tools,
                         "params": {"temperature": temperature},
-                        "include_context": include_context_default,
+                        "include_context": include_context_value,
                     },
                     "error": "Missing provider or model configuration",
                 }
@@ -1861,7 +1934,7 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
                     "params": {"temperature": temperature},
                     "provider": provider,
                     "model": model,
-                    "include_context": include_context_default,
+                    "include_context": include_context_value,
                 },
             }
 
@@ -2092,24 +2165,6 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
         return handler
 
     def _create_memory_note_handler(data: Dict[str, Any], config: Dict[str, Any]):
-        def _as_bool(value: Any) -> bool:
-            if isinstance(value, bool):
-                return bool(value)
-            if isinstance(value, (int, float)) and not isinstance(value, bool):
-                try:
-                    return float(value) != 0.0
-                except Exception:
-                    return False
-            if isinstance(value, str):
-                s = value.strip().lower()
-                if not s:
-                    return False
-                if s in {"false", "0", "no", "off"}:
-                    return False
-                if s in {"true", "1", "yes", "on"}:
-                    return True
-            return False
-
         def handler(input_data):
             content = input_data.get("content", "") if isinstance(input_data, dict) else str(input_data)
             tags = input_data.get("tags") if isinstance(input_data, dict) else None
@@ -2125,13 +2180,24 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
             if isinstance(scope, str) and scope.strip():
                 pending["scope"] = scope.strip()
 
-            # Visual-editor config: optionally rehydrate the stored note into context.messages.
-            keep_cfg = None
-            if isinstance(config, dict):
-                keep_cfg = config.get("keep_in_context")
-                if keep_cfg is None:
-                    keep_cfg = config.get("keepInContext")
-            keep_in_context = _as_bool(keep_cfg)
+            keep_in_context_specified = isinstance(input_data, dict) and (
+                "keep_in_context" in input_data or "keepInContext" in input_data
+            )
+            if keep_in_context_specified:
+                raw_keep = (
+                    input_data.get("keep_in_context")
+                    if isinstance(input_data, dict) and "keep_in_context" in input_data
+                    else input_data.get("keepInContext") if isinstance(input_data, dict) else None
+                )
+                keep_in_context = _coerce_bool(raw_keep)
+            else:
+                # Visual-editor config (checkbox) default.
+                keep_cfg = None
+                if isinstance(config, dict):
+                    keep_cfg = config.get("keep_in_context")
+                    if keep_cfg is None:
+                        keep_cfg = config.get("keepInContext")
+                keep_in_context = _coerce_bool(keep_cfg)
             if keep_in_context:
                 pending["keep_in_context"] = True
 

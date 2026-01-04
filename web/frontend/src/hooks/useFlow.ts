@@ -516,6 +516,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           data.nodeType === 'llm_call'
             ? [
                 execIn,
+                want({ id: 'include_context', label: 'use_context', type: 'boolean' }),
                 want({ id: 'provider', label: 'provider', type: 'provider' }),
                 want({ id: 'model', label: 'model', type: 'model' }),
                 want({ id: 'system', label: 'system', type: 'string' }),
@@ -524,20 +525,45 @@ export const useFlowStore = create<FlowState>((set, get) => ({
               ]
             : [
                 execIn,
+                want({ id: 'include_context', label: 'use_context', type: 'boolean' }),
                 want({ id: 'provider', label: 'provider', type: 'provider' }),
                 want({ id: 'model', label: 'model', type: 'model' }),
+                want({ id: 'max_iterations', label: 'max_iterations', type: 'number' }),
                 want({ id: 'system', label: 'system', type: 'string' }),
                 want({ id: 'task', label: 'prompt', type: 'string' }),
                 want({ id: 'tools', label: 'tools', type: 'array' }),
                 want({ id: 'context', label: 'context', type: 'object' }),
               ];
 
-        // Drop legacy/experimental pins that were converted to inline node config.
-        const dropIds =
-          data.nodeType === 'llm_call'
-            ? new Set(['include_context', 'use_context', 'write_context', 'writeContext'])
-            : new Set<string>();
+        // Drop truly deprecated pins (kept for backward compat in old flows).
+        // - `write_context` was an experimental feature and is not part of the durable contract.
+        const dropIds = data.nodeType === 'llm_call' ? new Set(['write_context', 'writeContext']) : new Set<string>();
         const extras = existingInputs.filter((p) => !used.has(p.id) && !dropIds.has(p.id));
+        data = { ...data, inputs: [...canonicalInputs, ...extras] };
+      }
+
+      // Backward-compat + canonical ordering for Subflow nodes.
+      // Add the inherit_context pin (default false via node config) so it can be driven via data edges.
+      if (data.nodeType === 'subflow') {
+        const existingInputs = Array.isArray(data.inputs) ? data.inputs : [];
+        const byId = new Map(existingInputs.map((p) => [p.id, p] as const));
+        const used = new Set<string>();
+
+        const want = (pin: Pin): Pin => {
+          const prev = byId.get(pin.id);
+          used.add(pin.id);
+          if (!prev) return pin;
+          if (prev.label === pin.label && prev.type === pin.type) return prev;
+          return { ...prev, label: pin.label, type: pin.type };
+        };
+
+        const canonicalInputs: Pin[] = [
+          want({ id: 'exec-in', label: '', type: 'execution' }),
+          want({ id: 'inherit_context', label: 'inherit_context', type: 'boolean' }),
+          want({ id: 'input', label: 'input', type: 'object' }),
+        ];
+
+        const extras = existingInputs.filter((p) => !used.has(p.id));
         data = { ...data, inputs: [...canonicalInputs, ...extras] };
       }
 
@@ -592,6 +618,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           data.nodeType === 'memory_note'
             ? [
                 wantInput({ id: 'exec-in', label: '', type: 'execution' }),
+                wantInput({ id: 'keep_in_context', label: 'keep_in_context', type: 'boolean' }),
                 wantInput({ id: 'scope', label: 'scope', type: 'string' }),
                 wantInput({ id: 'content', label: 'content', type: 'string' }),
                 wantInput({ id: 'location', label: 'location', type: 'string' }),
@@ -618,12 +645,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                   wantInput({ id: 'max_messages', label: 'max_messages', type: 'number' }),
                 ];
 
-        // Drop legacy/experimental pins that were converted to inline node config.
-        const dropIds =
-          data.nodeType === 'memory_note'
-            ? new Set(['keep_in_context', 'keepInContext'])
-            : new Set<string>();
-        const inputExtras = existingInputs.filter((p) => !usedInputs.has(p.id) && !dropIds.has(p.id));
+        const inputExtras = existingInputs.filter((p) => !usedInputs.has(p.id));
 
         const existingOutputs = Array.isArray(data.outputs) ? data.outputs : [];
         const byOutputId = new Map(existingOutputs.map((p) => [p.id, p] as const));
