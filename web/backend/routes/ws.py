@@ -735,6 +735,12 @@ async def _execute_runner_loop(
                 "wait_until_node_id": None,
                 "wait_event_started_at": None,
                 "wait_event_node_id": None,
+                # START_SUBWORKFLOW waits (Agent nodes / Subflow nodes):
+                # When a run is WAITING(reason=SUBWORKFLOW) and later gets resumed to a different node,
+                # we must emit `node_complete` for the waiting node. Otherwise the UI keeps it stuck
+                # as RUNNING forever (and subsequent nodes appear to run "in parallel").
+                "subworkflow_started_at": None,
+                "subworkflow_node_id": None,
             }
             run_tracks[run_id] = t
         return t
@@ -903,6 +909,54 @@ async def _execute_runner_loop(
         else:
             before = runtime.get_state(run_id)
         node_before = getattr(before, "current_node", None)
+
+        # Close SUBWORKFLOW waits when the run has been resumed past the waiting node.
+        #
+        # Why: Runtime.resume(...) transitions WAITING(SUBWORKFLOW) → RUNNING(next_node) without
+        # producing a new runtime step record for the waiting node. The WS layer must therefore
+        # synthesize a `node_complete` so the UI timeline + canvas highlighting stay consistent.
+        sw_node = track.get("subworkflow_node_id")
+        if isinstance(sw_node, str) and sw_node:
+            status_str = str(getattr(before, "status", None))
+            still_waiting_sub = False
+            if status_str == "RunStatus.WAITING":
+                w = getattr(before, "waiting", None)
+                r = getattr(w, "reason", None) if w is not None else None
+                rv = r.value if hasattr(r, "value") else str(r) if r else None
+                still_waiting_sub = rv == "subworkflow"
+            if not still_waiting_sub and node_before != sw_node:
+                started_at = track.get("subworkflow_started_at")
+                waited_ms = 0.0
+                if isinstance(started_at, (int, float)):
+                    waited_ms = (time.perf_counter() - float(started_at)) * 1000.0
+
+                # Keep root flow outputs in sync (so `_node_output` can see the resumed effect result).
+                if is_root:
+                    try:
+                        from abstractflow.compiler import _sync_effect_results_to_node_outputs as _sync_effect_results  # type: ignore
+                        if hasattr(runner, "flow"):
+                            _sync_effect_results(before, runner.flow)
+                    except Exception:
+                        pass
+
+                out_sw = _node_output(sw_node) if is_root else _run_node_output(before, sw_node)
+                await websocket.send_json(
+                    ExecutionEvent(
+                        type="node_complete",
+                        runId=run_id,
+                        nodeId=sw_node,
+                        result=out_sw,
+                        meta=_node_metrics(sw_node, duration_ms=waited_ms, output=out_sw),
+                    ).model_dump()
+                )
+
+                # Clear wait markers; allow the next node_start to become active.
+                track["subworkflow_node_id"] = None
+                track["subworkflow_started_at"] = None
+                active0 = track.get("active_node_id")
+                if isinstance(active0, str) and active0 == sw_node:
+                    track["active_node_id"] = None
+                    track["active_duration_ms"] = 0.0
 
         # Blueprint-style UX: event listeners should not appear as a "running step"
         # while they are *waiting* for an EVENT. Keep them silent until they are
@@ -1165,6 +1219,14 @@ async def _execute_runner_loop(
                 return state
             reason = getattr(wait, "reason", None) if wait is not None else None
             reason_value = reason.value if hasattr(reason, "value") else str(reason) if reason else None
+
+            if reason_value == "subworkflow":
+                active0 = track.get("active_node_id")
+                sw_id = active0 if isinstance(active0, str) and active0 else (node_before if isinstance(node_before, str) else None)
+                if isinstance(sw_id, str) and sw_id:
+                    if track.get("subworkflow_started_at") is None or track.get("subworkflow_node_id") != sw_id:
+                        track["subworkflow_started_at"] = time.perf_counter()
+                        track["subworkflow_node_id"] = sw_id
 
             if reason_value == "until":
                 if track.get("wait_until_started_at") is None or track.get("wait_until_node_id") != track.get("active_node_id"):

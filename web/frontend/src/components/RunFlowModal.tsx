@@ -15,6 +15,7 @@ import { AgentSubrunTracePanel } from './AgentSubrunTracePanel';
 import AfSelect from './inputs/AfSelect';
 import { useProviders, useModels } from '../hooks/useProviders';
 import { RunSwitcherDropdown } from './RunSwitcherDropdown';
+import { JsonCodeBlock } from './JsonCodeBlock';
 
 interface RunFlowModalProps {
   isOpen: boolean;
@@ -1716,13 +1717,13 @@ export function RunFlowModal({
 
                               <details className="run-raw-details">
                                 <summary>Trace JSON</summary>
-                                <pre className="run-details-output">{formatValue(outputPreview?.scratchpad)}</pre>
+                                <JsonCodeBlock value={outputPreview?.scratchpad} className="run-details-output" />
                               </details>
                             </div>
                           ) : selectedStep?.nodeType !== 'agent' && outputPreview?.scratchpad != null ? (
                             <details className="run-raw-details">
                               <summary>Scratchpad</summary>
-                              <pre className="run-details-output">{formatValue(outputPreview?.scratchpad)}</pre>
+                              <JsonCodeBlock value={outputPreview?.scratchpad} className="run-details-output" />
                             </details>
                           ) : null}
                         </div>
@@ -1730,7 +1731,7 @@ export function RunFlowModal({
 
                       <details className="run-raw-details" open={!outputPreview}>
                         <summary>Raw JSON</summary>
-                        <pre className="run-details-output">{formatValue(selectedStep.output)}</pre>
+                        <JsonCodeBlock value={selectedStep.output} className="run-details-output" />
                       </details>
                     </>
                   ) : (

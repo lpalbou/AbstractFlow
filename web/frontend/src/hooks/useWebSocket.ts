@@ -28,6 +28,15 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
   const [isPaused, setIsPaused] = useState(false);
   const [waitingInfo, setWaitingInfo] = useState<WaitingInfo | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
+  // Root run id for the active WS session.
+  //
+  // IMPORTANT: we keep a ref in addition to React state to avoid a race where
+  // child-run node_start events can arrive before the `runId` state update
+  // is visible to subsequent event handlers (React state updates are async).
+  //
+  // Without this, child run node ids like "node-4" can collide with the root
+  // graph's node ids and incorrectly highlight the wrong node.
+  const runIdRef = useRef<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const { setExecutingNodeId, setIsRunning } = useFlowStore();
@@ -127,7 +136,8 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
           setIsWaiting(false);
           setIsPaused(false);
           setWaitingInfo(null);
-          setRunId(event.runId || null);
+          runIdRef.current = event.runId || null;
+          setRunId(runIdRef.current);
           lastRootNodeIdRef.current = null;
           clearAfterglowTimers();
           resetExecutionDecorations();
@@ -135,7 +145,10 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
         case 'node_start':
           // Only highlight nodes for the root visual run. Child/sub-runs (e.g. Agent subworkflow)
           // may emit node_start events with internal node ids that don't exist in the visual graph.
-          if (event.runId && runId && event.runId !== runId) break;
+          // NOTE: use `runIdRef` to avoid a race right after flow_start.
+          if (event.runId && runIdRef.current && event.runId !== runIdRef.current) break;
+          // Defensive: if we somehow receive node events before flow_start, ignore them.
+          if (!runIdRef.current) break;
           if (!event.nodeId || !nodeIdSet.has(event.nodeId)) break;
 
           // Mark the execution edge from the previously executing root node → current node.
@@ -158,7 +171,8 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
         case 'node_complete':
           // Keep the last executed node highlighted until the next node_start.
           // This makes fast-running flows observable (Blueprint-style).
-          if (event.runId && runId && event.runId !== runId) break;
+          if (event.runId && runIdRef.current && event.runId !== runIdRef.current) break;
+          if (!runIdRef.current) break;
           if (event.nodeId && nodeIdSet.has(event.nodeId)) {
             markNodeAfterglow(event.nodeId);
 
@@ -209,6 +223,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
           setWaitingInfo(null);
           setExecutingNodeId(null);
           lastRootNodeIdRef.current = null;
+          runIdRef.current = null;
           break;
         case 'flow_complete':
         case 'flow_error':
@@ -218,6 +233,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
           setWaitingInfo(null);
           setExecutingNodeId(null);
           lastRootNodeIdRef.current = null;
+          runIdRef.current = null;
           break;
       }
     },
@@ -225,7 +241,6 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
       setExecutingNodeId,
       setIsRunning,
       onWaiting,
-      runId,
       nodeIdSet,
       edges,
       markEdgeAfterglow,
@@ -255,6 +270,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
       setIsPaused(false);
       setWaitingInfo(null);
       setRunId(null);
+      runIdRef.current = null;
       setExecutingNodeId(null);
       setIsRunning(false);
       wsFlowIdRef.current = flowId;

@@ -98,6 +98,33 @@ def _duration_ms(start_iso: Any, end_iso: Any) -> Optional[float]:
         return None
 
 
+def _best_effort_node_output_from_run(run: Any, node_id: str) -> Any:
+    """Best-effort durable node output lookup from persisted run vars.
+
+    Why:
+    - Some effectful nodes (notably async+wait START_SUBWORKFLOW used by Agent nodes)
+      transition through `status="waiting"` and then resume to the next node without
+      emitting a ledger "completed" record for the waiting node.
+    - For run history UX, we still want a node_complete payload so steps don't appear
+      to run forever, and users can inspect the effective output/result.
+    """
+    if run is None:
+        return None
+    vars0 = getattr(run, "vars", None)
+    if not isinstance(vars0, dict):
+        return None
+    temp = vars0.get("_temp")
+    if not isinstance(temp, dict):
+        return None
+    effects = temp.get("effects")
+    if isinstance(effects, dict) and node_id in effects:
+        return effects.get(node_id)
+    node_outputs = temp.get("node_outputs")
+    if isinstance(node_outputs, dict) and node_id in node_outputs:
+        return node_outputs.get(node_id)
+    return None
+
+
 @router.get("")
 async def list_runs(
     workflow_id: str = Query(..., description="Workflow id to filter runs (e.g. 'multi_agent_state_machine')."),
@@ -174,6 +201,7 @@ async def get_run_history(run_id: str) -> Dict[str, Any]:
     events.append({"type": "flow_start", "ts": created_at, "runId": run_id})
 
     # Map step records to UI events (best-effort).
+    open_nodes: Dict[str, str] = {}
     for rec in records:
         if not isinstance(rec, dict):
             continue
@@ -183,7 +211,33 @@ async def get_run_history(run_id: str) -> Dict[str, Any]:
             continue
 
         if status == "started":
+            # Defensive: a new node_start implies prior nodes are no longer active.
+            # Some waiting nodes (e.g. async+wait START_SUBWORKFLOW) may never emit
+            # a "completed" record. Synthesize a completion at this boundary so the
+            # UI doesn't show multiple root steps as running concurrently.
+            ts0 = rec.get("started_at") or created_at
+            for open_id, open_ts in list(open_nodes.items()):
+                if open_id == node_id:
+                    continue
+                meta0: Dict[str, Any] = {}
+                dur0 = _duration_ms(open_ts, ts0)
+                if dur0 is not None:
+                    meta0["duration_ms"] = round(float(dur0), 2)
+                result0 = _best_effort_node_output_from_run(run, open_id)
+                events.append(
+                    {
+                        "type": "node_complete",
+                        "ts": ts0,
+                        "runId": run_id,
+                        "nodeId": open_id,
+                        "result": result0,
+                        "meta": meta0 or None,
+                    }
+                )
+                open_nodes.pop(open_id, None)
+
             events.append({"type": "node_start", "ts": rec.get("started_at") or created_at, "runId": run_id, "nodeId": node_id})
+            open_nodes[node_id] = rec.get("started_at") or created_at
             continue
 
         if status == "completed":
@@ -201,6 +255,7 @@ async def get_run_history(run_id: str) -> Dict[str, Any]:
                     "meta": meta or None,
                 }
             )
+            open_nodes.pop(node_id, None)
             continue
 
         if status == "failed":
@@ -213,11 +268,37 @@ async def get_run_history(run_id: str) -> Dict[str, Any]:
                     "error": rec.get("error") or "Step failed",
                 }
             )
+            open_nodes.pop(node_id, None)
             continue
 
         # status == "waiting" is typically used for async+wait (SUBWORKFLOW). The UI
         # already renders a node as “in progress” when it has a node_start without a
         # node_complete, so we don't need a separate event here.
+        if status == "waiting":
+            # Ensure the node is tracked as open so we can synthesize completion later if needed.
+            if node_id not in open_nodes:
+                open_nodes[node_id] = rec.get("started_at") or created_at
+            continue
+
+    # Close any leftover open nodes on terminal runs so history never shows "forever running".
+    # Result is best-effort from persisted vars.
+    updated_at = getattr(run, "updated_at", None) or created_at or _utc_now_iso()
+    for open_id, open_ts in list(open_nodes.items()):
+        meta0: Dict[str, Any] = {}
+        dur0 = _duration_ms(open_ts, updated_at)
+        if dur0 is not None:
+            meta0["duration_ms"] = round(float(dur0), 2)
+        result0 = _best_effort_node_output_from_run(run, open_id)
+        events.append(
+            {
+                "type": "node_complete",
+                "ts": updated_at,
+                "runId": run_id,
+                "nodeId": open_id,
+                "result": result0,
+                "meta": meta0 or None,
+            }
+        )
 
     # Terminal / waiting markers (best-effort) so the modal can render controls.
     summary = _run_summary(run)

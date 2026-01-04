@@ -2207,6 +2207,35 @@ button.primary:hover:not(:disabled) {
   overflow: auto;
 }
 
+/* JSON viewer (Run modal Raw JSON / Trace JSON) */
+.json-codeblock {
+  /* Preserve indentation and structure (prefer horizontal scroll over wrapping). */
+  white-space: pre;
+  word-break: normal;
+}
+
+.json-codeblock__code {
+  white-space: inherit;
+}
+
+.json-token.key {
+  color: #9cdcfe; /* VS Code-like JSON key */
+}
+.json-token.string {
+  color: #ce9178;
+}
+.json-token.number {
+  color: #b5cea8;
+}
+.json-token.boolean {
+  color: #569cd6;
+}
+.json-token.null {
+  color: #569cd6;
+  opacity: 0.9;
+  font-style: italic;
+}
+
 .run-output-preview {
   display: flex;
   flex-direction: column;

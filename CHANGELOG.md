@@ -26,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The Agent details panel now renders a live sub-run trace of internal LLM/tool steps (expandable with prompts/responses/errors).
   - Runtime node trace entries are now streamed incrementally over WebSocket (`trace_update`) so Agent traces update during execution instead of only after the Agent node completes.
   - Visual Agent nodes now start their ReAct subworkflow in **async+wait** mode so the WebSocket runner can tick the child run incrementally (required for real-time `trace_update` streaming).
+- Canvas execution highlighting is now robust to fast child-run emissions: a race where child-run `node_start` events could arrive before the root `runId` state update (causing incorrect node highlights due to `node-#` id collisions) is fixed.
+- WebSocket subworkflow waits now correctly close the waiting node when the run resumes past `WAITING(reason=SUBWORKFLOW)`, preventing steps from getting stuck as RUNNING in the Run modal.
+- Run history replay (`/api/runs/{run_id}/history`) now synthesizes missing `node_complete` events for steps left open in the durable ledger (common with async+wait subworkflow nodes), so past runs don’t show “forever running” steps.
 - Web run “afterglow” execution highlighting now decays smoothly (3s) and highlights only the execution edges actually taken (prev → next), avoiding misleading branch highlighting on conditional/control nodes.
 - Data edges are now colored by their data type (based on the source pin type) to improve readability in dense graphs.
 - Markdown code block “Copy” now copies the original raw code (preserving newlines/indentation) even after syntax highlighting is applied.
@@ -36,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Run modal now shows a discreet, clickable **run id** pill (hover → click to copy to clipboard) for better observability/debugging.
 - Run modal UX: string inputs now default to a 3-line textarea, and modal actions are always pinned in the footer (the body scrolls).
 - Run modal observability no longer truncates sub-run (Agent) step previews or memory previews; full recalled content is displayed (loaded on demand).
+- Run modal JSON panels (`Raw JSON`, `Trace JSON`, `Scratchpad`) are now syntax-highlighted for readability.
 - In-run execution highlighting (nodes/edges) now has a stronger, more diffuse bloom to improve readability while flows are running.
 - Node palette UX is simplified for discoverability:
   - removed **Effects**
