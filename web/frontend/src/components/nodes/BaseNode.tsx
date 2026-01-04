@@ -6,7 +6,7 @@
  * - Empty shapes = not connected, Filled = connected
  */
 
-import { memo, type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, memo, type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { Handle, Position, NodeProps, useEdges, useUpdateNodeInternals } from 'reactflow';
 import { clsx } from 'clsx';
 import type { FlowNodeData, PinType } from '../../types/flow';
@@ -17,6 +17,7 @@ import { useModels, useProviders } from '../../hooks/useProviders';
 import { useTools } from '../../hooks/useTools';
 import { collectCustomEventNames } from '../../utils/events';
 import { extractFunctionBody, generatePythonTransformCode } from '../../utils/codegen';
+import { upsertPythonAvailableVariablesComments } from '../../utils/codegen';
 import AfSelect from '../inputs/AfSelect';
 import AfMultiSelect from '../inputs/AfMultiSelect';
 import { getNodeTemplate } from '../../types/nodes';
@@ -95,52 +96,6 @@ const ToolsAllowlistInline = memo(function ToolsAllowlistInline({
           searchPlaceholder="Search tools…"
           clearable
           minPopoverWidth={340}
-          onChange={onChange}
-        />
-      </div>
-    </div>
-  );
-});
-
-const ProviderModelsInline = memo(function ProviderModelsInline({
-  provider,
-  providerConnected,
-  models,
-  loading,
-  values,
-  onChange,
-}: {
-  provider: string;
-  providerConnected: boolean;
-  models: string[];
-  loading: boolean;
-  values: string[];
-  onChange: (next: string[]) => void;
-}) {
-  const options = useMemo(() => models.map((m) => ({ value: m, label: m })), [models]);
-  const placeholder = providerConnected
-    ? 'Provider from pin…'
-    : !provider
-      ? 'Pick provider…'
-      : loading
-        ? 'Loading…'
-        : 'Select…';
-
-  return (
-    <div className="node-inline-config nodrag">
-      <div className="node-config-row">
-        <span className="node-config-label">models</span>
-        <AfMultiSelect
-          variant="pin"
-          values={values}
-          placeholder={placeholder}
-          options={options}
-          disabled={providerConnected || !provider || loading}
-          loading={loading}
-          searchable
-          searchPlaceholder="Search models…"
-          clearable
-          minPopoverWidth={360}
           onChange={onChange}
         />
       </div>
@@ -582,6 +537,8 @@ export const BaseNode = memo(function BaseNode({
   const providers = Array.isArray(providersQuery.data) ? providersQuery.data : [];
   const models = Array.isArray(modelsQuery.data) ? modelsQuery.data : [];
   const tools = Array.isArray(toolsQuery.data) ? toolsQuery.data : [];
+
+  const modelOptions = useMemo(() => models.map((m) => ({ value: m, label: m })), [models]);
 
   const toolOptions = useMemo(() => {
     const out = tools
@@ -1299,17 +1256,6 @@ export const BaseNode = memo(function BaseNode({
           />
         )}
 
-        {data.nodeType === 'provider_models' && (
-          <ProviderModelsInline
-            provider={String(selectedProvider || '')}
-            providerConnected={providerConnected}
-            models={models}
-            loading={modelsQuery.isLoading}
-            values={selectedProviderModels}
-            onChange={setProviderModelsAllowedModels}
-          />
-        )}
-
         {data.nodeType === 'bool_var' && (
           <BoolVarInline
             nodeId={id}
@@ -1351,34 +1297,31 @@ export const BaseNode = memo(function BaseNode({
         {/* Data input pins */}
         <div className="pins-left" style={{ ['--pin-label-width' as any]: inputLabelWidth }}>
           {inputData.map((pin) => (
-            <div key={pin.id} className="pin-row input">
-              <AfTooltip content={pin.description} delayMs={2000} priority={2}>
-                <span
-                  className="pin-shape"
-                  style={{ color: PIN_COLORS[pin.type] }}
-                  onClick={(e) => handlePinClick(e, pin.id, true)}
-                  onMouseDownCapture={(e) => handlePinClick(e, pin.id, true)}
-                >
-                  <PinShape
-                    type={pin.type}
-                    size={10}
-                    filled={isPinConnected(pin.id, true)}
-                  />
-                  <Handle
-                    type="target"
-                    position={Position.Left}
-                    id={pin.id}
-                    className={`pin ${pin.type}`}
-                    style={overlayHandleStyle}
-                    onMouseDownCapture={(e) => handlePinClick(e, pin.id, true)}
+            <Fragment key={pin.id}>
+              <div className="pin-row input">
+                <AfTooltip content={pin.description} delayMs={2000} priority={2}>
+                  <span
+                    className="pin-shape"
+                    style={{ color: PIN_COLORS[pin.type] }}
                     onClick={(e) => handlePinClick(e, pin.id, true)}
-                  />
-                </span>
-              </AfTooltip>
-              <span className="pin-label">{pin.label}</span>
-              {(() => {
-                const connected = isPinConnected(pin.id, true);
-                const controls: ReactNode[] = [];
+                    onMouseDownCapture={(e) => handlePinClick(e, pin.id, true)}
+                  >
+                    <PinShape type={pin.type} size={10} filled={isPinConnected(pin.id, true)} />
+                    <Handle
+                      type="target"
+                      position={Position.Left}
+                      id={pin.id}
+                      className={`pin ${pin.type}`}
+                      style={overlayHandleStyle}
+                      onMouseDownCapture={(e) => handlePinClick(e, pin.id, true)}
+                      onClick={(e) => handlePinClick(e, pin.id, true)}
+                    />
+                  </span>
+                </AfTooltip>
+                <span className="pin-label">{pin.label}</span>
+                {(() => {
+                  const connected = isPinConnected(pin.id, true);
+                  const controls: ReactNode[] = [];
 
                 const isPrimitive =
                   pin.type === 'string' ||
@@ -1749,7 +1692,7 @@ export const BaseNode = memo(function BaseNode({
                       variant="pin"
                       value={selectedModel || ''}
                       placeholder={!selectedProvider ? 'Pick provider…' : modelsQuery.isLoading ? 'Loading…' : 'Select…'}
-                      options={models.map((m) => ({ value: m, label: m }))}
+                      options={modelOptions}
                       disabled={!selectedProvider || modelsQuery.isLoading}
                       loading={modelsQuery.isLoading}
                       searchable
@@ -1780,10 +1723,47 @@ export const BaseNode = memo(function BaseNode({
                   );
                 }
 
-                if (controls.length === 0) return null;
-                return <div className="pin-inline-controls nodrag">{controls}</div>;
-              })()}
-            </div>
+                  if (controls.length === 0) return null;
+                  return <div className="pin-inline-controls nodrag">{controls}</div>;
+                })()}
+              </div>
+
+              {/* Models Catalog: provider must be the first pin row; models selection follows. */}
+              {isProviderModelsNode && pin.id === 'provider' ? (
+                <div className="pin-row input nodrag">
+                  <span className="pin-shape" style={{ opacity: 0 }} aria-hidden="true" />
+                  <span className="pin-label">models</span>
+                  {(() => {
+                    const providerValue = typeof selectedProvider === 'string' ? selectedProvider.trim() : '';
+                    const placeholder = providerConnected
+                      ? 'Provider from pin…'
+                      : !providerValue
+                        ? 'Pick provider…'
+                        : modelsQuery.isLoading
+                          ? 'Loading…'
+                          : 'Select…';
+                    const disabled = providerConnected || !providerValue || modelsQuery.isLoading;
+                    return (
+                      <div className="pin-inline-controls nodrag">
+                        <AfMultiSelect
+                          variant="pin"
+                          values={selectedProviderModels}
+                          placeholder={placeholder}
+                          options={modelOptions}
+                          disabled={disabled}
+                          loading={modelsQuery.isLoading}
+                          searchable
+                          searchPlaceholder="Search models…"
+                          clearable
+                          minPopoverWidth={360}
+                          onChange={setProviderModelsAllowedModels}
+                        />
+                      </div>
+                    );
+                  })()}
+                </div>
+              ) : null}
+            </Fragment>
           ))}
 
           {(isConcatNode || isArrayConcatNode || isMakeArrayNode) && (
@@ -1832,12 +1812,13 @@ export const BaseNode = memo(function BaseNode({
           isOpen={showCodeEditor}
           title="Python Code"
           body={currentCodeBody}
-          params={codeParams.map((p) => p.id)}
+          params={codeParams}
           onClose={() => setShowCodeEditor(false)}
           onSave={(nextBody) => {
+            const nextWithHeader = upsertPythonAvailableVariablesComments(nextBody, codeParams);
             updateNodeData(id, {
-              codeBody: nextBody,
-              code: generatePythonTransformCode(data.inputs, nextBody),
+              codeBody: nextWithHeader,
+              code: generatePythonTransformCode(data.inputs, nextWithHeader),
               functionName: 'transform',
             });
             setShowCodeEditor(false);

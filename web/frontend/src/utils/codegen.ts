@@ -28,6 +28,63 @@ export function sanitizePythonIdentifier(raw: string): string {
   return out;
 }
 
+export function getPythonVarNameForPin(pin: Pin): string {
+  return sanitizePythonIdentifier(pin.id);
+}
+
+export function getPythonTypeLabelForPin(pin: Pin): string {
+  // Keep labels aligned with VisualFlow pin types for user predictability.
+  const t = (pin && typeof pin.type === 'string' ? pin.type : '').trim();
+  return t || 'any';
+}
+
+export function buildPythonAvailableVariablesComments(params: Pin[]): string {
+  const dataPins = params.filter((p) => p.type !== 'execution');
+  const lines: string[] = ['# Available variables:', '# _input (dict)'];
+  for (const pin of dataPins) {
+    const name = getPythonVarNameForPin(pin);
+    const typeLabel = getPythonTypeLabelForPin(pin);
+    lines.push(`# ${name} (${typeLabel})`);
+  }
+  return lines.join('\n');
+}
+
+export function upsertPythonAvailableVariablesComments(body: string, params: Pin[]): string {
+  const block = buildPythonAvailableVariablesComments(params);
+  const blockLines = block.split('\n');
+
+  const raw = String(body || '').replace(/\r\n/g, '\n');
+  const lines = raw.split('\n');
+
+  // Insert/replace right after any leading blank lines.
+  let i = 0;
+  while (i < lines.length && lines[i].trim().length === 0) i++;
+
+  const headerRe = /^#\s*Available variables\s*:?\s*$/i;
+  const varLineRe = /^#\s*[A-Za-z_][A-Za-z0-9_]*\s*\([^)]+\)\s*$/;
+
+  if (i < lines.length && headerRe.test(lines[i].trim())) {
+    let end = i + 1;
+    while (end < lines.length) {
+      const t = lines[end].trim();
+      if (t.length === 0) break;
+      if (!t.startsWith('#')) break;
+      if (!varLineRe.test(t)) break;
+      end++;
+    }
+
+    const before = lines.slice(0, i);
+    const after = lines.slice(end);
+    const next = [...before, ...blockLines, '', ...after];
+    return next.join('\n');
+  }
+
+  const before = lines.slice(0, i);
+  const after = lines.slice(i);
+  const next = [...before, ...blockLines, '', ...after];
+  return next.join('\n');
+}
+
 export function generatePythonTransformCode(params: Pin[], body: string): string {
   const bodyClean = dedent(body).trim();
   const lines: string[] = [];
@@ -35,7 +92,7 @@ export function generatePythonTransformCode(params: Pin[], body: string): string
 
   const dataPins = params.filter((p) => p.type !== 'execution');
   for (const pin of dataPins) {
-    const name = sanitizePythonIdentifier(pin.id);
+    const name = getPythonVarNameForPin(pin);
     lines.push(`    ${name} = _input.get(${JSON.stringify(pin.id)})`);
   }
 

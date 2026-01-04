@@ -1,0 +1,265 @@
+{
+  "id": "0275220f",
+  "name": "identify",
+  "description": "",
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "provider_models",
+      "position": {
+        "x": -176.0,
+        "y": 384.0
+      },
+      "data": {
+        "nodeType": "provider_models",
+        "label": "Models Catalog",
+        "icon": "&#x1F4DA;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider",
+            "description": "Provider id to list models for. If this pin is not connected, the node’s selected provider is used."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider",
+            "description": "Resolved provider id used to compute the models list."
+          },
+          {
+            "id": "models",
+            "label": "models",
+            "type": "array",
+            "description": "Array of model ids/names for the provider (filtered to the selected allowed models when set)."
+          }
+        ],
+        "providerModelsConfig": {
+          "provider": "lmstudio",
+          "allowedModels": [
+            "google/gemma-3n-e4b",
+            "openai/gpt-oss-20b",
+            "qwen/qwen3-4b-2507"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-2",
+      "type": "llm_call",
+      "position": {
+        "x": 336.0,
+        "y": 272.0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "LLM Call",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "include_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider",
+            "description": "LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model",
+            "description": "LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string",
+            "description": "Optional system prompt for this single call."
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string",
+            "description": "User prompt/content for this single call."
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array",
+            "description": "Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node)."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string",
+            "description": "Assistant text content (best-effort). For tool calls, content may be empty."
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object",
+            "description": "Full normalized LLM result (content, tool_calls, usage, provider/model metadata, trace_id)."
+          }
+        ],
+        "pinDefaults": {
+          "prompt": "identify yourself"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-3",
+      "type": "loop",
+      "position": {
+        "x": 112.0,
+        "y": 272.0
+      },
+      "data": {
+        "nodeType": "loop",
+        "label": "ForEach",
+        "icon": "&#x1F501;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "items",
+            "label": "items",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "loop",
+            "label": "loop",
+            "type": "execution"
+          },
+          {
+            "id": "done",
+            "label": "done",
+            "type": "execution"
+          },
+          {
+            "id": "item",
+            "label": "item",
+            "type": "any"
+          },
+          {
+            "id": "index",
+            "label": "index",
+            "type": "number"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-4",
+      "type": "on_flow_start",
+      "position": {
+        "x": -320.0,
+        "y": 224.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1767493502214",
+      "source": "node-1",
+      "sourceHandle": "models",
+      "target": "node-3",
+      "targetHandle": "items",
+      "animated": false
+    },
+    {
+      "id": "edge-1767493504315",
+      "source": "node-3",
+      "sourceHandle": "loop",
+      "target": "node-2",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767493514729",
+      "source": "node-4",
+      "sourceHandle": "exec-out",
+      "target": "node-3",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767493610407",
+      "source": "node-1",
+      "sourceHandle": "provider",
+      "target": "node-2",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1767493612583",
+      "source": "node-3",
+      "sourceHandle": "item",
+      "target": "node-2",
+      "targetHandle": "model",
+      "animated": false
+    }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2026-01-04T02:25:26.636781",
+  "updated_at": "2026-01-04T02:27:49.412741"
+}

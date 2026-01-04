@@ -49,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Models Catalog UX: removed the deprecated `allowed_models` input pin; model allowlisting is now edited via an in-node multi-select synced with the right panel.
 - Node/pin tooltips now appear after **2s** hover and are rendered in an overlay layer so they are not clipped by scroll containers.
 - `Python Code` nodes now include an in-node **Edit Code** button (same editor as the right panel).
+- `Python Code` editor now injects an “Available variables” comment block in the code body (one line per variable with type) to make pin-derived variables discoverable while editing.
 
 ### Added
 - Run history for the current workflow:

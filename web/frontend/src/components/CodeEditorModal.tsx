@@ -4,12 +4,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Editor from '@monaco-editor/react';
+import type { Pin } from '../types/flow';
+import { getPythonVarNameForPin, upsertPythonAvailableVariablesComments } from '../utils/codegen';
 
 interface CodeEditorModalProps {
   isOpen: boolean;
   title?: string;
   body: string;
-  params: string[];
+  params: Pin[];
   onClose: () => void;
   onSave: (body: string) => void;
 }
@@ -18,17 +20,20 @@ export function CodeEditorModal({ isOpen, title, body, params, onClose, onSave }
   const [value, setValue] = useState(body);
 
   useEffect(() => {
-    if (isOpen) setValue(body);
-  }, [isOpen, body]);
+    if (!isOpen) return;
+    // Ensure the helper comment block is present and up-to-date, without touching user logic.
+    setValue(upsertPythonAvailableVariablesComments(body, params));
+  }, [isOpen, body, params]);
 
   const hint = useMemo(() => {
-    if (params.length === 0) return 'Inputs: _input (dict)';
-    return `Inputs: _input (dict), ${params.join(', ')}`;
+    const names = params.filter((p) => p.type !== 'execution').map((p) => getPythonVarNameForPin(p));
+    if (names.length === 0) return 'Inputs: _input (dict)';
+    return `Inputs: _input (dict), ${names.join(', ')}`;
   }, [params]);
 
   const handleSave = useCallback(() => {
-    onSave(value);
-  }, [onSave, value]);
+    onSave(upsertPythonAvailableVariablesComments(value, params));
+  }, [onSave, params, value]);
 
   if (!isOpen) return null;
 

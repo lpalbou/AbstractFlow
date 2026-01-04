@@ -10,7 +10,12 @@ import { isEntryNodeType } from '../types/flow';
 import { useFlowStore } from '../hooks/useFlow';
 import { CodeEditorModal } from './CodeEditorModal';
 import ProviderModelsPanel from './ProviderModelsPanel';
-import { extractFunctionBody, generatePythonTransformCode, sanitizePythonIdentifier } from '../utils/codegen';
+import {
+  extractFunctionBody,
+  generatePythonTransformCode,
+  sanitizePythonIdentifier,
+  upsertPythonAvailableVariablesComments,
+} from '../utils/codegen';
 import { collectCustomEventNames } from '../utils/events';
 
 interface PropertiesPanelProps {
@@ -1990,10 +1995,14 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               const nextPins = data.inputs.map((p) =>
                 p.id === pinId ? { ...p, id: nextId, label: nextId } : p
               );
+              const nextBody = upsertPythonAvailableVariablesComments(
+                currentBody,
+                nextPins.filter((p) => p.type !== 'execution')
+              );
               updateNodeData(node.id, {
                 inputs: nextPins,
-                codeBody: currentBody,
-                code: generatePythonTransformCode(nextPins, currentBody),
+                codeBody: nextBody,
+                code: generatePythonTransformCode(nextPins, nextBody),
                 functionName: 'transform',
               });
 
@@ -2005,10 +2014,14 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
             const updateParam = (pinId: string, patch: Partial<typeof params[number]>) => {
               const nextPins = data.inputs.map((p) => (p.id === pinId ? { ...p, ...patch } : p));
+              const nextBody = upsertPythonAvailableVariablesComments(
+                currentBody,
+                nextPins.filter((p) => p.type !== 'execution')
+              );
               updateNodeData(node.id, {
                 inputs: nextPins,
-                codeBody: currentBody,
-                code: generatePythonTransformCode(nextPins, currentBody),
+                codeBody: nextBody,
+                code: generatePythonTransformCode(nextPins, nextBody),
                 functionName: 'transform',
               });
             };
@@ -2018,20 +2031,28 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               while (used.has(`param${n}`)) n++;
               const id = `param${n}`;
               const nextPins = [...data.inputs, { id, label: id, type: 'string' as DataPinType }];
+              const nextBody = upsertPythonAvailableVariablesComments(
+                currentBody,
+                nextPins.filter((p) => p.type !== 'execution')
+              );
               updateNodeData(node.id, {
                 inputs: nextPins,
-                codeBody: currentBody,
-                code: generatePythonTransformCode(nextPins, currentBody),
+                codeBody: nextBody,
+                code: generatePythonTransformCode(nextPins, nextBody),
                 functionName: 'transform',
               });
             };
 
             const removeParam = (pinId: string) => {
               const nextPins = data.inputs.filter((p) => p.id !== pinId);
+              const nextBody = upsertPythonAvailableVariablesComments(
+                currentBody,
+                nextPins.filter((p) => p.type !== 'execution')
+              );
               updateNodeData(node.id, {
                 inputs: nextPins,
-                codeBody: currentBody,
-                code: generatePythonTransformCode(nextPins, currentBody),
+                codeBody: nextBody,
+                code: generatePythonTransformCode(nextPins, nextBody),
                 functionName: 'transform',
               });
             };
@@ -2096,12 +2117,13 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                   isOpen={showCodeEditor}
                   title="Python Code"
                   body={currentBody}
-                  params={params.map((p) => p.id)}
+                  params={params}
                   onClose={() => setShowCodeEditor(false)}
                   onSave={(nextBody) => {
+                    const nextWithHeader = upsertPythonAvailableVariablesComments(nextBody, params);
                     updateNodeData(node.id, {
-                      codeBody: nextBody,
-                      code: generatePythonTransformCode(data.inputs, nextBody),
+                      codeBody: nextWithHeader,
+                      code: generatePythonTransformCode(data.inputs, nextWithHeader),
                       functionName: 'transform',
                     });
                     setShowCodeEditor(false);

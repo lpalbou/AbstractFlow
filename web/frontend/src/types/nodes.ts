@@ -3,7 +3,7 @@
  */
 
 import type { NodeType, FlowNodeData, Pin } from './flow';
-import { generatePythonTransformCode } from '../utils/codegen';
+import { generatePythonTransformCode, upsertPythonAvailableVariablesComments } from '../utils/codegen';
 
 // Node template used in the palette
 export interface NodeTemplate {
@@ -845,7 +845,10 @@ export function getNodeTemplate(type: NodeType): NodeTemplate | undefined {
 
 // Create default node data from template
 export function createNodeData(template: NodeTemplate): FlowNodeData {
-  const defaultCodeBody = 'return input';
+  const defaultCodeBodyBase = 'return input';
+  const defaultCodeBody = template.type === 'code'
+    ? upsertPythonAvailableVariablesComments(defaultCodeBodyBase, template.inputs)
+    : defaultCodeBodyBase;
 
   return {
     nodeType: template.type,
