@@ -686,7 +686,7 @@ const MEMORY_NODES: NodeTemplate[] = [
       { id: 'exec-in', label: '', type: 'execution' },
       {
         id: 'keep_in_context',
-        label: 'keep_in_context',
+        label: 'in_context',
         type: 'boolean',
         description:
           "When true, also insert the stored note into this run's context.messages (synthetic system message). If the pin is not connected, the node checkbox is used. Default: false.",

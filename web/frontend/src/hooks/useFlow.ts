@@ -618,7 +618,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           data.nodeType === 'memory_note'
             ? [
                 wantInput({ id: 'exec-in', label: '', type: 'execution' }),
-                wantInput({ id: 'keep_in_context', label: 'keep_in_context', type: 'boolean' }),
+                wantInput({ id: 'keep_in_context', label: 'in_context', type: 'boolean' }),
                 wantInput({ id: 'scope', label: 'scope', type: 'string' }),
                 wantInput({ id: 'content', label: 'content', type: 'string' }),
                 wantInput({ id: 'location', label: 'location', type: 'string' }),
