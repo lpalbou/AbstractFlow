@@ -257,3 +257,4 @@ def build_scoped_tool_executor(*, scope: WorkspaceScope) -> Any:
     return WorkspaceScopedToolExecutor(scope=scope, delegate=delegate)
 
 
+
