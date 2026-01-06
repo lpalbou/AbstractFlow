@@ -785,6 +785,11 @@
   gap: 6px;
 }
 
+.schema-field-desc {
+  margin-top: 6px;
+  font-size: 12px;
+}
+
 .schema-field-name {
   flex: 1;
   min-width: 0;

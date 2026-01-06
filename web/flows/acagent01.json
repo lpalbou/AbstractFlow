@@ -1,0 +1,198 @@
+{
+  "id": "acagent01",
+  "name": "AbstractCode Agent Example (v1)",
+  "description": "Example workflow implementing abstractcode.agent.v1. It echoes the incoming request as the response.",
+  "interfaces": [
+    "abstractcode.agent.v1"
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": -420,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          }
+        ]
+      },
+      "label": "On Flow Start",
+      "icon": "&#x1F3C1;",
+      "headerColor": "#C0392B",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "exec-out",
+          "label": "",
+          "type": "execution"
+        },
+        {
+          "id": "request",
+          "label": "request",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "id": "echo",
+      "type": "code",
+      "position": {
+        "x": -80,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Python Code",
+        "icon": "&#x1F40D;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "any"
+          }
+        ],
+        "functionName": "transform",
+        "code": "def transform(_input):\n    return f\"Echo: {_input.get('input')}\""
+      },
+      "label": "Python Code",
+      "icon": "&#x1F40D;",
+      "headerColor": "#9B59B6",
+      "inputs": [
+        {
+          "id": "exec-in",
+          "label": "",
+          "type": "execution"
+        },
+        {
+          "id": "input",
+          "label": "input",
+          "type": "any"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "exec-out",
+          "label": "",
+          "type": "execution"
+        },
+        {
+          "id": "output",
+          "label": "output",
+          "type": "any"
+        }
+      ]
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 260,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          }
+        ],
+        "outputs": []
+      },
+      "label": "On Flow End",
+      "icon": "&#x23F9;",
+      "headerColor": "#C0392B",
+      "inputs": [
+        {
+          "id": "exec-in",
+          "label": "",
+          "type": "execution"
+        },
+        {
+          "id": "response",
+          "label": "response",
+          "type": "string"
+        }
+      ],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-start-echo-exec",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "echo",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-start-echo-request",
+      "source": "start",
+      "sourceHandle": "request",
+      "target": "echo",
+      "targetHandle": "input",
+      "animated": false
+    },
+    {
+      "id": "edge-echo-end-exec",
+      "source": "echo",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-echo-end-response",
+      "source": "echo",
+      "sourceHandle": "output",
+      "target": "end",
+      "targetHandle": "response",
+      "animated": false
+    }
+  ],
+  "entryNode": "start"
+}

@@ -10,6 +10,7 @@ interface SchemaField {
   type: SchemaFieldType;
   required: boolean;
   itemsType?: Exclude<SchemaFieldType, 'any'>;
+  description?: string;
 }
 
 export interface JsonSchemaNodeEditorProps {
@@ -93,6 +94,7 @@ function schemaFieldsFromJsonSchema(schema: unknown): SchemaField[] {
       type,
       required: required.has(name),
       itemsType,
+      description: typeof specObj.description === 'string' ? specObj.description : undefined,
     });
   }
   return out;
@@ -105,15 +107,20 @@ function jsonSchemaFromFields(fields: SchemaField[]): Record<string, any> {
   for (const field of fields) {
     const name = field.name.trim();
     if (!name) continue;
+    const desc = typeof field.description === 'string' ? field.description.trim() : '';
 
     const t = field.type;
     if (t === 'any') {
-      properties[name] = {};
+      properties[name] = desc ? { description: desc } : {};
     } else if (t === 'array') {
       const itemsType = field.itemsType;
-      properties[name] = { type: 'array', items: itemsType ? { type: itemsType } : {} };
+      properties[name] = {
+        type: 'array',
+        items: itemsType ? { type: itemsType } : {},
+        ...(desc ? { description: desc } : {}),
+      };
     } else {
-      properties[name] = { type: t };
+      properties[name] = { type: t, ...(desc ? { description: desc } : {}) };
     }
 
     if (field.required) required.push(name);
@@ -326,6 +333,17 @@ export function JsonSchemaNodeEditor({ nodeId, schema, onChange }: JsonSchemaNod
                   <span>optional</span>
                 </label>
               </div>
+
+              <input
+                className="property-input schema-field-desc"
+                value={field.description ?? ''}
+                placeholder="Description (optional) — guides how the model should fill this field"
+                onChange={(e) => {
+                  const next = fields.map((f) => (f.id === field.id ? { ...f, description: e.target.value } : f));
+                  setFields(next);
+                  commitFields(next);
+                }}
+              />
             </div>
           ))}
 

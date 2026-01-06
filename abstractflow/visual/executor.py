@@ -709,6 +709,11 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
     flow._data_edge_map = data_edge_map  # type: ignore[attr-defined]
     flow._pure_node_ids = set()  # type: ignore[attr-defined]
     flow._volatile_pure_node_ids = set()  # type: ignore[attr-defined]
+    # Snapshot of "static" node outputs (literals, schemas, etc.). This is used to
+    # reset the in-memory cache when the same compiled VisualFlow is executed by
+    # multiple runs (e.g. recursive/mutual subflows). See compiler._sync_effect_results_to_node_outputs.
+    flow._static_node_outputs = {}  # type: ignore[attr-defined]
+    flow._active_run_id = None  # type: ignore[attr-defined]
 
     def _normalize_pin_defaults(raw: Any) -> Dict[str, Any]:
         if not isinstance(raw, dict):
@@ -827,6 +832,13 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
             literal_value = node.data.get("literalValue")
             flow._node_outputs[node.id] = {"value": literal_value}  # type: ignore[attr-defined]
             literal_node_ids.add(node.id)
+    # Capture baseline outputs (typically only literal nodes). This baseline must
+    # remain stable across runs so we can safely reset `_node_outputs` when switching
+    # between different `RunState.run_id` contexts (self-recursive subflows).
+    try:
+        flow._static_node_outputs = dict(flow._node_outputs)  # type: ignore[attr-defined]
+    except Exception:
+        flow._static_node_outputs = {}  # type: ignore[attr-defined]
 
     # Compute execution reachability and ignore disconnected execution nodes.
     #

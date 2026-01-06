@@ -65,6 +65,20 @@ async function updateFlowDescription(flowId: string, description: string): Promi
   return response.json();
 }
 
+async function updateFlowInterfaces(flowId: string, interfaces: string[]): Promise<VisualFlow> {
+  const response = await fetch(`/api/flows/${flowId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ interfaces }),
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    const message = error.detail ? String(error.detail) : `HTTP ${response.status}`;
+    throw new Error(message);
+  }
+  return response.json();
+}
+
 async function duplicateFlow(source: VisualFlow, newName: string): Promise<VisualFlow> {
   const response = await fetch('/api/flows', {
     method: 'POST',
@@ -237,6 +251,18 @@ export function Toolbar() {
       }
       queryClient.invalidateQueries({ queryKey: ['flows'] });
       toast.success('Description updated');
+    },
+    [flowId, loadFlow, queryClient]
+  );
+
+  const handleUpdateInterfaces = useCallback(
+    async (id: string, nextInterfaces: string[]) => {
+      const updated = await updateFlowInterfaces(id, nextInterfaces);
+      if (flowId && id === flowId) {
+        loadFlow(updated);
+      }
+      queryClient.invalidateQueries({ queryKey: ['flows'] });
+      toast.success('Interfaces updated');
     },
     [flowId, loadFlow, queryClient]
   );
@@ -660,6 +686,7 @@ export function Toolbar() {
         onLoadFlow={handleLoadFlow}
         onRenameFlow={handleRenameFlow}
         onUpdateDescription={handleUpdateDescription}
+        onUpdateInterfaces={handleUpdateInterfaces}
         onDuplicateFlow={handleDuplicateFlow}
         onDeleteFlow={handleDeleteFlow}
       />

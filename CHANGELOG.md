@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - VisualFlow execution now ignores unreachable/disconnected execution nodes (e.g. orphan `llm_call` / `subflow` nodes) so they cannot fail run initialization.
+- Recursive subflows (self/mutual) now terminate correctly when the base case depends on **pure nodes** (e.g. `compare`, `subtract`): the visual data-edge cache (`flow._node_outputs`) is now isolated per `run_id` to prevent stale outputs leaking across nested runs.
 - `Split` now avoids spurious empty trailing items (common with delimiter-terminated strings like `"A@@B@@"`) so downstream `Loop` nodes don't execute an extra empty iteration.
 - `Loop` (Foreach) now invalidates cached pure-node outputs (e.g. `concat`) per-iteration so loop bodies don't reuse stale values from iteration 0 (fixes scratchpad accumulation workflows).
 - `Concat` now infers a stable pin order (a..z) when template pin metadata is missing (common in programmatic/test-built VisualFlows), so connections to `b/c/...` are honored.

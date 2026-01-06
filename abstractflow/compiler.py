@@ -818,7 +818,44 @@ def _sync_effect_results_to_node_outputs(run: Any, flow: Flow) -> None:
     except Exception:
         pass
 
+    # IMPORTANT: `flow._node_outputs` is an in-memory cache used by the visual executor
+    # to resolve data edges (including lazy "pure" nodes like compare/subtract/concat).
+    #
+    # A single compiled `Flow` instance can be executed by multiple `RunState`s in the
+    # same process when using subworkflows (START_SUBWORKFLOW) — especially with
+    # self-recursion or mutual recursion. In that situation, stale cached outputs from
+    # another run can break correctness (e.g. a cached `compare` result keeps a base-case
+    # from ever becoming false), leading to infinite recursion.
+    #
+    # We isolate caches per run_id by resetting the dict *in-place* when the active run
+    # changes, then rehydrating persisted outputs from `run.vars["_temp"]`.
     node_outputs = flow._node_outputs
+    try:
+        rid = getattr(run, "run_id", None)
+        if isinstance(rid, str) and rid:
+            active = getattr(flow, "_active_run_id", None)
+            if active != rid:
+                base = getattr(flow, "_static_node_outputs", None)
+                # Backward-compat: if the baseline wasn't set (older flows), infer it
+                # on first use — at this point it should contain only literal nodes.
+                if not isinstance(base, dict):
+                    base = dict(node_outputs) if isinstance(node_outputs, dict) else {}
+                    try:
+                        flow._static_node_outputs = dict(base)  # type: ignore[attr-defined]
+                    except Exception:
+                        pass
+                if isinstance(node_outputs, dict):
+                    node_outputs.clear()
+                    if isinstance(base, dict):
+                        node_outputs.update(base)
+                try:
+                    flow._active_run_id = rid  # type: ignore[attr-defined]
+                except Exception:
+                    pass
+    except Exception:
+        # Best-effort; never let cache isolation break execution.
+        pass
+
     temp_data = run.vars.get("_temp", {})
     if not isinstance(temp_data, dict):
         return
