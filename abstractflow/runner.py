@@ -148,49 +148,107 @@ class FlowRunner:
                     and getattr(wait, "reason", None) == WaitReason.SUBWORKFLOW
                     and getattr(self.runtime, "workflow_registry", None) is not None
                 ):
-                    details = getattr(wait, "details", None)
-                    sub_run_id = None
-                    if isinstance(details, dict):
-                        rid = details.get("sub_run_id")
-                        if isinstance(rid, str) and rid:
-                            sub_run_id = rid
-                    wait_key = getattr(wait, "wait_key", None)
-                    if sub_run_id is None and isinstance(wait_key, str) and wait_key.startswith("subworkflow:"):
-                        sub_run_id = wait_key.split("subworkflow:", 1)[1] or None
+                    registry = getattr(self.runtime, "workflow_registry", None)
 
-                    if isinstance(sub_run_id, str) and sub_run_id:
-                        sub_state = self.runtime.get_state(sub_run_id)
-                        registry = self.runtime.workflow_registry
-                        sub_workflow = registry.get(sub_state.workflow_id) if registry is not None else None
-                        if sub_workflow is None:
-                            return {
-                                "waiting": True,
-                                "state": state,
-                                "wait_key": state.waiting.wait_key if state.waiting else None,
-                            }
+                    def _extract_sub_run_id(wait_state: Any) -> Optional[str]:
+                        details2 = getattr(wait_state, "details", None)
+                        if isinstance(details2, dict):
+                            rid2 = details2.get("sub_run_id")
+                            if isinstance(rid2, str) and rid2:
+                                return rid2
+                        wk = getattr(wait_state, "wait_key", None)
+                        if isinstance(wk, str) and wk.startswith("subworkflow:"):
+                            return wk.split("subworkflow:", 1)[1] or None
+                        return None
 
-                        # Drive the child until it completes or blocks.
-                        while sub_state.status == RunStatus.RUNNING:
-                            sub_state = self.runtime.tick(workflow=sub_workflow, run_id=sub_run_id)
+                    def _spec_for(run_state: Any):
+                        wf_id = getattr(run_state, "workflow_id", None)
+                        spec = registry.get(wf_id) if registry is not None else None
+                        return spec
 
-                        if sub_state.status == RunStatus.COMPLETED:
-                            node_traces = None
-                            try:
-                                node_traces = self.runtime.get_node_traces(sub_run_id)
-                            except Exception:
+                    top_run_id = self._current_run_id  # type: ignore[assignment]
+                    if isinstance(top_run_id, str) and top_run_id:
+                        # Find the deepest run in a SUBWORKFLOW wait chain.
+                        target_run_id = top_run_id
+                        for _ in range(50):
+                            cur_state = self.runtime.get_state(target_run_id)
+                            if cur_state.status != RunStatus.WAITING or cur_state.waiting is None:
+                                break
+                            if cur_state.waiting.reason != WaitReason.SUBWORKFLOW:
+                                break
+                            next_id = _extract_sub_run_id(cur_state.waiting)
+                            if not next_id:
+                                break
+                            target_run_id = next_id
+
+                        # Drive runs bottom-up: tick the deepest runnable run, then bubble completion
+                        # payloads to waiting parents until we either block on external input or
+                        # the chain unwinds.
+                        current_run_id = target_run_id
+                        for _ in range(10_000):
+                            cur_state = self.runtime.get_state(current_run_id)
+                            if cur_state.status == RunStatus.RUNNING:
+                                wf = _spec_for(cur_state)
+                                if wf is None:
+                                    break
+                                cur_state = self.runtime.tick(workflow=wf, run_id=current_run_id)
+
+                            if cur_state.status == RunStatus.WAITING:
+                                # If this is a subworkflow wait, descend further.
+                                if cur_state.waiting is not None and cur_state.waiting.reason == WaitReason.SUBWORKFLOW:
+                                    next_id = _extract_sub_run_id(cur_state.waiting)
+                                    if next_id:
+                                        current_run_id = next_id
+                                        continue
+                                # Blocked on non-subworkflow input (ASK_USER / EVENT / UNTIL).
+                                break
+
+                            if cur_state.status == RunStatus.FAILED:
+                                raise RuntimeError(f"Subworkflow failed: {cur_state.error}")
+                            if cur_state.status == RunStatus.CANCELLED:
+                                raise RuntimeError("Subworkflow cancelled")
+                            if cur_state.status != RunStatus.COMPLETED:
+                                break
+
+                            parent_id = getattr(cur_state, "parent_run_id", None)
+                            if not isinstance(parent_id, str) or not parent_id:
+                                break
+
+                            parent_state = self.runtime.get_state(parent_id)
+                            if (
+                                parent_state.status == RunStatus.WAITING
+                                and parent_state.waiting is not None
+                                and parent_state.waiting.reason == WaitReason.SUBWORKFLOW
+                            ):
+                                parent_wf = _spec_for(parent_state)
+                                if parent_wf is None:
+                                    break
+
                                 node_traces = None
+                                try:
+                                    node_traces = self.runtime.get_node_traces(cur_state.run_id)
+                                except Exception:
+                                    node_traces = None
 
-                            self.runtime.resume(
-                                workflow=self.workflow,
-                                run_id=self._current_run_id,  # type: ignore[arg-type]
-                                wait_key=None,
-                                payload={"sub_run_id": sub_state.run_id, "output": sub_state.output, "node_traces": node_traces},
-                                max_steps=0,
-                            )
-                            continue
+                                self.runtime.resume(
+                                    workflow=parent_wf,
+                                    run_id=parent_id,
+                                    wait_key=None,
+                                    payload={
+                                        "sub_run_id": cur_state.run_id,
+                                        "output": cur_state.output,
+                                        "node_traces": node_traces,
+                                    },
+                                    max_steps=0,
+                                )
+                                current_run_id = parent_id
+                                # Continue bubbling (and ticking resumed parents) until we unwind.
+                                continue
 
-                        if sub_state.status == RunStatus.FAILED:
-                            raise RuntimeError(f"Subworkflow failed: {sub_state.error}")
+                            break
+
+                        # After driving/bubbling, re-enter the main loop and tick the top run again.
+                        continue
 
                 # Flow is waiting for external input
                 return {

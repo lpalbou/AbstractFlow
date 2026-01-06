@@ -1,0 +1,998 @@
+{
+  "id": "88199678",
+  "name": "reliable-agent-v3",
+  "description": "",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": {
+        "x": -128.0,
+        "y": 576.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-2",
+      "type": "on_flow_end",
+      "position": {
+        "x": 1888.0,
+        "y": 144.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-3",
+      "type": "agent",
+      "position": {
+        "x": 496.0,
+        "y": 144.0
+      },
+      "data": {
+        "nodeType": "agent",
+        "label": "Agent",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "include_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) as agent history. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider",
+            "description": "LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model",
+            "description": "LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number",
+            "description": "Maximum internal ReAct iterations (safety cap). Higher values allow more tool-use steps."
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string",
+            "description": "Optional system prompt for this agent instance (high priority instructions)."
+          },
+          {
+            "id": "task",
+            "label": "prompt",
+            "type": "string",
+            "description": "The task/user prompt for the agent to solve."
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools",
+            "description": "Allowlist of tool names this agent can call (defense-in-depth; runtime still enforces allowlists)."
+          },
+          {
+            "id": "response_schema",
+            "label": "structured_output",
+            "type": "object",
+            "description": "Optional JSON Schema object (type=object) the final answer must conform to."
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object",
+            "description": "Optional explicit context object for the agent (e.g. {messages:[...]}). If provided, it can override inherited run context."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object",
+            "description": "Structured final agent result (answer + metadata/tool calls depending on agent)."
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object",
+            "description": "Runtime-owned execution trace/scratchpad for observability (LLM/tool steps, timings)."
+          }
+        ],
+        "pinDefaults": {
+          "include_context": true,
+          "system": "You are an autonomous ReAct agent who tries to resolve the user prompt with as much accuracy and thoroughness as possible. You are given access tools to help you resolve the user prompt, use them."
+        },
+        "agentConfig": {
+          "tools": [
+            "fetch_url",
+            "web_search"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-18",
+      "type": "llm_call",
+      "position": {
+        "x": 1040.0,
+        "y": 144.0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "LLM Call",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "include_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider",
+            "description": "LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model",
+            "description": "LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string",
+            "description": "Optional system prompt for this single call."
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string",
+            "description": "User prompt/content for this single call."
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools",
+            "description": "Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node)."
+          },
+          {
+            "id": "response_schema",
+            "label": "structured_output",
+            "type": "object",
+            "description": "Optional JSON Schema object (type=object) the assistant content must conform to."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string",
+            "description": "Assistant text content (best-effort). For tool calls, content may be empty."
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object",
+            "description": "Full normalized LLM result (content, tool_calls, usage, provider/model metadata, trace_id)."
+          }
+        ],
+        "pinDefaults": {
+          "include_context": true,
+          "system": "You are an expert reviewer specialized in understanding the intent of the user. Your goal is to define if we fully resolve the USER QUERY, if yes return is_complete = true with no missing_tasks, if not, return an array of the missing tasks and is_complete = false"
+        },
+        "effectConfig": {
+          "provider": "lmstudio",
+          "model": "gemma-3-1b-it"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-19",
+      "type": "concat",
+      "position": {
+        "x": 800.0,
+        "y": -48.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          },
+          {
+            "id": "d",
+            "label": "d",
+            "type": "string"
+          },
+          {
+            "id": "e",
+            "label": "e",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "a": "Did we fully resolve the user query ?\\nUSER QUERY : ",
+          "c": "\\n\\nAGENT ANSWER : ",
+          "e": "\\nIF there are remaining tasks, please answer with is_complete = false and an array describing the missing_tasks to help fully resolve the USER QUERY"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-22",
+      "type": "if",
+      "position": {
+        "x": 1600.0,
+        "y": 144.0
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "If/Else",
+        "icon": "&#x2753;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-33",
+      "type": "break_object",
+      "position": {
+        "x": 736.0,
+        "y": 352.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "result"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-34",
+      "type": "json_schema",
+      "position": {
+        "x": 832.0,
+        "y": 224.0
+      },
+      "data": {
+        "nodeType": "json_schema",
+        "label": "JSON Schema",
+        "icon": "&#x1F4CB;",
+        "headerColor": "#00FFFF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "schema",
+            "type": "object"
+          }
+        ],
+        "literalValue": {
+          "type": "object",
+          "properties": {
+            "missing_tasks": {
+              "type": "string",
+              "description": "if tasks are missing, write them here in a concise and actionable manner"
+            },
+            "is_complete": {
+              "type": "boolean",
+              "description": "return true if there are no missing tasks, false otherwise"
+            }
+          },
+          "required": [
+            "missing_tasks",
+            "is_complete"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-37",
+      "type": "get",
+      "position": {
+        "x": 1344.0,
+        "y": 288.0
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get Property",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "is_complete"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-40",
+      "type": "concat",
+      "position": {
+        "x": 1712.0,
+        "y": 592.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          },
+          {
+            "id": "d",
+            "label": "d",
+            "type": "string"
+          },
+          {
+            "id": "e",
+            "label": "e",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "a": "You were asked to resolve this query : ",
+          "c": "\\n\\nBUT THE REVIEWER CONSIDERED YOU DID NOT FULLY RESOLVE. HERE ARE THE MISSING TASKS HE WANTS YOU TO WORK ON TO FULLY RESOLVE THE TASK : ",
+          "e": "\\nRUN AUTONOMOUSLY, EXECUTE ALL TOOLS REQUIRED TO FULLY RESOLVE USER QUERY WHILE TAKING INTO ACCOUNT THE REVIEWER MISSIN£G TASKS"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-42",
+      "type": "get",
+      "position": {
+        "x": 1344.0,
+        "y": 432.0
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get Property",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "missing_tasks"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-43",
+      "type": "on_flow_end",
+      "position": {
+        "x": 2128.0,
+        "y": 288.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-45",
+      "type": "break_object",
+      "position": {
+        "x": 1040.0,
+        "y": 528.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "data",
+            "label": "data",
+            "type": "any"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "data"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-46",
+      "type": "subflow",
+      "position": {
+        "x": 1888.0,
+        "y": 288.0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Subflow",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          }
+        ],
+        "subflowId": "88199678"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1767660237158",
+      "source": "node-3",
+      "sourceHandle": "exec-out",
+      "target": "node-18",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767660376177",
+      "source": "node-19",
+      "sourceHandle": "result",
+      "target": "node-18",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "edge-1767660475976",
+      "source": "node-18",
+      "sourceHandle": "exec-out",
+      "target": "node-22",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767660636037",
+      "source": "node-3",
+      "sourceHandle": "result",
+      "target": "node-33",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1767663344054",
+      "source": "node-1",
+      "sourceHandle": "provider",
+      "target": "node-3",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1767663347088",
+      "source": "node-1",
+      "sourceHandle": "model",
+      "target": "node-3",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-1767663361627",
+      "source": "node-1",
+      "sourceHandle": "system",
+      "target": "node-3",
+      "targetHandle": "system",
+      "animated": false
+    },
+    {
+      "id": "edge-1767663387594",
+      "source": "node-1",
+      "sourceHandle": "tools",
+      "target": "node-3",
+      "targetHandle": "tools",
+      "animated": false
+    },
+    {
+      "id": "edge-1767667374389",
+      "source": "node-34",
+      "sourceHandle": "value",
+      "target": "node-18",
+      "targetHandle": "response_schema",
+      "animated": false
+    },
+    {
+      "id": "edge-1767667582662",
+      "source": "node-1",
+      "sourceHandle": "prompt",
+      "target": "node-3",
+      "targetHandle": "task",
+      "animated": false
+    },
+    {
+      "id": "edge-1767667594928",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-3",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767667704155",
+      "source": "node-37",
+      "sourceHandle": "value",
+      "target": "node-22",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "edge-1767667717034",
+      "source": "node-22",
+      "sourceHandle": "true",
+      "target": "node-2",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767667730519",
+      "source": "node-33",
+      "sourceHandle": "result",
+      "target": "node-19",
+      "targetHandle": "d",
+      "animated": false
+    },
+    {
+      "id": "edge-1767667733607",
+      "source": "node-33",
+      "sourceHandle": "result",
+      "target": "node-2",
+      "targetHandle": "response",
+      "animated": false
+    },
+    {
+      "id": "edge-1767667961283",
+      "source": "node-1",
+      "sourceHandle": "prompt",
+      "target": "node-40",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-1767669043081",
+      "source": "node-18",
+      "sourceHandle": "result",
+      "target": "node-45",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1767669082213",
+      "source": "node-45",
+      "sourceHandle": "data",
+      "target": "node-37",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1767669085240",
+      "source": "node-45",
+      "sourceHandle": "data",
+      "target": "node-42",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1767669617162",
+      "source": "node-42",
+      "sourceHandle": "value",
+      "target": "node-40",
+      "targetHandle": "d",
+      "animated": false
+    },
+    {
+      "id": "edge-1767677792883",
+      "source": "node-22",
+      "sourceHandle": "false",
+      "target": "node-46",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767677812458",
+      "source": "node-1",
+      "sourceHandle": "provider",
+      "target": "node-46",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1767677816200",
+      "source": "node-1",
+      "sourceHandle": "model",
+      "target": "node-46",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-1767677820407",
+      "source": "node-1",
+      "sourceHandle": "system",
+      "target": "node-46",
+      "targetHandle": "system",
+      "animated": false
+    },
+    {
+      "id": "edge-1767677828474",
+      "source": "node-1",
+      "sourceHandle": "tools",
+      "target": "node-46",
+      "targetHandle": "tools",
+      "animated": false
+    },
+    {
+      "id": "edge-1767677847317",
+      "source": "node-46",
+      "sourceHandle": "response",
+      "target": "node-43",
+      "targetHandle": "response",
+      "animated": false
+    },
+    {
+      "id": "edge-1767677850318",
+      "source": "node-46",
+      "sourceHandle": "exec-out",
+      "target": "node-43",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767677876212",
+      "source": "node-40",
+      "sourceHandle": "result",
+      "target": "node-46",
+      "targetHandle": "prompt",
+      "animated": false
+    }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2026-01-06T05:36:04.171718",
+  "updated_at": "2026-01-06T05:37:58.325565"
+}

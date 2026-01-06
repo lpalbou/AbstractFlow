@@ -116,6 +116,8 @@ body,
 }
 
 .sidebar.right {
+  /* UX: the properties panel is used for detailed editing; make it a bit wider than the left palette. */
+  width: clamp(276px, calc(var(--sidebar-width) * 1.15), 360px);
   border-right: none;
   border-left: 1px solid var(--bg-tertiary);
 }
@@ -1020,6 +1022,72 @@ button.primary:hover:not(:disabled) {
   font-size: 11px;
 }
 
+.flow-library-preview-val.flow-library-preview-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.flow-library-edit-icon.meta {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+}
+
+.flow-library-interfaces-editor {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  display: grid;
+  gap: 10px;
+}
+
+.flow-library-interface-option {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 12px;
+}
+
+.flow-library-interface-option input[type='checkbox'] {
+  margin-top: 3px;
+}
+
+.flow-library-interface-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.flow-library-interface-label {
+  font-weight: 700;
+}
+
+.flow-library-interface-desc {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.flow-library-interfaces-hint {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 10px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+}
+
+.flow-library-interfaces-hint-title {
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.86);
+  margin-bottom: 6px;
+}
+
+.flow-library-interfaces-hint-body code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
 .flow-library-preview-desc {
   position: relative;
   padding-top: 2px;
@@ -1775,6 +1843,12 @@ button.primary:hover:not(:disabled) {
   color: rgba(200, 255, 250, 0.95);
 }
 
+.run-metric-badge.metric-depth {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(235, 235, 235, 0.9);
+}
+
 .run-metric-badge.metric-number {
   border-color: rgba(0, 255, 0, 0.25);
   background: rgba(0, 255, 0, 0.08);
@@ -2046,6 +2120,21 @@ button.primary:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.05);
 }
 
+.run-step-tree-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.run-step-children {
+  margin-left: 14px;
+  padding-left: 10px;
+  border-left: 1px solid rgba(255, 255, 255, 0.10);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .run-step-border {
   width: 4px;
   border-radius: 999px;
@@ -2071,6 +2160,27 @@ button.primary:hover:not(:disabled) {
   gap: 8px;
   min-width: 0;
   flex: 1;
+}
+
+.run-step-toggle {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1;
+  user-select: none;
+}
+
+.run-step-toggle:hover {
+  border-color: rgba(233, 69, 96, 0.45);
+  background: rgba(233, 69, 96, 0.14);
+  color: rgba(255, 220, 225, 0.98);
 }
 
 .run-step-index {

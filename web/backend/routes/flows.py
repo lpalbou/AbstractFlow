@@ -21,6 +21,7 @@ from ..models import (
 from ..services.executor import create_visual_runner, visual_to_flow
 from ..services.runtime_stores import get_runtime_stores
 from abstractflow.visual.workspace_scoped_tools import WorkspaceScope, build_scoped_tool_executor
+from abstractflow.visual.interfaces import apply_visual_flow_interface_scaffold
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/flows", tags=["flows"])
@@ -37,6 +38,13 @@ def _load_flows_from_disk() -> Dict[str, VisualFlow]:
         try:
             data = json.loads(path.read_text())
             flow = VisualFlow(**data)
+            # Best-effort: keep interface-marked workflows scaffolded so the editor
+            # always shows the expected pins (even for older files).
+            try:
+                for iid in list(getattr(flow, "interfaces", []) or []):
+                    apply_visual_flow_interface_scaffold(flow, str(iid), include_recommended=True)
+            except Exception:
+                pass
             flows[flow.id] = flow
             logger.info(f"Loaded flow '{flow.name}' ({flow.id}) from {path}")
         except Exception as e:
@@ -77,12 +85,19 @@ async def create_flow(request: FlowCreateRequest):
         id=str(uuid.uuid4())[:8],
         name=request.name,
         description=request.description,
+        interfaces=list(request.interfaces or []),
         nodes=request.nodes,
         edges=request.edges,
         entryNode=request.entryNode,
         created_at=now,
         updated_at=now,
     )
+    # If the flow declares interfaces, ensure required pins exist.
+    try:
+        for iid in list(getattr(flow, "interfaces", []) or []):
+            apply_visual_flow_interface_scaffold(flow, str(iid), include_recommended=True)
+    except Exception:
+        pass
     _flows[flow.id] = flow
     _save_flow_to_disk(flow)  # Persist to disk
     return flow
@@ -109,12 +124,21 @@ async def update_flow(flow_id: str, request: FlowUpdateRequest):
         flow.name = request.name
     if request.description is not None:
         flow.description = request.description
+    if request.interfaces is not None:
+        flow.interfaces = list(request.interfaces or [])
     if request.nodes is not None:
         flow.nodes = request.nodes
     if request.edges is not None:
         flow.edges = request.edges
     if request.entryNode is not None:
         flow.entryNode = request.entryNode
+
+    # Keep interface-marked flows scaffolded even if only nodes/edges changed.
+    try:
+        for iid in list(getattr(flow, "interfaces", []) or []):
+            apply_visual_flow_interface_scaffold(flow, str(iid), include_recommended=True)
+    except Exception:
+        pass
 
     flow.updated_at = datetime.utcnow().isoformat()
     _flows[flow_id] = flow

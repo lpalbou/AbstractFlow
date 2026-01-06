@@ -106,6 +106,58 @@ def test_visual_break_object_extracts_nested_fields() -> None:
     assert result.get("result") == {"task": "hello", "total": 123}
 
 
+def test_visual_break_object_parses_json_string_inputs() -> None:
+    """Break Object should tolerate JSON-ish strings (common LLM outputs) by parsing best-effort."""
+    flow_id = "test-visual-break-object-json-string"
+    visual = VisualFlow(
+        id=flow_id,
+        name="break object json string",
+        entryNode="code",
+        nodes=[
+            VisualNode(
+                id="payload",
+                type=NodeType.LITERAL_STRING,
+                position=Position(x=0, y=0),
+                data={"literalValue": '{"enriched_request":"hello","tasks":["a","b"]}'},
+            ),
+            VisualNode(
+                id="break",
+                type=NodeType.BREAK_OBJECT,
+                position=Position(x=0, y=0),
+                data={"breakConfig": {"selectedPaths": ["enriched_request", "tasks"]}},
+            ),
+            VisualNode(
+                id="code",
+                type=NodeType.CODE,
+                position=Position(x=0, y=0),
+                data={
+                    "code": (
+                        "def transform(input):\n"
+                        "    return {'req': input.get('req'), 'tasks': input.get('tasks')}\n"
+                    ),
+                    "functionName": "transform",
+                },
+            ),
+        ],
+        edges=[
+            VisualEdge(id="d1", source="payload", sourceHandle="value", target="break", targetHandle="object"),
+            VisualEdge(
+                id="d2",
+                source="break",
+                sourceHandle="enriched_request",
+                target="code",
+                targetHandle="req",
+            ),
+            VisualEdge(id="d3", source="break", sourceHandle="tasks", target="code", targetHandle="tasks"),
+        ],
+    )
+
+    runner = create_visual_runner(visual, flows={flow_id: visual})
+    result = runner.run({})
+    assert result.get("success") is True
+    assert result.get("result") == {"req": "hello", "tasks": ["a", "b"]}
+
+
 def test_visual_concat_supports_dynamic_inputs_and_separator() -> None:
     flow_id = "test-visual-concat-dynamic"
     visual = VisualFlow(

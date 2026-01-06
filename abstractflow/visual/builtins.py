@@ -182,9 +182,23 @@ def string_split(inputs: Dict[str, Any]) -> List[str]:
 
 def string_join(inputs: Dict[str, Any]) -> str:
     """Join array items with delimiter."""
-    items = inputs.get("items", [])
+    items = inputs.get("items")
+    # Visual workflows frequently pass optional pins; treat `null` as empty.
+    if items is None:
+        items_list: list[Any] = []
+    elif isinstance(items, list):
+        items_list = items
+    elif isinstance(items, tuple):
+        items_list = list(items)
+    else:
+        # Defensive: if a non-array leaks in, treat it as a single element instead of
+        # iterating characters (strings) or keys (dicts).
+        items_list = [items]
+
     delimiter = str(inputs.get("delimiter", ","))
-    return delimiter.join(str(item) for item in items)
+    # UI often stores escape sequences (e.g. "\\n") in JSON.
+    delimiter = delimiter.replace("\\n", "\n").replace("\\t", "\t").replace("\\r", "\r")
+    return delimiter.join("" if item is None else str(item) for item in items_list)
 
 
 def string_format(inputs: Dict[str, Any]) -> str:

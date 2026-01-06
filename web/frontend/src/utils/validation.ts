@@ -64,6 +64,15 @@ export function areTypesCompatible(
     return sourceType === 'execution' && targetType === 'execution';
   }
 
+  // Tools is a specialized array of tool names (string[]).
+  // Treat it as compatible with `array` (and keep the explicit `tools` type for UX).
+  if (
+    (sourceType === 'tools' && targetType === 'array') ||
+    (sourceType === 'array' && targetType === 'tools')
+  ) {
+    return true;
+  }
+
   // 'any' type accepts anything
   if (sourceType === 'any' || targetType === 'any') {
     return true;
@@ -76,6 +85,11 @@ export function areTypesCompatible(
 
   // Array can connect to object (objects can represent arrays)
   if (sourceType === 'array' && targetType === 'object') {
+    return true;
+  }
+
+  // Tools is array-like; allow tools -> object for the same reason as array -> object.
+  if (sourceType === 'tools' && targetType === 'object') {
     return true;
   }
 

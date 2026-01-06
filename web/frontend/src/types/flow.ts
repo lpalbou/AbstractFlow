@@ -10,6 +10,7 @@ export type PinType =
   | 'boolean'   // Red #FF0000 - True/False
   | 'object'    // Cyan #00FFFF - JSON objects
   | 'array'     // Orange #FF8800 - Collections
+  | 'tools'     // Orange - Tool allowlist (string[])
   | 'provider'  // Cyan-blue - LLM provider id/name (string-like)
   | 'model'     // Purple - LLM model id/name (string-like)
   | 'agent'     // Blue #4488FF - Agent reference
@@ -23,6 +24,7 @@ export const PIN_COLORS: Record<PinType, string> = {
   boolean: '#FF0000',
   object: '#00FFFF',
   array: '#FF8800',
+  tools: '#FF8800',
   provider: '#00D2FF',
   model: '#9D4EDD',
   agent: '#4488FF',
@@ -40,6 +42,15 @@ export interface Pin {
    */
   description?: string;
 }
+
+// JSON-serializable values used for pin defaults and literals.
+export type JsonValue =
+  | null
+  | string
+  | number
+  | boolean
+  | JsonValue[]
+  | { [key: string]: JsonValue };
 
 // Node types
 export type NodeType =
@@ -72,6 +83,7 @@ export type NodeType =
   | 'model_catalog'
   // Literals - Pure value nodes (no exec pins, no inputs)
   | 'literal_string' | 'literal_number' | 'literal_boolean' | 'literal_json' | 'literal_array'
+  | 'json_schema'
   // Effects - Side-effect nodes (require execution pins)
   | 'ask_user'
   | 'answer_user'
@@ -111,9 +123,9 @@ export interface FlowNodeData {
   outputs: Pin[];
   /**
    * Blueprint-style default values for *unconnected* input pins.
-   * Keys are input pin ids; values are JSON primitives.
+   * Keys are pin ids; values are JSON-serializable (persisted in the flow JSON).
    */
-  pinDefaults?: Record<string, string | number | boolean>;
+  pinDefaults?: Record<string, JsonValue>;
   // Node-specific config
   code?: string;           // For code nodes
   codeBody?: string;       // For code nodes (body-only editor)
@@ -197,6 +209,11 @@ export interface VisualFlow {
   id: string;
   name: string;
   description?: string;
+  /**
+   * Optional interface markers for host contracts.
+   * Example: ["abstractcode.agent.v1"] to indicate this workflow can be run as an AbstractCode agent.
+   */
+  interfaces?: string[];
   nodes: VisualNode[];
   edges: VisualEdge[];
   entryNode?: string;

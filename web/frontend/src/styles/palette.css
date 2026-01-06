@@ -603,6 +603,12 @@
   flex: 1;
 }
 
+.io-pin-default {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .io-pin-name {
   min-width: 0;
 }
@@ -783,6 +789,11 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.schema-field-desc {
+  margin-top: 6px;
+  font-size: 12px;
 }
 
 .schema-field-name {

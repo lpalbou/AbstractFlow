@@ -13,7 +13,7 @@ import {
   NodeChange,
   EdgeChange,
 } from 'reactflow';
-import type { FlowNodeData, VisualFlow, Pin } from '../types/flow';
+import type { FlowNodeData, VisualFlow, Pin, JsonValue } from '../types/flow';
 import { createNodeData, getNodeTemplate, mergePinDocsFromTemplate, NodeTemplate } from '../types/nodes';
 import { validateConnection } from '../utils/validation';
 
@@ -21,6 +21,7 @@ interface FlowState {
   // Flow data
   flowId: string | null;
   flowName: string;
+  flowInterfaces: string[];
   nodes: Node<FlowNodeData>[];
   edges: Edge[];
 
@@ -47,6 +48,7 @@ interface FlowState {
   // Actions
   setFlowId: (id: string | null) => void;
   setFlowName: (name: string) => void;
+  setFlowInterfaces: (interfaces: string[]) => void;
   setNodes: (nodes: Node<FlowNodeData>[]) => void;
   setEdges: (edges: Edge[]) => void;
   onNodesChange: (changes: NodeChange[]) => void;
@@ -137,6 +139,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   // Initial state
   flowId: null,
   flowName: 'Untitled Flow',
+  flowInterfaces: [],
   nodes: [],
   edges: [],
   selectedNode: null,
@@ -154,6 +157,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   // Setters
   setFlowId: (id) => set({ flowId: id }),
   setFlowName: (name) => set({ flowName: name }),
+  setFlowInterfaces: (interfaces) => set({ flowInterfaces: Array.isArray(interfaces) ? interfaces : [] }),
   setNodes: (nodes) => set({ nodes }),
   setEdges: (edges) => set({ edges }),
 
@@ -521,7 +525,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                 want({ id: 'model', label: 'model', type: 'model' }),
                 want({ id: 'system', label: 'system', type: 'string' }),
                 want({ id: 'prompt', label: 'prompt', type: 'string' }),
-                want({ id: 'tools', label: 'tools', type: 'array' }),
+                want({ id: 'tools', label: 'tools', type: 'tools' }),
+                want({ id: 'response_schema', label: 'structured_output', type: 'object' }),
               ]
             : [
                 execIn,
@@ -531,7 +536,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                 want({ id: 'max_iterations', label: 'max_iterations', type: 'number' }),
                 want({ id: 'system', label: 'system', type: 'string' }),
                 want({ id: 'task', label: 'prompt', type: 'string' }),
-                want({ id: 'tools', label: 'tools', type: 'array' }),
+                want({ id: 'tools', label: 'tools', type: 'tools' }),
+                want({ id: 'response_schema', label: 'structured_output', type: 'object' }),
                 want({ id: 'context', label: 'context', type: 'object' }),
               ];
 
@@ -550,7 +556,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         // migrate it, the UI would show an unchecked pin (default false) while execution would
         // still follow the legacy config (surprising and unsafe).
         const prevDefaults = data.pinDefaults && typeof data.pinDefaults === 'object' ? data.pinDefaults : undefined;
-        const nextDefaults: Record<string, string | number | boolean> = { ...(prevDefaults || {}) };
+        const nextDefaults: Record<string, JsonValue> = { ...(prevDefaults || {}) };
 
         if (data.nodeType === 'llm_call') {
           const cfg = data.effectConfig && typeof data.effectConfig === 'object' ? (data.effectConfig as any) : null;
@@ -620,7 +626,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
         // Migration: legacy effectConfig.inherit_context -> pinDefaults.inherit_context
         const prevDefaults = data.pinDefaults && typeof data.pinDefaults === 'object' ? data.pinDefaults : undefined;
-        const nextDefaults: Record<string, string | number | boolean> = { ...(prevDefaults || {}) };
+        const nextDefaults: Record<string, JsonValue> = { ...(prevDefaults || {}) };
         const cfg = data.effectConfig && typeof data.effectConfig === 'object' ? (data.effectConfig as any) : null;
         const legacy =
           cfg && typeof cfg.inherit_context === 'boolean'
@@ -773,7 +779,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         // Migration: legacy memory_note keep_in_context -> pinDefaults.keep_in_context
         if (data.nodeType === 'memory_note') {
           const prevDefaults = data.pinDefaults && typeof data.pinDefaults === 'object' ? data.pinDefaults : undefined;
-          const nextDefaults: Record<string, string | number | boolean> = { ...(prevDefaults || {}) };
+          const nextDefaults: Record<string, JsonValue> = { ...(prevDefaults || {}) };
           const cfg = data.effectConfig && typeof data.effectConfig === 'object' ? (data.effectConfig as any) : null;
           const legacy =
             cfg && typeof cfg.keep_in_context === 'boolean'
@@ -967,6 +973,32 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         };
       }
 
+      // Backward-compat + canonical ordering for While nodes:
+      // ensure `item:any` exists (parity with ForEach / Loop).
+      if (data.nodeType === 'while') {
+        const existingOutputs = Array.isArray(data.outputs) ? data.outputs : [];
+        const byId = new Map(existingOutputs.map((p) => [p.id, p] as const));
+        const used = new Set<string>();
+
+        const want = (pin: Pin): Pin => {
+          const prev = byId.get(pin.id);
+          used.add(pin.id);
+          if (!prev) return pin;
+          if (prev.label === pin.label && prev.type === pin.type) return prev;
+          return { ...prev, label: pin.label, type: pin.type };
+        };
+
+        const canonicalOutputs: Pin[] = [
+          want({ id: 'loop', label: 'loop', type: 'execution' }),
+          want({ id: 'done', label: 'done', type: 'execution' }),
+          want({ id: 'item', label: 'item', type: 'any' }),
+          want({ id: 'index', label: 'index', type: 'number' }),
+        ];
+
+        const extras = existingOutputs.filter((p) => !used.has(p.id));
+        data = { ...data, outputs: [...canonicalOutputs, ...extras] };
+      }
+
       // Backfill template pin documentation (tooltip text) for legacy flows.
       // This intentionally runs after all canonical ordering / pin insertion above.
       if (template) {
@@ -1017,6 +1049,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     set({
       flowId: flow.id,
       flowName: flow.name,
+      flowInterfaces: Array.isArray(flow.interfaces) ? flow.interfaces : [],
       nodes,
       edges: validEdges,
       selectedNode: null,
@@ -1039,6 +1072,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     return {
       id: state.flowId || `flow-${Date.now()}`,
       name: state.flowName,
+      interfaces: Array.isArray(state.flowInterfaces) ? state.flowInterfaces : [],
       nodes: state.nodes.map((n) => ({
         id: n.id,
         type: n.data.nodeType,
@@ -1062,6 +1096,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     set({
       flowId: null,
       flowName: 'Untitled Flow',
+      flowInterfaces: [],
       nodes: [],
       edges: [],
       selectedNode: null,

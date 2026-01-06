@@ -82,6 +82,24 @@ export function fromVisualFlow(flow: VisualFlow): {
       }
     }
 
+    // While node: add `item:any` output pin for parity with ForEach / Loop.
+    if (data.nodeType === 'while') {
+      const outputs = Array.isArray(data.outputs) ? data.outputs : [];
+      const hasItem = outputs.some((p) => p.id === 'item');
+      if (!hasItem && outputs.length > 0) {
+        const next = [...outputs];
+        // Insert after `done` when possible; otherwise append.
+        const doneIdx = next.findIndex((p) => p.id === 'done');
+        const itemPin = { id: 'item', label: 'item', type: 'any' as const };
+        if (doneIdx >= 0) {
+          next.splice(doneIdx + 1, 0, itemPin);
+        } else {
+          next.push(itemPin);
+        }
+        (data as any).outputs = next;
+      }
+    }
+
     // Agent node: add max_iterations input pin (runtime budget control) for legacy flows.
     if (data.nodeType === 'agent') {
       const hasMax = Array.isArray(data.inputs) && data.inputs.some((p) => p.id === 'max_iterations');

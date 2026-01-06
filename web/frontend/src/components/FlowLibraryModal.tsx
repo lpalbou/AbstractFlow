@@ -14,8 +14,40 @@ export interface FlowLibraryModalProps {
   onLoadFlow: (flowId: string) => void;
   onRenameFlow: (flowId: string, nextName: string) => Promise<void> | void;
   onUpdateDescription: (flowId: string, nextDescription: string) => Promise<void> | void;
+  onUpdateInterfaces: (flowId: string, nextInterfaces: string[]) => Promise<void> | void;
   onDuplicateFlow: (flowId: string) => Promise<void> | void;
   onDeleteFlow: (flowId: string) => Promise<void> | void;
+}
+
+const KNOWN_INTERFACES: Array<{ id: string; label: string; description: string }> = [
+  {
+    id: 'abstractcode.agent.v1',
+    label: 'AbstractCode Agent (v1)',
+    description:
+      "Allows running this workflow as an AbstractCode agent via `abstractcode --agent <flow>` (host-configurable provider/model/tools pins).",
+  },
+];
+
+function normalizeInterfaces(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const out: string[] = [];
+  for (const item of value) {
+    if (typeof item !== 'string') continue;
+    const trimmed = item.trim();
+    if (!trimmed) continue;
+    if (!out.includes(trimmed)) out.push(trimmed);
+  }
+  return out;
+}
+
+function renderInterfaces(interfaces: string[]): string {
+  if (!interfaces.length) return '—';
+  const labels: string[] = [];
+  for (const iid of interfaces) {
+    const known = KNOWN_INTERFACES.find((x) => x.id === iid);
+    labels.push(known ? known.label : iid);
+  }
+  return labels.join(', ');
 }
 
 function safeLower(value: unknown): string {
@@ -78,6 +110,7 @@ export function FlowLibraryModal({
   onLoadFlow,
   onRenameFlow,
   onUpdateDescription,
+  onUpdateInterfaces,
   onDuplicateFlow,
   onDeleteFlow,
 }: FlowLibraryModalProps) {
@@ -91,6 +124,8 @@ export function FlowLibraryModal({
   const [renameDraft, setRenameDraft] = useState('');
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [descriptionDraft, setDescriptionDraft] = useState('');
+  const [isEditingInterfaces, setIsEditingInterfaces] = useState(false);
+  const [interfacesDraft, setInterfacesDraft] = useState<string[]>([]);
   const [isDeleteConfirm, setIsDeleteConfirm] = useState(false);
 
   const normalizedFlows = useMemo(() => {
@@ -170,7 +205,7 @@ export function FlowLibraryModal({
         }
       }
 
-      if (isRenaming || isEditingDescription) return; // do not hijack keys while editing
+      if (isRenaming || isEditingDescription || isEditingInterfaces) return; // do not hijack keys while editing
       if (!normalizedFlows.length) return;
 
       const idx = normalizedFlows.findIndex((f) => f.id === selectedFlowId);
@@ -197,7 +232,7 @@ export function FlowLibraryModal({
 
     window.addEventListener('keydown', onKeyDown, { capture: true });
     return () => window.removeEventListener('keydown', onKeyDown, { capture: true } as any);
-  }, [isOpen, isRenaming, isEditingDescription, normalizedFlows, onClose, onLoadFlow, selectedFlowId]);
+  }, [isOpen, isRenaming, isEditingDescription, isEditingInterfaces, normalizedFlows, onClose, onLoadFlow, selectedFlowId]);
 
   // Reset destructive UI when selection changes
   useEffect(() => {
@@ -206,6 +241,8 @@ export function FlowLibraryModal({
     setRenameDraft('');
     setIsEditingDescription(false);
     setDescriptionDraft('');
+    setIsEditingInterfaces(false);
+    setInterfacesDraft([]);
   }, [selectedFlowId]);
 
   const beginRename = useCallback(() => {
@@ -215,6 +252,8 @@ export function FlowLibraryModal({
     setIsDeleteConfirm(false);
     setIsEditingDescription(false);
     setDescriptionDraft('');
+    setIsEditingInterfaces(false);
+    setInterfacesDraft([]);
     window.setTimeout(() => searchRef.current?.blur(), 0);
   }, [selectedFlow]);
 
@@ -236,6 +275,8 @@ export function FlowLibraryModal({
     setIsDeleteConfirm(false);
     setIsRenaming(false);
     setRenameDraft('');
+    setIsEditingInterfaces(false);
+    setInterfacesDraft([]);
     window.setTimeout(() => searchRef.current?.blur(), 0);
   }, [selectedFlow]);
 
@@ -250,6 +291,30 @@ export function FlowLibraryModal({
     await onUpdateDescription(selectedFlow.id, descriptionDraft);
     setIsEditingDescription(false);
   }, [descriptionDraft, onUpdateDescription, selectedFlow]);
+
+  const beginEditInterfaces = useCallback(() => {
+    if (!selectedFlow) return;
+    setIsEditingInterfaces(true);
+    setInterfacesDraft(normalizeInterfaces(selectedFlow.interfaces));
+    setIsDeleteConfirm(false);
+    setIsRenaming(false);
+    setRenameDraft('');
+    setIsEditingDescription(false);
+    setDescriptionDraft('');
+    window.setTimeout(() => searchRef.current?.blur(), 0);
+  }, [selectedFlow]);
+
+  const commitInterfaces = useCallback(async () => {
+    if (!selectedFlow) return;
+    const next = normalizeInterfaces(interfacesDraft);
+    const current = normalizeInterfaces(selectedFlow.interfaces);
+    if (JSON.stringify(next) === JSON.stringify(current)) {
+      setIsEditingInterfaces(false);
+      return;
+    }
+    await onUpdateInterfaces(selectedFlow.id, next);
+    setIsEditingInterfaces(false);
+  }, [interfacesDraft, onUpdateInterfaces, selectedFlow]);
 
   const handleDelete = useCallback(async () => {
     if (!selectedFlow) return;
@@ -403,6 +468,78 @@ export function FlowLibraryModal({
                       {selectedFlow.nodes.length} nodes • {selectedFlow.edges.length} edges
                     </span>
                   </div>
+                  <div className="flow-library-preview-row">
+                    <span className="flow-library-preview-key">Interfaces</span>
+                    <span className="flow-library-preview-val flow-library-preview-inline">
+                      <span>{renderInterfaces(normalizeInterfaces(selectedFlow.interfaces))}</span>
+                      {!isRenaming && !isEditingDescription && !isEditingInterfaces ? (
+                        <button
+                          type="button"
+                          className="flow-library-edit-icon meta"
+                          onClick={beginEditInterfaces}
+                          aria-label="Edit workflow interfaces"
+                          title="Edit interfaces"
+                        >
+                          <EditIcon size={13} />
+                        </button>
+                      ) : null}
+                    </span>
+                  </div>
+
+                  {isEditingInterfaces ? (
+                    <div className="flow-library-interfaces-editor">
+                      {KNOWN_INTERFACES.map((iface) => {
+                        const checked = interfacesDraft.includes(iface.id);
+                        return (
+                          <label key={iface.id} className="flow-library-interface-option">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(e) => {
+                                const on = e.target.checked;
+                                setInterfacesDraft((prev) => {
+                                  const base = normalizeInterfaces(prev);
+                                  if (on) {
+                                    if (!base.includes(iface.id)) base.push(iface.id);
+                                    return base;
+                                  }
+                                  return base.filter((x) => x !== iface.id);
+                                });
+                              }}
+                            />
+                            <div className="flow-library-interface-copy">
+                              <div className="flow-library-interface-label">{iface.label}</div>
+                              <div className="flow-library-interface-desc">{iface.description}</div>
+                            </div>
+                          </label>
+                        );
+                      })}
+
+                      <div className="flow-library-interfaces-hint">
+                        <div className="flow-library-interfaces-hint-title">AbstractCode Agent (v1) requirements</div>
+                        <div className="flow-library-interfaces-hint-body">
+                          <div>
+                            On Flow Start: output pin <code>request</code> (string)
+                          </div>
+                          <div>
+                            On Flow Start: output pin <code>provider</code> (provider)
+                          </div>
+                          <div>
+                            On Flow Start: output pin <code>model</code> (model)
+                          </div>
+                          <div>
+                            On Flow Start: output pin <code>tools</code> (tools)
+                          </div>
+                          <div>
+                            On Flow End: input pin <code>response</code> (string)
+                          </div>
+                          <div style={{ marginTop: 6 }}>
+                            <em>Tip:</em> When you enable this interface, the editor will auto-add the required pins.
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="flow-library-preview-desc">
@@ -444,15 +581,19 @@ export function FlowLibraryModal({
                 </div>
 
                 <div className="flow-library-preview-actions">
-                  {isRenaming || isEditingDescription ? (
+                  {isRenaming || isEditingDescription || isEditingInterfaces ? (
                     <>
                       {isRenaming ? (
                         <button type="button" className="modal-button primary" onClick={commitRename}>
                           Save Name
                         </button>
-                      ) : (
+                      ) : isEditingDescription ? (
                         <button type="button" className="modal-button primary" onClick={commitDescription}>
                           Save Description
+                        </button>
+                      ) : (
+                        <button type="button" className="modal-button primary" onClick={commitInterfaces}>
+                          Save Interfaces
                         </button>
                       )}
                       <button
@@ -463,6 +604,8 @@ export function FlowLibraryModal({
                           setRenameDraft('');
                           setIsEditingDescription(false);
                           setDescriptionDraft('');
+                          setIsEditingInterfaces(false);
+                          setInterfacesDraft([]);
                         }}
                       >
                         Cancel
@@ -509,5 +652,3 @@ export function FlowLibraryModal({
 }
 
 export default FlowLibraryModal;
-
-

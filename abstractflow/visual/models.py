@@ -24,6 +24,7 @@ class PinType(str, Enum):
     BOOLEAN = "boolean"  # Red #FF0000 - True/False
     OBJECT = "object"  # Cyan #00FFFF - JSON objects
     ARRAY = "array"  # Orange #FF8800 - Collections
+    TOOLS = "tools"  # Orange - Tool allowlist (string[])
     PROVIDER = "provider"  # Cyan-blue - LLM provider id/name (string-like)
     MODEL = "model"  # Purple - LLM model id/name (string-like)
     AGENT = "agent"  # Blue #4488FF - Agent reference
@@ -105,6 +106,7 @@ class NodeType(str, Enum):
     LITERAL_NUMBER = "literal_number"
     LITERAL_BOOLEAN = "literal_boolean"
     LITERAL_JSON = "literal_json"
+    JSON_SCHEMA = "json_schema"
     LITERAL_ARRAY = "literal_array"
     # Effects
     ASK_USER = "ask_user"
@@ -171,6 +173,9 @@ class VisualFlow(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
     name: str
     description: str = ""
+    # Optional interface markers (host contracts).
+    # Example: ["abstractcode.agent.v1"] to indicate this workflow can be run as an AbstractCode agent.
+    interfaces: List[str] = Field(default_factory=list)
     nodes: List[VisualNode] = Field(default_factory=list)
     edges: List[VisualEdge] = Field(default_factory=list)
     entryNode: Optional[str] = None
@@ -183,6 +188,7 @@ class FlowCreateRequest(BaseModel):
 
     name: str
     description: str = ""
+    interfaces: List[str] = Field(default_factory=list)
     nodes: List[VisualNode] = Field(default_factory=list)
     edges: List[VisualEdge] = Field(default_factory=list)
     entryNode: Optional[str] = None
@@ -193,6 +199,7 @@ class FlowUpdateRequest(BaseModel):
 
     name: Optional[str] = None
     description: Optional[str] = None
+    interfaces: Optional[List[str]] = None
     nodes: Optional[List[VisualNode]] = None
     edges: Optional[List[VisualEdge]] = None
     entryNode: Optional[str] = None

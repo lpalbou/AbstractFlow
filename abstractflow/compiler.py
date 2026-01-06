@@ -451,6 +451,14 @@ def _create_visual_agent_effect_handler(
             resolved_inputs = _resolve_inputs(run)
             bucket["resolved_inputs"] = resolved_inputs if isinstance(resolved_inputs, dict) else {}
 
+        # Pin-driven structured output:
+        # If `response_schema` is provided via an input pin (data edge), it overrides the node config
+        # and enables the structured-output post-pass (durable LLM_CALL).
+        pin_schema = resolved_inputs.get("response_schema") if isinstance(resolved_inputs, dict) else None
+        if isinstance(pin_schema, dict) and pin_schema:
+            schema = dict(pin_schema)
+            schema_enabled = True
+
         # Provider/model can come from Agent node config or from data-edge inputs (pins).
         provider_raw = resolved_inputs.get("provider") if isinstance(resolved_inputs, dict) else None
         model_raw = resolved_inputs.get("model") if isinstance(resolved_inputs, dict) else None
@@ -810,7 +818,44 @@ def _sync_effect_results_to_node_outputs(run: Any, flow: Flow) -> None:
     except Exception:
         pass
 
+    # IMPORTANT: `flow._node_outputs` is an in-memory cache used by the visual executor
+    # to resolve data edges (including lazy "pure" nodes like compare/subtract/concat).
+    #
+    # A single compiled `Flow` instance can be executed by multiple `RunState`s in the
+    # same process when using subworkflows (START_SUBWORKFLOW) — especially with
+    # self-recursion or mutual recursion. In that situation, stale cached outputs from
+    # another run can break correctness (e.g. a cached `compare` result keeps a base-case
+    # from ever becoming false), leading to infinite recursion.
+    #
+    # We isolate caches per run_id by resetting the dict *in-place* when the active run
+    # changes, then rehydrating persisted outputs from `run.vars["_temp"]`.
     node_outputs = flow._node_outputs
+    try:
+        rid = getattr(run, "run_id", None)
+        if isinstance(rid, str) and rid:
+            active = getattr(flow, "_active_run_id", None)
+            if active != rid:
+                base = getattr(flow, "_static_node_outputs", None)
+                # Backward-compat: if the baseline wasn't set (older flows), infer it
+                # on first use — at this point it should contain only literal nodes.
+                if not isinstance(base, dict):
+                    base = dict(node_outputs) if isinstance(node_outputs, dict) else {}
+                    try:
+                        flow._static_node_outputs = dict(base)  # type: ignore[attr-defined]
+                    except Exception:
+                        pass
+                if isinstance(node_outputs, dict):
+                    node_outputs.clear()
+                    if isinstance(base, dict):
+                        node_outputs.update(base)
+                try:
+                    flow._active_run_id = rid  # type: ignore[attr-defined]
+                except Exception:
+                    pass
+    except Exception:
+        # Best-effort; never let cache isolation break execution.
+        pass
+
     temp_data = run.vars.get("_temp", {})
     if not isinstance(temp_data, dict):
         return

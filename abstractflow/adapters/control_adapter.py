@@ -593,6 +593,17 @@ def create_while_node_handler(
             out = dict(base)
         else:
             out = {"input": base}
+        # Expose `item:any` for parity with Foreach loops.
+        #
+        # Semantics:
+        # - If an upstream scheduler already set `item` (e.g. nested Loop), preserve it.
+        # - Otherwise, treat the current pipeline value as the loop "item".
+        #
+        # This is intentionally conservative: existing flows that rely on a prior `item`
+        # (from an outer loop) keep working, while standalone While loops gain a usable
+        # `item` output for wiring into the loop body.
+        if "item" not in out:
+            out["item"] = base
         out["index"] = iters
         run.vars["_last_output"] = out
         _persist_node_output(run.vars, out)

@@ -228,7 +228,8 @@ const CORE_NODES: NodeTemplate[] = [
       { id: 'max_iterations', label: 'max_iterations', type: 'number', description: 'Maximum internal ReAct iterations (safety cap). Higher values allow more tool-use steps.' },
       { id: 'system', label: 'system', type: 'string', description: 'Optional system prompt for this agent instance (high priority instructions).' },
       { id: 'task', label: 'prompt', type: 'string', description: 'The task/user prompt for the agent to solve.' },
-      { id: 'tools', label: 'tools', type: 'array', description: 'Allowlist of tool names this agent can call (defense-in-depth; runtime still enforces allowlists).' },
+      { id: 'tools', label: 'tools', type: 'tools', description: 'Allowlist of tool names this agent can call (defense-in-depth; runtime still enforces allowlists).' },
+      { id: 'response_schema', label: 'structured_output', type: 'object', description: 'Optional JSON Schema object (type=object) the final answer must conform to.' },
       { id: 'context', label: 'context', type: 'object', description: 'Optional explicit context object for the agent (e.g. {messages:[...]}). If provided, it can override inherited run context.' },
     ],
     outputs: [
@@ -257,7 +258,8 @@ const CORE_NODES: NodeTemplate[] = [
       { id: 'model', label: 'model', type: 'model', description: 'LLM model id/name. If unset, uses the node’s configured model.' },
       { id: 'system', label: 'system', type: 'string', description: 'Optional system prompt for this single call.' },
       { id: 'prompt', label: 'prompt', type: 'string', description: 'User prompt/content for this single call.' },
-      { id: 'tools', label: 'tools', type: 'array', description: 'Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node).' },
+      { id: 'tools', label: 'tools', type: 'tools', description: 'Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node).' },
+      { id: 'response_schema', label: 'structured_output', type: 'object', description: 'Optional JSON Schema object (type=object) the assistant content must conform to.' },
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
@@ -392,7 +394,7 @@ const CONTROL_NODES: NodeTemplate[] = [
   // Loops
   { type: 'loop', icon: '&#x1F501;', label: 'ForEach', description: 'Iterate over an array. Outputs current item and 0-based index.', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'items', label: 'items', type: 'array' }], outputs: [{ id: 'loop', label: 'loop', type: 'execution' }, { id: 'done', label: 'done', type: 'execution' }, { id: 'item', label: 'item', type: 'any' }, { id: 'index', label: 'index', type: 'number' }], category: 'control' },
   { type: 'for', icon: '&#x1F522;', label: 'For', description: 'Numeric loop from start to end with step. Outputs i and a 0-based index.', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'start', label: 'start', type: 'number' }, { id: 'end', label: 'end', type: 'number' }, { id: 'step', label: 'step', type: 'number' }], outputs: [{ id: 'loop', label: 'loop', type: 'execution' }, { id: 'done', label: 'done', type: 'execution' }, { id: 'i', label: 'i', type: 'number' }, { id: 'index', label: 'index', type: 'number' }], category: 'control' },
-  { type: 'while', icon: '&#x267B;', label: 'While', description: 'Loop while condition is true. Outputs a 0-based iteration index.', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'condition', label: 'condition', type: 'boolean' }], outputs: [{ id: 'loop', label: 'loop', type: 'execution' }, { id: 'done', label: 'done', type: 'execution' }, { id: 'index', label: 'index', type: 'number' }], category: 'control' },
+  { type: 'while', icon: '&#x267B;', label: 'While', description: 'Loop while condition is true. Outputs a pass-through item and a 0-based iteration index.', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'condition', label: 'condition', type: 'boolean' }], outputs: [{ id: 'loop', label: 'loop', type: 'execution' }, { id: 'done', label: 'done', type: 'execution' }, { id: 'item', label: 'item', type: 'any' }, { id: 'index', label: 'index', type: 'number' }], category: 'control' },
 
   // Branching
   { type: 'if', icon: '&#x2753;', label: 'If/Else', description: 'Branch execution based on a boolean condition.', headerColor: '#F39C12', inputs: [{ id: 'exec-in', label: '', type: 'execution' }, { id: 'condition', label: 'condition', type: 'boolean' }], outputs: [{ id: 'true', label: 'true', type: 'execution' }, { id: 'false', label: 'false', type: 'execution' }], category: 'control' },
@@ -620,6 +622,17 @@ const LITERAL_NODES: NodeTemplate[] = [
     category: 'literals',
   },
   {
+    type: 'json_schema',
+    icon: '&#x1F4CB;', // Clipboard
+    label: 'JSON Schema',
+    description:
+      'Define a JSON Schema object for structured outputs. Connect to LLM/Agent `structured_output` (response_schema).',
+    headerColor: '#00FFFF', // object pin color (schema is an object)
+    inputs: [],
+    outputs: [{ id: 'value', label: 'schema', type: 'object' }],
+    category: 'literals',
+  },
+  {
     type: 'literal_array',
     icon: '[]',
     label: 'Array',
@@ -671,7 +684,7 @@ const LITERAL_NODES: NodeTemplate[] = [
     description: 'Select an allowlist of tool names once and reuse it across LLM/Agent/Tool Calls nodes.',
     headerColor: '#FF8800', // Orange - array output
     inputs: [],
-    outputs: [{ id: 'tools', label: 'tools', type: 'array' }],
+    outputs: [{ id: 'tools', label: 'tools', type: 'tools' }],
     category: 'literals',
   },
 ];
@@ -882,6 +895,13 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
     ...(template.type === 'literal_number' && { literalValue: 0 }),
     ...(template.type === 'literal_boolean' && { literalValue: false }),
     ...(template.type === 'literal_json' && { literalValue: {} }),
+    ...(template.type === 'json_schema' && {
+      literalValue: {
+        type: 'object',
+        properties: { data: { type: 'string' } },
+        required: ['data'],
+      },
+    }),
     ...(template.type === 'literal_array' && { literalValue: [] }),
     ...(template.type === 'break_object' && { breakConfig: { selectedPaths: [] } }),
     ...(template.type === 'concat' && { concatConfig: { separator: ' ' } }),
