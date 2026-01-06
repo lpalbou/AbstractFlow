@@ -1,6 +1,6 @@
 {
-  "id": "1c5b7ce5",
-  "name": "ac-echo-agent",
+  "id": "ac-echo",
+  "name": "AbstractCode Echo Service",
   "description": "",
   "interfaces": [
     "abstractcode.agent.v1"

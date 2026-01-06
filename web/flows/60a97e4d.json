@@ -8,8 +8,8 @@
       "id": "node-1",
       "type": "on_flow_start",
       "position": {
-        "x": -1728.0,
-        "y": 96.0
+        "x": -2080.0,
+        "y": 80.0
       },
       "data": {
         "nodeType": "on_flow_start",
@@ -810,6 +810,320 @@
       "headerColor": null,
       "inputs": [],
       "outputs": []
+    },
+    {
+      "id": "node-20",
+      "type": "literal_string",
+      "position": {
+        "x": -1856.0,
+        "y": -256.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "status",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "abstractcode.status"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-21",
+      "type": "literal_string",
+      "position": {
+        "x": -1856.0,
+        "y": -160.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "scope",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "run"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-22",
+      "type": "emit_event",
+      "position": {
+        "x": -1552.0,
+        "y": -160.0
+      },
+      "data": {
+        "nodeType": "emit_event",
+        "label": "Emit Event",
+        "icon": "&#x1F4E3;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string"
+          },
+          {
+            "id": "payload",
+            "label": "payload",
+            "type": "any"
+          },
+          {
+            "id": "session_id",
+            "label": "session_id",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "delivered",
+            "label": "delivered",
+            "type": "number"
+          },
+          {
+            "id": "delivered_to",
+            "label": "delivered_to",
+            "type": "array"
+          },
+          {
+            "id": "wait_key",
+            "label": "wait_key",
+            "type": "string"
+          }
+        ],
+        "effectConfig": {
+          "name": "my_event",
+          "scope": "session",
+          "sessionId": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-23",
+      "type": "literal_string",
+      "position": {
+        "x": -1856.0,
+        "y": -64.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "state",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "Thinking..."
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-24",
+      "type": "literal_string",
+      "position": {
+        "x": -928.0,
+        "y": -416.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "status",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "abstractcode.status"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-25",
+      "type": "literal_string",
+      "position": {
+        "x": -928.0,
+        "y": -320.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "scope",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "run"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-26",
+      "type": "emit_event",
+      "position": {
+        "x": -624.0,
+        "y": -320.0
+      },
+      "data": {
+        "nodeType": "emit_event",
+        "label": "Emit Event",
+        "icon": "&#x1F4E3;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string"
+          },
+          {
+            "id": "payload",
+            "label": "payload",
+            "type": "any"
+          },
+          {
+            "id": "session_id",
+            "label": "session_id",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "delivered",
+            "label": "delivered",
+            "type": "number"
+          },
+          {
+            "id": "delivered_to",
+            "label": "delivered_to",
+            "type": "array"
+          },
+          {
+            "id": "wait_key",
+            "label": "wait_key",
+            "type": "string"
+          }
+        ],
+        "effectConfig": {
+          "name": "my_event",
+          "scope": "session",
+          "sessionId": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-27",
+      "type": "literal_string",
+      "position": {
+        "x": -928.0,
+        "y": -224.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "state",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "Reviewing..."
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
     }
   ],
   "edges": [
@@ -946,22 +1260,6 @@
       "source": "node-9",
       "sourceHandle": "true",
       "target": "node-2",
-      "targetHandle": "exec-in",
-      "animated": true
-    },
-    {
-      "id": "edge-1767683269507",
-      "source": "node-1",
-      "sourceHandle": "exec-out",
-      "target": "node-3",
-      "targetHandle": "exec-in",
-      "animated": true
-    },
-    {
-      "id": "edge-1767683293514",
-      "source": "node-3",
-      "sourceHandle": "exec-out",
-      "target": "node-8",
       "targetHandle": "exec-in",
       "animated": true
     },
@@ -1108,9 +1406,89 @@
       "target": "node-8",
       "targetHandle": "prompt",
       "animated": false
+    },
+    {
+      "id": "edge-1767726184439",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-22",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767726187469",
+      "source": "node-22",
+      "sourceHandle": "exec-out",
+      "target": "node-3",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767726190944",
+      "source": "node-20",
+      "sourceHandle": "value",
+      "target": "node-22",
+      "targetHandle": "name",
+      "animated": false
+    },
+    {
+      "id": "edge-1767726193735",
+      "source": "node-21",
+      "sourceHandle": "value",
+      "target": "node-22",
+      "targetHandle": "scope",
+      "animated": false
+    },
+    {
+      "id": "edge-1767726196177",
+      "source": "node-23",
+      "sourceHandle": "value",
+      "target": "node-22",
+      "targetHandle": "payload",
+      "animated": false
+    },
+    {
+      "id": "edge-1767726233127",
+      "source": "node-3",
+      "sourceHandle": "exec-out",
+      "target": "node-26",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767726235773",
+      "source": "node-26",
+      "sourceHandle": "exec-out",
+      "target": "node-8",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767726238452",
+      "source": "node-24",
+      "sourceHandle": "value",
+      "target": "node-26",
+      "targetHandle": "name",
+      "animated": false
+    },
+    {
+      "id": "edge-1767726240647",
+      "source": "node-25",
+      "sourceHandle": "value",
+      "target": "node-26",
+      "targetHandle": "scope",
+      "animated": false
+    },
+    {
+      "id": "edge-1767726242918",
+      "source": "node-27",
+      "sourceHandle": "value",
+      "target": "node-26",
+      "targetHandle": "payload",
+      "animated": false
     }
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-06T07:05:37.774266",
-  "updated_at": "2026-01-06T16:33:31.445881"
+  "updated_at": "2026-01-06T19:04:19.452288"
 }

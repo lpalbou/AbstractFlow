@@ -1,6 +1,6 @@
 {
-  "id": "8dfdea6b",
-  "name": "ac-advanced-agent",
+  "id": "ac-advanced-agent",
+  "name": "AbstractCode Advanced Agent",
   "description": "",
   "interfaces": [
     "abstractcode.agent.v1"
@@ -410,5 +410,5 @@
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-06T06:33:05.585966",
-  "updated_at": "2026-01-06T07:33:17.352892"
+  "updated_at": "2026-01-06T19:05:21.597646"
 }
