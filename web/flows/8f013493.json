@@ -369,6 +369,39 @@
       "headerColor": null,
       "inputs": [],
       "outputs": []
+    },
+    {
+      "id": "node-14",
+      "type": "on_flow_end",
+      "position": {
+        "x": 752.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          }
+        ],
+        "outputs": [],
+        "pinDefaults": {}
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
     }
   ],
   "edges": [
@@ -467,9 +500,25 @@
       "target": "node-13",
       "targetHandle": "number",
       "animated": false
+    },
+    {
+      "id": "edge-1767677730302",
+      "source": "node-13",
+      "sourceHandle": "exec-out",
+      "target": "node-14",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767677732533",
+      "source": "node-13",
+      "sourceHandle": "response",
+      "target": "node-14",
+      "targetHandle": "response",
+      "animated": false
     }
   ],
   "entryNode": "node-2",
   "created_at": "2026-01-06T04:00:48.503932",
-  "updated_at": "2026-01-06T05:13:16.661921"
+  "updated_at": "2026-01-06T05:35:34.798790"
 }
