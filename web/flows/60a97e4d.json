@@ -765,7 +765,7 @@
       "id": "node-19",
       "type": "concat",
       "position": {
-        "x": -768.0,
+        "x": -528.0,
         "y": 464.0
       },
       "data": {
@@ -787,6 +787,11 @@
           {
             "id": "c",
             "label": "c",
+            "type": "string"
+          },
+          {
+            "id": "d",
+            "label": "d",
             "type": "string"
           }
         ],
@@ -1392,14 +1397,6 @@
       "animated": false
     },
     {
-      "id": "edge-1767684098053",
-      "source": "node-4",
-      "sourceHandle": "result",
-      "target": "node-19",
-      "targetHandle": "c",
-      "animated": false
-    },
-    {
       "id": "edge-1767684102384",
       "source": "node-19",
       "sourceHandle": "result",
@@ -1486,9 +1483,17 @@
       "target": "node-26",
       "targetHandle": "payload",
       "animated": false
+    },
+    {
+      "id": "edge-1767730372355",
+      "source": "node-4",
+      "sourceHandle": "result",
+      "target": "node-19",
+      "targetHandle": "d",
+      "animated": false
     }
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-06T07:05:37.774266",
-  "updated_at": "2026-01-06T19:04:19.452288"
+  "updated_at": "2026-01-06T20:13:27.989358"
 }
