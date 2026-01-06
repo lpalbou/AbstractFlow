@@ -1,0 +1,780 @@
+{
+  "id": "acagent_status_demo",
+  "name": "AbstractCode Agent Status Demo",
+  "description": "Demonstrates workflow-driven AbstractCode footer updates via Emit Event(name='abstractcode.status') with 3 phases separated by 2s Delay nodes.",
+  "interfaces": [
+    "abstractcode.agent.v1"
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": -640.0,
+        "y": -400.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "status_name",
+      "type": "literal_string",
+      "position": {
+        "x": -640.0,
+        "y": -192.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "status",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "abstractcode.status"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "scope_run",
+      "type": "literal_string",
+      "position": {
+        "x": -640.0,
+        "y": -96.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "scope",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "run"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "payload_1",
+      "type": "literal_string",
+      "position": {
+        "x": -640.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "State1",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "Enrich Query..."
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "payload_2",
+      "type": "literal_string",
+      "position": {
+        "x": -640.0,
+        "y": 80.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "State2",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "Plan Tasks..."
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "payload_3",
+      "type": "literal_string",
+      "position": {
+        "x": -640.0,
+        "y": 160.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "State3",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "Recursive Answer..."
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "delay_seconds",
+      "type": "literal_number",
+      "position": {
+        "x": -640.0,
+        "y": 240.0
+      },
+      "data": {
+        "nodeType": "literal_number",
+        "label": "Delay",
+        "icon": "#",
+        "headerColor": "#00FF00",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "number"
+          }
+        ],
+        "literalValue": 2
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "emit_1",
+      "type": "emit_event",
+      "position": {
+        "x": -320.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "emit_event",
+        "label": "Emit Event",
+        "icon": "&#x1F4E3;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string"
+          },
+          {
+            "id": "payload",
+            "label": "payload",
+            "type": "any"
+          },
+          {
+            "id": "session_id",
+            "label": "session_id",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "delivered",
+            "label": "delivered",
+            "type": "number"
+          },
+          {
+            "id": "delivered_to",
+            "label": "delivered_to",
+            "type": "array"
+          },
+          {
+            "id": "wait_key",
+            "label": "wait_key",
+            "type": "string"
+          }
+        ],
+        "effectConfig": {
+          "name": "my_event",
+          "scope": "session",
+          "sessionId": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "delay_1",
+      "type": "wait_until",
+      "position": {
+        "x": -120.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "wait_until",
+        "label": "Delay",
+        "icon": "&#x23F3;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "duration",
+            "label": "duration",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "emit_2",
+      "type": "emit_event",
+      "position": {
+        "x": 80.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "emit_event",
+        "label": "Emit Event",
+        "icon": "&#x1F4E3;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string"
+          },
+          {
+            "id": "payload",
+            "label": "payload",
+            "type": "any"
+          },
+          {
+            "id": "session_id",
+            "label": "session_id",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "delivered",
+            "label": "delivered",
+            "type": "number"
+          },
+          {
+            "id": "delivered_to",
+            "label": "delivered_to",
+            "type": "array"
+          },
+          {
+            "id": "wait_key",
+            "label": "wait_key",
+            "type": "string"
+          }
+        ],
+        "effectConfig": {
+          "name": "my_event",
+          "scope": "session",
+          "sessionId": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "delay_2",
+      "type": "wait_until",
+      "position": {
+        "x": 280.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "wait_until",
+        "label": "Delay",
+        "icon": "&#x23F3;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "duration",
+            "label": "duration",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "emit_3",
+      "type": "emit_event",
+      "position": {
+        "x": 480.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "emit_event",
+        "label": "Emit Event",
+        "icon": "&#x1F4E3;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string"
+          },
+          {
+            "id": "payload",
+            "label": "payload",
+            "type": "any"
+          },
+          {
+            "id": "session_id",
+            "label": "session_id",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "delivered",
+            "label": "delivered",
+            "type": "number"
+          },
+          {
+            "id": "delivered_to",
+            "label": "delivered_to",
+            "type": "array"
+          },
+          {
+            "id": "wait_key",
+            "label": "wait_key",
+            "type": "string"
+          }
+        ],
+        "effectConfig": {
+          "name": "my_event",
+          "scope": "session",
+          "sessionId": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "delay_3",
+      "type": "wait_until",
+      "position": {
+        "x": 680.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "wait_until",
+        "label": "Delay",
+        "icon": "&#x23F3;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "duration",
+            "label": "duration",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 880.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          },
+          {
+            "id": "raw_result",
+            "label": "raw_result",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-start-emit1-exec",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "emit_1",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-emit1-delay1-exec",
+      "source": "emit_1",
+      "sourceHandle": "exec-out",
+      "target": "delay_1",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-delay1-emit2-exec",
+      "source": "delay_1",
+      "sourceHandle": "exec-out",
+      "target": "emit_2",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-emit2-delay2-exec",
+      "source": "emit_2",
+      "sourceHandle": "exec-out",
+      "target": "delay_2",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-delay2-emit3-exec",
+      "source": "delay_2",
+      "sourceHandle": "exec-out",
+      "target": "emit_3",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-emit3-delay3-exec",
+      "source": "emit_3",
+      "sourceHandle": "exec-out",
+      "target": "delay_3",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-delay3-end-exec",
+      "source": "delay_3",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-status-name-emit1",
+      "source": "status_name",
+      "sourceHandle": "value",
+      "target": "emit_1",
+      "targetHandle": "name",
+      "animated": false
+    },
+    {
+      "id": "edge-status-name-emit2",
+      "source": "status_name",
+      "sourceHandle": "value",
+      "target": "emit_2",
+      "targetHandle": "name",
+      "animated": false
+    },
+    {
+      "id": "edge-status-name-emit3",
+      "source": "status_name",
+      "sourceHandle": "value",
+      "target": "emit_3",
+      "targetHandle": "name",
+      "animated": false
+    },
+    {
+      "id": "edge-scope-run-emit1",
+      "source": "scope_run",
+      "sourceHandle": "value",
+      "target": "emit_1",
+      "targetHandle": "scope",
+      "animated": false
+    },
+    {
+      "id": "edge-scope-run-emit2",
+      "source": "scope_run",
+      "sourceHandle": "value",
+      "target": "emit_2",
+      "targetHandle": "scope",
+      "animated": false
+    },
+    {
+      "id": "edge-scope-run-emit3",
+      "source": "scope_run",
+      "sourceHandle": "value",
+      "target": "emit_3",
+      "targetHandle": "scope",
+      "animated": false
+    },
+    {
+      "id": "edge-payload1-emit1",
+      "source": "payload_1",
+      "sourceHandle": "value",
+      "target": "emit_1",
+      "targetHandle": "payload",
+      "animated": false
+    },
+    {
+      "id": "edge-payload2-emit2",
+      "source": "payload_2",
+      "sourceHandle": "value",
+      "target": "emit_2",
+      "targetHandle": "payload",
+      "animated": false
+    },
+    {
+      "id": "edge-payload3-emit3",
+      "source": "payload_3",
+      "sourceHandle": "value",
+      "target": "emit_3",
+      "targetHandle": "payload",
+      "animated": false
+    },
+    {
+      "id": "edge-delay-seconds-delay1",
+      "source": "delay_seconds",
+      "sourceHandle": "value",
+      "target": "delay_1",
+      "targetHandle": "duration",
+      "animated": false
+    },
+    {
+      "id": "edge-delay-seconds-delay2",
+      "source": "delay_seconds",
+      "sourceHandle": "value",
+      "target": "delay_2",
+      "targetHandle": "duration",
+      "animated": false
+    },
+    {
+      "id": "edge-delay-seconds-delay3",
+      "source": "delay_seconds",
+      "sourceHandle": "value",
+      "target": "delay_3",
+      "targetHandle": "duration",
+      "animated": false
+    },
+    {
+      "id": "edge-start-end-response",
+      "source": "start",
+      "sourceHandle": "request",
+      "target": "end",
+      "targetHandle": "response",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": null,
+  "updated_at": "2026-01-06T18:30:47.543689"
+}
