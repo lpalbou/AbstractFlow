@@ -1,0 +1,463 @@
+{
+  "id": "8f013493",
+  "name": "recursive-flow",
+  "description": "",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_end",
+      "position": {
+        "x": 528.0,
+        "y": 400.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          }
+        ],
+        "outputs": [],
+        "pinDefaults": {}
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-2",
+      "type": "on_flow_start",
+      "position": {
+        "x": -416.0,
+        "y": 224.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "number",
+            "label": "number",
+            "type": "number"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-3",
+      "type": "if",
+      "position": {
+        "x": 48.0,
+        "y": 224.0
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "If/Else",
+        "icon": "&#x2753;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-4",
+      "type": "compare",
+      "position": {
+        "x": -176.0,
+        "y": 320.0
+      },
+      "data": {
+        "nodeType": "compare",
+        "label": "Compare",
+        "icon": "=?",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "any"
+          },
+          {
+            "id": "op",
+            "label": "op",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "boolean"
+          }
+        ],
+        "pinDefaults": {
+          "op": ">"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-5",
+      "type": "literal_number",
+      "position": {
+        "x": -416.0,
+        "y": 464.0
+      },
+      "data": {
+        "nodeType": "literal_number",
+        "label": "Number",
+        "icon": "#",
+        "headerColor": "#00FF00",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "number"
+          }
+        ],
+        "literalValue": 0
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-7",
+      "type": "answer_user",
+      "position": {
+        "x": 288.0,
+        "y": 400.0
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-8",
+      "type": "concat",
+      "position": {
+        "x": 32.0,
+        "y": 512.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "a": "Final number : "
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-10",
+      "type": "subtract",
+      "position": {
+        "x": 288.0,
+        "y": 96.0
+      },
+      "data": {
+        "nodeType": "subtract",
+        "label": "Subtract",
+        "icon": "-",
+        "headerColor": "#27AE60",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "number"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "number"
+          }
+        ],
+        "pinDefaults": {
+          "b": 1
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-13",
+      "type": "subflow",
+      "position": {
+        "x": 528.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Subflow",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "number",
+            "label": "number",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          }
+        ],
+        "subflowId": "8f013493"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1767671938475",
+      "source": "node-2",
+      "sourceHandle": "exec-out",
+      "target": "node-3",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767671949290",
+      "source": "node-2",
+      "sourceHandle": "number",
+      "target": "node-4",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-1767671967867",
+      "source": "node-5",
+      "sourceHandle": "value",
+      "target": "node-4",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-1767671981495",
+      "source": "node-4",
+      "sourceHandle": "result",
+      "target": "node-3",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "edge-1767672019811",
+      "source": "node-3",
+      "sourceHandle": "false",
+      "target": "node-7",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767672023672",
+      "source": "node-7",
+      "sourceHandle": "exec-out",
+      "target": "node-1",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767672040280",
+      "source": "node-2",
+      "sourceHandle": "number",
+      "target": "node-8",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-1767672044562",
+      "source": "node-8",
+      "sourceHandle": "result",
+      "target": "node-7",
+      "targetHandle": "message",
+      "animated": false
+    },
+    {
+      "id": "edge-1767672933334",
+      "source": "node-2",
+      "sourceHandle": "number",
+      "target": "node-10",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-1767673348964",
+      "source": "node-7",
+      "sourceHandle": "message",
+      "target": "node-1",
+      "targetHandle": "response",
+      "animated": false
+    },
+    {
+      "id": "edge-1767673602648",
+      "source": "node-3",
+      "sourceHandle": "true",
+      "target": "node-13",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767673616365",
+      "source": "node-10",
+      "sourceHandle": "result",
+      "target": "node-13",
+      "targetHandle": "number",
+      "animated": false
+    }
+  ],
+  "entryNode": "node-2",
+  "created_at": "2026-01-06T04:00:48.503932",
+  "updated_at": "2026-01-06T04:27:02.005135"
+}

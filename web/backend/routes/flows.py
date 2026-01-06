@@ -77,6 +77,7 @@ async def create_flow(request: FlowCreateRequest):
         id=str(uuid.uuid4())[:8],
         name=request.name,
         description=request.description,
+        interfaces=list(request.interfaces or []),
         nodes=request.nodes,
         edges=request.edges,
         entryNode=request.entryNode,
@@ -109,6 +110,8 @@ async def update_flow(flow_id: str, request: FlowUpdateRequest):
         flow.name = request.name
     if request.description is not None:
         flow.description = request.description
+    if request.interfaces is not None:
+        flow.interfaces = list(request.interfaces or [])
     if request.nodes is not None:
         flow.nodes = request.nodes
     if request.edges is not None:

@@ -200,6 +200,11 @@ export interface VisualFlow {
   id: string;
   name: string;
   description?: string;
+  /**
+   * Optional interface markers for host contracts.
+   * Example: ["abstractcode.agent.v1"] to indicate this workflow can be run as an AbstractCode agent.
+   */
+  interfaces?: string[];
   nodes: VisualNode[];
   edges: VisualEdge[];
   entryNode?: string;

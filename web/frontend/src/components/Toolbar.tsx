@@ -72,6 +72,7 @@ async function duplicateFlow(source: VisualFlow, newName: string): Promise<Visua
     body: JSON.stringify({
       name: newName,
       description: source.description || '',
+      interfaces: Array.isArray(source.interfaces) ? source.interfaces : [],
       nodes: source.nodes,
       edges: source.edges,
       entryNode: source.entryNode,
@@ -101,6 +102,7 @@ async function saveFlow(
     body: JSON.stringify({
       name: flow.name,
       description: flow.description,
+      interfaces: Array.isArray(flow.interfaces) ? flow.interfaces : [],
       nodes: flow.nodes,
       edges: flow.edges,
       entryNode: flow.entryNode,

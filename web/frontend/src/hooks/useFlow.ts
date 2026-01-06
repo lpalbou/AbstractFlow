@@ -21,6 +21,7 @@ interface FlowState {
   // Flow data
   flowId: string | null;
   flowName: string;
+  flowInterfaces: string[];
   nodes: Node<FlowNodeData>[];
   edges: Edge[];
 
@@ -47,6 +48,7 @@ interface FlowState {
   // Actions
   setFlowId: (id: string | null) => void;
   setFlowName: (name: string) => void;
+  setFlowInterfaces: (interfaces: string[]) => void;
   setNodes: (nodes: Node<FlowNodeData>[]) => void;
   setEdges: (edges: Edge[]) => void;
   onNodesChange: (changes: NodeChange[]) => void;
@@ -137,6 +139,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   // Initial state
   flowId: null,
   flowName: 'Untitled Flow',
+  flowInterfaces: [],
   nodes: [],
   edges: [],
   selectedNode: null,
@@ -154,6 +157,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   // Setters
   setFlowId: (id) => set({ flowId: id }),
   setFlowName: (name) => set({ flowName: name }),
+  setFlowInterfaces: (interfaces) => set({ flowInterfaces: Array.isArray(interfaces) ? interfaces : [] }),
   setNodes: (nodes) => set({ nodes }),
   setEdges: (edges) => set({ edges }),
 
@@ -1045,6 +1049,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     set({
       flowId: flow.id,
       flowName: flow.name,
+      flowInterfaces: Array.isArray(flow.interfaces) ? flow.interfaces : [],
       nodes,
       edges: validEdges,
       selectedNode: null,
@@ -1067,6 +1072,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     return {
       id: state.flowId || `flow-${Date.now()}`,
       name: state.flowName,
+      interfaces: Array.isArray(state.flowInterfaces) ? state.flowInterfaces : [],
       nodes: state.nodes.map((n) => ({
         id: n.id,
         type: n.data.nodeType,
@@ -1090,6 +1096,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     set({
       flowId: null,
       flowName: 'Untitled Flow',
+      flowInterfaces: [],
       nodes: [],
       edges: [],
       selectedNode: null,
