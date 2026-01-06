@@ -11,6 +11,8 @@ import { useFlowStore } from '../hooks/useFlow';
 import { CodeEditorModal } from './CodeEditorModal';
 import ProviderModelsPanel from './ProviderModelsPanel';
 import { JsonSchemaNodeEditor } from './JsonSchemaNodeEditor';
+import AfSelect from './inputs/AfSelect';
+import AfMultiSelect from './inputs/AfMultiSelect';
 import {
   extractFunctionBody,
   generatePythonTransformCode,
@@ -190,6 +192,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const lastSyncedSubflowPins = useRef<string | null>(null);
 
   const [ioPinNameDrafts, setIoPinNameDrafts] = useState<Record<string, string>>({});
+  const [ioPinDefaultDrafts, setIoPinDefaultDrafts] = useState<Record<string, string>>({});
 
   const [agentSchemaEnabled, setAgentSchemaEnabled] = useState(false);
   const [agentSchemaMode, setAgentSchemaMode] = useState<'fields' | 'json'>('fields');
@@ -203,6 +206,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
   useEffect(() => {
     setShowCodeEditor(false);
+    setIoPinDefaultDrafts({});
   }, [node?.id]);
 
   useEffect(() => {
@@ -279,8 +283,22 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       .finally(() => setLoadingTools(false));
   }, []);
 
-  // Fetch models when provider changes (for both agent and llm_call nodes)
-  const selectedProvider = node?.data.agentConfig?.provider || node?.data.effectConfig?.provider;
+  // Fetch models when provider changes (agent/llm_call nodes + IO defaults on start/end nodes).
+  const selectedProvider = (() => {
+    const n = node?.data;
+    const fromAgent = n?.agentConfig?.provider;
+    const fromEffect = (n?.effectConfig as any)?.provider;
+    if (typeof fromAgent === 'string' && fromAgent.trim()) return fromAgent;
+    if (typeof fromEffect === 'string' && fromEffect.trim()) return fromEffect;
+
+    if (n && (n.nodeType === 'on_flow_start' || n.nodeType === 'on_flow_end')) {
+      const pins = n.nodeType === 'on_flow_start' ? n.outputs : n.inputs;
+      const providerPin = pins.find((p) => p.type === 'provider' || p.id === 'provider');
+      const raw = providerPin && n.pinDefaults ? (n.pinDefaults as any)[providerPin.id] : undefined;
+      if (typeof raw === 'string' && raw.trim()) return raw.trim();
+    }
+    return '';
+  })();
   useEffect(() => {
     // Skip if already fetched for this provider
     if (selectedProvider === lastFetchedProvider.current) {
@@ -673,25 +691,54 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const isInputPinConnected = (pinId: string) =>
     edges.some((e) => e.target === node.id && e.targetHandle === pinId);
 
-  const setPinDefault = (pinId: string, value: string | number | boolean | undefined) => {
+  const setPinDefault = (pinId: string, value: unknown) => {
     const prevDefaults = data.pinDefaults || {};
-    const nextDefaults = { ...prevDefaults } as Record<string, string | number | boolean>;
+    const nextDefaults = { ...(prevDefaults as any) } as Record<string, unknown>;
+
+    // `undefined` removes the default (pin treated as unset).
+    if (value === undefined) {
+      delete nextDefaults[pinId];
+      updateNodeData(node.id, { pinDefaults: nextDefaults as any });
+      return;
+    }
 
     // Keep booleans explicit (false is a meaningful default that should be visible).
     if (typeof value === 'boolean') {
       nextDefaults[pinId] = value;
-    } else if (typeof value === 'number') {
-      if (Number.isFinite(value)) nextDefaults[pinId] = value;
-      else delete nextDefaults[pinId];
-    } else if (typeof value === 'string') {
-      const v = value;
-      if (!v) delete nextDefaults[pinId];
-      else nextDefaults[pinId] = v;
-    } else {
-      delete nextDefaults[pinId];
+      updateNodeData(node.id, { pinDefaults: nextDefaults as any });
+      return;
     }
 
-    updateNodeData(node.id, { pinDefaults: nextDefaults });
+    if (typeof value === 'number') {
+      if (Number.isFinite(value)) nextDefaults[pinId] = value;
+      else delete nextDefaults[pinId];
+      updateNodeData(node.id, { pinDefaults: nextDefaults as any });
+      return;
+    }
+
+    if (typeof value === 'string') {
+      // Empty string clears (keeps previous UX).
+      if (!value) delete nextDefaults[pinId];
+      else nextDefaults[pinId] = value;
+      updateNodeData(node.id, { pinDefaults: nextDefaults as any });
+      return;
+    }
+
+    if (value === null) {
+      nextDefaults[pinId] = null;
+      updateNodeData(node.id, { pinDefaults: nextDefaults as any });
+      return;
+    }
+
+    // JSON objects/arrays (used for object/array/tools defaults).
+    if (Array.isArray(value) || typeof value === 'object') {
+      nextDefaults[pinId] = value;
+      updateNodeData(node.id, { pinDefaults: nextDefaults as any });
+      return;
+    }
+
+    delete nextDefaults[pinId];
+    updateNodeData(node.id, { pinDefaults: nextDefaults as any });
   };
 
   const updateAgentConfig = (patch: Partial<NonNullable<FlowNodeData['agentConfig']>>) => {
@@ -1448,61 +1495,176 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               : sample
                 ? flattenPaths(sample).sort()
                 : [];
-            const selected = data.breakConfig?.selectedPaths || [];
+            const selectedPaths = data.breakConfig?.selectedPaths || [];
+            const existing = data.outputs.filter((p) => p.type !== 'execution');
+            const existingPins: Pin[] =
+              existing.length > 0
+                ? existing
+                : selectedPaths.map((p) => ({
+                    id: p,
+                    label: p.split('.').slice(-1)[0] || p,
+                    type: 'any' as const,
+                  }));
 
-            const togglePath = (path: string) => {
-              const nextSelected = selected.includes(path)
-                ? selected.filter((p) => p !== path)
-                : [...selected, path];
-
-              const nextOutputs = nextSelected.map((p) => ({
-                id: p,
-                label: p.split('.').slice(-1)[0] || p,
-                type: schema
-                  ? inferPinTypeFromSchema(getSchemaByPath(schema, p))
-                  : inferPinType(getByPath(sample, p)),
-              }));
-
+            const syncPins = (nextPins: Pin[]) => {
               updateNodeData(node.id, {
-                breakConfig: { ...data.breakConfig, selectedPaths: nextSelected },
-                outputs: nextOutputs,
+                breakConfig: { ...data.breakConfig, selectedPaths: nextPins.map((p) => p.id) },
+                outputs: nextPins,
               });
             };
 
-            if (!inputEdge) {
-              return (
-                <span className="property-hint">
-                  Connect an object to the <code>object</code> input to discover fields.
-                </span>
-              );
-            }
+            const removeField = (pinId: string) => {
+              // Remove outgoing edges that referenced this output handle.
+              const nextEdges = edges.filter((e) => !(e.source === node.id && e.sourceHandle === pinId));
+              if (nextEdges.length !== edges.length) setEdges(nextEdges);
+              syncPins(existingPins.filter((p) => p.id !== pinId));
+            };
 
-            if (available.length === 0) {
-              return (
-                <span className="property-hint">
-                  No fields discovered for this input.
-                </span>
+            const updateField = (pinId: string, patch: Partial<Pin>) => {
+              const nextPins = existingPins.map((p) => (p.id === pinId ? { ...p, ...patch } : p));
+              syncPins(nextPins);
+            };
+
+            const commitRenameField = (pinId: string) => {
+              const draft = ioPinNameDrafts[pinId];
+              if (draft === undefined) return;
+              const nextPath = draft.trim();
+              if (!nextPath) {
+                setIoPinNameDrafts((prev) => {
+                  const { [pinId]: _removed, ...rest } = prev;
+                  return rest;
+                });
+                return;
+              }
+
+              const usedWithoutSelf = new Set(existingPins.filter((p) => p.id !== pinId).map((p) => p.id));
+              const nextId = uniquePinId(nextPath, usedWithoutSelf);
+
+              const nextEdges = edges.map((e) => {
+                if (e.source === node.id && e.sourceHandle === pinId) {
+                  return { ...e, sourceHandle: nextId };
+                }
+                return e;
+              });
+              setEdges(nextEdges);
+
+              const nextPins = existingPins.map((p) =>
+                p.id === pinId
+                  ? { ...p, id: nextId, label: nextId.split('.').slice(-1)[0] || nextId }
+                  : p
               );
-            }
+              syncPins(nextPins);
+
+              setIoPinNameDrafts((prev) => {
+                const { [pinId]: _removed, ...rest } = prev;
+                return nextId === pinId ? rest : { ...rest, [nextId]: nextId };
+              });
+            };
+
+            const addField = () => {
+              const used = new Set(existingPins.map((p) => p.id));
+              let n = 1;
+              while (used.has(`field${n}`)) n++;
+              const id = `field${n}`;
+              const nextPins: Pin[] = [...existingPins, { id, label: id, type: 'any' as const }];
+              syncPins(nextPins);
+              setIoPinNameDrafts((prev) => ({ ...prev, [id]: id }));
+            };
+
+            const togglePath = (path: string) => {
+              if (existingPins.some((p) => p.id === path)) {
+                removeField(path);
+                return;
+              }
+              const inferredType = (schema
+                ? inferPinTypeFromSchema(getSchemaByPath(schema, path))
+                : inferPinType(getByPath(sample, path))) as DataPinType;
+              const nextPins = [
+                ...existingPins,
+                { id: path, label: path.split('.').slice(-1)[0] || path, type: inferredType },
+              ];
+              syncPins(nextPins);
+            };
 
             return (
-              <div className="property-group">
-                <div className="checkbox-list">
-                  {available.map((path) => (
-                    <label key={path} className="checkbox-item">
-                      <input
-                        type="checkbox"
-                        checked={selected.includes(path)}
-                        onChange={() => togglePath(path)}
-                      />
-                      <span className="checkbox-label">{path}</span>
-                    </label>
-                  ))}
+              <>
+                {!inputEdge && (
+                  <span className="property-hint">
+                    Connect an object to the <code>object</code> input to auto-discover fields, or add fields manually below.
+                  </span>
+                )}
+
+                {inputEdge && available.length === 0 && (
+                  <span className="property-hint">
+                    No fields discovered for this input. You can still add fields manually.
+                  </span>
+                )}
+
+                {inputEdge && available.length > 0 && (
+                  <div className="property-group">
+                    <div className="checkbox-list">
+                      {available.map((path) => (
+                        <label key={path} className="checkbox-item">
+                          <input
+                            type="checkbox"
+                            checked={existingPins.some((p) => p.id === path)}
+                            onChange={() => togglePath(path)}
+                          />
+                          <span className="checkbox-label">{path}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <span className="property-hint">
+                      Select fields to expose as output pins.
+                    </span>
+                  </div>
+                )}
+
+                <div className="property-group">
+                  <label className="property-sublabel">Fields</label>
+                  <div className="array-editor">
+                    {existingPins.map((pin) => (
+                      <div key={pin.id} className="array-item">
+                        <input
+                          type="text"
+                          className="property-input array-item-input io-pin-name"
+                          value={ioPinNameDrafts[pin.id] ?? pin.id}
+                          onChange={(e) => setIoPinNameDrafts((prev) => ({ ...prev, [pin.id]: e.target.value }))}
+                          onBlur={() => commitRenameField(pin.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') e.currentTarget.blur();
+                          }}
+                          placeholder="path (e.g. data.enriched_request)"
+                        />
+                        <select
+                          className="property-select io-pin-type"
+                          value={pin.type}
+                          onChange={(e) => updateField(pin.id, { type: e.target.value as DataPinType })}
+                        >
+                          {DATA_PIN_TYPES.map((t) => (
+                            <option key={t} value={t}>
+                              {t}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          className="array-item-remove"
+                          onClick={() => removeField(pin.id)}
+                          title="Remove field"
+                        >
+                          &times;
+                        </button>
+                      </div>
+                    ))}
+                    <button className="array-add-button" onClick={addField}>
+                      + Add Field
+                    </button>
+                  </div>
+                  <span className="property-hint">
+                    These paths are extracted from the input object at runtime and exposed as output pins.
+                  </span>
                 </div>
-                <span className="property-hint">
-                  Select fields to expose as output pins.
-                </span>
-              </div>
+              </>
             );
           })()}
         </div>
@@ -2362,6 +2524,189 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
             const used = new Set(data.outputs.map((p) => p.id));
 
+            const providerOptions = providers
+              .filter((p) => p && typeof p.name === 'string' && p.name.trim())
+              .map((p) => ({ value: p.name, label: (p as any).display_name || p.name }));
+            providerOptions.sort((a, b) => a.label.localeCompare(b.label));
+
+            const modelOptions = (models || [])
+              .filter((m): m is string => typeof m === 'string' && m.trim().length > 0)
+              .map((m) => ({ value: m, label: m }));
+
+            const toolOptions = toolSpecs
+              .filter((t) => t && typeof t.name === 'string' && t.name.trim())
+              .map((t) => ({ value: t.name.trim(), label: t.name.trim() }))
+              .sort((a, b) => a.label.localeCompare(b.label));
+
+            const providerParam = params.find((p) => p.type === 'provider' || p.id === 'provider');
+            const providerDefault =
+              providerParam && data.pinDefaults && typeof (data.pinDefaults as any)[providerParam.id] === 'string'
+                ? String((data.pinDefaults as any)[providerParam.id] || '')
+                : '';
+
+            const renderDefaultEditor = (pin: Pin) => {
+              const raw = data.pinDefaults ? (data.pinDefaults as any)[pin.id] : undefined;
+              const defaultHint = `Default value for ${pin.id}`;
+
+              if (pin.type === 'provider') {
+                const value = typeof raw === 'string' ? raw : '';
+                return (
+                  <AfSelect
+                    value={value}
+                    options={providerOptions}
+                    placeholder={defaultHint}
+                    loading={loadingProviders}
+                    clearable
+                    onChange={(v) => setPinDefault(pin.id, v)}
+                  />
+                );
+              }
+
+              if (pin.type === 'model') {
+                const value = typeof raw === 'string' ? raw : '';
+                const disabled = !providerDefault;
+                return (
+                  <AfSelect
+                    value={value}
+                    options={modelOptions}
+                    placeholder={providerDefault ? defaultHint : `${defaultHint} (set provider first)`}
+                    loading={loadingModels}
+                    disabled={disabled}
+                    clearable
+                    onChange={(v) => setPinDefault(pin.id, v)}
+                  />
+                );
+              }
+
+              if (pin.type === 'tools') {
+                const values = Array.isArray(raw)
+                  ? raw.filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
+                  : [];
+                return (
+                  <AfMultiSelect
+                    values={values}
+                    options={toolOptions}
+                    placeholder={defaultHint}
+                    loading={loadingTools}
+                    clearable
+                    onChange={(vals) => setPinDefault(pin.id, vals.length > 0 ? vals : undefined)}
+                  />
+                );
+              }
+
+              if (pin.type === 'boolean') {
+                const value = typeof raw === 'boolean' ? (raw ? 'true' : 'false') : '';
+                return (
+                  <AfSelect
+                    value={value}
+                    options={[
+                      { value: 'true', label: 'true' },
+                      { value: 'false', label: 'false' },
+                    ]}
+                    placeholder={defaultHint}
+                    clearable
+                    onChange={(v) => {
+                      if (!v) setPinDefault(pin.id, undefined);
+                      else setPinDefault(pin.id, v === 'true');
+                    }}
+                  />
+                );
+              }
+
+              if (pin.type === 'number') {
+                const value = typeof raw === 'number' && Number.isFinite(raw) ? String(raw) : '';
+                return (
+                  <input
+                    type="number"
+                    className="property-input"
+                    value={value}
+                    placeholder={defaultHint}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (!v) {
+                        setPinDefault(pin.id, undefined);
+                        return;
+                      }
+                      const n = Number(v);
+                      if (!Number.isFinite(n)) return;
+                      setPinDefault(pin.id, n);
+                    }}
+                    step="any"
+                  />
+                );
+              }
+
+              if (pin.type === 'object' || pin.type === 'array') {
+                const fallback =
+                  raw === undefined
+                    ? ''
+                    : typeof raw === 'string'
+                      ? raw
+                      : (() => {
+                          try {
+                            return JSON.stringify(raw, null, 2);
+                          } catch {
+                            return '';
+                          }
+                        })();
+                const text = ioPinDefaultDrafts[pin.id] ?? fallback;
+                return (
+                  <textarea
+                    className="property-input property-textarea"
+                    value={text}
+                    onChange={(e) => setIoPinDefaultDrafts((prev) => ({ ...prev, [pin.id]: e.target.value }))}
+                    onBlur={() => {
+                      const v = (ioPinDefaultDrafts[pin.id] ?? fallback).trim();
+                      if (!v) {
+                        setPinDefault(pin.id, undefined);
+                        setIoPinDefaultDrafts((prev) => {
+                          const { [pin.id]: _removed, ...rest } = prev;
+                          return rest;
+                        });
+                        return;
+                      }
+                      try {
+                        const parsed = JSON.parse(v);
+                        if (pin.type === 'object' && (parsed === null || Array.isArray(parsed) || typeof parsed !== 'object')) {
+                          toast.error(`Default for ${pin.id} must be a JSON object`);
+                          return;
+                        }
+                        if (pin.type === 'array' && !Array.isArray(parsed)) {
+                          toast.error(`Default for ${pin.id} must be a JSON array`);
+                          return;
+                        }
+                        setPinDefault(pin.id, parsed);
+                        setIoPinDefaultDrafts((prev) => {
+                          const { [pin.id]: _removed, ...rest } = prev;
+                          return rest;
+                        });
+                      } catch {
+                        toast.error(`Invalid JSON default for ${pin.id}`);
+                      }
+                    }}
+                    rows={4}
+                    placeholder={
+                      pin.type === 'array'
+                        ? `${defaultHint}\n[\n  \"item\"\n]`
+                        : `${defaultHint}\n{\n  \"key\": \"value\"\n}`
+                    }
+                  />
+                );
+              }
+
+              // Default: string-like pins
+              const value = typeof raw === 'string' ? raw : '';
+              return (
+                <input
+                  type="text"
+                  className="property-input"
+                  value={value}
+                  onChange={(e) => setPinDefault(pin.id, e.target.value)}
+                  placeholder={defaultHint}
+                />
+              );
+            };
+
             const addParam = () => {
               let n = 1;
               while (used.has(`param${n}`)) n++;
@@ -2419,44 +2764,57 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
             return (
               <>
-                <div className="array-editor">
+                <div className="schema-fields">
                   {params.map((pin) => (
-                    <div key={pin.id} className="array-item">
-                      <input
-                        type="text"
-                        className="property-input array-item-input io-pin-name"
-                        value={ioPinNameDrafts[pin.id] ?? pin.id}
-                        onChange={(e) =>
-                          setIoPinNameDrafts((prev) => ({ ...prev, [pin.id]: e.target.value }))
-                        }
-                        onBlur={() => commitRenameParam(pin.id)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.currentTarget.blur();
+                    <div key={pin.id} className="schema-field-row">
+                      <div className="schema-field-top">
+                        <input
+                          type="text"
+                          className="property-input schema-field-name"
+                          value={ioPinNameDrafts[pin.id] ?? pin.id}
+                          onChange={(e) =>
+                            setIoPinNameDrafts((prev) => ({ ...prev, [pin.id]: e.target.value }))
                           }
-                        }}
-                        placeholder="name"
+                          onBlur={() => commitRenameParam(pin.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.currentTarget.blur();
+                            }
+                          }}
+                          placeholder="param_name"
+                        />
+                        <button
+                          className="array-item-remove"
+                          onClick={() => removeParam(pin.id)}
+                          title="Remove parameter"
+                        >
+                          &times;
+                        </button>
+                      </div>
+                      <div className="schema-field-bottom">
+                        <select
+                          className="property-select schema-field-type"
+                          value={pin.type}
+                          onChange={(e) =>
+                            updateParam(pin.id, { type: e.target.value as DataPinType })
+                          }
+                        >
+                          {DATA_PIN_TYPES.map((t) => (
+                            <option key={t} value={t}>
+                              {t}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="io-pin-default">
+                        {renderDefaultEditor(pin)}
+                      </div>
+                      <input
+                        className="property-input schema-field-desc"
+                        value={pin.description ?? ''}
+                        placeholder="Description (optional)"
+                        onChange={(e) => updateParam(pin.id, { description: e.target.value })}
                       />
-                      <select
-                        className="property-select io-pin-type"
-                        value={pin.type}
-                        onChange={(e) =>
-                          updateParam(pin.id, { type: e.target.value as DataPinType })
-                        }
-                      >
-                        {DATA_PIN_TYPES.map((t) => (
-                          <option key={t} value={t}>
-                            {t}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        className="array-item-remove"
-                        onClick={() => removeParam(pin.id)}
-                        title="Remove parameter"
-                      >
-                        &times;
-                      </button>
                     </div>
                   ))}
                   <button className="array-add-button" onClick={addParam}>
@@ -2480,6 +2838,186 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           {(() => {
             const outs = data.inputs.filter((p) => p.type !== 'execution');
             const used = new Set(data.inputs.map((p) => p.id));
+
+            const providerOptions = providers
+              .filter((p) => p && typeof p.name === 'string' && p.name.trim())
+              .map((p) => ({ value: p.name, label: (p as any).display_name || p.name }));
+            providerOptions.sort((a, b) => a.label.localeCompare(b.label));
+            const modelOptions = (models || [])
+              .filter((m): m is string => typeof m === 'string' && m.trim().length > 0)
+              .map((m) => ({ value: m, label: m }));
+            const toolOptions = toolSpecs
+              .filter((t) => t && typeof t.name === 'string' && t.name.trim())
+              .map((t) => ({ value: t.name.trim(), label: t.name.trim() }))
+              .sort((a, b) => a.label.localeCompare(b.label));
+
+            const providerOut = outs.find((p) => p.type === 'provider' || p.id === 'provider');
+            const providerDefault =
+              providerOut && data.pinDefaults && typeof (data.pinDefaults as any)[providerOut.id] === 'string'
+                ? String((data.pinDefaults as any)[providerOut.id] || '')
+                : '';
+
+            const renderDefaultEditor = (pin: Pin) => {
+              const raw = data.pinDefaults ? (data.pinDefaults as any)[pin.id] : undefined;
+              const defaultHint = `Default value for ${pin.id}`;
+
+              if (pin.type === 'provider') {
+                const value = typeof raw === 'string' ? raw : '';
+                return (
+                  <AfSelect
+                    value={value}
+                    options={providerOptions}
+                    placeholder={defaultHint}
+                    loading={loadingProviders}
+                    clearable
+                    onChange={(v) => setPinDefault(pin.id, v)}
+                  />
+                );
+              }
+
+              if (pin.type === 'model') {
+                const value = typeof raw === 'string' ? raw : '';
+                const disabled = !providerDefault;
+                return (
+                  <AfSelect
+                    value={value}
+                    options={modelOptions}
+                    placeholder={providerDefault ? defaultHint : `${defaultHint} (set provider first)`}
+                    loading={loadingModels}
+                    disabled={disabled}
+                    clearable
+                    onChange={(v) => setPinDefault(pin.id, v)}
+                  />
+                );
+              }
+
+              if (pin.type === 'tools') {
+                const values = Array.isArray(raw)
+                  ? raw.filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
+                  : [];
+                return (
+                  <AfMultiSelect
+                    values={values}
+                    options={toolOptions}
+                    placeholder={defaultHint}
+                    loading={loadingTools}
+                    clearable
+                    onChange={(vals) => setPinDefault(pin.id, vals.length > 0 ? vals : undefined)}
+                  />
+                );
+              }
+
+              if (pin.type === 'boolean') {
+                const value = typeof raw === 'boolean' ? (raw ? 'true' : 'false') : '';
+                return (
+                  <AfSelect
+                    value={value}
+                    options={[
+                      { value: 'true', label: 'true' },
+                      { value: 'false', label: 'false' },
+                    ]}
+                    placeholder={defaultHint}
+                    clearable
+                    onChange={(v) => {
+                      if (!v) setPinDefault(pin.id, undefined);
+                      else setPinDefault(pin.id, v === 'true');
+                    }}
+                  />
+                );
+              }
+
+              if (pin.type === 'number') {
+                const value = typeof raw === 'number' && Number.isFinite(raw) ? String(raw) : '';
+                return (
+                  <input
+                    type="number"
+                    className="property-input"
+                    value={value}
+                    placeholder={defaultHint}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (!v) {
+                        setPinDefault(pin.id, undefined);
+                        return;
+                      }
+                      const n = Number(v);
+                      if (!Number.isFinite(n)) return;
+                      setPinDefault(pin.id, n);
+                    }}
+                    step="any"
+                  />
+                );
+              }
+
+              if (pin.type === 'object' || pin.type === 'array') {
+                const fallback =
+                  raw === undefined
+                    ? ''
+                    : typeof raw === 'string'
+                      ? raw
+                      : (() => {
+                          try {
+                            return JSON.stringify(raw, null, 2);
+                          } catch {
+                            return '';
+                          }
+                        })();
+                const text = ioPinDefaultDrafts[pin.id] ?? fallback;
+                return (
+                  <textarea
+                    className="property-input property-textarea"
+                    value={text}
+                    onChange={(e) => setIoPinDefaultDrafts((prev) => ({ ...prev, [pin.id]: e.target.value }))}
+                    onBlur={() => {
+                      const v = (ioPinDefaultDrafts[pin.id] ?? fallback).trim();
+                      if (!v) {
+                        setPinDefault(pin.id, undefined);
+                        setIoPinDefaultDrafts((prev) => {
+                          const { [pin.id]: _removed, ...rest } = prev;
+                          return rest;
+                        });
+                        return;
+                      }
+                      try {
+                        const parsed = JSON.parse(v);
+                        if (pin.type === 'object' && (parsed === null || Array.isArray(parsed) || typeof parsed !== 'object')) {
+                          toast.error(`Default for ${pin.id} must be a JSON object`);
+                          return;
+                        }
+                        if (pin.type === 'array' && !Array.isArray(parsed)) {
+                          toast.error(`Default for ${pin.id} must be a JSON array`);
+                          return;
+                        }
+                        setPinDefault(pin.id, parsed);
+                        setIoPinDefaultDrafts((prev) => {
+                          const { [pin.id]: _removed, ...rest } = prev;
+                          return rest;
+                        });
+                      } catch {
+                        toast.error(`Invalid JSON default for ${pin.id}`);
+                      }
+                    }}
+                    rows={4}
+                    placeholder={
+                      pin.type === 'array'
+                        ? `${defaultHint}\n[\n  \"item\"\n]`
+                        : `${defaultHint}\n{\n  \"key\": \"value\"\n}`
+                    }
+                  />
+                );
+              }
+
+              const value = typeof raw === 'string' ? raw : '';
+              return (
+                <input
+                  type="text"
+                  className="property-input"
+                  value={value}
+                  onChange={(e) => setPinDefault(pin.id, e.target.value)}
+                  placeholder={defaultHint}
+                />
+              );
+            };
 
             const addOut = () => {
               let n = 1;
@@ -2537,44 +3075,62 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
             return (
               <>
-                <div className="array-editor">
+                <div className="schema-fields">
                   {outs.map((pin) => (
-                    <div key={pin.id} className="array-item">
-                      <input
-                        type="text"
-                        className="property-input array-item-input io-pin-name"
-                        value={ioPinNameDrafts[pin.id] ?? pin.id}
-                        onChange={(e) =>
-                          setIoPinNameDrafts((prev) => ({ ...prev, [pin.id]: e.target.value }))
-                        }
-                        onBlur={() => commitRenameOut(pin.id)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.currentTarget.blur();
+                    <div key={pin.id} className="schema-field-row">
+                      <div className="schema-field-top">
+                        <input
+                          type="text"
+                          className="property-input schema-field-name"
+                          value={ioPinNameDrafts[pin.id] ?? pin.id}
+                          onChange={(e) =>
+                            setIoPinNameDrafts((prev) => ({ ...prev, [pin.id]: e.target.value }))
                           }
-                        }}
-                        placeholder="name"
+                          onBlur={() => commitRenameOut(pin.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.currentTarget.blur();
+                            }
+                          }}
+                          placeholder="output_name"
+                        />
+                        <button
+                          className="array-item-remove"
+                          onClick={() => removeOut(pin.id)}
+                          title="Remove output"
+                        >
+                          &times;
+                        </button>
+                      </div>
+                      <div className="schema-field-bottom">
+                        <select
+                          className="property-select schema-field-type"
+                          value={pin.type}
+                          onChange={(e) =>
+                            updateOut(pin.id, { type: e.target.value as DataPinType })
+                          }
+                        >
+                          {DATA_PIN_TYPES.map((t) => (
+                            <option key={t} value={t}>
+                              {t}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="io-pin-default">
+                        {isInputPinConnected(pin.id) ? (
+                          <span className="property-hint">Provided by connected pin.</span>
+                        ) : (
+                          renderDefaultEditor(pin)
+                        )}
+                      </div>
+                      <input
+                        className="property-input schema-field-desc"
+                        value={pin.description ?? ''}
+                        placeholder="Description (optional)"
+                        onChange={(e) => updateOut(pin.id, { description: e.target.value })}
                       />
-                      <select
-                        className="property-select io-pin-type"
-                        value={pin.type}
-                        onChange={(e) =>
-                          updateOut(pin.id, { type: e.target.value as DataPinType })
-                        }
-                      >
-                        {DATA_PIN_TYPES.map((t) => (
-                          <option key={t} value={t}>
-                            {t}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        className="array-item-remove"
-                        onClick={() => removeOut(pin.id)}
-                        title="Remove output"
-                      >
-                        &times;
-                      </button>
                     </div>
                   ))}
                   <button className="array-add-button" onClick={addOut}>

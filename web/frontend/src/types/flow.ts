@@ -43,6 +43,15 @@ export interface Pin {
   description?: string;
 }
 
+// JSON-serializable values used for pin defaults and literals.
+export type JsonValue =
+  | null
+  | string
+  | number
+  | boolean
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
 // Node types
 export type NodeType =
   // Event/Trigger nodes (only exec OUT - entry points for flow)
@@ -114,9 +123,9 @@ export interface FlowNodeData {
   outputs: Pin[];
   /**
    * Blueprint-style default values for *unconnected* input pins.
-   * Keys are input pin ids; values are JSON primitives.
+   * Keys are pin ids; values are JSON-serializable (persisted in the flow JSON).
    */
-  pinDefaults?: Record<string, string | number | boolean>;
+  pinDefaults?: Record<string, JsonValue>;
   // Node-specific config
   code?: string;           // For code nodes
   codeBody?: string;       // For code nodes (body-only editor)

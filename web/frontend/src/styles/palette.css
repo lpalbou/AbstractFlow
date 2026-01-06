@@ -603,6 +603,12 @@
   flex: 1;
 }
 
+.io-pin-default {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .io-pin-name {
   min-width: 0;
 }

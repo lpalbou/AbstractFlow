@@ -216,3 +216,57 @@ def test_subflow_maps_entry_params_and_exposed_outputs() -> None:
     result = execute_visual_flow(parent, {"question": "hello"}, flows=flows)
     assert result["success"] is True
     assert result["result"] == {"answer": "HELLO"}
+
+
+def test_on_flow_start_pin_defaults_used_when_vars_missing() -> None:
+    """When a start parameter is missing from run.vars, pinDefaults should supply it."""
+    flow = VisualFlow(
+        id="flow-io-defaults",
+        name="io defaults",
+        entryNode="start",
+        nodes=[
+            VisualNode(
+                id="start",
+                type=NodeType.ON_FLOW_START,
+                position=Position(x=0, y=0),
+                data={
+                    "outputs": [
+                        {"id": "exec-out", "label": "", "type": "execution"},
+                        {"id": "name", "label": "name", "type": "string"},
+                    ],
+                    "pinDefaults": {"name": "Alice"},
+                },
+            ),
+            VisualNode(
+                id="end",
+                type=NodeType.ON_FLOW_END,
+                position=Position(x=0, y=0),
+                data={
+                    "inputs": [
+                        {"id": "exec-in", "label": "", "type": "execution"},
+                        {"id": "name", "label": "name", "type": "string"},
+                    ],
+                },
+            ),
+        ],
+        edges=[
+            VisualEdge(
+                id="e1",
+                source="start",
+                sourceHandle="exec-out",
+                target="end",
+                targetHandle="exec-in",
+            ),
+            VisualEdge(
+                id="d1",
+                source="start",
+                sourceHandle="name",
+                target="end",
+                targetHandle="name",
+            ),
+        ],
+    )
+
+    result = execute_visual_flow(flow, {}, flows={flow.id: flow})
+    assert result["success"] is True
+    assert result["result"] == {"name": "Alice"}

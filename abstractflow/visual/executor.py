@@ -722,9 +722,22 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
         for k, v in raw.items():
             if not isinstance(k, str) or not k:
                 continue
-            if isinstance(v, (str, int, float, bool)):
+            # Allow JSON-serializable values (including arrays/objects) for defaults.
+            # These are cloned at use-sites to avoid cross-run mutation.
+            if v is None or isinstance(v, (str, int, float, bool, dict, list)):
                 out[k] = v
         return out
+
+    def _clone_default(value: Any) -> Any:
+        # Prevent accidental shared-mutation of dict/list defaults across runs.
+        if isinstance(value, (dict, list)):
+            try:
+                import copy
+
+                return copy.deepcopy(value)
+            except Exception:
+                return value
+        return value
 
     pin_defaults_by_node_id: Dict[str, Dict[str, Any]] = {}
     for node in visual.nodes:
@@ -787,29 +800,37 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
             raise ValueError(f"Data edge cycle detected at '{node_id}'")
 
         evaluating.add(node_id)
-        resolved_input: Dict[str, Any] = {}
+        try:
+            resolved_input: Dict[str, Any] = {}
 
-        for target_pin, (source_node, source_pin) in data_edge_map.get(node_id, {}).items():
-            _ensure_node_output(source_node)
-            if source_node not in flow._node_outputs:  # type: ignore[attr-defined]
-                continue
-            source_output = flow._node_outputs[source_node]  # type: ignore[attr-defined]
-            if isinstance(source_output, dict) and source_pin in source_output:
-                resolved_input[target_pin] = source_output[source_pin]
-            elif source_pin in ("result", "output"):
-                resolved_input[target_pin] = source_output
-
-        defaults = pin_defaults_by_node_id.get(node_id)
-        if defaults:
-            for pin_id, value in defaults.items():
-                if pin_id in data_edge_map.get(node_id, {}):
+            for target_pin, (source_node, source_pin) in data_edge_map.get(node_id, {}).items():
+                _ensure_node_output(source_node)
+                if source_node not in flow._node_outputs:  # type: ignore[attr-defined]
                     continue
-                if pin_id not in resolved_input:
-                    resolved_input[pin_id] = value
+                source_output = flow._node_outputs[source_node]  # type: ignore[attr-defined]
+                if isinstance(source_output, dict) and source_pin in source_output:
+                    resolved_input[target_pin] = source_output[source_pin]
+                elif source_pin in ("result", "output"):
+                    resolved_input[target_pin] = source_output
 
-        result = handler(resolved_input if resolved_input else {})
-        flow._node_outputs[node_id] = result  # type: ignore[attr-defined]
-        evaluating.remove(node_id)
+            defaults = pin_defaults_by_node_id.get(node_id)
+            if defaults:
+                for pin_id, value in defaults.items():
+                    if pin_id in data_edge_map.get(node_id, {}):
+                        continue
+                    if pin_id not in resolved_input:
+                        resolved_input[pin_id] = _clone_default(value)
+
+            result = handler(resolved_input if resolved_input else {})
+            flow._node_outputs[node_id] = result  # type: ignore[attr-defined]
+        finally:
+            # IMPORTANT: even if an upstream pure node raises (bad input / parse_json failure),
+            # we must not leave `node_id` in `evaluating`, otherwise later evaluations can
+            # surface as a misleading "data edge cycle" at this node.
+            try:
+                evaluating.remove(node_id)
+            except KeyError:
+                pass
 
     EFFECT_NODE_TYPES = {
         "ask_user",
@@ -1150,6 +1171,15 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
             src_obj = None
             if isinstance(input_data, dict):
                 src_obj = input_data.get("object")
+
+            # Best-effort: tolerate JSON-ish strings (common when breaking LLM outputs).
+            if isinstance(src_obj, str) and src_obj.strip():
+                try:
+                    parser = get_builtin_handler("parse_json")
+                    if parser is not None:
+                        src_obj = parser({"text": src_obj, "wrap_scalar": True})
+                except Exception:
+                    pass
 
             out: Dict[str, Any] = {}
             for path in selected_paths:
@@ -1549,7 +1579,15 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
                         "type": "start_subworkflow",
                         "workflow_id": subflow_id,
                         "vars": sub_vars_dict,
-                        "async": False,
+                        # Start subworkflows in async+wait mode so hosts (notably AbstractFlow Web)
+                        # can tick child runs incrementally and stream their node_start/node_complete
+                        # events for better observability (nested/recursive subflows).
+                        #
+                        # Non-interactive hosts (tests/CLI) still complete synchronously because
+                        # FlowRunner.run() auto-drives WAITING(SUBWORKFLOW) children and resumes
+                        # parents until completion.
+                        "async": True,
+                        "wait": True,
                         **({"inherit_context": True} if inherit_context_value else {}),
                     }
                 ),
@@ -1584,11 +1622,35 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
                 # Prefer explicit pins: the visual editor treats non-exec output pins as
                 # "Flow Start Parameters" (initial vars). Only expose those by default.
                 if isinstance(input_data, dict):
+                    defaults_raw = data.get("pinDefaults") if isinstance(data, dict) else None
+                    defaults = defaults_raw if isinstance(defaults_raw, dict) else {}
                     if start_pin_ids:
-                        return {pid: input_data.get(pid) for pid in start_pin_ids}
+                        out: Dict[str, Any] = {}
+                        for pid in start_pin_ids:
+                            if pid in input_data:
+                                out[pid] = input_data.get(pid)
+                                continue
+                            if isinstance(pid, str) and pid in defaults:
+                                dv = defaults.get(pid)
+                                out[pid] = _clone_default(dv)
+                                # Also seed run.vars for downstream Get Variable / debugging.
+                                if not pid.startswith("_") and pid not in input_data:
+                                    input_data[pid] = _clone_default(dv)
+                                continue
+                            out[pid] = None
+                        return out
                     # Backward-compat: older/test-created flows may omit pin metadata.
                     # In that case, expose non-internal keys only (avoid `_temp`, `_limits`, ...).
-                    return {k: v for k, v in input_data.items() if isinstance(k, str) and not k.startswith("_")}
+                    out2 = {k: v for k, v in input_data.items() if isinstance(k, str) and not k.startswith("_")}
+                    # If pinDefaults exist, apply them for missing non-internal keys.
+                    for k, dv in defaults.items():
+                        if not isinstance(k, str) or not k or k.startswith("_"):
+                            continue
+                        if k in out2 or k in input_data:
+                            continue
+                        out2[k] = _clone_default(dv)
+                        input_data[k] = _clone_default(dv)
+                    return out2
 
                 # Non-dict input: if there is a single declared pin, map into it; otherwise
                 # keep a generic `input` key.
@@ -2645,7 +2707,16 @@ def _create_data_aware_handler(
                 if pin_id in data_edges:
                     continue
                 if pin_id not in resolved_input:
-                    resolved_input[pin_id] = value
+                    # Clone object/array defaults so handlers can't mutate the shared default.
+                    if isinstance(value, (dict, list)):
+                        try:
+                            import copy
+
+                            resolved_input[pin_id] = copy.deepcopy(value)
+                        except Exception:
+                            resolved_input[pin_id] = value
+                    else:
+                        resolved_input[pin_id] = value
 
         result = base_handler(resolved_input if resolved_input else input_data)
         node_outputs[node_id] = result

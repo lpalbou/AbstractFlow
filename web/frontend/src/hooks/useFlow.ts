@@ -13,7 +13,7 @@ import {
   NodeChange,
   EdgeChange,
 } from 'reactflow';
-import type { FlowNodeData, VisualFlow, Pin } from '../types/flow';
+import type { FlowNodeData, VisualFlow, Pin, JsonValue } from '../types/flow';
 import { createNodeData, getNodeTemplate, mergePinDocsFromTemplate, NodeTemplate } from '../types/nodes';
 import { validateConnection } from '../utils/validation';
 
@@ -556,7 +556,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         // migrate it, the UI would show an unchecked pin (default false) while execution would
         // still follow the legacy config (surprising and unsafe).
         const prevDefaults = data.pinDefaults && typeof data.pinDefaults === 'object' ? data.pinDefaults : undefined;
-        const nextDefaults: Record<string, string | number | boolean> = { ...(prevDefaults || {}) };
+        const nextDefaults: Record<string, JsonValue> = { ...(prevDefaults || {}) };
 
         if (data.nodeType === 'llm_call') {
           const cfg = data.effectConfig && typeof data.effectConfig === 'object' ? (data.effectConfig as any) : null;
@@ -626,7 +626,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
         // Migration: legacy effectConfig.inherit_context -> pinDefaults.inherit_context
         const prevDefaults = data.pinDefaults && typeof data.pinDefaults === 'object' ? data.pinDefaults : undefined;
-        const nextDefaults: Record<string, string | number | boolean> = { ...(prevDefaults || {}) };
+        const nextDefaults: Record<string, JsonValue> = { ...(prevDefaults || {}) };
         const cfg = data.effectConfig && typeof data.effectConfig === 'object' ? (data.effectConfig as any) : null;
         const legacy =
           cfg && typeof cfg.inherit_context === 'boolean'
@@ -779,7 +779,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         // Migration: legacy memory_note keep_in_context -> pinDefaults.keep_in_context
         if (data.nodeType === 'memory_note') {
           const prevDefaults = data.pinDefaults && typeof data.pinDefaults === 'object' ? data.pinDefaults : undefined;
-          const nextDefaults: Record<string, string | number | boolean> = { ...(prevDefaults || {}) };
+          const nextDefaults: Record<string, JsonValue> = { ...(prevDefaults || {}) };
           const cfg = data.effectConfig && typeof data.effectConfig === 'object' ? (data.effectConfig as any) : null;
           const legacy =
             cfg && typeof cfg.keep_in_context === 'boolean'

@@ -120,6 +120,9 @@ export function RunFlowModal({
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [toolsValues, setToolsValues] = useState<Record<string, string[]>>({});
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
+  // Nested subflow observability: folded by default; per-step expansion keyed by the
+  // parent step id (stable across this modal's event stream).
+  const [expandedSubflows, setExpandedSubflows] = useState<Record<string, boolean>>({});
   const [resumeDraft, setResumeDraft] = useState('');
   const [isMinimized, setIsMinimized] = useState(false);
   const [rehydrateArtifactMarkdown, setRehydrateArtifactMarkdown] = useState<string | null>(null);
@@ -169,7 +172,20 @@ export function RunFlowModal({
           : null;
       inputPins.forEach(pin => {
         if (pin.type === 'tools') {
-          initialTools[pin.id] = [];
+          const raw = defaults && pin.id in defaults ? defaults[pin.id] : undefined;
+          if (Array.isArray(raw)) {
+            initialTools[pin.id] = raw.filter((t): t is string => typeof t === 'string' && t.trim().length > 0);
+          } else if (typeof raw === 'string' && raw.trim()) {
+            // Convenience: allow comma-separated lists.
+            initialTools[pin.id] = raw
+              .split(',')
+              .map((s) => s.trim())
+              .filter((s) => s.length > 0);
+          } else {
+            initialTools[pin.id] = [];
+          }
+          // Tools are driven by toolsValues, not formValues.
+          return;
         }
         const raw = defaults && pin.id in defaults ? defaults[pin.id] : undefined;
         if (raw === undefined) {
@@ -188,6 +204,16 @@ export function RunFlowModal({
         if (typeof raw === 'string') {
           initialValues[pin.id] = raw;
           return;
+        }
+        // Objects/arrays (render as JSON in textarea pins).
+        if (pin.type === 'object' || pin.type === 'array') {
+          try {
+            initialValues[pin.id] = JSON.stringify(raw, null, 2);
+            return;
+          } catch {
+            initialValues[pin.id] = '';
+            return;
+          }
         }
         // Fallback: preserve existing behavior (empty).
         initialValues[pin.id] = '';
@@ -247,6 +273,7 @@ export function RunFlowModal({
   type Step = {
     id: string;
     status: StepStatus;
+    runId?: string;
     nodeId?: string;
     nodeLabel?: string;
     nodeType?: string;
@@ -342,9 +369,9 @@ export function RunFlowModal({
     return badges;
   };
 
-  const steps = useMemo<Step[]>(() => {
-    const out: Step[] = [];
+  const runSteps = useMemo(() => {
     const openByNode = new Map<string, number>();
+    const all: Step[] = [];
 
     const rootRunId = (() => {
       for (let i = events.length - 1; i >= 0; i--) {
@@ -460,23 +487,13 @@ export function RunFlowModal({
       // We show only node steps in the left timeline; flow-level status is surfaced in the header / final result.
       if (ev.type === 'flow_start' || ev.type === 'flow_complete') continue;
 
-      // Hide internal/sub-run node events from the main (visual) timeline.
-      // These will be rendered in the Agent details panel instead.
-      if (
-        rootRunId &&
-        ev.runId &&
-        ev.runId !== rootRunId &&
-        (ev.type === 'node_start' || ev.type === 'node_complete' || ev.type === 'flow_waiting')
-      ) {
-        continue;
-      }
-
       if (ev.type === 'node_start') {
         const key = `${ev.runId || ''}:${ev.nodeId || ''}`;
         const meta = nodeMeta(ev.nodeId);
         const step: Step = {
           id: `node_start:${ev.nodeId || 'unknown'}:${i}`,
           status: 'running',
+          runId: ev.runId,
           nodeId: ev.nodeId,
           nodeLabel: meta?.label,
           nodeType: meta?.type,
@@ -484,8 +501,8 @@ export function RunFlowModal({
           nodeColor: meta?.color,
           startedAt: typeof ev.ts === 'string' ? ev.ts : undefined,
         };
-        out.push(step);
-        if (ev.nodeId) openByNode.set(key, out.length - 1);
+        all.push(step);
+        if (ev.nodeId) openByNode.set(key, all.length - 1);
         continue;
       }
 
@@ -495,23 +512,24 @@ export function RunFlowModal({
         const idx = nodeId ? openByNode.get(key) : undefined;
         const mi = extractModelInfo(ev.result);
         if (typeof idx === 'number') {
-          out[idx] = {
-            ...out[idx],
+          all[idx] = {
+            ...all[idx],
             status: 'completed',
             output: ev.result,
             summary: summarize(ev.result),
             metrics: ev.meta,
             provider: mi.provider,
             model: mi.model,
-            endedAt: typeof ev.ts === 'string' ? ev.ts : out[idx].endedAt,
+            endedAt: typeof ev.ts === 'string' ? ev.ts : all[idx].endedAt,
           };
           openByNode.delete(key);
           continue;
         }
         const meta = nodeMeta(nodeId);
-        out.push({
+        all.push({
           id: `node_complete:${nodeId || 'unknown'}:${i}`,
           status: 'completed',
+          runId: ev.runId,
           nodeId,
           nodeLabel: meta?.label,
           nodeType: meta?.type,
@@ -542,14 +560,15 @@ export function RunFlowModal({
         };
 
         if (typeof idx === 'number') {
-          out[idx] = { ...out[idx], status: 'waiting', waiting };
+          all[idx] = { ...all[idx], status: 'waiting', waiting };
           continue;
         }
 
         const meta = nodeMeta(nodeId);
-        out.push({
+        all.push({
           id: `flow_waiting:${nodeId || 'unknown'}:${i}`,
           status: 'waiting',
+          runId: ev.runId,
           nodeId,
           nodeLabel: meta?.label,
           nodeType: meta?.type,
@@ -557,36 +576,53 @@ export function RunFlowModal({
           nodeColor: meta?.color,
           waiting,
         });
-        if (nodeId) openByNode.set(key, out.length - 1);
+        if (nodeId) openByNode.set(key, all.length - 1);
         continue;
       }
 
       if (ev.type === 'flow_error') {
         const nodeId = ev.nodeId;
-        const idx = nodeId ? openByNode.get(nodeId) : undefined;
+        const key = `${ev.runId || ''}:${nodeId || ''}`;
+        const idx = nodeId ? openByNode.get(key) : undefined;
         if (typeof idx === 'number') {
-          out[idx] = { ...out[idx], status: 'failed', error: ev.error || 'Unknown error' };
-          openByNode.delete(nodeId!);
+          all[idx] = { ...all[idx], status: 'failed', error: ev.error || 'Unknown error' };
+          openByNode.delete(key);
           continue;
         }
         // Best-effort: attach to the most recent step if we can't map to a node.
-        if (out.length > 0) {
-          const lastIdx = out.length - 1;
-          out[lastIdx] = { ...out[lastIdx], status: 'failed', error: ev.error || 'Unknown error' };
+        if (all.length > 0) {
+          const lastIdx = all.length - 1;
+          all[lastIdx] = { ...all[lastIdx], status: 'failed', error: ev.error || 'Unknown error' };
         }
       }
     }
 
-    return out;
-  }, [events, nodeById]);
-
-  const rootRunId = useMemo<string | null>(() => {
-    for (let i = events.length - 1; i >= 0; i--) {
-      const ev = events[i];
-      if (ev.type === 'flow_start' && ev.runId) return ev.runId;
+    const stepById = new Map<string, Step>();
+    const stepsByRunId = new Map<string, Step[]>();
+    for (const s of all) {
+      stepById.set(s.id, s);
+      const rid = typeof s.runId === 'string' ? s.runId.trim() : '';
+      if (!rid) continue;
+      const bucket = stepsByRunId.get(rid);
+      if (bucket) bucket.push(s);
+      else stepsByRunId.set(rid, [s]);
     }
-    return null;
-  }, [events]);
+
+    const rootSteps =
+      rootRunId && stepsByRunId.get(rootRunId) ? (stepsByRunId.get(rootRunId) as Step[]) : [];
+
+    return { rootRunId, rootSteps, stepById, stepsByRunId };
+  }, [events, nodeById]);
+  const rootRunId = runSteps.rootRunId;
+  const steps = runSteps.rootSteps;
+  const stepById = runSteps.stepById;
+  const stepsByRunId = runSteps.stepsByRunId;
+
+  // New run => collapse all nested subflow sections (predictable UX).
+  useEffect(() => {
+    if (!isOpen) return;
+    setExpandedSubflows({});
+  }, [isOpen, rootRunId]);
 
   const flowSummary = useMemo<ExecutionMetrics | null>(() => {
     if (!events || events.length === 0) return null;
@@ -597,6 +633,56 @@ export function RunFlowModal({
     return null;
   }, [events]);
 
+  const toggleSubflowExpansion = useCallback((stepId: string) => {
+    const id = String(stepId || '').trim();
+    if (!id) return;
+    setExpandedSubflows((prev) => ({ ...prev, [id]: !prev[id] }));
+  }, []);
+
+  type StepTreeNode = { stepId: string; depth: number; children: StepTreeNode[]; childRunId?: string };
+
+  const stepTree = useMemo<StepTreeNode[]>(() => {
+    const rid0 = typeof rootRunId === 'string' ? rootRunId.trim() : '';
+    if (!rid0) return [];
+
+    const pick = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+
+    const childRunIdFromOutput = (out: unknown): string | null => {
+      if (!out || typeof out !== 'object') return null;
+      const o = out as Record<string, unknown>;
+      const sr = pick(o.sub_run_id);
+      if (!sr) return null;
+      // Heuristic: only treat this as a subworkflow-like output when it looks like the
+      // visual START_SUBWORKFLOW mapping (compiler populates child_output/output fields).
+      if (!('child_output' in o) && !('output' in o)) return null;
+      return sr;
+    };
+
+    const seen = new Set<string>();
+    const buildForRun = (rid: string, depth: number): StepTreeNode[] => {
+      const rid2 = String(rid || '').trim();
+      if (!rid2) return [];
+      if (seen.has(rid2)) return [];
+      seen.add(rid2);
+
+      const bucket = stepsByRunId.get(rid2);
+      if (!bucket || bucket.length === 0) return [];
+
+      const nodes: StepTreeNode[] = [];
+      for (const s of bucket) {
+        const childRunId = childRunIdFromOutput(s.output);
+        const children =
+          childRunId && stepsByRunId.get(childRunId) && (stepsByRunId.get(childRunId) as Step[]).length > 0
+            ? buildForRun(childRunId, depth + 1)
+            : [];
+        nodes.push({ stepId: s.id, depth, children, childRunId: childRunId || undefined });
+      }
+      return nodes;
+    };
+
+    return buildForRun(rid0, 0);
+  }, [rootRunId, stepsByRunId]);
+
   // Keep selection valid; default to last step.
   useEffect(() => {
     if (!isOpen) return;
@@ -604,9 +690,9 @@ export function RunFlowModal({
       setSelectedStepId(null);
       return;
     }
-    if (selectedStepId && steps.some((s) => s.id === selectedStepId)) return;
+    if (selectedStepId && stepById.has(selectedStepId)) return;
     setSelectedStepId(steps[steps.length - 1].id);
-  }, [isOpen, steps, selectedStepId]);
+  }, [isOpen, steps, selectedStepId, stepById]);
 
   // Follow the live execution: when new steps arrive during a run (or waiting),
   // auto-select the latest step so the user always sees what's happening.
@@ -619,7 +705,10 @@ export function RunFlowModal({
     setSelectedStepId(last.id);
   }, [isOpen, isRunning, isWaiting, steps]);
 
-  const selectedStep = useMemo(() => steps.find((s) => s.id === selectedStepId) || null, [steps, selectedStepId]);
+  const selectedStep = useMemo(() => {
+    if (!selectedStepId) return null;
+    return stepById.get(selectedStepId) || null;
+  }, [selectedStepId, stepById]);
 
   const selectedAgentSubRunId = useMemo(() => {
     if (!selectedStep || selectedStep.nodeType !== 'agent') return null;
@@ -1399,91 +1488,128 @@ export function RunFlowModal({
               </div>
 
               <div className="run-steps-list">
-                {steps.length === 0 ? (
+                {stepTree.length === 0 ? (
                   <div className="run-steps-empty">No execution events yet.</div>
                 ) : (
-                  steps.map((s, idx) => {
-                    const selected = s.id === selectedStepId;
-                    const color = s.nodeColor || '#888888';
-                    const bg = hexToRgba(color, 0.12);
-                    const statusLabel =
-                      s.status === 'running' ? 'RUNNING' : s.status === 'completed' ? 'OK' : s.status === 'waiting' ? 'WAITING' : 'FAILED';
-                    const startedAtLabel = formatStepTime(s.startedAt);
-                    const durationLabel =
-                      s.status === 'completed' && s.metrics && s.metrics.duration_ms != null
-                        ? formatDuration(s.metrics.duration_ms)
-                        : '';
+                  (() => {
+                    const renderNodes = (nodes: StepTreeNode[]): Array<JSX.Element | null> => {
+                      return nodes.map((n, idx) => {
+                        const s = stepById.get(n.stepId);
+                        if (!s) return null;
 
-                    return (
-                      <button
-                        key={s.id}
-                        type="button"
-                        className={selected ? 'run-step selected' : 'run-step'}
-                        onClick={() => setSelectedStepId(s.id)}
-                      >
-                        <div className="run-step-border" style={{ background: color }} />
-                        <div className="run-step-main">
-                          <div className="run-step-top">
-                            <div className="run-step-left">
-                              <span className="run-step-index">#{idx + 1}</span>
-                              {s.nodeIcon ? (
-                                <span
-                                  className="run-step-icon"
-                                  style={{ color }}
-                                  dangerouslySetInnerHTML={{ __html: s.nodeIcon }}
-                                />
-                              ) : null}
-                              <span className="run-step-label">{s.nodeLabel || s.nodeId || 'node'}</span>
-                            </div>
-                            <span className="run-step-right">
-                              <span className={`run-step-status ${s.status}`}>
-                                {s.status === 'running' ? <span className="run-spinner" aria-label="running" /> : null}
-                                {statusLabel}
-                              </span>
-                              {durationLabel ? (
-                                <span className="run-metric-badge metric-duration" title="Duration">
-                                  {durationLabel}
-                                </span>
-                              ) : null}
-                              {startedAtLabel ? (
-                                <span className="run-step-time" title={`Started at ${startedAtLabel}`}>
-                                  {startedAtLabel}
-                                </span>
-                              ) : null}
-                            </span>
-                          </div>
-                          <div className="run-step-meta">
-                            <span className="run-step-type" style={{ background: bg, borderColor: color }}>
-                              {s.nodeType || 'node'}
-                            </span>
-                            {s.provider ? <span className="run-metric-badge metric-provider">{s.provider}</span> : null}
-                            {s.model ? <span className="run-metric-badge metric-model">{s.model}</span> : null}
-                            {s.nodeId ? <span className="run-step-id">{s.nodeId}</span> : null}
-                            {s.status === 'completed' && s.metrics ? (
-                              <span className="run-step-metrics">
-                                {formatTokenBadge(s.metrics) ? (
-                                  <span className="run-metric-badge metric-tokens">{formatTokenBadge(s.metrics)}</span>
+                        const selected = s.id === selectedStepId;
+                        const color = s.nodeColor || '#888888';
+                        const bg = hexToRgba(color, 0.12);
+                        const statusLabel =
+                          s.status === 'running'
+                            ? 'RUNNING'
+                            : s.status === 'completed'
+                              ? 'OK'
+                              : s.status === 'waiting'
+                                ? 'WAITING'
+                                : 'FAILED';
+                        const startedAtLabel = formatStepTime(s.startedAt);
+                        const durationLabel =
+                          s.status === 'completed' && s.metrics && s.metrics.duration_ms != null
+                            ? formatDuration(s.metrics.duration_ms)
+                            : '';
+
+                        const hasChildren = Array.isArray(n.children) && n.children.length > 0;
+                        const expanded = hasChildren && expandedSubflows[s.id] === true;
+                        const depth = typeof n.depth === 'number' && n.depth > 0 ? n.depth : 0;
+
+                        return (
+                          <div key={s.id} className="run-step-tree-item">
+                            <button
+                              type="button"
+                              className={selected ? 'run-step selected' : 'run-step'}
+                              onClick={() => setSelectedStepId(s.id)}
+                            >
+                              <div className="run-step-border" style={{ background: color }} />
+                              <div className="run-step-main">
+                                <div className="run-step-top">
+                                  <div className="run-step-left">
+                                    {hasChildren ? (
+                                      <span
+                                        className="run-step-toggle"
+                                        title={expanded ? 'Collapse subflow steps' : 'Expand subflow steps'}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          toggleSubflowExpansion(s.id);
+                                        }}
+                                      >
+                                        {expanded ? '▾' : '▸'}
+                                      </span>
+                                    ) : null}
+                                    <span className="run-step-index">#{idx + 1}</span>
+                                    {s.nodeIcon ? (
+                                      <span
+                                        className="run-step-icon"
+                                        style={{ color }}
+                                        dangerouslySetInnerHTML={{ __html: s.nodeIcon }}
+                                      />
+                                    ) : null}
+                                    <span className="run-step-label">{s.nodeLabel || s.nodeId || 'node'}</span>
+                                  </div>
+                                  <span className="run-step-right">
+                                    <span className={`run-step-status ${s.status}`}>
+                                      {s.status === 'running' ? <span className="run-spinner" aria-label="running" /> : null}
+                                      {statusLabel}
+                                    </span>
+                                    {durationLabel ? (
+                                      <span className="run-metric-badge metric-duration" title="Duration">
+                                        {durationLabel}
+                                      </span>
+                                    ) : null}
+                                    {startedAtLabel ? (
+                                      <span className="run-step-time" title={`Started at ${startedAtLabel}`}>
+                                        {startedAtLabel}
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                </div>
+                                <div className="run-step-meta">
+                                  <span className="run-step-type" style={{ background: bg, borderColor: color }}>
+                                    {s.nodeType || 'node'}
+                                  </span>
+                                  {depth > 0 ? <span className="run-metric-badge metric-depth">d{depth}</span> : null}
+                                  {s.provider ? <span className="run-metric-badge metric-provider">{s.provider}</span> : null}
+                                  {s.model ? <span className="run-metric-badge metric-model">{s.model}</span> : null}
+                                  {s.nodeId ? <span className="run-step-id">{s.nodeId}</span> : null}
+                                  {s.status === 'completed' && s.metrics ? (
+                                    <span className="run-step-metrics">
+                                      {formatTokenBadge(s.metrics) ? (
+                                        <span className="run-metric-badge metric-tokens">{formatTokenBadge(s.metrics)}</span>
+                                      ) : null}
+                                      {formatTpsBadge(s.metrics) ? (
+                                        <span className="run-metric-badge metric-throughput">{formatTpsBadge(s.metrics)}</span>
+                                      ) : null}
+                                    </span>
+                                  ) : null}
+                                </div>
+                                {s.status === 'failed' && s.error ? (
+                                  <div className="run-step-error">{s.error}</div>
+                                ) : s.status === 'waiting' && s.waiting ? (
+                                  <div className="run-step-waiting">
+                                    {s.waiting.reason ? `waiting · ${s.waiting.reason}` : 'waiting'}
+                                    {s.waiting.prompt ? ` · ${s.waiting.prompt}` : ''}
+                                  </div>
+                                ) : s.status === 'completed' && s.summary ? (
+                                  <div className="run-step-summary">{s.summary}</div>
                                 ) : null}
-                                {formatTpsBadge(s.metrics) ? (
-                                  <span className="run-metric-badge metric-throughput">{formatTpsBadge(s.metrics)}</span>
-                                ) : null}
-                              </span>
+                              </div>
+                            </button>
+
+                            {hasChildren && expanded ? (
+                              <div className="run-step-children">{renderNodes(n.children)}</div>
                             ) : null}
                           </div>
-                          {s.status === 'failed' && s.error ? (
-                            <div className="run-step-error">{s.error}</div>
-                          ) : s.status === 'waiting' && s.waiting ? (
-                            <div className="run-step-waiting">
-                              {s.waiting.reason ? `waiting · ${s.waiting.reason}` : 'waiting'}
-                              {s.waiting.prompt ? ` · ${s.waiting.prompt}` : ''}
-                            </div>
-                          ) : s.status === 'completed' && s.summary ? (
-                            <div className="run-step-summary">{s.summary}</div>
-                          ) : null}
-                        </div>
-                      </button>
-                    );
-                  })
+                        );
+                      });
+                    };
+
+                    return renderNodes(stepTree);
+                  })()
                 )}
               </div>
             </div>
@@ -2022,3 +2148,4 @@ export function RunFlowModal({
 }
 
 export default RunFlowModal;
+

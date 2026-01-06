@@ -38,44 +38,11 @@
             "label": "request",
             "type": "string"
           }
-        ]
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
-      "id": "node-2",
-      "type": "on_flow_end",
-      "position": {
-        "x": -416.0,
-        "y": -64.0
-      },
-      "data": {
-        "nodeType": "on_flow_end",
-        "label": "On Flow End",
-        "icon": "&#x23F9;",
-        "headerColor": "#C0392B",
-        "inputs": [
-          {
-            "id": "exec-in",
-            "label": "",
-            "type": "execution"
-          },
-          {
-            "id": "enriched_request",
-            "label": "enriched_request",
-            "type": "string"
-          },
-          {
-            "id": "tasks",
-            "label": "tasks",
-            "type": "array"
-          }
         ],
-        "outputs": []
+        "pinDefaults": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b"
+        }
       },
       "label": null,
       "icon": null,
@@ -272,7 +239,7 @@
       "id": "node-6",
       "type": "on_flow_end",
       "position": {
-        "x": -640.0,
+        "x": -400.0,
         "y": -64.0
       },
       "data": {
@@ -287,9 +254,14 @@
             "type": "execution"
           },
           {
-            "id": "response",
-            "label": "response",
-            "type": "object"
+            "id": "enriched_request",
+            "label": "enriched_request",
+            "type": "string"
+          },
+          {
+            "id": "tasks",
+            "label": "tasks",
+            "type": "array"
           }
         ],
         "outputs": []
@@ -304,8 +276,85 @@
       "id": "node-7",
       "type": "break_object",
       "position": {
-        "x": -656.0,
-        "y": 128.0
+        "x": -608.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "enriched_request",
+            "label": "enriched_request",
+            "type": "string"
+          },
+          {
+            "id": "tasks",
+            "label": "tasks",
+            "type": "array"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "enriched_request",
+            "tasks"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-8",
+      "type": "parse_json",
+      "position": {
+        "x": -608.0,
+        "y": 288.0
+      },
+      "data": {
+        "nodeType": "parse_json",
+        "label": "Parse JSON",
+        "icon": "&#x1F5C2;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "text",
+            "label": "text",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-9",
+      "type": "break_object",
+      "position": {
+        "x": -832.0,
+        "y": 288.0
       },
       "data": {
         "nodeType": "break_object",
@@ -365,27 +414,11 @@
       "animated": false
     },
     {
-      "id": "edge-1767681574855",
-      "source": "node-3",
-      "sourceHandle": "exec-out",
-      "target": "node-6",
-      "targetHandle": "exec-in",
-      "animated": true
-    },
-    {
-      "id": "edge-1767681596719",
-      "source": "node-3",
+      "id": "edge-1767681687679",
+      "source": "node-8",
       "sourceHandle": "result",
       "target": "node-7",
       "targetHandle": "object",
-      "animated": false
-    },
-    {
-      "id": "edge-1767681687679",
-      "source": "node-7",
-      "sourceHandle": "data",
-      "target": "node-6",
-      "targetHandle": "response",
       "animated": false
     },
     {
@@ -411,9 +444,49 @@
       "target": "node-4",
       "targetHandle": "b",
       "animated": false
+    },
+    {
+      "id": "edge-1767707444899",
+      "source": "node-3",
+      "sourceHandle": "exec-out",
+      "target": "node-6",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767707471460",
+      "source": "node-7",
+      "sourceHandle": "enriched_request",
+      "target": "node-6",
+      "targetHandle": "enriched_request",
+      "animated": false
+    },
+    {
+      "id": "edge-1767707491538",
+      "source": "node-7",
+      "sourceHandle": "tasks",
+      "target": "node-6",
+      "targetHandle": "tasks",
+      "animated": false
+    },
+    {
+      "id": "edge-1767707551748",
+      "source": "node-3",
+      "sourceHandle": "result",
+      "target": "node-9",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1767707560698",
+      "source": "node-9",
+      "sourceHandle": "data",
+      "target": "node-8",
+      "targetHandle": "text",
+      "animated": false
     }
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-06T06:40:25.651957",
-  "updated_at": "2026-01-06T06:48:47.624274"
+  "updated_at": "2026-01-06T15:12:30.307374"
 }
