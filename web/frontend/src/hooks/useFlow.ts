@@ -521,7 +521,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                 want({ id: 'model', label: 'model', type: 'model' }),
                 want({ id: 'system', label: 'system', type: 'string' }),
                 want({ id: 'prompt', label: 'prompt', type: 'string' }),
-                want({ id: 'tools', label: 'tools', type: 'array' }),
+                want({ id: 'tools', label: 'tools', type: 'tools' }),
+                want({ id: 'response_schema', label: 'structured_output', type: 'object' }),
               ]
             : [
                 execIn,
@@ -531,7 +532,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                 want({ id: 'max_iterations', label: 'max_iterations', type: 'number' }),
                 want({ id: 'system', label: 'system', type: 'string' }),
                 want({ id: 'task', label: 'prompt', type: 'string' }),
-                want({ id: 'tools', label: 'tools', type: 'array' }),
+                want({ id: 'tools', label: 'tools', type: 'tools' }),
+                want({ id: 'response_schema', label: 'structured_output', type: 'object' }),
                 want({ id: 'context', label: 'context', type: 'object' }),
               ];
 

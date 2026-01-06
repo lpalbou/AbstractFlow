@@ -169,6 +169,8 @@ const VarDeclInline = memo(function VarDeclInline({
   varType,
   defaultValue,
   nameOptions,
+  toolOptions,
+  toolLoading,
   onChange,
 }: {
   nodeId: string;
@@ -176,6 +178,8 @@ const VarDeclInline = memo(function VarDeclInline({
   varType: Exclude<PinType, 'execution'>;
   defaultValue: unknown;
   nameOptions: string[];
+  toolOptions: Array<{ value: string; label: string }>;
+  toolLoading: boolean;
   onChange: (next: { name: string; type: Exclude<PinType, 'execution'>; default: unknown }) => void;
 }) {
   const listId = `af-var-decl-names-${nodeId}`;
@@ -188,6 +192,7 @@ const VarDeclInline = memo(function VarDeclInline({
     { value: 'model', label: 'model' },
     { value: 'object', label: 'object' },
     { value: 'array', label: 'array' },
+    { value: 'tools', label: 'tools' },
     { value: 'any', label: 'any' },
   ];
 
@@ -250,6 +255,29 @@ const VarDeclInline = memo(function VarDeclInline({
       );
     }
 
+    if (varType === 'tools') {
+      const raw = Array.isArray(defaultValue) ? defaultValue : [];
+      const cleaned = raw
+        .filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
+        .map((t) => t.trim());
+      const unique = Array.from(new Set(cleaned));
+      return (
+        <AfMultiSelect
+          variant="pin"
+          values={unique}
+          placeholder={toolLoading ? 'Loading…' : 'Select…'}
+          options={toolOptions}
+          disabled={toolLoading}
+          loading={toolLoading}
+          searchable
+          searchPlaceholder="Search tools…"
+          clearable
+          minPopoverWidth={340}
+          onChange={(next) => onChange({ name, type: varType, default: Array.from(new Set(next)) })}
+        />
+      );
+    }
+
     const preview = varType === 'array' ? '[]' : varType === 'object' ? '{}' : 'null';
     return (
       <input
@@ -303,6 +331,8 @@ const VarDeclInline = memo(function VarDeclInline({
                   ? 0
                   : nextType === 'string' || nextType === 'provider' || nextType === 'model'
                     ? ''
+                    : nextType === 'tools'
+                      ? []
                     : nextType === 'array'
                       ? []
                       : nextType === 'object'
@@ -412,6 +442,7 @@ export const BaseNode = memo(function BaseNode({
             t === 'model' ||
             t === 'object' ||
             t === 'array' ||
+            t === 'tools' ||
             t === 'any'
               ? (t as Exclude<PinType, 'execution'>)
               : 'any';
@@ -532,7 +563,7 @@ export const BaseNode = memo(function BaseNode({
     selectedProvider,
     (hasModelControls && !modelConnected) || (isProviderModelsNode && !providerConnected)
   );
-  const toolsQuery = useTools((isAgentNode || isLlmNode || isToolsAllowlistNode) && !toolsConnected);
+  const toolsQuery = useTools((isAgentNode || isLlmNode || isToolsAllowlistNode || isVarDeclNode) && !toolsConnected);
 
   const providers = Array.isArray(providersQuery.data) ? providersQuery.data : [];
   const models = Array.isArray(modelsQuery.data) ? modelsQuery.data : [];
@@ -685,6 +716,7 @@ export const BaseNode = memo(function BaseNode({
         t === 'model' ||
         t === 'object' ||
         t === 'array' ||
+        t === 'tools' ||
         t === 'any'
           ? (t as Exclude<PinType, 'execution'>)
           : ('any' as const);
@@ -1273,6 +1305,8 @@ export const BaseNode = memo(function BaseNode({
             varType={varDeclConfig.type}
             defaultValue={varDeclConfig.default}
             nameOptions={variableOptions.map((o) => o.value)}
+            toolOptions={toolOptions}
+            toolLoading={toolsQuery.isLoading}
             onChange={setVarDeclConfig}
           />
         )}

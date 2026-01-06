@@ -170,20 +170,19 @@ def create_visual_runner(
                     stack2.append(nxt)
         return reachable
 
-    # Collect all reachable flows (root + transitive subflows), with cycle detection.
+    # Collect all reachable flows (root + transitive subflows).
+    #
+    # Important: subflows are executed via runtime `START_SUBWORKFLOW` by workflow id.
+    # This means subflow cycles (including self-recursion) are valid and should not be
+    # rejected at runner-wiring time; we only need to register each workflow id once.
     ordered: list[VisualFlow] = []
     visited: set[str] = set()
-    visiting: set[str] = set()
 
     def _dfs(vf: VisualFlow) -> None:
         if vf.id in visited:
             return
-        if vf.id in visiting:
-            raise ValueError(f"Subflow cycle detected at '{vf.id}'")
-
-        visiting.add(vf.id)
-        ordered.append(vf)
         visited.add(vf.id)
+        ordered.append(vf)
 
         reachable = _reachable_exec_node_ids(vf)
         for n in vf.nodes:
@@ -197,11 +196,12 @@ def create_visual_runner(
                 raise ValueError(f"Subflow node '{n.id}' missing subflowId")
             subflow_id = subflow_id.strip()
             child = flows.get(subflow_id)
+            # Self-recursion should work even if `flows` does not redundantly include this vf.
+            if child is None and subflow_id == vf.id:
+                child = vf
             if child is None:
                 raise ValueError(f"Referenced subflow '{subflow_id}' not found")
             _dfs(child)
-
-        visiting.remove(vf.id)
 
     _dfs(visual_flow)
 
@@ -733,6 +733,7 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
         "literal_number",
         "literal_boolean",
         "literal_json",
+        "json_schema",
         "literal_array",
     }
 
@@ -1355,6 +1356,23 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
         cfg = data.get("agentConfig", {}) if isinstance(data, dict) else {}
         cfg = cfg if isinstance(cfg, dict) else {}
 
+        def _normalize_response_schema(raw: Any) -> Optional[Dict[str, Any]]:
+            """Normalize a structured-output schema input into a JSON Schema dict.
+
+            Supported inputs (best-effort):
+            - JSON Schema dict: {"type":"object","properties":{...}, ...}
+            - LMStudio/OpenAI-style wrapper: {"type":"json_schema","json_schema": {"schema": {...}}}
+            """
+            if raw is None:
+                return None
+            if isinstance(raw, dict):
+                if raw.get("type") == "json_schema" and isinstance(raw.get("json_schema"), dict):
+                    inner = raw.get("json_schema")
+                    if isinstance(inner, dict) and isinstance(inner.get("schema"), dict):
+                        return dict(inner.get("schema") or {})
+                return dict(raw)
+            return None
+
         def _normalize_tool_names(raw: Any) -> list[str]:
             if raw is None:
                 return []
@@ -1415,6 +1433,11 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
             # Optional pin overrides (passed through for compiler/runtime consumption).
             if isinstance(input_data, dict) and "max_iterations" in input_data:
                 out["max_iterations"] = input_data.get("max_iterations")
+
+            if isinstance(input_data, dict) and "response_schema" in input_data:
+                schema = _normalize_response_schema(input_data.get("response_schema"))
+                if isinstance(schema, dict) and schema:
+                    out["response_schema"] = schema
 
             include_context_specified = isinstance(input_data, dict) and (
                 "include_context" in input_data or "use_context" in input_data
@@ -1876,6 +1899,25 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
                     out.append(spec)
             return out
 
+        def _normalize_response_schema(raw: Any) -> Optional[Dict[str, Any]]:
+            """Normalize a structured-output schema input into a JSON Schema dict.
+
+            Supported inputs (best-effort):
+            - JSON Schema dict: {"type":"object","properties":{...}, ...}
+            - LMStudio/OpenAI-style wrapper: {"type":"json_schema","json_schema": {"schema": {...}}}
+            """
+            if raw is None:
+                return None
+            if isinstance(raw, dict):
+                # Wrapper form (OpenAI "response_format": {type:"json_schema", json_schema:{schema:{...}}})
+                if raw.get("type") == "json_schema" and isinstance(raw.get("json_schema"), dict):
+                    inner = raw.get("json_schema")
+                    if isinstance(inner, dict) and isinstance(inner.get("schema"), dict):
+                        return dict(inner.get("schema") or {})
+                # Plain JSON Schema dict
+                return dict(raw)
+            return None
+
         def handler(input_data):
             prompt = input_data.get("prompt", "") if isinstance(input_data, dict) else str(input_data)
             system = input_data.get("system", "") if isinstance(input_data, dict) else ""
@@ -1924,18 +1966,30 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
                     "error": "Missing provider or model configuration",
                 }
 
+            response_schema = (
+                _normalize_response_schema(input_data.get("response_schema"))
+                if isinstance(input_data, dict) and "response_schema" in input_data
+                else None
+            )
+
+            pending: Dict[str, Any] = {
+                "type": "llm_call",
+                "prompt": prompt,
+                "system_prompt": system,
+                "tools": tools,
+                "params": {"temperature": temperature},
+                "provider": provider,
+                "model": model,
+                "include_context": include_context_value,
+            }
+            if isinstance(response_schema, dict) and response_schema:
+                pending["response_schema"] = response_schema
+                # Name is optional; AbstractRuntime will fall back to a safe default.
+                pending["response_schema_name"] = "LLM_StructuredOutput"
+
             return {
                 "response": None,
-                "_pending_effect": {
-                    "type": "llm_call",
-                    "prompt": prompt,
-                    "system_prompt": system,
-                    "tools": tools,
-                    "params": {"temperature": temperature},
-                    "provider": provider,
-                    "model": model,
-                    "include_context": include_context_value,
-                },
+                "_pending_effect": pending,
             }
 
         return handler

@@ -10,6 +10,7 @@ import { isEntryNodeType } from '../types/flow';
 import { useFlowStore } from '../hooks/useFlow';
 import { CodeEditorModal } from './CodeEditorModal';
 import ProviderModelsPanel from './ProviderModelsPanel';
+import { JsonSchemaNodeEditor } from './JsonSchemaNodeEditor';
 import {
   extractFunctionBody,
   generatePythonTransformCode,
@@ -50,6 +51,7 @@ const DATA_PIN_TYPES: DataPinType[] = [
   'boolean',
   'object',
   'array',
+  'tools',
   'provider',
   'model',
   'agent',
@@ -328,7 +330,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   useEffect(() => {
     if (!node || node.data.nodeType !== 'subflow') return;
     const subflowId = node.data.subflowId;
-    if (!subflowId || (flowId && subflowId === flowId)) return;
+    if (!subflowId) return;
 
     const syncKey = `${node.id}:${subflowId}`;
     if (lastSyncedSubflowPins.current === syncKey) return;
@@ -2150,16 +2152,14 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               <option value="">
                 {loadingFlows ? 'Loading...' : 'Select flow...'}
               </option>
-              {savedFlows
-                .filter((f) => !flowId || f.id !== flowId)
-                .map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.name} ({f.id})
-                  </option>
-                ))}
+              {savedFlows.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name} ({f.id}){flowId && f.id === flowId ? ' — this flow (recursive)' : ''}
+                </option>
+              ))}
             </select>
             <span className="property-hint">
-              Select an existing saved flow to execute as a subworkflow
+              Select a saved flow to execute as a subworkflow. Choosing this flow creates recursion; ensure a base case.
             </span>
           </div>
         </div>
@@ -2851,6 +2851,15 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
             );
           })()}
         </div>
+      )}
+
+      {/* JSON Schema editor */}
+      {data.nodeType === 'json_schema' && (
+        <JsonSchemaNodeEditor
+          nodeId={node.id}
+          schema={data.literalValue}
+          onChange={(nextSchema) => updateNodeData(node.id, { literalValue: nextSchema })}
+        />
       )}
 
       {/* Array literal value - item-based editor */}

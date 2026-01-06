@@ -10,6 +10,7 @@ export type PinType =
   | 'boolean'   // Red #FF0000 - True/False
   | 'object'    // Cyan #00FFFF - JSON objects
   | 'array'     // Orange #FF8800 - Collections
+  | 'tools'     // Orange - Tool allowlist (string[])
   | 'provider'  // Cyan-blue - LLM provider id/name (string-like)
   | 'model'     // Purple - LLM model id/name (string-like)
   | 'agent'     // Blue #4488FF - Agent reference
@@ -23,6 +24,7 @@ export const PIN_COLORS: Record<PinType, string> = {
   boolean: '#FF0000',
   object: '#00FFFF',
   array: '#FF8800',
+  tools: '#FF8800',
   provider: '#00D2FF',
   model: '#9D4EDD',
   agent: '#4488FF',
@@ -72,6 +74,7 @@ export type NodeType =
   | 'model_catalog'
   // Literals - Pure value nodes (no exec pins, no inputs)
   | 'literal_string' | 'literal_number' | 'literal_boolean' | 'literal_json' | 'literal_array'
+  | 'json_schema'
   // Effects - Side-effect nodes (require execution pins)
   | 'ask_user'
   | 'answer_user'

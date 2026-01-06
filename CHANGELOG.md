@@ -79,8 +79,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - WebSocket execution events now include a JSON-safe ISO timestamp (`ts`) for clearer observability in the UI and logs.
 - Visual `LLM Call` nodes now support optional **tool calling** via a `tools` allowlist input (pin or node config) and expose a structured `result` output object (normalized LLM response including `tool_calls`, `usage`, and `trace_id`). Tool execution remains runtime-owned and must be modeled explicitly in the workflow (no agent loop/scratchpad).
 - Visual `LLM Call` now also exposes an **inline tools dropdown** in the node UI (when the `tools` pin is not connected), matching the Agent node UX for quickly selecting an allowlist.
+- Visual `LLM Call` and `Agent` nodes now accept an optional **Structured Output** input pin (`response_schema`) containing a JSON Schema object. The schema is passed durably to AbstractRuntime `LLM_CALL` (`payload.response_schema`) so AbstractCore providers can enforce schema-conformant assistant `content`.
+- New literal node **JSON Schema** (`json_schema`) to author schema objects and wire them into `LLM Call.structured_output` / `Agent.structured_output`.
 - Visual `Tool Calls` node (`tool_calls`) to execute one or many tool call requests via AbstractRuntime `EffectType.TOOL_CALLS`, outputting `results[]` (per-call output/error) and an aggregate `success` boolean.
 - New pure node `Tools Allowlist` (`tools_allowlist`) that outputs a workflow-scope `tools: string[]` list (configured via inline multi-select), so one allowlist can be fed into `LLM Call.tools`, `Agent.tools`, and `Tool Calls.allowed_tools`.
+  - Added a dedicated `tools` pin type (specialized `string[]`) so `On Flow Start` parameters can be typed as `tools` and selected via the Run modal (same multi-select UX as `Tools Allowlist`).
 - New pure node `Bool Variable` (`bool_var`) to declare a workflow-scope boolean variable (name + default) with typed outputs (`value:boolean`, `name:string`) so flows can branch and mutate it cleanly via `Set Variable`.
 - New control node `For` (`for`) for numeric loops with inputs (`start`, `end`, `step`) and outputs (`i`, `index`) plus `loop`/`done` execution pins.
 - `While` (`while`) now exposes an `index` output pin (0-based iteration count) like `ForEach`.

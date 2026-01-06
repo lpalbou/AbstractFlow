@@ -13,7 +13,9 @@ import type { WaitingInfo } from '../hooks/useWebSocket';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { AgentSubrunTracePanel } from './AgentSubrunTracePanel';
 import AfSelect from './inputs/AfSelect';
+import AfMultiSelect from './inputs/AfMultiSelect';
 import { useProviders, useModels } from '../hooks/useProviders';
+import { useTools } from '../hooks/useTools';
 import { RunSwitcherDropdown } from './RunSwitcherDropdown';
 import { JsonCodeBlock } from './JsonCodeBlock';
 
@@ -116,6 +118,7 @@ export function RunFlowModal({
 
   // Form state for each input pin
   const [formValues, setFormValues] = useState<Record<string, string>>({});
+  const [toolsValues, setToolsValues] = useState<Record<string, string[]>>({});
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [resumeDraft, setResumeDraft] = useState('');
   const [isMinimized, setIsMinimized] = useState(false);
@@ -139,6 +142,17 @@ export function RunFlowModal({
   const providers = Array.isArray(providersQuery.data) ? providersQuery.data : [];
   const models = Array.isArray(modelsQuery.data) ? modelsQuery.data : [];
 
+  const wantToolsDropdown = Boolean(isOpen && inputPins.some((p) => p.type === 'tools'));
+  const toolsQuery = useTools(wantToolsDropdown);
+  const toolSpecs = Array.isArray(toolsQuery.data) ? toolsQuery.data : [];
+  const toolOptions = useMemo(() => {
+    const out = toolSpecs
+      .filter((t) => t && typeof t.name === 'string' && t.name.trim())
+      .map((t) => ({ value: t.name.trim(), label: t.name.trim() }));
+    out.sort((a, b) => a.label.localeCompare(b.label));
+    return out;
+  }, [toolSpecs]);
+
   // When the modal is opened, start expanded (predictable UX).
   useEffect(() => {
     if (isOpen) setIsMinimized(false);
@@ -148,11 +162,15 @@ export function RunFlowModal({
   useEffect(() => {
     if (isOpen && inputPins.length > 0) {
       const initialValues: Record<string, string> = {};
+      const initialTools: Record<string, string[]> = {};
       const defaults =
         entryNode && entryNode.data && typeof (entryNode.data as any).pinDefaults === 'object'
           ? ((entryNode.data as any).pinDefaults as Record<string, unknown>)
           : null;
       inputPins.forEach(pin => {
+        if (pin.type === 'tools') {
+          initialTools[pin.id] = [];
+        }
         const raw = defaults && pin.id in defaults ? defaults[pin.id] : undefined;
         if (raw === undefined) {
           initialValues[pin.id] = '';
@@ -175,6 +193,7 @@ export function RunFlowModal({
         initialValues[pin.id] = '';
       });
       setFormValues(initialValues);
+      setToolsValues(initialTools);
     }
   }, [isOpen, inputPins, entryNode]);
 
@@ -194,6 +213,10 @@ export function RunFlowModal({
     const inputData: Record<string, unknown> = {};
 
     inputPins.forEach(pin => {
+      if (pin.type === 'tools') {
+        inputData[pin.id] = Array.isArray(toolsValues[pin.id]) ? toolsValues[pin.id] : [];
+        return;
+      }
       const value = formValues[pin.id] || '';
 
       // Parse based on type
@@ -218,7 +241,7 @@ export function RunFlowModal({
     });
 
     onRun(inputData);
-  }, [formValues, inputPins, onRun]);
+  }, [formValues, inputPins, onRun, toolsValues]);
 
   type StepStatus = 'running' | 'completed' | 'waiting' | 'failed';
   type Step = {
@@ -1857,6 +1880,30 @@ export function RunFlowModal({
                               searchable
                               searchPlaceholder="Search models…"
                               onChange={(v) => handleFieldChange(pin.id, v)}
+                            />
+                          </div>
+                        );
+                      }
+
+                      if (pin.type === 'tools') {
+                        const values = Array.isArray(toolsValues[pin.id]) ? toolsValues[pin.id] : [];
+                        return (
+                          <div key={pin.id} className="run-form-field">
+                            <label className="run-form-label">
+                              {pin.label}
+                              <span className="run-form-type">({pin.type})</span>
+                            </label>
+                            <AfMultiSelect
+                              values={values}
+                              placeholder={toolsQuery.isLoading ? 'Loading…' : 'Select…'}
+                              options={toolOptions}
+                              disabled={isRunning || toolsQuery.isLoading}
+                              loading={toolsQuery.isLoading}
+                              searchable
+                              searchPlaceholder="Search tools…"
+                              clearable
+                              minPopoverWidth={340}
+                              onChange={(next) => setToolsValues((prev) => ({ ...prev, [pin.id]: next }))}
                             />
                           </div>
                         );

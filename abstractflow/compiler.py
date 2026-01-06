@@ -451,6 +451,14 @@ def _create_visual_agent_effect_handler(
             resolved_inputs = _resolve_inputs(run)
             bucket["resolved_inputs"] = resolved_inputs if isinstance(resolved_inputs, dict) else {}
 
+        # Pin-driven structured output:
+        # If `response_schema` is provided via an input pin (data edge), it overrides the node config
+        # and enables the structured-output post-pass (durable LLM_CALL).
+        pin_schema = resolved_inputs.get("response_schema") if isinstance(resolved_inputs, dict) else None
+        if isinstance(pin_schema, dict) and pin_schema:
+            schema = dict(pin_schema)
+            schema_enabled = True
+
         # Provider/model can come from Agent node config or from data-edge inputs (pins).
         provider_raw = resolved_inputs.get("provider") if isinstance(resolved_inputs, dict) else None
         model_raw = resolved_inputs.get("model") if isinstance(resolved_inputs, dict) else None
