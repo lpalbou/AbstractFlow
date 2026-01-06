@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Split` now avoids spurious empty trailing items (common with delimiter-terminated strings like `"A@@B@@"`) so downstream `Loop` nodes don't execute an extra empty iteration.
 - `Loop` (Foreach) now invalidates cached pure-node outputs (e.g. `concat`) per-iteration so loop bodies don't reuse stale values from iteration 0 (fixes scratchpad accumulation workflows).
 - `Concat` now infers a stable pin order (a..z) when template pin metadata is missing (common in programmatic/test-built VisualFlows), so connections to `b/c/...` are honored.
+- Durable persistence no longer crashes on file-backed runs: `on_flow_start` no longer leaks internal `_temp` into cached node outputs (which could create self-referential cycles and raise `RecursionError: maximum recursion depth exceeded` during JSON persistence).
 - WebSocket run controls are now responsive during long-running steps: pause/resume/cancel no longer block on the per-connection execution lock (important when LLM/Agent nodes stall).
 - Web run controls are now resilient to transient WebSocket disconnects: pause/resume/cancel can be sent with an explicit `run_id`, and the UI will reconnect-and-send for control actions when needed.
 - WebSocket execution is now resilient to transient UI disconnects: a dropped WebSocket connection no longer cancels the in-flight run task (execution continues durably; the UI is an observability/control channel).

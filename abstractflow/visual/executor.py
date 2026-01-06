@@ -1558,10 +1558,42 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
         return handler
 
     def _create_event_handler(event_type: str, data: Dict[str, Any]):
+        # Event nodes are special: they bridge external inputs / runtime vars into the graph.
+        #
+        # Critical constraint: RunState.vars must remain JSON-serializable for durable execution.
+        # The runtime persists per-node outputs in `vars["_temp"]["node_outputs"]`. If an event node
+        # returns the full `run.vars` dict (which contains `_temp`), we create a self-referential
+        # cycle: `_temp -> node_outputs -> <start_output>['_temp'] -> _temp`, which explodes during
+        # persistence (e.g. JsonFileRunStore uses dataclasses.asdict()).
+        #
+        # Therefore, `on_flow_start` must *not* leak internal namespaces like `_temp` into outputs.
+        start_pin_ids: list[str] = []
+        pins = data.get("outputs") if isinstance(data, dict) else None
+        if isinstance(pins, list):
+            for p in pins:
+                if not isinstance(p, dict):
+                    continue
+                if p.get("type") == "execution":
+                    continue
+                pid = p.get("id")
+                if isinstance(pid, str) and pid:
+                    start_pin_ids.append(pid)
+
         def handler(input_data):
             if event_type == "on_flow_start":
+                # Prefer explicit pins: the visual editor treats non-exec output pins as
+                # "Flow Start Parameters" (initial vars). Only expose those by default.
                 if isinstance(input_data, dict):
-                    return dict(input_data)
+                    if start_pin_ids:
+                        return {pid: input_data.get(pid) for pid in start_pin_ids}
+                    # Backward-compat: older/test-created flows may omit pin metadata.
+                    # In that case, expose non-internal keys only (avoid `_temp`, `_limits`, ...).
+                    return {k: v for k, v in input_data.items() if isinstance(k, str) and not k.startswith("_")}
+
+                # Non-dict input: if there is a single declared pin, map into it; otherwise
+                # keep a generic `input` key.
+                if start_pin_ids and len(start_pin_ids) == 1:
+                    return {start_pin_ids[0]: input_data}
                 return {"input": input_data}
             if event_type == "on_user_request":
                 message = input_data.get("message", "") if isinstance(input_data, dict) else str(input_data)
