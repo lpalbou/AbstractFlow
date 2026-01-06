@@ -29,6 +29,31 @@
             "id": "request",
             "label": "request",
             "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
           }
         ]
       },
@@ -42,7 +67,7 @@
       "id": "node-2",
       "type": "on_flow_end",
       "position": {
-        "x": 16.0,
+        "x": 528.0,
         "y": 16.0
       },
       "data": {
@@ -60,6 +85,21 @@
             "id": "response",
             "label": "response",
             "type": "string"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          },
+          {
+            "id": "raw_result",
+            "label": "raw_result",
+            "type": "object"
           }
         ],
         "outputs": []
@@ -74,8 +114,8 @@
       "id": "node-3",
       "type": "concat",
       "position": {
-        "x": -224.0,
-        "y": 80.0
+        "x": 32.0,
+        "y": 96.0
       },
       "data": {
         "nodeType": "concat",
@@ -113,17 +153,116 @@
       "headerColor": null,
       "inputs": [],
       "outputs": []
+    },
+    {
+      "id": "node-4",
+      "type": "subflow",
+      "position": {
+        "x": -160.0,
+        "y": -160.0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Subflow",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean",
+            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          },
+          {
+            "id": "state",
+            "label": "state",
+            "type": "string"
+          },
+          {
+            "id": "post_delay",
+            "label": "post_delay",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          }
+        ],
+        "subflowId": "15f19f7f",
+        "pinDefaults": {
+          "state": "Starting..",
+          "post_delay": 2
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-5",
+      "type": "subflow",
+      "position": {
+        "x": 176.0,
+        "y": -160.0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Subflow",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "state",
+            "label": "state",
+            "type": "string"
+          },
+          {
+            "id": "post_delay",
+            "label": "post_delay",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          }
+        ],
+        "subflowId": "15f19f7f",
+        "pinDefaults": {
+          "state": "Ending..",
+          "post_delay": 2
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
     }
   ],
   "edges": [
-    {
-      "id": "edge-1767677006340",
-      "source": "node-1",
-      "sourceHandle": "exec-out",
-      "target": "node-2",
-      "targetHandle": "exec-in",
-      "animated": true
-    },
     {
       "id": "edge-1767677039089",
       "source": "node-1",
@@ -139,9 +278,33 @@
       "target": "node-2",
       "targetHandle": "response",
       "animated": false
+    },
+    {
+      "id": "edge-1767736920933",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-4",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767736941927",
+      "source": "node-4",
+      "sourceHandle": "exec-out",
+      "target": "node-5",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767736951508",
+      "source": "node-5",
+      "sourceHandle": "exec-out",
+      "target": "node-2",
+      "targetHandle": "exec-in",
+      "animated": true
     }
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-06T05:23:42.931416",
-  "updated_at": "2026-01-06T05:57:17.284349"
+  "updated_at": "2026-01-06T22:03:38.958643"
 }
