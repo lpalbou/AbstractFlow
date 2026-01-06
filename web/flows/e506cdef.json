@@ -1,0 +1,562 @@
+{
+  "id": "e506cdef",
+  "name": "today-news",
+  "description": "",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": {
+        "x": -992.0,
+        "y": -160.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-2",
+      "type": "agent",
+      "position": {
+        "x": -656.0,
+        "y": -160.0
+      },
+      "data": {
+        "nodeType": "agent",
+        "label": "Agent",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "include_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) as agent history. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider",
+            "description": "LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model",
+            "description": "LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number",
+            "description": "Maximum internal ReAct iterations (safety cap). Higher values allow more tool-use steps."
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string",
+            "description": "Optional system prompt for this agent instance (high priority instructions)."
+          },
+          {
+            "id": "task",
+            "label": "prompt",
+            "type": "string",
+            "description": "The task/user prompt for the agent to solve."
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools",
+            "description": "Allowlist of tool names this agent can call (defense-in-depth; runtime still enforces allowlists)."
+          },
+          {
+            "id": "response_schema",
+            "label": "structured_output",
+            "type": "object",
+            "description": "Optional JSON Schema object (type=object) the final answer must conform to."
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object",
+            "description": "Optional explicit context object for the agent (e.g. {messages:[...]}). If provided, it can override inherited run context."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object",
+            "description": "Structured final agent result (answer + metadata/tool calls depending on agent)."
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object",
+            "description": "Runtime-owned execution trace/scratchpad for observability (LLM/tool steps, timings)."
+          }
+        ],
+        "agentConfig": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b",
+          "tools": [
+            "fetch_url",
+            "web_search"
+          ]
+        },
+        "pinDefaults": {
+          "system": "you are an expert web investigator"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-3",
+      "type": "answer_user",
+      "position": {
+        "x": -96.0,
+        "y": -160.0
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-4",
+      "type": "break_object",
+      "position": {
+        "x": -368.0,
+        "y": 128.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          },
+          {
+            "id": "task",
+            "label": "task",
+            "type": "string"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "context",
+            "result",
+            "task"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-5",
+      "type": "concat",
+      "position": {
+        "x": -912.0,
+        "y": 240.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "a": "what are today news ?",
+          "c": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-6",
+      "type": "system_datetime",
+      "position": {
+        "x": -1152.0,
+        "y": 80.0
+      },
+      "data": {
+        "nodeType": "system_datetime",
+        "label": "System Date/Time",
+        "icon": "&#x1F552;",
+        "headerColor": "#3498DB",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "iso",
+            "label": "iso",
+            "type": "string"
+          },
+          {
+            "id": "timezone",
+            "label": "timezone",
+            "type": "string"
+          },
+          {
+            "id": "utc_offset_minutes",
+            "label": "utc_offset_minutes",
+            "type": "number"
+          },
+          {
+            "id": "locale",
+            "label": "locale",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-7",
+      "type": "concat",
+      "position": {
+        "x": -912.0,
+        "y": -48.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          },
+          {
+            "id": "d",
+            "label": "d",
+            "type": "string"
+          },
+          {
+            "id": "e",
+            "label": "e",
+            "type": "string"
+          },
+          {
+            "id": "f",
+            "label": "f",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "a": "Today is ",
+          "c": " (",
+          "e": ")/n",
+          "f": "you are an expert web researcher"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-9",
+      "type": "break_object",
+      "position": {
+        "x": -368.0,
+        "y": -32.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          },
+          {
+            "id": "task",
+            "label": "task",
+            "type": "string"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "context",
+            "result",
+            "task"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-10",
+      "type": "stringify_json",
+      "position": {
+        "x": -400.0,
+        "y": -272.0
+      },
+      "data": {
+        "nodeType": "stringify_json",
+        "label": "Stringify JSON",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any",
+            "description": "JSON value to stringify (object/array/scalar)."
+          },
+          {
+            "id": "indent",
+            "label": "indent",
+            "type": "number",
+            "description": "Spaces per indent level. Default 2; <= 0 outputs compact JSON."
+          },
+          {
+            "id": "sort_keys",
+            "label": "sort_keys",
+            "type": "boolean",
+            "description": "Sort object keys for deterministic output. Default false."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1767738646473",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-2",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767738841953",
+      "source": "node-5",
+      "sourceHandle": "result",
+      "target": "node-2",
+      "targetHandle": "task",
+      "animated": false
+    },
+    {
+      "id": "edge-1767739037228",
+      "source": "node-6",
+      "sourceHandle": "iso",
+      "target": "node-7",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-1767739055725",
+      "source": "node-6",
+      "sourceHandle": "timezone",
+      "target": "node-7",
+      "targetHandle": "d",
+      "animated": false
+    },
+    {
+      "id": "edge-1767739096543",
+      "source": "node-7",
+      "sourceHandle": "result",
+      "target": "node-2",
+      "targetHandle": "system",
+      "animated": false
+    },
+    {
+      "id": "edge-1767740481585",
+      "source": "node-2",
+      "sourceHandle": "exec-out",
+      "target": "node-3",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767740485492",
+      "source": "node-10",
+      "sourceHandle": "result",
+      "target": "node-3",
+      "targetHandle": "message",
+      "animated": false
+    },
+    {
+      "id": "edge-1767740630663",
+      "source": "node-2",
+      "sourceHandle": "scratchpad",
+      "target": "node-10",
+      "targetHandle": "value",
+      "animated": false
+    }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2026-01-06T22:32:34.294372",
+  "updated_at": "2026-01-06T23:03:52.251476"
+}

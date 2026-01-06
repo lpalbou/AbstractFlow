@@ -77,7 +77,7 @@ export type NodeType =
   // Data - Pure functions (no exec pins)
   | 'get' | 'set' | 'merge' | 'make_array' | 'array_map' | 'array_filter' | 'array_concat' | 'array_length' | 'array_append' | 'array_dedup'
   | 'get_var' | 'set_var' | 'set_vars' | 'set_var_property'
-  | 'parse_json' | 'break_object' | 'system_datetime'
+  | 'parse_json' | 'stringify_json' | 'break_object' | 'system_datetime'
   | 'provider_catalog' | 'provider_models'
   // Backward-compat: deprecated
   | 'model_catalog'

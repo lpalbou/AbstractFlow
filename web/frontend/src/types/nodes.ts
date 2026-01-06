@@ -476,6 +476,20 @@ const DATA_NODES: NodeTemplate[] = [
   { type: 'array_concat', icon: '&#x2795;', label: 'Array Concat', description: 'Concatenate arrays (a then b).', headerColor: '#3498DB', inputs: [{ id: 'a', label: 'a', type: 'array' }, { id: 'b', label: 'b', type: 'array' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'data' },
   { type: 'parse_json', icon: '&#x1F5C2;', label: 'Parse JSON', description: 'Parse JSON (or JSON-ish) text into an object/array suitable for downstream nodes.', headerColor: '#3498DB', inputs: [{ id: 'text', label: 'text', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'object' }], category: 'data' },
   {
+    type: 'stringify_json',
+    icon: '&#x1F4DD;', // Memo
+    label: 'Stringify JSON',
+    description: 'Pretty-print a JSON value (object/array/scalar) into a string. Use indent <= 0 for compact output.',
+    headerColor: '#3498DB',
+    inputs: [
+      { id: 'value', label: 'value', type: 'any', description: 'JSON value to stringify (object/array/scalar).' },
+      { id: 'indent', label: 'indent', type: 'number', description: 'Spaces per indent level. Default 2; <= 0 outputs compact JSON.' },
+      { id: 'sort_keys', label: 'sort_keys', type: 'boolean', description: 'Sort object keys for deterministic output. Default false.' },
+    ],
+    outputs: [{ id: 'result', label: 'result', type: 'string' }],
+    category: 'data',
+  },
+  {
     type: 'break_object',
     icon: '&#x1F9E9;', // Puzzle piece
     label: 'Break Object',

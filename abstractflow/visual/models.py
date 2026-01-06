@@ -96,6 +96,7 @@ class NodeType(str, Enum):
     SET_VARS = "set_vars"
     SET_VAR_PROPERTY = "set_var_property"
     PARSE_JSON = "parse_json"
+    STRINGIFY_JSON = "stringify_json"
     BREAK_OBJECT = "break_object"
     SYSTEM_DATETIME = "system_datetime"
     MODEL_CATALOG = "model_catalog"

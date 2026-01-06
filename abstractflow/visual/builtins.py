@@ -622,6 +622,48 @@ def data_parse_json(inputs: Dict[str, Any]) -> Any:
     return parsed
 
 
+def data_stringify_json(inputs: Dict[str, Any]) -> str:
+    """Stringify a JSON-like value into a pretty JSON string.
+
+    Primary use-case: render objects/arrays as readable text for prompts, logs, or UI.
+
+    Inputs:
+    - value: any JSON-like value (dict/list/scalar). Missing => None (=> "null").
+    - indent: number of spaces to indent (default 2). If <= 0, output is compact (single line).
+    - sort_keys: when true, sort object keys for deterministic output (default False).
+
+    Notes:
+    - Uses ensure_ascii=False so unicode stays human-readable.
+    - Best-effort converts tuples to lists and unknown objects to strings recursively.
+    """
+
+    def _jsonify(value: Any) -> Any:
+        if value is None or isinstance(value, (bool, int, float, str)):
+            return value
+        if isinstance(value, dict):
+            return {str(k): _jsonify(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [_jsonify(v) for v in value]
+        if isinstance(value, tuple):
+            return [_jsonify(v) for v in value]
+        return str(value)
+
+    value = _jsonify(inputs.get("value"))
+
+    raw_indent = inputs.get("indent", 2)
+    indent_n: int
+    try:
+        indent_n = int(raw_indent)
+    except Exception:
+        indent_n = 2
+
+    sort_keys = bool(inputs.get("sort_keys", False))
+
+    if indent_n <= 0:
+        return json.dumps(value, ensure_ascii=False, sort_keys=sort_keys, separators=(",", ":"))
+    return json.dumps(value, ensure_ascii=False, sort_keys=sort_keys, indent=indent_n)
+
+
 # Literal value handlers - return configured constant values
 def literal_string(inputs: Dict[str, Any]) -> str:
     """Return string literal value."""
@@ -720,6 +762,7 @@ BUILTIN_HANDLERS: Dict[str, Callable[[Dict[str, Any]], Any]] = {
     "array_append": data_array_append,
     "array_dedup": data_array_dedup,
     "parse_json": data_parse_json,
+    "stringify_json": data_stringify_json,
     "system_datetime": system_datetime,
     # Literals
     "literal_string": literal_string,
