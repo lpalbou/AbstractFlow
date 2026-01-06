@@ -967,6 +967,32 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         };
       }
 
+      // Backward-compat + canonical ordering for While nodes:
+      // ensure `item:any` exists (parity with ForEach / Loop).
+      if (data.nodeType === 'while') {
+        const existingOutputs = Array.isArray(data.outputs) ? data.outputs : [];
+        const byId = new Map(existingOutputs.map((p) => [p.id, p] as const));
+        const used = new Set<string>();
+
+        const want = (pin: Pin): Pin => {
+          const prev = byId.get(pin.id);
+          used.add(pin.id);
+          if (!prev) return pin;
+          if (prev.label === pin.label && prev.type === pin.type) return prev;
+          return { ...prev, label: pin.label, type: pin.type };
+        };
+
+        const canonicalOutputs: Pin[] = [
+          want({ id: 'loop', label: 'loop', type: 'execution' }),
+          want({ id: 'done', label: 'done', type: 'execution' }),
+          want({ id: 'item', label: 'item', type: 'any' }),
+          want({ id: 'index', label: 'index', type: 'number' }),
+        ];
+
+        const extras = existingOutputs.filter((p) => !used.has(p.id));
+        data = { ...data, outputs: [...canonicalOutputs, ...extras] };
+      }
+
       // Backfill template pin documentation (tooltip text) for legacy flows.
       // This intentionally runs after all canonical ordering / pin insertion above.
       if (template) {

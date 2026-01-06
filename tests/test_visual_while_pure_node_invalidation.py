@@ -40,6 +40,7 @@ def test_while_invalidates_pure_nodes_inside_loop_body_so_index_dependent_logic_
                     "outputs": [
                         {"id": "loop", "label": "loop", "type": "execution"},
                         {"id": "done", "label": "done", "type": "execution"},
+                        {"id": "item", "label": "item", "type": "any"},
                         {"id": "index", "label": "index", "type": "number"},
                     ],
                 },
