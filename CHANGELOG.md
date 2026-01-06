@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2025-01-06
+
+### Added
+- **VisualFlow Interface System** (`abstractflow/visual/interfaces.py`): Declarative workflow interface markers for portable host validation, enabling workflows to be run as specialized capabilities with known IO contracts
+  - `abstractcode.agent.v1` interface: Host-configurable request → response contract for running a workflow as an AbstractCode agent
+  - Interface validation with required/recommended pin specifications
+  - Auto-scaffolding support: enabling `abstractcode.agent.v1` now auto-creates `On Flow Start` / `On Flow End` pins (provider/model/tools/request/response) without manual setup
+- **Structured Output Support**: Visual `LLM Call` and `Agent` nodes now accept optional `response_schema` input pin (JSON Schema object) for schema-conformant assistant responses via AbstractRuntime `LLM_CALL` payload
+  - New literal node `JSON Schema` (`json_schema`) to author schema objects and wire them into structured output pins
+  - Pin-driven schema overrides node config and enables durable structured-output enforcement
+- **JSON Validation & Error Handling**: Enhanced VisualFlow execution with robust JSON input validation and error handling (`abstractflow/visual/executor.py`, `web/frontend/src/utils/validation.ts`)
+- **UI Components**:
+  - New `JsonSchemaNodeEditor` component for authoring JSON schemas in the visual editor
+  - Enhanced `PropertiesPanel` with structured output configuration UI
+  - Improved `RunFlowModal` with better input validation and error display
+
 ### Notes
 - In this monorepo, `abstractflow` contains a working Flow compiler/runner and VisualFlow execution utilities. Packaging/docs alignment is tracked in `docs/backlog/planned/093-framework-packaging-alignment-flow-runtime.md`.
 
