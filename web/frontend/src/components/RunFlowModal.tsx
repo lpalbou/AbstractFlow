@@ -843,8 +843,9 @@ export function RunFlowModal({
 
   const shouldRenderMarkdown = useCallback(
     (nodeType?: string | null) => {
-      if (!nodeType) return false;
-      return nodeType === 'ask_user' || nodeType === 'answer_user' || nodeType === 'llm_call' || nodeType === 'agent';
+      const t = typeof nodeType === 'string' ? nodeType.trim() : '';
+      if (!t) return false;
+      return t === 'ask_user' || t === 'answer_user' || t === 'llm_call' || t === 'agent' || t === 'on_flow_end';
     },
     []
   );

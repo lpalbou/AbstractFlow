@@ -23,7 +23,8 @@ const KNOWN_INTERFACES: Array<{ id: string; label: string; description: string }
   {
     id: 'abstractcode.agent.v1',
     label: 'AbstractCode Agent (v1)',
-    description: "Allows running this workflow as an AbstractCode agent via `abstractcode --agent <flow>`.",
+    description:
+      "Allows running this workflow as an AbstractCode agent via `abstractcode --agent <flow>` (host-configurable provider/model/tools pins).",
   },
 ];
 
@@ -521,7 +522,19 @@ export function FlowLibraryModal({
                             On Flow Start: output pin <code>request</code> (string)
                           </div>
                           <div>
+                            On Flow Start: output pin <code>provider</code> (provider)
+                          </div>
+                          <div>
+                            On Flow Start: output pin <code>model</code> (model)
+                          </div>
+                          <div>
+                            On Flow Start: output pin <code>tools</code> (tools)
+                          </div>
+                          <div>
                             On Flow End: input pin <code>response</code> (string)
+                          </div>
+                          <div style={{ marginTop: 6 }}>
+                            <em>Tip:</em> When you enable this interface, the editor will auto-add the required pins.
                           </div>
                         </div>
                       </div>

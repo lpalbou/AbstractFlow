@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Memory nodes UX naming: `memory_note` is now labeled **Memorize** (was Remember) to align with AbstractCode `/memorize` and reduce ambiguity with span tagging.
 - Flow Library modal UX: flow name/description are now edited via inline edit icons (pencil) and the action row is simplified (removed `Rename` / `Edit Description` buttons).
+- Workflow-agent interface UX: enabling `abstractcode.agent.v1` now auto-scaffolds `On Flow Start` / `On Flow End` pins so workflows can be host-configured (provider/model/tools) without manual pin setup.
 - Run modal now shows a discreet, clickable **run id** pill (hover → click to copy to clipboard) for better observability/debugging.
 - Run modal UX: string inputs now default to a 3-line textarea, and modal actions are always pinned in the footer (the body scrolls).
 - Run modal observability no longer truncates sub-run (Agent) step previews or memory previews; full recalled content is displayed (loaded on demand).

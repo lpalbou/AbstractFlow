@@ -19,6 +19,9 @@ def test_visual_interface_abstractcode_agent_v1_validates() -> None:
                         "outputs": [
                             {"id": "exec-out", "label": "", "type": "execution"},
                             {"id": "request", "label": "request", "type": "string"},
+                            {"id": "provider", "label": "provider", "type": "provider"},
+                            {"id": "model", "label": "model", "type": "model"},
+                            {"id": "tools", "label": "tools", "type": "tools"},
                         ]
                     },
                 },
@@ -72,5 +75,8 @@ def test_visual_interface_abstractcode_agent_v1_missing_pins_errors() -> None:
 
     errors = validate_visual_flow_interface(vf, ABSTRACTCODE_AGENT_V1)
     assert any("On Flow Start must expose an output pin 'request'" in e for e in errors)
+    assert any("On Flow Start must expose an output pin 'provider'" in e for e in errors)
+    assert any("On Flow Start must expose an output pin 'model'" in e for e in errors)
+    assert any("On Flow Start must expose an output pin 'tools'" in e for e in errors)
     assert any("must expose an input pin 'response'" in e for e in errors)
 

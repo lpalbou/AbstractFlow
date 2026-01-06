@@ -29,6 +29,21 @@
             "id": "request",
             "label": "request",
             "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools"
           }
         ]
       },
@@ -46,6 +61,21 @@
           "id": "request",
           "label": "request",
           "type": "string"
+        },
+        {
+          "id": "provider",
+          "label": "provider",
+          "type": "provider"
+        },
+        {
+          "id": "model",
+          "label": "model",
+          "type": "model"
+        },
+        {
+          "id": "tools",
+          "label": "tools",
+          "type": "tools"
         }
       ]
     },
