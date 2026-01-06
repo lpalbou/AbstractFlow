@@ -133,3 +133,4 @@ def test_visual_llm_call_response_schema_wrapper_is_normalized() -> None:
     assert payload.get("response_schema") == schema
 
 
+

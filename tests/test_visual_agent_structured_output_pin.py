@@ -88,3 +88,4 @@ def test_agent_response_schema_pin_triggers_structured_output_postpass() -> None
     assert payload.get("response_schema_name") == "Agent_agent"
 
 
+
