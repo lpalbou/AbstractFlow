@@ -479,12 +479,23 @@ const DATA_NODES: NodeTemplate[] = [
     type: 'stringify_json',
     icon: '&#x1F4DD;', // Memo
     label: 'Stringify JSON',
-    description: 'Pretty-print a JSON value (object/array/scalar) into a string. Use indent <= 0 for compact output.',
+    description: 'Render a JSON value (object/array/scalar) into a string. Mode: none | beautify | minified.',
     headerColor: '#3498DB',
     inputs: [
-      { id: 'value', label: 'value', type: 'any', description: 'JSON value to stringify (object/array/scalar).' },
-      { id: 'indent', label: 'indent', type: 'number', description: 'Spaces per indent level. Default 2; <= 0 outputs compact JSON.' },
-      { id: 'sort_keys', label: 'sort_keys', type: 'boolean', description: 'Sort object keys for deterministic output. Default false.' },
+      { id: 'value', label: 'value', type: 'any', description: 'JSON value (or JSON-ish string) to stringify.' },
+      { id: 'mode', label: 'mode', type: 'string', description: 'Rendering mode: none | beautify | minified. Default beautify.' },
+    ],
+    outputs: [{ id: 'result', label: 'result', type: 'string' }],
+    category: 'data',
+  },
+  {
+    type: 'agent_trace_report',
+    icon: '&#x1F4CB;', // Clipboard
+    label: 'Agent Trace Report',
+    description: 'Render an agent scratchpad (runtime-owned node_traces) into a condensed Markdown report of actions and tool results.',
+    headerColor: '#3498DB',
+    inputs: [
+      { id: 'scratchpad', label: 'scratchpad', type: 'object', description: 'Agent scratchpad object (typically contains node_traces).' },
     ],
     outputs: [{ id: 'result', label: 'result', type: 'string' }],
     category: 'data',

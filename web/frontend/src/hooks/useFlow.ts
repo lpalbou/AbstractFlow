@@ -937,6 +937,60 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         data = { ...data, pinDefaults: nextDefaults, inputs: [...canonicalInputs, ...extras] };
       }
 
+      // Canonical ordering for JSON render nodes.
+      // Backward-compat: older flows may have `indent`/`sort_keys` pins; ensure `mode` exists so the inline dropdown is available.
+      if (data.nodeType === 'stringify_json') {
+        const existingInputs = Array.isArray(data.inputs) ? data.inputs : [];
+        const byId = new Map(existingInputs.map((p) => [p.id, p] as const));
+        const used = new Set<string>();
+
+        const want = (pin: Pin): Pin => {
+          const prev = byId.get(pin.id);
+          used.add(pin.id);
+          if (!prev) return pin;
+          if (prev.label === pin.label && prev.type === pin.type) return prev;
+          return { ...prev, label: pin.label, type: pin.type };
+        };
+
+        const canonicalInputs: Pin[] = [
+          want({ id: 'value', label: 'value', type: 'any' }),
+          want({ id: 'mode', label: 'mode', type: 'string' }),
+        ];
+
+        const extras = existingInputs.filter((p) => !used.has(p.id));
+
+        const existingOutputs = Array.isArray(data.outputs) ? data.outputs : [];
+        const outById = new Map(existingOutputs.map((p) => [p.id, p] as const));
+        const usedOut = new Set<string>();
+        const wantOut = (pin: Pin): Pin => {
+          const prev = outById.get(pin.id);
+          usedOut.add(pin.id);
+          if (!prev) return pin;
+          if (prev.label === pin.label && prev.type === pin.type) return prev;
+          return { ...prev, label: pin.label, type: pin.type };
+        };
+        const canonicalOutputs: Pin[] = [wantOut({ id: 'result', label: 'result', type: 'string' })];
+        const extraOutputs = existingOutputs.filter((p) => !usedOut.has(p.id));
+
+        const nextDefaults = (() => {
+          const prev = data.pinDefaults;
+          if (!prev || typeof prev !== 'object') return prev;
+          const anyPrev = prev as any;
+          if (typeof anyPrev.mode === 'string' && anyPrev.mode.trim()) return prev;
+          const rawIndent = anyPrev.indent;
+          const indent = typeof rawIndent === 'number' ? rawIndent : Number.isFinite(Number(rawIndent)) ? Number(rawIndent) : null;
+          if (indent === null) return prev;
+          return { ...anyPrev, mode: indent <= 0 ? 'minified' : 'beautify' };
+        })();
+
+        data = {
+          ...data,
+          pinDefaults: nextDefaults,
+          inputs: [...canonicalInputs, ...extras],
+          outputs: [...canonicalOutputs, ...extraOutputs],
+        };
+      }
+
       // Normalize Switch nodes: execution outputs only (cases + default).
       if (data.nodeType === 'switch') {
         const existingExecPins = data.outputs.filter((p) => p.type === 'execution');

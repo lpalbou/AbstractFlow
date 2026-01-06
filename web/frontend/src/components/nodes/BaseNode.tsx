@@ -862,6 +862,7 @@ export const BaseNode = memo(function BaseNode({
   const isParallelLike = data.nodeType === 'parallel';
   const isSwitchNode = data.nodeType === 'switch';
   const isCompareNode = data.nodeType === 'compare';
+  const isStringifyJsonNode = data.nodeType === 'stringify_json';
   const isConcatNode = data.nodeType === 'concat';
   const isArrayConcatNode = data.nodeType === 'array_concat';
   const isMakeArrayNode = data.nodeType === 'make_array';
@@ -1370,6 +1371,7 @@ export const BaseNode = memo(function BaseNode({
                 const isOnScheduleRecurrentPin = isOnScheduleNode && pin.id === 'recurrent';
                 const isWriteFileContentPin = isWriteFileNode && pin.id === 'content';
                 const isCompareOpPin = isCompareNode && pin.id === 'op';
+                const isStringifyJsonModePin = isStringifyJsonNode && pin.id === 'mode';
                 const isMemoryScopePin = (isMemoryNoteNode || isMemoryQueryNode) && pin.id === 'scope';
                 const isMemoryTagsModePin = isMemoryQueryNode && pin.id === 'tags_mode';
                 const isMemoryPlacementPin = isMemoryRehydrateNode && pin.id === 'placement';
@@ -1379,6 +1381,7 @@ export const BaseNode = memo(function BaseNode({
                   ((isAgentNode || isLlmNode) && pin.id === 'tools') ||
                   (isVarNode && pin.id === 'name') ||
                   isCompareOpPin ||
+                  isStringifyJsonModePin ||
                   isEmitEventName ||
                   isEmitEventScopePin ||
                   isOnEventScopePin ||
@@ -1530,6 +1533,28 @@ export const BaseNode = memo(function BaseNode({
                       searchable={false}
                       minPopoverWidth={120}
                       onChange={(v) => setPinDefault('op', (v || '==') as any)}
+                    />
+                  );
+                }
+
+                if (isStringifyJsonModePin && !connected) {
+                  const raw = pinDefaults.mode;
+                  const current =
+                    typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : 'beautify';
+                  controls.push(
+                    <AfSelect
+                      key="stringify-json-mode"
+                      variant="pin"
+                      value={current}
+                      placeholder="beautify"
+                      options={[
+                        { value: 'none', label: 'none' },
+                        { value: 'beautify', label: 'beautify' },
+                        { value: 'minified', label: 'minified' },
+                      ]}
+                      searchable={false}
+                      minPopoverWidth={180}
+                      onChange={(v) => setPinDefault('mode', (v || 'beautify') as any)}
                     />
                   );
                 }

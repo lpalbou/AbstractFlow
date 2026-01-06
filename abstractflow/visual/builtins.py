@@ -13,6 +13,9 @@ import locale
 import os
 from typing import Any, Callable, Dict, List, Optional
 
+from abstractruntime.rendering import render_agent_trace_markdown as runtime_render_agent_trace_markdown
+from abstractruntime.rendering import stringify_json as runtime_stringify_json
+
 
 def get_builtin_handler(node_type: str) -> Optional[Callable[[Any], Any]]:
     """Get a built-in handler function for a node type."""
@@ -623,45 +626,55 @@ def data_parse_json(inputs: Dict[str, Any]) -> Any:
 
 
 def data_stringify_json(inputs: Dict[str, Any]) -> str:
-    """Stringify a JSON-like value into a pretty JSON string.
+    """Render a JSON-like value into a string (runtime-owned implementation).
 
-    Primary use-case: render objects/arrays as readable text for prompts, logs, or UI.
+    The core stringify logic lives in AbstractRuntime so multiple hosts can reuse it.
 
-    Inputs:
-    - value: any JSON-like value (dict/list/scalar). Missing => None (=> "null").
-    - indent: number of spaces to indent (default 2). If <= 0, output is compact (single line).
-    - sort_keys: when true, sort object keys for deterministic output (default False).
-
-    Notes:
-    - Uses ensure_ascii=False so unicode stays human-readable.
-    - Best-effort converts tuples to lists and unknown objects to strings recursively.
+    Supported inputs (backward compatible):
+    - `value`: JSON value (dict/list/scalar) OR a JSON-ish string.
+    - `mode`: none | beautify | minified
+    - Legacy: `indent` (<=0 => minified; >0 => beautify with that indent)
+    - Legacy: `sort_keys` (bool)
     """
 
-    def _jsonify(value: Any) -> Any:
-        if value is None or isinstance(value, (bool, int, float, str)):
-            return value
-        if isinstance(value, dict):
-            return {str(k): _jsonify(v) for k, v in value.items()}
-        if isinstance(value, list):
-            return [_jsonify(v) for v in value]
-        if isinstance(value, tuple):
-            return [_jsonify(v) for v in value]
-        return str(value)
+    value = inputs.get("value")
 
-    value = _jsonify(inputs.get("value"))
+    raw_mode = inputs.get("mode")
+    mode = str(raw_mode).strip().lower() if isinstance(raw_mode, str) else ""
 
-    raw_indent = inputs.get("indent", 2)
-    indent_n: int
-    try:
-        indent_n = int(raw_indent)
-    except Exception:
-        indent_n = 2
+    raw_indent = inputs.get("indent")
+    indent_n: Optional[int] = None
+    if raw_indent is not None:
+        try:
+            indent_n = int(raw_indent)
+        except Exception:
+            indent_n = None
 
-    sort_keys = bool(inputs.get("sort_keys", False))
+    raw_sort_keys = inputs.get("sort_keys")
+    sort_keys = bool(raw_sort_keys) if isinstance(raw_sort_keys, bool) else False
 
-    if indent_n <= 0:
-        return json.dumps(value, ensure_ascii=False, sort_keys=sort_keys, separators=(",", ":"))
-    return json.dumps(value, ensure_ascii=False, sort_keys=sort_keys, indent=indent_n)
+    # If mode not provided, infer from legacy indent.
+    if not mode:
+        if indent_n is not None and indent_n <= 0:
+            mode = "minified"
+        elif indent_n is not None and indent_n > 0:
+            mode = "beautify"
+        else:
+            mode = "beautify"
+
+    return runtime_stringify_json(
+        value,
+        mode=mode,
+        beautify_indent=indent_n if isinstance(indent_n, int) and indent_n > 0 else 2,
+        sort_keys=sort_keys,
+        parse_strings=True,
+    )
+
+
+def data_agent_trace_report(inputs: Dict[str, Any]) -> str:
+    """Render an agent scratchpad (runtime-owned node traces) into Markdown."""
+    scratchpad = inputs.get("scratchpad")
+    return runtime_render_agent_trace_markdown(scratchpad)
 
 
 # Literal value handlers - return configured constant values
@@ -763,6 +776,7 @@ BUILTIN_HANDLERS: Dict[str, Callable[[Dict[str, Any]], Any]] = {
     "array_dedup": data_array_dedup,
     "parse_json": data_parse_json,
     "stringify_json": data_stringify_json,
+    "agent_trace_report": data_agent_trace_report,
     "system_datetime": system_datetime,
     # Literals
     "literal_string": literal_string,
