@@ -1,7 +1,7 @@
 {
   "id": "acagent_ask_demo",
   "name": "AbstractCode Agent Ask Demo",
-  "description": "Demonstrates workflow-driven ask+wait using WAIT_EVENT with a prompt (WaitReason.EVENT) and resumption via AbstractCode.",
+  "description": "Demonstrates workflow-driven ask+wait using WAIT_EVENT (WaitReason.EVENT) with prompt metadata (choices + allow_free_text) and resumption via AbstractCode.",
   "interfaces": [
     "abstractcode.agent.v1"
   ],
@@ -120,6 +120,66 @@
       "outputs": []
     },
     {
+      "id": "choices_list",
+      "type": "literal_json",
+      "position": {
+        "x": -640.0,
+        "y": 128.0
+      },
+      "data": {
+        "nodeType": "literal_json",
+        "label": "choices",
+        "icon": "{}",
+        "headerColor": "#00FFFF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "literalValue": [
+          "Red",
+          "Green",
+          "Blue"
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "allow_free_text",
+      "type": "literal_boolean",
+      "position": {
+        "x": -640.0,
+        "y": 208.0
+      },
+      "data": {
+        "nodeType": "literal_boolean",
+        "label": "allow_free_text",
+        "icon": "&#x2713;",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "boolean"
+          }
+        ],
+        "literalValue": false
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
       "id": "wait_ask",
       "type": "wait_event",
       "position": {
@@ -146,6 +206,16 @@
             "id": "prompt",
             "label": "prompt",
             "type": "string"
+          },
+          {
+            "id": "choices",
+            "label": "choices",
+            "type": "array"
+          },
+          {
+            "id": "allow_free_text",
+            "label": "allow_free_text",
+            "type": "boolean"
           }
         ],
         "outputs": [
@@ -478,6 +548,22 @@
       "sourceHandle": "value",
       "target": "wait_ask",
       "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "edge-choices-wait",
+      "source": "choices_list",
+      "sourceHandle": "value",
+      "target": "wait_ask",
+      "targetHandle": "choices",
+      "animated": false
+    },
+    {
+      "id": "edge-allow-free-text-wait",
+      "source": "allow_free_text",
+      "sourceHandle": "value",
+      "target": "wait_ask",
+      "targetHandle": "allow_free_text",
       "animated": false
     },
     {

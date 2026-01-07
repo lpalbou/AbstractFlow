@@ -1,7 +1,7 @@
 {
   "id": "acagent_tool_events_demo",
   "name": "AbstractCode Agent Tool Events Demo",
-  "description": "Demonstrates workflow-driven tool execution/result UX via Emit Event(name='abstractcode.tool_execution') and Emit Event(name='abstractcode.tool_result') with a short Delay between them.",
+  "description": "Demonstrates workflow-driven tool execution/result UX via `abstractcode.tool_execution` + `abstractcode.tool_result` using simplified wiring: LLM Call.tool_calls → Emit/Tool Calls, then Tool Calls.results → Emit (no Break Object needed).",
   "interfaces": [
     "abstractcode.agent.v1"
   ],
@@ -68,7 +68,7 @@
       "type": "literal_string",
       "position": {
         "x": -640.0,
-        "y": -48.0
+        "y": 96.0
       },
       "data": {
         "nodeType": "literal_string",
@@ -95,8 +95,8 @@
       "id": "name_exec",
       "type": "literal_string",
       "position": {
-        "x": -640.0,
-        "y": 32.0
+        "x": -336.0,
+        "y": 384.0
       },
       "data": {
         "nodeType": "literal_string",
@@ -123,8 +123,8 @@
       "id": "name_result",
       "type": "literal_string",
       "position": {
-        "x": -640.0,
-        "y": 112.0
+        "x": 336.0,
+        "y": 384.0
       },
       "data": {
         "nodeType": "literal_string",
@@ -148,32 +148,26 @@
       "outputs": []
     },
     {
-      "id": "payload_exec",
-      "type": "literal_json",
+      "id": "prompt_text",
+      "type": "literal_string",
       "position": {
         "x": -640.0,
-        "y": 192.0
+        "y": 224.0
       },
       "data": {
-        "nodeType": "literal_json",
-        "label": "tool_execution payload",
-        "icon": "{}",
-        "headerColor": "#00FFFF",
+        "nodeType": "literal_string",
+        "label": "prompt",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
         "inputs": [],
         "outputs": [
           {
             "id": "value",
             "label": "value",
-            "type": "any"
+            "type": "string"
           }
         ],
-        "literalValue": {
-          "tool": "read_file",
-          "call_id": "demo_call_1",
-          "arguments": {
-            "target_file": "docs/architecture.md"
-          }
-        }
+        "literalValue": "You MUST request tool calls only (no prose). First call read_file on docs/ui_events.md, then read_file on docs/backlog/README.md."
       },
       "label": null,
       "icon": null,
@@ -182,31 +176,149 @@
       "outputs": []
     },
     {
-      "id": "payload_result",
-      "type": "literal_json",
+      "id": "llm_1",
+      "type": "llm_call",
       "position": {
-        "x": -640.0,
-        "y": 272.0
+        "x": -320.0,
+        "y": -144.0
       },
       "data": {
-        "nodeType": "literal_json",
-        "label": "tool_result payload",
-        "icon": "{}",
-        "headerColor": "#00FFFF",
-        "inputs": [],
-        "outputs": [
+        "nodeType": "llm_call",
+        "label": "LLM Call (request tools)",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
           {
-            "id": "value",
-            "label": "value",
-            "type": "any"
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "include_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider",
+            "description": "LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model",
+            "description": "LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string",
+            "description": "Optional system prompt for this single call."
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string",
+            "description": "User prompt/content for this single call."
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools",
+            "description": "Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node)."
+          },
+          {
+            "id": "response_schema",
+            "label": "structured_output",
+            "type": "object",
+            "description": "Optional JSON Schema object (type=object) the assistant content must conform to."
           }
         ],
-        "literalValue": {
-          "tool": "read_file",
-          "call_id": "demo_call_1",
-          "success": true,
-          "output": "(demo) Tool result payload. In a real flow, emit the actual tool output here."
-        }
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string",
+            "description": "Assistant text content (best-effort). For tool calls, content may be empty."
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array",
+            "description": "Normalized tool call requests (same as result.tool_calls)."
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object",
+            "description": "Full normalized LLM result (content, tool_calls, usage, provider/model metadata, trace_id)."
+          }
+        ],
+        "pinDefaults": {}
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "tool_calls_1",
+      "type": "tool_calls",
+      "position": {
+        "x": 96.0,
+        "y": 192.0
+      },
+      "data": {
+        "nodeType": "tool_calls",
+        "label": "Tool Calls",
+        "icon": "&#x1F528;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array",
+            "description": "List of tool call requests (or a single call). Typical shape: {name, arguments, call_id?}. Often comes from LLM Call.result.tool_calls."
+          },
+          {
+            "id": "allowed_tools",
+            "label": "allowed_tools",
+            "type": "array",
+            "description": "Optional allowlist of tool names enforced by the runtime effect handler (empty list => allow none). If not connected, the node config (if any) is used."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "results",
+            "label": "results",
+            "type": "array",
+            "description": "Per-call results in input order (each entry includes output/error metadata). Use this for debugging or to feed structured tool outputs into the graph."
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean",
+            "description": "True if all tool calls succeeded (no per-call error)."
+          }
+        ]
       },
       "label": null,
       "icon": null,
@@ -234,7 +346,7 @@
             "type": "number"
           }
         ],
-        "literalValue": 2
+        "literalValue": 0.5
       },
       "label": null,
       "icon": null,
@@ -246,7 +358,7 @@
       "id": "emit_exec",
       "type": "emit_event",
       "position": {
-        "x": -320.0,
+        "x": -336.0,
         "y": 192.0
       },
       "data": {
@@ -357,8 +469,8 @@
       "id": "emit_result",
       "type": "emit_event",
       "position": {
-        "x": 80.0,
-        "y": 272.0
+        "x": 336.0,
+        "y": 192.0
       },
       "data": {
         "nodeType": "emit_event",
@@ -479,6 +591,14 @@
       "id": "edge-start-emitexec-exec",
       "source": "start",
       "sourceHandle": "exec-out",
+      "target": "llm_1",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-llm-emitexec-exec",
+      "source": "llm_1",
+      "sourceHandle": "exec-out",
       "target": "emit_exec",
       "targetHandle": "exec-in",
       "animated": true
@@ -494,6 +614,14 @@
     {
       "id": "edge-delay-emitresult-exec",
       "source": "delay_1",
+      "sourceHandle": "exec-out",
+      "target": "tool_calls_1",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-toolcalls-emitresult-exec",
+      "source": "tool_calls_1",
       "sourceHandle": "exec-out",
       "target": "emit_result",
       "targetHandle": "exec-in",
@@ -541,18 +669,66 @@
     },
     {
       "id": "edge-payload-exec-emitexec",
-      "source": "payload_exec",
-      "sourceHandle": "value",
+      "source": "llm_1",
+      "sourceHandle": "tool_calls",
       "target": "emit_exec",
       "targetHandle": "payload",
       "animated": false
     },
     {
       "id": "edge-payload-result-emitresult",
-      "source": "payload_result",
-      "sourceHandle": "value",
+      "source": "tool_calls_1",
+      "sourceHandle": "results",
       "target": "emit_result",
       "targetHandle": "payload",
+      "animated": false
+    },
+    {
+      "id": "edge-prompt-llm",
+      "source": "prompt_text",
+      "sourceHandle": "value",
+      "target": "llm_1",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "edge-start-provider-llm",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "llm_1",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-start-model-llm",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "llm_1",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-start-tools-llm",
+      "source": "start",
+      "sourceHandle": "tools",
+      "target": "llm_1",
+      "targetHandle": "tools",
+      "animated": false
+    },
+    {
+      "id": "edge-llm-toolcalls-toolcalls",
+      "source": "llm_1",
+      "sourceHandle": "tool_calls",
+      "target": "tool_calls_1",
+      "targetHandle": "tool_calls",
+      "animated": false
+    },
+    {
+      "id": "edge-start-tools-allowed-toolcalls",
+      "source": "start",
+      "sourceHandle": "tools",
+      "target": "tool_calls_1",
+      "targetHandle": "allowed_tools",
       "animated": false
     },
     {
@@ -574,7 +750,5 @@
   ],
   "entryNode": "start",
   "created_at": null,
-  "updated_at": "2026-01-07T00:00:00.000000"
+  "updated_at": "2026-01-07T07:02:54.627800"
 }
-
-

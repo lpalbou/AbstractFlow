@@ -121,28 +121,25 @@
     },
     {
       "id": "payload_1",
-      "type": "literal_json",
+      "type": "literal_string",
       "position": {
         "x": -640.0,
         "y": 112.0
       },
       "data": {
-        "nodeType": "literal_json",
+        "nodeType": "literal_string",
         "label": "Message 1",
-        "icon": "{}",
-        "headerColor": "#00FFFF",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
         "inputs": [],
         "outputs": [
           {
             "id": "value",
             "label": "value",
-            "type": "any"
+            "type": "string"
           }
         ],
-        "literalValue": {
-          "text": "Hello from workflow",
-          "level": "info"
-        }
+        "literalValue": "Hello from workflow"
       },
       "label": null,
       "icon": null,
@@ -541,7 +538,5 @@
   ],
   "entryNode": "start",
   "created_at": null,
-  "updated_at": "2026-01-07T00:00:00.000000"
+  "updated_at": "2026-01-07T07:12:11.009505"
 }
-
-

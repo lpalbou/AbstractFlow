@@ -121,25 +121,28 @@
     },
     {
       "id": "payload_1",
-      "type": "literal_string",
+      "type": "literal_json",
       "position": {
-        "x": -640.0,
+        "x": -848.0,
         "y": 0.0
       },
       "data": {
-        "nodeType": "literal_string",
+        "nodeType": "literal_json",
         "label": "State1",
-        "icon": "\"",
-        "headerColor": "#FF00FF",
+        "icon": "{}",
+        "headerColor": "#00FFFF",
         "inputs": [],
         "outputs": [
           {
             "id": "value",
             "label": "value",
-            "type": "string"
+            "type": "object"
           }
         ],
-        "literalValue": "Enrich Query..."
+        "literalValue": {
+          "text": "Enrich Query...",
+          "duration": -1
+        }
       },
       "label": null,
       "icon": null,
@@ -180,25 +183,28 @@
     },
     {
       "id": "payload_3",
-      "type": "literal_string",
+      "type": "literal_json",
       "position": {
         "x": -640.0,
         "y": 160.0
       },
       "data": {
-        "nodeType": "literal_string",
+        "nodeType": "literal_json",
         "label": "State3",
-        "icon": "\"",
-        "headerColor": "#FF00FF",
+        "icon": "{}",
+        "headerColor": "#00FFFF",
         "inputs": [],
         "outputs": [
           {
             "id": "value",
             "label": "value",
-            "type": "string"
+            "type": "object"
           }
         ],
-        "literalValue": "Recursive Answer..."
+        "literalValue": {
+          "text": "Recursive Answer...",
+          "duration": -1
+        }
       },
       "label": null,
       "icon": null,
@@ -613,6 +619,34 @@
       "headerColor": null,
       "inputs": [],
       "outputs": []
+    },
+    {
+      "id": "node-1",
+      "type": "literal_string",
+      "position": {
+        "x": -640.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "STATE1 (string)",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "GENIUS !!!"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
     }
   ],
   "edges": [
@@ -721,14 +755,6 @@
       "animated": false
     },
     {
-      "id": "edge-payload1-emit1",
-      "source": "payload_1",
-      "sourceHandle": "value",
-      "target": "emit_1",
-      "targetHandle": "payload",
-      "animated": false
-    },
-    {
       "id": "edge-payload2-emit2",
       "source": "payload_2",
       "sourceHandle": "value",
@@ -775,9 +801,17 @@
       "target": "end",
       "targetHandle": "response",
       "animated": false
+    },
+    {
+      "id": "edge-1767769796486",
+      "source": "node-1",
+      "sourceHandle": "value",
+      "target": "emit_1",
+      "targetHandle": "payload",
+      "animated": false
     }
   ],
   "entryNode": "start",
   "created_at": null,
-  "updated_at": "2026-01-06T18:30:47.543689"
+  "updated_at": "2026-01-07T07:10:27.199350"
 }
