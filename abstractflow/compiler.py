@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 from .core.flow import Flow
 from .adapters.function_adapter import create_function_node_handler
@@ -336,6 +336,42 @@ def _create_visual_agent_effect_handler(
         out.sort(key=lambda s: str(s.get("ts") or ""))
         return out
 
+    def _as_dict_list(value: Any) -> list[Dict[str, Any]]:
+        if value is None:
+            return []
+        if isinstance(value, dict):
+            return [dict(value)]
+        if isinstance(value, list):
+            out: list[Dict[str, Any]] = []
+            for x in value:
+                if isinstance(x, dict):
+                    out.append(dict(x))
+            return out
+        return []
+
+    def _extract_tool_activity_from_steps(steps: Any) -> tuple[list[Dict[str, Any]], list[Dict[str, Any]]]:
+        """Best-effort tool call/result extraction from flattened scratchpad steps."""
+        if not isinstance(steps, list):
+            return [], []
+        tool_calls: list[Dict[str, Any]] = []
+        tool_results: list[Dict[str, Any]] = []
+        for entry_any in steps:
+            entry = entry_any if isinstance(entry_any, dict) else None
+            if entry is None:
+                continue
+            effect = entry.get("effect")
+            if not isinstance(effect, dict) or str(effect.get("type") or "") != "tool_calls":
+                continue
+            payload = effect.get("payload")
+            payload_d = payload if isinstance(payload, dict) else {}
+            tool_calls.extend(_as_dict_list(payload_d.get("tool_calls")))
+
+            result = entry.get("result")
+            if not isinstance(result, dict):
+                continue
+            tool_results.extend(_as_dict_list(result.get("results")))
+        return tool_calls, tool_results
+
     def _build_sub_vars(
         run: Any,
         *,
@@ -539,7 +575,12 @@ def _create_visual_agent_effect_handler(
                 }
                 _set_nested(run.vars, f"_temp.effects.{node_id}", out)
                 bucket["phase"] = "done"
-                flow._node_outputs[node_id] = {"result": out, "scratchpad": {"node_id": node_id, "steps": []}}
+                flow._node_outputs[node_id] = {
+                    "result": out,
+                    "scratchpad": {"node_id": node_id, "steps": []},
+                    "tool_calls": [],
+                    "tool_results": [],
+                }
                 run.vars["_last_output"] = {"result": out}
                 if next_node:
                     return StepPlan(node_id=node_id, next_node=next_node)
@@ -604,6 +645,7 @@ def _create_visual_agent_effect_handler(
                 "steps": _flatten_node_traces(node_traces),
             }
             bucket["scratchpad"] = scratchpad
+            tc, tr = _extract_tool_activity_from_steps(scratchpad.get("steps"))
 
             result_obj = {
                 "result": answer,
@@ -648,7 +690,7 @@ def _create_visual_agent_effect_handler(
 
             _set_nested(run.vars, f"_temp.effects.{node_id}", result_obj)
             bucket["phase"] = "done"
-            flow._node_outputs[node_id] = {"result": result_obj, "scratchpad": scratchpad}
+            flow._node_outputs[node_id] = {"result": result_obj, "scratchpad": scratchpad, "tool_calls": tc, "tool_results": tr}
             run.vars["_last_output"] = {"result": result_obj}
             if next_node:
                 return StepPlan(node_id=node_id, next_node=next_node)
@@ -678,7 +720,8 @@ def _create_visual_agent_effect_handler(
             scratchpad = bucket.get("scratchpad")
             if not isinstance(scratchpad, dict):
                 scratchpad = {"node_id": node_id, "steps": []}
-            flow._node_outputs[node_id] = {"result": data, "scratchpad": scratchpad}
+            tc, tr = _extract_tool_activity_from_steps(scratchpad.get("steps"))
+            flow._node_outputs[node_id] = {"result": data, "scratchpad": scratchpad, "tool_calls": tc, "tool_results": tr}
             run.vars["_last_output"] = {"result": data}
             if next_node:
                 return StepPlan(node_id=node_id, next_node=next_node)
@@ -888,6 +931,76 @@ def _sync_effect_results_to_node_outputs(run: Any, flow: Flow) -> None:
             return span_id.strip()
         return None
 
+    def _as_dict_list(value: Any) -> List[Dict[str, Any]]:
+        """Normalize a value into a list of dicts (best-effort, JSON-safe)."""
+        if value is None:
+            return []
+        if isinstance(value, dict):
+            return [dict(value)]
+        if isinstance(value, list):
+            out: List[Dict[str, Any]] = []
+            for x in value:
+                if isinstance(x, dict):
+                    out.append(dict(x))
+            return out
+        return []
+
+    def _extract_agent_tool_activity(scratchpad: Any) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        """Extract tool call requests and tool results from an agent scratchpad.
+
+        This is *post-run* ergonomics: it does not provide real-time streaming while the agent runs.
+        For real-time tool observability, hosts should subscribe to the ledger and/or node_traces.
+        """
+        sp = scratchpad if isinstance(scratchpad, dict) else None
+        if sp is None:
+            return [], []
+
+        node_traces = sp.get("node_traces")
+        if not isinstance(node_traces, dict):
+            # Allow passing a single node trace directly.
+            if isinstance(sp.get("steps"), list) and sp.get("node_id") is not None:
+                node_traces = {str(sp.get("node_id")): sp}
+            else:
+                return [], []
+
+        # Flatten steps across nodes and sort by timestamp (ISO strings are lexicographically sortable).
+        steps: List[Tuple[str, Dict[str, Any]]] = []
+        for _nid, trace_any in node_traces.items():
+            trace = trace_any if isinstance(trace_any, dict) else None
+            if trace is None:
+                continue
+            entries = trace.get("steps")
+            if not isinstance(entries, list):
+                continue
+            for entry_any in entries:
+                entry = entry_any if isinstance(entry_any, dict) else None
+                if entry is None:
+                    continue
+                ts = entry.get("ts")
+                ts_s = ts if isinstance(ts, str) else ""
+                steps.append((ts_s, entry))
+        steps.sort(key=lambda x: x[0])
+
+        tool_calls: List[Dict[str, Any]] = []
+        tool_results: List[Dict[str, Any]] = []
+        for _ts, entry in steps:
+            effect = entry.get("effect")
+            if not isinstance(effect, dict):
+                continue
+            if str(effect.get("type") or "") != "tool_calls":
+                continue
+            payload = effect.get("payload")
+            payload_d = payload if isinstance(payload, dict) else {}
+            tool_calls.extend(_as_dict_list(payload_d.get("tool_calls")))
+
+            result = entry.get("result")
+            if not isinstance(result, dict):
+                continue
+            results = result.get("results")
+            tool_results.extend(_as_dict_list(results))
+
+        return tool_calls, tool_results
+
     for node_id, flow_node in flow.nodes.items():
         effect_type = flow_node.effect_type
         if not effect_type:
@@ -928,6 +1041,9 @@ def _sync_effect_results_to_node_outputs(run: Any, flow: Flow) -> None:
         elif effect_type == "llm_call":
             if isinstance(raw, dict):
                 current["response"] = raw.get("content")
+                # Convenience pin: expose tool_calls directly, instead of forcing consumers
+                # to drill into `result.tool_calls` via a Break Object node.
+                current["tool_calls"] = _as_dict_list(raw.get("tool_calls"))
                 # Expose the full normalized LLM result as an object output pin (`result`).
                 # This enables deterministic state-machine workflows to branch on:
                 # - tool_calls
@@ -974,6 +1090,11 @@ def _sync_effect_results_to_node_outputs(run: Any, flow: Flow) -> None:
                     scratchpad = _get_node_trace(run.vars, node_id)
 
             current["scratchpad"] = scratchpad if scratchpad is not None else {"node_id": node_id, "steps": []}
+            # Convenience pins: expose tool activity extracted from the scratchpad trace.
+            # This is intentionally best-effort and does not change agent execution behavior.
+            tc, tr = _extract_agent_tool_activity(current.get("scratchpad"))
+            current["tool_calls"] = tc
+            current["tool_results"] = tr
             mapped_value = raw
         elif effect_type == "wait_event":
             current["event_data"] = raw

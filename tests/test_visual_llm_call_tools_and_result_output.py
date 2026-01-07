@@ -132,6 +132,7 @@ def test_visual_llm_call_node_outputs_include_result_object_after_effect_complet
     out = getattr(flow, "_node_outputs", {}).get("n2")
     assert isinstance(out, dict)
     assert out.get("response") == "pong"
+    assert out.get("tool_calls") == raw_result.get("tool_calls")
     assert out.get("result") == raw_result
     assert out.get("gen_time") == 12.3
     assert out.get("ttft_ms") == 4.5

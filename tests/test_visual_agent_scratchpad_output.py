@@ -158,3 +158,12 @@ def test_visual_agent_exposes_runtime_backed_scratchpad_output() -> None:
         isinstance(step, dict) and isinstance(step.get("effect"), dict) and step["effect"].get("type") == "tool_calls"
         for step in steps
     )
+
+    # Convenience pins: tool activity extracted from scratchpad (post-run).
+    tool_calls = node_output.get("tool_calls")
+    assert isinstance(tool_calls, list)
+    assert any(isinstance(tc, dict) and tc.get("name") == "execute_command" for tc in tool_calls)
+
+    tool_results = node_output.get("tool_results")
+    assert isinstance(tool_results, list)
+    assert any(isinstance(tr, dict) and tr.get("name") == "execute_command" and tr.get("success") is True for tr in tool_results)

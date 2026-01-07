@@ -235,6 +235,20 @@ const CORE_NODES: NodeTemplate[] = [
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
       { id: 'result', label: 'result', type: 'object', description: 'Structured final agent result (answer + metadata/tool calls depending on agent).' },
+      {
+        id: 'tool_calls',
+        label: 'tool_calls',
+        type: 'array',
+        description:
+          'Best-effort list of tool call requests extracted from the agent scratchpad trace (post-run). For real-time tool observability, subscribe to the ledger/node_traces stream.',
+      },
+      {
+        id: 'tool_results',
+        label: 'tool_results',
+        type: 'array',
+        description:
+          'Best-effort list of tool results extracted from the agent scratchpad trace (post-run). For real-time tool observability, subscribe to the ledger/node_traces stream.',
+      },
       { id: 'scratchpad', label: 'scratchpad', type: 'object', description: 'Runtime-owned execution trace/scratchpad for observability (LLM/tool steps, timings).' },
     ],
     category: 'core',
@@ -264,6 +278,13 @@ const CORE_NODES: NodeTemplate[] = [
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
       { id: 'response', label: 'response', type: 'string', description: 'Assistant text content (best-effort). For tool calls, content may be empty.' },
+      {
+        id: 'tool_calls',
+        label: 'tool_calls',
+        type: 'array',
+        description:
+          'Normalized tool call requests (same as result.tool_calls). This pin exists to make wiring into Tool Calls / Emit Event nodes simpler.',
+      },
       { id: 'result', label: 'result', type: 'object', description: 'Full normalized LLM result (content, tool_calls, usage, provider/model metadata, trace_id).' },
     ],
     category: 'core',

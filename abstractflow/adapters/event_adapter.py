@@ -269,6 +269,8 @@ def create_emit_event_node_handler(
         elif payload is None:
             payload_dict = {}
         else:
+            # Event payloads are stored durably and delivered over the network.
+            # We normalize non-dict values under {"value": ...} for a stable shape.
             payload_dict = {"value": payload}
 
         target_session_id = resolved.get("session_id")

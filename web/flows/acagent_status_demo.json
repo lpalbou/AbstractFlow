@@ -1,7 +1,7 @@
 {
   "id": "acagent_status_demo",
   "name": "AbstractCode Agent Status Demo",
-  "description": "Demonstrates workflow-driven AbstractCode footer updates via Emit Event(name='abstractcode.status') with 3 phases separated by 2s Delay nodes.",
+  "description": "Demonstrates workflow-driven AbstractCode footer updates via Emit Event(name='abstractcode.status') with 3 phases separated by 2s Delay nodes. Phase 2 uses a duration to auto-clear the status after 2s.",
   "interfaces": [
     "abstractcode.agent.v1"
   ],
@@ -149,13 +149,13 @@
     },
     {
       "id": "payload_2",
-      "type": "literal_string",
+      "type": "literal_json",
       "position": {
         "x": -640.0,
         "y": 80.0
       },
       "data": {
-        "nodeType": "literal_string",
+        "nodeType": "literal_json",
         "label": "State2",
         "icon": "\"",
         "headerColor": "#FF00FF",
@@ -164,10 +164,13 @@
           {
             "id": "value",
             "label": "value",
-            "type": "string"
+            "type": "object"
           }
         ],
-        "literalValue": "Plan Tasks..."
+        "literalValue": {
+          "text": "Plan Tasks...",
+          "duration": 2
+        }
       },
       "label": null,
       "icon": null,

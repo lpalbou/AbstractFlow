@@ -91,6 +91,10 @@ This wires:
 - `EffectType.LLM_CALL` via an AbstractCore-backed LLM client
 - `EffectType.TOOL_CALLS` via a host-configured `ToolExecutor` (typically `MappingToolExecutor.from_tools(...)`)
 
+Visual node outputs are designed to be easy to wire:
+- **LLM Call** exposes both `result` (full normalized object) and a convenience `tool_calls` output (so you can connect directly into **Tool Calls** or event nodes).
+- **Agent** exposes `scratchpad` (runtime-owned trace) plus best-effort `tool_calls` / `tool_results` extracted from that trace (post-run).
+
 When a visual flow contains memory nodes, the host must also configure:
 - an `ArtifactStore` (for archived spans, notes, and rehydration source artifacts)
 
