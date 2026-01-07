@@ -218,8 +218,8 @@
       "id": "node-4",
       "type": "break_object",
       "position": {
-        "x": -736.0,
-        "y": 352.0
+        "x": -880.0,
+        "y": 560.0
       },
       "data": {
         "nodeType": "break_object",
@@ -435,7 +435,7 @@
           }
         ],
         "pinDefaults": {
-          "system": "You are a critical thinker and reviewer. Your role is to examine the work done by an agent and verify that it FULLY resolve the request and tasks it received. You answer by is_complete and if incomplete, you provide an array of concise and actionable missing_tasks to help fullfil FULLY the request."
+          "system": "You are a critical thinker and reviewer. Your role is to examine the activity report of an agent to evaluate if the agent has FULLY resolve the request and tasks it was given. You answer by is_complete and if incomplete, you provide an array of concise and actionable remaining_tasks to help the agent FULLY resolve the request."
         }
       },
       "label": null,
@@ -514,7 +514,7 @@
               "type": "boolean",
               "description": "If the request has been fully fulfill by the agent"
             },
-            "missing_tasks": {
+            "remaining_tasks": {
               "type": "array",
               "items": {
                 "type": "string"
@@ -524,7 +524,7 @@
           },
           "required": [
             "is_complete",
-            "missing_tasks"
+            "remaining_tasks"
           ]
         }
       },
@@ -806,8 +806,8 @@
           "separator": " "
         },
         "pinDefaults": {
-          "a": "THOSE WERE THE ORIGINAL REQUEST AND TASKS TO FULFILL:\\n",
-          "c": "\\n\\nAND THIS IS THE ANSWER OF THE AGENT : \\n"
+          "a": "HERE ARE THE ORIGINAL REQUEST AND TASKS TO FULFILL:\\n",
+          "c": "\\n\\nAND HERE IS THE ACTIVITY REPORT OF THE AGENT:\\n"
         }
       },
       "label": null,
@@ -1167,7 +1167,7 @@
           }
         ],
         "pinDefaults": {
-          "key": "missing_tasks"
+          "key": "remaining_tasks"
         }
       },
       "label": null,
@@ -1343,6 +1343,40 @@
         "pinDefaults": {
           "state": "Recursive Thinking.."
         }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-32",
+      "type": "agent_trace_report",
+      "position": {
+        "x": -768.0,
+        "y": 688.0
+      },
+      "data": {
+        "nodeType": "agent_trace_report",
+        "label": "Agent Trace Report",
+        "icon": "&#x1F4CB;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object",
+            "description": "Agent scratchpad object (typically contains node_traces)."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ]
       },
       "label": null,
       "icon": null,
@@ -1657,14 +1691,6 @@
       "animated": false
     },
     {
-      "id": "edge-1767730372355",
-      "source": "node-4",
-      "sourceHandle": "result",
-      "target": "node-19",
-      "targetHandle": "d",
-      "animated": false
-    },
-    {
       "id": "edge-1767736498248",
       "source": "node-12",
       "sourceHandle": "data",
@@ -1727,9 +1753,25 @@
       "target": "node-16",
       "targetHandle": "exec-in",
       "animated": true
+    },
+    {
+      "id": "edge-1767744204182",
+      "source": "node-3",
+      "sourceHandle": "scratchpad",
+      "target": "node-32",
+      "targetHandle": "scratchpad",
+      "animated": false
+    },
+    {
+      "id": "edge-1767744212748",
+      "source": "node-32",
+      "sourceHandle": "result",
+      "target": "node-19",
+      "targetHandle": "d",
+      "animated": false
     }
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-06T07:05:37.774266",
-  "updated_at": "2026-01-06T22:09:23.779409"
+  "updated_at": "2026-01-07T00:07:59.483917"
 }

@@ -1,0 +1,580 @@
+{
+  "id": "acagent_tool_events_demo",
+  "name": "AbstractCode Agent Tool Events Demo",
+  "description": "Demonstrates workflow-driven tool execution/result UX via Emit Event(name='abstractcode.tool_execution') and Emit Event(name='abstractcode.tool_result') with a short Delay between them.",
+  "interfaces": [
+    "abstractcode.agent.v1"
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": -640.0,
+        "y": -240.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "scope_run",
+      "type": "literal_string",
+      "position": {
+        "x": -640.0,
+        "y": -48.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "scope",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "run"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "name_exec",
+      "type": "literal_string",
+      "position": {
+        "x": -640.0,
+        "y": 32.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "name (exec)",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "abstractcode.tool_execution"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "name_result",
+      "type": "literal_string",
+      "position": {
+        "x": -640.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "name (result)",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "abstractcode.tool_result"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "payload_exec",
+      "type": "literal_json",
+      "position": {
+        "x": -640.0,
+        "y": 192.0
+      },
+      "data": {
+        "nodeType": "literal_json",
+        "label": "tool_execution payload",
+        "icon": "{}",
+        "headerColor": "#00FFFF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "literalValue": {
+          "tool": "read_file",
+          "call_id": "demo_call_1",
+          "arguments": {
+            "target_file": "docs/architecture.md"
+          }
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "payload_result",
+      "type": "literal_json",
+      "position": {
+        "x": -640.0,
+        "y": 272.0
+      },
+      "data": {
+        "nodeType": "literal_json",
+        "label": "tool_result payload",
+        "icon": "{}",
+        "headerColor": "#00FFFF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "literalValue": {
+          "tool": "read_file",
+          "call_id": "demo_call_1",
+          "success": true,
+          "output": "(demo) Tool result payload. In a real flow, emit the actual tool output here."
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "delay_seconds",
+      "type": "literal_number",
+      "position": {
+        "x": -640.0,
+        "y": 352.0
+      },
+      "data": {
+        "nodeType": "literal_number",
+        "label": "Delay",
+        "icon": "#",
+        "headerColor": "#00FF00",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "number"
+          }
+        ],
+        "literalValue": 2
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "emit_exec",
+      "type": "emit_event",
+      "position": {
+        "x": -320.0,
+        "y": 192.0
+      },
+      "data": {
+        "nodeType": "emit_event",
+        "label": "Emit Event",
+        "icon": "&#x1F4E3;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string"
+          },
+          {
+            "id": "payload",
+            "label": "payload",
+            "type": "any"
+          },
+          {
+            "id": "session_id",
+            "label": "session_id",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "delivered",
+            "label": "delivered",
+            "type": "number"
+          },
+          {
+            "id": "delivered_to",
+            "label": "delivered_to",
+            "type": "array"
+          },
+          {
+            "id": "wait_key",
+            "label": "wait_key",
+            "type": "string"
+          }
+        ],
+        "effectConfig": {
+          "name": "my_event",
+          "scope": "session",
+          "sessionId": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "delay_1",
+      "type": "wait_until",
+      "position": {
+        "x": -120.0,
+        "y": 192.0
+      },
+      "data": {
+        "nodeType": "wait_until",
+        "label": "Delay",
+        "icon": "&#x23F3;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "duration",
+            "label": "duration",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "emit_result",
+      "type": "emit_event",
+      "position": {
+        "x": 80.0,
+        "y": 272.0
+      },
+      "data": {
+        "nodeType": "emit_event",
+        "label": "Emit Event",
+        "icon": "&#x1F4E3;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string"
+          },
+          {
+            "id": "payload",
+            "label": "payload",
+            "type": "any"
+          },
+          {
+            "id": "session_id",
+            "label": "session_id",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "delivered",
+            "label": "delivered",
+            "type": "number"
+          },
+          {
+            "id": "delivered_to",
+            "label": "delivered_to",
+            "type": "array"
+          },
+          {
+            "id": "wait_key",
+            "label": "wait_key",
+            "type": "string"
+          }
+        ],
+        "effectConfig": {
+          "name": "my_event",
+          "scope": "session",
+          "sessionId": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 320.0,
+        "y": -240.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          },
+          {
+            "id": "raw_result",
+            "label": "raw_result",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-start-emitexec-exec",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "emit_exec",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-emitexec-delay-exec",
+      "source": "emit_exec",
+      "sourceHandle": "exec-out",
+      "target": "delay_1",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-delay-emitresult-exec",
+      "source": "delay_1",
+      "sourceHandle": "exec-out",
+      "target": "emit_result",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-emitresult-end-exec",
+      "source": "emit_result",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-scope-run-emitexec",
+      "source": "scope_run",
+      "sourceHandle": "value",
+      "target": "emit_exec",
+      "targetHandle": "scope",
+      "animated": false
+    },
+    {
+      "id": "edge-scope-run-emitresult",
+      "source": "scope_run",
+      "sourceHandle": "value",
+      "target": "emit_result",
+      "targetHandle": "scope",
+      "animated": false
+    },
+    {
+      "id": "edge-name-exec-emitexec",
+      "source": "name_exec",
+      "sourceHandle": "value",
+      "target": "emit_exec",
+      "targetHandle": "name",
+      "animated": false
+    },
+    {
+      "id": "edge-name-result-emitresult",
+      "source": "name_result",
+      "sourceHandle": "value",
+      "target": "emit_result",
+      "targetHandle": "name",
+      "animated": false
+    },
+    {
+      "id": "edge-payload-exec-emitexec",
+      "source": "payload_exec",
+      "sourceHandle": "value",
+      "target": "emit_exec",
+      "targetHandle": "payload",
+      "animated": false
+    },
+    {
+      "id": "edge-payload-result-emitresult",
+      "source": "payload_result",
+      "sourceHandle": "value",
+      "target": "emit_result",
+      "targetHandle": "payload",
+      "animated": false
+    },
+    {
+      "id": "edge-delay-seconds-delay1",
+      "source": "delay_seconds",
+      "sourceHandle": "value",
+      "target": "delay_1",
+      "targetHandle": "duration",
+      "animated": false
+    },
+    {
+      "id": "edge-start-end-response",
+      "source": "start",
+      "sourceHandle": "request",
+      "target": "end",
+      "targetHandle": "response",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": null,
+  "updated_at": "2026-01-07T00:00:00.000000"
+}
+
+

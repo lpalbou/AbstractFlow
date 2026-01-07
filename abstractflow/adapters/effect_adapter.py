@@ -213,16 +213,33 @@ def create_wait_event_handler(
         else:
             input_data = run.vars
 
-        # Extract event key
+        # Extract event key + optional host UX fields (prompt/choices).
         if isinstance(input_data, dict):
-            event_key = input_data.get("event_key", "default")
+            event_key = input_data.get("event_key")
+            if event_key is None:
+                event_key = input_data.get("wait_key")
+            if not event_key:
+                event_key = "default"
+            prompt = input_data.get("prompt")
+            choices = input_data.get("choices")
+            allow_free_text = input_data.get("allow_free_text")
+            if allow_free_text is None:
+                allow_free_text = input_data.get("allowFreeText")
         else:
             event_key = str(input_data) if input_data else "default"
+            prompt = None
+            choices = None
+            allow_free_text = None
 
         # Create the effect
         effect = Effect(
             type=EffectType.WAIT_EVENT,
-            payload={"wait_key": event_key},
+            payload={
+                "wait_key": str(event_key),
+                **({"prompt": prompt} if isinstance(prompt, str) and prompt.strip() else {}),
+                **({"choices": choices} if isinstance(choices, list) else {}),
+                **({"allow_free_text": bool(allow_free_text)} if allow_free_text is not None else {}),
+            },
             result_key=output_key or "_temp.event_data",
         )
 

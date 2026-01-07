@@ -1,0 +1,535 @@
+{
+  "id": "acagent_ask_demo",
+  "name": "AbstractCode Agent Ask Demo",
+  "description": "Demonstrates workflow-driven ask+wait using WAIT_EVENT with a prompt (WaitReason.EVENT) and resumption via AbstractCode.",
+  "interfaces": [
+    "abstractcode.agent.v1"
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": -640.0,
+        "y": -240.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "event_key",
+      "type": "literal_string",
+      "position": {
+        "x": -640.0,
+        "y": -32.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "event_key",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "abstractcode.ask"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "prompt_text",
+      "type": "literal_string",
+      "position": {
+        "x": -640.0,
+        "y": 48.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "prompt",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "What is your favorite color?"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "wait_ask",
+      "type": "wait_event",
+      "position": {
+        "x": -320.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "wait_event",
+        "label": "Wait Event",
+        "icon": "&#x23F3;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "event_key",
+            "label": "event_key",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "event_data",
+            "label": "event_data",
+            "type": "object"
+          },
+          {
+            "id": "event_key",
+            "label": "event_key",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_response",
+      "type": "get",
+      "position": {
+        "x": -120.0,
+        "y": 96.0
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get Property",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "response"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "concat_answer",
+      "type": "concat",
+      "position": {
+        "x": 80.0,
+        "y": 96.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": ""
+        },
+        "pinDefaults": {
+          "a": "You answered: "
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "message_name",
+      "type": "literal_string",
+      "position": {
+        "x": -112.0,
+        "y": -320.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "name",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "abstractcode.message"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "scope_run",
+      "type": "literal_string",
+      "position": {
+        "x": -96.0,
+        "y": -224.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "scope",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "run"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "emit_message",
+      "type": "emit_event",
+      "position": {
+        "x": 192.0,
+        "y": -240.0
+      },
+      "data": {
+        "nodeType": "emit_event",
+        "label": "Emit Event",
+        "icon": "&#x1F4E3;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string"
+          },
+          {
+            "id": "payload",
+            "label": "payload",
+            "type": "any"
+          },
+          {
+            "id": "session_id",
+            "label": "session_id",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "delivered",
+            "label": "delivered",
+            "type": "number"
+          },
+          {
+            "id": "delivered_to",
+            "label": "delivered_to",
+            "type": "array"
+          },
+          {
+            "id": "wait_key",
+            "label": "wait_key",
+            "type": "string"
+          }
+        ],
+        "effectConfig": {
+          "name": "my_event",
+          "scope": "session",
+          "sessionId": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 480.0,
+        "y": -240.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          },
+          {
+            "id": "raw_result",
+            "label": "raw_result",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-start-wait-exec",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "wait_ask",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-wait-emit-exec",
+      "source": "wait_ask",
+      "sourceHandle": "exec-out",
+      "target": "emit_message",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-emit-end-exec",
+      "source": "emit_message",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-event-key-wait",
+      "source": "event_key",
+      "sourceHandle": "value",
+      "target": "wait_ask",
+      "targetHandle": "event_key",
+      "animated": false
+    },
+    {
+      "id": "edge-prompt-wait",
+      "source": "prompt_text",
+      "sourceHandle": "value",
+      "target": "wait_ask",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "edge-wait-eventdata-get",
+      "source": "wait_ask",
+      "sourceHandle": "event_data",
+      "target": "get_response",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-get-concat",
+      "source": "get_response",
+      "sourceHandle": "value",
+      "target": "concat_answer",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-message-name-emit",
+      "source": "message_name",
+      "sourceHandle": "value",
+      "target": "emit_message",
+      "targetHandle": "name",
+      "animated": false
+    },
+    {
+      "id": "edge-scope-run-emit",
+      "source": "scope_run",
+      "sourceHandle": "value",
+      "target": "emit_message",
+      "targetHandle": "scope",
+      "animated": false
+    },
+    {
+      "id": "edge-concat-payload-emit",
+      "source": "concat_answer",
+      "sourceHandle": "result",
+      "target": "emit_message",
+      "targetHandle": "payload",
+      "animated": false
+    },
+    {
+      "id": "edge-concat-end-response",
+      "source": "concat_answer",
+      "sourceHandle": "result",
+      "target": "end",
+      "targetHandle": "response",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": null,
+  "updated_at": "2026-01-07T01:10:55.457713"
+}

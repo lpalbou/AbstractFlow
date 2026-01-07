@@ -163,8 +163,15 @@ class FlowRunner:
 
                     def _spec_for(run_state: Any):
                         wf_id = getattr(run_state, "workflow_id", None)
-                        spec = registry.get(wf_id) if registry is not None else None
-                        return spec
+                        # FlowRunner always has the root workflow spec (self.workflow).
+                        # The runtime registry is required only for *child* workflows.
+                        #
+                        # Without this fallback, synchronous `FlowRunner.run()` can hang on
+                        # SUBWORKFLOW waits if callers register only subworkflows (common in
+                        # unit tests where the parent spec is not registered).
+                        if wf_id == getattr(self.workflow, "workflow_id", None):
+                            return self.workflow
+                        return registry.get(wf_id) if registry is not None else None
 
                     top_run_id = self._current_run_id  # type: ignore[assignment]
                     if isinstance(top_run_id, str) and top_run_id:

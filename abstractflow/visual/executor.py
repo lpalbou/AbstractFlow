@@ -2315,11 +2315,44 @@ def visual_to_flow(visual: VisualFlow) -> Flow:
 
     def _create_wait_event_handler(data: Dict[str, Any], config: Dict[str, Any]):
         def handler(input_data):
+            # `wait_event` is a durable pause that waits for an external signal.
+            #
+            # Input shape (best-effort):
+            # - event_key: str (required; defaults to "default" for backward-compat)
+            # - prompt: str (optional; enables human-in-the-loop UX for EVENT waits)
+            # - choices: list[str] (optional)
+            # - allow_free_text: bool (optional; default True)
+            #
+            # NOTE: The compiler will wrap `_pending_effect` into an AbstractRuntime Effect payload.
             event_key = input_data.get("event_key", "default") if isinstance(input_data, dict) else str(input_data)
+            prompt = None
+            choices = None
+            allow_free_text = True
+            if isinstance(input_data, dict):
+                p = input_data.get("prompt")
+                if isinstance(p, str) and p.strip():
+                    prompt = p
+                ch = input_data.get("choices")
+                if isinstance(ch, list):
+                    # Keep choices JSON-safe and predictable.
+                    choices = [str(c) for c in ch if isinstance(c, str) and str(c).strip()]
+                aft = input_data.get("allow_free_text")
+                if aft is None:
+                    aft = input_data.get("allowFreeText")
+                if aft is not None:
+                    allow_free_text = bool(aft)
+ 
+            pending: Dict[str, Any] = {"type": "wait_event", "wait_key": event_key}
+            if prompt is not None:
+                pending["prompt"] = prompt
+            if isinstance(choices, list):
+                pending["choices"] = choices
+            # Always include allow_free_text so hosts can render consistent UX.
+            pending["allow_free_text"] = allow_free_text
             return {
                 "event_data": {},
                 "event_key": event_key,
-                "_pending_effect": {"type": "wait_event", "wait_key": event_key},
+                "_pending_effect": pending,
             }
 
         return handler
