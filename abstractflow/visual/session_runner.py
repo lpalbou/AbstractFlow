@@ -37,8 +37,14 @@ class VisualSessionRunner(FlowRunner):
     def event_listener_run_ids(self) -> List[str]:
         return list(self._event_listener_run_ids)
 
-    def start(self, input_data: Optional[Dict[str, Any]] = None) -> str:
-        run_id = super().start(input_data)
+    def start(
+        self,
+        input_data: Optional[Dict[str, Any]] = None,
+        *,
+        actor_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+    ) -> str:
+        run_id = super().start(input_data, actor_id=actor_id, session_id=session_id)
 
         # Default session_id to the root run_id for session-scoped events.
         try:
@@ -60,6 +66,7 @@ class VisualSessionRunner(FlowRunner):
                     workflow=spec,
                     vars={},
                     session_id=run_id,
+                    actor_id=actor_id,
                     parent_run_id=run_id,
                 )
                 # Advance the listener to its first WAIT_EVENT (On Event node).

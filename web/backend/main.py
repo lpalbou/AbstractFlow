@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from .routes import flows_router, providers_router, runs_router, tools_router, ws_router
+from .routes import flows_router, gateway_router, providers_router, runs_router, tools_router, ws_router
 
 # Create FastAPI app
 app = FastAPI(
@@ -30,10 +30,34 @@ app.add_middleware(
 
 # Include routers
 app.include_router(flows_router, prefix="/api")
+app.include_router(gateway_router, prefix="/api")
 app.include_router(providers_router, prefix="/api")
 app.include_router(runs_router, prefix="/api")
 app.include_router(tools_router, prefix="/api")
 app.include_router(ws_router, prefix="/api")
+
+
+@app.on_event("startup")
+async def _startup_gateway_runner() -> None:
+    # Start the background worker that polls the durable command inbox and ticks runs.
+    try:
+        from .services.run_gateway import start_gateway_runner
+
+        start_gateway_runner()
+    except Exception:
+        # The gateway routes still work (commands can be accepted durably); they will be
+        # fulfilled once a runner is available.
+        pass
+
+
+@app.on_event("shutdown")
+async def _shutdown_gateway_runner() -> None:
+    try:
+        from .services.run_gateway import stop_gateway_runner
+
+        stop_gateway_runner()
+    except Exception:
+        pass
 
 @app.get("/api/health")
 async def health_check():

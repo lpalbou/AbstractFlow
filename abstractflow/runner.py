@@ -66,7 +66,13 @@ class FlowRunner:
         """Get the current run ID."""
         return self._current_run_id
 
-    def start(self, input_data: Optional[Dict[str, Any]] = None) -> str:
+    def start(
+        self,
+        input_data: Optional[Dict[str, Any]] = None,
+        *,
+        actor_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+    ) -> str:
         """Start flow execution.
 
         Args:
@@ -79,6 +85,8 @@ class FlowRunner:
         self._current_run_id = self.runtime.start(
             workflow=self.workflow,
             vars=vars_dict,
+            actor_id=actor_id,
+            session_id=session_id,
         )
         return self._current_run_id
 

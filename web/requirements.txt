@@ -1,0 +1,11 @@
+# Python requirements for Snake Game
+# curses is built-in on Unix-like systems, but we'll specify it for completeness
+curses
+
+# Optional: pygame as alternative (uncomment if you want to switch)
+# pygame
+
+# For development
+wheel
+time
+random
