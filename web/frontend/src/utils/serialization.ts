@@ -116,6 +116,26 @@ export function fromVisualFlow(flow: VisualFlow): {
       }
     }
 
+    // Wait Event node: add host UX metadata pins (prompt/choices/allow_free_text) for legacy flows.
+    if (data.nodeType === 'wait_event') {
+      const inputs = Array.isArray(data.inputs) ? data.inputs : [];
+      const hasPrompt = inputs.some((p) => p.id === 'prompt');
+      const hasChoices = inputs.some((p) => p.id === 'choices');
+      const hasAft = inputs.some((p) => p.id === 'allow_free_text');
+      if ((!hasPrompt || !hasChoices || !hasAft) && inputs.length > 0) {
+        const nextInputs = [...inputs];
+        const insertAfterId = 'event_key';
+        let insertAt = nextInputs.findIndex((p) => p.id === insertAfterId);
+        if (insertAt < 0) insertAt = nextInputs.length - 1;
+        const toAdd: Array<{ id: string; label: string; type: any }> = [];
+        if (!hasPrompt) toAdd.push({ id: 'prompt', label: 'prompt', type: 'string' as const });
+        if (!hasChoices) toAdd.push({ id: 'choices', label: 'choices', type: 'array' as const });
+        if (!hasAft) toAdd.push({ id: 'allow_free_text', label: 'allow_free_text', type: 'boolean' as const });
+        nextInputs.splice(insertAt + 1, 0, ...toAdd);
+        (data as any).inputs = nextInputs;
+      }
+    }
+
     return {
       id: vn.id,
       type: vn.type === 'code' ? 'code' : 'custom',

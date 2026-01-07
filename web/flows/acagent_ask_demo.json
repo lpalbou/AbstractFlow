@@ -121,15 +121,15 @@
     },
     {
       "id": "choices_list",
-      "type": "literal_json",
+      "type": "literal_array",
       "position": {
         "x": -640.0,
         "y": 128.0
       },
       "data": {
-        "nodeType": "literal_json",
+        "nodeType": "literal_array",
         "label": "choices",
-        "icon": "{}",
+        "icon": "[]",
         "headerColor": "#00FFFF",
         "inputs": [],
         "outputs": [
@@ -189,8 +189,8 @@
       "data": {
         "nodeType": "wait_event",
         "label": "Wait Event",
-        "icon": "&#x23F3;",
-        "headerColor": "#F39C12",
+        "icon": "&#x1F514;",
+        "headerColor": "#C0392B",
         "inputs": [
           {
             "id": "exec-in",
@@ -228,11 +228,6 @@
             "id": "event_data",
             "label": "event_data",
             "type": "object"
-          },
-          {
-            "id": "event_key",
-            "label": "event_key",
-            "type": "string"
           }
         ]
       },

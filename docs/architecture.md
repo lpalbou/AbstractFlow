@@ -1,6 +1,6 @@
 # AbstractFlow — Architecture (Current)
 
-> Updated: 2026-01-02  
+> Updated: 2026-01-07  
 > Scope: this describes **what is implemented today** in this monorepo (no “future” design claims).
 
 AbstractFlow is the **workflow authoring + orchestration** layer of the AbstractFramework:
@@ -12,6 +12,26 @@ This document focuses on AbstractFlow’s architecture and how it leverages:
 - `abstractruntime` for durability + effects + run control
 - `abstractcore` for provider/model/tool abstractions (via runtime integrations)
 - `abstractagent` for agent workflows (ReAct/CodeAct) used by the visual Agent node
+
+## High-level component/data flow
+
+```
+             (authoring)                                  (execution)
+┌─────────────────────────────┐                 ┌─────────────────────────────┐
+│ AbstractFlow Web Frontend    │                 │ Host (AbstractFlow backend, │
+│ (React visual editor)        │                 │ AbstractCode, 3rd-party)    │
+│ - edits VisualFlow JSON      │                 │ - loads VisualFlow JSON     │
+└──────────────┬──────────────┘                 │ - compiles to WorkflowSpec  │
+               │ save/load                        │ - ticks Runtime            │
+               ▼                                  └──────────────┬────────────┘
+┌─────────────────────────────┐                               uses│
+│ AbstractFlow Web Backend     │                                   ▼
+│ (FastAPI)                    │                 ┌─────────────────────────────┐
+│ - persists VisualFlow JSON   │                 │ AbstractRuntime               │
+│ - runs flows (WS)            │                 │ - RunStore/Ledger/Artifacts   │
+│ - run history APIs           │                 │ - effects + waits + resume    │
+└─────────────────────────────┘                 └─────────────────────────────┘
+```
 
 ## Repository Layout
 
@@ -107,6 +127,9 @@ AbstractFlow expresses event-driven behavior using AbstractRuntime’s durable w
 
 For visual flows, `VisualSessionRunner` (`abstractflow/abstractflow/visual/session_runner.py`) starts `On Event` listeners as child runs in the same session and actively ticks them when events are emitted.
 
+Note:
+- `Wait Event` nodes support optional UX metadata pins (`prompt`, `choices`, `allow_free_text`) so hosts can render durable “ask + wait” interactions (ADR-0017).
+
 ## Web Backend Execution (Run Flow UI)
 
 The real-time Run Flow UI is powered by WebSockets (`abstractflow/web/backend/routes/ws.py`):
@@ -115,6 +138,10 @@ The real-time Run Flow UI is powered by WebSockets (`abstractflow/web/backend/ro
 - backend drives execution by calling `runner.step()` (which calls `Runtime.tick(...)`) and streams `ExecutionEvent` updates
 - if the runtime enters a wait state (ASK_USER / WAIT_EVENT / WAIT_UNTIL / SUBWORKFLOW), the UI shows the waiting step and can send `{type:"resume"}` to continue
 - run controls (pause/resume/cancel) are exposed as `{type:"control"}` messages and map to AbstractRuntime run control APIs
+
+### Run history (web host)
+The web backend also exposes run-history endpoints (list runs + replay) to support browsing historical runs in the UI:
+- see `abstractflow/web/backend/routes/runs.py`
 
 ## What AbstractFlow Owns vs Uses
 
@@ -128,4 +155,7 @@ The real-time Run Flow UI is powered by WebSockets (`abstractflow/web/backend/ro
 - **AbstractRuntime**: durable run state, waits, ledger, artifacts, run control
 - **AbstractCore**: providers/models/tools (via runtime’s `integrations.abstractcore`)
 - **AbstractAgent**: agent workflows used by the visual Agent node (ReAct today; CodeAct exists in AbstractAgent)
+
+## Acknowledgements (inspiration)
+- The visual editor UX is inspired by **Unreal Engine (UE4/UE5) Blueprints**: execution pins, typed pins with color coding, and “graph-as-program” ergonomics.
 

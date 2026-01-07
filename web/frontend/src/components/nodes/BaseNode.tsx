@@ -9,7 +9,7 @@
 import { Fragment, memo, type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { Handle, Position, NodeProps, useEdges, useUpdateNodeInternals } from 'reactflow';
 import { clsx } from 'clsx';
-import type { FlowNodeData, PinType } from '../../types/flow';
+import type { FlowNodeData, JsonValue, PinType } from '../../types/flow';
 import { PIN_COLORS, isEntryNodeType } from '../../types/flow';
 import { PinShape } from '../pins/PinShape';
 import { useFlowStore } from '../../hooks/useFlow';
@@ -176,11 +176,11 @@ const VarDeclInline = memo(function VarDeclInline({
   nodeId: string;
   name: string;
   varType: Exclude<PinType, 'execution'>;
-  defaultValue: unknown;
+  defaultValue: JsonValue;
   nameOptions: string[];
   toolOptions: Array<{ value: string; label: string }>;
   toolLoading: boolean;
-  onChange: (next: { name: string; type: Exclude<PinType, 'execution'>; default: unknown }) => void;
+  onChange: (next: { name: string; type: Exclude<PinType, 'execution'>; default: JsonValue }) => void;
 }) {
   const listId = `af-var-decl-names-${nodeId}`;
 
@@ -703,7 +703,7 @@ export const BaseNode = memo(function BaseNode({
   );
 
   const varDeclConfig = useMemo(() => {
-    if (!isVarDeclNode) return { name: '', type: 'any' as const, default: null as unknown };
+    if (!isVarDeclNode) return { name: '', type: 'any' as const, default: null as JsonValue };
     const raw = data.literalValue;
     if (raw && typeof raw === 'object') {
       const name = typeof (raw as any).name === 'string' ? String((raw as any).name).trim() : '';
@@ -720,14 +720,14 @@ export const BaseNode = memo(function BaseNode({
         t === 'any'
           ? (t as Exclude<PinType, 'execution'>)
           : ('any' as const);
-      const def = (raw as any).default as unknown;
+      const def = ((raw as any).default as JsonValue | undefined) ?? null;
       return { name, type, default: def };
     }
-    return { name: '', type: 'any' as const, default: null as unknown };
+    return { name: '', type: 'any' as const, default: null as JsonValue };
   }, [data.literalValue, isVarDeclNode]);
 
   const setVarDeclConfig = useCallback(
-    (next: { name: string; type: Exclude<PinType, 'execution'>; default: unknown }) => {
+    (next: { name: string; type: Exclude<PinType, 'execution'>; default: JsonValue }) => {
       if (!isVarDeclNode) return;
       const nextOutputs = data.outputs.map((p) => (p.id === 'value' ? { ...p, type: next.type } : p));
       updateNodeData(id, { literalValue: { name: next.name, type: next.type, default: next.default }, outputs: nextOutputs });

@@ -133,11 +133,15 @@ const EVENT_NODES: NodeTemplate[] = [
     type: 'wait_event',
     icon: '&#x1F514;', // Bell
     label: 'Wait Event',
-    description: 'Pause the workflow until an event matching event_key is received, then resume with event_data.',
+    description:
+      'Pause the workflow until an event matching event_key is received, then resume with event_data. Optional pins (prompt/choices/allow_free_text) enable durable “ask + wait” UX for hosts like AbstractCode.',
     headerColor: '#C0392B',
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
       { id: 'event_key', label: 'event_key', type: 'string' },
+      { id: 'prompt', label: 'prompt', type: 'string' },
+      { id: 'choices', label: 'choices', type: 'array' },
+      { id: 'allow_free_text', label: 'allow_free_text', type: 'boolean' },
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },

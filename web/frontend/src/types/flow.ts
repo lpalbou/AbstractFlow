@@ -156,7 +156,7 @@ export interface FlowNodeData {
     description?: string;    // Description of what triggers this event
   };
   // Literal node value
-  literalValue?: string | number | boolean | object;
+  literalValue?: JsonValue;
   // Break Object node configuration
   breakConfig?: {
     selectedPaths?: string[];

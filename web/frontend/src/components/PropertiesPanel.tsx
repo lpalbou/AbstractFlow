@@ -11,6 +11,7 @@ import { useFlowStore } from '../hooks/useFlow';
 import { CodeEditorModal } from './CodeEditorModal';
 import ProviderModelsPanel from './ProviderModelsPanel';
 import { JsonSchemaNodeEditor } from './JsonSchemaNodeEditor';
+import { JsonValueEditor } from './JsonValueEditor';
 import AfSelect from './inputs/AfSelect';
 import AfMultiSelect from './inputs/AfMultiSelect';
 import {
@@ -3202,211 +3203,12 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
       {/* JSON literal value */}
       {data.nodeType === 'literal_json' && (
-        <div className="property-section">
-          <label className="property-label">Fields (Object)</label>
-
-          {(() => {
-            const current = data.literalValue;
-            const isObject =
-              current !== null &&
-              typeof current === 'object' &&
-              !Array.isArray(current);
-
-            const obj: Record<string, unknown> = isObject
-              ? (current as Record<string, unknown>)
-              : {};
-
-            const valueType = (value: unknown) => {
-              if (Array.isArray(value)) return 'array';
-              if (value === null) return 'null';
-              switch (typeof value) {
-                case 'string':
-                  return 'string';
-                case 'number':
-                  return 'number';
-                case 'boolean':
-                  return 'boolean';
-                case 'object':
-                  return 'object';
-                default:
-                  return 'string';
-              }
-            };
-
-            const setKey = (oldKey: string, newKeyRaw: string): boolean => {
-              const newKey = newKeyRaw.trim();
-              if (!newKey || newKey === oldKey) return false;
-              if (Object.prototype.hasOwnProperty.call(obj, newKey)) return false;
-              const next: Record<string, unknown> = {};
-              for (const [k, v] of Object.entries(obj)) {
-                next[k === oldKey ? newKey : k] = v;
-              }
-              updateNodeData(node.id, { literalValue: next });
-              return true;
-            };
-
-            const setValue = (key: string, value: unknown) => {
-              updateNodeData(node.id, { literalValue: { ...obj, [key]: value } });
-            };
-
-            const removeKey = (key: string) => {
-              const next: Record<string, unknown> = {};
-              for (const [k, v] of Object.entries(obj)) {
-                if (k !== key) next[k] = v;
-              }
-              updateNodeData(node.id, { literalValue: next });
-            };
-
-            const addKey = () => {
-              let i = 1;
-              let key = `field_${i}`;
-              while (Object.prototype.hasOwnProperty.call(obj, key)) {
-                i += 1;
-                key = `field_${i}`;
-              }
-              updateNodeData(node.id, { literalValue: { ...obj, [key]: '' } });
-            };
-
-            const setType = (key: string, t: string) => {
-              if (t === 'string') return setValue(key, '');
-              if (t === 'number') return setValue(key, 0);
-              if (t === 'boolean') return setValue(key, false);
-              if (t === 'null') return setValue(key, null);
-              if (t === 'array') return setValue(key, []);
-              if (t === 'object') return setValue(key, {});
-            };
-
-            return (
-              <>
-                {!isObject && (
-                  <span className="property-hint">
-                    Visual editing supports JSON objects. Use Raw JSON below for arrays or advanced values.
-                  </span>
-                )}
-
-                <div className="object-editor">
-                  {Object.entries(obj).map(([key, value]) => {
-                    const t = valueType(value);
-                    return (
-                      <div key={key} className="object-field">
-                        <input
-                          type="text"
-                          className="property-input object-key"
-                          defaultValue={key}
-                          onBlur={(e) => {
-                            const ok = setKey(key, e.target.value);
-                            if (!ok) {
-                              e.currentTarget.value = key;
-                            }
-                          }}
-                          placeholder="key"
-                        />
-                        <select
-                          className="property-select object-type"
-                          value={t}
-                          onChange={(e) => setType(key, e.target.value)}
-                        >
-                          <option value="string">string</option>
-                          <option value="number">number</option>
-                          <option value="boolean">boolean</option>
-                          <option value="null">null</option>
-                          <option value="object">object</option>
-                          <option value="array">array</option>
-                        </select>
-
-                        {t === 'string' && (
-                          <input
-                            type="text"
-                            className="property-input object-value"
-                            value={String(value ?? '')}
-                            onChange={(e) => setValue(key, e.target.value)}
-                            placeholder="value"
-                          />
-                        )}
-
-                        {t === 'number' && (
-                          <input
-                            type="number"
-                            className="property-input object-value"
-                            value={typeof value === 'number' ? value : Number(value ?? 0)}
-                            onChange={(e) => setValue(key, Number(e.target.value))}
-                            step="any"
-                          />
-                        )}
-
-                        {t === 'boolean' && (
-                          <label className="toggle-container object-value">
-                            <input
-                              type="checkbox"
-                              className="toggle-checkbox"
-                              checked={Boolean(value)}
-                              onChange={(e) => setValue(key, e.target.checked)}
-                            />
-                            <span className="toggle-label">{value ? 'True' : 'False'}</span>
-                          </label>
-                        )}
-
-                        {t === 'null' && (
-                          <div className="object-null object-value">null</div>
-                        )}
-
-                        {(t === 'object' || t === 'array') && (
-                          <textarea
-                            className="property-input property-textarea code object-value"
-                            value={JSON.stringify(value, null, 2)}
-                            onChange={(e) => {
-                              try {
-                                const parsed = JSON.parse(e.target.value);
-                                setValue(key, parsed);
-                              } catch {
-                                // keep editing; don't update until valid
-                              }
-                            }}
-                            rows={3}
-                          />
-                        )}
-
-                        <button
-                          className="array-item-remove"
-                          onClick={() => removeKey(key)}
-                          title="Remove field"
-                        >
-                          &times;
-                        </button>
-                      </div>
-                    );
-                  })}
-
-                  <button className="array-add-button" onClick={addKey}>
-                    + Add Field
-                  </button>
-                </div>
-
-                <details className="raw-json-details">
-                  <summary>Raw JSON (advanced)</summary>
-                  <textarea
-                    className="property-input property-textarea code"
-                    value={
-                      typeof data.literalValue === 'object'
-                        ? JSON.stringify(data.literalValue, null, 2)
-                        : String(data.literalValue ?? '{}')
-                    }
-                    onChange={(e) => {
-                      try {
-                        const parsed = JSON.parse(e.target.value);
-                        updateNodeData(node.id, { literalValue: parsed });
-                      } catch {
-                        // Keep invalid JSON in the textarea but don't update state.
-                      }
-                    }}
-                    placeholder="{}"
-                    rows={6}
-                  />
-                </details>
-              </>
-            );
-          })()}
-        </div>
+        <JsonValueEditor
+          label="Fields (Object)"
+          rootKind="object"
+          value={data.literalValue ?? {}}
+          onChange={(next) => updateNodeData(node.id, { literalValue: next })}
+        />
       )}
 
       {/* JSON Schema editor */}
@@ -3420,56 +3222,12 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
       {/* Array literal value - item-based editor */}
       {data.nodeType === 'literal_array' && (
-        <div className="property-section">
-          <label className="property-label">Items</label>
-          <div className="array-editor">
-            {(Array.isArray(data.literalValue) ? data.literalValue : []).map(
-              (item: string, index: number) => (
-                <div key={index} className="array-item">
-                  <input
-                    type="text"
-                    className="property-input array-item-input"
-                    value={String(item)}
-                    onChange={(e) => {
-                      const newArray = [...(data.literalValue as string[])];
-                      newArray[index] = e.target.value;
-                      updateNodeData(node.id, { literalValue: newArray });
-                    }}
-                    placeholder={`Item ${index + 1}`}
-                  />
-                  <button
-                    className="array-item-remove"
-                    onClick={() => {
-                      const newArray = (data.literalValue as string[]).filter(
-                        (_, i) => i !== index
-                      );
-                      updateNodeData(node.id, { literalValue: newArray });
-                    }}
-                    title="Remove item"
-                  >
-                    &times;
-                  </button>
-                </div>
-              )
-            )}
-            <button
-              className="array-add-button"
-              onClick={() => {
-                const currentArray = Array.isArray(data.literalValue)
-                  ? data.literalValue
-                  : [];
-                updateNodeData(node.id, {
-                  literalValue: [...currentArray, ''],
-                });
-              }}
-            >
-              + Add Item
-            </button>
-          </div>
-          <span className="property-hint">
-            {(Array.isArray(data.literalValue) ? data.literalValue : []).length} items
-          </span>
-        </div>
+        <JsonValueEditor
+          label="Items"
+          rootKind="array"
+          value={data.literalValue ?? []}
+          onChange={(next) => updateNodeData(node.id, { literalValue: next })}
+        />
       )}
 
       {/* Ask User effect properties */}
