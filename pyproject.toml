@@ -24,8 +24,6 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -33,14 +31,24 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: System :: Distributed Computing",
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 dependencies = [
-    "abstractcore[tools]>=2.0.0",
+    # AbstractFlow is built on AbstractRuntime (durable execution kernel).
+    # `abstractflow/__init__.py` imports runtime-backed components (FlowRunner/compile_flow),
+    # so this dependency is required (not optional).
+    "AbstractRuntime>=0.4.0",
+    # Keep this aligned with the latest known published AbstractCore versions
+    # (monorepo may carry a newer dev version).
+    "abstractcore[tools]>=2.6.8",
     "pydantic>=2.0.0",
     "typing-extensions>=4.0.0",
 ]
 
 [project.optional-dependencies]
+agent = [
+    # Enables built-in Agent node creation in the VisualFlow executor.
+    "abstractagent>=0.2.0",
+]
 dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
@@ -61,7 +69,7 @@ ui = [
     "networkx>=3.1.0",
 ]
 all = [
-    "abstractflow[dev,server,ui]"
+    "abstractflow[agent,dev,server,ui]"
 ]
 
 [project.urls]
@@ -84,7 +92,7 @@ abstractflow = ["py.typed", "*.json", "*.yaml", "*.yml"]
 
 [tool.black]
 line-length = 88
-target-version = ['py38']
+target-version = ['py310']
 include = '\.pyi?$'
 extend-exclude = '''
 /(
@@ -107,7 +115,7 @@ line_length = 88
 known_first_party = ["abstractflow"]
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true

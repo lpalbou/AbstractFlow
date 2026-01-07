@@ -84,7 +84,7 @@ AbstractFlow is built on a robust foundation:
 
 ## 🛠️ Technology Stack
 
-- **Core**: Python 3.8+ with AsyncIO support
+- **Core**: Python 3.10+ (aligns with AbstractRuntime)
 - **AI Integration**: [AbstractCore](https://github.com/lpalbou/AbstractCore) for LLM provider abstraction
 - **Web Framework**: FastAPI for high-performance API server
 - **Frontend**: React with TypeScript for the diagram editor
@@ -111,7 +111,7 @@ pip install -e .[dev]
 ### Dependencies
 
 AbstractFlow requires:
-- Python 3.8+
+- Python 3.10+ (aligns with AbstractRuntime)
 - [AbstractRuntime](https://github.com/lpalbou/AbstractRuntime) - Workflow execution engine
 - [AbstractCore](https://github.com/lpalbou/AbstractCore) - LLM provider abstraction
 
@@ -231,11 +231,16 @@ AbstractFlow includes a state-of-the-art web-based visual editor inspired by Unr
 cd abstractflow
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -e .  # Install abstractflow
-pip install -r web/requirements.txt  # Install FastAPI, uvicorn, websockets
 
-# 2. Start backend server (from abstractflow root)
-PYTHONPATH=web:../abstractruntime/src:../abstractcore uvicorn backend.main:app --port 8080 --reload
+# Prefer editable installs over PYTHONPATH hacks so dependency wiring matches real installs.
+pip install -e "../abstractcore[tools]"
+pip install -e "../abstractruntime[abstractcore]"
+pip install -e "../abstractagent"
+pip install -e ".[server,agent]"
+
+# 2. Start backend server (run from web/ so `backend.*` is importable)
+cd web
+uvicorn backend.main:app --port 8080 --reload
 
 # 3. In a new terminal, start frontend dev server
 cd abstractflow/web/frontend
@@ -251,7 +256,8 @@ Then open http://localhost:3000 in your browser.
 cd web/frontend && npm run build && cd ../..
 
 # Run backend only (serves frontend from dist/)
-PYTHONPATH=web:../abstractruntime/src:../abstractcore uvicorn backend.main:app --port 8080
+cd web
+uvicorn backend.main:app --port 8080
 
 # Open http://localhost:8080
 ```
