@@ -55,7 +55,10 @@
             "label": "max_iterations",
             "type": "number"
           }
-        ]
+        ],
+        "pinDefaults": {
+          "max_iterations": 5
+        }
       },
       "label": null,
       "icon": null,
@@ -127,17 +130,6 @@
             "id": "exec-in",
             "label": "",
             "type": "execution"
-          },
-          {
-            "id": "inherit_context",
-            "label": "inherit_context",
-            "type": "boolean",
-            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
-          },
-          {
-            "id": "input",
-            "label": "input",
-            "type": "object"
           },
           {
             "id": "request",
@@ -230,17 +222,6 @@
             "type": "execution"
           },
           {
-            "id": "inherit_context",
-            "label": "inherit_context",
-            "type": "boolean",
-            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
-          },
-          {
-            "id": "input",
-            "label": "input",
-            "type": "object"
-          },
-          {
             "id": "provider",
             "label": "provider",
             "type": "provider"
@@ -318,8 +299,8 @@
             "type": "execution"
           },
           {
-            "id": "plan",
-            "label": "plan",
+            "id": "tasks",
+            "label": "tasks",
             "type": "array"
           }
         ],
@@ -471,15 +452,23 @@
       "animated": true
     },
     {
-      "id": "edge-1767908846203",
+      "id": "edge-1767908855993",
+      "source": "node-17",
+      "sourceHandle": "enriched_request",
+      "target": "node-16",
+      "targetHandle": "request",
+      "animated": false
+    },
+    {
+      "id": "edge-1767910718361",
       "source": "node-18",
-      "sourceHandle": "plan",
+      "sourceHandle": "tasks",
       "target": "node-16",
       "targetHandle": "tasks",
       "animated": false
     },
     {
-      "id": "edge-1767908852352",
+      "id": "edge-1767912407129",
       "source": "node-1",
       "sourceHandle": "tools",
       "target": "node-16",
@@ -487,15 +476,15 @@
       "animated": false
     },
     {
-      "id": "edge-1767908855993",
-      "source": "node-17",
-      "sourceHandle": "enriched_request",
+      "id": "edge-1767912999555",
+      "source": "node-1",
+      "sourceHandle": "max_iterations",
       "target": "node-16",
-      "targetHandle": "request",
+      "targetHandle": "max_iterations",
       "animated": false
     }
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-06T20:10:57.384035",
-  "updated_at": "2026-01-08T21:55:04.550925"
+  "updated_at": "2026-01-08T22:57:17.031162"
 }
