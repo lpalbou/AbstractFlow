@@ -1,0 +1,531 @@
+{
+  "id": "1cd9eec9",
+  "name": "request-planner",
+  "description": "",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": {
+        "x": -1568.0,
+        "y": -64.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-3",
+      "type": "llm_call",
+      "position": {
+        "x": -928.0,
+        "y": -64.0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "PLANNER",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "include_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider",
+            "description": "LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model",
+            "description": "LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string",
+            "description": "Optional system prompt for this single call."
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string",
+            "description": "User prompt/content for this single call."
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools",
+            "description": "Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node)."
+          },
+          {
+            "id": "response_schema",
+            "label": "structured_output",
+            "type": "object",
+            "description": "Optional JSON Schema object (type=object) the assistant content must conform to."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string",
+            "description": "Assistant text content (best-effort). For tool calls, content may be empty."
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object",
+            "description": "Full normalized LLM result (content, tool_calls, usage, provider/model metadata, trace_id)."
+          }
+        ],
+        "pinDefaults": {
+          "system": "You are an expert planner who strategically analyze the request received and expertly conceive a structured, clear, concise and actionable plan as a set of \"tasks\" to  resolve the request with the highest standards of quality and efficiency. You regroup and order requirements into clear sequential tasks. You always make sure the set of \"tasks\" enable to truly and fully resolve the request. You also make sure each task is  comprehensible and actionable by others as they will be the ones resolving the request."
+        },
+        "effectConfig": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-4",
+      "type": "concat",
+      "position": {
+        "x": -1184.0,
+        "y": 80.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "a": "This is the request that you must enrich and for which you must create concise and actionable tasks : "
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-5",
+      "type": "json_schema",
+      "position": {
+        "x": -1184.0,
+        "y": 256.0
+      },
+      "data": {
+        "nodeType": "json_schema",
+        "label": "PAYLOAD SCHEMA",
+        "icon": "&#x1F4CB;",
+        "headerColor": "#00FFFF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "schema",
+            "type": "object"
+          }
+        ],
+        "literalValue": {
+          "type": "object",
+          "properties": {
+            "tasks": {
+              "type": "string",
+              "description": "This is the request enriched by your additional understanding and thoughts"
+            }
+          },
+          "required": [
+            "tasks"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-6",
+      "type": "on_flow_end",
+      "position": {
+        "x": -400.0,
+        "y": -64.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "tasks",
+            "label": "tasks",
+            "type": "array"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-7",
+      "type": "break_object",
+      "position": {
+        "x": -608.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "tasks",
+            "label": "tasks",
+            "type": "array"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "tasks"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-8",
+      "type": "parse_json",
+      "position": {
+        "x": -608.0,
+        "y": 288.0
+      },
+      "data": {
+        "nodeType": "parse_json",
+        "label": "Parse JSON",
+        "icon": "&#x1F5C2;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "text",
+            "label": "text",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-9",
+      "type": "break_object",
+      "position": {
+        "x": -832.0,
+        "y": 288.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "data",
+            "label": "data",
+            "type": "any"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "data"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-17",
+      "type": "subflow",
+      "position": {
+        "x": -1264.0,
+        "y": -64.0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "INFORM ON PLANNING",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean",
+            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          },
+          {
+            "id": "state",
+            "label": "state",
+            "type": "string"
+          },
+          {
+            "id": "post_delay",
+            "label": "post_delay",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          }
+        ],
+        "subflowId": "15f19f7f",
+        "pinDefaults": {
+          "state": "Planning..."
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1767681499604",
+      "source": "node-4",
+      "sourceHandle": "result",
+      "target": "node-3",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "edge-1767681521505",
+      "source": "node-5",
+      "sourceHandle": "value",
+      "target": "node-3",
+      "targetHandle": "response_schema",
+      "animated": false
+    },
+    {
+      "id": "edge-1767681687679",
+      "source": "node-8",
+      "sourceHandle": "result",
+      "target": "node-7",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1767682117483",
+      "source": "node-1",
+      "sourceHandle": "provider",
+      "target": "node-3",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1767682119849",
+      "source": "node-1",
+      "sourceHandle": "model",
+      "target": "node-3",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-1767682122600",
+      "source": "node-1",
+      "sourceHandle": "request",
+      "target": "node-4",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-1767707444899",
+      "source": "node-3",
+      "sourceHandle": "exec-out",
+      "target": "node-6",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767707551748",
+      "source": "node-3",
+      "sourceHandle": "result",
+      "target": "node-9",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1767707560698",
+      "source": "node-9",
+      "sourceHandle": "data",
+      "target": "node-8",
+      "targetHandle": "text",
+      "animated": false
+    },
+    {
+      "id": "edge-1767908090964",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-17",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767908094455",
+      "source": "node-17",
+      "sourceHandle": "exec-out",
+      "target": "node-3",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767908326240",
+      "source": "node-7",
+      "sourceHandle": "tasks",
+      "target": "node-6",
+      "targetHandle": "tasks",
+      "animated": false
+    }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2026-01-08T21:36:58.593867",
+  "updated_at": "2026-01-08T21:57:52.317709"
+}

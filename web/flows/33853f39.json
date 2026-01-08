@@ -10,8 +10,8 @@
       "id": "node-1",
       "type": "on_flow_start",
       "position": {
-        "x": -1536.0,
-        "y": 0.0
+        "x": -1584.0,
+        "y": 48.0
       },
       "data": {
         "nodeType": "on_flow_start",
@@ -67,8 +67,8 @@
       "id": "node-2",
       "type": "on_flow_end",
       "position": {
-        "x": -560.0,
-        "y": 0.0
+        "x": -272.0,
+        "y": 48.0
       },
       "data": {
         "nodeType": "on_flow_end",
@@ -111,82 +111,11 @@
       "outputs": []
     },
     {
-      "id": "node-5",
-      "type": "subflow",
-      "position": {
-        "x": -1200.0,
-        "y": 0.0
-      },
-      "data": {
-        "nodeType": "subflow",
-        "label": "Plan & Enrich",
-        "icon": "&#x1F4E6;",
-        "headerColor": "#00CCCC",
-        "inputs": [
-          {
-            "id": "exec-in",
-            "label": "",
-            "type": "execution"
-          },
-          {
-            "id": "inherit_context",
-            "label": "inherit_context",
-            "type": "boolean",
-            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
-          },
-          {
-            "id": "input",
-            "label": "input",
-            "type": "object"
-          },
-          {
-            "id": "provider",
-            "label": "provider",
-            "type": "provider"
-          },
-          {
-            "id": "model",
-            "label": "model",
-            "type": "model"
-          },
-          {
-            "id": "request",
-            "label": "request",
-            "type": "string"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "exec-out",
-            "label": "",
-            "type": "execution"
-          },
-          {
-            "id": "enriched_request",
-            "label": "enriched_request",
-            "type": "string"
-          },
-          {
-            "id": "tasks",
-            "label": "tasks",
-            "type": "array"
-          }
-        ],
-        "subflowId": "4ed3b340",
-        "pinDefaults": {}
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
       "id": "node-16",
       "type": "subflow",
       "position": {
-        "x": -896.0,
-        "y": 0.0
+        "x": -656.0,
+        "y": 48.0
       },
       "data": {
         "nodeType": "subflow",
@@ -239,6 +168,11 @@
             "id": "tasks",
             "label": "tasks",
             "type": "array"
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
           }
         ],
         "outputs": [
@@ -276,49 +210,130 @@
       "headerColor": null,
       "inputs": [],
       "outputs": []
+    },
+    {
+      "id": "node-17",
+      "type": "subflow",
+      "position": {
+        "x": -1264.0,
+        "y": 48.0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "REQUEST ENRICHER",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean",
+            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "enriched_request",
+            "label": "enriched_request",
+            "type": "string"
+          }
+        ],
+        "subflowId": "72b51d91",
+        "pinDefaults": {}
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-18",
+      "type": "subflow",
+      "position": {
+        "x": -960.0,
+        "y": 48.0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "REQUEST PLANNER",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "plan",
+            "label": "plan",
+            "type": "array"
+          }
+        ],
+        "subflowId": "1cd9eec9",
+        "pinDefaults": {}
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
     }
   ],
   "edges": [
-    {
-      "id": "edge-1767682150357",
-      "source": "node-1",
-      "sourceHandle": "provider",
-      "target": "node-5",
-      "targetHandle": "provider",
-      "animated": false
-    },
-    {
-      "id": "edge-1767682152910",
-      "source": "node-1",
-      "sourceHandle": "model",
-      "target": "node-5",
-      "targetHandle": "model",
-      "animated": false
-    },
-    {
-      "id": "edge-1767682169966",
-      "source": "node-1",
-      "sourceHandle": "request",
-      "target": "node-5",
-      "targetHandle": "request",
-      "animated": false
-    },
-    {
-      "id": "edge-1767682745134",
-      "source": "node-1",
-      "sourceHandle": "exec-out",
-      "target": "node-5",
-      "targetHandle": "exec-in",
-      "animated": true
-    },
-    {
-      "id": "edge-1767684752750",
-      "source": "node-5",
-      "sourceHandle": "exec-out",
-      "target": "node-16",
-      "targetHandle": "exec-in",
-      "animated": true
-    },
     {
       "id": "edge-1767684754855",
       "source": "node-16",
@@ -352,22 +367,6 @@
       "animated": false
     },
     {
-      "id": "edge-1767684764748",
-      "source": "node-5",
-      "sourceHandle": "tasks",
-      "target": "node-16",
-      "targetHandle": "tasks",
-      "animated": false
-    },
-    {
-      "id": "edge-1767684767090",
-      "source": "node-5",
-      "sourceHandle": "enriched_request",
-      "target": "node-16",
-      "targetHandle": "request",
-      "animated": false
-    },
-    {
       "id": "edge-1767684773601",
       "source": "node-1",
       "sourceHandle": "provider",
@@ -381,14 +380,6 @@
       "sourceHandle": "model",
       "target": "node-16",
       "targetHandle": "model",
-      "animated": false
-    },
-    {
-      "id": "edge-1767684782208",
-      "source": "node-1",
-      "sourceHandle": "tools",
-      "target": "node-16",
-      "targetHandle": "tools",
       "animated": false
     },
     {
@@ -406,9 +397,105 @@
       "target": "node-2",
       "targetHandle": "exec-in",
       "animated": true
+    },
+    {
+      "id": "edge-1767908704459",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-17",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767908738534",
+      "source": "node-1",
+      "sourceHandle": "request",
+      "target": "node-17",
+      "targetHandle": "request",
+      "animated": false
+    },
+    {
+      "id": "edge-1767908740951",
+      "source": "node-1",
+      "sourceHandle": "provider",
+      "target": "node-17",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1767908743559",
+      "source": "node-1",
+      "sourceHandle": "model",
+      "target": "node-17",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-1767908802014",
+      "source": "node-1",
+      "sourceHandle": "provider",
+      "target": "node-18",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1767908804919",
+      "source": "node-1",
+      "sourceHandle": "model",
+      "target": "node-18",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-1767908809561",
+      "source": "node-17",
+      "sourceHandle": "enriched_request",
+      "target": "node-18",
+      "targetHandle": "request",
+      "animated": false
+    },
+    {
+      "id": "edge-1767908825226",
+      "source": "node-17",
+      "sourceHandle": "exec-out",
+      "target": "node-18",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767908832093",
+      "source": "node-18",
+      "sourceHandle": "exec-out",
+      "target": "node-16",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767908846203",
+      "source": "node-18",
+      "sourceHandle": "plan",
+      "target": "node-16",
+      "targetHandle": "tasks",
+      "animated": false
+    },
+    {
+      "id": "edge-1767908852352",
+      "source": "node-1",
+      "sourceHandle": "tools",
+      "target": "node-16",
+      "targetHandle": "tools",
+      "animated": false
+    },
+    {
+      "id": "edge-1767908855993",
+      "source": "node-17",
+      "sourceHandle": "enriched_request",
+      "target": "node-16",
+      "targetHandle": "request",
+      "animated": false
     }
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-06T20:10:57.384035",
-  "updated_at": "2026-01-06T20:11:06.142045"
+  "updated_at": "2026-01-08T21:55:04.550925"
 }
