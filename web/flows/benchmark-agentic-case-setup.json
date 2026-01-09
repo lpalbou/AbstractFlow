@@ -1,0 +1,191 @@
+{
+  "id": "be0a6c04",
+  "name": "benchmark-agentic-case-setup",
+  "description": "Agentic benchmark: create per-run case files (scoped under workspace_root) and compute expected outputs.",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": { "x": -880.0, "y": 80.0 },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "case_dir", "label": "case_dir", "type": "string" },
+          { "id": "case_id", "label": "case_id", "type": "string" }
+        ],
+        "pinDefaults": { "case_dir": "cases/example/react", "case_id": "example-react" }
+      }
+    },
+    {
+      "id": "node-2",
+      "type": "code",
+      "position": { "x": -560.0, "y": 80.0 },
+      "data": {
+        "nodeType": "code",
+        "label": "Build Case Bundle",
+        "icon": "&#x1F40D;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "case_dir", "label": "case_dir", "type": "string" },
+          { "id": "case_id", "label": "case_id", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "output", "label": "output", "type": "object" }
+        ],
+        "codeBody": "return {\n  \"case_dir\": case_dir,\n  \"case_id\": case_id,\n  \"index_path\": index_path,\n  \"paths\": paths,\n  \"task_prompt\": task_prompt,\n  \"expected\": expected,\n  \"tool_calls\": tool_calls,\n}\n",
+        "code": "def transform(_input):\n    case_dir = str(_input.get(\"case_dir\") or \"\").strip()\n    case_id = str(_input.get(\"case_id\") or \"\").strip()\n\n    while case_dir.startswith(\"/\"):\n        case_dir = case_dir[1:]\n    while case_dir.endswith(\"/\"):\n        case_dir = case_dir[:-1]\n\n    if not case_id:\n        case_id = \"case\"\n    if not case_dir:\n        case_dir = \"cases/\" + case_id\n\n    customers = [\n        {\"customer_id\": \"C01\", \"name\": \"Alice\"},\n        {\"customer_id\": \"C02\", \"name\": \"Bob\"},\n        {\"customer_id\": \"C03\", \"name\": \"Cara\"},\n        {\"customer_id\": \"C04\", \"name\": \"Dan\"},\n        {\"customer_id\": \"C05\", \"name\": \"Eve\"},\n    ]\n\n    orders = [\n        {\"order_id\": \"O1001\", \"customer_id\": \"C01\", \"amount\": 120},\n        {\"order_id\": \"O1002\", \"customer_id\": \"C02\", \"amount\": 50},\n        {\"order_id\": \"O1003\", \"customer_id\": \"C03\", \"amount\": 200},\n        {\"order_id\": \"O1004\", \"customer_id\": \"C01\", \"amount\": 80},\n        {\"order_id\": \"O1005\", \"customer_id\": \"C04\", \"amount\": 30},\n        {\"order_id\": \"O1006\", \"customer_id\": \"C05\", \"amount\": 150},\n        {\"order_id\": \"O1007\", \"customer_id\": \"C02\", \"amount\": 60},\n        {\"order_id\": \"O1008\", \"customer_id\": \"C04\", \"amount\": 90},\n    ]\n\n    refunds = [\n        {\"order_id\": \"O1003\", \"amount\": 40},\n        {\"order_id\": \"O1004\", \"amount\": 20},\n        {\"order_id\": \"O1006\", \"amount\": 10},\n        {\"order_id\": \"O1008\", \"amount\": 90},\n    ]\n\n    name_by_cid = {}\n    for c in customers:\n        cid = c.get(\"customer_id\")\n        if isinstance(cid, str) and cid:\n            name_by_cid[cid] = str(c.get(\"name\") or \"\")\n\n    orders_by_oid = {}\n    net_by_cid = {}\n    total_orders = 0\n\n    for o in orders:\n        oid = str(o.get(\"order_id\") or \"\")\n        cid = str(o.get(\"customer_id\") or \"\")\n        raw_amt = o.get(\"amount\")\n        try:\n            amt = int(raw_amt)\n        except Exception:\n            amt = 0\n        orders_by_oid[oid] = {\"customer_id\": cid, \"amount\": amt}\n        total_orders += amt\n        net_by_cid[cid] = int(net_by_cid.get(cid, 0) or 0) + amt\n\n    total_refunds = 0\n    for r in refunds:\n        oid = str(r.get(\"order_id\") or \"\")\n        raw_amt = r.get(\"amount\")\n        try:\n            amt = int(raw_amt)\n        except Exception:\n            amt = 0\n        total_refunds += amt\n        linked = orders_by_oid.get(oid)\n        if isinstance(linked, dict):\n            cid = str(linked.get(\"customer_id\") or \"\")\n            net_by_cid[cid] = int(net_by_cid.get(cid, 0) or 0) - amt\n\n    rows = []\n    for cid, net in net_by_cid.items():\n        rows.append({\"customer_id\": str(cid), \"name\": name_by_cid.get(str(cid), \"\"), \"net_amount\": int(net)})\n\n    rows_sorted = sorted(rows, key=lambda x: (-int(x.get(\"net_amount\") or 0), str(x.get(\"customer_id\") or \"\")))\n    top_customers = rows_sorted[:3]\n\n    expected = {\n        \"case_id\": case_id,\n        \"top_customers\": top_customers,\n        \"totals\": {\n            \"orders_amount\": int(total_orders),\n            \"refunds_amount\": int(total_refunds),\n            \"net_amount\": int(total_orders - total_refunds),\n        },\n    }\n\n    customers_lines = []\n    for c in customers:\n        customers_lines.append(str(c.get(\"customer_id\") or \"\") + \",\" + str(c.get(\"name\") or \"\"))\n    customers_csv = \"\\n\".join(customers_lines) + \"\\n\"\n\n    orders_lines = []\n    for o in orders:\n        orders_lines.append(\n            str(o.get(\"order_id\") or \"\") + \",\" + str(o.get(\"customer_id\") or \"\") + \",\" + str(o.get(\"amount\") or \"\")\n        )\n    orders_csv = \"\\n\".join(orders_lines) + \"\\n\"\n\n    refunds_lines = []\n    for r in refunds:\n        refunds_lines.append(str(r.get(\"order_id\") or \"\") + \",\" + str(r.get(\"amount\") or \"\"))\n    refunds_csv = \"\\n\".join(refunds_lines) + \"\\n\"\n\n    index_path = case_dir + \"/inputs/index.txt\"\n    customers_path = case_dir + \"/inputs/customers.csv\"\n    orders_path = case_dir + \"/inputs/orders.csv\"\n    refunds_path = case_dir + \"/inputs/refunds.csv\"\n\n    paths = {\n        \"index\": index_path,\n        \"customers\": customers_path,\n        \"orders\": orders_path,\n        \"refunds\": refunds_path,\n    }\n\n    index_txt = (\n        \"BENCHMARK-AGENTIC\\n\"\n        \"case_id: \" + case_id + \"\\n\\n\"\n        \"FILES (relative to workspace_root)\\n\"\n        \"- \" + customers_path + \"\\n\"\n        \"- \" + orders_path + \"\\n\"\n        \"- \" + refunds_path + \"\\n\\n\"\n        \"TASK\\n\"\n        \"- Compute net_amount per customer:\\n\"\n        \"    net_amount = sum(order.amount for customer's orders) - sum(refund.amount for that customer's orders)\\n\"\n        \"- TOP 3 customers by net_amount desc; tiebreak customer_id asc.\\n\"\n        \"- Totals: orders_amount, refunds_amount, net_amount.\\n\\n\"\n        \"OUTPUT\\n\"\n        \"Return JSON with keys: case_id, top_customers, totals.\\n\"\n        \"top_customers: array of {customer_id,name,net_amount}.\\n\"\n        \"totals: {orders_amount,refunds_amount,net_amount}.\\n\"\n    )\n\n    task_prompt = (\n        \"Benchmark task (file-backed).\\n\\n\"\n        \"1) Read the index file: \" + index_path + \"\\n\"\n        \"2) From it, read the listed data files (you can read independent files in parallel).\\n\"\n        \"3) Compute the required JSON result.\\n\\n\"\n        \"Rules:\\n\"\n        \"- Use tool outputs as evidence; do not guess file contents.\\n\"\n        \"- Do not modify the input files.\\n\"\n        \"- If you need multiple independent tool calls, batch them in a single tool step when possible.\\n\"\n    )\n\n    tool_calls = [\n        {\"name\": \"write_file\", \"arguments\": {\"file_path\": index_path, \"content\": index_txt, \"mode\": \"w\"}},\n        {\"name\": \"write_file\", \"arguments\": {\"file_path\": customers_path, \"content\": customers_csv, \"mode\": \"w\"}},\n        {\"name\": \"write_file\", \"arguments\": {\"file_path\": orders_path, \"content\": orders_csv, \"mode\": \"w\"}},\n        {\"name\": \"write_file\", \"arguments\": {\"file_path\": refunds_path, \"content\": refunds_csv, \"mode\": \"w\"}},\n    ]\n\n    return {\n        \"case_dir\": case_dir,\n        \"case_id\": case_id,\n        \"index_path\": index_path,\n        \"paths\": paths,\n        \"task_prompt\": task_prompt,\n        \"expected\": expected,\n        \"tool_calls\": tool_calls,\n    }\n",
+        "functionName": "transform"
+      }
+    },
+    {
+      "id": "node-3",
+      "type": "get",
+      "position": { "x": -336.0, "y": 16.0 },
+      "data": {
+        "nodeType": "get",
+        "label": "Get tool_calls",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "tool_calls", "default": [] }
+      }
+    },
+    {
+      "id": "node-4",
+      "type": "tool_calls",
+      "position": { "x": -336.0, "y": 144.0 },
+      "data": {
+        "nodeType": "tool_calls",
+        "label": "Tool Calls",
+        "icon": "&#x1F528;",
+        "headerColor": "#16A085",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "tool_calls", "label": "tool_calls", "type": "array" },
+          { "id": "allowed_tools", "label": "allowed_tools", "type": "array" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "results", "label": "results", "type": "array" },
+          { "id": "success", "label": "success", "type": "boolean" }
+        ],
+        "effectConfig": { "allowed_tools": ["write_file"] }
+      }
+    },
+    {
+      "id": "node-5",
+      "type": "get",
+      "position": { "x": -336.0, "y": 272.0 },
+      "data": {
+        "nodeType": "get",
+        "label": "Get expected",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "expected", "default": {} }
+      }
+    },
+    {
+      "id": "node-6",
+      "type": "get",
+      "position": { "x": -336.0, "y": 384.0 },
+      "data": {
+        "nodeType": "get",
+        "label": "Get index_path",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "index_path", "default": "" }
+      }
+    },
+    {
+      "id": "node-7",
+      "type": "get",
+      "position": { "x": -336.0, "y": 496.0 },
+      "data": {
+        "nodeType": "get",
+        "label": "Get task_prompt",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "task_prompt", "default": "" }
+      }
+    },
+    {
+      "id": "node-8",
+      "type": "on_flow_end",
+      "position": { "x": 32.0, "y": 144.0 },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "case_dir", "label": "case_dir", "type": "string" },
+          { "id": "case_id", "label": "case_id", "type": "string" },
+          { "id": "index_path", "label": "index_path", "type": "string" },
+          { "id": "task_prompt", "label": "task_prompt", "type": "string" },
+          { "id": "expected", "label": "expected", "type": "object" },
+          { "id": "setup_success", "label": "setup_success", "type": "boolean" },
+          { "id": "setup_results", "label": "setup_results", "type": "array" }
+        ],
+        "outputs": []
+      }
+    }
+  ],
+  "edges": [
+    { "id": "edge-1", "source": "node-1", "sourceHandle": "exec-out", "target": "node-2", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-2", "source": "node-1", "sourceHandle": "case_dir", "target": "node-2", "targetHandle": "case_dir", "animated": false },
+    { "id": "edge-3", "source": "node-1", "sourceHandle": "case_id", "target": "node-2", "targetHandle": "case_id", "animated": false },
+
+    { "id": "edge-4", "source": "node-2", "sourceHandle": "output", "target": "node-3", "targetHandle": "object", "animated": false },
+    { "id": "edge-5", "source": "node-2", "sourceHandle": "exec-out", "target": "node-4", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-6", "source": "node-3", "sourceHandle": "value", "target": "node-4", "targetHandle": "tool_calls", "animated": false },
+
+    { "id": "edge-7", "source": "node-2", "sourceHandle": "output", "target": "node-5", "targetHandle": "object", "animated": false },
+    { "id": "edge-8", "source": "node-2", "sourceHandle": "output", "target": "node-6", "targetHandle": "object", "animated": false },
+    { "id": "edge-9", "source": "node-2", "sourceHandle": "output", "target": "node-7", "targetHandle": "object", "animated": false },
+
+    { "id": "edge-10", "source": "node-4", "sourceHandle": "exec-out", "target": "node-8", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-11", "source": "node-1", "sourceHandle": "case_dir", "target": "node-8", "targetHandle": "case_dir", "animated": false },
+    { "id": "edge-12", "source": "node-1", "sourceHandle": "case_id", "target": "node-8", "targetHandle": "case_id", "animated": false },
+    { "id": "edge-13", "source": "node-6", "sourceHandle": "value", "target": "node-8", "targetHandle": "index_path", "animated": false },
+    { "id": "edge-14", "source": "node-7", "sourceHandle": "value", "target": "node-8", "targetHandle": "task_prompt", "animated": false },
+    { "id": "edge-15", "source": "node-5", "sourceHandle": "value", "target": "node-8", "targetHandle": "expected", "animated": false },
+    { "id": "edge-16", "source": "node-4", "sourceHandle": "success", "target": "node-8", "targetHandle": "setup_success", "animated": false },
+    { "id": "edge-17", "source": "node-4", "sourceHandle": "results", "target": "node-8", "targetHandle": "setup_results", "animated": false }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2026-01-09T20:05:12.000000",
+  "updated_at": "2026-01-09T20:05:12.000000"
+}
+

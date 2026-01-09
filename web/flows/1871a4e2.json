@@ -1,0 +1,217 @@
+{
+  "id": "1871a4e2",
+  "name": "abilityeval-probe-v1",
+  "description": "Fast capability probe (planning/execution/review/calibration in a single LLM call).",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": { "x": -640.0, "y": 256.0 },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "label", "label": "label", "type": "string" },
+          { "id": "provider", "label": "provider", "type": "provider" },
+          { "id": "model", "label": "model", "type": "model" },
+          { "id": "temperature", "label": "temperature", "type": "number" },
+          { "id": "seed", "label": "seed", "type": "number" }
+        ],
+        "pinDefaults": {
+          "label": "baseline",
+          "provider": "lmstudio",
+          "model": "google_gemma-3-1b-it",
+          "temperature": 0.7,
+          "seed": -1
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-2",
+      "type": "llm_call",
+      "position": { "x": -176.0, "y": 256.0 },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Ability Probe",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          {
+            "id": "include_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          { "id": "provider", "label": "provider", "type": "provider", "description": "LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider." },
+          { "id": "model", "label": "model", "type": "model", "description": "LLM model id/name. If unset, uses the node’s configured model." },
+          { "id": "temperature", "label": "temperature", "type": "number", "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature." },
+          { "id": "seed", "label": "seed", "type": "number", "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed." },
+          { "id": "system", "label": "system", "type": "string", "description": "Optional system prompt for this single call." },
+          { "id": "prompt", "label": "prompt", "type": "string", "description": "User prompt/content for this single call." },
+          { "id": "tools", "label": "tools", "type": "tools", "description": "Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node)." },
+          { "id": "response_schema", "label": "structured_output", "type": "object", "description": "Optional JSON Schema object (type=object) the assistant content must conform to." }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "response", "label": "response", "type": "string", "description": "Assistant text content (best-effort). For tool calls, content may be empty." },
+          { "id": "tool_calls", "label": "tool_calls", "type": "array", "description": "Normalized tool call requests (same as result.tool_calls). This pin exists to make wiring into Tool Calls / Emit Event nodes simpler." },
+          { "id": "result", "label": "result", "type": "object", "description": "Full normalized LLM result (content, tool_calls, usage, provider/model metadata, trace_id)." }
+        ],
+        "pinDefaults": {
+          "system": "You are the AI system being evaluated. Answer as yourself (no roleplay). Prioritize correctness and clarity.",
+          "prompt": "You are taking a fast AbilityEval probe. Return ONLY valid JSON matching the provided schema.\n\nTASK 1 — Planning\nYou must design a plan for: \"Build a workflow that evaluates a model across multiple (seed, temperature) presets and produces both a human-readable report and a JSON profile for comparison.\" \nInclude clarifying questions, step-by-step plan, key risks, and how you would test it.\n\nTASK 2 — Execution (Python)\nWrite a small Python function `stability_stats(values: list[float]) -> dict` that returns:\n- mean\n- std (population standard deviation)\n- min\n- max\n- n\nAssume `values` is non-empty.\n\nTASK 3 — Review\nReview this flawed function and explain what is wrong, then provide an improved version:\n\n```python\ndef normalize_seed(seed):\n    if seed:\n        return int(seed)\n    return -1\n```\n\nTASK 4 — Calibration\nFor each of the three tasks above (planning/execution/review), provide a confidence score 0–1 and list the main assumptions/unknowns.\n\nKeep output concise."
+        },
+        "effectConfig": { "provider": "lmstudio", "model": "google_gemma-3-1b-it" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-3",
+      "type": "json_schema",
+      "position": { "x": -176.0, "y": 640.0 },
+      "data": {
+        "nodeType": "json_schema",
+        "label": "JSON Schema",
+        "icon": "&#x1F4CB;",
+        "headerColor": "#00FFFF",
+        "inputs": [],
+        "outputs": [{ "id": "value", "label": "schema", "type": "object" }],
+        "literalValue": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "planning": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "clarifying_questions": { "type": "array", "items": { "type": "string" } },
+                "plan_steps": { "type": "array", "items": { "type": "string" } },
+                "risks": { "type": "array", "items": { "type": "string" } },
+                "tests": { "type": "array", "items": { "type": "string" } }
+              },
+              "required": ["clarifying_questions", "plan_steps", "risks", "tests"]
+            },
+            "execution": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "language": { "type": "string" },
+                "code": { "type": "string" },
+                "notes": { "type": "string" }
+              },
+              "required": ["language", "code"]
+            },
+            "review": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "issues": { "type": "array", "items": { "type": "string" } },
+                "improved_code": { "type": "string" },
+                "notes": { "type": "string" }
+              },
+              "required": ["issues", "improved_code"]
+            },
+            "calibration": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "planning_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+                "execution_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+                "review_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+                "assumptions": { "type": "array", "items": { "type": "string" } }
+              },
+              "required": ["planning_confidence", "execution_confidence", "review_confidence", "assumptions"]
+            }
+          },
+          "required": ["planning", "execution", "review", "calibration"]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-4",
+      "type": "break_object",
+      "position": { "x": 176.0, "y": 256.0 },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [{ "id": "object", "label": "object", "type": "object" }],
+        "outputs": [
+          { "id": "data", "label": "data", "type": "any" },
+          { "id": "content", "label": "content", "type": "string" }
+        ],
+        "breakConfig": { "selectedPaths": ["data", "content"] }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-5",
+      "type": "on_flow_end",
+      "position": { "x": 560.0, "y": 256.0 },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "label", "label": "label", "type": "string" },
+          { "id": "seed", "label": "seed", "type": "number" },
+          { "id": "temperature", "label": "temperature", "type": "number" },
+          { "id": "ability", "label": "ability", "type": "object" },
+          { "id": "raw_text", "label": "raw_text", "type": "string" }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    { "id": "edge-1", "source": "node-1", "sourceHandle": "exec-out", "target": "node-2", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-2", "source": "node-1", "sourceHandle": "provider", "target": "node-2", "targetHandle": "provider", "animated": false },
+    { "id": "edge-3", "source": "node-1", "sourceHandle": "model", "target": "node-2", "targetHandle": "model", "animated": false },
+    { "id": "edge-4", "source": "node-1", "sourceHandle": "temperature", "target": "node-2", "targetHandle": "temperature", "animated": false },
+    { "id": "edge-5", "source": "node-1", "sourceHandle": "seed", "target": "node-2", "targetHandle": "seed", "animated": false },
+    { "id": "edge-6", "source": "node-3", "sourceHandle": "value", "target": "node-2", "targetHandle": "response_schema", "animated": false },
+    { "id": "edge-7", "source": "node-2", "sourceHandle": "result", "target": "node-4", "targetHandle": "object", "animated": false },
+    { "id": "edge-8", "source": "node-2", "sourceHandle": "exec-out", "target": "node-5", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-9", "source": "node-4", "sourceHandle": "data", "target": "node-5", "targetHandle": "ability", "animated": false },
+    { "id": "edge-10", "source": "node-4", "sourceHandle": "content", "target": "node-5", "targetHandle": "raw_text", "animated": false },
+    { "id": "edge-11", "source": "node-1", "sourceHandle": "label", "target": "node-5", "targetHandle": "label", "animated": false },
+    { "id": "edge-12", "source": "node-1", "sourceHandle": "seed", "target": "node-5", "targetHandle": "seed", "animated": false },
+    { "id": "edge-13", "source": "node-1", "sourceHandle": "temperature", "target": "node-5", "targetHandle": "temperature", "animated": false }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2026-01-09T17:20:00.000000",
+  "updated_at": "2026-01-09T17:20:00.000000"
+}
+

@@ -1,0 +1,1044 @@
+{
+  "id": "be0a6c03",
+  "name": "benchmark-agentic-codeact-run",
+  "description": "Run a single benchmark case using a CodeAct-style LLM/tool loop (VisualFlow llm_call + tool_calls) and score correctness + tool-use metrics.",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": { "x": -1408.0, "y": 96.0 },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "prompt_id", "label": "prompt_id", "type": "string" },
+          { "id": "prompt_label", "label": "prompt_label", "type": "string" },
+          { "id": "repeat", "label": "repeat", "type": "number" },
+          { "id": "system_prompt", "label": "system_prompt", "type": "string" },
+          { "id": "provider", "label": "provider", "type": "provider" },
+          { "id": "model", "label": "model", "type": "model" },
+          { "id": "temperature", "label": "temperature", "type": "number" },
+          { "id": "seed", "label": "seed", "type": "number" },
+          { "id": "evaluator_temperature", "label": "evaluator_temperature", "type": "number" },
+          { "id": "evaluator_seed", "label": "evaluator_seed", "type": "number" },
+          { "id": "max_iterations", "label": "max_iterations", "type": "number" },
+          { "id": "tools", "label": "tools", "type": "tools" }
+        ],
+        "pinDefaults": {
+          "prompt_id": "p01",
+          "prompt_label": "Baseline",
+          "repeat": 1,
+          "system_prompt": "You are an autonomous tool-using agent. Use tools, be truthful, and finish the task.",
+          "provider": "lmstudio",
+          "model": "google_gemma-3-1b-it",
+          "temperature": 0.7,
+          "seed": -1,
+          "evaluator_temperature": 0,
+          "evaluator_seed": 0,
+          "max_iterations": 16,
+          "tools": ["list_files", "search_files", "read_file", "write_file", "edit_file", "analyze_code", "execute_command"]
+        }
+      }
+    },
+    {
+      "id": "node-2",
+      "type": "code",
+      "position": { "x": -1184.0, "y": 96.0 },
+      "data": {
+        "nodeType": "code",
+        "label": "Compute case_dir/case_id",
+        "icon": "&#x1F40D;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "prompt_id", "label": "prompt_id", "type": "string" },
+          { "id": "repeat", "label": "repeat", "type": "number" },
+          { "id": "temperature", "label": "temperature", "type": "number" },
+          { "id": "seed", "label": "seed", "type": "number" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "output", "label": "output", "type": "object" }
+        ],
+        "codeBody": "return {\"case_dir\": case_dir, \"case_id\": case_id}\n",
+        "code": "def transform(_input):\n    def _fmt_temp(v):\n        try:\n            if v is None or isinstance(v, bool):\n                return \"NA\"\n            fv = float(v)\n            s = (\"{:.3f}\".format(fv)).rstrip(\"0\").rstrip(\".\")\n            return s if s else \"0\"\n        except Exception:\n            s = str(v or \"\").strip()\n            return s if s else \"NA\"\n\n    def _fmt_seed(v):\n        try:\n            if v is None or isinstance(v, bool):\n                return \"-1\"\n            return str(int(float(v)))\n        except Exception:\n            s = str(v or \"\").strip()\n            return s if s else \"-1\"\n\n    prompt_id = str(_input.get(\"prompt_id\") or \"\").strip() or \"pXX\"\n    raw_repeat = _input.get(\"repeat\")\n    try:\n        repeat_i = int(float(raw_repeat))\n    except Exception:\n        repeat_i = 0\n\n    temp_s = _fmt_temp(_input.get(\"temperature\"))\n    seed_s = _fmt_seed(_input.get(\"seed\"))\n    run_key = \"t\" + temp_s + \"_s\" + seed_s\n\n    case_dir = \"cases/\" + prompt_id + \"/\" + run_key + \"/r\" + str(repeat_i) + \"/codeact\"\n    case_id = \"codeact-\" + prompt_id + \"-\" + run_key + \"-r\" + str(repeat_i)\n    return {\"case_dir\": case_dir, \"case_id\": case_id}\n",
+        "functionName": "transform"
+      }
+    },
+    {
+      "id": "node-3",
+      "type": "get",
+      "position": { "x": -928.0, "y": 16.0 },
+      "data": {
+        "nodeType": "get",
+        "label": "Get case_dir",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "case_dir", "default": "" }
+      }
+    },
+    {
+      "id": "node-4",
+      "type": "get",
+      "position": { "x": -928.0, "y": 112.0 },
+      "data": {
+        "nodeType": "get",
+        "label": "Get case_id",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "case_id", "default": "" }
+      }
+    },
+    {
+      "id": "node-5",
+      "type": "subflow",
+      "position": { "x": -704.0, "y": 96.0 },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Case Setup",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "inherit_context", "label": "inherit_context", "type": "boolean" },
+          { "id": "case_dir", "label": "case_dir", "type": "string" },
+          { "id": "case_id", "label": "case_id", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "expected", "label": "expected", "type": "object" },
+          { "id": "index_path", "label": "index_path", "type": "string" },
+          { "id": "task_prompt", "label": "task_prompt", "type": "string" },
+          { "id": "setup_success", "label": "setup_success", "type": "boolean" },
+          { "id": "setup_results", "label": "setup_results", "type": "array" }
+        ],
+        "subflowId": "be0a6c04",
+        "pinDefaults": { "inherit_context": false }
+      }
+    },
+    {
+      "id": "node-6",
+      "type": "var_decl",
+      "position": { "x": -704.0, "y": 288.0 },
+      "data": {
+        "nodeType": "var_decl",
+        "label": "Variable",
+        "icon": "𝑥",
+        "headerColor": "#16A085",
+        "inputs": [],
+        "outputs": [
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "boolean" }
+        ],
+        "literalValue": { "name": "b_continue", "type": "boolean", "default": true }
+      }
+    },
+    {
+      "id": "node-7",
+      "type": "var_decl",
+      "position": { "x": -704.0, "y": 400.0 },
+      "data": {
+        "nodeType": "var_decl",
+        "label": "Variable",
+        "icon": "𝑥",
+        "headerColor": "#16A085",
+        "inputs": [],
+        "outputs": [
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "array" }
+        ],
+        "literalValue": { "name": "steps", "type": "array", "default": [] }
+      }
+    },
+    {
+      "id": "node-8",
+      "type": "var_decl",
+      "position": { "x": -704.0, "y": 512.0 },
+      "data": {
+        "nodeType": "var_decl",
+        "label": "Variable",
+        "icon": "𝑥",
+        "headerColor": "#16A085",
+        "inputs": [],
+        "outputs": [
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "string" }
+        ],
+        "literalValue": { "name": "final_answer", "type": "string", "default": "" }
+      }
+    },
+    {
+      "id": "node-9",
+      "type": "var_decl",
+      "position": { "x": -704.0, "y": 624.0 },
+      "data": {
+        "nodeType": "var_decl",
+        "label": "Variable",
+        "icon": "𝑥",
+        "headerColor": "#16A085",
+        "inputs": [],
+        "outputs": [
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "string" }
+        ],
+        "literalValue": { "name": "stop_reason", "type": "string", "default": "" }
+      }
+    },
+    {
+      "id": "node-10",
+      "type": "while",
+      "position": { "x": -432.0, "y": 288.0 },
+      "data": {
+        "nodeType": "while",
+        "label": "CodeAct Loop",
+        "icon": "&#x267B;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "condition", "label": "condition", "type": "boolean" }
+        ],
+        "outputs": [
+          { "id": "loop", "label": "loop", "type": "execution" },
+          { "id": "done", "label": "done", "type": "execution" },
+          { "id": "index", "label": "index", "type": "number" }
+        ]
+      }
+    },
+    {
+      "id": "node-11",
+      "type": "get_var",
+      "position": { "x": -432.0, "y": 448.0 },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get steps",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [{ "id": "name", "label": "name", "type": "string" }],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "name": "steps" }
+      }
+    },
+    {
+      "id": "node-12",
+      "type": "stringify_json",
+      "position": { "x": -176.0, "y": 448.0 },
+      "data": {
+        "nodeType": "stringify_json",
+        "label": "Stringify JSON",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "value", "label": "value", "type": "any", "description": "JSON value (or JSON-ish string) to stringify." },
+          { "id": "mode", "label": "mode", "type": "string", "description": "Rendering mode: none | beautify | minified. Default beautify." }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "string" }],
+        "pinDefaults": { "mode": "minified" }
+      }
+    },
+    {
+      "id": "node-13",
+      "type": "code",
+      "position": { "x": -176.0, "y": 288.0 },
+      "data": {
+        "nodeType": "code",
+        "label": "Build loop prompt",
+        "icon": "&#x1F40D;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "task_prompt", "label": "task_prompt", "type": "string" },
+          { "id": "steps_json", "label": "steps_json", "type": "string" },
+          { "id": "index", "label": "index", "type": "number" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "output", "label": "output", "type": "string" }
+        ],
+        "codeBody": "return prompt\n",
+        "code": "def transform(_input):\n    task_prompt = str(_input.get(\"task_prompt\") or \"\").strip()\n    steps_json = str(_input.get(\"steps_json\") or \"[]\")\n    idx = _input.get(\"index\")\n    try:\n        i = int(float(idx))\n    except Exception:\n        i = 0\n\n    prompt = (\n        task_prompt\n        + \"\\n\\n\"\n        + \"Loop iteration: \" + str(i) + \"\\n\"\n        + \"PREVIOUS_STEPS_JSON (minified):\\n\" + steps_json + \"\\n\\n\"\n        + \"Decide the next action.\\n\"\n        + \"- If you need more information, call tools (batch independent tool calls when possible).\\n\"\n        + \"- If you have enough information, return the final JSON answer (you can include extra text; it will be formatted).\\n\"\n    )\n    return prompt\n",
+        "functionName": "transform"
+      }
+    },
+    {
+      "id": "node-14",
+      "type": "llm_call",
+      "position": { "x": 64.0, "y": 288.0 },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "LLM Call",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "include_context", "label": "use_context", "type": "boolean" },
+          { "id": "provider", "label": "provider", "type": "provider" },
+          { "id": "model", "label": "model", "type": "model" },
+          { "id": "temperature", "label": "temperature", "type": "number" },
+          { "id": "seed", "label": "seed", "type": "number" },
+          { "id": "system", "label": "system", "type": "string" },
+          { "id": "prompt", "label": "prompt", "type": "string" },
+          { "id": "tools", "label": "tools", "type": "tools" },
+          { "id": "response_schema", "label": "structured_output", "type": "object" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "response", "label": "response", "type": "string" },
+          { "id": "tool_calls", "label": "tool_calls", "type": "array" },
+          { "id": "result", "label": "result", "type": "object" }
+        ],
+        "pinDefaults": { "include_context": false }
+      }
+    },
+    {
+      "id": "node-15",
+      "type": "code",
+      "position": { "x": 320.0, "y": 288.0 },
+      "data": {
+        "nodeType": "code",
+        "label": "Normalize LLM output",
+        "icon": "&#x1F40D;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "index", "label": "index", "type": "number" },
+          { "id": "response", "label": "response", "type": "string" },
+          { "id": "tool_calls", "label": "tool_calls", "type": "array" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "output", "label": "output", "type": "object" }
+        ],
+        "codeBody": "return out\n",
+        "code": "def transform(_input):\n    idx = _input.get(\"index\")\n    try:\n        i = int(float(idx))\n    except Exception:\n        i = 0\n\n    response = _input.get(\"response\")\n    resp = \"\" if response is None else str(response)\n\n    raw_calls = _input.get(\"tool_calls\")\n    calls = []\n    if isinstance(raw_calls, list):\n        for c in raw_calls:\n            if isinstance(c, dict):\n                calls.append(c)\n    elif isinstance(raw_calls, dict):\n        calls = [raw_calls]\n\n    n = len(calls)\n\n    out = {\n        \"index\": int(i),\n        \"response\": resp,\n        \"tool_calls\": calls,\n        \"n_tool_calls\": int(n),\n        \"has_tool_calls\": bool(n > 0),\n    }\n    return out\n",
+        "functionName": "transform"
+      }
+    },
+    {
+      "id": "node-16",
+      "type": "get",
+      "position": { "x": 576.0, "y": 144.0 },
+      "data": {
+        "nodeType": "get",
+        "label": "Get tool_calls",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "tool_calls", "default": [] }
+      }
+    },
+    {
+      "id": "node-17",
+      "type": "get",
+      "position": { "x": 576.0, "y": 240.0 },
+      "data": {
+        "nodeType": "get",
+        "label": "Get has_tool_calls",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "has_tool_calls", "default": false }
+      }
+    },
+    {
+      "id": "node-18",
+      "type": "if",
+      "position": { "x": 832.0, "y": 288.0 },
+      "data": {
+        "nodeType": "if",
+        "label": "Has tool calls?",
+        "icon": "&#x2753;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "condition", "label": "condition", "type": "boolean" }
+        ],
+        "outputs": [
+          { "id": "true", "label": "true", "type": "execution" },
+          { "id": "false", "label": "false", "type": "execution" }
+        ]
+      }
+    },
+    {
+      "id": "node-19",
+      "type": "tool_calls",
+      "position": { "x": 1088.0, "y": 176.0 },
+      "data": {
+        "nodeType": "tool_calls",
+        "label": "Tool Calls",
+        "icon": "&#x1F528;",
+        "headerColor": "#16A085",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "tool_calls", "label": "tool_calls", "type": "array" },
+          { "id": "allowed_tools", "label": "allowed_tools", "type": "array" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "results", "label": "results", "type": "array" },
+          { "id": "success", "label": "success", "type": "boolean" }
+        ]
+      }
+    },
+    {
+      "id": "node-20",
+      "type": "code",
+      "position": { "x": 1328.0, "y": 176.0 },
+      "data": {
+        "nodeType": "code",
+        "label": "Build step (tool)",
+        "icon": "&#x1F40D;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "index", "label": "index", "type": "number" },
+          { "id": "response", "label": "response", "type": "string" },
+          { "id": "tool_calls", "label": "tool_calls", "type": "array" },
+          { "id": "tool_results", "label": "tool_results", "type": "array" },
+          { "id": "tool_success", "label": "tool_success", "type": "boolean" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "output", "label": "output", "type": "object" }
+        ],
+        "codeBody": "return step\n",
+        "code": "def transform(_input):\n    idx = _input.get(\"index\")\n    try:\n        i = int(float(idx))\n    except Exception:\n        i = 0\n\n    response = _input.get(\"response\")\n    resp = \"\" if response is None else str(response)\n\n    calls_raw = _input.get(\"tool_calls\")\n    calls = []\n    if isinstance(calls_raw, list):\n        for c in calls_raw:\n            if isinstance(c, dict):\n                calls.append(c)\n    elif isinstance(calls_raw, dict):\n        calls = [calls_raw]\n\n    results_raw = _input.get(\"tool_results\")\n    results = results_raw if isinstance(results_raw, list) else []\n\n    ts = _input.get(\"tool_success\")\n    tool_success = bool(ts) if isinstance(ts, bool) else None\n\n    step = {\n        \"index\": int(i),\n        \"assistant_response\": resp,\n        \"tool_calls\": calls,\n        \"tool_results\": results,\n        \"tool_success\": tool_success,\n    }\n    return step\n",
+        "functionName": "transform"
+      }
+    },
+    {
+      "id": "node-21",
+      "type": "array_append",
+      "position": { "x": 1568.0, "y": 176.0 },
+      "data": {
+        "nodeType": "array_append",
+        "label": "Array Append",
+        "icon": "&#x2795;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "array", "label": "array", "type": "array" },
+          { "id": "item", "label": "item", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "array" }]
+      }
+    },
+    {
+      "id": "node-22",
+      "type": "set_var",
+      "position": { "x": 1792.0, "y": 176.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Set steps",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "pinDefaults": { "name": "steps" }
+      }
+    },
+    {
+      "id": "node-23",
+      "type": "subtract",
+      "position": { "x": 1792.0, "y": 48.0 },
+      "data": {
+        "nodeType": "subtract",
+        "label": "Subtract",
+        "icon": "-",
+        "headerColor": "#27AE60",
+        "inputs": [
+          { "id": "a", "label": "a", "type": "number" },
+          { "id": "b", "label": "b", "type": "number" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "number" }],
+        "pinDefaults": { "b": 1 }
+      }
+    },
+    {
+      "id": "node-24",
+      "type": "compare",
+      "position": { "x": 2048.0, "y": 48.0 },
+      "data": {
+        "nodeType": "compare",
+        "label": "Reached max?",
+        "icon": "=?",
+        "headerColor": "#F39C12",
+        "inputs": [
+          { "id": "a", "label": "a", "type": "any" },
+          { "id": "op", "label": "op", "type": "string" },
+          { "id": "b", "label": "b", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "boolean" }],
+        "pinDefaults": { "op": ">=" }
+      }
+    },
+    {
+      "id": "node-25",
+      "type": "if",
+      "position": { "x": 2048.0, "y": 176.0 },
+      "data": {
+        "nodeType": "if",
+        "label": "If reached max",
+        "icon": "&#x2753;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "condition", "label": "condition", "type": "boolean" }
+        ],
+        "outputs": [
+          { "id": "true", "label": "true", "type": "execution" },
+          { "id": "false", "label": "false", "type": "execution" }
+        ]
+      }
+    },
+    {
+      "id": "node-26",
+      "type": "set_var",
+      "position": { "x": 2288.0, "y": 96.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Set stop_reason",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "string" }
+        ],
+        "pinDefaults": { "name": "stop_reason", "value": "max_iterations" }
+      }
+    },
+    {
+      "id": "node-27",
+      "type": "set_var",
+      "position": { "x": 2528.0, "y": 96.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Stop loop",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "boolean" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "boolean" }
+        ],
+        "pinDefaults": { "name": "b_continue", "value": false }
+      }
+    },
+    {
+      "id": "node-28",
+      "type": "code",
+      "position": { "x": 1088.0, "y": 400.0 },
+      "data": {
+        "nodeType": "code",
+        "label": "Build step (final)",
+        "icon": "&#x1F40D;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "index", "label": "index", "type": "number" },
+          { "id": "response", "label": "response", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "output", "label": "output", "type": "object" }
+        ],
+        "codeBody": "return step\n",
+        "code": "def transform(_input):\n    idx = _input.get(\"index\")\n    try:\n        i = int(float(idx))\n    except Exception:\n        i = 0\n\n    response = _input.get(\"response\")\n    resp = \"\" if response is None else str(response)\n\n    step = {\n        \"index\": int(i),\n        \"assistant_response\": resp,\n        \"tool_calls\": [],\n        \"tool_results\": [],\n        \"tool_success\": None,\n        \"done\": True,\n    }\n    return step\n",
+        "functionName": "transform"
+      }
+    },
+    {
+      "id": "node-29",
+      "type": "array_append",
+      "position": { "x": 1328.0, "y": 400.0 },
+      "data": {
+        "nodeType": "array_append",
+        "label": "Array Append",
+        "icon": "&#x2795;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "array", "label": "array", "type": "array" },
+          { "id": "item", "label": "item", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "array" }]
+      }
+    },
+    {
+      "id": "node-30",
+      "type": "set_var",
+      "position": { "x": 1568.0, "y": 400.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Set steps",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "pinDefaults": { "name": "steps" }
+      }
+    },
+    {
+      "id": "node-31",
+      "type": "set_var",
+      "position": { "x": 1792.0, "y": 400.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Set final_answer",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "string" }
+        ],
+        "pinDefaults": { "name": "final_answer" }
+      }
+    },
+    {
+      "id": "node-32",
+      "type": "set_var",
+      "position": { "x": 2000.0, "y": 400.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Set stop_reason",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "string" }
+        ],
+        "pinDefaults": { "name": "stop_reason", "value": "no_tool_calls" }
+      }
+    },
+    {
+      "id": "node-33",
+      "type": "set_var",
+      "position": { "x": 2216.0, "y": 400.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Stop loop",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "boolean" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "boolean" }
+        ],
+        "pinDefaults": { "name": "b_continue", "value": false }
+      }
+    },
+    {
+      "id": "node-34",
+      "type": "get_var",
+      "position": { "x": -176.0, "y": 720.0 },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get final_answer",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [{ "id": "name", "label": "name", "type": "string" }],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "name": "final_answer" }
+      }
+    },
+    {
+      "id": "node-42",
+      "type": "code",
+      "position": { "x": 64.0, "y": 608.0 },
+      "data": {
+        "nodeType": "code",
+        "label": "Select raw_answer",
+        "icon": "&#x1F40D;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "final_answer", "label": "final_answer", "type": "string" },
+          { "id": "steps", "label": "steps", "type": "array" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "output", "label": "output", "type": "string" }
+        ],
+        "codeBody": "return raw\n",
+        "code": "def transform(_input):\n    fa = str(_input.get(\"final_answer\") or \"\").strip()\n    if fa:\n        return fa\n\n    steps = _input.get(\"steps\")\n    if isinstance(steps, list):\n        for s_any in reversed(steps):\n            s = s_any if isinstance(s_any, dict) else None\n            if s is None:\n                continue\n            v = s.get(\"assistant_response\")\n            if v is None:\n                v = s.get(\"response\")\n            txt = str(v or \"\").strip()\n            if txt:\n                return txt\n\n    return \"\"\n",
+        "functionName": "transform"
+      }
+    },
+    {
+      "id": "node-35",
+      "type": "json_schema",
+      "position": { "x": 64.0, "y": 896.0 },
+      "data": {
+        "nodeType": "json_schema",
+        "label": "JSON Schema",
+        "icon": "&#x1F4CB;",
+        "headerColor": "#00FFFF",
+        "inputs": [],
+        "outputs": [{ "id": "value", "label": "schema", "type": "object" }],
+        "literalValue": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["case_id", "top_customers", "totals"],
+          "properties": {
+            "case_id": { "type": "string" },
+            "top_customers": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["customer_id", "name", "net_amount"],
+                "properties": {
+                  "customer_id": { "type": "string" },
+                  "name": { "type": "string" },
+                  "net_amount": { "type": "integer" }
+                }
+              }
+            },
+            "totals": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["orders_amount", "refunds_amount", "net_amount"],
+              "properties": {
+                "orders_amount": { "type": "integer" },
+                "refunds_amount": { "type": "integer" },
+                "net_amount": { "type": "integer" }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "node-36",
+      "type": "code",
+      "position": { "x": 64.0, "y": 720.0 },
+      "data": {
+        "nodeType": "code",
+        "label": "Build formatter prompt",
+        "icon": "&#x1F40D;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "case_id", "label": "case_id", "type": "string" },
+          { "id": "raw_answer", "label": "raw_answer", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "output", "label": "output", "type": "string" }
+        ],
+        "codeBody": "return prompt\n",
+        "code": "def transform(_input):\n    case_id = str(_input.get(\"case_id\") or \"\").strip()\n    raw_answer = str(_input.get(\"raw_answer\") or \"\").strip()\n    prompt = (\n        \"Convert the following agent answer into JSON matching the required schema. \"\n        \"Return JSON only (no markdown, no extra keys).\\n\\n\"\n        + \"case_id: \" + case_id + \"\\n\\n\"\n        + \"Answer:\\n\" + raw_answer\n    )\n    return prompt\n",
+        "functionName": "transform"
+      }
+    },
+    {
+      "id": "node-37",
+      "type": "llm_call",
+      "position": { "x": 320.0, "y": 720.0 },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "LLM Call",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "include_context", "label": "use_context", "type": "boolean" },
+          { "id": "provider", "label": "provider", "type": "provider" },
+          { "id": "model", "label": "model", "type": "model" },
+          { "id": "temperature", "label": "temperature", "type": "number" },
+          { "id": "seed", "label": "seed", "type": "number" },
+          { "id": "system", "label": "system", "type": "string" },
+          { "id": "prompt", "label": "prompt", "type": "string" },
+          { "id": "tools", "label": "tools", "type": "tools" },
+          { "id": "response_schema", "label": "structured_output", "type": "object" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "response", "label": "response", "type": "string" },
+          { "id": "tool_calls", "label": "tool_calls", "type": "array" },
+          { "id": "result", "label": "result", "type": "object" }
+        ],
+        "pinDefaults": {
+          "include_context": false,
+          "system": "You are a strict JSON formatter. Output only valid JSON. Do not add commentary.",
+          "tools": []
+        }
+      }
+    },
+    {
+      "id": "node-38",
+      "type": "get",
+      "position": { "x": 576.0, "y": 640.0 },
+      "data": {
+        "nodeType": "get",
+        "label": "Get structured.data",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "data", "default": {} }
+      }
+    },
+    {
+      "id": "node-39",
+      "type": "get_var",
+      "position": { "x": 576.0, "y": 896.0 },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get stop_reason",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [{ "id": "name", "label": "name", "type": "string" }],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "name": "stop_reason" }
+      }
+    },
+    {
+      "id": "node-40",
+      "type": "code",
+      "position": { "x": 576.0, "y": 736.0 },
+      "data": {
+        "nodeType": "code",
+        "label": "Evaluate + Build Record",
+        "icon": "&#x1F40D;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "mode", "label": "mode", "type": "string" },
+          { "id": "prompt_id", "label": "prompt_id", "type": "string" },
+          { "id": "prompt_label", "label": "prompt_label", "type": "string" },
+          { "id": "repeat", "label": "repeat", "type": "number" },
+          { "id": "case_dir", "label": "case_dir", "type": "string" },
+          { "id": "case_id", "label": "case_id", "type": "string" },
+          { "id": "index_path", "label": "index_path", "type": "string" },
+          { "id": "provider", "label": "provider", "type": "string" },
+          { "id": "model", "label": "model", "type": "string" },
+          { "id": "temperature", "label": "temperature", "type": "number" },
+          { "id": "seed", "label": "seed", "type": "number" },
+          { "id": "expected", "label": "expected", "type": "object" },
+          { "id": "output", "label": "output", "type": "object" },
+          { "id": "raw_answer", "label": "raw_answer", "type": "string" },
+          { "id": "steps", "label": "steps", "type": "array" },
+          { "id": "stop_reason", "label": "stop_reason", "type": "string" },
+          { "id": "setup_success", "label": "setup_success", "type": "boolean" },
+          { "id": "setup_results", "label": "setup_results", "type": "array" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "output", "label": "output", "type": "object" }
+        ],
+        "pinDefaults": { "mode": "codeact" },
+        "codeBody": "return record\n",
+        "code": "def transform(_input):\n    def _as_int(x):\n        try:\n            if x is None:\n                return None\n            if isinstance(x, bool):\n                return int(x)\n            return int(float(x))\n        except Exception:\n            return None\n\n    def _as_list(v):\n        return v if isinstance(v, list) else []\n\n    def _as_dict(v):\n        return v if isinstance(v, dict) else {}\n\n    mode = str(_input.get(\"mode\") or \"codeact\")\n    prompt_id = str(_input.get(\"prompt_id\") or \"\")\n    prompt_label = str(_input.get(\"prompt_label\") or \"\")\n\n    raw_repeat = _input.get(\"repeat\")\n    try:\n        repeat_i = int(float(raw_repeat))\n    except Exception:\n        repeat_i = 0\n\n    case_dir = str(_input.get(\"case_dir\") or \"\")\n    case_id = str(_input.get(\"case_id\") or \"\")\n    index_path = str(_input.get(\"index_path\") or \"\")\n\n    provider = str(_input.get(\"provider\") or \"\")\n    model = str(_input.get(\"model\") or \"\")\n    temperature = _input.get(\"temperature\")\n    seed = _input.get(\"seed\")\n\n    expected = _as_dict(_input.get(\"expected\"))\n    output = _as_dict(_input.get(\"output\"))\n    raw_answer = str(_input.get(\"raw_answer\") or \"\")\n\n    stop_reason = str(_input.get(\"stop_reason\") or \"\")\n\n    setup_success = _input.get(\"setup_success\")\n    setup_ok = bool(setup_success) if isinstance(setup_success, bool) else True\n\n    issues = []\n\n    if stop_reason == \"max_iterations\":\n        issues.append(\"max_iterations_reached\")\n\n    exp_case = str(expected.get(\"case_id\") or \"\")\n    out_case = str(output.get(\"case_id\") or \"\")\n    if setup_ok and exp_case and out_case and exp_case != out_case:\n        issues.append(\"case_id_mismatch\")\n\n    exp_tot = _as_dict(expected.get(\"totals\"))\n    out_tot = _as_dict(output.get(\"totals\"))\n\n    for k in (\"orders_amount\", \"refunds_amount\", \"net_amount\"):\n        ev = _as_int(exp_tot.get(k))\n        ov = _as_int(out_tot.get(k))\n        if setup_ok and ev is not None and ov is not None and ev != ov:\n            issues.append(\"totals_\" + k + \"_mismatch\")\n\n    exp_top = _as_list(expected.get(\"top_customers\"))\n    out_top = _as_list(output.get(\"top_customers\"))\n\n    if setup_ok and len(exp_top) != 3:\n        issues.append(\"expected_top_customers_not_3\")\n    if setup_ok and len(out_top) != 3:\n        issues.append(\"output_top_customers_not_3\")\n\n    def _normalize_top(lst):\n        out = []\n        for row in _as_list(lst):\n            if not isinstance(row, dict):\n                continue\n            out.append(\n                {\n                    \"customer_id\": str(row.get(\"customer_id\") or \"\"),\n                    \"name\": str(row.get(\"name\") or \"\"),\n                    \"net_amount\": _as_int(row.get(\"net_amount\")),\n                }\n            )\n        return out\n\n    exp_norm = _normalize_top(exp_top)\n    out_norm = _normalize_top(out_top)\n\n    if setup_ok and len(exp_norm) == 3 and len(out_norm) == 3:\n        for i in range(3):\n            if exp_norm[i].get(\"customer_id\") != out_norm[i].get(\"customer_id\"):\n                issues.append(\"top_customer_id_mismatch_\" + str(i))\n            if exp_norm[i].get(\"net_amount\") != out_norm[i].get(\"net_amount\"):\n                issues.append(\"top_net_amount_mismatch_\" + str(i))\n\n    correct = setup_ok and (len(issues) == 0)\n\n    sig_parts = []\n    if isinstance(out_case, str) and out_case:\n        sig_parts.append(\"case_id=\" + out_case)\n    if len(out_norm) == 3:\n        for r in out_norm:\n            sig_parts.append(str(r.get(\"customer_id\") or \"\") + \":\" + str(r.get(\"net_amount\")))\n    if isinstance(out_tot, dict):\n        oa = _as_int(out_tot.get(\"orders_amount\"))\n        ra = _as_int(out_tot.get(\"refunds_amount\"))\n        na = _as_int(out_tot.get(\"net_amount\"))\n        sig_parts.append(\"totals=\" + str(oa) + \",\" + str(ra) + \",\" + str(na))\n    signature = \"|\".join(sig_parts)\n\n    steps = _as_list(_input.get(\"steps\"))\n\n    llm_calls = len(steps)\n    tool_batches = 0\n    tool_calls = 0\n    max_tools_per_batch = 0\n    multi_tool_batches = 0\n    tool_errors = 0\n    tools_used = {}\n\n    steps_summary = []\n\n    for s_any in steps:\n        s = s_any if isinstance(s_any, dict) else None\n        if s is None:\n            continue\n        idx = _as_int(s.get(\"index\"))\n        calls_raw = s.get(\"tool_calls\")\n        calls = []\n        if isinstance(calls_raw, list):\n            for c in calls_raw:\n                if isinstance(c, dict):\n                    calls.append(c)\n        elif isinstance(calls_raw, dict):\n            calls = [calls_raw]\n\n        n_calls = len(calls)\n        if n_calls > 0:\n            tool_batches += 1\n            tool_calls += n_calls\n            if n_calls > max_tools_per_batch:\n                max_tools_per_batch = n_calls\n            if n_calls >= 2:\n                multi_tool_batches += 1\n            for c in calls:\n                name = c.get(\"name\")\n                if isinstance(name, str) and name:\n                    tools_used[name] = int(tools_used.get(name, 0) or 0) + 1\n\n        results_raw = s.get(\"tool_results\")\n        if isinstance(results_raw, list):\n            for r_any in results_raw:\n                r = r_any if isinstance(r_any, dict) else None\n                if r is None:\n                    continue\n                if r.get(\"success\") is not True:\n                    tool_errors += 1\n\n        tool_names = []\n        for c in calls:\n            name = c.get(\"name\")\n            if isinstance(name, str) and name:\n                tool_names.append(name)\n\n        steps_summary.append({\"index\": idx, \"n_tool_calls\": int(n_calls), \"tool_names\": tool_names})\n\n    metrics = {\n        \"llm_calls\": int(llm_calls),\n        \"tool_batches\": int(tool_batches),\n        \"tool_calls\": int(tool_calls),\n        \"max_tools_per_batch\": int(max_tools_per_batch),\n        \"multi_tool_batches\": int(multi_tool_batches),\n        \"tool_errors\": int(tool_errors),\n        \"tools_used\": tools_used,\n        \"stop_reason\": stop_reason,\n    }\n\n    record = {\n        \"mode\": mode,\n        \"prompt_id\": prompt_id,\n        \"prompt_label\": prompt_label,\n        \"repeat\": int(repeat_i),\n        \"case_dir\": case_dir,\n        \"case_id\": case_id,\n        \"index_path\": index_path,\n        \"config\": {\n            \"provider\": provider,\n            \"model\": model,\n            \"temperature\": temperature,\n            \"seed\": seed,\n        },\n        \"setup\": {\n            \"success\": bool(setup_ok),\n            \"results\": _as_list(_input.get(\"setup_results\")),\n        },\n        \"output\": output,\n        \"expected\": expected,\n        \"correct\": bool(correct),\n        \"issues\": issues,\n        \"signature\": signature,\n        \"metrics\": metrics,\n        \"debug\": {\n            \"raw_answer\": raw_answer,\n            \"steps_summary\": steps_summary,\n        },\n    }\n\n    return record\n",
+        "functionName": "transform"
+      }
+    },
+    {
+      "id": "node-41",
+      "type": "on_flow_end",
+      "position": { "x": 832.0, "y": 736.0 },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "record", "label": "record", "type": "object" }
+        ],
+        "outputs": []
+      }
+    }
+  ],
+  "edges": [
+    { "id": "edge-1", "source": "node-1", "sourceHandle": "exec-out", "target": "node-2", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-2", "source": "node-1", "sourceHandle": "prompt_id", "target": "node-2", "targetHandle": "prompt_id", "animated": false },
+    { "id": "edge-3", "source": "node-1", "sourceHandle": "repeat", "target": "node-2", "targetHandle": "repeat", "animated": false },
+    { "id": "edge-4", "source": "node-1", "sourceHandle": "temperature", "target": "node-2", "targetHandle": "temperature", "animated": false },
+    { "id": "edge-5", "source": "node-1", "sourceHandle": "seed", "target": "node-2", "targetHandle": "seed", "animated": false },
+
+    { "id": "edge-6", "source": "node-2", "sourceHandle": "output", "target": "node-3", "targetHandle": "object", "animated": false },
+    { "id": "edge-7", "source": "node-2", "sourceHandle": "output", "target": "node-4", "targetHandle": "object", "animated": false },
+
+    { "id": "edge-8", "source": "node-2", "sourceHandle": "exec-out", "target": "node-5", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-9", "source": "node-3", "sourceHandle": "value", "target": "node-5", "targetHandle": "case_dir", "animated": false },
+    { "id": "edge-10", "source": "node-4", "sourceHandle": "value", "target": "node-5", "targetHandle": "case_id", "animated": false },
+
+    { "id": "edge-11", "source": "node-5", "sourceHandle": "exec-out", "target": "node-10", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-12", "source": "node-6", "sourceHandle": "value", "target": "node-10", "targetHandle": "condition", "animated": false },
+
+    { "id": "edge-13", "source": "node-10", "sourceHandle": "loop", "target": "node-13", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-14", "source": "node-10", "sourceHandle": "index", "target": "node-13", "targetHandle": "index", "animated": false },
+    { "id": "edge-15", "source": "node-5", "sourceHandle": "task_prompt", "target": "node-13", "targetHandle": "task_prompt", "animated": false },
+
+    { "id": "edge-16", "source": "node-11", "sourceHandle": "value", "target": "node-12", "targetHandle": "value", "animated": false },
+    { "id": "edge-17", "source": "node-12", "sourceHandle": "result", "target": "node-13", "targetHandle": "steps_json", "animated": false },
+
+    { "id": "edge-18", "source": "node-13", "sourceHandle": "exec-out", "target": "node-14", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-19", "source": "node-1", "sourceHandle": "provider", "target": "node-14", "targetHandle": "provider", "animated": false },
+    { "id": "edge-20", "source": "node-1", "sourceHandle": "model", "target": "node-14", "targetHandle": "model", "animated": false },
+    { "id": "edge-21", "source": "node-1", "sourceHandle": "temperature", "target": "node-14", "targetHandle": "temperature", "animated": false },
+    { "id": "edge-22", "source": "node-1", "sourceHandle": "seed", "target": "node-14", "targetHandle": "seed", "animated": false },
+    { "id": "edge-23", "source": "node-1", "sourceHandle": "system_prompt", "target": "node-14", "targetHandle": "system", "animated": false },
+    { "id": "edge-24", "source": "node-13", "sourceHandle": "output", "target": "node-14", "targetHandle": "prompt", "animated": false },
+    { "id": "edge-25", "source": "node-1", "sourceHandle": "tools", "target": "node-14", "targetHandle": "tools", "animated": false },
+
+    { "id": "edge-26", "source": "node-14", "sourceHandle": "exec-out", "target": "node-15", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-27", "source": "node-10", "sourceHandle": "index", "target": "node-15", "targetHandle": "index", "animated": false },
+    { "id": "edge-28", "source": "node-14", "sourceHandle": "response", "target": "node-15", "targetHandle": "response", "animated": false },
+    { "id": "edge-29", "source": "node-14", "sourceHandle": "tool_calls", "target": "node-15", "targetHandle": "tool_calls", "animated": false },
+
+    { "id": "edge-30", "source": "node-15", "sourceHandle": "output", "target": "node-16", "targetHandle": "object", "animated": false },
+    { "id": "edge-31", "source": "node-15", "sourceHandle": "output", "target": "node-17", "targetHandle": "object", "animated": false },
+
+    { "id": "edge-32", "source": "node-15", "sourceHandle": "exec-out", "target": "node-18", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-33", "source": "node-17", "sourceHandle": "value", "target": "node-18", "targetHandle": "condition", "animated": false },
+
+    { "id": "edge-34", "source": "node-18", "sourceHandle": "true", "target": "node-19", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-35", "source": "node-16", "sourceHandle": "value", "target": "node-19", "targetHandle": "tool_calls", "animated": false },
+    { "id": "edge-36", "source": "node-1", "sourceHandle": "tools", "target": "node-19", "targetHandle": "allowed_tools", "animated": false },
+
+    { "id": "edge-37", "source": "node-19", "sourceHandle": "exec-out", "target": "node-20", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-38", "source": "node-10", "sourceHandle": "index", "target": "node-20", "targetHandle": "index", "animated": false },
+    { "id": "edge-39", "source": "node-14", "sourceHandle": "response", "target": "node-20", "targetHandle": "response", "animated": false },
+    { "id": "edge-40", "source": "node-16", "sourceHandle": "value", "target": "node-20", "targetHandle": "tool_calls", "animated": false },
+    { "id": "edge-41", "source": "node-19", "sourceHandle": "results", "target": "node-20", "targetHandle": "tool_results", "animated": false },
+    { "id": "edge-42", "source": "node-19", "sourceHandle": "success", "target": "node-20", "targetHandle": "tool_success", "animated": false },
+
+    { "id": "edge-43", "source": "node-11", "sourceHandle": "value", "target": "node-21", "targetHandle": "array", "animated": false },
+    { "id": "edge-44", "source": "node-20", "sourceHandle": "output", "target": "node-21", "targetHandle": "item", "animated": false },
+    { "id": "edge-45", "source": "node-20", "sourceHandle": "exec-out", "target": "node-22", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-46", "source": "node-21", "sourceHandle": "result", "target": "node-22", "targetHandle": "value", "animated": false },
+
+    { "id": "edge-47", "source": "node-1", "sourceHandle": "max_iterations", "target": "node-23", "targetHandle": "a", "animated": false },
+    { "id": "edge-48", "source": "node-10", "sourceHandle": "index", "target": "node-24", "targetHandle": "a", "animated": false },
+    { "id": "edge-49", "source": "node-23", "sourceHandle": "result", "target": "node-24", "targetHandle": "b", "animated": false },
+
+    { "id": "edge-50", "source": "node-22", "sourceHandle": "exec-out", "target": "node-25", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-51", "source": "node-24", "sourceHandle": "result", "target": "node-25", "targetHandle": "condition", "animated": false },
+    { "id": "edge-52", "source": "node-25", "sourceHandle": "true", "target": "node-26", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-53", "source": "node-26", "sourceHandle": "exec-out", "target": "node-27", "targetHandle": "exec-in", "animated": true },
+
+    { "id": "edge-54", "source": "node-18", "sourceHandle": "false", "target": "node-28", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-55", "source": "node-10", "sourceHandle": "index", "target": "node-28", "targetHandle": "index", "animated": false },
+    { "id": "edge-56", "source": "node-14", "sourceHandle": "response", "target": "node-28", "targetHandle": "response", "animated": false },
+
+    { "id": "edge-57", "source": "node-11", "sourceHandle": "value", "target": "node-29", "targetHandle": "array", "animated": false },
+    { "id": "edge-58", "source": "node-28", "sourceHandle": "output", "target": "node-29", "targetHandle": "item", "animated": false },
+    { "id": "edge-59", "source": "node-28", "sourceHandle": "exec-out", "target": "node-30", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-60", "source": "node-29", "sourceHandle": "result", "target": "node-30", "targetHandle": "value", "animated": false },
+    { "id": "edge-61", "source": "node-30", "sourceHandle": "exec-out", "target": "node-31", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-62", "source": "node-14", "sourceHandle": "response", "target": "node-31", "targetHandle": "value", "animated": false },
+    { "id": "edge-63", "source": "node-31", "sourceHandle": "exec-out", "target": "node-32", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-64", "source": "node-32", "sourceHandle": "exec-out", "target": "node-33", "targetHandle": "exec-in", "animated": true },
+
+    { "id": "edge-65", "source": "node-10", "sourceHandle": "done", "target": "node-42", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-66", "source": "node-4", "sourceHandle": "value", "target": "node-36", "targetHandle": "case_id", "animated": false },
+    { "id": "edge-67", "source": "node-42", "sourceHandle": "output", "target": "node-36", "targetHandle": "raw_answer", "animated": false },
+    { "id": "edge-96", "source": "node-42", "sourceHandle": "exec-out", "target": "node-36", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-97", "source": "node-34", "sourceHandle": "value", "target": "node-42", "targetHandle": "final_answer", "animated": false },
+    { "id": "edge-98", "source": "node-11", "sourceHandle": "value", "target": "node-42", "targetHandle": "steps", "animated": false },
+
+    { "id": "edge-68", "source": "node-36", "sourceHandle": "exec-out", "target": "node-37", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-69", "source": "node-1", "sourceHandle": "provider", "target": "node-37", "targetHandle": "provider", "animated": false },
+    { "id": "edge-70", "source": "node-1", "sourceHandle": "model", "target": "node-37", "targetHandle": "model", "animated": false },
+    { "id": "edge-71", "source": "node-1", "sourceHandle": "evaluator_temperature", "target": "node-37", "targetHandle": "temperature", "animated": false },
+    { "id": "edge-72", "source": "node-1", "sourceHandle": "evaluator_seed", "target": "node-37", "targetHandle": "seed", "animated": false },
+    { "id": "edge-73", "source": "node-36", "sourceHandle": "output", "target": "node-37", "targetHandle": "prompt", "animated": false },
+    { "id": "edge-74", "source": "node-35", "sourceHandle": "value", "target": "node-37", "targetHandle": "response_schema", "animated": false },
+
+    { "id": "edge-75", "source": "node-37", "sourceHandle": "result", "target": "node-38", "targetHandle": "object", "animated": false },
+
+    { "id": "edge-76", "source": "node-37", "sourceHandle": "exec-out", "target": "node-40", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-77", "source": "node-1", "sourceHandle": "prompt_id", "target": "node-40", "targetHandle": "prompt_id", "animated": false },
+    { "id": "edge-78", "source": "node-1", "sourceHandle": "prompt_label", "target": "node-40", "targetHandle": "prompt_label", "animated": false },
+    { "id": "edge-79", "source": "node-1", "sourceHandle": "repeat", "target": "node-40", "targetHandle": "repeat", "animated": false },
+    { "id": "edge-80", "source": "node-3", "sourceHandle": "value", "target": "node-40", "targetHandle": "case_dir", "animated": false },
+    { "id": "edge-81", "source": "node-4", "sourceHandle": "value", "target": "node-40", "targetHandle": "case_id", "animated": false },
+    { "id": "edge-82", "source": "node-5", "sourceHandle": "index_path", "target": "node-40", "targetHandle": "index_path", "animated": false },
+    { "id": "edge-83", "source": "node-1", "sourceHandle": "provider", "target": "node-40", "targetHandle": "provider", "animated": false },
+    { "id": "edge-84", "source": "node-1", "sourceHandle": "model", "target": "node-40", "targetHandle": "model", "animated": false },
+    { "id": "edge-85", "source": "node-1", "sourceHandle": "temperature", "target": "node-40", "targetHandle": "temperature", "animated": false },
+    { "id": "edge-86", "source": "node-1", "sourceHandle": "seed", "target": "node-40", "targetHandle": "seed", "animated": false },
+    { "id": "edge-87", "source": "node-5", "sourceHandle": "expected", "target": "node-40", "targetHandle": "expected", "animated": false },
+    { "id": "edge-88", "source": "node-38", "sourceHandle": "value", "target": "node-40", "targetHandle": "output", "animated": false },
+    { "id": "edge-89", "source": "node-34", "sourceHandle": "value", "target": "node-40", "targetHandle": "raw_answer", "animated": false },
+    { "id": "edge-90", "source": "node-11", "sourceHandle": "value", "target": "node-40", "targetHandle": "steps", "animated": false },
+    { "id": "edge-91", "source": "node-39", "sourceHandle": "value", "target": "node-40", "targetHandle": "stop_reason", "animated": false },
+    { "id": "edge-92", "source": "node-5", "sourceHandle": "setup_success", "target": "node-40", "targetHandle": "setup_success", "animated": false },
+    { "id": "edge-93", "source": "node-5", "sourceHandle": "setup_results", "target": "node-40", "targetHandle": "setup_results", "animated": false },
+
+    { "id": "edge-94", "source": "node-40", "sourceHandle": "exec-out", "target": "node-41", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-95", "source": "node-40", "sourceHandle": "output", "target": "node-41", "targetHandle": "record", "animated": false }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2026-01-09T20:05:12.000000",
+  "updated_at": "2026-01-09T20:05:12.000000"
+}
