@@ -38,6 +38,132 @@ interface RunFlowModalProps {
   onSelectRunId?: (runId: string) => void;
 }
 
+type JsonParseResult<T> =
+  | { ok: true; value: T }
+  | { ok: false; error: string };
+
+function parseJson<T>(raw: string): JsonParseResult<T> {
+  const text = typeof raw === 'string' ? raw.trim() : '';
+  if (!text) {
+    return { ok: false, error: 'Empty' };
+  }
+  try {
+    return { ok: true, value: JSON.parse(text) as T };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Invalid JSON';
+    return { ok: false, error: msg };
+  }
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((v) => typeof v === 'string');
+}
+
+function stringifyJson(value: unknown): string {
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return '';
+  }
+}
+
+function ArrayParamEditor({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: string;
+  disabled: boolean;
+  onChange: (next: string) => void;
+}) {
+  // Support empty -> []
+  const trimmed = (value || '').trim();
+  const parsed = trimmed ? parseJson<unknown>(trimmed) : ({ ok: true, value: [] } as const);
+
+  const canUseList = parsed.ok && isStringArray(parsed.value);
+  const items = canUseList ? parsed.value : [];
+
+  const setItems = (nextItems: string[]) => {
+    onChange(stringifyJson(nextItems));
+  };
+
+  if (!canUseList) {
+    const hint =
+      !trimmed
+        ? 'Enter a JSON array (e.g., ["a","b"]).'
+        : !parsed.ok
+          ? `Invalid JSON: ${parsed.error}`
+          : 'This array contains non-string items. Use Raw JSON to edit advanced arrays.';
+
+    return (
+      <div className="array-editor">
+        <span className="property-hint">{hint}</span>
+        <textarea
+          className="run-form-input property-textarea code"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="[ ]"
+          rows={5}
+          disabled={disabled}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="array-editor">
+      {items.map((item, index) => (
+        <div key={index} className="array-item">
+          <input
+            type="text"
+            className="run-form-input array-item-input"
+            value={item}
+            onChange={(e) => {
+              const next = [...items];
+              next[index] = e.target.value;
+              setItems(next);
+            }}
+            placeholder={`Item ${index + 1}`}
+            disabled={disabled}
+          />
+          <button
+            type="button"
+            className="array-item-remove"
+            onClick={() => setItems(items.filter((_, i) => i !== index))}
+            title="Remove item"
+            disabled={disabled}
+          >
+            &times;
+          </button>
+        </div>
+      ))}
+
+      <button
+        type="button"
+        className="array-add-button"
+        onClick={() => setItems([...items, ''])}
+        disabled={disabled}
+      >
+        + Add Item
+      </button>
+
+      <span className="property-hint">{items.length} items</span>
+
+      <details className="raw-json-details">
+        <summary>Raw JSON (advanced)</summary>
+        <textarea
+          className="run-form-input property-textarea code"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder='[\n  "item"\n]'
+          rows={6}
+          disabled={disabled}
+        />
+      </details>
+    </div>
+  );
+}
+
 // Map pin types to input field types
 function getInputTypeForPin(pinType: string): 'text' | 'number' | 'checkbox' | 'textarea' {
   switch (pinType) {
@@ -2031,6 +2157,22 @@ export function RunFlowModal({
                               clearable
                               minPopoverWidth={340}
                               onChange={(next) => setToolsValues((prev) => ({ ...prev, [pin.id]: next }))}
+                            />
+                          </div>
+                        );
+                      }
+
+                      if (pin.type === 'array') {
+                        return (
+                          <div key={pin.id} className="run-form-field">
+                            <label className="run-form-label">
+                              {pin.label}
+                              <span className="run-form-type">({pin.type})</span>
+                            </label>
+                            <ArrayParamEditor
+                              value={value}
+                              disabled={isRunning}
+                              onChange={(next) => handleFieldChange(pin.id, next)}
                             />
                           </div>
                         );

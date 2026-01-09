@@ -8,8 +8,8 @@
       "id": "node-1",
       "type": "on_flow_start",
       "position": {
-        "x": -1520.0,
-        "y": 112.0
+        "x": -1568.0,
+        "y": 880.0
       },
       "data": {
         "nodeType": "on_flow_start",
@@ -78,7 +78,7 @@
       "id": "node-3",
       "type": "llm_call",
       "position": {
-        "x": -1152.0,
+        "x": -1184.0,
         "y": 112.0
       },
       "data": {
@@ -174,7 +174,7 @@
           ]
         },
         "pinDefaults": {
-          "system": "You are an expert scheduler.  You are given a request and you decompose it into tasks that are actionable by simple and small agents. Each task must include : 1) system prompt 2) the prompt 3) the tools the agent should use to accomplish the task given to him. For the tools, just give their names based on your own available tool list. Answer only with the requested structured format. Divide in at least 3 distinct tasks"
+          "system": "You are an expert scheduler who works like Map/Reduce : you decompose the request you receive into a series of IDENTICAL but small tasks (eg if you must read 500 files and have 100 agents, each agent will be given 5 files to read), so that each sub-task can be executed in parallel by a large number of small agents. As your role is to initialize those agents, you must output 1) a system prompt common to all small agents (they will run the SAME TYPE of task) 2) a set of tools based on your available tool names (again, SAME TYPE of task = need same type of tools) and 3) for each task, a dedicated user prompt informing on the agent specific task. Example : { “system_prompt” : “xxx”, “tools”: [ list_files, read_file…], tasks : [ {“user_prompt” : “read files xx1, xx2, xx3 and report the key insights”}, {“user_prompt” : “read the files xx4, xx5, xx6 and report the key insights”}, … ]"
         }
       },
       "label": null,
@@ -188,7 +188,7 @@
       "type": "json_schema",
       "position": {
         "x": -1456.0,
-        "y": 368.0
+        "y": 672.0
       },
       "data": {
         "nodeType": "json_schema",
@@ -206,61 +206,31 @@
         "literalValue": {
           "type": "object",
           "properties": {
-            "data": {
+            "system_prompt": {
+              "type": "string",
+              "description": "the system_prompt shared by all small agents to accomplish a similar task"
+            },
+            "tools": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "the array of tool names specifying the tool each agent will have access to"
+            },
+            "tasks": {
               "type": "array",
               "items": {
                 "type": "object"
               },
-              "description": "This array is designed to contain an array of tasks, each task being a json object : { \"system_prompt\" : string , \"user_prompt\", \"tools\" : array[string] }. It corresponds to the payload necessary to instantiate an agent on a given task"
+              "description": "the list of task given to an agent as a user prompt, each item having a structure : { \"user_prompt\" : \"my_personal_task\" }"
             }
           },
           "required": [
-            "data"
+            "system_prompt",
+            "tools",
+            "tasks"
           ]
         }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
-      "id": "node-6",
-      "type": "answer_user",
-      "position": {
-        "x": -720.0,
-        "y": 112.0
-      },
-      "data": {
-        "nodeType": "answer_user",
-        "label": "Answer User",
-        "icon": "&#x1F4AC;",
-        "headerColor": "#9B59B6",
-        "inputs": [
-          {
-            "id": "exec-in",
-            "label": "",
-            "type": "execution"
-          },
-          {
-            "id": "message",
-            "label": "message",
-            "type": "string"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "exec-out",
-            "label": "",
-            "type": "execution"
-          },
-          {
-            "id": "message",
-            "label": "message",
-            "type": "string"
-          }
-        ]
       },
       "label": null,
       "icon": null,
@@ -305,17 +275,801 @@
       "headerColor": null,
       "inputs": [],
       "outputs": []
+    },
+    {
+      "id": "node-8",
+      "type": "agent",
+      "position": {
+        "x": -1216.0,
+        "y": 432.0
+      },
+      "data": {
+        "nodeType": "agent",
+        "label": "Agent",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "include_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) as agent history. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider",
+            "description": "LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model",
+            "description": "LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number",
+            "description": "Maximum internal ReAct iterations (safety cap). Higher values allow more tool-use steps."
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string",
+            "description": "Optional system prompt for this agent instance (high priority instructions)."
+          },
+          {
+            "id": "task",
+            "label": "prompt",
+            "type": "string",
+            "description": "The task/user prompt for the agent to solve."
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools",
+            "description": "Allowlist of tool names this agent can call (defense-in-depth; runtime still enforces allowlists)."
+          },
+          {
+            "id": "response_schema",
+            "label": "structured_output",
+            "type": "object",
+            "description": "Optional JSON Schema object (type=object) the final answer must conform to."
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object",
+            "description": "Optional explicit context object for the agent (e.g. {messages:[...]}). If provided, it can override inherited run context."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object",
+            "description": "Structured final agent result (answer + metadata/tool calls depending on agent)."
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array",
+            "description": "Best-effort list of tool call requests extracted from the agent scratchpad trace (post-run). For real-time tool observability, subscribe to the ledger/node_traces stream."
+          },
+          {
+            "id": "tool_results",
+            "label": "tool_results",
+            "type": "array",
+            "description": "Best-effort list of tool results extracted from the agent scratchpad trace (post-run). For real-time tool observability, subscribe to the ledger/node_traces stream."
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object",
+            "description": "Runtime-owned execution trace/scratchpad for observability (LLM/tool steps, timings)."
+          }
+        ],
+        "pinDefaults": {
+          "system": "You are an expert scheduler who works like Map/Reduce : you decompose the request you receive into a series of IDENTICAL but small tasks (eg if you must read 500 files and have 100 agents, each agent will be given 5 files to read), so that each sub-task can be executed in parallel by a large number of small agents. As your role is to initialize those agents, you must output 1) a system prompt common to all small agents (they will run the SAME TYPE of task) 2) a set of tools based on your available tool names (again, SAME TYPE of task = need same type of tools) and 3) for each task, a dedicated user prompt informing on the agent specific task. Example : { “system_prompt” : “xxx”, “tools”: [ list_files, read_file…], tasks : [ {“user_prompt” : “read files xx1, xx2, xx3 and report the key insights”}, {“user_prompt” : “read the files xx4, xx5, xx6 and report the key insights”}, … ]  CRITICAL : before being able to truly decompose a problem into tasks, you often have to execute one or more tools yourself first, for instance, to have the full list of files"
+        },
+        "agentConfig": {
+          "tools": [
+            "list_files",
+            "read_file"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-10",
+      "type": "answer_user",
+      "position": {
+        "x": -656.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-11",
+      "type": "stringify_json",
+      "position": {
+        "x": -896.0,
+        "y": 400.0
+      },
+      "data": {
+        "nodeType": "stringify_json",
+        "label": "Stringify JSON",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any",
+            "description": "JSON value (or JSON-ish string) to stringify."
+          },
+          {
+            "id": "mode",
+            "label": "mode",
+            "type": "string",
+            "description": "Rendering mode: none | beautify | minified. Default beautify."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-12",
+      "type": "loop",
+      "position": {
+        "x": -608.0,
+        "y": 416.0
+      },
+      "data": {
+        "nodeType": "loop",
+        "label": "ForEach",
+        "icon": "&#x1F501;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "items",
+            "label": "items",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "loop",
+            "label": "loop",
+            "type": "execution"
+          },
+          {
+            "id": "done",
+            "label": "done",
+            "type": "execution"
+          },
+          {
+            "id": "item",
+            "label": "item",
+            "type": "any"
+          },
+          {
+            "id": "index",
+            "label": "index",
+            "type": "number"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-14",
+      "type": "break_object",
+      "position": {
+        "x": -784.0,
+        "y": 784.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result.system_prompt",
+            "label": "system_prompt",
+            "type": "string"
+          },
+          {
+            "id": "result.tasks",
+            "label": "tasks",
+            "type": "array"
+          },
+          {
+            "id": "result.tools",
+            "label": "tools",
+            "type": "array"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "result.system_prompt",
+            "result.tasks",
+            "result.tools"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-15",
+      "type": "agent",
+      "position": {
+        "x": -352.0,
+        "y": 416.0
+      },
+      "data": {
+        "nodeType": "agent",
+        "label": "Agent",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "include_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) as agent history. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider",
+            "description": "LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model",
+            "description": "LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number",
+            "description": "Maximum internal ReAct iterations (safety cap). Higher values allow more tool-use steps."
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string",
+            "description": "Optional system prompt for this agent instance (high priority instructions)."
+          },
+          {
+            "id": "task",
+            "label": "prompt",
+            "type": "string",
+            "description": "The task/user prompt for the agent to solve."
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools",
+            "description": "Allowlist of tool names this agent can call (defense-in-depth; runtime still enforces allowlists)."
+          },
+          {
+            "id": "response_schema",
+            "label": "structured_output",
+            "type": "object",
+            "description": "Optional JSON Schema object (type=object) the final answer must conform to."
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object",
+            "description": "Optional explicit context object for the agent (e.g. {messages:[...]}). If provided, it can override inherited run context."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object",
+            "description": "Structured final agent result (answer + metadata/tool calls depending on agent)."
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array",
+            "description": "Best-effort list of tool call requests extracted from the agent scratchpad trace (post-run). For real-time tool observability, subscribe to the ledger/node_traces stream."
+          },
+          {
+            "id": "tool_results",
+            "label": "tool_results",
+            "type": "array",
+            "description": "Best-effort list of tool results extracted from the agent scratchpad trace (post-run). For real-time tool observability, subscribe to the ledger/node_traces stream."
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object",
+            "description": "Runtime-owned execution trace/scratchpad for observability (LLM/tool steps, timings)."
+          }
+        ],
+        "agentConfig": {
+          "provider": "lmstudio",
+          "model": "gemma-3-270m-it-mlx"
+        },
+        "pinDefaults": {}
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-16",
+      "type": "literal_json",
+      "position": {
+        "x": -1200.0,
+        "y": 992.0
+      },
+      "data": {
+        "nodeType": "literal_json",
+        "label": "JSON",
+        "icon": "{}",
+        "headerColor": "#00FFFF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "object"
+          }
+        ],
+        "literalValue": {
+          "result": {
+            "system_prompt": "You are a document summarizer. Your task is to read and summarize one markdown file from the backlog directory. Extract key insights, main objectives, technical requirements, and any critical dependencies or implications. Keep summaries concise (under 200 words) and structured: Title, Summary, Key Points. Do not include metadata like file size or path unless relevant.",
+            "tools": [
+              "read_file"
+            ],
+            "tasks": [
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/338-abstractcode-thin-client-ux-and-subworkflow-wait-fix.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/322-framework-workflow-dsl-documentation-visualflow-and-workflowartifact.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/311-abstractruntime-run-history-bundle-and-workflow-snapshot.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/315-framework-workflow-registry-publish-install-and-interface-discovery.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/301-framework-empty-llm-response-recovery-and-reviewer-validation.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/283-abstractcode-tui-collapsible-transcript-blocks.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/268-abstractflow-required-input-pins-and-run-preflight.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/267-framework-active-memory-flow-nodes-and-recall-mapping.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/265-framework-remote-executor-memory-transfer.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/255-framework-memorize-recall-terminology-unification.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/266-abstractmemory-typed-memory-blocks-and-multimodal.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/207-abstractcore-qwen3-thinking-mode-control.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/042-abstractagent-remember-notes-tool.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/041-abstractcode-auto-remember-suggestions.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/095-abstractagent-fix-real-llm-integration-test.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/092-abstractflow-visual-agent-deduplicate-agent-logic.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/319-framework-multi-repo-packaging-cleanup-remove-monorepo-assumptions.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/320-framework-client-local-tool-workers-web-pwa-ios.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/308-abstractcode-remote-thin-client-runtime-gateway.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/312-framework-ai-identity-fingerprints-and-signed-provenance.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/313-abstractcore-inference-sidecar-server-and-model-lifecycle.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/177-framework-agent-host-pool.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/316-framework-pypi-install-matrix-and-deps-audit.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/310-framework-backlog-hygiene-renumber-and-metadata.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/290-framework-structured-agent-response-envelope-for-active-memory.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/281-framework-active-memory-and-abstractcore-tool-synergy.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/279-framework-remote-worker-security-hardening.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/118-framework-provider-toolcall-conformance-suite.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/175-abstractflow-execution-targets.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/174-framework-execution-target-discovery.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/219-abstractruntime-memory-bundle-export-import.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/209-abstractcore-ollama-execute-tools-per-call.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/005-abstractcore-multi-provider-requests.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/216-framework-abstractprocessing-sota-text-processing.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/215-abstractcore-multi-provider-requests-analysis.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/213-abstractcore-batch-generate-api.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/214-abstractcore-openai-compatible-base-class.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/212-abstractcore-external-secrets-management.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/208-abstractcore-toolregistry-preserve-tool-decorator-metadata.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/211-abstractcore-httpx-connection-pooling.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/176-framework-code-digest-for-editing.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/171-abstractruntime-purge-run-and-descendant-artifact-cleanup.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/115-abstractflow-evidence-ux-and-evidence-nodes.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/158-framework-workflow-declared-dependencies-and-multi-language-code-nodes.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/156-framework-react-delegation-minimal-context-subcalls.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/152-abstractagent-codeact-runtime-scratchpad-injection.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/151-framework-best-possible-agent-context-per-iteration.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/130-abstractcode-tui-copy-accessibility-and-flow-live-panel.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/126-framework-search-verticals-and-general-search-router.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/117-abstractruntime-enforced-budgets-and-timeouts.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/116-framework-typed-json-schema-registry.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/033-framework-graph-compression-contracts.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/018-framework-experience-feedback-loop.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/010-abstractruntime-signatures-keys.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/008-abstractruntime-effect-handler-registry.md'. Extract the main goal, technical approach, and implications."
+              },
+              {
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/007-abstractflow-initial-design.md'. Extract the main goal, technical approach, and implications."
+              }
+            ]
+          },
+          "success": true
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-17",
+      "type": "llm_call",
+      "position": {
+        "x": -464.0,
+        "y": 880.0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "LLM Call",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "include_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider",
+            "description": "LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model",
+            "description": "LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string",
+            "description": "Optional system prompt for this single call."
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string",
+            "description": "User prompt/content for this single call."
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools",
+            "description": "Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node)."
+          },
+          {
+            "id": "response_schema",
+            "label": "structured_output",
+            "type": "object",
+            "description": "Optional JSON Schema object (type=object) the assistant content must conform to."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string",
+            "description": "Assistant text content (best-effort). For tool calls, content may be empty."
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array",
+            "description": "Normalized tool call requests (same as result.tool_calls). This pin exists to make wiring into Tool Calls / Emit Event nodes simpler."
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object",
+            "description": "Full normalized LLM result (content, tool_calls, usage, provider/model metadata, trace_id)."
+          }
+        ],
+        "effectConfig": {
+          "provider": "lmstudio",
+          "model": "google_gemma-3-1b-it"
+        },
+        "pinDefaults": {}
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-18",
+      "type": "tool_calls",
+      "position": {
+        "x": -208.0,
+        "y": 880.0
+      },
+      "data": {
+        "nodeType": "tool_calls",
+        "label": "Tool Calls",
+        "icon": "&#x1F528;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array",
+            "description": "List of tool call requests (or a single call). Typical shape: {name, arguments, call_id?}. Often comes from LLM Call.result.tool_calls."
+          },
+          {
+            "id": "allowed_tools",
+            "label": "allowed_tools",
+            "type": "array",
+            "description": "Optional allowlist of tool names enforced by the runtime effect handler (empty list => allow none). If not connected, the node config (if any) is used."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "results",
+            "label": "results",
+            "type": "array",
+            "description": "Per-call results in input order (each entry includes output/error metadata). Use this for debugging or to feed structured tool outputs into the graph."
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean",
+            "description": "True if all tool calls succeeded (no per-call error)."
+          }
+        ],
+        "effectConfig": {
+          "allowed_tools": [
+            "list_files",
+            "edit_file",
+            "analyze_code",
+            "read_file",
+            "search_files"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
     }
   ],
   "edges": [
-    {
-      "id": "edge-1767916095598",
-      "source": "node-1",
-      "sourceHandle": "exec-out",
-      "target": "node-3",
-      "targetHandle": "exec-in",
-      "animated": true
-    },
     {
       "id": "edge-1767916099466",
       "source": "node-1",
@@ -341,30 +1095,6 @@
       "animated": false
     },
     {
-      "id": "edge-1767916650701",
-      "source": "node-5",
-      "sourceHandle": "value",
-      "target": "node-3",
-      "targetHandle": "response_schema",
-      "animated": false
-    },
-    {
-      "id": "edge-1767916673737",
-      "source": "node-3",
-      "sourceHandle": "exec-out",
-      "target": "node-6",
-      "targetHandle": "exec-in",
-      "animated": true
-    },
-    {
-      "id": "edge-1767916679776",
-      "source": "node-6",
-      "sourceHandle": "exec-out",
-      "target": "node-2",
-      "targetHandle": "exec-in",
-      "animated": true
-    },
-    {
       "id": "edge-1767916688260",
       "source": "node-3",
       "sourceHandle": "result",
@@ -373,15 +1103,167 @@
       "animated": false
     },
     {
-      "id": "edge-1767916694085",
-      "source": "node-7",
-      "sourceHandle": "data",
-      "target": "node-6",
+      "id": "edge-1767924460065",
+      "source": "node-1",
+      "sourceHandle": "enriched_request",
+      "target": "node-8",
+      "targetHandle": "task",
+      "animated": false
+    },
+    {
+      "id": "edge-1767924513499",
+      "source": "node-1",
+      "sourceHandle": "provider",
+      "target": "node-8",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1767924516431",
+      "source": "node-1",
+      "sourceHandle": "model",
+      "target": "node-8",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-1767925916489",
+      "source": "node-3",
+      "sourceHandle": "exec-out",
+      "target": "node-10",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767925957495",
+      "source": "node-8",
+      "sourceHandle": "result",
+      "target": "node-11",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-1767925964546",
+      "source": "node-11",
+      "sourceHandle": "result",
+      "target": "node-10",
       "targetHandle": "message",
       "animated": false
+    },
+    {
+      "id": "edge-1767926313186",
+      "source": "node-5",
+      "sourceHandle": "value",
+      "target": "node-8",
+      "targetHandle": "response_schema",
+      "animated": false
+    },
+    {
+      "id": "edge-1767926332293",
+      "source": "node-12",
+      "sourceHandle": "item",
+      "target": "node-15",
+      "targetHandle": "task",
+      "animated": false
+    },
+    {
+      "id": "edge-1767926761757",
+      "source": "node-14",
+      "sourceHandle": "result.system_prompt",
+      "target": "node-15",
+      "targetHandle": "system",
+      "animated": false
+    },
+    {
+      "id": "edge-1767926770740",
+      "source": "node-14",
+      "sourceHandle": "result.tasks",
+      "target": "node-12",
+      "targetHandle": "items",
+      "animated": false
+    },
+    {
+      "id": "edge-1767926773756",
+      "source": "node-14",
+      "sourceHandle": "result.tools",
+      "target": "node-15",
+      "targetHandle": "tools",
+      "animated": false
+    },
+    {
+      "id": "edge-1767926903699",
+      "source": "node-14",
+      "sourceHandle": "result.tools",
+      "target": "node-17",
+      "targetHandle": "tools",
+      "animated": false
+    },
+    {
+      "id": "edge-1767926908217",
+      "source": "node-12",
+      "sourceHandle": "item",
+      "target": "node-17",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "edge-1767926927301",
+      "source": "node-14",
+      "sourceHandle": "result.system_prompt",
+      "target": "node-17",
+      "targetHandle": "system",
+      "animated": false
+    },
+    {
+      "id": "edge-1767927024059",
+      "source": "node-17",
+      "sourceHandle": "exec-out",
+      "target": "node-18",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767927027526",
+      "source": "node-17",
+      "sourceHandle": "tool_calls",
+      "target": "node-18",
+      "targetHandle": "tool_calls",
+      "animated": false
+    },
+    {
+      "id": "edge-1767927127993",
+      "source": "node-8",
+      "sourceHandle": "result",
+      "target": "node-14",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1767927170285",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-8",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767927174262",
+      "source": "node-8",
+      "sourceHandle": "exec-out",
+      "target": "node-12",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767927180237",
+      "source": "node-12",
+      "sourceHandle": "loop",
+      "target": "node-15",
+      "targetHandle": "exec-in",
+      "animated": true
     }
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-08T23:58:16.824654",
-  "updated_at": "2026-01-08T23:59:05.424064"
+  "updated_at": "2026-01-09T02:53:08.492033"
 }
