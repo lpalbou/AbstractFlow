@@ -1,7 +1,7 @@
 {
   "id": "acagent_message_demo",
   "name": "AbstractCode Agent Message Demo",
-  "description": "Demonstrates workflow-driven AbstractCode message notifications via Emit Event(name='abstractcode.message') with a short Delay between messages.",
+  "description": "Demonstrates workflow-driven host message notifications via Emit Event(name='abstract.message') with a short Delay between messages.",
   "interfaces": [
     "abstractcode.agent.v1"
   ],
@@ -83,7 +83,7 @@
             "type": "string"
           }
         ],
-        "literalValue": "abstractcode.message"
+        "literalValue": "abstract.message"
       },
       "label": null,
       "icon": null,

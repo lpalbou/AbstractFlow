@@ -1,7 +1,7 @@
 {
   "id": "acagent_tool_events_demo",
   "name": "AbstractCode Agent Tool Events Demo",
-  "description": "Demonstrates workflow-driven tool execution/result UX via `abstractcode.tool_execution` + `abstractcode.tool_result` using simplified wiring: LLM Call.tool_calls → Emit/Tool Calls, then Tool Calls.results → Emit (no Break Object needed).",
+  "description": "Demonstrates workflow-driven tool execution/result UX via `abstract.tool_execution` + `abstract.tool_result` using simplified wiring: LLM Call.tool_calls → Emit/Tool Calls, then Tool Calls.results → Emit (no Break Object needed).",
   "interfaces": [
     "abstractcode.agent.v1"
   ],
@@ -111,7 +111,7 @@
             "type": "string"
           }
         ],
-        "literalValue": "abstractcode.tool_execution"
+        "literalValue": "abstract.tool_execution"
       },
       "label": null,
       "icon": null,
@@ -139,7 +139,7 @@
             "type": "string"
           }
         ],
-        "literalValue": "abstractcode.tool_result"
+        "literalValue": "abstract.tool_result"
       },
       "label": null,
       "icon": null,

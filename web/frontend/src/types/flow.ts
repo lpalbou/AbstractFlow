@@ -135,6 +135,8 @@ export interface FlowNodeData {
   agentConfig?: {          // For agent nodes
     provider?: string;
     model?: string;
+    temperature?: number;  // Sampling temperature (0 = deterministic)
+    seed?: number;         // Seed for deterministic outputs (-1 = random/unset)
     tools?: string[];      // Allowlisted tool names (0..N)
     include_context?: boolean; // When true, include run context/messages as history (Recall into context)
     outputSchema?: {       // Optional structured output schema
@@ -174,6 +176,7 @@ export interface FlowNodeData {
     provider?: string;     // For llm_call
     model?: string;        // For llm_call
     temperature?: number;  // For llm_call
+    seed?: number;         // For llm_call (-1 = random/unset)
     tools?: string[];      // For llm_call (tool allowlist; resolved to ToolSpecs at execution)
     include_context?: boolean; // For llm_call: include run context/messages as history (Recall into context)
     allowFreeText?: boolean; // For ask_user

@@ -678,6 +678,8 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const providerPinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'provider');
   const modelPinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'model');
   const toolsPinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'tools');
+  const temperaturePinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'temperature');
+  const seedPinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'seed');
   const emitEventNamePinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'name');
   const scopePinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'scope');
   const emitEventScopePinConnected = scopePinConnected && data.nodeType === 'emit_event';
@@ -1718,6 +1720,46 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 ))}
               </select>
             )}
+          </div>
+
+          <div className="property-group">
+            <label className="property-sublabel">Temperature</label>
+            {temperaturePinConnected ? (
+              <span className="property-hint">Provided by connected pin.</span>
+            ) : (
+              <input
+                type="number"
+                className="property-input"
+                value={data.agentConfig?.temperature ?? 0.7}
+                onChange={(e) => {
+                  const parsed = parseFloat(e.target.value);
+                  updateAgentConfig({ temperature: Number.isFinite(parsed) ? parsed : 0.7 });
+                }}
+                min={0}
+                max={2}
+                step={0.1}
+              />
+            )}
+            <span className="property-hint">0 = deterministic, 2 = creative</span>
+          </div>
+
+          <div className="property-group">
+            <label className="property-sublabel">Seed</label>
+            {seedPinConnected ? (
+              <span className="property-hint">Provided by connected pin.</span>
+            ) : (
+              <input
+                type="number"
+                className="property-input"
+                value={data.agentConfig?.seed ?? -1}
+                onChange={(e) => {
+                  const parsed = parseInt(e.target.value, 10);
+                  updateAgentConfig({ seed: Number.isFinite(parsed) ? parsed : -1 });
+                }}
+                step={1}
+              />
+            )}
+            <span className="property-hint">-1 = random/unset; {'>=0'} = deterministic (provider permitting)</span>
           </div>
 
           <div className="property-group">
@@ -3321,23 +3363,42 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           </div>
           <div className="property-group">
             <label className="property-sublabel">Temperature</label>
-            <input
-              type="number"
-              className="property-input"
-              value={data.effectConfig?.temperature ?? 0.7}
-              onChange={(e) =>
-                updateNodeData(node.id, {
-                  effectConfig: {
-                    ...data.effectConfig,
-                    temperature: parseFloat(e.target.value) || 0.7,
-                  },
-                })
-              }
-              min={0}
-              max={2}
-              step={0.1}
-            />
+            {temperaturePinConnected ? (
+              <span className="property-hint">Provided by connected pin.</span>
+            ) : (
+              <input
+                type="number"
+                className="property-input"
+                value={data.effectConfig?.temperature ?? 0.7}
+                onChange={(e) => {
+                  const parsed = parseFloat(e.target.value);
+                  updateLlmCallEffectConfig({ temperature: Number.isFinite(parsed) ? parsed : 0.7 });
+                }}
+                min={0}
+                max={2}
+                step={0.1}
+              />
+            )}
             <span className="property-hint">0 = deterministic, 2 = creative</span>
+          </div>
+
+          <div className="property-group">
+            <label className="property-sublabel">Seed</label>
+            {seedPinConnected ? (
+              <span className="property-hint">Provided by connected pin.</span>
+            ) : (
+              <input
+                type="number"
+                className="property-input"
+                value={data.effectConfig?.seed ?? -1}
+                onChange={(e) => {
+                  const parsed = parseInt(e.target.value, 10);
+                  updateLlmCallEffectConfig({ seed: Number.isFinite(parsed) ? parsed : -1 });
+                }}
+                step={1}
+              />
+            )}
+            <span className="property-hint">-1 = random/unset; {'>=0'} = deterministic (provider permitting)</span>
           </div>
 
           <div className="property-group">

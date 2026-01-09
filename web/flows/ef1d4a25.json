@@ -34,6 +34,16 @@
             "type": "model"
           },
           {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number"
+          },
+          {
             "id": "evaluator",
             "label": "evaluator",
             "type": "model"
@@ -43,7 +53,8 @@
           "param1": "lmstudio",
           "provider": "lmstudio",
           "model": "qwen/qwen3-next-80b",
-          "evaluator": "qwen/qwen3-next-80b"
+          "evaluator": "qwen/qwen3-next-80b",
+          "seed": 50
         }
       },
       "label": null,
@@ -71,17 +82,6 @@
             "type": "execution"
           },
           {
-            "id": "inherit_context",
-            "label": "inherit_context",
-            "type": "boolean",
-            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
-          },
-          {
-            "id": "input",
-            "label": "input",
-            "type": "object"
-          },
-          {
             "id": "request",
             "label": "request",
             "type": "string"
@@ -105,6 +105,16 @@
             "id": "model",
             "label": "model",
             "type": "model"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number"
           }
         ],
         "outputs": [
@@ -218,17 +228,6 @@
             "type": "execution"
           },
           {
-            "id": "inherit_context",
-            "label": "inherit_context",
-            "type": "boolean",
-            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
-          },
-          {
-            "id": "input",
-            "label": "input",
-            "type": "object"
-          },
-          {
             "id": "request",
             "label": "request",
             "type": "string"
@@ -252,6 +251,16 @@
             "id": "model",
             "label": "model",
             "type": "model"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number"
           }
         ],
         "outputs": [
@@ -302,17 +311,6 @@
             "type": "execution"
           },
           {
-            "id": "inherit_context",
-            "label": "inherit_context",
-            "type": "boolean",
-            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
-          },
-          {
-            "id": "input",
-            "label": "input",
-            "type": "object"
-          },
-          {
             "id": "request",
             "label": "request",
             "type": "string"
@@ -336,6 +334,16 @@
             "id": "model",
             "label": "model",
             "type": "model"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number"
           }
         ],
         "outputs": [
@@ -386,17 +394,6 @@
             "type": "execution"
           },
           {
-            "id": "inherit_context",
-            "label": "inherit_context",
-            "type": "boolean",
-            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
-          },
-          {
-            "id": "input",
-            "label": "input",
-            "type": "object"
-          },
-          {
             "id": "request",
             "label": "request",
             "type": "string"
@@ -420,6 +417,16 @@
             "id": "model",
             "label": "model",
             "type": "model"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number"
           }
         ],
         "outputs": [
@@ -470,17 +477,6 @@
             "type": "execution"
           },
           {
-            "id": "inherit_context",
-            "label": "inherit_context",
-            "type": "boolean",
-            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
-          },
-          {
-            "id": "input",
-            "label": "input",
-            "type": "object"
-          },
-          {
             "id": "request",
             "label": "request",
             "type": "string"
@@ -504,6 +500,16 @@
             "id": "model",
             "label": "model",
             "type": "model"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number"
           }
         ],
         "outputs": [
@@ -793,6 +799,18 @@
             "label": "model",
             "type": "model",
             "description": "LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number",
+            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number",
+            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
           },
           {
             "id": "system",
@@ -1524,14 +1542,6 @@
       "animated": false
     },
     {
-      "id": "edge-1767967817239",
-      "source": "node-1",
-      "sourceHandle": "evaluator",
-      "target": "node-15",
-      "targetHandle": "model",
-      "animated": false
-    },
-    {
       "id": "edge-1767967822524",
       "source": "node-1",
       "sourceHandle": "provider",
@@ -1770,9 +1780,97 @@
       "target": "node-9",
       "targetHandle": "ambiguity_tolerance",
       "animated": false
+    },
+    {
+      "id": "edge-1767976199583",
+      "source": "node-1",
+      "sourceHandle": "evaluator",
+      "target": "node-15",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-1767976329052",
+      "source": "node-1",
+      "sourceHandle": "temperature",
+      "target": "node-3",
+      "targetHandle": "temperature",
+      "animated": false
+    },
+    {
+      "id": "edge-1767976332459",
+      "source": "node-1",
+      "sourceHandle": "temperature",
+      "target": "node-5",
+      "targetHandle": "temperature",
+      "animated": false
+    },
+    {
+      "id": "edge-1767976343386",
+      "source": "node-1",
+      "sourceHandle": "temperature",
+      "target": "node-6",
+      "targetHandle": "temperature",
+      "animated": false
+    },
+    {
+      "id": "edge-1767976346852",
+      "source": "node-1",
+      "sourceHandle": "temperature",
+      "target": "node-7",
+      "targetHandle": "temperature",
+      "animated": false
+    },
+    {
+      "id": "edge-1767976355700",
+      "source": "node-1",
+      "sourceHandle": "temperature",
+      "target": "node-8",
+      "targetHandle": "temperature",
+      "animated": false
+    },
+    {
+      "id": "edge-1767976454020",
+      "source": "node-1",
+      "sourceHandle": "seed",
+      "target": "node-8",
+      "targetHandle": "seed",
+      "animated": false
+    },
+    {
+      "id": "edge-1767976458169",
+      "source": "node-1",
+      "sourceHandle": "seed",
+      "target": "node-7",
+      "targetHandle": "seed",
+      "animated": false
+    },
+    {
+      "id": "edge-1767976461786",
+      "source": "node-1",
+      "sourceHandle": "seed",
+      "target": "node-6",
+      "targetHandle": "seed",
+      "animated": false
+    },
+    {
+      "id": "edge-1767976466478",
+      "source": "node-1",
+      "sourceHandle": "seed",
+      "target": "node-5",
+      "targetHandle": "seed",
+      "animated": false
+    },
+    {
+      "id": "edge-1767976469904",
+      "source": "node-1",
+      "sourceHandle": "seed",
+      "target": "node-3",
+      "targetHandle": "seed",
+      "animated": false
     }
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-09T13:52:38.295820",
-  "updated_at": "2026-01-09T14:45:06.153694"
+  "updated_at": "2026-01-09T16:34:43.740453"
 }

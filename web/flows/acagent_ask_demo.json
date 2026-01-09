@@ -83,7 +83,7 @@
             "type": "string"
           }
         ],
-        "literalValue": "abstractcode.ask"
+        "literalValue": "abstract.ask"
       },
       "label": null,
       "icon": null,
@@ -347,7 +347,7 @@
             "type": "string"
           }
         ],
-        "literalValue": "abstractcode.message"
+        "literalValue": "abstract.message"
       },
       "label": null,
       "icon": null,

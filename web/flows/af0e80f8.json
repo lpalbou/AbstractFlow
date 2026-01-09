@@ -47,6 +47,16 @@
             "id": "model",
             "label": "model",
             "type": "model"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number"
           }
         ],
         "pinDefaults": {
@@ -95,6 +105,18 @@
             "label": "model",
             "type": "model",
             "description": "LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number",
+            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number",
+            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
           },
           {
             "id": "system",
@@ -536,9 +558,25 @@
       "target": "node-2",
       "targetHandle": "model",
       "animated": false
+    },
+    {
+      "id": "edge-1767976253634",
+      "source": "node-1",
+      "sourceHandle": "temperature",
+      "target": "node-2",
+      "targetHandle": "temperature",
+      "animated": false
+    },
+    {
+      "id": "edge-1767976255817",
+      "source": "node-1",
+      "sourceHandle": "seed",
+      "target": "node-2",
+      "targetHandle": "seed",
+      "animated": false
     }
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-09T10:39:09.823264",
-  "updated_at": "2026-01-09T13:54:49.568354"
+  "updated_at": "2026-01-09T16:31:24.071157"
 }
