@@ -1,7 +1,7 @@
 {
   "id": "1871a4e2",
   "name": "abilityeval-probe-v1",
-  "description": "Fast capability probe (planning/execution/review/calibration in a single LLM call).",
+  "description": "Fast capability probe (planning/execution/review/calibration in a single LLM call). Requests structured_output by default; runtime can fall back to best-effort parsing for weaker models.",
   "interfaces": [],
   "nodes": [
     {
@@ -69,10 +69,11 @@
           { "id": "result", "label": "result", "type": "object", "description": "Full normalized LLM result (content, tool_calls, usage, provider/model metadata, trace_id)." }
         ],
         "pinDefaults": {
+          "include_context": false,
           "system": "You are the AI system being evaluated. Answer as yourself (no roleplay). Prioritize correctness and clarity.",
-          "prompt": "You are taking a fast AbilityEval probe. Return ONLY valid JSON matching the provided schema.\n\nTASK 1 — Planning\nYou must design a plan for: \"Build a workflow that evaluates a model across multiple (seed, temperature) presets and produces both a human-readable report and a JSON profile for comparison.\" \nInclude clarifying questions, step-by-step plan, key risks, and how you would test it.\n\nTASK 2 — Execution (Python)\nWrite a small Python function `stability_stats(values: list[float]) -> dict` that returns:\n- mean\n- std (population standard deviation)\n- min\n- max\n- n\nAssume `values` is non-empty.\n\nTASK 3 — Review\nReview this flawed function and explain what is wrong, then provide an improved version:\n\n```python\ndef normalize_seed(seed):\n    if seed:\n        return int(seed)\n    return -1\n```\n\nTASK 4 — Calibration\nFor each of the three tasks above (planning/execution/review), provide a confidence score 0–1 and list the main assumptions/unknowns.\n\nKeep output concise."
+          "prompt": "You are taking a fast AbilityEval probe.\n\nReturn a single JSON object (no Markdown, no code fences). Use double quotes.\n\nShape:\n{\n  \"clarifying_questions\": [\"...\"],\n  \"plan_steps\": [\"...\"],\n  \"risks\": [\"...\"],\n  \"tests\": [\"...\"],\n  \"code\": \"...\",\n  \"review_notes\": \"...\",\n  \"improved_code\": \"...\",\n  \"planning_confidence\": 0,\n  \"execution_confidence\": 0,\n  \"review_confidence\": 0,\n  \"assumptions\": [\"...\"]\n}\n\nRules:\n- Keep arrays short.\n- code/improved_code must be plain strings (no ```).\n- confidences are 0–1.\n\nTASK 1 — Planning\nDesign a plan for: \"Build a workflow that evaluates a model across multiple (seed, temperature) presets and produces both a human-readable report and a JSON profile for comparison.\" Include clarifying_questions, plan_steps, risks, tests.\n\nTASK 2 — Execution (Python)\nWrite `stability_stats(values: list[float]) -> dict` returning mean/std/min/max/n.\n\nTASK 3 — Review\nReview and improve:\n\ndef normalize_seed(seed):\n    if seed:\n        return int(seed)\n    return -1\n\nTASK 4 — Calibration\nProvide confidence scores for planning/execution/review and list assumptions."
         },
-        "effectConfig": { "provider": "lmstudio", "model": "google_gemma-3-1b-it" }
+        "effectConfig": { "provider": "lmstudio", "model": "google_gemma-3-1b-it", "structured_output_fallback": true }
       },
       "label": null,
       "icon": null,
@@ -83,85 +84,30 @@
     {
       "id": "node-3",
       "type": "json_schema",
-      "position": { "x": -176.0, "y": 640.0 },
+      "position": { "x": 176.0, "y": 128.0 },
       "data": {
         "nodeType": "json_schema",
         "label": "JSON Schema",
         "icon": "&#x1F4CB;",
         "headerColor": "#00FFFF",
         "inputs": [],
-        "outputs": [{ "id": "value", "label": "schema", "type": "object" }],
+        "outputs": [{ "id": "value", "label": "value", "type": "object" }],
         "literalValue": {
           "type": "object",
-          "additionalProperties": false,
           "properties": {
-            "planning": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "clarifying_questions": { "type": "array", "items": { "type": "string" } },
-                "plan_steps": { "type": "array", "items": { "type": "string" } },
-                "risks": { "type": "array", "items": { "type": "string" } },
-                "tests": { "type": "array", "items": { "type": "string" } }
-              },
-              "required": ["clarifying_questions", "plan_steps", "risks", "tests"]
-            },
-            "execution": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "language": { "type": "string" },
-                "code": { "type": "string" },
-                "notes": { "type": "string" }
-              },
-              "required": ["language", "code"]
-            },
-            "review": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "issues": { "type": "array", "items": { "type": "string" } },
-                "improved_code": { "type": "string" },
-                "notes": { "type": "string" }
-              },
-              "required": ["issues", "improved_code"]
-            },
-            "calibration": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "planning_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
-                "execution_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
-                "review_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
-                "assumptions": { "type": "array", "items": { "type": "string" } }
-              },
-              "required": ["planning_confidence", "execution_confidence", "review_confidence", "assumptions"]
-            }
-          },
-          "required": ["planning", "execution", "review", "calibration"]
+            "clarifying_questions": { "type": "array", "items": { "type": "string" } },
+            "plan_steps": { "type": "array", "items": { "type": "string" } },
+            "risks": { "type": "array", "items": { "type": "string" } },
+            "tests": { "type": "array", "items": { "type": "string" } },
+            "code": { "type": "string" },
+            "review_notes": { "type": "string" },
+            "improved_code": { "type": "string" },
+            "planning_confidence": { "type": "number" },
+            "execution_confidence": { "type": "number" },
+            "review_confidence": { "type": "number" },
+            "assumptions": { "type": "array", "items": { "type": "string" } }
+          }
         }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
-      "id": "node-4",
-      "type": "break_object",
-      "position": { "x": 176.0, "y": 256.0 },
-      "data": {
-        "nodeType": "break_object",
-        "label": "Break Object",
-        "icon": "&#x1F9E9;",
-        "headerColor": "#3498DB",
-        "inputs": [{ "id": "object", "label": "object", "type": "object" }],
-        "outputs": [
-          { "id": "data", "label": "data", "type": "any" },
-          { "id": "content", "label": "content", "type": "string" }
-        ],
-        "breakConfig": { "selectedPaths": ["data", "content"] }
       },
       "label": null,
       "icon": null,
@@ -202,10 +148,9 @@
     { "id": "edge-4", "source": "node-1", "sourceHandle": "temperature", "target": "node-2", "targetHandle": "temperature", "animated": false },
     { "id": "edge-5", "source": "node-1", "sourceHandle": "seed", "target": "node-2", "targetHandle": "seed", "animated": false },
     { "id": "edge-6", "source": "node-3", "sourceHandle": "value", "target": "node-2", "targetHandle": "response_schema", "animated": false },
-    { "id": "edge-7", "source": "node-2", "sourceHandle": "result", "target": "node-4", "targetHandle": "object", "animated": false },
     { "id": "edge-8", "source": "node-2", "sourceHandle": "exec-out", "target": "node-5", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-9", "source": "node-4", "sourceHandle": "data", "target": "node-5", "targetHandle": "ability", "animated": false },
-    { "id": "edge-10", "source": "node-4", "sourceHandle": "content", "target": "node-5", "targetHandle": "raw_text", "animated": false },
+    { "id": "edge-9", "source": "node-2", "sourceHandle": "result", "target": "node-5", "targetHandle": "ability", "animated": false },
+    { "id": "edge-10", "source": "node-2", "sourceHandle": "response", "target": "node-5", "targetHandle": "raw_text", "animated": false },
     { "id": "edge-11", "source": "node-1", "sourceHandle": "label", "target": "node-5", "targetHandle": "label", "animated": false },
     { "id": "edge-12", "source": "node-1", "sourceHandle": "seed", "target": "node-5", "targetHandle": "seed", "animated": false },
     { "id": "edge-13", "source": "node-1", "sourceHandle": "temperature", "target": "node-5", "targetHandle": "temperature", "animated": false }
@@ -214,4 +159,3 @@
   "created_at": "2026-01-09T17:20:00.000000",
   "updated_at": "2026-01-09T17:20:00.000000"
 }
-

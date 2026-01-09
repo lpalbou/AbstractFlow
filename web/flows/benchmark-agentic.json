@@ -539,19 +539,20 @@
     },
     {
       "id": "node-24",
-      "type": "break_object",
+      "type": "get",
       "position": { "x": 128.0, "y": 528.0 },
       "data": {
-        "nodeType": "break_object",
-        "label": "Break Object",
-        "icon": "&#x1F9E9;",
+        "nodeType": "get",
+        "label": "Get report_markdown",
+        "icon": "&#x1F4E5;",
         "headerColor": "#3498DB",
-        "inputs": [{ "id": "object", "label": "object", "type": "object" }],
-        "outputs": [
-          { "id": "report_markdown", "label": "report_markdown", "type": "string" },
-          { "id": "summary", "label": "summary", "type": "object" }
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
         ],
-        "breakConfig": { "selectedPaths": ["report_markdown", "rankings"] }
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "report_markdown", "default": "" }
       }
     },
     {
@@ -645,8 +646,8 @@
 
     { "id": "edge-58", "source": "node-23", "sourceHandle": "output", "target": "node-24", "targetHandle": "object", "animated": false },
     { "id": "edge-59", "source": "node-23", "sourceHandle": "exec-out", "target": "node-25", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-60", "source": "node-24", "sourceHandle": "report_markdown", "target": "node-25", "targetHandle": "report", "animated": false },
-    { "id": "edge-61", "source": "node-24", "sourceHandle": "summary", "target": "node-25", "targetHandle": "summary", "animated": false },
+    { "id": "edge-60", "source": "node-24", "sourceHandle": "value", "target": "node-25", "targetHandle": "report", "animated": false },
+    { "id": "edge-61", "source": "node-23", "sourceHandle": "output", "target": "node-25", "targetHandle": "summary", "animated": false },
     { "id": "edge-62", "source": "node-22", "sourceHandle": "value", "target": "node-25", "targetHandle": "run_results", "animated": false }
   ],
   "entryNode": "node-1",
