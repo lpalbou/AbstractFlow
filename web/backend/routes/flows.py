@@ -177,6 +177,7 @@ async def run_flow(flow_id: str, request: FlowRunRequest):
             ledger_store=ledger_store,
             artifact_store=artifact_store,
             tool_executor=tool_executor,
+            input_data=input_data,
         )
         result = runner.run(input_data)
 

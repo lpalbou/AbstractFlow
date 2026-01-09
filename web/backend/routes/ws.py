@@ -93,31 +93,45 @@ def _json_safe(value: Any, *, depth: int = 0, seen: Optional[set[int]] = None) -
 
     if seen is None:
         seen = set()
+
+    # Track the current recursion path (not a global "seen") so repeated references
+    # are preserved, while actual cycles are replaced with "<cycle>".
+    vid: Optional[int] = None
     try:
         vid = id(value)
+    except Exception:
+        vid = None
+
+    if vid is not None:
         if vid in seen:
             return "<cycle>"
         seen.add(vid)
-    except Exception:
-        pass
 
-    if isinstance(value, dict):
-        out: Dict[str, Any] = {}
-        for k, v in value.items():
-            out[str(k)] = _json_safe(v, depth=depth + 1, seen=seen)
-        return out
-
-    if isinstance(value, (list, tuple)):
-        return [_json_safe(v, depth=depth + 1, seen=seen) for v in list(value)]
-
-    # Pydantic models / dataclasses (best-effort).
     try:
-        if hasattr(value, "model_dump") and callable(getattr(value, "model_dump")):
-            return _json_safe(value.model_dump(), depth=depth + 1, seen=seen)  # type: ignore[no-any-return]
-    except Exception:
-        pass
+        if isinstance(value, dict):
+            out: Dict[str, Any] = {}
+            for k, v in value.items():
+                out[str(k)] = _json_safe(v, depth=depth + 1, seen=seen)
+            return out
 
-    return str(value)
+        if isinstance(value, (list, tuple)):
+            return [_json_safe(v, depth=depth + 1, seen=seen) for v in list(value)]
+
+        # Pydantic models / dataclasses (best-effort).
+        try:
+            md = getattr(value, "model_dump", None)
+            if callable(md):
+                return _json_safe(md(), depth=depth + 1, seen=seen)  # type: ignore[no-any-return]
+        except Exception:
+            pass
+
+        return str(value)
+    finally:
+        if vid is not None:
+            try:
+                seen.discard(vid)
+            except Exception:
+                pass
 
 
 def _is_pause_wait(wait: Any, *, run_id: str) -> bool:
@@ -292,6 +306,7 @@ async def execute_with_updates(
             ledger_store=ledger_store,
             artifact_store=artifact_store,
             tool_executor=tool_executor,
+            input_data=input_data,
         )
         _active_runners[connection_id] = runner
 

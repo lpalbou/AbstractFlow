@@ -15,6 +15,7 @@ export interface AfSelectProps {
   loading?: boolean;
   searchable?: boolean;
   searchPlaceholder?: string;
+  allowCustom?: boolean;
   clearable?: boolean;
   minPopoverWidth?: number;
   variant?: 'pin' | 'panel';
@@ -29,6 +30,7 @@ export function AfSelect({
   loading = false,
   searchable = true,
   searchPlaceholder = 'Search…',
+  allowCustom = false,
   clearable = false,
   minPopoverWidth = 240,
   variant = 'panel',
@@ -46,7 +48,7 @@ export function AfSelect({
 
   const selectedLabel = useMemo(() => {
     const found = options.find((o) => o.value === value);
-    return found?.label || '';
+    return found?.label || value || '';
   }, [options, value]);
 
   const filtered = useMemo(() => {
@@ -54,6 +56,20 @@ export function AfSelect({
     if (!q) return options;
     return options.filter((o) => o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q));
   }, [options, search]);
+
+  const customOption = useMemo(() => {
+    if (!allowCustom) return null;
+    const q = search.trim();
+    if (!q) return null;
+    const exists = options.some((o) => o.value === q);
+    if (exists) return null;
+    return { value: q, label: `Use "${q}"` } satisfies AfSelectOption;
+  }, [allowCustom, options, search]);
+
+  const visibleOptions = useMemo(() => {
+    if (!customOption) return filtered;
+    return [customOption, ...filtered];
+  }, [customOption, filtered]);
 
   const recalcPosition = useCallback(() => {
     const el = triggerRef.current;
@@ -105,14 +121,14 @@ export function AfSelect({
     if (!open) return;
     const idx = Math.max(
       0,
-      filtered.findIndex((o) => o.value === value)
+      visibleOptions.findIndex((o) => o.value === value)
     );
     setHighlightIdx(idx === -1 ? 0 : idx);
     // Focus search for fast typing
     if (searchable) {
       setTimeout(() => searchRef.current?.focus(), 0);
     }
-  }, [open, filtered, searchable, value]);
+  }, [open, searchable, value, visibleOptions]);
 
   const pick = (v: string) => {
     onChange(v);
@@ -138,7 +154,7 @@ export function AfSelect({
     }
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setHighlightIdx((i) => Math.min(i + 1, Math.max(0, filtered.length - 1)));
+      setHighlightIdx((i) => Math.min(i + 1, Math.max(0, visibleOptions.length - 1)));
       return;
     }
     if (e.key === 'ArrowUp') {
@@ -148,12 +164,12 @@ export function AfSelect({
     }
     if (e.key === 'Enter') {
       e.preventDefault();
-      const opt = filtered[highlightIdx];
+      const opt = visibleOptions[highlightIdx];
       if (opt) pick(opt.value);
     }
   };
 
-  const showValue = Boolean(value) && Boolean(selectedLabel);
+  const showValue = Boolean(value);
   const triggerText = showValue ? selectedLabel : placeholder;
 
   return (
@@ -232,10 +248,10 @@ export function AfSelect({
               ) : null}
 
               <div className="af-select-options">
-                {filtered.length === 0 ? (
+                {visibleOptions.length === 0 ? (
                   <div className="af-select-empty">No results</div>
                 ) : (
-                  filtered.map((o, i) => {
+                  visibleOptions.map((o, i) => {
                     const isSelected = o.value === value;
                     const isHighlighted = i === highlightIdx;
                     return (
@@ -270,7 +286,6 @@ export function AfSelect({
 }
 
 export default AfSelect;
-
 
 
 

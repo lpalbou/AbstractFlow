@@ -1,0 +1,18 @@
+BENCHMARK-AGENTIC
+case_id: react-p06-t0.7_s42-r3
+
+FILES (relative to workspace_root)
+- cases/p06/t0.7_s42/r3/react/inputs/customers.csv
+- cases/p06/t0.7_s42/r3/react/inputs/orders.csv
+- cases/p06/t0.7_s42/r3/react/inputs/refunds.csv
+
+TASK
+- Compute net_amount per customer:
+    net_amount = sum(order.amount for customer's orders) - sum(refund.amount for that customer's orders)
+- TOP 3 customers by net_amount desc; tiebreak customer_id asc.
+- Totals: orders_amount, refunds_amount, net_amount.
+
+OUTPUT
+Return JSON with keys: case_id, top_customers, totals.
+top_customers: array of {customer_id,name,net_amount}.
+totals: {orders_amount,refunds_amount,net_amount}.

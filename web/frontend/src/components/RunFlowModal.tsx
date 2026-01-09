@@ -218,7 +218,7 @@ export function RunFlowModal({
   onCancelRun,
   onSelectRunId,
 }: RunFlowModalProps) {
-  const { nodes, edges, flowName, flowId, lastLoopProgress } = useFlowStore();
+  const { nodes, edges, flowName, flowId, lastLoopProgress, loopProgressByNodeId } = useFlowStore();
 
   const nodeById = useMemo(() => {
     const map = new Map<string, (typeof nodes)[number]>();
@@ -759,6 +759,129 @@ export function RunFlowModal({
     return null;
   }, [events]);
 
+  const benchmarkProgress = useMemo(() => {
+    const isBenchmark = flowId === 'be0a6c01' || flowName === 'benchmark-agentic';
+    if (!isBenchmark) return null;
+
+    const asRecord = (v: unknown): Record<string, unknown> | null => {
+      if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+      return v as Record<string, unknown>;
+    };
+
+    const isBenchmarkRecord = (v: unknown): v is Record<string, unknown> => {
+      const rec = asRecord(v);
+      if (!rec) return false;
+      const mode = typeof rec.mode === 'string' ? rec.mode.trim() : '';
+      const promptId = typeof rec.prompt_id === 'string' ? rec.prompt_id.trim() : '';
+      if (!mode || !promptId) return false;
+      return 'metrics' in rec || 'correct' in rec || 'signature' in rec;
+    };
+
+    const parseArray = (pinId: string): unknown[] => {
+      const raw = typeof formValues[pinId] === 'string' ? formValues[pinId] : '';
+      const parsed = raw.trim() ? parseJson<unknown>(raw) : ({ ok: true, value: [] } as const);
+      return parsed.ok && Array.isArray(parsed.value) ? parsed.value : [];
+    };
+
+    const parseClampedInt = (pinId: string, fallback: number, min: number, max: number): number => {
+      const raw = typeof formValues[pinId] === 'string' ? formValues[pinId] : '';
+      const n = Number.parseInt(raw.trim(), 10);
+      const out = Number.isFinite(n) ? n : fallback;
+      return Math.max(min, Math.min(max, out));
+    };
+
+    const runsPinId = inputPins.find((p) => p.id === 'runs')?.id ?? 'runs';
+    const promptsPinId = inputPins.find((p) => p.id === 'prompts')?.id ?? 'prompts';
+    const repeatsPinId = inputPins.find((p) => p.id === 'repeats')?.id ?? 'repeats';
+
+    const runsRaw = parseArray(runsPinId);
+    const runsCount = runsRaw.filter((r) => r && typeof r === 'object' && !Array.isArray(r)).length || 1;
+
+    const promptsRaw = parseArray(promptsPinId);
+    const prompts = promptsRaw.filter((p) => p && typeof p === 'object' && !Array.isArray(p)) as Array<Record<string, unknown>>;
+    const promptsCount = prompts.length || 0;
+
+    // Mirror `Build repeats_array` behavior (clamped to 1..20).
+    const repeatsCount = parseClampedInt(repeatsPinId, 3, 1, 20);
+
+    const totalRecords = runsCount * promptsCount * repeatsCount * 2;
+
+    const findLoopNodeId = (needle: RegExp): string | null => {
+      const n = nodes.find((n) => n.data?.nodeType === 'loop' && needle.test(String(n.data?.label || '')));
+      return n?.id || null;
+    };
+
+    const runsLoopId = findLoopNodeId(/runs/i);
+    const promptsLoopId = findLoopNodeId(/prompts/i);
+    const repeatsLoopId = findLoopNodeId(/repeats/i);
+
+    const runsLoop = runsLoopId ? loopProgressByNodeId[runsLoopId] : null;
+    const promptsLoop = promptsLoopId ? loopProgressByNodeId[promptsLoopId] : null;
+    const repeatsLoop = repeatsLoopId ? loopProgressByNodeId[repeatsLoopId] : null;
+
+    const promptIndex = promptsLoop && typeof promptsLoop.index === 'number' ? promptsLoop.index : null;
+    const promptObj = promptIndex != null && promptIndex >= 0 && promptIndex < prompts.length ? prompts[promptIndex] : null;
+    const promptId = typeof promptObj?.id === 'string' ? promptObj.id : null;
+    const promptLabel = typeof promptObj?.label === 'string' ? promptObj.label : null;
+
+    let completedRecords = 0;
+    if (rootRunId) {
+      for (let i = events.length - 1; i >= 0; i--) {
+        const ev = events[i];
+        if (ev.type !== 'node_complete') continue;
+        if (ev.runId && ev.runId !== rootRunId) continue;
+
+        const r = ev.result as unknown;
+        const obj = asRecord(r);
+
+        const candidate =
+          (obj && Array.isArray(obj.value) ? obj.value : null) ||
+          (obj && Array.isArray(obj.run_results) ? obj.run_results : null) ||
+          (Array.isArray(r) ? r : null);
+
+        if (!candidate || !Array.isArray(candidate)) continue;
+        if (!candidate.some(isBenchmarkRecord)) continue;
+        completedRecords = candidate.length;
+        break;
+      }
+    }
+
+    const findSubflowNodeId = (needle: RegExp): string | null => {
+      const n = nodes.find((n) => n.data?.nodeType === 'subflow' && needle.test(String(n.data?.label || '')));
+      return n?.id || null;
+    };
+
+    const reactSubflowId = findSubflowNodeId(/react\s*run/i);
+    const codeactSubflowId = findSubflowNodeId(/codeact\s*run/i);
+
+    const durations: number[] = [];
+    if (rootRunId && (reactSubflowId || codeactSubflowId)) {
+      for (const ev of events) {
+        if (ev.type !== 'node_complete') continue;
+        if (ev.runId && ev.runId !== rootRunId) continue;
+        if (!ev.nodeId) continue;
+        if (ev.nodeId !== reactSubflowId && ev.nodeId !== codeactSubflowId) continue;
+        const ms = ev.meta && typeof ev.meta.duration_ms === 'number' ? ev.meta.duration_ms : null;
+        if (ms != null && Number.isFinite(ms) && ms > 0) durations.push(ms);
+      }
+    }
+
+    const avgMs = durations.length ? durations.reduce((a, b) => a + b, 0) / durations.length : null;
+    const remaining = totalRecords > 0 ? Math.max(0, totalRecords - completedRecords) : 0;
+    const etaMs = avgMs != null && remaining > 0 ? avgMs * remaining : null;
+
+    return {
+      totalRecords,
+      completedRecords,
+      runsLoop,
+      promptsLoop,
+      repeatsLoop,
+      promptId,
+      promptLabel,
+      etaMs,
+    };
+  }, [events, flowId, flowName, formValues, inputPins, loopProgressByNodeId, nodes, rootRunId]);
+
   const toggleSubflowExpansion = useCallback((stepId: string) => {
     const id = String(stepId || '').trim();
     if (!id) return;
@@ -1060,7 +1183,15 @@ export function RunFlowModal({
     (nodeType?: string | null) => {
       const t = typeof nodeType === 'string' ? nodeType.trim() : '';
       if (!t) return false;
-      return t === 'ask_user' || t === 'answer_user' || t === 'llm_call' || t === 'agent' || t === 'on_flow_end';
+      return (
+        t === 'ask_user' ||
+        t === 'answer_user' ||
+        t === 'llm_call' ||
+        t === 'agent' ||
+        t === 'on_flow_end' ||
+        // Subflows often contain markdown-ish artifacts (e.g. raw LLM answers with code fences).
+        t === 'subflow'
+      );
     },
     []
   );
@@ -1115,12 +1246,39 @@ export function RunFlowModal({
 
     const obj = value as Record<string, unknown>;
 
-    let task: string | null = null;
-    let previewText: string | null = null;
-    let scratchpad: unknown = null;
-    let provider: string | null = null;
-    let model: string | null = null;
-    let usage: unknown = null;
+	    let task: string | null = null;
+	    let previewText: string | null = null;
+	    let scratchpad: unknown = null;
+	    let provider: string | null = null;
+	    let model: string | null = null;
+	    let usage: unknown = null;
+	    let benchmark: Record<string, unknown> | null = null;
+	    let subRunId: string | null = null;
+
+    const asRecord = (v: unknown): Record<string, unknown> | null => {
+      if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+      return v as Record<string, unknown>;
+    };
+
+    const isBenchmarkRecord = (v: unknown): v is Record<string, unknown> => {
+      const rec = asRecord(v);
+      if (!rec) return false;
+      const mode = typeof rec.mode === 'string' ? rec.mode.trim() : '';
+      const promptId = typeof rec.prompt_id === 'string' ? rec.prompt_id.trim() : '';
+      if (!mode || !promptId) return false;
+      return 'metrics' in rec || 'correct' in rec || 'signature' in rec;
+    };
+
+    // Many nodes return wrappers (e.g. subflow: { output: { record }, record }).
+    // Detect our benchmark record shape so we can show a richer preview.
+    benchmark =
+      (isBenchmarkRecord(obj) ? obj : null) ||
+      (isBenchmarkRecord(obj.record) ? (obj.record as Record<string, unknown>) : null) ||
+      (() => {
+        const out = asRecord(obj.output);
+        const nested = out ? out.record : null;
+        return isBenchmarkRecord(nested) ? (nested as Record<string, unknown>) : null;
+      })();
 
     // Agent output shape: { result: { task, result, ... }, scratchpad: ... }
     if (obj.result && typeof obj.result === 'object') {
@@ -1136,10 +1294,18 @@ export function RunFlowModal({
 
     if (!previewText && typeof obj.message === 'string' && obj.message.trim()) previewText = obj.message.trim();
     if (!previewText && typeof obj.response === 'string' && obj.response.trim()) previewText = obj.response.trim();
-    if (!previewText && typeof obj.result === 'string' && obj.result.trim()) previewText = obj.result.trim();
-    if (!provider && typeof obj.provider === 'string' && obj.provider.trim()) provider = obj.provider.trim();
-    if (!model && typeof obj.model === 'string' && obj.model.trim()) model = obj.model.trim();
-    if (!usage && 'usage' in obj) usage = obj.usage;
+	    if (!previewText && typeof obj.result === 'string' && obj.result.trim()) previewText = obj.result.trim();
+	    if (!provider && typeof obj.provider === 'string' && obj.provider.trim()) provider = obj.provider.trim();
+	    if (!model && typeof obj.model === 'string' && obj.model.trim()) model = obj.model.trim();
+	    if (!usage && 'usage' in obj) usage = obj.usage;
+	    if (!subRunId && typeof obj.sub_run_id === 'string' && obj.sub_run_id.trim()) subRunId = obj.sub_run_id.trim();
+
+    // Benchmark records store provider/model under `config`.
+    if ((!provider || !model) && benchmark) {
+      const cfg = asRecord(benchmark.config);
+      if (!provider && typeof cfg?.provider === 'string' && cfg.provider.trim()) provider = cfg.provider.trim();
+      if (!model && typeof cfg?.model === 'string' && cfg.model.trim()) model = cfg.model.trim();
+    }
 
     // llm_call output shape stores provider/model/usage under `raw`.
     if ((!provider || !model || !usage) && obj.raw && typeof obj.raw === 'object') {
@@ -1176,6 +1342,13 @@ export function RunFlowModal({
       }
     }
 
+	    // If no previewText yet, fall back to the benchmark raw answer (often contains code fences).
+	    if (!previewText && benchmark) {
+	      const dbg = asRecord(benchmark.debug);
+	      const rawAnswer = dbg && typeof dbg.raw_answer === 'string' ? dbg.raw_answer.trim() : '';
+	      if (rawAnswer) previewText = rawAnswer;
+	    }
+
     let cleaned: unknown = value;
     if (obj && typeof obj === 'object') {
       const copy = { ...obj };
@@ -1183,9 +1356,9 @@ export function RunFlowModal({
       cleaned = copy;
     }
 
-    if (!task && !previewText && scratchpad == null && !provider && !model && !usage) return null;
-    return { task, previewText, scratchpad, provider, model, usage, raw: value, cleaned };
-  }, [selectedStep?.output]);
+	    if (!task && !previewText && scratchpad == null && !provider && !model && !usage && !benchmark && !subRunId) return null;
+	    return { task, previewText, scratchpad, provider, model, usage, benchmark, subRunId, raw: value, cleaned };
+	  }, [selectedStep?.output]);
 
   const selectedEventIndex = useMemo(() => {
     if (!selectedStep?.id) return null;
@@ -1610,6 +1783,41 @@ export function RunFlowModal({
                       ) : null}
                     </span>
                   ) : null}
+                  {benchmarkProgress && benchmarkProgress.totalRecords > 0 ? (
+                    <span className="run-metrics-inline">
+                      <span className="run-metric-badge metric-benchmark" title="Completed benchmark sub-runs">
+                        Bench {benchmarkProgress.completedRecords}/{benchmarkProgress.totalRecords}
+                      </span>
+                      {benchmarkProgress.runsLoop ? (
+                        <span className="run-metric-badge metric-benchmark" title="Run preset">
+                          run {Math.min(benchmarkProgress.runsLoop.index + 1, benchmarkProgress.runsLoop.total)}/{benchmarkProgress.runsLoop.total}
+                        </span>
+                      ) : null}
+                      {benchmarkProgress.promptsLoop ? (
+                        <span
+                          className="run-metric-badge metric-benchmark"
+                          title={
+                            benchmarkProgress.promptLabel
+                              ? `${benchmarkProgress.promptId || 'prompt'} — ${benchmarkProgress.promptLabel}`
+                              : (benchmarkProgress.promptId || 'System prompt')
+                          }
+                        >
+                          {(benchmarkProgress.promptId || 'prompt')}{' '}
+                          {Math.min(benchmarkProgress.promptsLoop.index + 1, benchmarkProgress.promptsLoop.total)}/{benchmarkProgress.promptsLoop.total}
+                        </span>
+                      ) : null}
+                      {benchmarkProgress.repeatsLoop ? (
+                        <span className="run-metric-badge metric-benchmark" title="Repeat">
+                          rep {Math.min(benchmarkProgress.repeatsLoop.index + 1, benchmarkProgress.repeatsLoop.total)}/{benchmarkProgress.repeatsLoop.total}
+                        </span>
+                      ) : null}
+                      {benchmarkProgress.etaMs != null ? (
+                        <span className="run-metric-badge metric-duration" title="ETA (rough; based on average sub-run duration)">
+                          ETA {formatDuration(benchmarkProgress.etaMs)}
+                        </span>
+                      ) : null}
+                    </span>
+                  ) : null}
                 </div>
               </div>
 
@@ -1849,15 +2057,25 @@ export function RunFlowModal({
                           ) : null}
                         </div>
                       ) : null}
-                      <div className="run-details-actions">
-                        <button type="button" className="modal-button" onClick={() => copyToClipboard(selectedStep.output)}>
-                          Copy raw
-                        </button>
-                        {memorizeContentPreview ? (
-                          <button type="button" className="modal-button" onClick={() => copyToClipboard(memorizeContentPreview)}>
-                            Copy content
-                          </button>
-                        ) : null}
+	                      <div className="run-details-actions">
+	                        <button type="button" className="modal-button" onClick={() => copyToClipboard(selectedStep.output)}>
+	                          Copy raw
+	                        </button>
+	                        {outputPreview?.subRunId && onSelectRunId ? (
+	                          <button
+	                            type="button"
+	                            className="modal-button"
+	                            onClick={() => onSelectRunId(outputPreview.subRunId ?? '')}
+	                            title="Open the subflow run in the run switcher"
+	                          >
+	                            Open sub-run
+	                          </button>
+	                        ) : null}
+	                        {memorizeContentPreview ? (
+	                          <button type="button" className="modal-button" onClick={() => copyToClipboard(memorizeContentPreview)}>
+	                            Copy content
+	                          </button>
+	                        ) : null}
                         {outputPreview?.previewText ? (
                           <button type="button" className="modal-button" onClick={() => copyToClipboard(outputPreview.previewText)}>
                             Copy preview
@@ -1945,6 +2163,121 @@ export function RunFlowModal({
                               <div className="run-output-title">Task</div>
                               <pre className="run-details-output">{outputPreview.task}</pre>
                             </div>
+                          ) : null}
+
+	                          {outputPreview?.benchmark ? (
+	                            <div className="run-output-section">
+	                              <div className="run-output-title">Benchmark</div>
+	                              <div className="run-output-meta">
+                                <div>
+                                  <span className="run-output-meta-key">Mode</span>
+                                  <span className="run-output-meta-val">{String(outputPreview.benchmark.mode ?? '')}</span>
+                                </div>
+                                <div>
+                                  <span className="run-output-meta-key">Prompt</span>
+                                  <span className="run-output-meta-val">
+                                    {String(outputPreview.benchmark.prompt_id ?? '')}
+                                    {outputPreview.benchmark.prompt_label ? ` — ${String(outputPreview.benchmark.prompt_label)}` : ''}
+                                  </span>
+                                </div>
+	                                {outputPreview.benchmark.repeat != null ? (
+	                                  <div>
+	                                    <span className="run-output-meta-key">Repeat</span>
+	                                    <span className="run-output-meta-val">{String(outputPreview.benchmark.repeat)}</span>
+	                                  </div>
+	                                ) : null}
+	                                {outputPreview.subRunId ? (
+	                                  <div>
+	                                    <span className="run-output-meta-key">Sub-run</span>
+	                                    <span className="run-output-meta-val">{outputPreview.subRunId}</span>
+	                                  </div>
+	                                ) : null}
+	                                {typeof outputPreview.benchmark.correct === 'boolean' ? (
+	                                  <div>
+	                                    <span className="run-output-meta-key">Correct</span>
+	                                    <span className="run-output-meta-val">{outputPreview.benchmark.correct ? 'true' : 'false'}</span>
+	                                  </div>
+	                                ) : null}
+                                {Array.isArray(outputPreview.benchmark.issues) && outputPreview.benchmark.issues.length ? (
+                                  <div>
+                                    <span className="run-output-meta-key">Issues</span>
+                                    <span className="run-output-meta-val">{outputPreview.benchmark.issues.join(', ')}</span>
+                                  </div>
+                                ) : null}
+                                {typeof outputPreview.benchmark.signature === 'string' && outputPreview.benchmark.signature.trim() ? (
+                                  <div>
+                                    <span className="run-output-meta-key">Signature</span>
+                                    <span className="run-output-meta-val">{outputPreview.benchmark.signature}</span>
+                                  </div>
+                                ) : null}
+                                {(() => {
+                                  const metrics =
+                                    outputPreview.benchmark && typeof outputPreview.benchmark.metrics === 'object'
+                                      ? (outputPreview.benchmark.metrics as Record<string, unknown>)
+                                      : null;
+                                  const stopReason = metrics && typeof metrics.stop_reason === 'string' ? metrics.stop_reason : null;
+                                  return stopReason ? (
+                                    <div>
+                                      <span className="run-output-meta-key">Stop</span>
+                                      <span className="run-output-meta-val">{stopReason}</span>
+                                    </div>
+                                  ) : null;
+                                })()}
+                              </div>
+                            </div>
+                          ) : null}
+
+	                          {outputPreview?.benchmark ? (
+	                            (() => {
+	                              const modelOutput = outputPreview.benchmark.model_output ?? outputPreview.benchmark.output;
+	                              if (modelOutput == null) return null;
+	                              return (
+	                                <div className="run-output-section">
+	                                  <div className="run-output-title">Model output</div>
+	                                  <JsonCodeBlock value={modelOutput} className="run-details-output" />
+	                                </div>
+	                              );
+	                            })()
+	                          ) : null}
+
+	                          {outputPreview?.benchmark ? (
+	                            (() => {
+	                              const dbg =
+	                                outputPreview.benchmark.debug && typeof outputPreview.benchmark.debug === 'object' && !Array.isArray(outputPreview.benchmark.debug)
+	                                  ? (outputPreview.benchmark.debug as Record<string, unknown>)
+	                                  : null;
+	                              const rawAnswer = dbg && typeof dbg.raw_answer === 'string' ? dbg.raw_answer.trim() : '';
+	                              if (!rawAnswer) return null;
+	                              return (
+	                                <div className="run-output-section">
+	                                  <div className="run-output-title">Raw answer</div>
+	                                  <div className="run-details-markdown">
+	                                    <MarkdownRenderer markdown={rawAnswer} />
+	                                  </div>
+	                                </div>
+	                              );
+	                            })()
+	                          ) : null}
+
+	                          {outputPreview?.benchmark && outputPreview.benchmark.expected != null ? (
+	                            <details className="run-raw-details">
+	                              <summary>Expected</summary>
+	                              <JsonCodeBlock value={outputPreview.benchmark.expected} className="run-details-output" />
+	                            </details>
+	                          ) : null}
+
+                          {outputPreview?.benchmark && outputPreview.benchmark.metrics != null ? (
+                            <details className="run-raw-details">
+                              <summary>Metrics</summary>
+                              <JsonCodeBlock value={outputPreview.benchmark.metrics} className="run-details-output" />
+                            </details>
+                          ) : null}
+
+                          {outputPreview?.benchmark && outputPreview.benchmark.debug != null ? (
+                            <details className="run-raw-details">
+                              <summary>Debug</summary>
+                              <JsonCodeBlock value={outputPreview.benchmark.debug} className="run-details-output" />
+                            </details>
                           ) : null}
 
                           {(outputPreview?.provider || outputPreview?.model || outputPreview?.usage) ? (
@@ -2115,26 +2448,27 @@ export function RunFlowModal({
                         );
                       }
 
-                      if (pin.type === 'model' || pin.id === 'model') {
-                        return (
-                          <div key={pin.id} className="run-form-field">
-                            <label className="run-form-label">
-                              {pin.label}
-                              <span className="run-form-type">({pin.type})</span>
-                            </label>
-                            <AfSelect
-                              value={value}
-                              placeholder={
-                                !selectedProvider ? 'Pick provider…' : modelsQuery.isLoading ? 'Loading…' : 'Select…'
-                              }
-                              options={models.map((m) => ({ value: m, label: m }))}
-                              disabled={!selectedProvider || modelsQuery.isLoading}
-                              loading={modelsQuery.isLoading}
-                              searchable
-                              searchPlaceholder="Search models…"
-                              onChange={(v) => handleFieldChange(pin.id, v)}
-                            />
-                          </div>
+	                      if (pin.type === 'model' || pin.id === 'model') {
+	                        return (
+	                          <div key={pin.id} className="run-form-field">
+	                            <label className="run-form-label">
+	                              {pin.label}
+	                              <span className="run-form-type">({pin.type})</span>
+	                            </label>
+	                            <AfSelect
+	                              value={value}
+	                              placeholder={
+	                                !selectedProvider ? 'Pick provider…' : modelsQuery.isLoading ? 'Loading…' : 'Select…'
+	                              }
+	                              options={models.map((m) => ({ value: m, label: m }))}
+	                              disabled={!selectedProvider}
+	                              loading={modelsQuery.isLoading}
+	                              allowCustom
+	                              searchable
+	                              searchPlaceholder="Search models…"
+	                              onChange={(v) => handleFieldChange(pin.id, v)}
+	                            />
+	                          </div>
                         );
                       }
 
@@ -2290,4 +2624,3 @@ export function RunFlowModal({
 }
 
 export default RunFlowModal;
-

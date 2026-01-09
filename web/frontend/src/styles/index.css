@@ -1831,6 +1831,12 @@ button.primary:hover:not(:disabled) {
   color: rgba(210, 255, 230, 0.95);
 }
 
+.run-metric-badge.metric-benchmark {
+  border-color: rgba(243, 156, 18, 0.35);
+  background: rgba(243, 156, 18, 0.10);
+  color: rgba(255, 235, 200, 0.95);
+}
+
 .run-metric-badge.metric-provider {
   border-color: rgba(233, 69, 96, 0.35);
   background: rgba(233, 69, 96, 0.10);

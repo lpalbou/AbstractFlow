@@ -26,6 +26,7 @@ def create_visual_runner(
     ledger_store: Optional[Any] = None,
     artifact_store: Optional[Any] = None,
     tool_executor: Optional[Any] = None,
+    input_data: Optional[Dict[str, Any]] = None,
 ) -> FlowRunner:
     """Create a FlowRunner for a visual run with a correctly wired runtime.
 
@@ -34,6 +35,12 @@ def create_visual_runner(
     - Create a runtime with an ArtifactStore (required for MEMORY_* effects).
     - If any LLM_CALL / Agent nodes exist in the flow tree, wire AbstractCore-backed
       effect handlers (via AbstractRuntime's integration module).
+
+    Notes:
+    - When LLM nodes rely on *connected* provider/model pins (e.g. from ON_FLOW_START),
+      this runner still needs a default provider/model to initialize runtime capabilities.
+      We use `input_data["provider"]`/`input_data["model"]` when provided, otherwise fall
+      back to static pin defaults (best-effort).
     """
     # Be resilient to different AbstractRuntime install layouts: not all exports
     # are guaranteed to be re-exported from `abstractruntime.__init__`.
@@ -229,6 +236,53 @@ def create_visual_runner(
                 continue
         return False
 
+    def _infer_connected_pin_default(vf: VisualFlow, *, node_id: str, pin_id: str) -> Optional[str]:
+        """Best-effort static inference for a connected pin's default value.
+
+        This is used only to pick a reasonable *default* provider/model for the runtime
+        (capabilities, limits, etc). Per-node/provider routing still happens at execution
+        time via effect payloads.
+        """
+        try:
+            for e in vf.edges:
+                if e.target != node_id or e.targetHandle != pin_id:
+                    continue
+                source_id = getattr(e, "source", None)
+                if not isinstance(source_id, str) or not source_id:
+                    continue
+                source_handle = getattr(e, "sourceHandle", None)
+                if not isinstance(source_handle, str) or not source_handle:
+                    source_handle = pin_id
+
+                src = next((n for n in vf.nodes if getattr(n, "id", None) == source_id), None)
+                if src is None:
+                    return None
+                data = getattr(src, "data", None)
+                if not isinstance(data, dict):
+                    return None
+
+                pin_defaults = data.get("pinDefaults")
+                if isinstance(pin_defaults, dict) and source_handle in pin_defaults:
+                    v = pin_defaults.get(source_handle)
+                    if isinstance(v, str) and v.strip():
+                        return v.strip()
+
+                literal_value = data.get("literalValue")
+                if isinstance(literal_value, str) and literal_value.strip():
+                    return literal_value.strip()
+                if isinstance(literal_value, dict):
+                    dv = literal_value.get("default")
+                    if isinstance(dv, str) and dv.strip():
+                        return dv.strip()
+                    vv = literal_value.get(source_handle)
+                    if isinstance(vv, str) and vv.strip():
+                        return vv.strip()
+                return None
+        except Exception:
+            return None
+
+        return None
+
     def _add_pair(provider_raw: Any, model_raw: Any) -> None:
         nonlocal default_llm
         if not isinstance(provider_raw, str) or not provider_raw.strip():
@@ -239,6 +293,12 @@ def create_visual_runner(
         llm_configs.add(pair)
         if default_llm is None:
             default_llm = pair
+
+    # Prefer run inputs for the runtime default provider/model when available.
+    # This avoids expensive provider probing and makes model capability detection match
+    # what the user selected in the Run Flow modal.
+    if isinstance(input_data, dict):
+        _add_pair(input_data.get("provider"), input_data.get("model"))
 
     for vf in ordered:
         reachable = _reachable_exec_node_ids(vf)
@@ -270,7 +330,9 @@ def create_visual_runner(
                         f"LLM_CALL node '{n.id}' in flow '{vf.id}' missing model "
                         "(set effectConfig.model or connect the model input pin)"
                     )
-                _add_pair(provider, model)
+                provider_default = provider if provider_ok else (_infer_connected_pin_default(vf, node_id=n.id, pin_id="provider") if provider_connected else None)
+                model_default = model if model_ok else (_infer_connected_pin_default(vf, node_id=n.id, pin_id="model") if model_connected else None)
+                _add_pair(provider_default, model_default)
 
             elif node_type == "agent":
                 cfg = n.data.get("agentConfig", {}) if isinstance(n.data, dict) else {}
@@ -293,7 +355,9 @@ def create_visual_runner(
                         f"Agent node '{n.id}' in flow '{vf.id}' missing model "
                         "(set agentConfig.model or connect the model input pin)"
                     )
-                _add_pair(provider, model)
+                provider_default = provider if provider_ok else (_infer_connected_pin_default(vf, node_id=n.id, pin_id="provider") if provider_connected else None)
+                model_default = model if model_ok else (_infer_connected_pin_default(vf, node_id=n.id, pin_id="model") if model_connected else None)
+                _add_pair(provider_default, model_default)
 
             elif node_type == "provider_models":
                 cfg = n.data.get("providerModelsConfig", {}) if isinstance(n.data, dict) else {}
