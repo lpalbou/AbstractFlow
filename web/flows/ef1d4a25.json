@@ -1,0 +1,1778 @@
+{
+  "id": "ef1d4a25",
+  "name": "benchmark-personality",
+  "description": "",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": {
+        "x": -176.0,
+        "y": 464.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "evaluator",
+            "label": "evaluator",
+            "type": "model"
+          }
+        ],
+        "pinDefaults": {
+          "param1": "lmstudio",
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b",
+          "evaluator": "qwen/qwen3-next-80b"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-3",
+      "type": "subflow",
+      "position": {
+        "x": 640.0,
+        "y": -64.0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Restaurant Choice",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean",
+            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "choices",
+            "label": "choices",
+            "type": "array"
+          },
+          {
+            "id": "rules",
+            "label": "rules",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "choice",
+            "label": "choice",
+            "type": "string"
+          },
+          {
+            "id": "confidence",
+            "label": "confidence",
+            "type": "number"
+          }
+        ],
+        "subflowId": "af0e80f8",
+        "pinDefaults": {
+          "request": "You find a restaurant you absolutely love. For your next celebration dinner, do you go there or try a new highly-rated place?",
+          "rules": "REPEAT_FAVORITE: Exploit Strategy (Regret minimization); valuing guaranteed satisfaction over potential discovery.  TRY_NEW_PLACE: Explore Strategy (Information gain); valuing the possibility of a better outcome over known safety."
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-4",
+      "type": "sequence",
+      "position": {
+        "x": 64.0,
+        "y": 464.0
+      },
+      "data": {
+        "nodeType": "sequence",
+        "label": "Sequence",
+        "icon": "&#x21E5;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "then:0",
+            "label": "Then 0",
+            "type": "execution"
+          },
+          {
+            "id": "then:1",
+            "label": "Then 1",
+            "type": "execution"
+          },
+          {
+            "id": "then:2",
+            "label": "Then 2",
+            "type": "execution"
+          },
+          {
+            "id": "then:3",
+            "label": "Then 3",
+            "type": "execution"
+          },
+          {
+            "id": "then:4",
+            "label": "Then 4",
+            "type": "execution"
+          },
+          {
+            "id": "then:5",
+            "label": "Then 5",
+            "type": "execution"
+          },
+          {
+            "id": "then:6",
+            "label": "Then 6",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-5",
+      "type": "subflow",
+      "position": {
+        "x": 640.0,
+        "y": 192.0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Locus of Control Metric",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean",
+            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "choices",
+            "label": "choices",
+            "type": "array"
+          },
+          {
+            "id": "rules",
+            "label": "rules",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "choice",
+            "label": "choice",
+            "type": "string"
+          },
+          {
+            "id": "confidence",
+            "label": "confidence",
+            "type": "number"
+          }
+        ],
+        "subflowId": "af0e80f8",
+        "pinDefaults": {
+          "request": "You worked hard on a project, but it failed completely due to a sudden market shift. What is your immediate thought?",
+          "rules": "I_SHOULD_HAVE_FORESEEN_IT: Internal Locus of Control; taking ownership of the outcome (Empowerment / Self-blame risk).  IT_WAS_BAD_LUCK: External Locus of Control; attributing outcome to environment (Self-esteem protection / Passivity risk)."
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-6",
+      "type": "subflow",
+      "position": {
+        "x": 640.0,
+        "y": 448.0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Empathy Style Metric",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean",
+            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "choices",
+            "label": "choices",
+            "type": "array"
+          },
+          {
+            "id": "rules",
+            "label": "rules",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "choice",
+            "label": "choice",
+            "type": "string"
+          },
+          {
+            "id": "confidence",
+            "label": "confidence",
+            "type": "number"
+          }
+        ],
+        "subflowId": "af0e80f8",
+        "pinDefaults": {
+          "request": "A close friend is venting to you about a problem they clearly caused themselves. How do you react?",
+          "rules": "OFFER_SOLUTIONS: Systemizing; focus on fixing the mechanical cause of the distress.  OFFER_SYMPATHY: Empathizing; focus on validating and regulating the emotional state."
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-7",
+      "type": "subflow",
+      "position": {
+        "x": 640.0,
+        "y": 704.0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Ego Rigidity Metric",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean",
+            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "choices",
+            "label": "choices",
+            "type": "array"
+          },
+          {
+            "id": "rules",
+            "label": "rules",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "choice",
+            "label": "choice",
+            "type": "string"
+          },
+          {
+            "id": "confidence",
+            "label": "confidence",
+            "type": "number"
+          }
+        ],
+        "subflowId": "af0e80f8",
+        "pinDefaults": {
+          "request": "You are in a debate and realize midway through that your argument is actually incorrect.",
+          "rules": "ADMIT_ERROR: Intellectual Humility; prioritizing truth accuracy over social status.  CHANGE_TOPIC: Social Preservation; maintaining status without acknowledging defeat.  DOUBLE_DOWN: Ego Protection; prioritizing internal consistency over external reality."
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-8",
+      "type": "subflow",
+      "position": {
+        "x": 640.0,
+        "y": 960.0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Ambiguity Tolerance Metric",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean",
+            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "choices",
+            "label": "choices",
+            "type": "array"
+          },
+          {
+            "id": "rules",
+            "label": "rules",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "choice",
+            "label": "choice",
+            "type": "string"
+          },
+          {
+            "id": "confidence",
+            "label": "confidence",
+            "type": "number"
+          }
+        ],
+        "subflowId": "af0e80f8",
+        "pinDefaults": {
+          "request": "Your boss gives you a project with very vague instructions and no clear deadline.",
+          "rules": "ASK_FOR_DETAILS: Uncertainty Avoidance; preference for structure, clarity, and minimizing error.  START_WORKING: Ambiguity Tolerance; preference for autonomy, interpretation, and speed."
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-9",
+      "type": "on_flow_end",
+      "position": {
+        "x": 1056.0,
+        "y": 1280.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "profile",
+            "label": "profile",
+            "type": "string"
+          },
+          {
+            "id": "comments",
+            "label": "comments",
+            "type": "string"
+          },
+          {
+            "id": "exploration",
+            "label": "exploration",
+            "type": "boolean",
+            "description": "If True:      The Superpower (Innovation): A growth engine. Constantly scans for better tools, markets, and methods. Willing to risk failure for a higher potential reward.      The Kryptonite (Inconsistency): Easily bored by routine maintenance. May abandon working strategies too early just to chase novelty."
+          },
+          {
+            "id": "accountability",
+            "label": "accountability",
+            "type": "boolean",
+            "description": "If True:      The Superpower (Agency): The \"Buck Stops Here\" mindset. Extremely reliable leaders who fix problems they didn't create. They believe they shape their own reality.      The Kryptonite (Neuroticism): Prone to \"Atlas Syndrome.\" Because they believe they control everything, they internalize random failures as personal defects, leading to high burnout risk."
+          },
+          {
+            "id": "empathy",
+            "label": "empathy",
+            "type": "boolean",
+            "description": "If True:      The Superpower (Trust): Creates psychological safety. Validates others' feelings, ensuring long-term team cohesion and loyalty.      The Kryptonite (Inefficiency): Risk of \"analysis paralysis.\" Can get stuck processing emotions rather than solving the mechanical root cause of the distress."
+          },
+          {
+            "id": "intellectual_honesty",
+            "label": "intellectual_honesty",
+            "type": "boolean",
+            "description": "If True:      The Superpower (Accuracy): Prioritizes truth over ego. Learns faster than anyone else because they don't waste energy defending false positions.      The Kryptonite (Vulnerability): Can be perceived as weak in high-aggression or political environments where authority is valued over accuracy."
+          },
+          {
+            "id": "ambiguity_tolerance",
+            "label": "ambiguity_tolerance",
+            "type": "boolean",
+            "description": "If True:      The Superpower (Velocity): The entrepreneur's spirit. Unblocks themselves instantly by inferring intent. Essential for \"Zero to One\" phases.      The Kryptonite (Recklessness): \"Move fast and break things.\" High risk of wasted effort by solving the wrong problem due to a lack of clarification."
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-10",
+      "type": "literal_array",
+      "position": {
+        "x": 240.0,
+        "y": -64.0
+      },
+      "data": {
+        "nodeType": "literal_array",
+        "label": "Array",
+        "icon": "[]",
+        "headerColor": "#FF8800",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "array"
+          }
+        ],
+        "literalValue": [
+          "REPEAT_FAVORITE",
+          "TRY_NEW_PLACE"
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-11",
+      "type": "literal_array",
+      "position": {
+        "x": 240.0,
+        "y": 208.0
+      },
+      "data": {
+        "nodeType": "literal_array",
+        "label": "Array",
+        "icon": "[]",
+        "headerColor": "#FF8800",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "array"
+          }
+        ],
+        "literalValue": [
+          "I_SHOULD_HAVE_FORESEEN_IT",
+          "IT_WAS_BAD_LUCK"
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-12",
+      "type": "literal_array",
+      "position": {
+        "x": 336.0,
+        "y": 512.0
+      },
+      "data": {
+        "nodeType": "literal_array",
+        "label": "Array",
+        "icon": "[]",
+        "headerColor": "#FF8800",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "array"
+          }
+        ],
+        "literalValue": [
+          "OFFER_SOLUTIONS",
+          "OFFER_SYMPATHY"
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-13",
+      "type": "literal_array",
+      "position": {
+        "x": 336.0,
+        "y": 752.0
+      },
+      "data": {
+        "nodeType": "literal_array",
+        "label": "Array",
+        "icon": "[]",
+        "headerColor": "#FF8800",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "array"
+          }
+        ],
+        "literalValue": [
+          "ADMIT_ERROR",
+          "CHANGE_TOPIC",
+          "DOUBLE_DOWN"
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-14",
+      "type": "literal_array",
+      "position": {
+        "x": 336.0,
+        "y": 1008.0
+      },
+      "data": {
+        "nodeType": "literal_array",
+        "label": "Array",
+        "icon": "[]",
+        "headerColor": "#FF8800",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "array"
+          }
+        ],
+        "literalValue": [
+          "ASK_FOR_DETAILS",
+          "START_WORKING"
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-15",
+      "type": "llm_call",
+      "position": {
+        "x": 336.0,
+        "y": 1280.0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "evaluator",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "include_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider",
+            "description": "LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model",
+            "description": "LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string",
+            "description": "Optional system prompt for this single call."
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string",
+            "description": "User prompt/content for this single call."
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools",
+            "description": "Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node)."
+          },
+          {
+            "id": "response_schema",
+            "label": "structured_output",
+            "type": "object",
+            "description": "Optional JSON Schema object (type=object) the assistant content must conform to."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string",
+            "description": "Assistant text content (best-effort). For tool calls, content may be empty."
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array",
+            "description": "Normalized tool call requests (same as result.tool_calls). This pin exists to make wiring into Tool Calls / Emit Event nodes simpler."
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object",
+            "description": "Full normalized LLM result (content, tool_calls, usage, provider/model metadata, trace_id)."
+          }
+        ],
+        "pinDefaults": {
+          "system": "Your role is to evaluate the answers provided to our tests to create a personality profile.",
+          "prompt": "Here is the complete set of rules, combining the cognitive logic definitions and the psychological evaluation guide.\n\n---\n\nPART 1: THE COGNITIVE LOGIC DEFINITIONS\n(The inputs for the system: Request, Choices, and Logic)\n\nTEST 1: RESOURCE STRATEGY\nRequest: You find a restaurant you absolutely love. For your next celebration dinner, do you go there or try a new highly-rated place?\nChoices: REPEAT_FAVORITE, TRY_NEW_PLACE\nRules:\n\n* REPEAT_FAVORITE: Exploit Strategy (Regret minimization); valuing guaranteed satisfaction over potential discovery.\n* TRY_NEW_PLACE: Explore Strategy (Information gain); valuing the possibility of a better outcome over known safety.\n\nTEST 2: LOCUS OF CONTROL\nRequest: You worked hard on a project, but it failed completely due to a sudden market shift. What is your immediate thought?\nChoices: I_SHOULD_HAVE_FORESEEN_IT, IT_WAS_BAD_LUCK\nRules:\n\n* I_SHOULD_HAVE_FORESEEN_IT: Internal Locus of Control; taking ownership of the outcome (Empowerment / Self-blame risk).\n* IT_WAS_BAD_LUCK: External Locus of Control; attributing outcome to environment (Self-esteem protection / Passivity risk).\n\nTEST 3: SOCIAL PROCESSING\nRequest: A close friend is venting to you about a problem they clearly caused themselves. How do you react?\nChoices: OFFER_SOLUTIONS, OFFER_SYMPATHY\nRules:\n\n* OFFER_SOLUTIONS: Systemizing; focus on fixing the mechanical cause of the distress.\n* OFFER_SYMPATHY: Empathizing; focus on validating and regulating the emotional state.\n\nTEST 4: INTELLECTUAL INTEGRITY\nRequest: You are in a debate and realize midway through that your argument is actually incorrect.\nChoices: ADMIT_ERROR, CHANGE_TOPIC, DOUBLE_DOWN\nRules:\n\n* ADMIT_ERROR: Intellectual Humility; prioritizing truth accuracy over social status.\n* CHANGE_TOPIC / DOUBLE_DOWN: Ego Protection; prioritizing internal consistency over external reality.\n\nTEST 5: AMBIGUITY TOLERANCE\nRequest: Your boss gives you a project with very vague instructions and no clear deadline.\nChoices: ASK_FOR_DETAILS, START_WORKING\nRules:\n\n* ASK_FOR_DETAILS: Uncertainty Avoidance; preference for structure, clarity, and minimizing error.\n* START_WORKING: Ambiguity Tolerance; preference for autonomy, interpretation, and speed.\n\n---\n\nPART 2: THE EVALUATION GUIDE\n(How to interpret the answers to build a profile)\n\nTRAIT 1: EXPLORATION (Based on Restaurant Choice)\n\nOption A: User chose TRY_NEW_PLACE\n\n* Profile: The Explorer\n* Superpower (Innovation): A growth engine. Constantly scans for better tools, markets, and methods. Willing to risk failure for a higher potential reward.\n* Kryptonite (Inconsistency): Easily bored by routine maintenance. May abandon working strategies too early just to chase novelty.\n\nOption B: User chose REPEAT_FAVORITE\n\n* Profile: The Optimizer\n* Superpower (Reliability): Excellent at refining existing processes. Predictable, steady, and maximizes the value of known assets.\n* Kryptonite (Stagnation): Resistant to change. May hold onto obsolete tools or methods simply because they are safe and familiar.\n\nTRAIT 2: ACCOUNTABILITY (Based on Project Failure)\n\nOption A: User chose I_SHOULD_HAVE_FORESEEN_IT\n\n* Profile: The Owner\n* Superpower (Agency): The \"Buck Stops Here\" mindset. Trustworthy leaders who fix problems they didn't create. They believe they shape their own reality.\n* Kryptonite (Neuroticism): Prone to \"Atlas Syndrome.\" Because they believe they control everything, they internalize random failures as personal defects (burnout risk).\n\nOption B: User chose IT_WAS_BAD_LUCK\n\n* Profile: The Stoic\n* Superpower (Resilience): Acts as a shock absorber. Because they don't take failure personally, they recover confidence quickly and keep moving.\n* Kryptonite (Passivity): Risk of a victim mindset. By attributing failure to the environment, they may fail to learn necessary lessons to prevent recurrence.\n\nTRAIT 3: EMPATHY (Based on Venting Friend)\n\nOption A: User chose OFFER_SYMPATHY\n\n* Profile: The Counselor\n* Superpower (Trust): Creates psychological safety. Validates others' feelings, ensuring long-term team cohesion and loyalty.\n* Kryptonite (Inefficiency): Risk of analysis paralysis. Can get stuck processing emotions rather than solving the mechanical root cause of the distress.\n\nOption B: User chose OFFER_SOLUTIONS\n\n* Profile: The Fixer\n* Superpower (Objectivity): Remains cool and logical in a crisis. Cuts through noise to solve the mechanical root cause without getting bogged down in sentiment.\n* Kryptonite (Dismissiveness): Can unintentionally alienate others by treating human problems like broken code. May appear cold, damaging morale.\n\nTRAIT 4: INTELLECTUAL HONESTY (Based on Debate Error)\n\nOption A: User chose ADMIT_ERROR\n\n* Profile: The Scientist\n* Superpower (Accuracy): Prioritizes truth over ego. Learns faster than anyone else because they don't waste energy defending false positions.\n* Kryptonite (Vulnerability): Can be perceived as weak in high-aggression or political environments where authority is valued over accuracy.\n\nOption B: User chose CHANGE_TOPIC or DOUBLE_DOWN\n\n* Profile: The Politician\n* Superpower (Influence): Skilled at maintaining command. Protects group morale by projecting certainty and strength, even when the path is unclear.\n* Kryptonite (Rigidity): Dangerous in decision-making roles. May refuse to pivot away from a failing strategy if it means admitting they were wrong.\n\nTRAIT 5: AMBIGUITY TOLERANCE (Based on Vague Task)\n\nOption A: User chose START_WORKING\n\n* Profile: The Entrepreneur\n* Superpower (Velocity): Unblocks themselves instantly by inferring intent. Essential for \"Zero to One\" phases where speed is more important than perfection.\n* Kryptonite (Recklessness): \"Move fast and break things.\" High risk of wasted effort by solving the wrong problem due to a lack of clarification.\n\nOption B: User chose ASK_FOR_DETAILS\n\n* Profile: The Architect\n* Superpower (Precision): Measures twice, cuts once. Prevents the team from rushing into disasters and ensures the final output is exactly what was requested.\n* Kryptonite (Dependency): Can become a bottleneck. If leadership is unavailable to answer questions, this person may stop working entirely rather than risk an error."
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-17",
+      "type": "json_schema",
+      "position": {
+        "x": 48.0,
+        "y": 1552.0
+      },
+      "data": {
+        "nodeType": "json_schema",
+        "label": "JSON Schema",
+        "icon": "&#x1F4CB;",
+        "headerColor": "#00FFFF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "schema",
+            "type": "object"
+          }
+        ],
+        "literalValue": {
+          "type": "object",
+          "properties": {
+            "profile": {
+              "type": "string"
+            },
+            "comments": {
+              "type": "string"
+            },
+            "exploration": {
+              "type": "boolean"
+            },
+            "accountability": {
+              "type": "boolean"
+            },
+            "empathy": {
+              "type": "boolean"
+            },
+            "intellectual_honesty": {
+              "type": "boolean"
+            },
+            "ambiguity_tolerance": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "profile",
+            "comments",
+            "exploration",
+            "accountability",
+            "empathy",
+            "intellectual_honesty",
+            "ambiguity_tolerance"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-18",
+      "type": "set_var",
+      "position": {
+        "x": 16.0,
+        "y": -240.0
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Set selected_answers",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "selected_answers"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-20",
+      "type": "set_var_property",
+      "position": {
+        "x": 1056.0,
+        "y": -64.0
+      },
+      "data": {
+        "nodeType": "set_var_property",
+        "label": "Set Variable Property",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "key": "The Exploration Metric",
+          "name": "selected_answers"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-21",
+      "type": "literal_json",
+      "position": {
+        "x": -224.0,
+        "y": -224.0
+      },
+      "data": {
+        "nodeType": "literal_json",
+        "label": "JSON",
+        "icon": "{}",
+        "headerColor": "#00FFFF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "object"
+          }
+        ],
+        "literalValue": {}
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-22",
+      "type": "set_var_property",
+      "position": {
+        "x": 1056.0,
+        "y": 192.0
+      },
+      "data": {
+        "nodeType": "set_var_property",
+        "label": "Set Variable Property",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "key": "The Locus of Control Metric",
+          "name": "selected_answers"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-23",
+      "type": "set_var_property",
+      "position": {
+        "x": 1056.0,
+        "y": 448.0
+      },
+      "data": {
+        "nodeType": "set_var_property",
+        "label": "Set Variable Property",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "key": "The Empathy Style Metric",
+          "name": "selected_answers"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-24",
+      "type": "set_var_property",
+      "position": {
+        "x": 1056.0,
+        "y": 704.0
+      },
+      "data": {
+        "nodeType": "set_var_property",
+        "label": "Set Variable Property",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "key": "The Ego Rigidity Metric",
+          "name": "selected_answers"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-25",
+      "type": "set_var_property",
+      "position": {
+        "x": 1056.0,
+        "y": 960.0
+      },
+      "data": {
+        "nodeType": "set_var_property",
+        "label": "Set Variable Property",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "key": "The Ambiguity Tolerance",
+          "name": "selected_answers"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-26",
+      "type": "break_object",
+      "position": {
+        "x": 656.0,
+        "y": 1696.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "data",
+            "label": "data",
+            "type": "any"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "data"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-27",
+      "type": "break_object",
+      "position": {
+        "x": 656.0,
+        "y": 1456.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "profile",
+            "label": "profile",
+            "type": "string"
+          },
+          {
+            "id": "comments",
+            "label": "comments",
+            "type": "string"
+          },
+          {
+            "id": "exploration",
+            "label": "exploration",
+            "type": "boolean"
+          },
+          {
+            "id": "accountability",
+            "label": "accountability",
+            "type": "boolean"
+          },
+          {
+            "id": "empathy",
+            "label": "empathy",
+            "type": "boolean"
+          },
+          {
+            "id": "intellectual_honesty",
+            "label": "intellectual_honesty",
+            "type": "boolean"
+          },
+          {
+            "id": "ambiguity_tolerance",
+            "label": "ambiguity_tolerance",
+            "type": "boolean"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "profile",
+            "comments",
+            "exploration",
+            "accountability",
+            "empathy",
+            "intellectual_honesty",
+            "ambiguity_tolerance"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1767966974063",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-4",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767967112575",
+      "source": "node-1",
+      "sourceHandle": "provider",
+      "target": "node-8",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1767967148139",
+      "source": "node-1",
+      "sourceHandle": "provider",
+      "target": "node-3",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1767967150966",
+      "source": "node-1",
+      "sourceHandle": "provider",
+      "target": "node-5",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1767967154434",
+      "source": "node-1",
+      "sourceHandle": "provider",
+      "target": "node-6",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1767967174298",
+      "source": "node-1",
+      "sourceHandle": "provider",
+      "target": "node-7",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1767967180333",
+      "source": "node-1",
+      "sourceHandle": "model",
+      "target": "node-3",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-1767967183281",
+      "source": "node-1",
+      "sourceHandle": "model",
+      "target": "node-5",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-1767967186131",
+      "source": "node-1",
+      "sourceHandle": "model",
+      "target": "node-6",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-1767967190722",
+      "source": "node-1",
+      "sourceHandle": "model",
+      "target": "node-7",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-1767967194150",
+      "source": "node-1",
+      "sourceHandle": "model",
+      "target": "node-8",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-1767967225981",
+      "source": "node-10",
+      "sourceHandle": "value",
+      "target": "node-3",
+      "targetHandle": "choices",
+      "animated": false
+    },
+    {
+      "id": "edge-1767967602582",
+      "source": "node-11",
+      "sourceHandle": "value",
+      "target": "node-5",
+      "targetHandle": "choices",
+      "animated": false
+    },
+    {
+      "id": "edge-1767967652065",
+      "source": "node-12",
+      "sourceHandle": "value",
+      "target": "node-6",
+      "targetHandle": "choices",
+      "animated": false
+    },
+    {
+      "id": "edge-1767967678006",
+      "source": "node-13",
+      "sourceHandle": "value",
+      "target": "node-7",
+      "targetHandle": "choices",
+      "animated": false
+    },
+    {
+      "id": "edge-1767967724840",
+      "source": "node-14",
+      "sourceHandle": "value",
+      "target": "node-8",
+      "targetHandle": "choices",
+      "animated": false
+    },
+    {
+      "id": "edge-1767967817239",
+      "source": "node-1",
+      "sourceHandle": "evaluator",
+      "target": "node-15",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-1767967822524",
+      "source": "node-1",
+      "sourceHandle": "provider",
+      "target": "node-15",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1767967839089",
+      "source": "node-15",
+      "sourceHandle": "exec-out",
+      "target": "node-9",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767967891898",
+      "source": "node-17",
+      "sourceHandle": "value",
+      "target": "node-15",
+      "targetHandle": "response_schema",
+      "animated": false
+    },
+    {
+      "id": "edge-1767968114982",
+      "source": "node-21",
+      "sourceHandle": "value",
+      "target": "node-18",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-1767968141405",
+      "source": "node-4",
+      "sourceHandle": "then:0",
+      "target": "node-18",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767968145474",
+      "source": "node-4",
+      "sourceHandle": "then:1",
+      "target": "node-3",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767968148151",
+      "source": "node-4",
+      "sourceHandle": "then:2",
+      "target": "node-5",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767968152499",
+      "source": "node-4",
+      "sourceHandle": "then:3",
+      "target": "node-6",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767968155424",
+      "source": "node-4",
+      "sourceHandle": "then:4",
+      "target": "node-7",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767968160049",
+      "source": "node-4",
+      "sourceHandle": "then:5",
+      "target": "node-8",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767968163440",
+      "source": "node-4",
+      "sourceHandle": "then:6",
+      "target": "node-15",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767968213925",
+      "source": "node-3",
+      "sourceHandle": "exec-out",
+      "target": "node-20",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767968217160",
+      "source": "node-3",
+      "sourceHandle": "choice",
+      "target": "node-20",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-1767968231215",
+      "source": "node-5",
+      "sourceHandle": "exec-out",
+      "target": "node-22",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767968235630",
+      "source": "node-5",
+      "sourceHandle": "choice",
+      "target": "node-22",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-1767968259174",
+      "source": "node-8",
+      "sourceHandle": "exec-out",
+      "target": "node-25",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767968261274",
+      "source": "node-7",
+      "sourceHandle": "exec-out",
+      "target": "node-24",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767968263058",
+      "source": "node-6",
+      "sourceHandle": "exec-out",
+      "target": "node-23",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767968267923",
+      "source": "node-6",
+      "sourceHandle": "choice",
+      "target": "node-23",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-1767968270666",
+      "source": "node-7",
+      "sourceHandle": "choice",
+      "target": "node-24",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-1767968273611",
+      "source": "node-8",
+      "sourceHandle": "choice",
+      "target": "node-25",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-1767968347131",
+      "source": "node-15",
+      "sourceHandle": "result",
+      "target": "node-26",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1767968359260",
+      "source": "node-26",
+      "sourceHandle": "data",
+      "target": "node-27",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1767968543218",
+      "source": "node-27",
+      "sourceHandle": "profile",
+      "target": "node-9",
+      "targetHandle": "profile",
+      "animated": false
+    },
+    {
+      "id": "edge-1767968545426",
+      "source": "node-27",
+      "sourceHandle": "comments",
+      "target": "node-9",
+      "targetHandle": "comments",
+      "animated": false
+    },
+    {
+      "id": "edge-1767968947402",
+      "source": "node-27",
+      "sourceHandle": "exploration",
+      "target": "node-9",
+      "targetHandle": "exploration",
+      "animated": false
+    },
+    {
+      "id": "edge-1767968949826",
+      "source": "node-27",
+      "sourceHandle": "accountability",
+      "target": "node-9",
+      "targetHandle": "accountability",
+      "animated": false
+    },
+    {
+      "id": "edge-1767968952386",
+      "source": "node-27",
+      "sourceHandle": "empathy",
+      "target": "node-9",
+      "targetHandle": "empathy",
+      "animated": false
+    },
+    {
+      "id": "edge-1767968954695",
+      "source": "node-27",
+      "sourceHandle": "intellectual_honesty",
+      "target": "node-9",
+      "targetHandle": "intellectual_honesty",
+      "animated": false
+    },
+    {
+      "id": "edge-1767968957010",
+      "source": "node-27",
+      "sourceHandle": "ambiguity_tolerance",
+      "target": "node-9",
+      "targetHandle": "ambiguity_tolerance",
+      "animated": false
+    }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2026-01-09T13:52:38.295820",
+  "updated_at": "2026-01-09T14:45:06.153694"
+}

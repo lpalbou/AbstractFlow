@@ -22,6 +22,7 @@ def test_pack_workflow_bundle_creates_flow_zip_with_manifest_and_flows(tmp_path:
     assert man.bundle_id == "ac-echo"
     assert man.bundle_format_version == "1"
     assert any(ep.flow_id == "ac-echo" for ep in man.entrypoints)
+    assert man.default_entrypoint == "ac-echo"
 
     # Must include at least root + one subflow.
     assert "ac-echo" in man.flows

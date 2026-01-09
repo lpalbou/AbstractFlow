@@ -174,6 +174,7 @@ def pack_workflow_bundle(
     bundle_version: str = "0.0.0",
     flows_dir: Optional[str | Path] = None,
     entrypoints: Optional[List[str]] = None,
+    default_entrypoint: Optional[str] = None,
 ) -> PackedWorkflowBundle:
     """Pack a `.flow` bundle from a root VisualFlow JSON file."""
     root_path = Path(root_flow_json).expanduser().resolve()
@@ -193,6 +194,14 @@ def pack_workflow_bundle(
 
     # Entry points: default to root flow id.
     entry_ids = list(entrypoints) if isinstance(entrypoints, list) and entrypoints else [str(root_flow.id)]
+    entry_ids = [str(x).strip() for x in entry_ids if isinstance(x, str) and str(x).strip()]
+    if not entry_ids:
+        raise WorkflowBundleError("No valid entrypoints specified")
+
+    de_param = str(default_entrypoint).strip() if isinstance(default_entrypoint, str) and str(default_entrypoint).strip() else ""
+    if de_param and de_param not in entry_ids:
+        raise WorkflowBundleError(f"default_entrypoint '{de_param}' must be one of: {entry_ids}")
+    default_ep = de_param or (str(root_flow.id).strip() if str(root_flow.id).strip() in entry_ids else entry_ids[0])
 
     # Compile artifacts for all included flows.
     flows_json: Dict[str, bytes] = {}
@@ -231,6 +240,7 @@ def pack_workflow_bundle(
         bundle_version=str(bundle_version or "0.0.0"),
         created_at=created_at,
         entrypoints=eps,
+        default_entrypoint=default_ep,
         flows={fid: f"flows/{fid}.json" for fid in sorted(flows_json.keys())},
         artifacts={},
         assets={},
@@ -274,4 +284,3 @@ def unpack_workflow_bundle(*, bundle_path: str | Path, out_dir: str | Path) -> P
     with zipfile.ZipFile(src, "r") as zf:
         zf.extractall(out)
     return out
-

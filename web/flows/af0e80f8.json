@@ -1,5 +1,5 @@
 {
-  "id": "d6653292",
+  "id": "af0e80f8",
   "name": "smart-selector",
   "description": "",
   "interfaces": [],
@@ -37,8 +37,22 @@
             "id": "rules",
             "label": "rules",
             "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
           }
-        ]
+        ],
+        "pinDefaults": {
+          "provider": "lmstudio",
+          "model": "google_gemma-3-1b-it"
+        }
       },
       "label": null,
       "icon": null,
@@ -133,7 +147,7 @@
           }
         ],
         "pinDefaults": {
-          "system": "Select the best choice amongst CHOICES, based on the provided RULES and REQUEST. Answer only with your choice."
+          "system": "Select the best choice amongst CHOICES, based on the provided RULES and REQUEST. Answer only with your \"choice\" and \"confidence\" (continuous score 0.0 : uncertain; 0.5 : somewhat confident; 1.0 : certain)."
         },
         "effectConfig": {
           "provider": "lmstudio",
@@ -217,7 +231,7 @@
       "type": "join",
       "position": {
         "x": -1376.0,
-        "y": 784.0
+        "y": 832.0
       },
       "data": {
         "nodeType": "join",
@@ -257,7 +271,7 @@
       "id": "node-5",
       "type": "on_flow_end",
       "position": {
-        "x": -624.0,
+        "x": -592.0,
         "y": 432.0
       },
       "data": {
@@ -275,6 +289,11 @@
             "id": "choice",
             "label": "choice",
             "type": "string"
+          },
+          {
+            "id": "confidence",
+            "label": "confidence",
+            "type": "number"
           }
         ],
         "outputs": []
@@ -289,8 +308,8 @@
       "id": "node-6",
       "type": "literal_json",
       "position": {
-        "x": -1440.0,
-        "y": 1024.0
+        "x": -1056.0,
+        "y": 800.0
       },
       "data": {
         "nodeType": "literal_json",
@@ -306,7 +325,8 @@
           }
         ],
         "literalValue": {
-          "choice": "the choice you selected"
+          "choice": "",
+          "index": 0
         }
       },
       "label": null,
@@ -316,11 +336,11 @@
       "outputs": []
     },
     {
-      "id": "node-7",
+      "id": "node-12",
       "type": "break_object",
       "position": {
-        "x": -736.0,
-        "y": 1120.0
+        "x": -832.0,
+        "y": 720.0
       },
       "data": {
         "nodeType": "break_object",
@@ -336,14 +356,20 @@
         ],
         "outputs": [
           {
-            "id": "result",
-            "label": "result",
+            "id": "data",
+            "label": "data",
+            "type": "any"
+          },
+          {
+            "id": "content",
+            "label": "content",
             "type": "string"
           }
         ],
         "breakConfig": {
           "selectedPaths": [
-            "result"
+            "data",
+            "content"
           ]
         }
       },
@@ -354,202 +380,42 @@
       "outputs": []
     },
     {
-      "id": "node-8",
-      "type": "answer_user",
+      "id": "node-13",
+      "type": "break_object",
       "position": {
-        "x": -736.0,
-        "y": 528.0
+        "x": -832.0,
+        "y": 560.0
       },
       "data": {
-        "nodeType": "answer_user",
-        "label": "Answer User",
-        "icon": "&#x1F4AC;",
-        "headerColor": "#9B59B6",
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
         "inputs": [
           {
-            "id": "exec-in",
-            "label": "",
-            "type": "execution"
-          },
-          {
-            "id": "message",
-            "label": "message",
-            "type": "string"
+            "id": "object",
+            "label": "object",
+            "type": "object"
           }
         ],
         "outputs": [
           {
-            "id": "exec-out",
-            "label": "",
-            "type": "execution"
-          },
-          {
-            "id": "message",
-            "label": "message",
+            "id": "choice",
+            "label": "choice",
             "type": "string"
-          }
-        ]
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
-      "id": "node-9",
-      "type": "agent",
-      "position": {
-        "x": -1136.0,
-        "y": 992.0
-      },
-      "data": {
-        "nodeType": "agent",
-        "label": "Agent",
-        "icon": "&#x1F916;",
-        "headerColor": "#4488FF",
-        "inputs": [
-          {
-            "id": "exec-in",
-            "label": "",
-            "type": "execution"
           },
           {
-            "id": "include_context",
-            "label": "use_context",
-            "type": "boolean",
-            "description": "When true, include this run's active context messages (context.messages) as agent history. If the pin is not connected, the node checkbox is used. Default: false."
-          },
-          {
-            "id": "provider",
-            "label": "provider",
-            "type": "provider",
-            "description": "LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
-          },
-          {
-            "id": "model",
-            "label": "model",
-            "type": "model",
-            "description": "LLM model id/name. If unset, uses the node’s configured model."
-          },
-          {
-            "id": "max_iterations",
-            "label": "max_iterations",
-            "type": "number",
-            "description": "Maximum internal ReAct iterations (safety cap). Higher values allow more tool-use steps."
-          },
-          {
-            "id": "system",
-            "label": "system",
-            "type": "string",
-            "description": "Optional system prompt for this agent instance (high priority instructions)."
-          },
-          {
-            "id": "task",
-            "label": "prompt",
-            "type": "string",
-            "description": "The task/user prompt for the agent to solve."
-          },
-          {
-            "id": "tools",
-            "label": "tools",
-            "type": "tools",
-            "description": "Allowlist of tool names this agent can call (defense-in-depth; runtime still enforces allowlists)."
-          },
-          {
-            "id": "response_schema",
-            "label": "structured_output",
-            "type": "object",
-            "description": "Optional JSON Schema object (type=object) the final answer must conform to."
-          },
-          {
-            "id": "context",
-            "label": "context",
-            "type": "object",
-            "description": "Optional explicit context object for the agent (e.g. {messages:[...]}). If provided, it can override inherited run context."
+            "id": "confidence",
+            "label": "confidence",
+            "type": "number"
           }
         ],
-        "outputs": [
-          {
-            "id": "exec-out",
-            "label": "",
-            "type": "execution"
-          },
-          {
-            "id": "result",
-            "label": "result",
-            "type": "object",
-            "description": "Structured final agent result (answer + metadata/tool calls depending on agent)."
-          },
-          {
-            "id": "tool_calls",
-            "label": "tool_calls",
-            "type": "array",
-            "description": "Best-effort list of tool call requests extracted from the agent scratchpad trace (post-run). For real-time tool observability, subscribe to the ledger/node_traces stream."
-          },
-          {
-            "id": "tool_results",
-            "label": "tool_results",
-            "type": "array",
-            "description": "Best-effort list of tool results extracted from the agent scratchpad trace (post-run). For real-time tool observability, subscribe to the ledger/node_traces stream."
-          },
-          {
-            "id": "scratchpad",
-            "label": "scratchpad",
-            "type": "object",
-            "description": "Runtime-owned execution trace/scratchpad for observability (LLM/tool steps, timings)."
-          }
-        ],
-        "pinDefaults": {
-          "system": "Select the best choice amongst CHOICES, based on the provided RULES and REQUEST. Answer only with your choice."
-        },
-        "agentConfig": {
-          "provider": "lmstudio",
-          "model": "qwen/qwen3-next-80b"
+        "breakConfig": {
+          "selectedPaths": [
+            "choice",
+            "confidence"
+          ]
         }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
-      "id": "node-11",
-      "type": "answer_user",
-      "position": {
-        "x": -736.0,
-        "y": 1024.0
-      },
-      "data": {
-        "nodeType": "answer_user",
-        "label": "Answer User",
-        "icon": "&#x1F4AC;",
-        "headerColor": "#9B59B6",
-        "inputs": [
-          {
-            "id": "exec-in",
-            "label": "",
-            "type": "execution"
-          },
-          {
-            "id": "message",
-            "label": "message",
-            "type": "string"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "exec-out",
-            "label": "",
-            "type": "execution"
-          },
-          {
-            "id": "message",
-            "label": "message",
-            "type": "string"
-          }
-        ]
       },
       "label": null,
       "icon": null,
@@ -600,38 +466,6 @@
       "animated": false
     },
     {
-      "id": "edge-1767949276779",
-      "source": "node-2",
-      "sourceHandle": "exec-out",
-      "target": "node-8",
-      "targetHandle": "exec-in",
-      "animated": true
-    },
-    {
-      "id": "edge-1767949279226",
-      "source": "node-8",
-      "sourceHandle": "exec-out",
-      "target": "node-5",
-      "targetHandle": "exec-in",
-      "animated": true
-    },
-    {
-      "id": "edge-1767949352573",
-      "source": "node-2",
-      "sourceHandle": "response",
-      "target": "node-8",
-      "targetHandle": "message",
-      "animated": false
-    },
-    {
-      "id": "edge-1767949355180",
-      "source": "node-8",
-      "sourceHandle": "message",
-      "target": "node-5",
-      "targetHandle": "choice",
-      "animated": false
-    },
-    {
       "id": "edge-1767949478837",
       "source": "node-6",
       "sourceHandle": "value",
@@ -640,55 +474,71 @@
       "animated": false
     },
     {
-      "id": "edge-1767949542980",
-      "source": "node-4",
-      "sourceHandle": "result",
-      "target": "node-9",
-      "targetHandle": "task",
-      "animated": false
-    },
-    {
-      "id": "edge-1767949547794",
-      "source": "node-6",
-      "sourceHandle": "value",
-      "target": "node-9",
-      "targetHandle": "response_schema",
-      "animated": false
-    },
-    {
-      "id": "edge-1767949551802",
+      "id": "edge-1767952641724",
       "source": "node-1",
       "sourceHandle": "exec-out",
-      "target": "node-9",
+      "target": "node-2",
       "targetHandle": "exec-in",
       "animated": true
     },
     {
-      "id": "edge-1767949569111",
-      "source": "node-9",
-      "sourceHandle": "exec-out",
-      "target": "node-11",
-      "targetHandle": "exec-in",
-      "animated": true
-    },
-    {
-      "id": "edge-1767949572645",
-      "source": "node-9",
+      "id": "edge-1767952681364",
+      "source": "node-2",
       "sourceHandle": "result",
-      "target": "node-7",
+      "target": "node-12",
       "targetHandle": "object",
       "animated": false
     },
     {
-      "id": "edge-1767949605429",
-      "source": "node-7",
-      "sourceHandle": "result",
-      "target": "node-11",
-      "targetHandle": "message",
+      "id": "edge-1767952886216",
+      "source": "node-2",
+      "sourceHandle": "exec-out",
+      "target": "node-5",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1767954510373",
+      "source": "node-12",
+      "sourceHandle": "data",
+      "target": "node-13",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1767954521723",
+      "source": "node-13",
+      "sourceHandle": "choice",
+      "target": "node-5",
+      "targetHandle": "choice",
+      "animated": false
+    },
+    {
+      "id": "edge-1767955016507",
+      "source": "node-13",
+      "sourceHandle": "confidence",
+      "target": "node-5",
+      "targetHandle": "confidence",
+      "animated": false
+    },
+    {
+      "id": "edge-1767966833889",
+      "source": "node-1",
+      "sourceHandle": "provider",
+      "target": "node-2",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1767966836198",
+      "source": "node-1",
+      "sourceHandle": "model",
+      "target": "node-2",
+      "targetHandle": "model",
       "animated": false
     }
   ],
   "entryNode": "node-1",
-  "created_at": "2026-01-09T08:30:03.342324",
-  "updated_at": "2026-01-09T09:13:46.427575"
+  "created_at": "2026-01-09T10:39:09.823264",
+  "updated_at": "2026-01-09T13:54:49.568354"
 }
