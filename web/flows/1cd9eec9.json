@@ -34,6 +34,16 @@
             "type": "model"
           },
           {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number"
+          },
+          {
             "id": "request",
             "label": "request",
             "type": "string"
@@ -41,7 +51,9 @@
         ],
         "pinDefaults": {
           "provider": "lmstudio",
-          "model": "qwen/qwen3-next-80b"
+          "model": "qwen/qwen3-next-80b",
+          "temperature": 0.7,
+          "seed": -1
         }
       },
       "label": null,
@@ -85,6 +97,18 @@
             "label": "model",
             "type": "model",
             "description": "LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number",
+            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number",
+            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
           },
           {
             "id": "system",
@@ -469,6 +493,22 @@
       "sourceHandle": "model",
       "target": "node-3",
       "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-1768020030001",
+      "source": "node-1",
+      "sourceHandle": "temperature",
+      "target": "node-3",
+      "targetHandle": "temperature",
+      "animated": false
+    },
+    {
+      "id": "edge-1768020030002",
+      "source": "node-1",
+      "sourceHandle": "seed",
+      "target": "node-3",
+      "targetHandle": "seed",
       "animated": false
     },
     {

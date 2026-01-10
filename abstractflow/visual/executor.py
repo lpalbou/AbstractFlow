@@ -330,8 +330,20 @@ def create_visual_runner(
                         f"LLM_CALL node '{n.id}' in flow '{vf.id}' missing model "
                         "(set effectConfig.model or connect the model input pin)"
                     )
-                provider_default = provider if provider_ok else (_infer_connected_pin_default(vf, node_id=n.id, pin_id="provider") if provider_connected else None)
-                model_default = model if model_ok else (_infer_connected_pin_default(vf, node_id=n.id, pin_id="model") if model_connected else None)
+                provider_default = (
+                    provider
+                    if provider_ok
+                    else _infer_connected_pin_default(vf, node_id=n.id, pin_id="provider")
+                    if provider_connected
+                    else None
+                )
+                model_default = (
+                    model
+                    if model_ok
+                    else _infer_connected_pin_default(vf, node_id=n.id, pin_id="model")
+                    if model_connected
+                    else None
+                )
                 _add_pair(provider_default, model_default)
 
             elif node_type == "agent":
@@ -355,8 +367,20 @@ def create_visual_runner(
                         f"Agent node '{n.id}' in flow '{vf.id}' missing model "
                         "(set agentConfig.model or connect the model input pin)"
                     )
-                provider_default = provider if provider_ok else (_infer_connected_pin_default(vf, node_id=n.id, pin_id="provider") if provider_connected else None)
-                model_default = model if model_ok else (_infer_connected_pin_default(vf, node_id=n.id, pin_id="model") if model_connected else None)
+                provider_default = (
+                    provider
+                    if provider_ok
+                    else _infer_connected_pin_default(vf, node_id=n.id, pin_id="provider")
+                    if provider_connected
+                    else None
+                )
+                model_default = (
+                    model
+                    if model_ok
+                    else _infer_connected_pin_default(vf, node_id=n.id, pin_id="model")
+                    if model_connected
+                    else None
+                )
                 _add_pair(provider_default, model_default)
 
             elif node_type == "provider_models":
@@ -374,53 +398,20 @@ def create_visual_runner(
 
     if has_llm_nodes:
         provider_model = default_llm
-        if provider_model is None and provider_hints:
-            # If the graph contains a provider selection node, prefer it for the runtime default.
-            try:
-                from abstractcore.providers.registry import get_available_models_for_provider
-            except Exception:
-                get_available_models_for_provider = None  # type: ignore[assignment]
-            if callable(get_available_models_for_provider):
-                for p in provider_hints:
-                    try:
-                        models = get_available_models_for_provider(p)
-                    except Exception:
-                        models = []
-                    if isinstance(models, list):
-                        first = next((m for m in models if isinstance(m, str) and m.strip()), None)
-                        if first:
-                            provider_model = (p, first.strip())
-                            break
 
-        if provider_model is None:
-            # Fall back to the first available provider/model from AbstractCore.
-            try:
-                from abstractcore.providers.registry import get_all_providers_with_models
-
-                providers_meta = get_all_providers_with_models(include_models=True)
-                for p in providers_meta:
-                    if not isinstance(p, dict):
-                        continue
-                    if p.get("status") != "available":
-                        continue
-                    name = p.get("name")
-                    models = p.get("models")
-                    if not isinstance(name, str) or not name.strip():
-                        continue
-                    if not isinstance(models, list):
-                        continue
-                    first = next((m for m in models if isinstance(m, str) and m.strip()), None)
-                    if first:
-                        provider_model = (name.strip().lower(), first.strip())
-                        break
-            except Exception:
-                provider_model = None
-
+        # Strict behavior: do not probe unrelated providers/models to "guess" a default.
+        #
+        # A VisualFlow run must provide a deterministic provider+model for the runtime:
+        # - via run inputs (e.g. ON_FLOW_START pinDefaults / user-provided input_data), OR
+        # - via static node configs (effectConfig/agentConfig), OR
+        # - via connected pin defaults (best-effort).
+        #
+        # If we can't determine that, fail loudly with a clear error message.
         if provider_model is None:
             raise RuntimeError(
-                "This flow uses LLM nodes (llm_call/agent), but no provider/model could be determined. "
-                "Either set provider/model on a node, connect provider+model pins, or ensure AbstractCore "
-                "has at least one available provider with models."
+                "This flow uses LLM nodes (llm_call/agent), but no default provider/model could be determined. "
+                "Set provider+model on a node, or connect provider/model pins to a node with pinDefaults "
+                "(e.g. ON_FLOW_START), or pass `input_data={'provider': ..., 'model': ...}` when creating the runner."
             )
 
         provider, model = provider_model

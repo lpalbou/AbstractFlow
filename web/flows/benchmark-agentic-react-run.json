@@ -346,6 +346,28 @@
       }
     },
     {
+      "id": "node-14",
+      "type": "code",
+      "position": { "x": 480.0, "y": 304.0 },
+      "data": {
+        "nodeType": "code",
+        "label": "Normalize signature",
+        "icon": "&#x1F40D;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "record", "label": "record", "type": "object" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "output", "label": "output", "type": "object" }
+        ],
+        "codeBody": "return out\n",
+        "code": "def transform(_input):\n    rec = _input.get(\"record\")\n    if not isinstance(rec, dict):\n        return rec\n\n    out = dict(rec)\n\n    model_output = out.get(\"model_output\")\n    if not isinstance(model_output, dict):\n        model_output = out.get(\"output\") if isinstance(out.get(\"output\"), dict) else {}\n\n    def _as_int(v):\n        try:\n            if v is None or isinstance(v, bool):\n                return None\n            return int(float(v))\n        except Exception:\n            return None\n\n    parts = []\n\n    top = model_output.get(\"top_customers\") if isinstance(model_output, dict) else None\n    if isinstance(top, list):\n        for row in top:\n            if not isinstance(row, dict):\n                continue\n            cid = str(row.get(\"customer_id\") or \"\").strip()\n            net = _as_int(row.get(\"net_amount\"))\n            parts.append(f\"{cid}:{net}\")\n\n    tot = model_output.get(\"totals\") if isinstance(model_output, dict) else None\n    if isinstance(tot, dict):\n        oa = _as_int(tot.get(\"orders_amount\"))\n        ra = _as_int(tot.get(\"refunds_amount\"))\n        na = _as_int(tot.get(\"net_amount\"))\n        parts.append(f\"totals={oa},{ra},{na}\")\n\n    out[\"signature\"] = \"|\".join(parts)\n    return out\n",
+        "functionName": "transform"
+      }
+    },
+    {
       "id": "node-13",
       "type": "on_flow_end",
       "position": { "x": 768.0, "y": 160.0 },

@@ -1,0 +1,987 @@
+{
+  "id": "4189916b",
+  "name": "advanced-agent",
+  "description": "",
+  "interfaces": [
+    "abstractcode.agent.v1"
+  ],
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": {
+        "x": -1088.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "RECEIVING REQUEST",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 960.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "ANSWERING",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          },
+          {
+            "id": "raw_result",
+            "label": "raw_result",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-2",
+      "type": "agent",
+      "position": {
+        "x": 176.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "agent",
+        "label": "AGENTIC LOOP",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "include_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) as agent history. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider",
+            "description": "LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model",
+            "description": "LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number",
+            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number",
+            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number",
+            "description": "Maximum internal ReAct iterations (safety cap). Higher values allow more tool-use steps."
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string",
+            "description": "Optional system prompt for this agent instance (high priority instructions)."
+          },
+          {
+            "id": "task",
+            "label": "prompt",
+            "type": "string",
+            "description": "The task/user prompt for the agent to solve."
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools",
+            "description": "Allowlist of tool names this agent can call (defense-in-depth; runtime still enforces allowlists)."
+          },
+          {
+            "id": "response_schema",
+            "label": "structured_output",
+            "type": "object",
+            "description": "Optional JSON Schema object (type=object) the final answer must conform to."
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object",
+            "description": "Optional explicit context object for the agent (e.g. {messages:[...]}). If provided, it can override inherited run context."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object",
+            "description": "Structured final agent result (answer + metadata/tool calls depending on agent)."
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array",
+            "description": "Best-effort list of tool call requests extracted from the agent scratchpad trace (post-run). For real-time tool observability, subscribe to the ledger/node_traces stream."
+          },
+          {
+            "id": "tool_results",
+            "label": "tool_results",
+            "type": "array",
+            "description": "Best-effort list of tool results extracted from the agent scratchpad trace (post-run). For real-time tool observability, subscribe to the ledger/node_traces stream."
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object",
+            "description": "Runtime-owned execution trace/scratchpad for observability (LLM/tool steps, timings)."
+          }
+        ],
+        "pinDefaults": {
+          "include_context": true,
+          "system": "You are a highly autonomous ReAct agent who requests the execution of tools to your host in order to fullfill ALL the USER REQUEST and ALL their associated TASKS. You work with the highest standards of rigor and profesionalism, you do not skip test, you continue until your work is done, fully done."
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-3",
+      "type": "break_object",
+      "position": {
+        "x": 736.0,
+        "y": 304.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          },
+          {
+            "id": "usage",
+            "label": "usage",
+            "type": "object"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "result",
+            "usage"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-4",
+      "type": "subflow",
+      "position": {
+        "x": -800.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "INFO ENRICHING",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean",
+            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          },
+          {
+            "id": "state",
+            "label": "state",
+            "type": "string"
+          },
+          {
+            "id": "post_delay",
+            "label": "post_delay",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          }
+        ],
+        "subflowId": "15f19f7f",
+        "pinDefaults": {
+          "state": "Enriching..."
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-5",
+      "type": "subflow",
+      "position": {
+        "x": 496.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "INFO DONE",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean",
+            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          },
+          {
+            "id": "state",
+            "label": "state",
+            "type": "string"
+          },
+          {
+            "id": "post_delay",
+            "label": "post_delay",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          }
+        ],
+        "subflowId": "15f19f7f",
+        "pinDefaults": {
+          "state": "Done",
+          "post_delay": 3
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-6",
+      "type": "subflow",
+      "position": {
+        "x": -48.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "PLANNING",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean",
+            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "tasks",
+            "label": "tasks",
+            "type": "array"
+          }
+        ],
+        "subflowId": "1cd9eec9",
+        "pinDefaults": {}
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-7",
+      "type": "subflow",
+      "position": {
+        "x": -528.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "ENRICHING",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean",
+            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "enriched_request",
+            "label": "enriched_request",
+            "type": "string"
+          }
+        ],
+        "subflowId": "72b51d91",
+        "pinDefaults": {}
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-8",
+      "type": "subflow",
+      "position": {
+        "x": -320.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "INFO PLANNING",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean",
+            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          },
+          {
+            "id": "state",
+            "label": "state",
+            "type": "string"
+          },
+          {
+            "id": "post_delay",
+            "label": "post_delay",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          }
+        ],
+        "subflowId": "15f19f7f",
+        "pinDefaults": {
+          "state": "Planning..."
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-9",
+      "type": "concat",
+      "position": {
+        "x": -304.0,
+        "y": 304.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          },
+          {
+            "id": "d",
+            "label": "d",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "a": "USER REQUEST: ",
+          "c": "\\n\\nTASKS:"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-10",
+      "type": "join",
+      "position": {
+        "x": -576.0,
+        "y": 384.0
+      },
+      "data": {
+        "nodeType": "join",
+        "label": "Join",
+        "icon": "&#x1F517;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "items",
+            "label": "items",
+            "type": "array"
+          },
+          {
+            "id": "delimiter",
+            "label": "delimiter",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "delimiter": "@@"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1768015012692",
+      "source": "node-1",
+      "sourceHandle": "tools",
+      "target": "node-2",
+      "targetHandle": "tools",
+      "animated": false
+    },
+    {
+      "id": "edge-1768015015156",
+      "source": "node-1",
+      "sourceHandle": "context",
+      "target": "node-2",
+      "targetHandle": "context",
+      "animated": false
+    },
+    {
+      "id": "edge-1768015017449",
+      "source": "node-1",
+      "sourceHandle": "model",
+      "target": "node-2",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-1768015019109",
+      "source": "node-1",
+      "sourceHandle": "provider",
+      "target": "node-2",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1768015038917",
+      "source": "node-2",
+      "sourceHandle": "result",
+      "target": "node-3",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1768015060982",
+      "source": "node-3",
+      "sourceHandle": "result",
+      "target": "end",
+      "targetHandle": "response",
+      "animated": false
+    },
+    {
+      "id": "edge-1768015066098",
+      "source": "node-3",
+      "sourceHandle": "usage",
+      "target": "end",
+      "targetHandle": "meta",
+      "animated": false
+    },
+    {
+      "id": "edge-1768015068923",
+      "source": "node-2",
+      "sourceHandle": "scratchpad",
+      "target": "end",
+      "targetHandle": "scratchpad",
+      "animated": false
+    },
+    {
+      "id": "edge-1768015071706",
+      "source": "node-2",
+      "sourceHandle": "result",
+      "target": "end",
+      "targetHandle": "raw_result",
+      "animated": false
+    },
+    {
+      "id": "edge-1768015078148",
+      "source": "node-1",
+      "sourceHandle": "max_iterations",
+      "target": "node-2",
+      "targetHandle": "max_iterations",
+      "animated": false
+    },
+    {
+      "id": "edge-1768020020001",
+      "source": "node-1",
+      "sourceHandle": "temperature",
+      "target": "node-2",
+      "targetHandle": "temperature",
+      "animated": false
+    },
+    {
+      "id": "edge-1768020020002",
+      "source": "node-1",
+      "sourceHandle": "seed",
+      "target": "node-2",
+      "targetHandle": "seed",
+      "animated": false
+    },
+    {
+      "id": "edge-1768015206686",
+      "source": "node-2",
+      "sourceHandle": "exec-out",
+      "target": "node-5",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768015210518",
+      "source": "node-5",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768015347990",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-4",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768015351724",
+      "source": "node-4",
+      "sourceHandle": "exec-out",
+      "target": "node-7",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768015366389",
+      "source": "node-1",
+      "sourceHandle": "provider",
+      "target": "node-7",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1768015370263",
+      "source": "node-1",
+      "sourceHandle": "model",
+      "target": "node-7",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-1768020021001",
+      "source": "node-1",
+      "sourceHandle": "temperature",
+      "target": "node-7",
+      "targetHandle": "temperature",
+      "animated": false
+    },
+    {
+      "id": "edge-1768020021002",
+      "source": "node-1",
+      "sourceHandle": "seed",
+      "target": "node-7",
+      "targetHandle": "seed",
+      "animated": false
+    },
+    {
+      "id": "edge-1768015372889",
+      "source": "node-1",
+      "sourceHandle": "request",
+      "target": "node-7",
+      "targetHandle": "request",
+      "animated": false
+    },
+    {
+      "id": "edge-1768015427639",
+      "source": "node-7",
+      "sourceHandle": "exec-out",
+      "target": "node-8",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768015435454",
+      "source": "node-8",
+      "sourceHandle": "exec-out",
+      "target": "node-6",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768015439012",
+      "source": "node-1",
+      "sourceHandle": "provider",
+      "target": "node-6",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1768015442045",
+      "source": "node-1",
+      "sourceHandle": "model",
+      "target": "node-6",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-1768020022001",
+      "source": "node-1",
+      "sourceHandle": "temperature",
+      "target": "node-6",
+      "targetHandle": "temperature",
+      "animated": false
+    },
+    {
+      "id": "edge-1768020022002",
+      "source": "node-1",
+      "sourceHandle": "seed",
+      "target": "node-6",
+      "targetHandle": "seed",
+      "animated": false
+    },
+    {
+      "id": "edge-1768015445021",
+      "source": "node-1",
+      "sourceHandle": "request",
+      "target": "node-6",
+      "targetHandle": "request",
+      "animated": false
+    },
+    {
+      "id": "edge-1768015482671",
+      "source": "node-7",
+      "sourceHandle": "enriched_request",
+      "target": "node-9",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-1768015519676",
+      "source": "node-6",
+      "sourceHandle": "tasks",
+      "target": "node-10",
+      "targetHandle": "items",
+      "animated": false
+    },
+    {
+      "id": "edge-1768015526442",
+      "source": "node-10",
+      "sourceHandle": "result",
+      "target": "node-9",
+      "targetHandle": "d",
+      "animated": false
+    },
+    {
+      "id": "edge-1768015533268",
+      "source": "node-9",
+      "sourceHandle": "result",
+      "target": "node-2",
+      "targetHandle": "task",
+      "animated": false
+    },
+    {
+      "id": "edge-1768015539851",
+      "source": "node-6",
+      "sourceHandle": "exec-out",
+      "target": "node-2",
+      "targetHandle": "exec-in",
+      "animated": true
+    }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2026-01-10T03:20:26.635222",
+  "updated_at": "2026-01-10T03:30:17.275418"
+}
