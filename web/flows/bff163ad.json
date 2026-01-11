@@ -1,13 +1,14 @@
 {
   "id": "bff163ad",
-  "name": "todel",
-  "description": "",
+  "name": "memory-recall-tests",
+  "description": "This is a series of tests to explore how the memorize and recall work, including in terms of \"use context\". \n\nThis is crucial to make sure the memory works as expected",
+  "interfaces": [],
   "nodes": [
     {
       "id": "node-1",
       "type": "on_flow_start",
       "position": {
-        "x": 160.0,
+        "x": 144.0,
         "y": 112.0
       },
       "data": {
@@ -59,29 +60,58 @@
             "type": "execution"
           },
           {
+            "id": "include_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
             "id": "provider",
             "label": "provider",
-            "type": "provider"
+            "type": "provider",
+            "description": "LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
           },
           {
             "id": "model",
             "label": "model",
-            "type": "model"
+            "type": "model",
+            "description": "LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number",
+            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number",
+            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
           },
           {
             "id": "system",
             "label": "system",
-            "type": "string"
+            "type": "string",
+            "description": "Optional system prompt for this single call."
           },
           {
             "id": "prompt",
             "label": "prompt",
-            "type": "string"
+            "type": "string",
+            "description": "User prompt/content for this single call."
           },
           {
             "id": "tools",
             "label": "tools",
-            "type": "array"
+            "type": "tools",
+            "description": "Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node)."
+          },
+          {
+            "id": "response_schema",
+            "label": "structured_output",
+            "type": "object",
+            "description": "Optional JSON Schema object (type=object) the assistant content must conform to."
           }
         ],
         "outputs": [
@@ -93,12 +123,14 @@
           {
             "id": "response",
             "label": "response",
-            "type": "string"
+            "type": "string",
+            "description": "Assistant text content (best-effort). For tool calls, content may be empty."
           },
           {
             "id": "result",
             "label": "result",
-            "type": "object"
+            "type": "object",
+            "description": "Full normalized LLM result (content, tool_calls, usage, provider/model metadata, trace_id)."
           }
         ],
         "effectConfig": {
@@ -134,24 +166,40 @@
             "type": "execution"
           },
           {
-            "id": "content",
-            "label": "content",
-            "type": "string"
-          },
-          {
-            "id": "tags",
-            "label": "tags",
-            "type": "object"
-          },
-          {
-            "id": "sources",
-            "label": "sources",
-            "type": "object"
+            "id": "keep_in_context",
+            "label": "in_context",
+            "type": "boolean",
+            "description": "When true, also insert the stored note into this run's context.messages (synthetic system message). If the pin is not connected, the node checkbox is used. Default: false."
           },
           {
             "id": "scope",
             "label": "scope",
-            "type": "string"
+            "type": "string",
+            "description": "Where to store/index the note: run (this run), session (all runs with the same session_id; owned by an internal session memory run), or global (shared global memory run). If session_id is missing, session falls back to the run-tree root."
+          },
+          {
+            "id": "content",
+            "label": "content",
+            "type": "string",
+            "description": "The note text to store durably (keep it short; prefer references in sources for large payloads)."
+          },
+          {
+            "id": "location",
+            "label": "location",
+            "type": "string",
+            "description": "Optional location label (where the note was produced, e.g. \"flow:my_flow/node-12\"). Useful for filtering."
+          },
+          {
+            "id": "tags",
+            "label": "tags",
+            "type": "object",
+            "description": "Key/value tags for filtering (e.g. {topic:\"memory\", person:\"laurent\"}). Values must be strings."
+          },
+          {
+            "id": "sources",
+            "label": "sources",
+            "type": "object",
+            "description": "Optional provenance refs (e.g. {run_id, span_ids, message_ids}). The note stores refs, not the full source content."
           }
         ],
         "outputs": [
@@ -163,9 +211,13 @@
           {
             "id": "note_id",
             "label": "note_id",
-            "type": "string"
+            "type": "string",
+            "description": "The stored note’s span_id / artifact_id. Use it for Recall into context (span_ids) or for precise Recall."
           }
-        ]
+        ],
+        "pinDefaults": {
+          "keep_in_context": false
+        }
       },
       "label": null,
       "icon": null,
@@ -194,17 +246,20 @@
           {
             "id": "span_ids",
             "label": "span_ids",
-            "type": "array"
+            "type": "array",
+            "description": "List of span_ids (artifact_ids) to insert into context.messages. Typically comes from Recall results."
           },
           {
             "id": "placement",
             "label": "placement",
-            "type": "string"
+            "type": "string",
+            "description": "Where to insert: after_summary | after_system | end."
           },
           {
             "id": "max_messages",
             "label": "max_messages",
-            "type": "number"
+            "type": "number",
+            "description": "Optional cap on inserted messages across all spans (None/empty = unlimited). Useful to avoid huge contexts."
           }
         ],
         "outputs": [
@@ -216,12 +271,14 @@
           {
             "id": "inserted",
             "label": "inserted",
-            "type": "number"
+            "type": "number",
+            "description": "Number of messages inserted into context.messages."
           },
           {
             "id": "skipped",
             "label": "skipped",
-            "type": "number"
+            "type": "number",
+            "description": "Number of messages skipped (usually due to dedup)."
           }
         ],
         "pinDefaults": {
@@ -238,8 +295,8 @@
       "id": "node-8",
       "type": "make_array",
       "position": {
-        "x": 896.0,
-        "y": 320.0
+        "x": 960.0,
+        "y": 336.0
       },
       "data": {
         "nodeType": "make_array",
@@ -276,7 +333,7 @@
       "id": "node-9",
       "type": "sequence",
       "position": {
-        "x": 896.0,
+        "x": 960.0,
         "y": 112.0
       },
       "data": {
@@ -325,7 +382,7 @@
       "type": "literal_string",
       "position": {
         "x": 672.0,
-        "y": 288.0
+        "y": 352.0
       },
       "data": {
         "nodeType": "literal_string",
@@ -353,7 +410,7 @@
       "type": "llm_call",
       "position": {
         "x": 1216.0,
-        "y": -64.0
+        "y": -192.0
       },
       "data": {
         "nodeType": "llm_call",
@@ -367,29 +424,58 @@
             "type": "execution"
           },
           {
+            "id": "include_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
             "id": "provider",
             "label": "provider",
-            "type": "provider"
+            "type": "provider",
+            "description": "LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
           },
           {
             "id": "model",
             "label": "model",
-            "type": "model"
+            "type": "model",
+            "description": "LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number",
+            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number",
+            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
           },
           {
             "id": "system",
             "label": "system",
-            "type": "string"
+            "type": "string",
+            "description": "Optional system prompt for this single call."
           },
           {
             "id": "prompt",
             "label": "prompt",
-            "type": "string"
+            "type": "string",
+            "description": "User prompt/content for this single call."
           },
           {
             "id": "tools",
             "label": "tools",
-            "type": "array"
+            "type": "tools",
+            "description": "Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node)."
+          },
+          {
+            "id": "response_schema",
+            "label": "structured_output",
+            "type": "object",
+            "description": "Optional JSON Schema object (type=object) the assistant content must conform to."
           }
         ],
         "outputs": [
@@ -401,12 +487,14 @@
           {
             "id": "response",
             "label": "response",
-            "type": "string"
+            "type": "string",
+            "description": "Assistant text content (best-effort). For tool calls, content may be empty."
           },
           {
             "id": "result",
             "label": "result",
-            "type": "object"
+            "type": "object",
+            "description": "Full normalized LLM result (content, tool_calls, usage, provider/model metadata, trace_id)."
           }
         ],
         "effectConfig": {
@@ -415,7 +503,8 @@
         },
         "pinDefaults": {
           "system": "",
-          "prompt": "do you know who i am ?"
+          "prompt": "do you know who i am ?",
+          "include_context": false
         }
       },
       "label": null,
@@ -428,7 +517,7 @@
       "id": "node-14",
       "type": "llm_call",
       "position": {
-        "x": 1488.0,
+        "x": 1536.0,
         "y": 240.0
       },
       "data": {
@@ -443,29 +532,58 @@
             "type": "execution"
           },
           {
+            "id": "include_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
             "id": "provider",
             "label": "provider",
-            "type": "provider"
+            "type": "provider",
+            "description": "LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
           },
           {
             "id": "model",
             "label": "model",
-            "type": "model"
+            "type": "model",
+            "description": "LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number",
+            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number",
+            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
           },
           {
             "id": "system",
             "label": "system",
-            "type": "string"
+            "type": "string",
+            "description": "Optional system prompt for this single call."
           },
           {
             "id": "prompt",
             "label": "prompt",
-            "type": "string"
+            "type": "string",
+            "description": "User prompt/content for this single call."
           },
           {
             "id": "tools",
             "label": "tools",
-            "type": "array"
+            "type": "tools",
+            "description": "Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node)."
+          },
+          {
+            "id": "response_schema",
+            "label": "structured_output",
+            "type": "object",
+            "description": "Optional JSON Schema object (type=object) the assistant content must conform to."
           }
         ],
         "outputs": [
@@ -477,12 +595,14 @@
           {
             "id": "response",
             "label": "response",
-            "type": "string"
+            "type": "string",
+            "description": "Assistant text content (best-effort). For tool calls, content may be empty."
           },
           {
             "id": "result",
             "label": "result",
-            "type": "object"
+            "type": "object",
+            "description": "Full normalized LLM result (content, tool_calls, usage, provider/model metadata, trace_id)."
           }
         ],
         "effectConfig": {
@@ -490,7 +610,8 @@
           "model": "gemma-3-1b-it"
         },
         "pinDefaults": {
-          "prompt": "do you know who i am ?"
+          "prompt": "do you know who i am ?",
+          "include_context": true
         }
       },
       "label": null,
@@ -504,7 +625,7 @@
       "type": "memory_query",
       "position": {
         "x": 1216.0,
-        "y": 800.0
+        "y": 896.0
       },
       "data": {
         "nodeType": "memory_query",
@@ -520,47 +641,56 @@
           {
             "id": "query",
             "label": "query",
-            "type": "string"
+            "type": "string",
+            "description": "Keyword query (substring match over span metadata and small previews). Combined with tags/authors/locations using AND semantics."
           },
           {
             "id": "limit",
             "label": "limit",
-            "type": "number"
+            "type": "number",
+            "description": "Maximum number of spans to return (limit_spans). Default: 5."
           },
           {
             "id": "tags",
             "label": "tags",
-            "type": "object"
-          },
-          {
-            "id": "since",
-            "label": "since",
-            "type": "string"
-          },
-          {
-            "id": "until",
-            "label": "until",
-            "type": "string"
-          },
-          {
-            "id": "scope",
-            "label": "scope",
-            "type": "string"
+            "type": "object",
+            "description": "Tag filters as key→string or key→list[string]. Reserved key \"kind\" is ignored."
           },
           {
             "id": "tags_mode",
             "label": "tags_mode",
-            "type": "string"
+            "type": "string",
+            "description": "How to combine tag keys: all (AND) or any (OR). Within a single key, list values are OR."
           },
           {
             "id": "usernames",
             "label": "usernames",
-            "type": "array"
+            "type": "array",
+            "description": "Filter by created_by (actor id). Case-insensitive exact match. Empty means no filter."
           },
           {
             "id": "locations",
             "label": "locations",
-            "type": "array"
+            "type": "array",
+            "description": "Filter by location metadata (or tags.location). Case-insensitive exact match."
+          },
+          {
+            "id": "since",
+            "label": "since",
+            "type": "string",
+            "description": "ISO8601 start time. Matches spans whose [from,to] intersects this range."
+          },
+          {
+            "id": "until",
+            "label": "until",
+            "type": "string",
+            "description": "ISO8601 end time. Matches spans whose [from,to] intersects this range."
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string",
+            "description": "Which span index to query: run | session | global | all. (all queries run+session+global. session uses session_id authority; if session_id is missing, it falls back to the run-tree root.)"
           }
         ],
         "outputs": [
@@ -572,12 +702,14 @@
           {
             "id": "results",
             "label": "results",
-            "type": "array"
+            "type": "array",
+            "description": "Structured match list (meta.matches). Use it to extract span_ids for Recall into context."
           },
           {
             "id": "rendered",
             "label": "rendered",
-            "type": "string"
+            "type": "string",
+            "description": "Human-readable recall summary (tool-style output string)."
           }
         ],
         "pinDefaults": {
@@ -610,29 +742,58 @@
             "type": "execution"
           },
           {
+            "id": "include_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
             "id": "provider",
             "label": "provider",
-            "type": "provider"
+            "type": "provider",
+            "description": "LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
           },
           {
             "id": "model",
             "label": "model",
-            "type": "model"
+            "type": "model",
+            "description": "LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number",
+            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number",
+            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
           },
           {
             "id": "system",
             "label": "system",
-            "type": "string"
+            "type": "string",
+            "description": "Optional system prompt for this single call."
           },
           {
             "id": "prompt",
             "label": "prompt",
-            "type": "string"
+            "type": "string",
+            "description": "User prompt/content for this single call."
           },
           {
             "id": "tools",
             "label": "tools",
-            "type": "array"
+            "type": "tools",
+            "description": "Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node)."
+          },
+          {
+            "id": "response_schema",
+            "label": "structured_output",
+            "type": "object",
+            "description": "Optional JSON Schema object (type=object) the assistant content must conform to."
           }
         ],
         "outputs": [
@@ -644,21 +805,23 @@
           {
             "id": "response",
             "label": "response",
-            "type": "string"
+            "type": "string",
+            "description": "Assistant text content (best-effort). For tool calls, content may be empty."
           },
           {
             "id": "result",
             "label": "result",
-            "type": "object"
+            "type": "object",
+            "description": "Full normalized LLM result (content, tool_calls, usage, provider/model metadata, trace_id)."
           }
         ],
         "effectConfig": {
           "provider": "lmstudio",
-          "model": "gemma-3-1b-it",
-          "include_context": false
+          "model": "gemma-3-1b-it"
         },
         "pinDefaults": {
-          "prompt": "do you know who i am ?"
+          "prompt": "do you know who i am ?",
+          "include_context": false
         }
       },
       "label": null,
@@ -672,7 +835,7 @@
       "type": "llm_call",
       "position": {
         "x": 1504.0,
-        "y": 800.0
+        "y": 896.0
       },
       "data": {
         "nodeType": "llm_call",
@@ -686,29 +849,58 @@
             "type": "execution"
           },
           {
+            "id": "include_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
             "id": "provider",
             "label": "provider",
-            "type": "provider"
+            "type": "provider",
+            "description": "LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
           },
           {
             "id": "model",
             "label": "model",
-            "type": "model"
+            "type": "model",
+            "description": "LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number",
+            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number",
+            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
           },
           {
             "id": "system",
             "label": "system",
-            "type": "string"
+            "type": "string",
+            "description": "Optional system prompt for this single call."
           },
           {
             "id": "prompt",
             "label": "prompt",
-            "type": "string"
+            "type": "string",
+            "description": "User prompt/content for this single call."
           },
           {
             "id": "tools",
             "label": "tools",
-            "type": "array"
+            "type": "tools",
+            "description": "Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node)."
+          },
+          {
+            "id": "response_schema",
+            "label": "structured_output",
+            "type": "object",
+            "description": "Optional JSON Schema object (type=object) the assistant content must conform to."
           }
         ],
         "outputs": [
@@ -720,21 +912,23 @@
           {
             "id": "response",
             "label": "response",
-            "type": "string"
+            "type": "string",
+            "description": "Assistant text content (best-effort). For tool calls, content may be empty."
           },
           {
             "id": "result",
             "label": "result",
-            "type": "object"
+            "type": "object",
+            "description": "Full normalized LLM result (content, tool_calls, usage, provider/model metadata, trace_id)."
           }
         ],
         "effectConfig": {
           "provider": "lmstudio",
-          "model": "gemma-3-1b-it",
-          "include_context": false
+          "model": "gemma-3-1b-it"
         },
         "pinDefaults": {
-          "prompt": "do you know who i am ?"
+          "prompt": "do you know who i am ?",
+          "include_context": false
         }
       },
       "label": null,
@@ -906,5 +1100,5 @@
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-02T19:06:00.895671",
-  "updated_at": "2026-01-03T00:45:09.401614"
+  "updated_at": "2026-01-11T02:16:33.679030"
 }

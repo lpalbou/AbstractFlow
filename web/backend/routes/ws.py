@@ -757,6 +757,9 @@ async def _execute_runner_loop(
                 # as RUNNING forever (and subsequent nodes appear to run "in parallel").
                 "subworkflow_started_at": None,
                 "subworkflow_node_id": None,
+                # For UX: allow the UI to expand and render child run steps while the parent
+                # is still waiting on a subworkflow (so long-running subflows aren't "opaque").
+                "subworkflow_child_run_id": None,
             }
             run_tracks[run_id] = t
         return t
@@ -1036,6 +1039,7 @@ async def _execute_runner_loop(
                 # Clear wait markers; allow the next node_start to become active.
                 track["subworkflow_node_id"] = None
                 track["subworkflow_started_at"] = None
+                track["subworkflow_child_run_id"] = None
                 active0 = track.get("active_node_id")
                 if isinstance(active0, str) and active0 == sw_node:
                     track["active_node_id"] = None
@@ -1310,6 +1314,20 @@ async def _execute_runner_loop(
                     if track.get("subworkflow_started_at") is None or track.get("subworkflow_node_id") != sw_id:
                         track["subworkflow_started_at"] = time.perf_counter()
                         track["subworkflow_node_id"] = sw_id
+
+                    sub_run_id = _extract_sub_run_id(wait)
+                    if isinstance(sub_run_id, str) and sub_run_id and track.get("subworkflow_child_run_id") != sub_run_id:
+                        track["subworkflow_child_run_id"] = sub_run_id
+                        # Inform the UI of the child run id *while* the parent node is still running.
+                        await websocket.send_json(
+                            {
+                                "type": "subworkflow_update",
+                                "ts": _utc_now_iso(),
+                                "runId": run_id,
+                                "nodeId": sw_id,
+                                "sub_run_id": sub_run_id,
+                            }
+                        )
 
             if reason_value == "until":
                 if track.get("wait_until_started_at") is None or track.get("wait_until_node_id") != track.get("active_node_id"):

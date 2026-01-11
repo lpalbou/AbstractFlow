@@ -995,6 +995,53 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         };
       }
 
+      // Canonical ordering for Tool Calls node pins.
+      // Keep `tool_calls` typed as `array` (explicit list of calls).
+      if (data.nodeType === 'tool_calls') {
+        const existingInputs = Array.isArray(data.inputs) ? data.inputs : [];
+        const byId = new Map(existingInputs.map((p) => [p.id, p] as const));
+        const used = new Set<string>();
+
+        const want = (pin: Pin): Pin => {
+          const prev = byId.get(pin.id);
+          used.add(pin.id);
+          if (!prev) return pin;
+          if (prev.label === pin.label && prev.type === pin.type) return prev;
+          return { ...prev, label: pin.label, type: pin.type };
+        };
+
+        const canonicalInputs: Pin[] = [
+          want({ id: 'exec-in', label: '', type: 'execution' }),
+          want({ id: 'tool_calls', label: 'tool_calls', type: 'array' }),
+          want({ id: 'allowed_tools', label: 'allowed_tools', type: 'array' }),
+        ];
+
+        const extraInputs = existingInputs.filter((p) => !used.has(p.id));
+
+        const existingOutputs = Array.isArray(data.outputs) ? data.outputs : [];
+        const outById = new Map(existingOutputs.map((p) => [p.id, p] as const));
+        const usedOut = new Set<string>();
+        const wantOut = (pin: Pin): Pin => {
+          const prev = outById.get(pin.id);
+          usedOut.add(pin.id);
+          if (!prev) return pin;
+          if (prev.label === pin.label && prev.type === pin.type) return prev;
+          return { ...prev, label: pin.label, type: pin.type };
+        };
+        const canonicalOutputs: Pin[] = [
+          wantOut({ id: 'exec-out', label: '', type: 'execution' }),
+          wantOut({ id: 'results', label: 'results', type: 'array' }),
+          wantOut({ id: 'success', label: 'success', type: 'boolean' }),
+        ];
+        const extraOutputs = existingOutputs.filter((p) => !usedOut.has(p.id));
+
+        data = {
+          ...data,
+          inputs: [...canonicalInputs, ...extraInputs],
+          outputs: [...canonicalOutputs, ...extraOutputs],
+        };
+      }
+
       // Normalize Switch nodes: execution outputs only (cases + default).
       if (data.nodeType === 'switch') {
         const existingExecPins = data.outputs.filter((p) => p.type === 'execution');

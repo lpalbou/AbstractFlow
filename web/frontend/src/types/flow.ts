@@ -83,6 +83,7 @@ export type NodeType =
   | 'model_catalog'
   // Literals - Pure value nodes (no exec pins, no inputs)
   | 'literal_string' | 'literal_number' | 'literal_boolean' | 'literal_json' | 'literal_array'
+  | 'tool_parameters'
   | 'json_schema'
   // Effects - Side-effect nodes (require execution pins)
   | 'ask_user'
@@ -159,6 +160,11 @@ export interface FlowNodeData {
   };
   // Literal node value
   literalValue?: JsonValue;
+
+  // Tool Parameters node configuration
+  toolParametersConfig?: {
+    tool?: string; // tool name
+  };
   // Break Object node configuration
   breakConfig?: {
     selectedPaths?: string[];
@@ -252,12 +258,15 @@ export interface ExecutionEvent {
     | 'flow_paused'
     | 'flow_resumed'
     | 'flow_cancelled'
-    | 'trace_update';
+    | 'trace_update'
+    | 'subworkflow_update';
   // ISO 8601 UTC timestamp for event emission (host-side observability).
   ts?: string;
   runId?: string;
   nodeId?: string;
   result?: unknown;
+  // subworkflow_update payload
+  sub_run_id?: string;
   // trace_update payload (runtime-owned node traces; streamed as deltas)
   steps?: unknown[];
   error?: string;

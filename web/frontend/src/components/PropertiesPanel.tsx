@@ -1018,6 +1018,31 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 );
               }
 
+              if (pin.id === 'level' && data.nodeType === 'answer_user') {
+                const rawLevel = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+                const current =
+                  rawLevel === 'error'
+                    ? 'error'
+                    : rawLevel === 'warn' || rawLevel === 'warning'
+                      ? 'warning'
+                      : rawLevel === 'info'
+                        ? 'message'
+                        : rawLevel === 'message'
+                          ? 'message'
+                          : 'message';
+                return (
+                  <div key={pin.id} className="property-group">
+                    <label className="property-sublabel">{rowLabel}</label>
+                    <select className="property-select" value={current} onChange={(e) => setPinDefault(pin.id, e.target.value)}>
+                      <option value="message">message</option>
+                      <option value="warning">warning</option>
+                      <option value="error">error</option>
+                    </select>
+                    <span className="property-hint">Controls host styling when rendering this message.</span>
+                  </div>
+                );
+              }
+
               if (pin.type === 'boolean') {
                 const checked = typeof raw === 'boolean' ? raw : false;
                 return (

@@ -15,7 +15,7 @@
       },
       "data": {
         "nodeType": "on_flow_start",
-        "label": "On Flow Start",
+        "label": "RECEIVING REQUEST",
         "icon": "&#x1F3C1;",
         "headerColor": "#C0392B",
         "inputs": [],
@@ -82,7 +82,7 @@
       },
       "data": {
         "nodeType": "on_flow_end",
-        "label": "On Flow End",
+        "label": "ANSWERING",
         "icon": "&#x23F9;",
         "headerColor": "#C0392B",
         "inputs": [
@@ -129,7 +129,7 @@
       },
       "data": {
         "nodeType": "agent",
-        "label": "Agent",
+        "label": "Agentic Loop",
         "icon": "&#x1F916;",
         "headerColor": "#4488FF",
         "inputs": [
@@ -297,7 +297,7 @@
       },
       "data": {
         "nodeType": "subflow",
-        "label": "Subflow",
+        "label": "Thinking",
         "icon": "&#x1F4E6;",
         "headerColor": "#00CCCC",
         "inputs": [
@@ -305,6 +305,17 @@
             "id": "exec-in",
             "label": "",
             "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean",
+            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
           },
           {
             "id": "state",
@@ -344,7 +355,7 @@
       },
       "data": {
         "nodeType": "subflow",
-        "label": "Subflow",
+        "label": "DONE",
         "icon": "&#x1F4E6;",
         "headerColor": "#00CCCC",
         "inputs": [
@@ -352,6 +363,17 @@
             "id": "exec-in",
             "label": "",
             "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean",
+            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
           },
           {
             "id": "state",
@@ -524,5 +546,5 @@
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-10T03:16:28.522693",
-  "updated_at": "2026-01-10T03:20:21.501058"
+  "updated_at": "2026-01-11T02:06:04.324373"
 }

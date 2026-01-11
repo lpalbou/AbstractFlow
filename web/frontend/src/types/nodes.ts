@@ -310,7 +310,7 @@ const CORE_NODES: NodeTemplate[] = [
         label: 'tool_calls',
         type: 'array',
         description:
-          'List of tool call requests (or a single call). Typical shape: {name, arguments, call_id?}. Often comes from LLM Call.result.tool_calls.',
+          'List of tool call requests. Each entry shape: {name, arguments, call_id?}. Often comes from LLM Call.result.tool_calls.',
       },
       {
         id: 'allowed_tools',
@@ -364,6 +364,12 @@ const CORE_NODES: NodeTemplate[] = [
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
       { id: 'message', label: 'message', type: 'string' },
+      {
+        id: 'level',
+        label: 'level',
+        type: 'string',
+        description: "Message level for hosts (message|warning|error). Defaults to 'message' when unset.",
+      },
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
@@ -741,6 +747,23 @@ const LITERAL_NODES: NodeTemplate[] = [
     outputs: [{ id: 'tools', label: 'tools', type: 'tools' }],
     category: 'literals',
   },
+  {
+    type: 'tool_parameters',
+    icon: '&#x2699;', // Gear
+    label: 'Tool Parameters',
+    description: 'Pick a tool and set its arguments (typed + defaults). Outputs a tool call object for Tool Calls.',
+    headerColor: '#FF8800', // Orange - tools/config
+    inputs: [], // Dynamic pins based on selected tool
+    outputs: [
+      {
+        id: 'tool_call',
+        label: 'tool_call',
+        type: 'object',
+        description: 'Single tool call request object: {name, arguments, call_id?}.',
+      },
+    ],
+    category: 'literals',
+  },
 ];
 
 // Memory nodes - Durable memory operations + file IO.
@@ -795,7 +818,13 @@ const MEMORY_NODES: NodeTemplate[] = [
         description:
           "When true, also insert the stored note into this run's context.messages (synthetic system message). If the pin is not connected, the node checkbox is used. Default: false.",
       },
-      { id: 'scope', label: 'scope', type: 'string', description: 'Where to store/index the note: run (this run), session (root run of this run-tree), or global (shared global memory run).' },
+      {
+        id: 'scope',
+        label: 'scope',
+        type: 'string',
+        description:
+          'Where to store/index the note: run (this run), session (all runs with the same session_id; owned by an internal session memory run), or global (shared global memory run). If session_id is missing, session falls back to the run-tree root.',
+      },
       { id: 'content', label: 'content', type: 'string', description: 'The note text to store durably (keep it short; prefer references in sources for large payloads).' },
       { id: 'location', label: 'location', type: 'string', description: 'Optional location label (where the note was produced, e.g. "flow:my_flow/node-12"). Useful for filtering.' },
       { id: 'tags', label: 'tags', type: 'object', description: 'Key/value tags for filtering (e.g. {topic:"memory", person:"laurent"}). Values must be strings.' },
@@ -823,7 +852,13 @@ const MEMORY_NODES: NodeTemplate[] = [
       { id: 'locations', label: 'locations', type: 'array', description: 'Filter by location metadata (or tags.location). Case-insensitive exact match.' },
       { id: 'since', label: 'since', type: 'string', description: 'ISO8601 start time. Matches spans whose [from,to] intersects this range.' },
       { id: 'until', label: 'until', type: 'string', description: 'ISO8601 end time. Matches spans whose [from,to] intersects this range.' },
-      { id: 'scope', label: 'scope', type: 'string', description: 'Which span index to query: run | session | global | all. (all queries run+session-root+global; indices require non-all scopes).' },
+      {
+        id: 'scope',
+        label: 'scope',
+        type: 'string',
+        description:
+          'Which span index to query: run | session | global | all. (all queries run+session+global. session uses session_id authority; if session_id is missing, it falls back to the run-tree root.)',
+      },
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
@@ -957,6 +992,7 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
       },
     }),
     ...(template.type === 'literal_array' && { literalValue: [] }),
+    ...(template.type === 'tool_parameters' && { toolParametersConfig: { tool: '' } }),
     ...(template.type === 'break_object' && { breakConfig: { selectedPaths: [] } }),
     ...(template.type === 'concat' && { concatConfig: { separator: ' ' } }),
     ...(template.type === 'switch' && { switchConfig: { cases: [] } }),

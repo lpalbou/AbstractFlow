@@ -300,17 +300,6 @@
             "type": "execution"
           },
           {
-            "id": "inherit_context",
-            "label": "inherit_context",
-            "type": "boolean",
-            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
-          },
-          {
-            "id": "input",
-            "label": "input",
-            "type": "object"
-          },
-          {
             "id": "state",
             "label": "state",
             "type": "string"
@@ -348,7 +337,7 @@
       },
       "data": {
         "nodeType": "subflow",
-        "label": "INFO DONE",
+        "label": "DONE",
         "icon": "&#x1F4E6;",
         "headerColor": "#00CCCC",
         "inputs": [
@@ -621,5 +610,5 @@
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-10T03:28:20.679163",
-  "updated_at": "2026-01-10T03:30:06.909581"
+  "updated_at": "2026-01-11T02:06:36.057993"
 }

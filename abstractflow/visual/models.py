@@ -110,6 +110,7 @@ class NodeType(str, Enum):
     LITERAL_JSON = "literal_json"
     JSON_SCHEMA = "json_schema"
     LITERAL_ARRAY = "literal_array"
+    TOOL_PARAMETERS = "tool_parameters"
     # Effects
     ASK_USER = "ask_user"
     ANSWER_USER = "answer_user"

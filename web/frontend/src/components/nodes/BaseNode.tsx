@@ -6,7 +6,7 @@
  * - Empty shapes = not connected, Filled = connected
  */
 
-import { Fragment, memo, type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, memo, type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Handle, Position, NodeProps, useEdges, useUpdateNodeInternals } from 'reactflow';
 import { clsx } from 'clsx';
 import type { FlowNodeData, JsonValue, PinType } from '../../types/flow';
@@ -97,6 +97,39 @@ const ToolsAllowlistInline = memo(function ToolsAllowlistInline({
           clearable
           minPopoverWidth={340}
           onChange={onChange}
+        />
+      </div>
+    </div>
+  );
+});
+
+const ToolParametersInline = memo(function ToolParametersInline({
+  tool,
+  toolOptions,
+  loading,
+  onChange,
+}: {
+  tool: string;
+  toolOptions: Array<{ value: string; label: string }>;
+  loading: boolean;
+  onChange: (next: string) => void;
+}) {
+  return (
+    <div className="node-inline-config nodrag">
+      <div className="node-config-row">
+        <span className="node-config-label">tool</span>
+        <AfSelect
+          variant="pin"
+          value={tool}
+          placeholder={loading ? 'Loading…' : 'Select…'}
+          options={toolOptions}
+          disabled={loading}
+          loading={loading}
+          searchable
+          searchPlaceholder="Search tools…"
+          clearable
+          minPopoverWidth={340}
+          onChange={(v) => onChange(v || '')}
         />
       </div>
     </div>
@@ -530,6 +563,7 @@ export const BaseNode = memo(function BaseNode({
   const isLlmNode = data.nodeType === 'llm_call';
   const isAgentNode = data.nodeType === 'agent';
   const isToolsAllowlistNode = data.nodeType === 'tools_allowlist';
+  const isToolParametersNode = data.nodeType === 'tool_parameters';
   const isBoolVarNode = data.nodeType === 'bool_var';
   const isVarDeclNode = data.nodeType === 'var_decl';
   const isProviderModelsNode = data.nodeType === 'provider_models';
@@ -563,7 +597,7 @@ export const BaseNode = memo(function BaseNode({
     selectedProvider,
     (hasModelControls && !modelConnected) || (isProviderModelsNode && !providerConnected)
   );
-  const toolsQuery = useTools((isAgentNode || isLlmNode || isToolsAllowlistNode || isVarDeclNode) && !toolsConnected);
+  const toolsQuery = useTools((isAgentNode || isLlmNode || isToolsAllowlistNode || isVarDeclNode || isToolParametersNode) && !toolsConnected);
 
   const providers = Array.isArray(providersQuery.data) ? providersQuery.data : [];
   const models = Array.isArray(modelsQuery.data) ? modelsQuery.data : [];
@@ -581,6 +615,115 @@ export const BaseNode = memo(function BaseNode({
     out.sort((a, b) => a.label.localeCompare(b.label));
     return out;
   }, [tools]);
+
+  const toolsByName = useMemo(() => {
+    const m = new Map<string, (typeof tools)[number]>();
+    for (const t of tools) {
+      if (!t || typeof t.name !== 'string') continue;
+      const name = t.name.trim();
+      if (!name) continue;
+      m.set(name, t);
+    }
+    return m;
+  }, [tools]);
+
+  const selectedToolParametersTool = useMemo(() => {
+    if (!isToolParametersNode) return '';
+    const raw = data.toolParametersConfig?.tool;
+    return typeof raw === 'string' ? raw : '';
+  }, [data.toolParametersConfig?.tool, isToolParametersNode]);
+
+  const setToolParametersTool = useCallback(
+    (nextTool: string) => {
+      if (!isToolParametersNode) return;
+
+      const cleaned = (nextTool || '').trim();
+      const spec = cleaned ? toolsByName.get(cleaned) : undefined;
+
+      const toolCallPin: FlowNodeData['outputs'][number] = {
+        id: 'tool_call',
+        label: 'tool_call',
+        type: 'object',
+        description: 'Single tool call request object: {name, arguments, call_id?}.',
+      };
+
+      if (!spec || !spec.parameters || typeof spec.parameters !== 'object') {
+        updateNodeData(id, {
+          toolParametersConfig: { tool: cleaned },
+          inputs: [],
+          outputs: [toolCallPin],
+          pinDefaults: {},
+        });
+        return;
+      }
+
+      const mapParamType = (raw: unknown): PinType => {
+        const t = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+        if (t === 'boolean') return 'boolean';
+        if (t === 'integer' || t === 'number') return 'number';
+        if (t === 'array') return 'array';
+        if (t === 'object') return 'object';
+        if (t === 'string') return 'string';
+        return 'any';
+      };
+
+      const prevTool = typeof data.toolParametersConfig?.tool === 'string' ? data.toolParametersConfig.tool.trim() : '';
+      const keepExisting = prevTool === cleaned;
+      const prevDefaults = data.pinDefaults || {};
+
+      const nextInputs: FlowNodeData['inputs'] = [];
+      const nextOutputs: FlowNodeData['outputs'] = [toolCallPin];
+      const nextDefaults: Record<string, JsonValue> = {};
+
+      const entries = Object.entries(spec.parameters as Record<string, any>);
+      for (const [rawName, meta] of entries) {
+        const name = typeof rawName === 'string' ? rawName.trim() : '';
+        if (!name) continue;
+
+        const pinType = mapParamType(meta && typeof meta === 'object' ? (meta as any).type : undefined);
+        const pin: FlowNodeData['inputs'][number] = { id: name, label: name, type: pinType };
+
+        nextInputs.push(pin);
+        nextOutputs.push(pin);
+
+        if (keepExisting && name in prevDefaults) {
+          nextDefaults[name] = (prevDefaults as any)[name] as JsonValue;
+          continue;
+        }
+
+        const def = meta && typeof meta === 'object' ? (meta as any).default : undefined;
+        if (def === null || def === undefined) continue;
+        nextDefaults[name] = def as JsonValue;
+      }
+
+      updateNodeData(id, {
+        toolParametersConfig: { tool: cleaned },
+        inputs: nextInputs,
+        outputs: nextOutputs,
+        pinDefaults: nextDefaults,
+      });
+    },
+    [data.pinDefaults, data.toolParametersConfig?.tool, id, isToolParametersNode, toolsByName, updateNodeData]
+  );
+
+  const toolParametersSyncRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isToolParametersNode) return;
+    const tool = selectedToolParametersTool.trim();
+    if (!tool) return;
+
+    const syncKey = `${id}:${tool}`;
+    if (toolParametersSyncRef.current === syncKey) return;
+
+    const hasPins = (data.inputs || []).some((p) => p && p.type !== 'execution');
+    if (hasPins) {
+      toolParametersSyncRef.current = syncKey;
+      return;
+    }
+
+    toolParametersSyncRef.current = syncKey;
+    setToolParametersTool(tool);
+  }, [data.inputs, id, isToolParametersNode, selectedToolParametersTool, setToolParametersTool]);
 
   const selectedTools = useMemo(() => {
     if (isAgentNode) {
@@ -1289,6 +1432,15 @@ export const BaseNode = memo(function BaseNode({
           />
         )}
 
+        {data.nodeType === 'tool_parameters' && (
+          <ToolParametersInline
+            tool={selectedToolParametersTool}
+            toolOptions={toolOptions}
+            loading={toolsQuery.isLoading}
+            onChange={setToolParametersTool}
+          />
+        )}
+
         {data.nodeType === 'bool_var' && (
           <BoolVarInline
             nodeId={id}
@@ -1782,6 +1934,27 @@ export const BaseNode = memo(function BaseNode({
                   );
                 }
 
+                if (isToolParametersNode) {
+                  controls.push(
+                    <span
+                      key="tool-parameters-output"
+                      className="pin-shape"
+                      style={{ color: PIN_COLORS[pin.type] }}
+                      onClick={(e) => handlePinClick(e, pin.id, false)}
+                    >
+                      <PinShape type={pin.type} size={10} filled={isPinConnected(pin.id, false)} />
+                      <Handle
+                        type="source"
+                        position={Position.Right}
+                        id={pin.id}
+                        className={`pin ${pin.type}`}
+                        style={overlayHandleStyle}
+                        onClick={(e) => handlePinClick(e, pin.id, false)}
+                      />
+                    </span>
+                  );
+                }
+
                   if (controls.length === 0) return null;
                   return <div className="pin-inline-controls nodrag">{controls}</div>;
                 })()}
@@ -1836,7 +2009,7 @@ export const BaseNode = memo(function BaseNode({
 
         {/* Data output pins */}
         <div className="pins-right">
-          {outputData.map((pin) => (
+          {(isToolParametersNode ? outputData.filter((p) => p.id === 'tool_call') : outputData).map((pin) => (
             <div key={pin.id} className="pin-row output">
               <span className="pin-label">{pin.label}</span>
               <AfTooltip content={pin.description} delayMs={2000} priority={2}>

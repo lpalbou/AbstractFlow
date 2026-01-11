@@ -47,14 +47,17 @@ class VisualSessionRunner(FlowRunner):
         run_id = super().start(input_data, actor_id=actor_id, session_id=session_id)
 
         # Default session_id to the root run_id for session-scoped events.
+        # If a session_id is explicitly provided, preserve it.
+        effective_session_id = session_id
         try:
             state = self.runtime.get_state(run_id)
             if not getattr(state, "session_id", None):
                 state.session_id = run_id  # type: ignore[attr-defined]
                 self.runtime.run_store.save(state)
+            effective_session_id = str(getattr(state, "session_id", None) or run_id).strip() or run_id
         except Exception:
             # Best-effort; session-scoped keys will fall back to run_id if missing.
-            pass
+            effective_session_id = str(session_id).strip() if isinstance(session_id, str) and session_id.strip() else run_id
 
         if not self._event_listener_specs:
             return run_id
@@ -65,7 +68,7 @@ class VisualSessionRunner(FlowRunner):
                 child_run_id = self.runtime.start(
                     workflow=spec,
                     vars={},
-                    session_id=run_id,
+                    session_id=effective_session_id,
                     actor_id=actor_id,
                     parent_run_id=run_id,
                 )
@@ -171,5 +174,4 @@ class VisualSessionRunner(FlowRunner):
                     "state": state,
                     "wait_key": state.waiting.wait_key if state.waiting else None,
                 }
-
 

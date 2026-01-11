@@ -3,7 +3,16 @@ import { useQuery } from '@tanstack/react-query';
 export interface ToolSpec {
   name: string;
   description?: string;
+  /**
+   * Tool parameter schema (best-effort, JSON-safe).
+   * Convention: absence of `default` means "required".
+   */
+  parameters?: Record<string, { type?: string; default?: any }>;
+  required_args?: string[];
   toolset?: string;
+  tags?: string[];
+  when_to_use?: string;
+  examples?: unknown[];
 }
 
 async function fetchJson<T>(url: string): Promise<T> {
@@ -27,4 +36,3 @@ export function useTools(enabled: boolean) {
     staleTime: 30_000,
   });
 }
-

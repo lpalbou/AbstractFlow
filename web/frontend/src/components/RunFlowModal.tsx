@@ -744,6 +744,21 @@ export function RunFlowModal({
   const stepById = runSteps.stepById;
   const stepsByRunId = runSteps.stepsByRunId;
 
+  // Map (parentRunId:nodeId) -> sub_run_id for subworkflow waits, so the UI can show
+  // child run steps even before the parent subflow node completes.
+  const subworkflowLinks = useMemo(() => {
+    const out = new Map<string, string>();
+    for (const ev of events) {
+      if (ev.type !== 'subworkflow_update') continue;
+      const parentRunId = typeof ev.runId === 'string' ? ev.runId.trim() : '';
+      const parentNodeId = typeof ev.nodeId === 'string' ? ev.nodeId.trim() : '';
+      const childRunId = typeof ev.sub_run_id === 'string' ? ev.sub_run_id.trim() : '';
+      if (!parentRunId || !parentNodeId || !childRunId) continue;
+      out.set(`${parentRunId}:${parentNodeId}`, childRunId);
+    }
+    return out;
+  }, [events]);
+
   // New run => collapse all nested subflow sections (predictable UX).
   useEffect(() => {
     if (!isOpen) return;
@@ -907,6 +922,15 @@ export function RunFlowModal({
       return sr;
     };
 
+    const childRunIdFromStep = (s: Step): string | null => {
+      const fromOutput = childRunIdFromOutput(s.output);
+      if (fromOutput) return fromOutput;
+      const parentRunId = pick(s.runId);
+      const parentNodeId = pick(s.nodeId);
+      if (!parentRunId || !parentNodeId) return null;
+      return subworkflowLinks.get(`${parentRunId}:${parentNodeId}`) || null;
+    };
+
     const seen = new Set<string>();
     const buildForRun = (rid: string, depth: number): StepTreeNode[] => {
       const rid2 = String(rid || '').trim();
@@ -919,7 +943,7 @@ export function RunFlowModal({
 
       const nodes: StepTreeNode[] = [];
       for (const s of bucket) {
-        const childRunId = childRunIdFromOutput(s.output);
+        const childRunId = childRunIdFromStep(s);
         const children =
           childRunId && stepsByRunId.get(childRunId) && (stepsByRunId.get(childRunId) as Step[]).length > 0
             ? buildForRun(childRunId, depth + 1)
@@ -930,7 +954,36 @@ export function RunFlowModal({
     };
 
     return buildForRun(rid0, 0);
-  }, [rootRunId, stepsByRunId]);
+  }, [rootRunId, stepsByRunId, subworkflowLinks]);
+
+  // Auto-expand running subflows so long-running nested runs are observable by default.
+  // If the user explicitly collapses (sets false), do not override.
+  useEffect(() => {
+    if (!isOpen) return;
+    if (stepTree.length === 0) return;
+    setExpandedSubflows((prev) => {
+      let changed = false;
+      const next: Record<string, boolean> = { ...prev };
+
+      const visit = (nodes: StepTreeNode[]) => {
+        for (const n of nodes) {
+          if (!n.children || n.children.length === 0) continue;
+          const s = stepById.get(n.stepId);
+          if (!s) continue;
+
+          const isRunningish = s.status === 'running' || s.status === 'waiting';
+          if (isRunningish && !(n.stepId in prev)) {
+            next[n.stepId] = true;
+            changed = true;
+          }
+          visit(n.children);
+        }
+      };
+      visit(stepTree);
+
+      return changed ? next : prev;
+    });
+  }, [isOpen, stepById, stepTree]);
 
   // Keep selection valid; default to last step.
   useEffect(() => {
