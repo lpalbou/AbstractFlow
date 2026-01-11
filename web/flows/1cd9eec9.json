@@ -1,7 +1,7 @@
 {
   "id": "1cd9eec9",
   "name": "request-planner",
-  "description": "",
+  "description": "Create a structured plan to resolve a request",
   "interfaces": [],
   "nodes": [
     {
@@ -678,5 +678,5 @@
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-08T21:36:58.593867",
-  "updated_at": "2026-01-11T02:08:23.166873"
+  "updated_at": "2026-01-11T12:10:17.938127"
 }
