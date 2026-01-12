@@ -121,6 +121,8 @@ def create_visual_runner(
             "write_file",
             "memory_note",
             "memory_query",
+            "memory_tag",
+            "memory_compact",
             "memory_rehydrate",
         }
 
@@ -217,7 +219,7 @@ def create_visual_runner(
                 needs_registry = True
             if t in {"on_event", "emit_event"}:
                 needs_registry = True
-            if t in {"memory_note", "memory_query", "memory_rehydrate"}:
+            if t in {"memory_note", "memory_query", "memory_rehydrate", "memory_compact"}:
                 needs_artifacts = True
 
     # Detect whether this flow tree needs AbstractCore LLM integration.
@@ -306,7 +308,7 @@ def create_visual_runner(
             node_type = _node_type(n)
             if reachable and n.id not in reachable:
                 continue
-            if node_type in {"llm_call", "agent", "tool_calls"}:
+            if node_type in {"llm_call", "agent", "tool_calls", "memory_compact"}:
                 has_llm_nodes = True
 
             if node_type == "llm_call":
@@ -330,6 +332,33 @@ def create_visual_runner(
                         f"LLM_CALL node '{n.id}' in flow '{vf.id}' missing model "
                         "(set effectConfig.model or connect the model input pin)"
                     )
+                provider_default = (
+                    provider
+                    if provider_ok
+                    else _infer_connected_pin_default(vf, node_id=n.id, pin_id="provider")
+                    if provider_connected
+                    else None
+                )
+                model_default = (
+                    model
+                    if model_ok
+                    else _infer_connected_pin_default(vf, node_id=n.id, pin_id="model")
+                    if model_connected
+                    else None
+                )
+                _add_pair(provider_default, model_default)
+
+            elif node_type == "memory_compact":
+                cfg = n.data.get("effectConfig", {}) if isinstance(n.data, dict) else {}
+                cfg = cfg if isinstance(cfg, dict) else {}
+                provider = cfg.get("provider")
+                model = cfg.get("model")
+
+                provider_ok = isinstance(provider, str) and provider.strip()
+                model_ok = isinstance(model, str) and model.strip()
+                provider_connected = _pin_connected(vf, node_id=n.id, pin_id="provider")
+                model_connected = _pin_connected(vf, node_id=n.id, pin_id="model")
+
                 provider_default = (
                     provider
                     if provider_ok
@@ -409,7 +438,7 @@ def create_visual_runner(
         # If we can't determine that, fail loudly with a clear error message.
         if provider_model is None:
             raise RuntimeError(
-                "This flow uses LLM nodes (llm_call/agent), but no default provider/model could be determined. "
+                "This flow uses LLM nodes (llm_call/agent/memory_compact), but no default provider/model could be determined. "
                 "Set provider+model on a node, or connect provider/model pins to a node with pinDefaults "
                 "(e.g. ON_FLOW_START), or pass `input_data={'provider': ..., 'model': ...}` when creating the runner."
             )

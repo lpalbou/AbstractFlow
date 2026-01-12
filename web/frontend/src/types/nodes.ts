@@ -868,6 +868,44 @@ const MEMORY_NODES: NodeTemplate[] = [
     category: 'memory',
   },
   {
+    type: 'memory_tag',
+    icon: '&#x1F3F7;', // Label
+    label: 'Tag memory',
+    description: 'Apply/merge tags onto an existing memory span record (conversation span or memory note).',
+    headerColor: '#2ECC71', // Green - memory
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'span_id', label: 'span_id', type: 'string', description: 'Target span_id (artifact id). Also accepts a 1-based span index as a string/number in some hosts.' },
+      { id: 'tags', label: 'tags', type: 'object', description: 'Key/value tags to set (values must be strings). Reserved key "kind" is ignored.' },
+      { id: 'merge', label: 'merge', type: 'boolean', description: 'When true, merges with existing tags. When false, replaces the tag dict. Default: true.' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'success', label: 'success', type: 'boolean', description: 'Whether the tag operation succeeded.' },
+      { id: 'rendered', label: 'rendered', type: 'string', description: 'Human-readable result string.' },
+    ],
+    category: 'memory',
+  },
+  {
+    type: 'memory_compact',
+    icon: '&#x1F5DC;', // Clamp (compression)
+    label: 'Compact memory',
+    description:
+      'Runtime-owned compaction: archives older messages into an artifact span and inserts a summary message with an LLM-visible span_id handle.',
+    headerColor: '#2ECC71', // Green - memory
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'preserve_recent', label: 'preserve_recent', type: 'number', description: 'Number of most recent non-system messages to keep verbatim (default 6).' },
+      { id: 'compression_mode', label: 'compression_mode', type: 'string', description: 'light | standard | heavy (default standard).' },
+      { id: 'focus', label: 'focus', type: 'string', description: 'Optional topic/focus hint for the compaction summary.' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'span_id', label: 'span_id', type: 'string', description: 'The archived conversation span_id (artifact id). Use it for tagging or recall.' },
+    ],
+    category: 'memory',
+  },
+  {
     type: 'memory_rehydrate',
     icon: '&#x1F4AC;', // Speech balloon
     label: 'Recall into context',

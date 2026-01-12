@@ -1,0 +1,1003 @@
+{
+  "id": "ltm-ai-chat",
+  "name": "ltm-ai-chat",
+  "description": "One-turn memory-enabled chat: retrieve → rehydrate → answer → encode durable notes (subflow) → optional compaction/tagging. Designed for observability (ledger + memory spans).",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": { "x": 96.0, "y": 96.0 },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "provider", "label": "provider", "type": "provider" },
+          { "id": "model", "label": "model", "type": "model" },
+          { "id": "message", "label": "message", "type": "string" },
+          { "id": "recall_scope", "label": "recall_scope", "type": "string" },
+          { "id": "recall_limit", "label": "recall_limit", "type": "number" },
+          { "id": "recall_tags", "label": "recall_tags", "type": "object" },
+          { "id": "compact_threshold_messages", "label": "compact_threshold_messages", "type": "number" },
+          { "id": "compact_preserve_recent", "label": "compact_preserve_recent", "type": "number" },
+          { "id": "compact_compression_mode", "label": "compact_compression_mode", "type": "string" },
+          { "id": "compact_focus", "label": "compact_focus", "type": "string" },
+          { "id": "project", "label": "project", "type": "string" }
+        ],
+        "pinDefaults": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b",
+          "recall_scope": "all",
+          "recall_limit": 8,
+          "recall_tags": {},
+          "compact_threshold_messages": 24,
+          "compact_preserve_recent": 6,
+          "compact_compression_mode": "standard",
+          "compact_focus": "ltm",
+          "project": "abstractframework"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-2",
+      "type": "length",
+      "position": { "x": 320.0, "y": 96.0 },
+      "data": {
+        "nodeType": "length",
+        "label": "Length",
+        "icon": "#",
+        "headerColor": "#E74C3C",
+        "inputs": [{ "id": "text", "label": "text", "type": "string" }],
+        "outputs": [{ "id": "result", "label": "result", "type": "number" }]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-3",
+      "type": "compare",
+      "position": { "x": 512.0, "y": 96.0 },
+      "data": {
+        "nodeType": "compare",
+        "label": "len > 0",
+        "icon": "=?",
+        "headerColor": "#F39C12",
+        "inputs": [
+          { "id": "a", "label": "a", "type": "any" },
+          { "id": "op", "label": "op", "type": "string" },
+          { "id": "b", "label": "b", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "boolean" }],
+        "pinDefaults": { "op": ">", "b": 0 }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-4",
+      "type": "if",
+      "position": { "x": 704.0, "y": 96.0 },
+      "data": {
+        "nodeType": "if",
+        "label": "Message provided?",
+        "icon": "&#x2753;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "condition", "label": "condition", "type": "boolean" }
+        ],
+        "outputs": [
+          { "id": "true", "label": "true", "type": "execution" },
+          { "id": "false", "label": "false", "type": "execution" }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-5",
+      "type": "set_var",
+      "position": { "x": 896.0, "y": 32.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Set user_message",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "pinDefaults": { "name": "scratchpad.user_message" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-6",
+      "type": "ask_user",
+      "position": { "x": 896.0, "y": 160.0 },
+      "data": {
+        "nodeType": "ask_user",
+        "label": "Ask message",
+        "icon": "&#x2753;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "prompt", "label": "prompt", "type": "string" },
+          { "id": "choices", "label": "choices", "type": "array" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "response", "label": "response", "type": "string" }
+        ],
+        "pinDefaults": { "prompt": "Your message:" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-7",
+      "type": "set_var",
+      "position": { "x": 1104.0, "y": 160.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Set user_message (asked)",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "pinDefaults": { "name": "scratchpad.user_message" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-8",
+      "type": "get_var",
+      "position": { "x": 1104.0, "y": 48.0 },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get user_message",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [{ "id": "name", "label": "name", "type": "string" }],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "name": "scratchpad.user_message" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-9",
+      "type": "memory_query",
+      "position": { "x": 1328.0, "y": 96.0 },
+      "data": {
+        "nodeType": "memory_query",
+        "label": "Recall",
+        "icon": "&#x1F50D;",
+        "headerColor": "#2ECC71",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "query", "label": "query", "type": "string" },
+          { "id": "limit", "label": "limit", "type": "number" },
+          { "id": "tags", "label": "tags", "type": "object" },
+          { "id": "tags_mode", "label": "tags_mode", "type": "string" },
+          { "id": "usernames", "label": "usernames", "type": "array" },
+          { "id": "locations", "label": "locations", "type": "array" },
+          { "id": "since", "label": "since", "type": "string" },
+          { "id": "until", "label": "until", "type": "string" },
+          { "id": "scope", "label": "scope", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "results", "label": "results", "type": "array" },
+          { "id": "rendered", "label": "rendered", "type": "string" }
+        ],
+        "pinDefaults": { "tags_mode": "any" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-10",
+      "type": "array_map",
+      "position": { "x": 1552.0, "y": 96.0 },
+      "data": {
+        "nodeType": "array_map",
+        "label": "Extract span_ids",
+        "icon": "&#x1F5FA;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "items", "label": "items", "type": "array" },
+          { "id": "key", "label": "key", "type": "string" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "array" }],
+        "pinDefaults": { "key": "span_id" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-11",
+      "type": "memory_rehydrate",
+      "position": { "x": 1776.0, "y": 96.0 },
+      "data": {
+        "nodeType": "memory_rehydrate",
+        "label": "Recall into context",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#2ECC71",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "span_ids", "label": "span_ids", "type": "array" },
+          { "id": "placement", "label": "placement", "type": "string" },
+          { "id": "max_messages", "label": "max_messages", "type": "number" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "inserted", "label": "inserted", "type": "number" },
+          { "id": "skipped", "label": "skipped", "type": "number" }
+        ],
+        "pinDefaults": { "placement": "after_summary", "max_messages": 40 }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-12",
+      "type": "llm_call",
+      "position": { "x": 2000.0, "y": 96.0 },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Answer",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "include_context", "label": "use_context", "type": "boolean" },
+          { "id": "provider", "label": "provider", "type": "provider" },
+          { "id": "model", "label": "model", "type": "model" },
+          { "id": "temperature", "label": "temperature", "type": "number" },
+          { "id": "seed", "label": "seed", "type": "number" },
+          { "id": "system", "label": "system", "type": "string" },
+          { "id": "prompt", "label": "prompt", "type": "string" },
+          { "id": "tools", "label": "tools", "type": "tools" },
+          { "id": "response_schema", "label": "structured_output", "type": "object" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "response", "label": "response", "type": "string" },
+          { "id": "tool_calls", "label": "tool_calls", "type": "array" },
+          { "id": "result", "label": "result", "type": "object" }
+        ],
+        "effectConfig": { "provider": "lmstudio", "model": "qwen/qwen3-next-80b", "temperature": 0.7 },
+        "pinDefaults": {
+          "include_context": true,
+          "system": "You are a helpful assistant with access to recalled memory spans embedded in the context. Use recalled memory when relevant, but do not invent facts. When unsure, say so."
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-13",
+      "type": "sequence",
+      "position": { "x": 2224.0, "y": 96.0 },
+      "data": {
+        "nodeType": "sequence",
+        "label": "Post actions",
+        "icon": "&#x21E5;",
+        "headerColor": "#F39C12",
+        "inputs": [{ "id": "exec-in", "label": "", "type": "execution" }],
+        "outputs": [
+          { "id": "then:0", "label": "Then 0", "type": "execution" },
+          { "id": "then:1", "label": "Then 1", "type": "execution" },
+          { "id": "then:2", "label": "Then 2", "type": "execution" },
+          { "id": "then:3", "label": "Then 3", "type": "execution" }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-14",
+      "type": "answer_user",
+      "position": { "x": 2448.0, "y": 16.0 },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "message", "label": "message", "type": "string" },
+          { "id": "level", "label": "level", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "message", "label": "message", "type": "string" }
+        ],
+        "pinDefaults": { "level": "message" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-15",
+      "type": "literal_json",
+      "position": { "x": 2448.0, "y": 160.0 },
+      "data": {
+        "nodeType": "literal_json",
+        "label": "Encode input",
+        "icon": "{}",
+        "headerColor": "#00FFFF",
+        "inputs": [],
+        "outputs": [{ "id": "value", "label": "value", "type": "object" }],
+        "literalValue": {}
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-16",
+      "type": "set",
+      "position": { "x": 2656.0, "y": 144.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set provider",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "provider" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-17",
+      "type": "set",
+      "position": { "x": 2864.0, "y": 144.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set model",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "model" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-18",
+      "type": "set",
+      "position": { "x": 3072.0, "y": 144.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set user_message",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "user_message" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-19",
+      "type": "set",
+      "position": { "x": 3280.0, "y": 144.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set assistant_answer",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "assistant_answer" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-20",
+      "type": "set",
+      "position": { "x": 3488.0, "y": 144.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set recall_span_ids",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "recall_span_ids" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-21",
+      "type": "set",
+      "position": { "x": 3696.0, "y": 144.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set project",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "project" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-22",
+      "type": "subflow",
+      "position": { "x": 2448.0, "y": 256.0 },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Encode turn",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "inherit_context", "label": "inherit_context", "type": "boolean" },
+          { "id": "input", "label": "input", "type": "object" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "output", "label": "output", "type": "object" }
+        ],
+        "subflowId": "ltm-ai-encode-turn",
+        "pinDefaults": { "inherit_context": true }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-23",
+      "type": "get",
+      "position": { "x": 2656.0, "y": 352.0 },
+      "data": {
+        "nodeType": "get",
+        "label": "Get should_compact",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "should_compact", "default": false }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-24",
+      "type": "get",
+      "position": { "x": 2656.0, "y": 432.0 },
+      "data": {
+        "nodeType": "get",
+        "label": "Get compaction",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "compaction", "default": {} }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-25",
+      "type": "get",
+      "position": { "x": 2864.0, "y": 432.0 },
+      "data": {
+        "nodeType": "get",
+        "label": "preserve_recent",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "preserve_recent" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-26",
+      "type": "get",
+      "position": { "x": 2864.0, "y": 512.0 },
+      "data": {
+        "nodeType": "get",
+        "label": "compression_mode",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "compression_mode" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-27",
+      "type": "get",
+      "position": { "x": 2864.0, "y": 592.0 },
+      "data": {
+        "nodeType": "get",
+        "label": "focus",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "focus" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-28",
+      "type": "get_var",
+      "position": { "x": 3072.0, "y": 352.0 },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get context.messages",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [{ "id": "name", "label": "name", "type": "string" }],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "name": "context.messages" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-29",
+      "type": "array_length",
+      "position": { "x": 3280.0, "y": 352.0 },
+      "data": {
+        "nodeType": "array_length",
+        "label": "Count messages",
+        "icon": "#",
+        "headerColor": "#3498DB",
+        "inputs": [{ "id": "array", "label": "array", "type": "array" }],
+        "outputs": [{ "id": "result", "label": "result", "type": "number" }]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-30",
+      "type": "compare",
+      "position": { "x": 3488.0, "y": 352.0 },
+      "data": {
+        "nodeType": "compare",
+        "label": "messages > threshold",
+        "icon": "=?",
+        "headerColor": "#F39C12",
+        "inputs": [
+          { "id": "a", "label": "a", "type": "any" },
+          { "id": "op", "label": "op", "type": "string" },
+          { "id": "b", "label": "b", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "boolean" }],
+        "pinDefaults": { "op": ">" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-31",
+      "type": "or",
+      "position": { "x": 3696.0, "y": 352.0 },
+      "data": {
+        "nodeType": "or",
+        "label": "OR",
+        "icon": "||",
+        "headerColor": "#F39C12",
+        "inputs": [
+          { "id": "a", "label": "a", "type": "boolean" },
+          { "id": "b", "label": "b", "type": "boolean" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "boolean" }]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-32",
+      "type": "if",
+      "position": { "x": 3904.0, "y": 352.0 },
+      "data": {
+        "nodeType": "if",
+        "label": "Compact?",
+        "icon": "&#x2753;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "condition", "label": "condition", "type": "boolean" }
+        ],
+        "outputs": [
+          { "id": "true", "label": "true", "type": "execution" },
+          { "id": "false", "label": "false", "type": "execution" }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-33",
+      "type": "memory_compact",
+      "position": { "x": 4112.0, "y": 352.0 },
+      "data": {
+        "nodeType": "memory_compact",
+        "label": "Compact memory",
+        "icon": "&#x1F5DC;",
+        "headerColor": "#2ECC71",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "preserve_recent", "label": "preserve_recent", "type": "number" },
+          { "id": "compression_mode", "label": "compression_mode", "type": "string" },
+          { "id": "focus", "label": "focus", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "span_id", "label": "span_id", "type": "string" }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-34",
+      "type": "literal_json",
+      "position": { "x": 4112.0, "y": 496.0 },
+      "data": {
+        "nodeType": "literal_json",
+        "label": "Compaction tags",
+        "icon": "{}",
+        "headerColor": "#00FFFF",
+        "inputs": [],
+        "outputs": [{ "id": "value", "label": "value", "type": "object" }],
+        "literalValue": { "topic": "ltm", "phase": "compact" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-35",
+      "type": "set",
+      "position": { "x": 4320.0, "y": 496.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set project",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "project" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-36",
+      "type": "memory_tag",
+      "position": { "x": 4320.0, "y": 352.0 },
+      "data": {
+        "nodeType": "memory_tag",
+        "label": "Tag span",
+        "icon": "&#x1F3F7;",
+        "headerColor": "#2ECC71",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "span_id", "label": "span_id", "type": "string" },
+          { "id": "tags", "label": "tags", "type": "object" },
+          { "id": "merge", "label": "merge", "type": "boolean" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "success", "label": "success", "type": "boolean" },
+          { "id": "rendered", "label": "rendered", "type": "string" }
+        ],
+        "pinDefaults": { "merge": true }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-37",
+      "type": "on_flow_end",
+      "position": { "x": 2448.0, "y": 592.0 },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "answer", "label": "answer", "type": "string" },
+          { "id": "user_message", "label": "user_message", "type": "string" },
+          { "id": "recall_span_ids", "label": "recall_span_ids", "type": "array" },
+          { "id": "recall_rendered", "label": "recall_rendered", "type": "string" },
+          { "id": "encoding", "label": "encoding", "type": "object" },
+          { "id": "compacted_span_id", "label": "compacted_span_id", "type": "string" }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    { "id": "edge-1", "source": "node-1", "sourceHandle": "message", "target": "node-2", "targetHandle": "text", "animated": false },
+    { "id": "edge-2", "source": "node-2", "sourceHandle": "result", "target": "node-3", "targetHandle": "a", "animated": false },
+    { "id": "edge-3", "source": "node-3", "sourceHandle": "result", "target": "node-4", "targetHandle": "condition", "animated": false },
+    { "id": "edge-4", "source": "node-1", "sourceHandle": "exec-out", "target": "node-4", "targetHandle": "exec-in", "animated": true },
+
+    { "id": "edge-5", "source": "node-4", "sourceHandle": "true", "target": "node-5", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-6", "source": "node-1", "sourceHandle": "message", "target": "node-5", "targetHandle": "value", "animated": false },
+
+    { "id": "edge-7", "source": "node-4", "sourceHandle": "false", "target": "node-6", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-8", "source": "node-6", "sourceHandle": "exec-out", "target": "node-7", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-9", "source": "node-6", "sourceHandle": "response", "target": "node-7", "targetHandle": "value", "animated": false },
+
+    { "id": "edge-10", "source": "node-5", "sourceHandle": "exec-out", "target": "node-9", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-11", "source": "node-7", "sourceHandle": "exec-out", "target": "node-9", "targetHandle": "exec-in", "animated": true },
+
+    { "id": "edge-12", "source": "node-8", "sourceHandle": "value", "target": "node-9", "targetHandle": "query", "animated": false },
+    { "id": "edge-13", "source": "node-1", "sourceHandle": "recall_limit", "target": "node-9", "targetHandle": "limit", "animated": false },
+    { "id": "edge-14", "source": "node-1", "sourceHandle": "recall_tags", "target": "node-9", "targetHandle": "tags", "animated": false },
+    { "id": "edge-15", "source": "node-1", "sourceHandle": "recall_scope", "target": "node-9", "targetHandle": "scope", "animated": false },
+
+    { "id": "edge-16", "source": "node-9", "sourceHandle": "results", "target": "node-10", "targetHandle": "items", "animated": false },
+    { "id": "edge-17", "source": "node-10", "sourceHandle": "result", "target": "node-11", "targetHandle": "span_ids", "animated": false },
+    { "id": "edge-18", "source": "node-9", "sourceHandle": "exec-out", "target": "node-11", "targetHandle": "exec-in", "animated": true },
+
+    { "id": "edge-19", "source": "node-11", "sourceHandle": "exec-out", "target": "node-12", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-20", "source": "node-1", "sourceHandle": "provider", "target": "node-12", "targetHandle": "provider", "animated": false },
+    { "id": "edge-21", "source": "node-1", "sourceHandle": "model", "target": "node-12", "targetHandle": "model", "animated": false },
+    { "id": "edge-22", "source": "node-8", "sourceHandle": "value", "target": "node-12", "targetHandle": "prompt", "animated": false },
+
+    { "id": "edge-23", "source": "node-12", "sourceHandle": "exec-out", "target": "node-13", "targetHandle": "exec-in", "animated": true },
+
+    { "id": "edge-24", "source": "node-13", "sourceHandle": "then:0", "target": "node-14", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-25", "source": "node-12", "sourceHandle": "response", "target": "node-14", "targetHandle": "message", "animated": false },
+
+    { "id": "edge-26", "source": "node-13", "sourceHandle": "then:1", "target": "node-22", "targetHandle": "exec-in", "animated": true },
+
+    { "id": "edge-27", "source": "node-15", "sourceHandle": "value", "target": "node-16", "targetHandle": "object", "animated": false },
+    { "id": "edge-28", "source": "node-1", "sourceHandle": "provider", "target": "node-16", "targetHandle": "value", "animated": false },
+    { "id": "edge-29", "source": "node-16", "sourceHandle": "result", "target": "node-17", "targetHandle": "object", "animated": false },
+    { "id": "edge-30", "source": "node-1", "sourceHandle": "model", "target": "node-17", "targetHandle": "value", "animated": false },
+    { "id": "edge-31", "source": "node-17", "sourceHandle": "result", "target": "node-18", "targetHandle": "object", "animated": false },
+    { "id": "edge-32", "source": "node-8", "sourceHandle": "value", "target": "node-18", "targetHandle": "value", "animated": false },
+    { "id": "edge-33", "source": "node-18", "sourceHandle": "result", "target": "node-19", "targetHandle": "object", "animated": false },
+    { "id": "edge-34", "source": "node-12", "sourceHandle": "response", "target": "node-19", "targetHandle": "value", "animated": false },
+    { "id": "edge-35", "source": "node-19", "sourceHandle": "result", "target": "node-20", "targetHandle": "object", "animated": false },
+    { "id": "edge-36", "source": "node-10", "sourceHandle": "result", "target": "node-20", "targetHandle": "value", "animated": false },
+    { "id": "edge-37", "source": "node-20", "sourceHandle": "result", "target": "node-21", "targetHandle": "object", "animated": false },
+    { "id": "edge-38", "source": "node-1", "sourceHandle": "project", "target": "node-21", "targetHandle": "value", "animated": false },
+    { "id": "edge-39", "source": "node-21", "sourceHandle": "result", "target": "node-22", "targetHandle": "input", "animated": false },
+
+    { "id": "edge-40", "source": "node-22", "sourceHandle": "output", "target": "node-23", "targetHandle": "object", "animated": false },
+    { "id": "edge-41", "source": "node-22", "sourceHandle": "output", "target": "node-24", "targetHandle": "object", "animated": false },
+    { "id": "edge-42", "source": "node-24", "sourceHandle": "value", "target": "node-25", "targetHandle": "object", "animated": false },
+    { "id": "edge-43", "source": "node-24", "sourceHandle": "value", "target": "node-26", "targetHandle": "object", "animated": false },
+    { "id": "edge-44", "source": "node-24", "sourceHandle": "value", "target": "node-27", "targetHandle": "object", "animated": false },
+
+    { "id": "edge-45", "source": "node-1", "sourceHandle": "compact_preserve_recent", "target": "node-25", "targetHandle": "default", "animated": false },
+    { "id": "edge-46", "source": "node-1", "sourceHandle": "compact_compression_mode", "target": "node-26", "targetHandle": "default", "animated": false },
+    { "id": "edge-47", "source": "node-1", "sourceHandle": "compact_focus", "target": "node-27", "targetHandle": "default", "animated": false },
+
+    { "id": "edge-48", "source": "node-28", "sourceHandle": "value", "target": "node-29", "targetHandle": "array", "animated": false },
+    { "id": "edge-49", "source": "node-29", "sourceHandle": "result", "target": "node-30", "targetHandle": "a", "animated": false },
+    { "id": "edge-50", "source": "node-1", "sourceHandle": "compact_threshold_messages", "target": "node-30", "targetHandle": "b", "animated": false },
+
+    { "id": "edge-51", "source": "node-23", "sourceHandle": "value", "target": "node-31", "targetHandle": "a", "animated": false },
+    { "id": "edge-52", "source": "node-30", "sourceHandle": "result", "target": "node-31", "targetHandle": "b", "animated": false },
+    { "id": "edge-53", "source": "node-31", "sourceHandle": "result", "target": "node-32", "targetHandle": "condition", "animated": false },
+
+    { "id": "edge-54", "source": "node-13", "sourceHandle": "then:2", "target": "node-32", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-55", "source": "node-32", "sourceHandle": "true", "target": "node-33", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-56", "source": "node-25", "sourceHandle": "value", "target": "node-33", "targetHandle": "preserve_recent", "animated": false },
+    { "id": "edge-57", "source": "node-26", "sourceHandle": "value", "target": "node-33", "targetHandle": "compression_mode", "animated": false },
+    { "id": "edge-58", "source": "node-27", "sourceHandle": "value", "target": "node-33", "targetHandle": "focus", "animated": false },
+
+    { "id": "edge-59", "source": "node-33", "sourceHandle": "exec-out", "target": "node-36", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-60", "source": "node-33", "sourceHandle": "span_id", "target": "node-36", "targetHandle": "span_id", "animated": false },
+    { "id": "edge-61", "source": "node-34", "sourceHandle": "value", "target": "node-35", "targetHandle": "object", "animated": false },
+    { "id": "edge-62", "source": "node-1", "sourceHandle": "project", "target": "node-35", "targetHandle": "value", "animated": false },
+    { "id": "edge-63", "source": "node-35", "sourceHandle": "result", "target": "node-36", "targetHandle": "tags", "animated": false },
+
+    { "id": "edge-64", "source": "node-13", "sourceHandle": "then:3", "target": "node-37", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-65", "source": "node-12", "sourceHandle": "response", "target": "node-37", "targetHandle": "answer", "animated": false },
+    { "id": "edge-66", "source": "node-8", "sourceHandle": "value", "target": "node-37", "targetHandle": "user_message", "animated": false },
+    { "id": "edge-67", "source": "node-10", "sourceHandle": "result", "target": "node-37", "targetHandle": "recall_span_ids", "animated": false },
+    { "id": "edge-68", "source": "node-9", "sourceHandle": "rendered", "target": "node-37", "targetHandle": "recall_rendered", "animated": false },
+    { "id": "edge-69", "source": "node-22", "sourceHandle": "output", "target": "node-37", "targetHandle": "encoding", "animated": false },
+    { "id": "edge-70", "source": "node-33", "sourceHandle": "span_id", "target": "node-37", "targetHandle": "compacted_span_id", "animated": false }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2026-01-12T04:15:00.000000",
+  "updated_at": "2026-01-12T04:15:00.000000"
+}

@@ -7,24 +7,13 @@ from typing import Optional
 from abstractruntime import InMemoryLedgerStore, InMemoryRunStore, Runtime
 from abstractruntime.core.models import Effect, EffectType, RunState
 from abstractruntime.core.runtime import EffectOutcome
-from abstractruntime.workflow_artifact.default_nodes import register_default_visual_node_factories
-from abstractruntime.workflow_artifact.interpreter import workflow_spec_from_artifact
-from abstractruntime.workflow_artifact.registry import NodeRegistry
-
-from abstractflow.visual.models import VisualFlow
-from abstractflow.workflow_artifact_compiler import compile_visualflow_to_workflow_artifact
+from abstractruntime.visualflow_compiler import compile_visualflow
 
 
-def test_workflow_artifact_executes_real_visualflow_json_without_abstractflow_runtime_dependency() -> None:
+def test_visualflow_compiler_executes_real_visualflow_json_without_abstractflow_runtime_dependency() -> None:
     flow_path = Path(__file__).resolve().parent.parent / "web" / "flows" / "4ed3b340.json"
     raw = json.loads(flow_path.read_text(encoding="utf-8"))
-    flow = VisualFlow.model_validate(raw)
-
-    artifact = compile_visualflow_to_workflow_artifact(flow)
-
-    registry = NodeRegistry()
-    register_default_visual_node_factories(registry)
-    spec = workflow_spec_from_artifact(artifact=artifact, registry=registry)
+    spec = compile_visualflow(raw)
 
     def _llm_handler(run: RunState, effect: Effect, default_next_node: Optional[str]) -> EffectOutcome:
         del run, default_next_node
@@ -56,5 +45,4 @@ def test_workflow_artifact_executes_real_visualflow_json_without_abstractflow_ru
     assert isinstance(result, dict)
     assert result.get("enriched_request") == "enriched"
     assert result.get("tasks") == ["t1", "t2"]
-
 

@@ -96,6 +96,8 @@ export type NodeType =
   | 'write_file'
   | 'memory_note'
   | 'memory_query'
+  | 'memory_tag'
+  | 'memory_compact'
   | 'memory_rehydrate'
   | 'tool_calls'
   | 'tools_allowlist'

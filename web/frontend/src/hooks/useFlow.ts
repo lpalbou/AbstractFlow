@@ -683,7 +683,13 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       // Backward-compat + canonical ordering for memory nodes.
       //
       // Keep pins addressable by id (edges), so reordering/adding pins is safe.
-      if (data.nodeType === 'memory_note' || data.nodeType === 'memory_query' || data.nodeType === 'memory_rehydrate') {
+      if (
+        data.nodeType === 'memory_note' ||
+        data.nodeType === 'memory_query' ||
+        data.nodeType === 'memory_tag' ||
+        data.nodeType === 'memory_compact' ||
+        data.nodeType === 'memory_rehydrate'
+      ) {
         const existingInputs = Array.isArray(data.inputs) ? data.inputs : [];
         const byInputId = new Map(existingInputs.map((p) => [p.id, p] as const));
         const usedInputs = new Set<string>();
@@ -720,12 +726,26 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                   wantInput({ id: 'until', label: 'until', type: 'string' }),
                   wantInput({ id: 'scope', label: 'scope', type: 'string' }),
                 ]
-              : [
-                  wantInput({ id: 'exec-in', label: '', type: 'execution' }),
-                  wantInput({ id: 'span_ids', label: 'span_ids', type: 'array' }),
-                  wantInput({ id: 'placement', label: 'placement', type: 'string' }),
-                  wantInput({ id: 'max_messages', label: 'max_messages', type: 'number' }),
-                ];
+              : data.nodeType === 'memory_tag'
+                ? [
+                    wantInput({ id: 'exec-in', label: '', type: 'execution' }),
+                    wantInput({ id: 'span_id', label: 'span_id', type: 'string' }),
+                    wantInput({ id: 'tags', label: 'tags', type: 'object' }),
+                    wantInput({ id: 'merge', label: 'merge', type: 'boolean' }),
+                  ]
+              : data.nodeType === 'memory_compact'
+                  ? [
+                      wantInput({ id: 'exec-in', label: '', type: 'execution' }),
+                      wantInput({ id: 'preserve_recent', label: 'preserve_recent', type: 'number' }),
+                      wantInput({ id: 'compression_mode', label: 'compression_mode', type: 'string' }),
+                      wantInput({ id: 'focus', label: 'focus', type: 'string' }),
+                    ]
+                  : [
+                      wantInput({ id: 'exec-in', label: '', type: 'execution' }),
+                      wantInput({ id: 'span_ids', label: 'span_ids', type: 'array' }),
+                      wantInput({ id: 'placement', label: 'placement', type: 'string' }),
+                      wantInput({ id: 'max_messages', label: 'max_messages', type: 'number' }),
+                    ];
 
         const inputExtras = existingInputs.filter((p) => !usedInputs.has(p.id));
 
@@ -753,11 +773,22 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                   wantOutput({ id: 'results', label: 'results', type: 'array' }),
                   wantOutput({ id: 'rendered', label: 'rendered', type: 'string' }),
                 ]
-              : [
-                  wantOutput({ id: 'exec-out', label: '', type: 'execution' }),
-                  wantOutput({ id: 'inserted', label: 'inserted', type: 'number' }),
-                  wantOutput({ id: 'skipped', label: 'skipped', type: 'number' }),
-                ];
+              : data.nodeType === 'memory_tag'
+                ? [
+                    wantOutput({ id: 'exec-out', label: '', type: 'execution' }),
+                    wantOutput({ id: 'success', label: 'success', type: 'boolean' }),
+                    wantOutput({ id: 'rendered', label: 'rendered', type: 'string' }),
+                  ]
+                : data.nodeType === 'memory_compact'
+                  ? [
+                      wantOutput({ id: 'exec-out', label: '', type: 'execution' }),
+                      wantOutput({ id: 'span_id', label: 'span_id', type: 'string' }),
+                    ]
+                  : [
+                      wantOutput({ id: 'exec-out', label: '', type: 'execution' }),
+                      wantOutput({ id: 'inserted', label: 'inserted', type: 'number' }),
+                      wantOutput({ id: 'skipped', label: 'skipped', type: 'number' }),
+                    ];
 
         const outputExtras = existingOutputs.filter((p) => !usedOutputs.has(p.id));
 
@@ -770,7 +801,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             ? new Set(['Add Note', 'Remember'])
             : data.nodeType === 'memory_query'
               ? new Set(['Query Memory'])
-              : new Set(['Memory Rehydrate']);
+              : data.nodeType === 'memory_tag'
+                ? new Set(['Tag Memory', 'Memory Tag'])
+                : data.nodeType === 'memory_compact'
+                  ? new Set(['Compact', 'Compaction'])
+                  : new Set(['Memory Rehydrate']);
         if (template && typeof data.label === 'string') {
           const cur = data.label.trim();
           if (!cur || legacyLabels.has(cur)) {

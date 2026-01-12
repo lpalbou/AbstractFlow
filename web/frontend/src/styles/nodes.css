@@ -17,6 +17,7 @@
 
 /* Slightly wider nodes for common “agentic” steps so inline toggles and pin labels don’t truncate. */
 .flow-node.flow-node--memory_note,
+.flow-node.flow-node--memory_compact,
 .flow-node.flow-node--llm_call,
 .flow-node.flow-node--agent {
   min-width: 210px;

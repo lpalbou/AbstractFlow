@@ -1,0 +1,583 @@
+{
+  "id": "ltm-ai-consolidate-session",
+  "name": "ltm-ai-consolidate-session",
+  "description": "Offline consolidation: compact older context into an archived span, tag it, then extract higher-level semantic notes referencing the archived span (episodic → semantic).",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": { "x": 96.0, "y": 96.0 },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "provider", "label": "provider", "type": "provider" },
+          { "id": "model", "label": "model", "type": "model" },
+          { "id": "preserve_recent", "label": "preserve_recent", "type": "number" },
+          { "id": "compression_mode", "label": "compression_mode", "type": "string" },
+          { "id": "focus", "label": "focus", "type": "string" },
+          { "id": "project", "label": "project", "type": "string" }
+        ],
+        "pinDefaults": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b",
+          "preserve_recent": 6,
+          "compression_mode": "standard",
+          "focus": "decisions",
+          "project": "abstractframework"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-2",
+      "type": "memory_compact",
+      "position": { "x": 320.0, "y": 96.0 },
+      "data": {
+        "nodeType": "memory_compact",
+        "label": "Compact memory",
+        "icon": "&#x1F5DC;",
+        "headerColor": "#2ECC71",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "preserve_recent", "label": "preserve_recent", "type": "number" },
+          { "id": "compression_mode", "label": "compression_mode", "type": "string" },
+          { "id": "focus", "label": "focus", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "span_id", "label": "span_id", "type": "string" }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-3",
+      "type": "literal_json",
+      "position": { "x": 320.0, "y": 240.0 },
+      "data": {
+        "nodeType": "literal_json",
+        "label": "Base tags",
+        "icon": "{}",
+        "headerColor": "#00FFFF",
+        "inputs": [],
+        "outputs": [{ "id": "value", "label": "value", "type": "object" }],
+        "literalValue": { "topic": "ltm", "phase": "consolidate" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-4",
+      "type": "set",
+      "position": { "x": 528.0, "y": 240.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set project",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "project" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-5",
+      "type": "memory_tag",
+      "position": { "x": 528.0, "y": 96.0 },
+      "data": {
+        "nodeType": "memory_tag",
+        "label": "Tag compacted span",
+        "icon": "&#x1F3F7;",
+        "headerColor": "#2ECC71",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "span_id", "label": "span_id", "type": "string" },
+          { "id": "tags", "label": "tags", "type": "object" },
+          { "id": "merge", "label": "merge", "type": "boolean" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "success", "label": "success", "type": "boolean" },
+          { "id": "rendered", "label": "rendered", "type": "string" }
+        ],
+        "pinDefaults": { "merge": true }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-6",
+      "type": "literal_json",
+      "position": { "x": 768.0, "y": 96.0 },
+      "data": {
+        "nodeType": "literal_json",
+        "label": "Vars",
+        "icon": "{}",
+        "headerColor": "#00FFFF",
+        "inputs": [],
+        "outputs": [{ "id": "value", "label": "value", "type": "object" }],
+        "literalValue": {}
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-7",
+      "type": "set",
+      "position": { "x": 976.0, "y": 96.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set span_id",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "span_id" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-8",
+      "type": "string_template",
+      "position": { "x": 1184.0, "y": 96.0 },
+      "data": {
+        "nodeType": "string_template",
+        "label": "Build prompt",
+        "icon": "&#x1F9FE;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          { "id": "template", "label": "template", "type": "string" },
+          { "id": "vars", "label": "vars", "type": "object" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "string" }],
+        "pinDefaults": {
+          "template": "You have just compacted prior conversation history into span_id={{span_id}}.\n\nBased on the summary/system context now visible, extract 1-5 durable semantic memory notes (decisions, conventions, user/project preferences).\n\nReturn ONLY JSON:\n{\"notes\":[{\"note\":\"...\",\"scope\":\"session\",\"tags\":{\"topic\":\"...\"}}]}.\n\nEach note must be short and actionable (<= 300 chars)."
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-9",
+      "type": "llm_call",
+      "position": { "x": 1408.0, "y": 96.0 },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Extract semantic notes",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "include_context", "label": "use_context", "type": "boolean" },
+          { "id": "provider", "label": "provider", "type": "provider" },
+          { "id": "model", "label": "model", "type": "model" },
+          { "id": "temperature", "label": "temperature", "type": "number" },
+          { "id": "seed", "label": "seed", "type": "number" },
+          { "id": "system", "label": "system", "type": "string" },
+          { "id": "prompt", "label": "prompt", "type": "string" },
+          { "id": "tools", "label": "tools", "type": "tools" },
+          { "id": "response_schema", "label": "structured_output", "type": "object" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "response", "label": "response", "type": "string" },
+          { "id": "tool_calls", "label": "tool_calls", "type": "array" },
+          { "id": "result", "label": "result", "type": "object" }
+        ],
+        "effectConfig": { "provider": "lmstudio", "model": "qwen/qwen3-next-80b", "temperature": 0.2 },
+        "pinDefaults": {
+          "include_context": true,
+          "system": "You are a memory consolidator. Output STRICT JSON only."
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-10",
+      "type": "parse_json",
+      "position": { "x": 1632.0, "y": 96.0 },
+      "data": {
+        "nodeType": "parse_json",
+        "label": "Parse JSON",
+        "icon": "&#x1F5C2;",
+        "headerColor": "#3498DB",
+        "inputs": [{ "id": "text", "label": "text", "type": "string" }],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-11",
+      "type": "get",
+      "position": { "x": 1840.0, "y": 96.0 },
+      "data": {
+        "nodeType": "get",
+        "label": "Get notes",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "notes", "default": [] }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-12",
+      "type": "array_length",
+      "position": { "x": 2048.0, "y": 96.0 },
+      "data": {
+        "nodeType": "array_length",
+        "label": "Count notes",
+        "icon": "#",
+        "headerColor": "#3498DB",
+        "inputs": [{ "id": "array", "label": "array", "type": "array" }],
+        "outputs": [{ "id": "result", "label": "result", "type": "number" }]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-13",
+      "type": "make_array",
+      "position": { "x": 768.0, "y": 352.0 },
+      "data": {
+        "nodeType": "make_array",
+        "label": "Span array",
+        "icon": "[]",
+        "headerColor": "#3498DB",
+        "inputs": [{ "id": "a", "label": "a", "type": "any" }],
+        "outputs": [{ "id": "result", "label": "result", "type": "array" }]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-14",
+      "type": "literal_json",
+      "position": { "x": 976.0, "y": 352.0 },
+      "data": {
+        "nodeType": "literal_json",
+        "label": "Sources",
+        "icon": "{}",
+        "headerColor": "#00FFFF",
+        "inputs": [],
+        "outputs": [{ "id": "value", "label": "value", "type": "object" }],
+        "literalValue": {}
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-15",
+      "type": "set",
+      "position": { "x": 1184.0, "y": 352.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set sources.span_ids",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "span_ids" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-16",
+      "type": "loop",
+      "position": { "x": 1408.0, "y": 352.0 },
+      "data": {
+        "nodeType": "loop",
+        "label": "ForEach note",
+        "icon": "&#x1F501;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "items", "label": "items", "type": "array" }
+        ],
+        "outputs": [
+          { "id": "loop", "label": "loop", "type": "execution" },
+          { "id": "done", "label": "done", "type": "execution" },
+          { "id": "item", "label": "item", "type": "any" },
+          { "id": "index", "label": "index", "type": "number" }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-17",
+      "type": "get",
+      "position": { "x": 1632.0, "y": 352.0 },
+      "data": {
+        "nodeType": "get",
+        "label": "Get note",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "note", "default": "" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-18",
+      "type": "get",
+      "position": { "x": 1632.0, "y": 432.0 },
+      "data": {
+        "nodeType": "get",
+        "label": "Get tags",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "tags", "default": {} }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-19",
+      "type": "merge",
+      "position": { "x": 1840.0, "y": 432.0 },
+      "data": {
+        "nodeType": "merge",
+        "label": "Merge tags",
+        "icon": "&#x1F517;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "a", "label": "a", "type": "object" },
+          { "id": "b", "label": "b", "type": "object" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-20",
+      "type": "get",
+      "position": { "x": 1632.0, "y": 512.0 },
+      "data": {
+        "nodeType": "get",
+        "label": "Get scope",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "scope", "default": "session" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-21",
+      "type": "memory_note",
+      "position": { "x": 2048.0, "y": 352.0 },
+      "data": {
+        "nodeType": "memory_note",
+        "label": "Memorize",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#2ECC71",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "keep_in_context", "label": "in_context", "type": "boolean" },
+          { "id": "scope", "label": "scope", "type": "string" },
+          { "id": "content", "label": "content", "type": "string" },
+          { "id": "location", "label": "location", "type": "string" },
+          { "id": "tags", "label": "tags", "type": "object" },
+          { "id": "sources", "label": "sources", "type": "object" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "note_id", "label": "note_id", "type": "string" }
+        ],
+        "pinDefaults": { "keep_in_context": false, "location": "flow:ltm-ai-consolidate-session" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-22",
+      "type": "on_flow_end",
+      "position": { "x": 2272.0, "y": 224.0 },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "span_id", "label": "span_id", "type": "string" },
+          { "id": "notes_count", "label": "notes_count", "type": "number" },
+          { "id": "raw", "label": "raw", "type": "string" }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    { "id": "edge-1", "source": "node-1", "sourceHandle": "exec-out", "target": "node-2", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-2", "source": "node-1", "sourceHandle": "preserve_recent", "target": "node-2", "targetHandle": "preserve_recent", "animated": false },
+    { "id": "edge-3", "source": "node-1", "sourceHandle": "compression_mode", "target": "node-2", "targetHandle": "compression_mode", "animated": false },
+    { "id": "edge-4", "source": "node-1", "sourceHandle": "focus", "target": "node-2", "targetHandle": "focus", "animated": false },
+
+    { "id": "edge-5", "source": "node-2", "sourceHandle": "exec-out", "target": "node-5", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-6", "source": "node-2", "sourceHandle": "span_id", "target": "node-5", "targetHandle": "span_id", "animated": false },
+
+    { "id": "edge-7", "source": "node-3", "sourceHandle": "value", "target": "node-4", "targetHandle": "object", "animated": false },
+    { "id": "edge-8", "source": "node-1", "sourceHandle": "project", "target": "node-4", "targetHandle": "value", "animated": false },
+    { "id": "edge-9", "source": "node-4", "sourceHandle": "result", "target": "node-5", "targetHandle": "tags", "animated": false },
+
+    { "id": "edge-10", "source": "node-6", "sourceHandle": "value", "target": "node-7", "targetHandle": "object", "animated": false },
+    { "id": "edge-11", "source": "node-2", "sourceHandle": "span_id", "target": "node-7", "targetHandle": "value", "animated": false },
+    { "id": "edge-12", "source": "node-7", "sourceHandle": "result", "target": "node-8", "targetHandle": "vars", "animated": false },
+    { "id": "edge-13", "source": "node-8", "sourceHandle": "result", "target": "node-9", "targetHandle": "prompt", "animated": false },
+    { "id": "edge-14", "source": "node-5", "sourceHandle": "exec-out", "target": "node-9", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-15", "source": "node-1", "sourceHandle": "provider", "target": "node-9", "targetHandle": "provider", "animated": false },
+    { "id": "edge-16", "source": "node-1", "sourceHandle": "model", "target": "node-9", "targetHandle": "model", "animated": false },
+
+    { "id": "edge-17", "source": "node-9", "sourceHandle": "response", "target": "node-10", "targetHandle": "text", "animated": false },
+    { "id": "edge-18", "source": "node-10", "sourceHandle": "result", "target": "node-11", "targetHandle": "object", "animated": false },
+    { "id": "edge-19", "source": "node-11", "sourceHandle": "value", "target": "node-12", "targetHandle": "array", "animated": false },
+
+    { "id": "edge-20", "source": "node-9", "sourceHandle": "exec-out", "target": "node-16", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-21", "source": "node-11", "sourceHandle": "value", "target": "node-16", "targetHandle": "items", "animated": false },
+    { "id": "edge-22", "source": "node-16", "sourceHandle": "item", "target": "node-17", "targetHandle": "object", "animated": false },
+    { "id": "edge-23", "source": "node-16", "sourceHandle": "item", "target": "node-18", "targetHandle": "object", "animated": false },
+    { "id": "edge-24", "source": "node-16", "sourceHandle": "item", "target": "node-20", "targetHandle": "object", "animated": false },
+    { "id": "edge-25", "source": "node-17", "sourceHandle": "value", "target": "node-21", "targetHandle": "content", "animated": false },
+    { "id": "edge-26", "source": "node-20", "sourceHandle": "value", "target": "node-21", "targetHandle": "scope", "animated": false },
+
+    { "id": "edge-28", "source": "node-4", "sourceHandle": "result", "target": "node-19", "targetHandle": "a", "animated": false },
+    { "id": "edge-29", "source": "node-18", "sourceHandle": "value", "target": "node-19", "targetHandle": "b", "animated": false },
+    { "id": "edge-30", "source": "node-19", "sourceHandle": "result", "target": "node-21", "targetHandle": "tags", "animated": false },
+
+    { "id": "edge-31", "source": "node-2", "sourceHandle": "span_id", "target": "node-13", "targetHandle": "a", "animated": false },
+    { "id": "edge-32", "source": "node-14", "sourceHandle": "value", "target": "node-15", "targetHandle": "object", "animated": false },
+    { "id": "edge-33", "source": "node-13", "sourceHandle": "result", "target": "node-15", "targetHandle": "value", "animated": false },
+    { "id": "edge-34", "source": "node-15", "sourceHandle": "result", "target": "node-21", "targetHandle": "sources", "animated": false },
+
+    { "id": "edge-35", "source": "node-16", "sourceHandle": "loop", "target": "node-21", "targetHandle": "exec-in", "animated": true },
+
+    { "id": "edge-36", "source": "node-16", "sourceHandle": "done", "target": "node-22", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-37", "source": "node-2", "sourceHandle": "span_id", "target": "node-22", "targetHandle": "span_id", "animated": false },
+    { "id": "edge-38", "source": "node-12", "sourceHandle": "result", "target": "node-22", "targetHandle": "notes_count", "animated": false },
+    { "id": "edge-39", "source": "node-9", "sourceHandle": "response", "target": "node-22", "targetHandle": "raw", "animated": false }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2026-01-12T04:15:00.000000",
+  "updated_at": "2026-01-12T04:15:00.000000"
+}
