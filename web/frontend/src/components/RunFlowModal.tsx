@@ -906,6 +906,7 @@ export function RunFlowModal({
   }, []);
 
   type StepTreeNode = { stepId: string; depth: number; children: StepTreeNode[]; childRunId?: string };
+  const MAX_STEP_TREE_DEPTH = 3;
 
   const stepTree = useMemo<StepTreeNode[]>(() => {
     const rid0 = typeof rootRunId === 'string' ? rootRunId.trim() : '';
@@ -947,7 +948,10 @@ export function RunFlowModal({
       for (const s of bucket) {
         const childRunId = childRunIdFromStep(s);
         const children =
-          childRunId && stepsByRunId.get(childRunId) && (stepsByRunId.get(childRunId) as Step[]).length > 0
+          depth < MAX_STEP_TREE_DEPTH &&
+          childRunId &&
+          stepsByRunId.get(childRunId) &&
+          (stepsByRunId.get(childRunId) as Step[]).length > 0
             ? buildForRun(childRunId, depth + 1)
             : [];
         nodes.push({ stepId: s.id, depth, children, childRunId: childRunId || undefined });
@@ -970,6 +974,8 @@ export function RunFlowModal({
       const visit = (nodes: StepTreeNode[]) => {
         for (const n of nodes) {
           if (!n.children || n.children.length === 0) continue;
+          // Keep the execution list readable: only auto-expand direct subflows (depth 0).
+          if (n.depth > 0) continue;
           const s = stepById.get(n.stepId);
           if (!s) continue;
 
@@ -978,7 +984,6 @@ export function RunFlowModal({
             next[n.stepId] = true;
             changed = true;
           }
-          visit(n.children);
         }
       };
       visit(stepTree);
@@ -1072,12 +1077,6 @@ export function RunFlowModal({
     if (!parentRunId || !parentNodeId) return null;
     return subworkflowLinks.get(`${parentRunId}:${parentNodeId}`) || null;
   }, [selectedStep, subworkflowLinks]);
-
-  const selectedSubflowSteps = useMemo(() => {
-    if (!selectedSubflowRunId) return [];
-    const bucket = stepsByRunId.get(selectedSubflowRunId);
-    return bucket ? (bucket as Step[]) : [];
-  }, [selectedSubflowRunId, stepsByRunId]);
 
   const hasRunData = isRunning || result != null || events.length > 0;
 
@@ -2082,51 +2081,24 @@ export function RunFlowModal({
 	                        </div>
 	                      </div>
 	                      {selectedStep.nodeType === 'subflow' ? (
-	                        <div className="run-subflow-live">
-	                          <div className="run-subflow-live-header">
-	                            <div className="run-subflow-live-title">Subflow</div>
-	                            {selectedSubflowRunId ? (
-	                              <div className="run-subflow-live-actions">
-	                                <span className="run-subflow-live-runid" title={selectedSubflowRunId}>
-	                                  sub_run_id: {selectedSubflowRunId}
-	                                </span>
-	                                <button
-	                                  type="button"
-	                                  className="run-subflow-live-copy"
-	                                  onClick={() => copyToClipboard(selectedSubflowRunId)}
-	                                  title="Copy sub run id"
-	                                  aria-label="Copy sub run id"
-	                                >
-	                                  ⧉
-	                                </button>
-	                                {onSelectRunId ? (
-	                                  <button
-	                                    type="button"
-	                                    className="run-subflow-live-open"
-	                                    onClick={() => onSelectRunId(selectedSubflowRunId)}
-	                                    title="Open subflow run"
-	                                  >
-	                                    Open
-	                                  </button>
-	                                ) : null}
-	                              </div>
-	                            ) : (
-	                              <div className="run-subflow-live-wait">Waiting for subflow run id…</div>
-	                            )}
-	                          </div>
-	                          {selectedSubflowSteps.length > 0 ? (
-	                            <div className="run-subflow-live-steps">
-	                              {selectedSubflowSteps.slice(-8).map((s) => (
-	                                <div key={s.id} className={`run-subflow-live-step ${s.status}`}>
-	                                  <span className={`run-subflow-live-step-status ${s.status}`}>{s.status}</span>
-	                                  <span className="run-subflow-live-step-label">
-	                                    {s.nodeLabel || s.nodeId || 'step'}
-	                                  </span>
-	                                </div>
-	                              ))}
+	                        selectedSubflowRunId ? (
+	                          <AgentSubrunTracePanel
+	                            rootRunId={rootRunId}
+	                            events={traceEvents}
+	                            subRunId={selectedSubflowRunId}
+	                            title="Subflow calls"
+	                            subtitle="Live per-effect trace (LLM/tool calls)."
+	                            onOpenSubRun={onSelectRunId ? () => onSelectRunId(selectedSubflowRunId) : undefined}
+	                          />
+	                        ) : (
+	                          <div className="agent-trace-panel">
+	                            <div className="agent-trace-header">
+	                              <div className="agent-trace-title">Subflow calls</div>
+	                              <div className="agent-trace-subtitle">Waiting for sub_run_id…</div>
 	                            </div>
-	                          ) : null}
-	                        </div>
+	                            <div className="agent-trace-empty">No trace entries yet.</div>
+	                          </div>
+	                        )
 	                      ) : null}
 	                      {selectedStep.nodeType === 'agent' ? (
 	                        <AgentSubrunTracePanel rootRunId={rootRunId} events={traceEvents} subRunId={selectedAgentSubRunId} />

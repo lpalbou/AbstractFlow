@@ -318,7 +318,7 @@
         ],
         "pinDefaults": {
           "include_context": true,
-          "system": "You are a highly autonomous ReAct agent who requests the execution of tools to your host in order to fullfill ALL the USER REQUEST and ALL their associated TASKS. You work with the highest standards of rigor and profesionalism, you do not skip test, you continue until your work is done, fully done."
+          "system": "You are a highly autonomous ReAct agent who requests the execution of tools to your host in order to fullfill ALL the USER REQUEST and ALL their associated TASKS. You work with the highest standards of rigor and profesionalism, you do not skip test, you continue until your work is done, fully done.\n\nCompletion protocol (Ralph-style):\n- When you have fully completed the request (including verification/tests), output the token <@work_complete> on its own line at the end of your final message.\n- Never output <@work_complete> unless the work is truly complete.\n- If you are explicitly asked to output <@work_complete>, do so immediately and do not run tools."
         }
       },
       "label": null,

@@ -19,6 +19,9 @@ interface AgentSubrunTracePanelProps {
   rootRunId: string | null;
   events: ExecutionEvent[];
   subRunId?: string | null;
+  title?: string;
+  subtitle?: string;
+  onOpenSubRun?: () => void;
 }
 
 async function copyText(text: string): Promise<void> {
@@ -302,7 +305,14 @@ function PanelBody({ item }: { item: TraceItem }) {
   );
 }
 
-export function AgentSubrunTracePanel({ rootRunId, events, subRunId }: AgentSubrunTracePanelProps) {
+export function AgentSubrunTracePanel({
+  rootRunId,
+  events,
+  subRunId,
+  title,
+  subtitle,
+  onOpenSubRun,
+}: AgentSubrunTracePanelProps) {
   const items = useMemo<TraceItem[]>(() => {
     if (!rootRunId) return [];
     const out: TraceItem[] = [];
@@ -341,16 +351,20 @@ export function AgentSubrunTracePanel({ rootRunId, events, subRunId }: AgentSubr
     });
 
     return out;
-  }, [events, rootRunId]);
+  }, [events, rootRunId, subRunId]);
 
   if (!rootRunId) return null;
+
+  const titleText = typeof title === 'string' && title.trim() ? title.trim() : 'Agent calls';
+  const subtitleText =
+    typeof subtitle === 'string' && subtitle.trim() ? subtitle.trim() : 'Live per-effect trace (LLM/tool calls).';
 
   return (
     <div className="agent-trace-panel">
       <div className="agent-trace-header">
-        <div className="agent-trace-title">Agent calls</div>
+        <div className="agent-trace-title">{titleText}</div>
         <div className="agent-trace-subtitle">
-          Live per-effect trace (LLM/tool calls).
+          {subtitleText}
           {subRunId ? (
             <span className="agent-trace-subrun">
               {' '}
@@ -367,13 +381,26 @@ export function AgentSubrunTracePanel({ rootRunId, events, subRunId }: AgentSubr
               >
                 ⧉
               </button>
+              {onOpenSubRun ? (
+                <button
+                  type="button"
+                  className="agent-trace-open"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenSubRun();
+                  }}
+                  title="Open sub-run"
+                >
+                  Open
+                </button>
+              ) : null}
             </span>
           ) : null}
         </div>
       </div>
 
       {items.length === 0 ? (
-        <div className="agent-trace-empty">No agent trace entries yet.</div>
+        <div className="agent-trace-empty">No trace entries yet.</div>
       ) : (
         <div className="agent-trace-list">
           {items.map((item) => {

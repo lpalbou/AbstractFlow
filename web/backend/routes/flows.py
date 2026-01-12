@@ -23,6 +23,7 @@ from ..models import (
     FlowRunResult,
 )
 from ..services.executor import create_visual_runner, visual_to_flow
+from ..services.execution_workspace import ensure_default_workspace_root, ensure_run_id_workspace_alias
 from ..services.runtime_stores import get_runtime_stores
 from abstractflow.visual.workspace_scoped_tools import WorkspaceScope, build_scoped_tool_executor
 from abstractflow.visual.interfaces import apply_visual_flow_interface_scaffold
@@ -404,6 +405,7 @@ async def run_flow(flow_id: str, request: FlowRunRequest):
 
     try:
         input_data = dict(request.input_data or {})
+        workspace_dir = ensure_default_workspace_root(input_data)
         scope = WorkspaceScope.from_input_data(input_data)
         tool_executor = build_scoped_tool_executor(scope=scope) if scope is not None else None
 
@@ -418,6 +420,8 @@ async def run_flow(flow_id: str, request: FlowRunRequest):
             input_data=input_data,
         )
         result = runner.run(input_data)
+        if workspace_dir is not None and isinstance(runner.run_id, str) and runner.run_id.strip():
+            ensure_run_id_workspace_alias(run_id=runner.run_id.strip(), workspace_dir=workspace_dir)
 
         if isinstance(result, dict) and result.get("waiting"):
             state = runner.get_state()

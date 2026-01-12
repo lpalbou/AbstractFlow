@@ -178,10 +178,15 @@
           { "id": "tool_calls", "label": "tool_calls", "type": "array" },
           { "id": "result", "label": "result", "type": "object" }
         ],
-        "effectConfig": { "provider": "lmstudio", "model": "qwen/qwen3-next-80b", "temperature": 0.2 },
+        "effectConfig": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b",
+          "temperature": 0.2,
+          "structured_output_fallback": true
+        },
         "pinDefaults": {
           "include_context": true,
-          "system": "You are a memory controller for an AI system. Extract only stable, reusable information worth storing as durable notes. Prefer provenance and conservative writing. Output must be STRICT JSON only (no markdown, no backticks)."
+          "system": "You are a memory controller for an AI system. Extract only stable, reusable information worth storing as durable notes. Prefer provenance and conservative writing. Always comply with the provided structured output schema."
         }
       },
       "label": null,
@@ -190,27 +195,77 @@
       "inputs": [],
       "outputs": []
     },
-    {
-      "id": "node-8",
-      "type": "parse_json",
+	    {
+	      "id": "node-8",
+	      "type": "get",
       "position": { "x": 1344.0, "y": 64.0 },
       "data": {
-        "nodeType": "parse_json",
-        "label": "Parse JSON",
-        "icon": "&#x1F5C2;",
+        "nodeType": "get",
+        "label": "Get structured.data",
+        "icon": "&#x1F4E5;",
         "headerColor": "#3498DB",
-        "inputs": [{ "id": "text", "label": "text", "type": "string" }],
-        "outputs": [{ "id": "result", "label": "result", "type": "object" }]
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "data", "default": {} }
       },
       "label": null,
       "icon": null,
       "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
-      "id": "node-9",
-      "type": "get",
+	      "inputs": [],
+	      "outputs": []
+	    },
+	    {
+	      "id": "node-27",
+	      "type": "json_schema",
+	      "position": { "x": 1104.0, "y": -96.0 },
+	      "data": {
+	        "nodeType": "json_schema",
+	        "label": "Extraction schema",
+	        "icon": "&#x1F4CB;",
+	        "headerColor": "#00FFFF",
+	        "inputs": [],
+	        "outputs": [{ "id": "value", "label": "schema", "type": "object" }],
+	        "literalValue": {
+	          "type": "object",
+	          "properties": {
+	            "notes": {
+	              "type": "array",
+	              "items": {
+	                "type": "object",
+	                "properties": {
+	                  "note": { "type": "string", "description": "Durable note text (<= 300 chars)." },
+	                  "scope": { "type": "string", "description": "run|session|global (optional; defaults to flow default_scope)." },
+	                  "tags": { "type": "object", "description": "Flat string->string tags (optional)." }
+	                },
+	                "required": ["note"]
+	              }
+	            },
+	            "should_compact": { "type": "boolean" },
+	            "compaction": {
+	              "type": "object",
+	              "properties": {
+	                "preserve_recent": { "type": "integer" },
+	                "compression_mode": { "type": "string" },
+	                "focus": { "type": "string" }
+	              }
+	            }
+	          },
+	          "required": ["notes"]
+	        }
+	      },
+	      "label": null,
+	      "icon": null,
+	      "headerColor": null,
+	      "inputs": [],
+	      "outputs": []
+	    },
+	    {
+	      "id": "node-9",
+	      "type": "get",
       "position": { "x": 1584.0, "y": 64.0 },
       "data": {
         "nodeType": "get",
@@ -628,8 +683,8 @@
     { "id": "edge-9", "source": "node-1", "sourceHandle": "provider", "target": "node-7", "targetHandle": "provider", "animated": false },
     { "id": "edge-10", "source": "node-1", "sourceHandle": "model", "target": "node-7", "targetHandle": "model", "animated": false },
     { "id": "edge-11", "source": "node-1", "sourceHandle": "exec-out", "target": "node-7", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-12", "source": "node-7", "sourceHandle": "response", "target": "node-8", "targetHandle": "text", "animated": false },
-    { "id": "edge-13", "source": "node-8", "sourceHandle": "result", "target": "node-9", "targetHandle": "object", "animated": false },
+    { "id": "edge-12", "source": "node-7", "sourceHandle": "result", "target": "node-8", "targetHandle": "object", "animated": false },
+    { "id": "edge-13", "source": "node-8", "sourceHandle": "value", "target": "node-9", "targetHandle": "object", "animated": false },
     { "id": "edge-14", "source": "node-9", "sourceHandle": "value", "target": "node-10", "targetHandle": "array", "animated": false },
     { "id": "edge-15", "source": "node-9", "sourceHandle": "value", "target": "node-11", "targetHandle": "items", "animated": false },
     { "id": "edge-16", "source": "node-7", "sourceHandle": "exec-out", "target": "node-11", "targetHandle": "exec-in", "animated": true },
@@ -653,14 +708,15 @@
     { "id": "edge-34", "source": "node-1", "sourceHandle": "location", "target": "node-23", "targetHandle": "location", "animated": false },
     { "id": "edge-35", "source": "node-12", "sourceHandle": "value", "target": "node-23", "targetHandle": "content", "animated": false },
     { "id": "edge-36", "source": "node-15", "sourceHandle": "true", "target": "node-23", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-37", "source": "node-8", "sourceHandle": "result", "target": "node-24", "targetHandle": "object", "animated": false },
-    { "id": "edge-38", "source": "node-8", "sourceHandle": "result", "target": "node-25", "targetHandle": "object", "animated": false },
+    { "id": "edge-37", "source": "node-8", "sourceHandle": "value", "target": "node-24", "targetHandle": "object", "animated": false },
+    { "id": "edge-38", "source": "node-8", "sourceHandle": "value", "target": "node-25", "targetHandle": "object", "animated": false },
     { "id": "edge-39", "source": "node-11", "sourceHandle": "done", "target": "node-26", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-40", "source": "node-8", "sourceHandle": "result", "target": "node-26", "targetHandle": "extraction", "animated": false },
+    { "id": "edge-40", "source": "node-8", "sourceHandle": "value", "target": "node-26", "targetHandle": "extraction", "animated": false },
     { "id": "edge-41", "source": "node-10", "sourceHandle": "result", "target": "node-26", "targetHandle": "notes_count", "animated": false },
     { "id": "edge-42", "source": "node-24", "sourceHandle": "value", "target": "node-26", "targetHandle": "should_compact", "animated": false },
     { "id": "edge-43", "source": "node-25", "sourceHandle": "value", "target": "node-26", "targetHandle": "compaction", "animated": false },
-    { "id": "edge-44", "source": "node-7", "sourceHandle": "response", "target": "node-26", "targetHandle": "raw", "animated": false }
+    { "id": "edge-44", "source": "node-7", "sourceHandle": "response", "target": "node-26", "targetHandle": "raw", "animated": false },
+    { "id": "edge-45", "source": "node-27", "sourceHandle": "value", "target": "node-7", "targetHandle": "response_schema", "animated": false }
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-12T04:15:00.000000",

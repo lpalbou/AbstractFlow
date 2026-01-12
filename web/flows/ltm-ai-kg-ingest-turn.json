@@ -1,0 +1,227 @@
+{
+  "id": "ltm-ai-kg-ingest-turn",
+  "name": "ltm-ai-kg-ingest-turn",
+  "description": "Extract triples from a turn (or any text fragment) and assert them into AbstractMemory via the runtime-owned memory_kg_assert effect. Designed to be composed into ltm-ai-chat or scheduled maintenance workflows.",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": { "x": 96.0, "y": 128.0 },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "provider", "label": "provider", "type": "provider" },
+          { "id": "model", "label": "model", "type": "model" },
+          { "id": "text", "label": "text", "type": "string" },
+          { "id": "scope", "label": "scope", "type": "string" },
+          { "id": "span_id", "label": "span_id", "type": "string" },
+          { "id": "domain_focus", "label": "domain_focus", "type": "string" }
+        ],
+        "pinDefaults": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b",
+          "scope": "session",
+          "domain_focus": "software / agents / memory systems"
+        }
+      }
+    },
+    {
+      "id": "node-2",
+      "type": "literal_json",
+      "position": { "x": 96.0, "y": 288.0 },
+      "data": {
+        "nodeType": "literal_json",
+        "label": "Subflow input",
+        "icon": "{}",
+        "headerColor": "#00FFFF",
+        "inputs": [],
+        "outputs": [{ "id": "value", "label": "value", "type": "object" }],
+        "literalValue": {}
+      }
+    },
+    {
+      "id": "node-3",
+      "type": "set",
+      "position": { "x": 320.0, "y": 288.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set provider",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "provider" }
+      }
+    },
+    {
+      "id": "node-4",
+      "type": "set",
+      "position": { "x": 560.0, "y": 288.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set model",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "model" }
+      }
+    },
+    {
+      "id": "node-5",
+      "type": "set",
+      "position": { "x": 800.0, "y": 288.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set text",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "text" }
+      }
+    },
+    {
+      "id": "node-6",
+      "type": "set",
+      "position": { "x": 1040.0, "y": 288.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set domain_focus",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "domain_focus" }
+      }
+    },
+    {
+      "id": "node-7",
+      "type": "subflow",
+      "position": { "x": 1280.0, "y": 128.0 },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Extract triples",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "inherit_context", "label": "inherit_context", "type": "boolean" },
+          { "id": "input", "label": "input", "type": "object" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "output", "label": "output", "type": "object" }
+        ],
+        "subflowId": "ltm-ai-kg-extract-triples",
+        "pinDefaults": { "inherit_context": false }
+      }
+    },
+    {
+      "id": "node-8",
+      "type": "get",
+      "position": { "x": 1504.0, "y": 128.0 },
+      "data": {
+        "nodeType": "get",
+        "label": "Get assertions",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "assertions", "default": [] }
+      }
+    },
+    {
+      "id": "node-9",
+      "type": "memory_kg_assert",
+      "position": { "x": 1728.0, "y": 128.0 },
+      "data": {
+        "nodeType": "memory_kg_assert",
+        "label": "Assert triples",
+        "icon": "&#x1F9E0;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "assertions", "label": "assertions", "type": "array" },
+          { "id": "scope", "label": "scope", "type": "string" },
+          { "id": "span_id", "label": "span_id", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "assertion_ids", "label": "assertion_ids", "type": "array" },
+          { "id": "count", "label": "count", "type": "number" },
+          { "id": "ok", "label": "ok", "type": "boolean" },
+          { "id": "raw", "label": "raw", "type": "object" }
+        ]
+      }
+    },
+    {
+      "id": "node-10",
+      "type": "on_flow_end",
+      "position": { "x": 1952.0, "y": 128.0 },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "extracted", "label": "extracted", "type": "object" },
+          { "id": "assertion_ids", "label": "assertion_ids", "type": "array" },
+          { "id": "count", "label": "count", "type": "number" },
+          { "id": "ok", "label": "ok", "type": "boolean" }
+        ],
+        "outputs": []
+      }
+    }
+  ],
+  "edges": [
+    { "id": "edge-1", "source": "node-2", "sourceHandle": "value", "target": "node-3", "targetHandle": "object", "animated": false },
+    { "id": "edge-2", "source": "node-1", "sourceHandle": "provider", "target": "node-3", "targetHandle": "value", "animated": false },
+    { "id": "edge-3", "source": "node-3", "sourceHandle": "result", "target": "node-4", "targetHandle": "object", "animated": false },
+    { "id": "edge-4", "source": "node-1", "sourceHandle": "model", "target": "node-4", "targetHandle": "value", "animated": false },
+    { "id": "edge-5", "source": "node-4", "sourceHandle": "result", "target": "node-5", "targetHandle": "object", "animated": false },
+    { "id": "edge-6", "source": "node-1", "sourceHandle": "text", "target": "node-5", "targetHandle": "value", "animated": false },
+    { "id": "edge-7", "source": "node-5", "sourceHandle": "result", "target": "node-6", "targetHandle": "object", "animated": false },
+    { "id": "edge-8", "source": "node-1", "sourceHandle": "domain_focus", "target": "node-6", "targetHandle": "value", "animated": false },
+    { "id": "edge-9", "source": "node-6", "sourceHandle": "result", "target": "node-7", "targetHandle": "input", "animated": false },
+    { "id": "edge-10", "source": "node-1", "sourceHandle": "exec-out", "target": "node-7", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-11", "source": "node-7", "sourceHandle": "output", "target": "node-8", "targetHandle": "object", "animated": false },
+    { "id": "edge-12", "source": "node-8", "sourceHandle": "value", "target": "node-9", "targetHandle": "assertions", "animated": false },
+    { "id": "edge-13", "source": "node-1", "sourceHandle": "scope", "target": "node-9", "targetHandle": "scope", "animated": false },
+    { "id": "edge-14", "source": "node-1", "sourceHandle": "span_id", "target": "node-9", "targetHandle": "span_id", "animated": false },
+    { "id": "edge-15", "source": "node-7", "sourceHandle": "exec-out", "target": "node-9", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-16", "source": "node-7", "sourceHandle": "output", "target": "node-10", "targetHandle": "extracted", "animated": false },
+    { "id": "edge-17", "source": "node-9", "sourceHandle": "assertion_ids", "target": "node-10", "targetHandle": "assertion_ids", "animated": false },
+    { "id": "edge-18", "source": "node-9", "sourceHandle": "count", "target": "node-10", "targetHandle": "count", "animated": false },
+    { "id": "edge-19", "source": "node-9", "sourceHandle": "ok", "target": "node-10", "targetHandle": "ok", "animated": false },
+    { "id": "edge-20", "source": "node-9", "sourceHandle": "exec-out", "target": "node-10", "targetHandle": "exec-in", "animated": true }
+  ],
+  "entryNode": "node-1"
+}

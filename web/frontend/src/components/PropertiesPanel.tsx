@@ -925,7 +925,14 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         const editable = inputPins.filter((p) => {
           if (p.type === 'boolean' || p.type === 'number' || p.type === 'string') return true;
           // Known "string-select" pins that have inline dropdowns in the node UI.
-          if (p.id === 'scope' && (data.nodeType === 'memory_note' || data.nodeType === 'memory_query')) return true;
+          if (
+            p.id === 'scope' &&
+            (data.nodeType === 'memory_note' ||
+              data.nodeType === 'memory_query' ||
+              data.nodeType === 'memory_kg_assert' ||
+              data.nodeType === 'memory_kg_query')
+          )
+            return true;
           if (p.id === 'tags_mode' && data.nodeType === 'memory_query') return true;
           if (p.id === 'placement' && data.nodeType === 'memory_rehydrate') return true;
           return false;
@@ -956,12 +963,16 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               }
 
               // Special dropdown pins (match node inline controls).
-              if (pin.id === 'scope' && (data.nodeType === 'memory_note' || data.nodeType === 'memory_query')) {
+              if (
+                pin.id === 'scope' &&
+                (data.nodeType === 'memory_note' ||
+                  data.nodeType === 'memory_query' ||
+                  data.nodeType === 'memory_kg_assert' ||
+                  data.nodeType === 'memory_kg_query')
+              ) {
                 const current = typeof raw === 'string' && raw.trim() ? raw.trim() : 'run';
-                const options =
-                  data.nodeType === 'memory_query'
-                    ? ['run', 'session', 'global', 'all']
-                    : ['run', 'session', 'global'];
+                const allowAll = data.nodeType === 'memory_query' || data.nodeType === 'memory_kg_query';
+                const options = allowAll ? ['run', 'session', 'global', 'all'] : ['run', 'session', 'global'];
                 return (
                   <div key={pin.id} className="property-group">
                     <label className="property-sublabel">{rowLabel}</label>

@@ -2107,6 +2107,20 @@ button.primary:hover:not(:disabled) {
   color: rgba(255, 255, 255, 0.9);
 }
 
+.agent-trace-open {
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.agent-trace-open:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.07);
+}
+
 .agent-trace-badges {
   display: inline-flex;
   align-items: center;
@@ -2168,6 +2182,14 @@ button.primary:hover:not(:disabled) {
 
 .agent-trace-status.running {
   color: var(--warning);
+}
+
+.agent-trace-status.waiting {
+  color: var(--warning);
+}
+
+.agent-trace-status.failed {
+  color: var(--error);
 }
 
 .agent-trace-kind {

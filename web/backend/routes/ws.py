@@ -14,6 +14,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from ..models import ExecutionEvent, VisualFlow
 from ..services.executor import create_visual_runner
+from ..services.execution_workspace import ensure_default_workspace_root, ensure_run_id_workspace_alias
 from ..services.runtime_stores import get_runtime_stores
 from abstractflow.visual.workspace_scoped_tools import WorkspaceScope, build_scoped_tool_executor
 
@@ -296,6 +297,10 @@ async def execute_with_updates(
         if gate is not None:
             gate.set()
 
+        # Default to an isolated per-run workspace so file/shell tools don't pollute the repo.
+        # The stable alias `<ABSTRACTFLOW_BASE_EXECUTION>/<run_id>` is created after start.
+        workspace_dir = ensure_default_workspace_root(input_data)
+
         run_store, ledger_store, artifact_store = get_runtime_stores()
         scope = WorkspaceScope.from_input_data(input_data)
         tool_executor = build_scoped_tool_executor(scope=scope) if scope is not None else None
@@ -314,6 +319,8 @@ async def execute_with_updates(
         run_id = runner.start(input_data)
         if isinstance(run_id, str) and run_id:
             _active_run_ids[connection_id] = run_id
+            if workspace_dir is not None:
+                ensure_run_id_workspace_alias(run_id=run_id, workspace_dir=workspace_dir)
         await websocket.send_json(ExecutionEvent(type="flow_start", runId=run_id).model_dump())
 
         # Execute and handle waiting

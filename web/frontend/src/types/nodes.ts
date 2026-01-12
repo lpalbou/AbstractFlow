@@ -232,6 +232,13 @@ const CORE_NODES: NodeTemplate[] = [
       { id: 'temperature', label: 'temperature', type: 'number', description: 'Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature.' },
       { id: 'seed', label: 'seed', type: 'number', description: 'Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed.' },
       { id: 'max_iterations', label: 'max_iterations', type: 'number', description: 'Maximum internal ReAct iterations (safety cap). Higher values allow more tool-use steps.' },
+      {
+        id: 'max_input_tokens',
+        label: 'max_input_tokens',
+        type: 'number',
+        description:
+          "Optional per-agent input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for the agent sub-run.",
+      },
       { id: 'system', label: 'system', type: 'string', description: 'Optional system prompt for this agent instance (high priority instructions).' },
       { id: 'task', label: 'prompt', type: 'string', description: 'The task/user prompt for the agent to solve.' },
       { id: 'tools', label: 'tools', type: 'tools', description: 'Allowlist of tool names this agent can call (defense-in-depth; runtime still enforces allowlists).' },
@@ -273,6 +280,13 @@ const CORE_NODES: NodeTemplate[] = [
         type: 'boolean',
         description:
           "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false.",
+      },
+      {
+        id: 'max_input_tokens',
+        label: 'max_input_tokens',
+        type: 'number',
+        description:
+          "Optional per-call input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for this call.",
       },
       { id: 'provider', label: 'provider', type: 'provider', description: 'LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider.' },
       { id: 'model', label: 'model', type: 'model', description: 'LLM model id/name. If unset, uses the node’s configured model.' },
@@ -876,6 +890,7 @@ const MEMORY_NODES: NodeTemplate[] = [
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
       { id: 'span_id', label: 'span_id', type: 'string', description: 'Target span_id (artifact id). Also accepts a 1-based span index as a string/number in some hosts.' },
+      { id: 'scope', label: 'scope', type: 'string', description: 'Which span index to tag: run | session | global | all. (all tags every matching record across run+session+global; indices are not allowed with all.)' },
       { id: 'tags', label: 'tags', type: 'object', description: 'Key/value tags to set (values must be strings). Reserved key "kind" is ignored.' },
       { id: 'merge', label: 'merge', type: 'boolean', description: 'When true, merges with existing tags. When false, replaces the tag dict. Default: true.' },
     ],
@@ -921,6 +936,54 @@ const MEMORY_NODES: NodeTemplate[] = [
       { id: 'exec-out', label: '', type: 'execution' },
       { id: 'inserted', label: 'inserted', type: 'number', description: 'Number of messages inserted into context.messages.' },
       { id: 'skipped', label: 'skipped', type: 'number', description: 'Number of messages skipped (usually due to dedup).' },
+    ],
+    category: 'memory',
+  },
+  {
+    type: 'memory_kg_query',
+    icon: '&#x1F50E;', // Magnifying glass
+    label: 'KG Query',
+    description: 'Query the AbstractMemory triple store (pattern filters + optional semantic query_text).',
+    headerColor: '#8E44AD', // Purple - semantic memory
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'query_text', label: 'query_text', type: 'string', description: 'Optional semantic query. Requires embeddings to be configured in the host.' },
+      { id: 'subject', label: 'subject', type: 'string', description: 'Optional exact-match subject filter.' },
+      { id: 'predicate', label: 'predicate', type: 'string', description: 'Optional exact-match predicate filter.' },
+      { id: 'object', label: 'object', type: 'string', description: 'Optional exact-match object filter.' },
+      { id: 'since', label: 'since', type: 'string', description: 'Optional observed_at lower bound (ISO8601).' },
+      { id: 'until', label: 'until', type: 'string', description: 'Optional observed_at upper bound (ISO8601).' },
+      { id: 'active_at', label: 'active_at', type: 'string', description: 'Optional validity window selector (ISO8601). Filters assertions active at that time.' },
+      { id: 'scope', label: 'scope', type: 'string', description: 'run | session | global | all (fan-out over run+session+global).' },
+      { id: 'owner_id', label: 'owner_id', type: 'string', description: 'Optional explicit owner id override (advanced; normally derived from scope).' },
+      { id: 'limit', label: 'limit', type: 'number', description: 'Max assertions to return (default 100).' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'items', label: 'items', type: 'array', description: 'List of triple assertions (dicts).' },
+      { id: 'count', label: 'count', type: 'number', description: 'Number of returned assertions.' },
+      { id: 'ok', label: 'ok', type: 'boolean', description: 'True when query succeeded.' },
+    ],
+    category: 'memory',
+  },
+  {
+    type: 'memory_kg_assert',
+    icon: '&#x1F9E0;', // Brain
+    label: 'KG Assert',
+    description: 'Append triple assertions into AbstractMemory (provenance-first, no destructive updates).',
+    headerColor: '#8E44AD', // Purple - semantic memory
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'assertions', label: 'assertions', type: 'array', description: 'List of {subject,predicate,object,...} assertion objects.' },
+      { id: 'scope', label: 'scope', type: 'string', description: 'run | session | global. Determines the owner_id when not explicitly provided.' },
+      { id: 'span_id', label: 'span_id', type: 'string', description: 'Optional provenance pointer to a runtime span/artifact id.' },
+      { id: 'owner_id', label: 'owner_id', type: 'string', description: 'Optional explicit owner id override (advanced; normally derived from scope).' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'assertion_ids', label: 'assertion_ids', type: 'array', description: 'IDs assigned by the store (implementation-specific).' },
+      { id: 'count', label: 'count', type: 'number', description: 'Number of asserted triples.' },
+      { id: 'ok', label: 'ok', type: 'boolean', description: 'True when assertion succeeded.' },
     ],
     category: 'memory',
   },

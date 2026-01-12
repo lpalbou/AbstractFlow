@@ -14,33 +14,35 @@
         "icon": "&#x1F3C1;",
         "headerColor": "#C0392B",
         "inputs": [],
-        "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "provider", "label": "provider", "type": "provider" },
-          { "id": "model", "label": "model", "type": "model" },
-          { "id": "message", "label": "message", "type": "string" },
-          { "id": "recall_scope", "label": "recall_scope", "type": "string" },
-          { "id": "recall_limit", "label": "recall_limit", "type": "number" },
-          { "id": "recall_tags", "label": "recall_tags", "type": "object" },
-          { "id": "compact_threshold_messages", "label": "compact_threshold_messages", "type": "number" },
-          { "id": "compact_preserve_recent", "label": "compact_preserve_recent", "type": "number" },
-          { "id": "compact_compression_mode", "label": "compact_compression_mode", "type": "string" },
-          { "id": "compact_focus", "label": "compact_focus", "type": "string" },
-          { "id": "project", "label": "project", "type": "string" }
-        ],
-        "pinDefaults": {
-          "provider": "lmstudio",
-          "model": "qwen/qwen3-next-80b",
-          "recall_scope": "all",
-          "recall_limit": 8,
-          "recall_tags": {},
-          "compact_threshold_messages": 24,
-          "compact_preserve_recent": 6,
-          "compact_compression_mode": "standard",
-          "compact_focus": "ltm",
-          "project": "abstractframework"
-        }
-      },
+	        "outputs": [
+	          { "id": "exec-out", "label": "", "type": "execution" },
+	          { "id": "provider", "label": "provider", "type": "provider" },
+	          { "id": "model", "label": "model", "type": "model" },
+	          { "id": "message", "label": "message", "type": "string" },
+	          { "id": "recall_scope", "label": "recall_scope", "type": "string" },
+	          { "id": "recall_limit", "label": "recall_limit", "type": "number" },
+	          { "id": "recall_tags", "label": "recall_tags", "type": "object" },
+	          { "id": "compact_threshold_messages", "label": "compact_threshold_messages", "type": "number" },
+	          { "id": "compact_threshold_pct", "label": "compact_threshold_pct", "type": "number" },
+	          { "id": "compact_preserve_recent", "label": "compact_preserve_recent", "type": "number" },
+	          { "id": "compact_compression_mode", "label": "compact_compression_mode", "type": "string" },
+	          { "id": "compact_focus", "label": "compact_focus", "type": "string" },
+	          { "id": "project", "label": "project", "type": "string" }
+	        ],
+	        "pinDefaults": {
+	          "provider": "lmstudio",
+	          "model": "qwen/qwen3-next-80b",
+	          "recall_scope": "all",
+	          "recall_limit": 8,
+	          "recall_tags": {},
+	          "compact_threshold_messages": 24,
+	          "compact_threshold_pct": 0.85,
+	          "compact_preserve_recent": 6,
+	          "compact_compression_mode": "standard",
+	          "compact_focus": "ltm",
+	          "project": "abstractframework"
+	        }
+	      },
       "label": null,
       "icon": null,
       "headerColor": null,
@@ -680,50 +682,72 @@
       "inputs": [],
       "outputs": []
     },
-    {
-      "id": "node-28",
-      "type": "get_var",
-      "position": { "x": 3072.0, "y": 352.0 },
-      "data": {
-        "nodeType": "get_var",
-        "label": "Get context.messages",
-        "icon": "&#x1F4E5;",
-        "headerColor": "#16A085",
-        "inputs": [{ "id": "name", "label": "name", "type": "string" }],
-        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
-        "pinDefaults": { "name": "context.messages" }
-      },
-      "label": null,
-      "icon": null,
+	    {
+	      "id": "node-28",
+	      "type": "get_var",
+	      "position": { "x": 3072.0, "y": 352.0 },
+	      "data": {
+	        "nodeType": "get_var",
+	        "label": "Get max_input_tokens",
+	        "icon": "&#x1F4E5;",
+	        "headerColor": "#16A085",
+	        "inputs": [{ "id": "name", "label": "name", "type": "string" }],
+	        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+	        "pinDefaults": { "name": "_limits.max_input_tokens" }
+	      },
+	      "label": null,
+	      "icon": null,
+      "headerColor": null,
+	      "inputs": [],
+	      "outputs": []
+	    },
+	    {
+	      "id": "node-38",
+	      "type": "get_var",
+	      "position": { "x": 3072.0, "y": 448.0 },
+	      "data": {
+	        "nodeType": "get_var",
+	        "label": "Get estimated_input_tokens",
+	        "icon": "&#x1F4E5;",
+	        "headerColor": "#16A085",
+	        "inputs": [{ "id": "name", "label": "name", "type": "string" }],
+	        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+	        "pinDefaults": { "name": "_limits.estimated_tokens_used" }
+	      },
+	      "label": null,
+	      "icon": null,
+	      "headerColor": null,
+	      "inputs": [],
+	      "outputs": []
+	    },
+	    {
+	      "id": "node-29",
+	      "type": "multiply",
+	      "position": { "x": 3280.0, "y": 352.0 },
+	      "data": {
+	        "nodeType": "multiply",
+	        "label": "Threshold tokens",
+	        "icon": "×",
+	        "headerColor": "#3498DB",
+	        "inputs": [
+	          { "id": "a", "label": "a", "type": "number" },
+	          { "id": "b", "label": "b", "type": "number" }
+	        ],
+	        "outputs": [{ "id": "result", "label": "result", "type": "number" }]
+	      },
+	      "label": null,
+	      "icon": null,
       "headerColor": null,
       "inputs": [],
       "outputs": []
     },
-    {
-      "id": "node-29",
-      "type": "array_length",
-      "position": { "x": 3280.0, "y": 352.0 },
-      "data": {
-        "nodeType": "array_length",
-        "label": "Count messages",
-        "icon": "#",
-        "headerColor": "#3498DB",
-        "inputs": [{ "id": "array", "label": "array", "type": "array" }],
-        "outputs": [{ "id": "result", "label": "result", "type": "number" }]
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
-      "id": "node-30",
-      "type": "compare",
+	    {
+	      "id": "node-30",
+	      "type": "compare",
       "position": { "x": 3488.0, "y": 352.0 },
       "data": {
         "nodeType": "compare",
-        "label": "messages > threshold",
+	        "label": "tokens > threshold",
         "icon": "=?",
         "headerColor": "#F39C12",
         "inputs": [
@@ -969,9 +993,10 @@
     { "id": "edge-46", "source": "node-1", "sourceHandle": "compact_compression_mode", "target": "node-26", "targetHandle": "default", "animated": false },
     { "id": "edge-47", "source": "node-1", "sourceHandle": "compact_focus", "target": "node-27", "targetHandle": "default", "animated": false },
 
-    { "id": "edge-48", "source": "node-28", "sourceHandle": "value", "target": "node-29", "targetHandle": "array", "animated": false },
-    { "id": "edge-49", "source": "node-29", "sourceHandle": "result", "target": "node-30", "targetHandle": "a", "animated": false },
-    { "id": "edge-50", "source": "node-1", "sourceHandle": "compact_threshold_messages", "target": "node-30", "targetHandle": "b", "animated": false },
+    { "id": "edge-48", "source": "node-28", "sourceHandle": "value", "target": "node-29", "targetHandle": "a", "animated": false },
+    { "id": "edge-49", "source": "node-29", "sourceHandle": "result", "target": "node-30", "targetHandle": "b", "animated": false },
+    { "id": "edge-50", "source": "node-1", "sourceHandle": "compact_threshold_pct", "target": "node-29", "targetHandle": "b", "animated": false },
+    { "id": "edge-71", "source": "node-38", "sourceHandle": "value", "target": "node-30", "targetHandle": "a", "animated": false },
 
     { "id": "edge-51", "source": "node-23", "sourceHandle": "value", "target": "node-31", "targetHandle": "a", "animated": false },
     { "id": "edge-52", "source": "node-30", "sourceHandle": "result", "target": "node-31", "targetHandle": "b", "animated": false },

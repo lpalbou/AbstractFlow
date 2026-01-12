@@ -1,0 +1,249 @@
+{
+  "id": "ltm-ai-kg-extract-triples",
+  "name": "ltm-ai-kg-extract-triples",
+  "description": "Extract append-only temporal triple assertions (subject-predicate-object) from a text fragment, using schema-enforced structured output. Intended to be composed into ltm-ai-kg-ingest-* flows.",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": { "x": 96.0, "y": 96.0 },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "provider", "label": "provider", "type": "provider" },
+          { "id": "model", "label": "model", "type": "model" },
+          { "id": "text", "label": "text", "type": "string" },
+          { "id": "domain_focus", "label": "domain_focus", "type": "string" }
+        ],
+        "pinDefaults": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b",
+          "domain_focus": "software / agents / memory systems"
+        }
+      }
+    },
+    {
+      "id": "node-2",
+      "type": "literal_json",
+      "position": { "x": 96.0, "y": 224.0 },
+      "data": {
+        "nodeType": "literal_json",
+        "label": "Vars",
+        "icon": "{}",
+        "headerColor": "#00FFFF",
+        "inputs": [],
+        "outputs": [{ "id": "value", "label": "value", "type": "object" }],
+        "literalValue": {}
+      }
+    },
+    {
+      "id": "node-3",
+      "type": "set",
+      "position": { "x": 320.0, "y": 224.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set text",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "text" }
+      }
+    },
+    {
+      "id": "node-4",
+      "type": "set",
+      "position": { "x": 560.0, "y": 224.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set domain_focus",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "domain_focus" }
+      }
+    },
+    {
+      "id": "node-5",
+      "type": "string_template",
+      "position": { "x": 800.0, "y": 224.0 },
+      "data": {
+        "nodeType": "string_template",
+        "label": "Build prompt",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "template", "label": "template", "type": "string" },
+          { "id": "vars", "label": "vars", "type": "object" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "string" }],
+        "pinDefaults": {
+          "template": "Extract a compact, append-only set of temporal triples (subject-predicate-object) from the TEXT below.\\n\\nFocus domain: {{domain_focus}}\\n\\nTEXT:\\n{{text}}\\n\\nRules:\\n- Prefer stable facts, commitments, relationships, and system components.\\n- Use concise strings for subject/predicate/object.\\n- Do not invent facts.\\n- Aim for <= 30 triples unless the text is very dense.\\n- Confidence is optional (0..1).\\n- Use valid_from/valid_until only when explicitly temporal."
+        }
+      }
+    },
+    {
+      "id": "node-6",
+      "type": "json_schema",
+      "position": { "x": 800.0, "y": 64.0 },
+      "data": {
+        "nodeType": "json_schema",
+        "label": "Triples schema",
+        "icon": "&#x1F4CB;",
+        "headerColor": "#00FFFF",
+        "inputs": [],
+        "outputs": [{ "id": "value", "label": "schema", "type": "object" }],
+        "literalValue": {
+          "type": "object",
+          "properties": {
+            "assertions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "subject": { "type": "string" },
+                  "predicate": { "type": "string" },
+                  "object": { "type": "string" },
+                  "confidence": { "type": "number" },
+                  "valid_from": { "type": "string" },
+                  "valid_until": { "type": "string" },
+                  "provenance": { "type": "object" },
+                  "attributes": { "type": "object" }
+                },
+                "required": ["subject", "predicate", "object"]
+              }
+            }
+          },
+          "required": ["assertions"]
+        }
+      }
+    },
+    {
+      "id": "node-7",
+      "type": "llm_call",
+      "position": { "x": 1040.0, "y": 96.0 },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Extract triples",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "include_context", "label": "use_context", "type": "boolean" },
+          { "id": "provider", "label": "provider", "type": "provider" },
+          { "id": "model", "label": "model", "type": "model" },
+          { "id": "temperature", "label": "temperature", "type": "number" },
+          { "id": "seed", "label": "seed", "type": "number" },
+          { "id": "system", "label": "system", "type": "string" },
+          { "id": "prompt", "label": "prompt", "type": "string" },
+          { "id": "tools", "label": "tools", "type": "tools" },
+          { "id": "response_schema", "label": "structured_output", "type": "object" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "response", "label": "response", "type": "string" },
+          { "id": "tool_calls", "label": "tool_calls", "type": "array" },
+          { "id": "result", "label": "result", "type": "object" }
+        ],
+        "effectConfig": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b",
+          "temperature": 0.2,
+          "structured_output_fallback": true
+        },
+        "pinDefaults": {
+          "include_context": false,
+          "system": "You are a semantic extractor for an AI long-term memory system. Always comply with the provided structured output schema."
+        }
+      }
+    },
+    {
+      "id": "node-8",
+      "type": "get",
+      "position": { "x": 1264.0, "y": 96.0 },
+      "data": {
+        "nodeType": "get",
+        "label": "Get structured.data",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "data", "default": {} }
+      }
+    },
+    {
+      "id": "node-9",
+      "type": "get",
+      "position": { "x": 1488.0, "y": 96.0 },
+      "data": {
+        "nodeType": "get",
+        "label": "Get assertions",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "assertions", "default": [] }
+      }
+    },
+    {
+      "id": "node-10",
+      "type": "on_flow_end",
+      "position": { "x": 1728.0, "y": 96.0 },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "assertions", "label": "assertions", "type": "array" },
+          { "id": "extraction", "label": "extraction", "type": "object" },
+          { "id": "raw", "label": "raw", "type": "string" }
+        ],
+        "outputs": []
+      }
+    }
+  ],
+  "edges": [
+    { "id": "edge-1", "source": "node-1", "sourceHandle": "text", "target": "node-3", "targetHandle": "value", "animated": false },
+    { "id": "edge-2", "source": "node-2", "sourceHandle": "value", "target": "node-3", "targetHandle": "object", "animated": false },
+    { "id": "edge-3", "source": "node-3", "sourceHandle": "result", "target": "node-4", "targetHandle": "object", "animated": false },
+    { "id": "edge-4", "source": "node-1", "sourceHandle": "domain_focus", "target": "node-4", "targetHandle": "value", "animated": false },
+    { "id": "edge-5", "source": "node-4", "sourceHandle": "result", "target": "node-5", "targetHandle": "vars", "animated": false },
+    { "id": "edge-6", "source": "node-5", "sourceHandle": "result", "target": "node-7", "targetHandle": "prompt", "animated": false },
+    { "id": "edge-7", "source": "node-1", "sourceHandle": "provider", "target": "node-7", "targetHandle": "provider", "animated": false },
+    { "id": "edge-8", "source": "node-1", "sourceHandle": "model", "target": "node-7", "targetHandle": "model", "animated": false },
+    { "id": "edge-9", "source": "node-6", "sourceHandle": "value", "target": "node-7", "targetHandle": "response_schema", "animated": false },
+    { "id": "edge-10", "source": "node-1", "sourceHandle": "exec-out", "target": "node-7", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-11", "source": "node-7", "sourceHandle": "result", "target": "node-8", "targetHandle": "object", "animated": false },
+    { "id": "edge-12", "source": "node-8", "sourceHandle": "value", "target": "node-9", "targetHandle": "object", "animated": false },
+    { "id": "edge-13", "source": "node-9", "sourceHandle": "value", "target": "node-10", "targetHandle": "assertions", "animated": false },
+    { "id": "edge-14", "source": "node-8", "sourceHandle": "value", "target": "node-10", "targetHandle": "extraction", "animated": false },
+    { "id": "edge-15", "source": "node-7", "sourceHandle": "response", "target": "node-10", "targetHandle": "raw", "animated": false },
+    { "id": "edge-16", "source": "node-7", "sourceHandle": "exec-out", "target": "node-10", "targetHandle": "exec-in", "animated": true }
+  ],
+  "entryNode": "node-1"
+}

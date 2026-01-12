@@ -209,6 +209,7 @@ def create_visual_runner(
     # These flags keep `create_visual_runner()` resilient to older AbstractRuntime installs.
     needs_registry = False
     needs_artifacts = False
+    needs_memory_kg = False
     for vf in ordered:
         reachable = _reachable_exec_node_ids(vf)
         for n in vf.nodes:
@@ -221,6 +222,8 @@ def create_visual_runner(
                 needs_registry = True
             if t in {"memory_note", "memory_query", "memory_rehydrate", "memory_compact"}:
                 needs_artifacts = True
+            if t in {"memory_kg_assert", "memory_kg_query"}:
+                needs_memory_kg = True
 
     # Detect whether this flow tree needs AbstractCore LLM integration.
     # Provider/model can be supplied either via node config *or* via connected input pins.
@@ -425,6 +428,86 @@ def create_visual_runner(
                         for m in allowed:
                             _add_pair(provider, m)
 
+    extra_effect_handlers: Dict[Any, Any] = {}
+    if needs_memory_kg:
+        try:
+            from pathlib import Path
+
+            from abstractmemory import InMemoryTripleStore, LanceDBTripleStore
+            from abstractruntime.integrations.abstractmemory.effect_handlers import build_memory_kg_effect_handlers
+            from abstractruntime.storage.artifacts import utc_now_iso
+        except Exception as e:
+            raise RuntimeError(
+                "This flow uses memory_kg_* nodes, but AbstractMemory integration is not available. "
+                "Install `abstractmemory` (and optionally `abstractmemory[lancedb]`)."
+            ) from e
+
+        # Ensure stores exist so KG handlers can resolve run-tree scope fallbacks.
+        if run_store is None:
+            run_store = InMemoryRunStore()
+        if ledger_store is None:
+            ledger_store = InMemoryLedgerStore()
+
+        base_dir = None
+        mem_dir_raw = os.getenv("ABSTRACTMEMORY_DIR") or os.getenv("ABSTRACTFLOW_MEMORY_DIR")
+        if isinstance(mem_dir_raw, str) and mem_dir_raw.strip():
+            try:
+                base_dir = Path(mem_dir_raw).expanduser().resolve()
+            except Exception:
+                base_dir = None
+        if base_dir is None and artifact_store is not None:
+            base_attr = getattr(artifact_store, "_base", None)
+            if base_attr is not None:
+                try:
+                    base_dir = Path(base_attr).expanduser().resolve() / "abstractmemory"
+                except Exception:
+                    base_dir = None
+
+        embedder = None
+        try:
+            from abstractruntime.integrations.abstractcore.embeddings_client import AbstractCoreEmbeddingsClient
+
+            emb_provider = (
+                os.getenv("ABSTRACTFLOW_EMBEDDING_PROVIDER")
+                or os.getenv("ABSTRACTGATEWAY_EMBEDDING_PROVIDER")
+                or "lmstudio"
+            )
+            emb_model = (
+                os.getenv("ABSTRACTFLOW_EMBEDDING_MODEL")
+                or os.getenv("ABSTRACTGATEWAY_EMBEDDING_MODEL")
+                or "text-embedding-nomic-embed-text-v1.5@q6_k"
+            )
+            cache_dir = (base_dir.parent if base_dir is not None else Path.cwd()) / "abstractcore" / "embeddings"
+
+            emb_client = AbstractCoreEmbeddingsClient(
+                provider=str(emb_provider).strip().lower(),
+                model=str(emb_model).strip(),
+                manager_kwargs={"cache_dir": cache_dir},
+            )
+
+            class _Embedder:
+                def __init__(self, client: Any) -> None:
+                    self._client = client
+
+                def embed_texts(self, texts):
+                    return self._client.embed_texts(texts).embeddings
+
+            embedder = _Embedder(emb_client)
+        except Exception:
+            embedder = None
+
+        store_obj: Any
+        if base_dir is not None:
+            try:
+                base_dir.mkdir(parents=True, exist_ok=True)
+                store_obj = LanceDBTripleStore(base_dir / "kg", embedder=embedder)
+            except Exception:
+                store_obj = InMemoryTripleStore(embedder=embedder)
+        else:
+            store_obj = InMemoryTripleStore(embedder=embedder)
+
+        extra_effect_handlers = build_memory_kg_effect_handlers(store=store_obj, run_store=run_store, now_iso=utc_now_iso)
+
     if has_llm_nodes:
         provider_model = default_llm
 
@@ -542,12 +625,15 @@ def create_visual_runner(
             ledger_store=ledger_store,
             artifact_store=artifact_store,
             config=runtime_config,
+            extra_effect_handlers=extra_effect_handlers,
         )
     else:
         runtime_kwargs: Dict[str, Any] = {
             "run_store": run_store or InMemoryRunStore(),
             "ledger_store": ledger_store or InMemoryLedgerStore(),
         }
+        if extra_effect_handlers:
+            runtime_kwargs["effect_handlers"] = extra_effect_handlers
 
         if needs_artifacts:
             # MEMORY_* effects require an ArtifactStore. Only configure it when needed.

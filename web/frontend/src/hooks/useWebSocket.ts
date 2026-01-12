@@ -123,7 +123,9 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
       t === 'flow_paused' ||
       t === 'flow_resumed' ||
       t === 'flow_cancelled' ||
-      t === 'trace_update'
+      t === 'trace_update' ||
+      // Emitted while a parent run is waiting for a subworkflow: maps parent node -> child run_id.
+      t === 'subworkflow_update'
     );
   };
 

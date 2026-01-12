@@ -99,6 +99,8 @@ export type NodeType =
   | 'memory_tag'
   | 'memory_compact'
   | 'memory_rehydrate'
+  | 'memory_kg_assert'
+  | 'memory_kg_query'
   | 'tool_calls'
   | 'tools_allowlist'
   | 'bool_var'

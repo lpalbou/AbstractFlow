@@ -239,10 +239,15 @@
           { "id": "tool_calls", "label": "tool_calls", "type": "array" },
           { "id": "result", "label": "result", "type": "object" }
         ],
-        "effectConfig": { "provider": "lmstudio", "model": "qwen/qwen3-next-80b", "temperature": 0.2 },
+        "effectConfig": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b",
+          "temperature": 0.2,
+          "structured_output_fallback": true
+        },
         "pinDefaults": {
           "include_context": true,
-          "system": "You are a memory maintenance researcher. Output STRICT JSON only."
+          "system": "You are a memory maintenance researcher. Always comply with the provided structured output schema."
         }
       },
       "label": null,
@@ -251,27 +256,68 @@
       "inputs": [],
       "outputs": []
     },
-    {
-      "id": "node-10",
-      "type": "parse_json",
+	    {
+	      "id": "node-10",
+	      "type": "get",
       "position": { "x": 1216.0, "y": 96.0 },
       "data": {
-        "nodeType": "parse_json",
-        "label": "Parse JSON",
-        "icon": "&#x1F5C2;",
+        "nodeType": "get",
+        "label": "Get structured.data",
+        "icon": "&#x1F4E5;",
         "headerColor": "#3498DB",
-        "inputs": [{ "id": "text", "label": "text", "type": "string" }],
-        "outputs": [{ "id": "result", "label": "result", "type": "object" }]
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "data", "default": {} }
       },
       "label": null,
       "icon": null,
       "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
-      "id": "node-11",
-      "type": "get",
+	      "inputs": [],
+	      "outputs": []
+	    },
+	    {
+	      "id": "node-24",
+	      "type": "json_schema",
+	      "position": { "x": 992.0, "y": -64.0 },
+	      "data": {
+	        "nodeType": "json_schema",
+	        "label": "Replay schema",
+	        "icon": "&#x1F4CB;",
+	        "headerColor": "#00FFFF",
+	        "inputs": [],
+	        "outputs": [{ "id": "value", "label": "schema", "type": "object" }],
+	        "literalValue": {
+	          "type": "object",
+	          "properties": {
+	            "notes": {
+	              "type": "array",
+	              "items": {
+	                "type": "object",
+	                "properties": {
+	                  "note": { "type": "string" },
+	                  "scope": { "type": "string" },
+	                  "tags": { "type": "object" }
+	                },
+	                "required": ["note"]
+	              }
+	            }
+	          },
+	          "required": ["notes"]
+	        }
+	      },
+	      "label": null,
+	      "icon": null,
+	      "headerColor": null,
+	      "inputs": [],
+	      "outputs": []
+	    },
+	    {
+	      "id": "node-11",
+	      "type": "get",
       "position": { "x": 1424.0, "y": 96.0 },
       "data": {
         "nodeType": "get",
@@ -586,8 +632,8 @@
     { "id": "edge-16", "source": "node-7", "sourceHandle": "result", "target": "node-8", "targetHandle": "vars", "animated": false },
     { "id": "edge-17", "source": "node-8", "sourceHandle": "result", "target": "node-9", "targetHandle": "prompt", "animated": false },
 
-    { "id": "edge-18", "source": "node-9", "sourceHandle": "response", "target": "node-10", "targetHandle": "text", "animated": false },
-    { "id": "edge-19", "source": "node-10", "sourceHandle": "result", "target": "node-11", "targetHandle": "object", "animated": false },
+    { "id": "edge-18", "source": "node-9", "sourceHandle": "result", "target": "node-10", "targetHandle": "object", "animated": false },
+    { "id": "edge-19", "source": "node-10", "sourceHandle": "value", "target": "node-11", "targetHandle": "object", "animated": false },
     { "id": "edge-20", "source": "node-11", "sourceHandle": "value", "target": "node-12", "targetHandle": "array", "animated": false },
 
     { "id": "edge-21", "source": "node-9", "sourceHandle": "exec-out", "target": "node-17", "targetHandle": "exec-in", "animated": true },
@@ -616,7 +662,8 @@
     { "id": "edge-37", "source": "node-17", "sourceHandle": "done", "target": "node-23", "targetHandle": "exec-in", "animated": true },
     { "id": "edge-38", "source": "node-3", "sourceHandle": "result", "target": "node-23", "targetHandle": "replayed_span_ids", "animated": false },
     { "id": "edge-39", "source": "node-12", "sourceHandle": "result", "target": "node-23", "targetHandle": "notes_count", "animated": false },
-    { "id": "edge-40", "source": "node-9", "sourceHandle": "response", "target": "node-23", "targetHandle": "raw", "animated": false }
+    { "id": "edge-40", "source": "node-9", "sourceHandle": "response", "target": "node-23", "targetHandle": "raw", "animated": false },
+    { "id": "edge-41", "source": "node-24", "sourceHandle": "value", "target": "node-9", "targetHandle": "response_schema", "animated": false }
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-12T04:15:00.000000",

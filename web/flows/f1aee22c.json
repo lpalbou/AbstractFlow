@@ -186,7 +186,7 @@
           }
         ],
         "pinDefaults": {
-          "system": "You are an expert in evaluating if a LLM finished his task or if it describes additional direct tasks and it seems to have just stopped. If the LLM interrupted its task too early, your goal is then to provide guidance back to the LLM, like a user would do, so that the LLM continue its work until it delivers its final response."
+          "system": "You are an expert in evaluating if a LLM has finished its task or if it stopped suddenly while describing what it wanted to do next. If the LLM wanted to request an action but stopped early, your goal is to provide a simple guidance back to the LLM, like a user would do, so that it actually requests the execution of that action.\n\nCompletion protocol:\n- Work is ONLY considered complete when the response contains the token <@work_complete>.\n- If the response appears finished but the token is missing, your next_steps must ask for <@work_complete> (and explicitly tell the model to not run tools)."
         },
         "effectConfig": {
           "provider": "lmstudio",
@@ -278,7 +278,7 @@
         },
         "pinDefaults": {
           "a": "Evaluate if the following response contains next steps :",
-          "c": "\\n\\nIF YES : return \"has_next_steps\" true and \"next_steps\" must be a message to prompt back the model and ask it to continue to work on <next steps> and to request the execution of appropriate tools to accomplish its task. Make it direct, concise, actionable for a LLM"
+          "c": "\\n\\nRules:\\n- If the response already contains the token <@work_complete>, return \\\"has_next_steps\\\" false and \\\"next_steps\\\" \\\"\\\".\\n- If the response appears finished but the token is missing, return \\\"has_next_steps\\\" true and \\\"next_steps\\\" a single short instruction: \\\"Reply with <@work_complete> on its own line (do not run tools).\\\"\\n- Otherwise (the response implies an unexecuted next action), return \\\"has_next_steps\\\" true and \\\"next_steps\\\" as a direct, concise, 1-step prompt that tells the model exactly what to do next (focus only on the action it forgot to request)."
         }
       },
       "label": null,
@@ -455,5 +455,5 @@
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-12T00:14:35.326916",
-  "updated_at": "2026-01-12T01:23:58.509893"
+  "updated_at": "2026-01-12T07:30:24.940408"
 }
