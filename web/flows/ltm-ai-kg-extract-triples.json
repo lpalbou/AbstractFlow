@@ -93,7 +93,7 @@
         ],
         "outputs": [{ "id": "result", "label": "result", "type": "string" }],
         "pinDefaults": {
-          "template": "Extract a compact, append-only set of temporal triples (subject-predicate-object) from the TEXT below.\\n\\nFocus domain: {{domain_focus}}\\n\\nTEXT:\\n{{text}}\\n\\nRules:\\n- Prefer stable facts, commitments, relationships, and system components.\\n- Use concise strings for subject/predicate/object.\\n- Do not invent facts.\\n- Aim for <= 30 triples unless the text is very dense.\\n- Confidence is optional (0..1).\\n- Use valid_from/valid_until only when explicitly temporal."
+          "template": "Extract a compact, append-only set of temporal triples (subject-predicate-object) from the TEXT below.\\n\\nSemantic contract: follow Semantic Model V4 (typed entities + typed relationships + context preservation), expressed as triples.\\n\\nFocus domain: {{domain_focus}}\\n\\nTEXT:\\n{{text}}\\n\\nEntity types (MUST use exactly in attributes.subject_type / attributes.object_type): Person, Team, Software Agent, Organization, Date, Time, Period, Event, Concept, Process, State, Attribute, Article, Report, Note, Message, Location, Digital Location.\\n\\nRelationship types (predicate MUST be exactly one of): is_part_of, contains, references, defines, precedes, follows, transforms_into, occurs_during, starts_at, ends_at, concurrent_with, discusses, examines, illustrates, contrasts_with, causes, enables, prevents, influences, participates_in, experiences, creates, modifies, related_to, implies, contradicts, similar_to.\\n\\nGrounding & quality rules:\\n- Output only triples that are directly supported by the TEXT (no external knowledge).\\n- Do NOT infer absolute dates from relative expressions. Keep the relative expression verbatim (e.g. \\\"seven years ago\\\") and type it as Period.\\n- evidence_quote MUST be an exact verbatim substring of TEXT (copy/paste; no ellipses).\\n- original_context MUST be an exact verbatim substring of TEXT (copy/paste; no added commentary).\\n- Use human-readable entity names (spaces). Do not output snake_case / identifier-like ids.\\n- Document metadata: if you see title/author lines (e.g. \\\"by Charles Dickens\\\"), model as Person creates Article; do not attribute authorship/creation to story characters unless explicitly stated.\\n\\nModeling guidance (V4-only; do not invent new predicates):\\n- Attributes: use Person experiences State or Person related_to Attribute (instead of \\\"has_attribute\\\").\\n- Death: use an Event (e.g. \\\"Death of Marley\\\"); Marley participates_in Death of Marley; connect time via occurs_during Period or ends_at Date only if explicitly present.\\n- If the TEXT is primarily a request/goal/instruction, model it as a small semantic graph using the V4 types/relations:\\n  - a Message entity for the utterance\\n  - an Event/Process representing the requested work\\n  - a Concept for the main topic\\n  - an optional Report/Note deliverable\\n  Connect them with V4 relations (e.g. Person participates_in Event; Event examines Concept; Event creates Report; Process enables Report).\\n\\nConstraints:\\n- Avoid duplicates; aim for <= 30 triples unless the text is very dense.\\n- Confidence is optional (0..1). Use valid_from/valid_until only when explicitly temporal."
         }
       }
     },
@@ -107,32 +107,116 @@
         "icon": "&#x1F4CB;",
         "headerColor": "#00FFFF",
         "inputs": [],
-        "outputs": [{ "id": "value", "label": "schema", "type": "object" }],
-        "literalValue": {
-          "type": "object",
-          "properties": {
-            "assertions": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "subject": { "type": "string" },
-                  "predicate": { "type": "string" },
-                  "object": { "type": "string" },
-                  "confidence": { "type": "number" },
-                  "valid_from": { "type": "string" },
-                  "valid_until": { "type": "string" },
-                  "provenance": { "type": "object" },
-                  "attributes": { "type": "object" }
-                },
-                "required": ["subject", "predicate", "object"]
-              }
-            }
-          },
-          "required": ["assertions"]
-        }
-      }
-    },
+	        "outputs": [{ "id": "value", "label": "schema", "type": "object" }],
+	        "literalValue": {
+	          "type": "object",
+	          "properties": {
+	            "assertions": {
+	              "type": "array",
+	              "items": {
+	                "type": "object",
+	                "properties": {
+	                  "subject": { "type": "string" },
+	                  "predicate": {
+	                    "type": "string",
+	                    "enum": [
+	                      "is_part_of",
+	                      "contains",
+	                      "references",
+	                      "defines",
+	                      "precedes",
+	                      "follows",
+	                      "transforms_into",
+	                      "occurs_during",
+	                      "starts_at",
+	                      "ends_at",
+	                      "concurrent_with",
+	                      "discusses",
+	                      "examines",
+	                      "illustrates",
+	                      "contrasts_with",
+	                      "causes",
+	                      "enables",
+	                      "prevents",
+	                      "influences",
+	                      "participates_in",
+	                      "experiences",
+	                      "creates",
+	                      "modifies",
+	                      "related_to",
+	                      "implies",
+	                      "contradicts",
+	                      "similar_to"
+	                    ]
+	                  },
+	                  "object": { "type": "string" },
+	                  "confidence": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+	                  "valid_from": { "type": ["string", "null"] },
+	                  "valid_until": { "type": ["string", "null"] },
+	                  "provenance": { "type": ["object", "null"] },
+	                  "attributes": {
+	                    "type": "object",
+	                    "properties": {
+	                      "subject_type": {
+	                        "type": "string",
+	                        "enum": [
+	                          "Person",
+	                          "Team",
+	                          "Software Agent",
+	                          "Organization",
+	                          "Date",
+	                          "Time",
+	                          "Period",
+	                          "Event",
+	                          "Concept",
+	                          "Process",
+	                          "State",
+	                          "Attribute",
+	                          "Article",
+	                          "Report",
+	                          "Note",
+	                          "Message",
+	                          "Location",
+	                          "Digital Location"
+	                        ]
+	                      },
+	                      "object_type": {
+	                        "type": "string",
+	                        "enum": [
+	                          "Person",
+	                          "Team",
+	                          "Software Agent",
+	                          "Organization",
+	                          "Date",
+	                          "Time",
+	                          "Period",
+	                          "Event",
+	                          "Concept",
+	                          "Process",
+	                          "State",
+	                          "Attribute",
+	                          "Article",
+	                          "Report",
+	                          "Note",
+	                          "Message",
+	                          "Location",
+	                          "Digital Location"
+	                        ]
+	                      },
+	                      "evidence_quote": { "type": "string" },
+	                      "original_context": { "type": "string" }
+	                    },
+	                    "required": ["subject_type", "object_type", "evidence_quote", "original_context"]
+	                  }
+	                },
+	                "required": ["subject", "predicate", "object", "attributes"]
+	              }
+	            }
+	          },
+	          "required": ["assertions"]
+	        }
+	      }
+	    },
     {
       "id": "node-7",
       "type": "llm_call",
@@ -163,7 +247,8 @@
         "effectConfig": {
           "provider": "lmstudio",
           "model": "qwen/qwen3-next-80b",
-          "temperature": 0.2,
+          "temperature": 0.0,
+          "seed": 0,
           "structured_output_fallback": true
         },
         "pinDefaults": {
@@ -190,10 +275,10 @@
         "pinDefaults": { "key": "data", "default": {} }
       }
     },
-    {
-      "id": "node-9",
-      "type": "get",
-      "position": { "x": 1488.0, "y": 96.0 },
+	    {
+	      "id": "node-9",
+	      "type": "get",
+	      "position": { "x": 1488.0, "y": 96.0 },
       "data": {
         "nodeType": "get",
         "label": "Get assertions",
@@ -204,14 +289,53 @@
           { "id": "key", "label": "key", "type": "string" },
           { "id": "default", "label": "default", "type": "any" }
         ],
-        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
-        "pinDefaults": { "key": "assertions", "default": [] }
-      }
-    },
-    {
-      "id": "node-10",
-      "type": "on_flow_end",
-      "position": { "x": 1728.0, "y": 96.0 },
+	        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+	        "pinDefaults": { "key": "assertions", "default": [] }
+	      }
+	    },
+	    {
+	      "id": "node-11",
+	      "type": "set",
+	      "position": { "x": 1264.0, "y": 224.0 },
+	      "data": {
+	        "nodeType": "set",
+	        "label": "Set assertions",
+	        "icon": "&#x1F4E4;",
+	        "headerColor": "#3498DB",
+	        "inputs": [
+	          { "id": "object", "label": "object", "type": "object" },
+	          { "id": "key", "label": "key", "type": "string" },
+	          { "id": "value", "label": "value", "type": "any" }
+	        ],
+	        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+	        "pinDefaults": { "key": "assertions" }
+	      }
+	    },
+	    {
+	      "id": "node-12",
+	      "type": "code",
+	      "position": { "x": 1488.0, "y": 224.0 },
+	      "data": {
+	        "nodeType": "code",
+	        "label": "Gate assertions",
+	        "icon": "&#x1F40D;",
+	        "headerColor": "#9B59B6",
+	        "inputs": [
+	          { "id": "exec-in", "label": "", "type": "execution" },
+	          { "id": "input", "label": "input", "type": "any" }
+	        ],
+	        "outputs": [
+	          { "id": "exec-out", "label": "", "type": "execution" },
+	          { "id": "output", "label": "output", "type": "any" }
+	        ],
+	        "functionName": "transform",
+	        "code": "def transform(_input):\n    payload = _input.get('input') if isinstance(_input, dict) else None\n    if not isinstance(payload, dict):\n        payload = {}\n\n    text = payload.get('text', '')\n    if not isinstance(text, str):\n        text = str(text or '')\n\n    raw = payload.get('assertions', [])\n    if not isinstance(raw, list):\n        return []\n\n    allowed_entity_types = [\n        'Person',\n        'Team',\n        'Software Agent',\n        'Organization',\n        'Date',\n        'Time',\n        'Period',\n        'Event',\n        'Concept',\n        'Process',\n        'State',\n        'Attribute',\n        'Article',\n        'Report',\n        'Note',\n        'Message',\n        'Location',\n        'Digital Location',\n    ]\n    allowed_predicates = [\n        'is_part_of',\n        'contains',\n        'references',\n        'defines',\n        'precedes',\n        'follows',\n        'transforms_into',\n        'occurs_during',\n        'starts_at',\n        'ends_at',\n        'concurrent_with',\n        'discusses',\n        'examines',\n        'illustrates',\n        'contrasts_with',\n        'causes',\n        'enables',\n        'prevents',\n        'influences',\n        'participates_in',\n        'experiences',\n        'creates',\n        'modifies',\n        'related_to',\n        'implies',\n        'contradicts',\n        'similar_to',\n    ]\n\n    type_map = {str(t).strip().lower(): t for t in allowed_entity_types}\n    pred_map = {str(p).strip().lower(): p for p in allowed_predicates}\n\n    def _norm_space(s):\n        return ' '.join(s.split()) if isinstance(s, str) else ''\n\n    def _contains_digit(s):\n        for ch in s:\n            if '0' <= ch <= '9':\n                return True\n        return False\n\n    def _norm_entity_name(s):\n        s2 = _norm_space(s)\n        if '_' in s2 and s2 not in text:\n            s2 = _norm_space(s2.replace('_', ' '))\n        return s2\n\n    def _repair_context(evidence, window=200):\n        idx = text.find(evidence)\n        if idx < 0:\n            return ''\n        start = idx - int(window)\n        if start < 0:\n            start = 0\n        end = idx + len(evidence) + int(window)\n        if end > len(text):\n            end = len(text)\n        return text[start:end]\n\n    seen = set()\n    out = []\n\n    for a in raw:\n        if not isinstance(a, dict):\n            continue\n\n        subj = _norm_entity_name(a.get('subject'))\n        pred_raw = _norm_space(a.get('predicate'))\n        obj = _norm_entity_name(a.get('object'))\n\n        if not subj or not pred_raw or not obj:\n            continue\n\n        pred = pred_map.get(pred_raw.lower())\n        if not pred:\n            continue\n\n        attrs = a.get('attributes') if isinstance(a.get('attributes'), dict) else {}\n        st_raw = attrs.get('subject_type')\n        ot_raw = attrs.get('object_type')\n        st = type_map.get(_norm_space(st_raw).lower()) if isinstance(st_raw, str) else None\n        ot = type_map.get(_norm_space(ot_raw).lower()) if isinstance(ot_raw, str) else None\n        if not st or not ot:\n            continue\n\n        ev = attrs.get('evidence_quote')\n        ctx = attrs.get('original_context')\n        if not isinstance(ev, str):\n            continue\n        ev2 = ev.strip()\n        if not ev2 or ev2 not in text:\n            continue\n\n        ctx2 = ctx.strip() if isinstance(ctx, str) else ''\n        if not ctx2 or ctx2 not in text:\n            ctx2 = _repair_context(ev2)\n            if not ctx2:\n                continue\n\n        # Avoid inferred absolute dates/times/periods (must appear verbatim in TEXT).\n        if ot in ('Date', 'Time', 'Period') and obj not in text:\n            continue\n\n        # Avoid ungrounded numeric normalizations (e.g. adding a year).\n        if _contains_digit(subj) and subj not in text:\n            continue\n        if _contains_digit(obj) and obj not in text:\n            continue\n\n        key = (subj.lower(), pred.lower(), obj.lower())\n        if key in seen:\n            continue\n        seen.add(key)\n\n        a2 = {'subject': subj, 'predicate': pred, 'object': obj}\n        for opt_key in ('confidence', 'valid_from', 'valid_until', 'provenance'):\n            if opt_key in a:\n                a2[opt_key] = a.get(opt_key)\n\n        a2['attributes'] = {\n            'subject_type': st,\n            'object_type': ot,\n            'evidence_quote': ev2,\n            'original_context': ctx2,\n        }\n\n        out.append(a2)\n        if len(out) >= 30:\n            break\n\n    return out\n"
+	      }
+	    },
+	    {
+	      "id": "node-10",
+	      "type": "on_flow_end",
+	      "position": { "x": 1728.0, "y": 96.0 },
       "data": {
         "nodeType": "on_flow_end",
         "label": "End",
@@ -227,7 +351,7 @@
       }
     }
   ],
-  "edges": [
+	  "edges": [
     { "id": "edge-1", "source": "node-1", "sourceHandle": "text", "target": "node-3", "targetHandle": "value", "animated": false },
     { "id": "edge-2", "source": "node-2", "sourceHandle": "value", "target": "node-3", "targetHandle": "object", "animated": false },
     { "id": "edge-3", "source": "node-3", "sourceHandle": "result", "target": "node-4", "targetHandle": "object", "animated": false },
@@ -238,12 +362,16 @@
     { "id": "edge-8", "source": "node-1", "sourceHandle": "model", "target": "node-7", "targetHandle": "model", "animated": false },
     { "id": "edge-9", "source": "node-6", "sourceHandle": "value", "target": "node-7", "targetHandle": "response_schema", "animated": false },
     { "id": "edge-10", "source": "node-1", "sourceHandle": "exec-out", "target": "node-7", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-11", "source": "node-7", "sourceHandle": "result", "target": "node-8", "targetHandle": "object", "animated": false },
-    { "id": "edge-12", "source": "node-8", "sourceHandle": "value", "target": "node-9", "targetHandle": "object", "animated": false },
-    { "id": "edge-13", "source": "node-9", "sourceHandle": "value", "target": "node-10", "targetHandle": "assertions", "animated": false },
-    { "id": "edge-14", "source": "node-8", "sourceHandle": "value", "target": "node-10", "targetHandle": "extraction", "animated": false },
-    { "id": "edge-15", "source": "node-7", "sourceHandle": "response", "target": "node-10", "targetHandle": "raw", "animated": false },
-    { "id": "edge-16", "source": "node-7", "sourceHandle": "exec-out", "target": "node-10", "targetHandle": "exec-in", "animated": true }
-  ],
-  "entryNode": "node-1"
-}
+	    { "id": "edge-11", "source": "node-7", "sourceHandle": "result", "target": "node-8", "targetHandle": "object", "animated": false },
+	    { "id": "edge-12", "source": "node-8", "sourceHandle": "value", "target": "node-9", "targetHandle": "object", "animated": false },
+	    { "id": "edge-13", "source": "node-12", "sourceHandle": "output", "target": "node-10", "targetHandle": "assertions", "animated": false },
+	    { "id": "edge-14", "source": "node-8", "sourceHandle": "value", "target": "node-10", "targetHandle": "extraction", "animated": false },
+	    { "id": "edge-15", "source": "node-7", "sourceHandle": "response", "target": "node-10", "targetHandle": "raw", "animated": false },
+	    { "id": "edge-16", "source": "node-12", "sourceHandle": "exec-out", "target": "node-10", "targetHandle": "exec-in", "animated": true },
+	    { "id": "edge-17", "source": "node-4", "sourceHandle": "result", "target": "node-11", "targetHandle": "object", "animated": false },
+	    { "id": "edge-18", "source": "node-9", "sourceHandle": "value", "target": "node-11", "targetHandle": "value", "animated": false },
+	    { "id": "edge-19", "source": "node-11", "sourceHandle": "result", "target": "node-12", "targetHandle": "input", "animated": false },
+	    { "id": "edge-20", "source": "node-7", "sourceHandle": "exec-out", "target": "node-12", "targetHandle": "exec-in", "animated": true }
+	  ],
+	  "entryNode": "node-1"
+	}

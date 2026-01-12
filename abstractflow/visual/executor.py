@@ -124,6 +124,8 @@ def create_visual_runner(
             "memory_tag",
             "memory_compact",
             "memory_rehydrate",
+            "memory_kg_assert",
+            "memory_kg_query",
         }
 
         node_types: Dict[str, str] = {n.id: _node_type(n) for n in vf.nodes}
@@ -431,7 +433,26 @@ def create_visual_runner(
     extra_effect_handlers: Dict[Any, Any] = {}
     if needs_memory_kg:
         try:
+            # Dev convenience (monorepo):
+            #
+            # When running from source (without installing each package), `import abstractmemory`
+            # can resolve to the *project directory* (namespace package, no exports) instead of
+            # the src-layout package at `abstractmemory/src/abstractmemory`.
+            #
+            # Add the src-layout path when it exists so VisualFlows with `memory_kg_*` nodes
+            # work out-of-the-box in local dev environments.
+            import sys
             from pathlib import Path
+
+            repo_root = Path(__file__).resolve().parents[3]  # .../abstractframework
+            mem_src = repo_root / "abstractmemory" / "src"
+            if mem_src.is_dir():
+                mem_src_str = str(mem_src)
+                try:
+                    sys.path.remove(mem_src_str)
+                except ValueError:
+                    pass
+                sys.path.insert(0, mem_src_str)
 
             from abstractmemory import InMemoryTripleStore, LanceDBTripleStore
             from abstractruntime.integrations.abstractmemory.effect_handlers import build_memory_kg_effect_handlers

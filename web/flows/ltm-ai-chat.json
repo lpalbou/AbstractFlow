@@ -14,34 +14,42 @@
         "icon": "&#x1F3C1;",
         "headerColor": "#C0392B",
         "inputs": [],
-	        "outputs": [
-	          { "id": "exec-out", "label": "", "type": "execution" },
-	          { "id": "provider", "label": "provider", "type": "provider" },
-	          { "id": "model", "label": "model", "type": "model" },
-	          { "id": "message", "label": "message", "type": "string" },
-	          { "id": "recall_scope", "label": "recall_scope", "type": "string" },
-	          { "id": "recall_limit", "label": "recall_limit", "type": "number" },
-	          { "id": "recall_tags", "label": "recall_tags", "type": "object" },
-	          { "id": "compact_threshold_messages", "label": "compact_threshold_messages", "type": "number" },
-	          { "id": "compact_threshold_pct", "label": "compact_threshold_pct", "type": "number" },
-	          { "id": "compact_preserve_recent", "label": "compact_preserve_recent", "type": "number" },
-	          { "id": "compact_compression_mode", "label": "compact_compression_mode", "type": "string" },
-	          { "id": "compact_focus", "label": "compact_focus", "type": "string" },
-	          { "id": "project", "label": "project", "type": "string" }
-	        ],
-	        "pinDefaults": {
-	          "provider": "lmstudio",
-	          "model": "qwen/qwen3-next-80b",
-	          "recall_scope": "all",
-	          "recall_limit": 8,
-	          "recall_tags": {},
-	          "compact_threshold_messages": 24,
-	          "compact_threshold_pct": 0.85,
-	          "compact_preserve_recent": 6,
-	          "compact_compression_mode": "standard",
-	          "compact_focus": "ltm",
-	          "project": "abstractframework"
-	        }
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "provider", "label": "provider", "type": "provider" },
+          { "id": "model", "label": "model", "type": "model" },
+          { "id": "message", "label": "message", "type": "string" },
+          { "id": "recall_scope", "label": "recall_scope", "type": "string" },
+          { "id": "recall_limit", "label": "recall_limit", "type": "number" },
+          { "id": "recall_tags", "label": "recall_tags", "type": "object" },
+          { "id": "kg_enabled", "label": "kg_enabled", "type": "boolean" },
+          { "id": "kg_scope", "label": "kg_scope", "type": "string" },
+          { "id": "kg_limit", "label": "kg_limit", "type": "number" },
+          { "id": "kg_max_input_tokens", "label": "kg_max_input_tokens", "type": "number" },
+          { "id": "compact_threshold_messages", "label": "compact_threshold_messages", "type": "number" },
+          { "id": "compact_threshold_pct", "label": "compact_threshold_pct", "type": "number" },
+          { "id": "compact_preserve_recent", "label": "compact_preserve_recent", "type": "number" },
+          { "id": "compact_compression_mode", "label": "compact_compression_mode", "type": "string" },
+          { "id": "compact_focus", "label": "compact_focus", "type": "string" },
+          { "id": "project", "label": "project", "type": "string" }
+        ],
+        "pinDefaults": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b",
+          "recall_scope": "all",
+          "recall_limit": 8,
+          "recall_tags": {},
+          "kg_enabled": true,
+          "kg_scope": "session",
+          "kg_limit": 80,
+          "kg_max_input_tokens": 2000,
+          "compact_threshold_messages": 24,
+          "compact_threshold_pct": 0.85,
+          "compact_preserve_recent": 6,
+          "compact_compression_mode": "standard",
+          "compact_focus": "ltm",
+          "project": "abstractframework"
+        }
 	      },
       "label": null,
       "icon": null,
@@ -304,18 +312,19 @@
         "label": "Answer",
         "icon": "&#x1F4AD;",
         "headerColor": "#3498DB",
-        "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "include_context", "label": "use_context", "type": "boolean" },
-          { "id": "provider", "label": "provider", "type": "provider" },
-          { "id": "model", "label": "model", "type": "model" },
-          { "id": "temperature", "label": "temperature", "type": "number" },
-          { "id": "seed", "label": "seed", "type": "number" },
-          { "id": "system", "label": "system", "type": "string" },
-          { "id": "prompt", "label": "prompt", "type": "string" },
-          { "id": "tools", "label": "tools", "type": "tools" },
-          { "id": "response_schema", "label": "structured_output", "type": "object" }
-        ],
+	        "inputs": [
+	          { "id": "exec-in", "label": "", "type": "execution" },
+	          { "id": "include_context", "label": "use_context", "type": "boolean" },
+	          { "id": "provider", "label": "provider", "type": "provider" },
+	          { "id": "model", "label": "model", "type": "model" },
+	          { "id": "temperature", "label": "temperature", "type": "number" },
+	          { "id": "seed", "label": "seed", "type": "number" },
+	          { "id": "system", "label": "system", "type": "string" },
+	          { "id": "prompt", "label": "prompt", "type": "string" },
+	          { "id": "tools", "label": "tools", "type": "tools" },
+          { "id": "max_input_tokens", "label": "max_input_tokens", "type": "number" },
+	          { "id": "response_schema", "label": "structured_output", "type": "object" }
+	        ],
         "outputs": [
           { "id": "exec-out", "label": "", "type": "execution" },
           { "id": "response", "label": "response", "type": "string" },
@@ -323,11 +332,8 @@
           { "id": "result", "label": "result", "type": "object" }
         ],
         "effectConfig": { "provider": "lmstudio", "model": "qwen/qwen3-next-80b", "temperature": 0.7 },
-        "pinDefaults": {
-          "include_context": true,
-          "system": "You are a helpful assistant with access to recalled memory spans embedded in the context. Use recalled memory when relevant, but do not invent facts. When unsure, say so."
-        }
-      },
+	        "pinDefaults": { "include_context": true }
+	      },
       "label": null,
       "icon": null,
       "headerColor": null,
@@ -906,6 +912,318 @@
       "outputs": []
     },
     {
+      "id": "node-39",
+      "type": "if",
+      "position": { "x": 2000.0, "y": 192.0 },
+      "data": {
+        "nodeType": "if",
+        "label": "KG recall enabled?",
+        "icon": "&#x2753;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "condition", "label": "condition", "type": "boolean" }
+        ],
+        "outputs": [
+          { "id": "true", "label": "true", "type": "execution" },
+          { "id": "false", "label": "false", "type": "execution" }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-40",
+      "type": "literal_json",
+      "position": { "x": 2000.0, "y": 304.0 },
+      "data": {
+        "nodeType": "literal_json",
+        "label": "KG input",
+        "icon": "{}",
+        "headerColor": "#00FFFF",
+        "inputs": [],
+        "outputs": [{ "id": "value", "label": "value", "type": "object" }],
+        "literalValue": {}
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-41",
+      "type": "set",
+      "position": { "x": 2208.0, "y": 304.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set query_text",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "query_text" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-42",
+      "type": "set",
+      "position": { "x": 2416.0, "y": 304.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set scope",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "scope" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-43",
+      "type": "set",
+      "position": { "x": 2624.0, "y": 304.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set limit",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "limit" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-44",
+      "type": "set",
+      "position": { "x": 2832.0, "y": 304.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set max_input_tokens",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "max_input_tokens" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-45",
+      "type": "set",
+      "position": { "x": 3040.0, "y": 304.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set model",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "model" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-46",
+      "type": "subflow",
+      "position": { "x": 2208.0, "y": 240.0 },
+      "data": {
+        "nodeType": "subflow",
+        "label": "KG map to active",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "inherit_context", "label": "inherit_context", "type": "boolean" },
+          { "id": "input", "label": "input", "type": "object" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "output", "label": "output", "type": "object" }
+        ],
+        "subflowId": "ltm-ai-kg-map-to-active",
+        "pinDefaults": { "inherit_context": false }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-47",
+      "type": "get",
+      "position": { "x": 2448.0, "y": 240.0 },
+      "data": {
+        "nodeType": "get",
+        "label": "Get active_memory_text",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "active_memory_text", "default": "" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-48",
+      "type": "set_var",
+      "position": { "x": 2656.0, "y": 240.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Set kg_active_memory_text",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "pinDefaults": { "name": "scratchpad.kg_active_memory_text" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-50",
+      "type": "get_var",
+      "position": { "x": 1776.0, "y": 32.0 },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get kg_active_memory_text",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [{ "id": "name", "label": "name", "type": "string" }],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "name": "scratchpad.kg_active_memory_text" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-51",
+      "type": "literal_string",
+      "position": { "x": 1776.0, "y": -32.0 },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "Base system",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [{ "id": "value", "label": "value", "type": "string" }],
+        "literalValue": "You are a helpful assistant with access to recalled memory spans embedded in the context. You may also receive a KG ACTIVE MEMORY block (semantic packets). Use recalled memory when relevant, but do not invent facts. When unsure, say so."
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-55",
+      "type": "concat",
+      "position": { "x": 2000.0, "y": -32.0 },
+      "data": {
+        "nodeType": "concat",
+        "label": "System + KG",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          { "id": "a", "label": "a", "type": "string" },
+          { "id": "b", "label": "b", "type": "string" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "string" }],
+        "concatConfig": { "separator": "\\n\\n" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-56",
+      "type": "trim",
+      "position": { "x": 2224.0, "y": -32.0 },
+      "data": {
+        "nodeType": "trim",
+        "label": "Trim",
+        "icon": "&#x2702;",
+        "headerColor": "#E74C3C",
+        "inputs": [{ "id": "text", "label": "text", "type": "string" }],
+        "outputs": [{ "id": "result", "label": "result", "type": "string" }]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
       "id": "node-37",
       "type": "on_flow_end",
       "position": { "x": 2448.0, "y": 592.0 },
@@ -957,10 +1275,36 @@
     { "id": "edge-17", "source": "node-10", "sourceHandle": "result", "target": "node-11", "targetHandle": "span_ids", "animated": false },
     { "id": "edge-18", "source": "node-9", "sourceHandle": "exec-out", "target": "node-11", "targetHandle": "exec-in", "animated": true },
 
-    { "id": "edge-19", "source": "node-11", "sourceHandle": "exec-out", "target": "node-12", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-72", "source": "node-11", "sourceHandle": "exec-out", "target": "node-39", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-73", "source": "node-1", "sourceHandle": "kg_enabled", "target": "node-39", "targetHandle": "condition", "animated": false },
+
+    { "id": "edge-74", "source": "node-39", "sourceHandle": "true", "target": "node-46", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-75", "source": "node-39", "sourceHandle": "false", "target": "node-12", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-76", "source": "node-46", "sourceHandle": "exec-out", "target": "node-48", "targetHandle": "exec-in", "animated": true },
+    { "id": "edge-77", "source": "node-48", "sourceHandle": "exec-out", "target": "node-12", "targetHandle": "exec-in", "animated": true },
     { "id": "edge-20", "source": "node-1", "sourceHandle": "provider", "target": "node-12", "targetHandle": "provider", "animated": false },
     { "id": "edge-21", "source": "node-1", "sourceHandle": "model", "target": "node-12", "targetHandle": "model", "animated": false },
     { "id": "edge-22", "source": "node-8", "sourceHandle": "value", "target": "node-12", "targetHandle": "prompt", "animated": false },
+    { "id": "edge-78", "source": "node-56", "sourceHandle": "result", "target": "node-12", "targetHandle": "system", "animated": false },
+    { "id": "edge-79", "source": "node-28", "sourceHandle": "value", "target": "node-12", "targetHandle": "max_input_tokens", "animated": false },
+
+    { "id": "edge-80", "source": "node-51", "sourceHandle": "value", "target": "node-55", "targetHandle": "a", "animated": false },
+    { "id": "edge-81", "source": "node-50", "sourceHandle": "value", "target": "node-55", "targetHandle": "b", "animated": false },
+    { "id": "edge-82", "source": "node-55", "sourceHandle": "result", "target": "node-56", "targetHandle": "text", "animated": false },
+
+    { "id": "edge-83", "source": "node-40", "sourceHandle": "value", "target": "node-41", "targetHandle": "object", "animated": false },
+    { "id": "edge-84", "source": "node-8", "sourceHandle": "value", "target": "node-41", "targetHandle": "value", "animated": false },
+    { "id": "edge-85", "source": "node-41", "sourceHandle": "result", "target": "node-42", "targetHandle": "object", "animated": false },
+    { "id": "edge-86", "source": "node-1", "sourceHandle": "kg_scope", "target": "node-42", "targetHandle": "value", "animated": false },
+    { "id": "edge-87", "source": "node-42", "sourceHandle": "result", "target": "node-43", "targetHandle": "object", "animated": false },
+    { "id": "edge-88", "source": "node-1", "sourceHandle": "kg_limit", "target": "node-43", "targetHandle": "value", "animated": false },
+    { "id": "edge-89", "source": "node-43", "sourceHandle": "result", "target": "node-44", "targetHandle": "object", "animated": false },
+    { "id": "edge-90", "source": "node-1", "sourceHandle": "kg_max_input_tokens", "target": "node-44", "targetHandle": "value", "animated": false },
+    { "id": "edge-91", "source": "node-44", "sourceHandle": "result", "target": "node-45", "targetHandle": "object", "animated": false },
+    { "id": "edge-92", "source": "node-1", "sourceHandle": "model", "target": "node-45", "targetHandle": "value", "animated": false },
+    { "id": "edge-93", "source": "node-45", "sourceHandle": "result", "target": "node-46", "targetHandle": "input", "animated": false },
+    { "id": "edge-94", "source": "node-46", "sourceHandle": "output", "target": "node-47", "targetHandle": "object", "animated": false },
+    { "id": "edge-95", "source": "node-47", "sourceHandle": "value", "target": "node-48", "targetHandle": "value", "animated": false },
 
     { "id": "edge-23", "source": "node-12", "sourceHandle": "exec-out", "target": "node-13", "targetHandle": "exec-in", "animated": true },
 

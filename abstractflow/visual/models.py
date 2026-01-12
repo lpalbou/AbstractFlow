@@ -125,6 +125,8 @@ class NodeType(str, Enum):
     MEMORY_TAG = "memory_tag"
     MEMORY_COMPACT = "memory_compact"
     MEMORY_REHYDRATE = "memory_rehydrate"
+    MEMORY_KG_ASSERT = "memory_kg_assert"
+    MEMORY_KG_QUERY = "memory_kg_query"
     TOOL_CALLS = "tool_calls"
     TOOLS_ALLOWLIST = "tools_allowlist"
     BOOL_VAR = "bool_var"

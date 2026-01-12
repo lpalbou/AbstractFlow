@@ -47,3 +47,7 @@ if _agent_src.is_dir():
 _core_root = repo_root / "abstractcore"  # package-at-root layout
 if _core_root.is_dir():
     _ensure_path(_core_root)
+
+_memory_src = repo_root / "abstractmemory" / "src"  # src-layout
+if _memory_src.is_dir():
+    _ensure_path(_memory_src)

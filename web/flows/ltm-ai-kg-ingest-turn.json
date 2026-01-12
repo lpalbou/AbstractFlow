@@ -7,7 +7,10 @@
     {
       "id": "node-1",
       "type": "on_flow_start",
-      "position": { "x": 96.0, "y": 128.0 },
+      "position": {
+        "x": 96.0,
+        "y": 128.0
+      },
       "data": {
         "nodeType": "on_flow_start",
         "label": "Start",
@@ -15,13 +18,41 @@
         "headerColor": "#C0392B",
         "inputs": [],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "provider", "label": "provider", "type": "provider" },
-          { "id": "model", "label": "model", "type": "model" },
-          { "id": "text", "label": "text", "type": "string" },
-          { "id": "scope", "label": "scope", "type": "string" },
-          { "id": "span_id", "label": "span_id", "type": "string" },
-          { "id": "domain_focus", "label": "domain_focus", "type": "string" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "text",
+            "label": "text",
+            "type": "string"
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string"
+          },
+          {
+            "id": "span_id",
+            "label": "span_id",
+            "type": "string"
+          },
+          {
+            "id": "domain_focus",
+            "label": "domain_focus",
+            "type": "string"
+          }
         ],
         "pinDefaults": {
           "provider": "lmstudio",
@@ -29,199 +60,616 @@
           "scope": "session",
           "domain_focus": "software / agents / memory systems"
         }
-      }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
     },
     {
       "id": "node-2",
       "type": "literal_json",
-      "position": { "x": 96.0, "y": 288.0 },
+      "position": {
+        "x": 96.0,
+        "y": 336.0
+      },
       "data": {
         "nodeType": "literal_json",
         "label": "Subflow input",
         "icon": "{}",
         "headerColor": "#00FFFF",
         "inputs": [],
-        "outputs": [{ "id": "value", "label": "value", "type": "object" }],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "object"
+          }
+        ],
         "literalValue": {}
-      }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
     },
     {
       "id": "node-3",
       "type": "set",
-      "position": { "x": 320.0, "y": 288.0 },
+      "position": {
+        "x": 320.0,
+        "y": 288.0
+      },
       "data": {
         "nodeType": "set",
         "label": "Set provider",
         "icon": "&#x1F4E4;",
         "headerColor": "#3498DB",
         "inputs": [
-          { "id": "object", "label": "object", "type": "object" },
-          { "id": "key", "label": "key", "type": "string" },
-          { "id": "value", "label": "value", "type": "any" }
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
         ],
-        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
-        "pinDefaults": { "key": "provider" }
-      }
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "key": "provider"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
     },
     {
       "id": "node-4",
       "type": "set",
-      "position": { "x": 560.0, "y": 288.0 },
+      "position": {
+        "x": 560.0,
+        "y": 288.0
+      },
       "data": {
         "nodeType": "set",
         "label": "Set model",
         "icon": "&#x1F4E4;",
         "headerColor": "#3498DB",
         "inputs": [
-          { "id": "object", "label": "object", "type": "object" },
-          { "id": "key", "label": "key", "type": "string" },
-          { "id": "value", "label": "value", "type": "any" }
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
         ],
-        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
-        "pinDefaults": { "key": "model" }
-      }
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "key": "model"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
     },
     {
       "id": "node-5",
       "type": "set",
-      "position": { "x": 800.0, "y": 288.0 },
+      "position": {
+        "x": 800.0,
+        "y": 288.0
+      },
       "data": {
         "nodeType": "set",
         "label": "Set text",
         "icon": "&#x1F4E4;",
         "headerColor": "#3498DB",
         "inputs": [
-          { "id": "object", "label": "object", "type": "object" },
-          { "id": "key", "label": "key", "type": "string" },
-          { "id": "value", "label": "value", "type": "any" }
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
         ],
-        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
-        "pinDefaults": { "key": "text" }
-      }
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "key": "text"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
     },
     {
       "id": "node-6",
       "type": "set",
-      "position": { "x": 1040.0, "y": 288.0 },
+      "position": {
+        "x": 1040.0,
+        "y": 288.0
+      },
       "data": {
         "nodeType": "set",
         "label": "Set domain_focus",
         "icon": "&#x1F4E4;",
         "headerColor": "#3498DB",
         "inputs": [
-          { "id": "object", "label": "object", "type": "object" },
-          { "id": "key", "label": "key", "type": "string" },
-          { "id": "value", "label": "value", "type": "any" }
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
         ],
-        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
-        "pinDefaults": { "key": "domain_focus" }
-      }
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "key": "domain_focus"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
     },
     {
       "id": "node-7",
       "type": "subflow",
-      "position": { "x": 1280.0, "y": 128.0 },
+      "position": {
+        "x": 1280.0,
+        "y": 128.0
+      },
       "data": {
         "nodeType": "subflow",
         "label": "Extract triples",
         "icon": "&#x1F4E6;",
         "headerColor": "#00CCCC",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "inherit_context", "label": "inherit_context", "type": "boolean" },
-          { "id": "input", "label": "input", "type": "object" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean",
+            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          }
         ],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "output", "label": "output", "type": "object" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          }
         ],
         "subflowId": "ltm-ai-kg-extract-triples",
-        "pinDefaults": { "inherit_context": false }
-      }
+        "pinDefaults": {
+          "inherit_context": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
     },
     {
       "id": "node-8",
       "type": "get",
-      "position": { "x": 1504.0, "y": 128.0 },
+      "position": {
+        "x": 1504.0,
+        "y": 128.0
+      },
       "data": {
         "nodeType": "get",
         "label": "Get assertions",
         "icon": "&#x1F4E5;",
         "headerColor": "#3498DB",
         "inputs": [
-          { "id": "object", "label": "object", "type": "object" },
-          { "id": "key", "label": "key", "type": "string" },
-          { "id": "default", "label": "default", "type": "any" }
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
         ],
-        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
-        "pinDefaults": { "key": "assertions", "default": [] }
-      }
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "assertions",
+          "default": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
     },
     {
       "id": "node-9",
       "type": "memory_kg_assert",
-      "position": { "x": 1728.0, "y": 128.0 },
+      "position": {
+        "x": 1728.0,
+        "y": 128.0
+      },
       "data": {
         "nodeType": "memory_kg_assert",
         "label": "Assert triples",
         "icon": "&#x1F9E0;",
         "headerColor": "#8E44AD",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "assertions", "label": "assertions", "type": "array" },
-          { "id": "scope", "label": "scope", "type": "string" },
-          { "id": "span_id", "label": "span_id", "type": "string" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "assertions",
+            "label": "assertions",
+            "type": "array",
+            "description": "List of {subject,predicate,object,...} assertion objects."
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string",
+            "description": "run | session | global. Determines the owner_id when not explicitly provided."
+          },
+          {
+            "id": "span_id",
+            "label": "span_id",
+            "type": "string",
+            "description": "Optional provenance pointer to a runtime span/artifact id."
+          },
+          {
+            "id": "owner_id",
+            "label": "owner_id",
+            "type": "string",
+            "description": "Optional explicit owner id override (advanced; normally derived from scope)."
+          }
         ],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "assertion_ids", "label": "assertion_ids", "type": "array" },
-          { "id": "count", "label": "count", "type": "number" },
-          { "id": "ok", "label": "ok", "type": "boolean" },
-          { "id": "raw", "label": "raw", "type": "object" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "assertion_ids",
+            "label": "assertion_ids",
+            "type": "array",
+            "description": "IDs assigned by the store (implementation-specific)."
+          },
+          {
+            "id": "count",
+            "label": "count",
+            "type": "number",
+            "description": "Number of asserted triples."
+          },
+          {
+            "id": "ok",
+            "label": "ok",
+            "type": "boolean",
+            "description": "True when assertion succeeded."
+          },
+          {
+            "id": "raw",
+            "label": "raw",
+            "type": "object"
+          }
         ]
-      }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
     },
     {
       "id": "node-10",
       "type": "on_flow_end",
-      "position": { "x": 1952.0, "y": 128.0 },
+      "position": {
+        "x": 1952.0,
+        "y": 128.0
+      },
       "data": {
         "nodeType": "on_flow_end",
         "label": "End",
         "icon": "&#x23F9;",
         "headerColor": "#C0392B",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "extracted", "label": "extracted", "type": "object" },
-          { "id": "assertion_ids", "label": "assertion_ids", "type": "array" },
-          { "id": "count", "label": "count", "type": "number" },
-          { "id": "ok", "label": "ok", "type": "boolean" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "extracted",
+            "label": "extracted",
+            "type": "object"
+          },
+          {
+            "id": "assertion_ids",
+            "label": "assertion_ids",
+            "type": "array"
+          },
+          {
+            "id": "count",
+            "label": "count",
+            "type": "number"
+          },
+          {
+            "id": "ok",
+            "label": "ok",
+            "type": "boolean"
+          }
         ],
         "outputs": []
-      }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
     }
   ],
   "edges": [
-    { "id": "edge-1", "source": "node-2", "sourceHandle": "value", "target": "node-3", "targetHandle": "object", "animated": false },
-    { "id": "edge-2", "source": "node-1", "sourceHandle": "provider", "target": "node-3", "targetHandle": "value", "animated": false },
-    { "id": "edge-3", "source": "node-3", "sourceHandle": "result", "target": "node-4", "targetHandle": "object", "animated": false },
-    { "id": "edge-4", "source": "node-1", "sourceHandle": "model", "target": "node-4", "targetHandle": "value", "animated": false },
-    { "id": "edge-5", "source": "node-4", "sourceHandle": "result", "target": "node-5", "targetHandle": "object", "animated": false },
-    { "id": "edge-6", "source": "node-1", "sourceHandle": "text", "target": "node-5", "targetHandle": "value", "animated": false },
-    { "id": "edge-7", "source": "node-5", "sourceHandle": "result", "target": "node-6", "targetHandle": "object", "animated": false },
-    { "id": "edge-8", "source": "node-1", "sourceHandle": "domain_focus", "target": "node-6", "targetHandle": "value", "animated": false },
-    { "id": "edge-9", "source": "node-6", "sourceHandle": "result", "target": "node-7", "targetHandle": "input", "animated": false },
-    { "id": "edge-10", "source": "node-1", "sourceHandle": "exec-out", "target": "node-7", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-11", "source": "node-7", "sourceHandle": "output", "target": "node-8", "targetHandle": "object", "animated": false },
-    { "id": "edge-12", "source": "node-8", "sourceHandle": "value", "target": "node-9", "targetHandle": "assertions", "animated": false },
-    { "id": "edge-13", "source": "node-1", "sourceHandle": "scope", "target": "node-9", "targetHandle": "scope", "animated": false },
-    { "id": "edge-14", "source": "node-1", "sourceHandle": "span_id", "target": "node-9", "targetHandle": "span_id", "animated": false },
-    { "id": "edge-15", "source": "node-7", "sourceHandle": "exec-out", "target": "node-9", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-16", "source": "node-7", "sourceHandle": "output", "target": "node-10", "targetHandle": "extracted", "animated": false },
-    { "id": "edge-17", "source": "node-9", "sourceHandle": "assertion_ids", "target": "node-10", "targetHandle": "assertion_ids", "animated": false },
-    { "id": "edge-18", "source": "node-9", "sourceHandle": "count", "target": "node-10", "targetHandle": "count", "animated": false },
-    { "id": "edge-19", "source": "node-9", "sourceHandle": "ok", "target": "node-10", "targetHandle": "ok", "animated": false },
-    { "id": "edge-20", "source": "node-9", "sourceHandle": "exec-out", "target": "node-10", "targetHandle": "exec-in", "animated": true }
+    {
+      "id": "edge-1",
+      "source": "node-2",
+      "sourceHandle": "value",
+      "target": "node-3",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-2",
+      "source": "node-1",
+      "sourceHandle": "provider",
+      "target": "node-3",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-3",
+      "source": "node-3",
+      "sourceHandle": "result",
+      "target": "node-4",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-4",
+      "source": "node-1",
+      "sourceHandle": "model",
+      "target": "node-4",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-5",
+      "source": "node-4",
+      "sourceHandle": "result",
+      "target": "node-5",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-6",
+      "source": "node-1",
+      "sourceHandle": "text",
+      "target": "node-5",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-7",
+      "source": "node-5",
+      "sourceHandle": "result",
+      "target": "node-6",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-8",
+      "source": "node-1",
+      "sourceHandle": "domain_focus",
+      "target": "node-6",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-9",
+      "source": "node-6",
+      "sourceHandle": "result",
+      "target": "node-7",
+      "targetHandle": "input",
+      "animated": false
+    },
+    {
+      "id": "edge-10",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-7",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-11",
+      "source": "node-7",
+      "sourceHandle": "output",
+      "target": "node-8",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-12",
+      "source": "node-8",
+      "sourceHandle": "value",
+      "target": "node-9",
+      "targetHandle": "assertions",
+      "animated": false
+    },
+    {
+      "id": "edge-13",
+      "source": "node-1",
+      "sourceHandle": "scope",
+      "target": "node-9",
+      "targetHandle": "scope",
+      "animated": false
+    },
+    {
+      "id": "edge-14",
+      "source": "node-1",
+      "sourceHandle": "span_id",
+      "target": "node-9",
+      "targetHandle": "span_id",
+      "animated": false
+    },
+    {
+      "id": "edge-15",
+      "source": "node-7",
+      "sourceHandle": "exec-out",
+      "target": "node-9",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-16",
+      "source": "node-7",
+      "sourceHandle": "output",
+      "target": "node-10",
+      "targetHandle": "extracted",
+      "animated": false
+    },
+    {
+      "id": "edge-17",
+      "source": "node-9",
+      "sourceHandle": "assertion_ids",
+      "target": "node-10",
+      "targetHandle": "assertion_ids",
+      "animated": false
+    },
+    {
+      "id": "edge-18",
+      "source": "node-9",
+      "sourceHandle": "count",
+      "target": "node-10",
+      "targetHandle": "count",
+      "animated": false
+    },
+    {
+      "id": "edge-19",
+      "source": "node-9",
+      "sourceHandle": "ok",
+      "target": "node-10",
+      "targetHandle": "ok",
+      "animated": false
+    },
+    {
+      "id": "edge-20",
+      "source": "node-9",
+      "sourceHandle": "exec-out",
+      "target": "node-10",
+      "targetHandle": "exec-in",
+      "animated": true
+    }
   ],
-  "entryNode": "node-1"
+  "entryNode": "node-1",
+  "created_at": null,
+  "updated_at": "2026-01-12T16:24:44.376311"
 }
