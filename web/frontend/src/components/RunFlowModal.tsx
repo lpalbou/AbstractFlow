@@ -7,7 +7,7 @@
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useFlowStore } from '../hooks/useFlow';
-import type { ExecutionEvent, ExecutionMetrics, Pin, FlowRunResult } from '../types/flow';
+import type { ExecutionEvent, ExecutionMetrics, Pin, FlowRunResult, RunSummary } from '../types/flow';
 import { isEntryNodeType } from '../types/flow';
 import type { WaitingInfo } from '../hooks/useWebSocket';
 import { MarkdownRenderer } from './MarkdownRenderer';
@@ -36,6 +36,7 @@ interface RunFlowModalProps {
   onResumeRun?: () => void;
   onCancelRun?: () => void;
   onSelectRunId?: (runId: string) => void;
+  runSummary?: RunSummary | null;
 }
 
 type JsonParseResult<T> =
@@ -217,6 +218,7 @@ export function RunFlowModal({
   onResumeRun,
   onCancelRun,
   onSelectRunId,
+  runSummary = null,
 }: RunFlowModalProps) {
   const { nodes, edges, flowName, flowId, lastLoopProgress, loopProgressByNodeId } = useFlowStore();
 
@@ -1012,6 +1014,12 @@ export function RunFlowModal({
     return stepById.get(selectedStepId) || null;
   }, [selectedStepId, stepById]);
 
+  const parentRunId = useMemo(() => {
+    const raw = runSummary?.parent_run_id;
+    const pid = typeof raw === 'string' ? raw.trim() : '';
+    return pid || null;
+  }, [runSummary?.parent_run_id]);
+
   const selectedAgentSubRunId = useMemo(() => {
     if (!selectedStep || selectedStep.nodeType !== 'agent') return null;
     const out = selectedStep.output;
@@ -1041,6 +1049,35 @@ export function RunFlowModal({
     }
     return null;
   }, [selectedStep, traceEvents, rootRunId]);
+
+  const selectedSubflowRunId = useMemo(() => {
+    if (!selectedStep || selectedStep.nodeType !== 'subflow') return null;
+    const pick = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+
+    const out = selectedStep.output;
+    if (out && typeof out === 'object') {
+      const o = out as Record<string, unknown>;
+      const direct = pick(o.sub_run_id);
+      if (direct) return direct;
+      const childOut = o.child_output;
+      if (childOut && typeof childOut === 'object') {
+        const co = childOut as Record<string, unknown>;
+        const sr = pick(co.sub_run_id);
+        if (sr) return sr;
+      }
+    }
+
+    const parentRunId = pick(selectedStep.runId);
+    const parentNodeId = pick(selectedStep.nodeId);
+    if (!parentRunId || !parentNodeId) return null;
+    return subworkflowLinks.get(`${parentRunId}:${parentNodeId}`) || null;
+  }, [selectedStep, subworkflowLinks]);
+
+  const selectedSubflowSteps = useMemo(() => {
+    if (!selectedSubflowRunId) return [];
+    const bucket = stepsByRunId.get(selectedSubflowRunId);
+    return bucket ? (bucket as Step[]) : [];
+  }, [selectedSubflowRunId, stepsByRunId]);
 
   const hasRunData = isRunning || result != null || events.length > 0;
 
@@ -2010,6 +2047,16 @@ export function RunFlowModal({
                   <div className="run-details-header-badges">
                     {selectedStep.provider ? <span className="run-metric-badge metric-provider">{selectedStep.provider}</span> : null}
                     {selectedStep.model ? <span className="run-metric-badge metric-model">{selectedStep.model}</span> : null}
+                    {parentRunId && onSelectRunId ? (
+                      <button
+                        type="button"
+                        className="run-details-parent-link"
+                        onClick={() => onSelectRunId(parentRunId)}
+                        title={`Back to parent run: ${parentRunId}`}
+                      >
+                        Main flow
+                      </button>
+                    ) : null}
                     <span
                       className="run-details-type"
                       style={{
@@ -2023,22 +2070,69 @@ export function RunFlowModal({
                 ) : null}
               </div>
 
-              {selectedStep ? (
-                <div className="run-details-body">
-                  {selectedStep.status === 'running' ? (
-                    <>
-                      <div className="run-working">
-                        <span className="run-spinner" aria-label="working" />
-                        <div>
-                          <div className="run-working-title">Working…</div>
-                          <div className="run-working-note">This node is still processing. The output will appear when it completes.</div>
-                        </div>
-                      </div>
-                      {selectedStep.nodeType === 'agent' ? (
-                        <AgentSubrunTracePanel rootRunId={rootRunId} events={traceEvents} subRunId={selectedAgentSubRunId} />
-                      ) : null}
-                    </>
-                  ) : selectedStep.status === 'waiting' && (waitingInfo || selectedStep.waiting) ? (
+	              {selectedStep ? (
+	                <div className="run-details-body">
+	                  {selectedStep.status === 'running' ? (
+	                    <>
+	                      <div className="run-working">
+	                        <span className="run-spinner" aria-label="working" />
+	                        <div>
+	                          <div className="run-working-title">Working…</div>
+	                          <div className="run-working-note">This node is still processing. The output will appear when it completes.</div>
+	                        </div>
+	                      </div>
+	                      {selectedStep.nodeType === 'subflow' ? (
+	                        <div className="run-subflow-live">
+	                          <div className="run-subflow-live-header">
+	                            <div className="run-subflow-live-title">Subflow</div>
+	                            {selectedSubflowRunId ? (
+	                              <div className="run-subflow-live-actions">
+	                                <span className="run-subflow-live-runid" title={selectedSubflowRunId}>
+	                                  sub_run_id: {selectedSubflowRunId}
+	                                </span>
+	                                <button
+	                                  type="button"
+	                                  className="run-subflow-live-copy"
+	                                  onClick={() => copyToClipboard(selectedSubflowRunId)}
+	                                  title="Copy sub run id"
+	                                  aria-label="Copy sub run id"
+	                                >
+	                                  ⧉
+	                                </button>
+	                                {onSelectRunId ? (
+	                                  <button
+	                                    type="button"
+	                                    className="run-subflow-live-open"
+	                                    onClick={() => onSelectRunId(selectedSubflowRunId)}
+	                                    title="Open subflow run"
+	                                  >
+	                                    Open
+	                                  </button>
+	                                ) : null}
+	                              </div>
+	                            ) : (
+	                              <div className="run-subflow-live-wait">Waiting for subflow run id…</div>
+	                            )}
+	                          </div>
+	                          {selectedSubflowSteps.length > 0 ? (
+	                            <div className="run-subflow-live-steps">
+	                              {selectedSubflowSteps.slice(-8).map((s) => (
+	                                <div key={s.id} className={`run-subflow-live-step ${s.status}`}>
+	                                  <span className={`run-subflow-live-step-status ${s.status}`}>{s.status}</span>
+	                                  <span className="run-subflow-live-step-label">
+	                                    {s.nodeLabel || s.nodeId || 'step'}
+	                                  </span>
+	                                </div>
+	                              ))}
+	                            </div>
+	                          ) : null}
+	                        </div>
+	                      ) : null}
+	                      {selectedStep.nodeType === 'agent' ? (
+	                        <AgentSubrunTracePanel rootRunId={rootRunId} events={traceEvents} subRunId={selectedAgentSubRunId} />
+	                      ) : null}
+	                    </>
+	                  ) : selectedStep.status === 'waiting' && (waitingInfo || selectedStep.waiting) ? (
                     <div className="run-waiting">
                       <div className="run-waiting-prompt">
                         <MarkdownRenderer
@@ -2644,9 +2738,8 @@ export function RunFlowModal({
           <button
             className="modal-button cancel"
             onClick={onClose}
-            disabled={isRunning}
           >
-            {hasRunData || result ? 'Close' : 'Cancel'}
+            {(isRunning || isPaused || isWaiting) ? 'Hide' : (hasRunData || result ? 'Close' : 'Cancel')}
           </button>
 
           {!hasRunData && !result && (

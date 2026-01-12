@@ -11,6 +11,7 @@ import { RunFlowModal } from './RunFlowModal';
 import { RunHistoryModal } from './RunHistoryModal';
 import { UserPromptModal } from './UserPromptModal';
 import { FlowLibraryModal } from './FlowLibraryModal';
+import { PublishFlowModal } from './PublishFlowModal';
 import type { ExecutionEvent, FlowRunResult, VisualFlow, RunHistoryResponse, RunSummary } from '../types/flow';
 import { computeRunPreflightIssues } from '../utils/preflight';
 
@@ -158,6 +159,7 @@ export function Toolbar() {
   const [showRunModal, setShowRunModal] = useState(false);
   const [showFlowLibrary, setShowFlowLibrary] = useState(false);
   const [showRunHistory, setShowRunHistory] = useState(false);
+  const [showPublishModal, setShowPublishModal] = useState(false);
   const [runResult, setRunResult] = useState<FlowRunResult | null>(null);
   const [executionEvents, setExecutionEvents] = useState<ExecutionEvent[]>([]);
   const [traceEvents, setTraceEvents] = useState<ExecutionEvent[]>([]);
@@ -400,6 +402,13 @@ export function Toolbar() {
       toast.error('Please save the flow first');
       return;
     }
+    // If we already have an active/previous run in memory, opening the modal should
+    // *not* reset anything. Users should be able to hide/reopen the run modal to
+    // observe progress and revisit results.
+    if (isRunning || inspectedRun || runResult || executionEvents.length > 0 || traceEvents.length > 0) {
+      setShowRunModal(true);
+      return;
+    }
     const issues = computeRunPreflightIssues(nodes, edges);
     if (issues.length > 0) {
       setPreflightIssues(issues);
@@ -407,9 +416,8 @@ export function Toolbar() {
       return;
     }
     clearPreflightIssues();
-    setRunResult(null); // Clear previous result
     setShowRunModal(true);
-  }, [clearPreflightIssues, edges, flowId, nodes, setPreflightIssues]);
+  }, [clearPreflightIssues, edges, executionEvents.length, flowId, inspectedRun, isRunning, nodes, runResult, setPreflightIssues, traceEvents.length]);
 
   // Handle run from modal
   const handleRunExecute = useCallback((inputData: Record<string, unknown>) => {
@@ -426,20 +434,9 @@ export function Toolbar() {
 
   // Handle modal close
   const handleRunModalClose = useCallback(() => {
-    if (inspectedRun) {
-      setShowRunModal(false);
-      setInspectedRun(null);
-      setInspectedEvents([]);
-      setInspectedTraceEvents([]);
-      return;
-    }
-    if (!isRunning) {
-      setShowRunModal(false);
-      setRunResult(null);
-      setExecutionEvents([]);
-      setTraceEvents([]);
-    }
-  }, [inspectedRun, isRunning]);
+    // Close = hide. Keep state so the user can reopen the modal (even after completion).
+    setShowRunModal(false);
+  }, []);
 
   const handleRunAgain = useCallback(() => {
     if (isRunning) return;
@@ -531,6 +528,14 @@ export function Toolbar() {
     }
   }, [clearFlow]);
 
+  const handlePublish = useCallback(() => {
+    if (!flowId) {
+      toast.error('Please save the flow first');
+      return;
+    }
+    setShowPublishModal(true);
+  }, [flowId]);
+
   return (
     <>
       <div className="toolbar">
@@ -574,10 +579,19 @@ export function Toolbar() {
         <button
           className="toolbar-button primary"
           onClick={handleRun}
-          disabled={isRunning || !flowId}
-          title="Run Flow"
+          disabled={!flowId}
+          title={isRunning ? 'Open current run' : 'Run Flow'}
         >
           {isRunning ? '⏳ Running...' : '▶ Run'}
+        </button>
+
+        <button
+          className="toolbar-button"
+          onClick={handlePublish}
+          disabled={isRunning || !flowId}
+          title="Publish WorkflowBundle (.flow)"
+        >
+          📦 Publish
         </button>
 
         <button
@@ -664,6 +678,7 @@ export function Toolbar() {
         onResumeRun={() => resumeRun(inspectedRun?.run_id)}
         onCancelRun={() => cancelRun(inspectedRun?.run_id)}
         onSelectRunId={handleSelectRunFromModal}
+        runSummary={viewing ? inspectedRun : null}
       />
         );
       })()}
@@ -689,6 +704,13 @@ export function Toolbar() {
         onUpdateInterfaces={handleUpdateInterfaces}
         onDuplicateFlow={handleDuplicateFlow}
         onDeleteFlow={handleDeleteFlow}
+      />
+
+      <PublishFlowModal
+        isOpen={showPublishModal}
+        flowId={flowId}
+        flowName={flowName}
+        onClose={() => setShowPublishModal(false)}
       />
 
       {/* User Prompt Modal (fallback) */}

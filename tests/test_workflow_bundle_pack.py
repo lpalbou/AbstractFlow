@@ -35,3 +35,18 @@ def test_pack_workflow_bundle_creates_flow_zip_with_manifest_and_flows(tmp_path:
         assert isinstance(raw, dict)
         spec = compile_visualflow(raw)
         assert spec.workflow_id == flow_id
+
+
+def test_pack_workflow_bundle_embeds_manifest_metadata(tmp_path: Path) -> None:
+    root = Path(__file__).resolve().parent.parent / "web" / "flows" / "ac-echo.json"
+    assert root.exists()
+
+    out = tmp_path / "ac-echo-meta.flow"
+    meta = {"lineage": {"origin": "ac-echo", "previous": "0.0.0"}, "tags": ["test"]}
+    pack_workflow_bundle(root_flow_json=root, out_path=out, bundle_id="ac-echo", bundle_version="0.0.1", metadata=meta)
+
+    b = open_workflow_bundle(out)
+    assert b.manifest.bundle_id == "ac-echo"
+    assert b.manifest.bundle_version == "0.0.1"
+    assert b.manifest.metadata.get("lineage") == {"origin": "ac-echo", "previous": "0.0.0"}
+    assert b.manifest.metadata.get("tags") == ["test"]

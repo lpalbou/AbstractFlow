@@ -1513,6 +1513,26 @@ button.primary:hover:not(:disabled) {
   gap: 8px;
 }
 
+.run-switcher-copy-current {
+  width: 26px;
+  height: 26px;
+  margin-left: 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.6);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.run-switcher-copy-current:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.9);
+}
+
 .run-switcher-caret {
   opacity: 0.85;
 }
@@ -1912,6 +1932,128 @@ button.primary:hover:not(:disabled) {
   color: var(--text-secondary);
 }
 
+.run-subflow-live {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.run-subflow-live-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.run-subflow-live-title {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.run-subflow-live-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.run-subflow-live-runid {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.run-subflow-live-wait {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.run-subflow-live-copy {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.6);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.run-subflow-live-copy:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.run-subflow-live-open {
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+}
+
+.run-subflow-live-open:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.run-subflow-live-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.run-subflow-live-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.run-subflow-live-step-status {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 800;
+  color: var(--text-secondary);
+}
+
+.run-subflow-live-step-status.completed {
+  color: var(--success);
+}
+
+.run-subflow-live-step-status.running {
+  color: var(--warning);
+}
+
+.run-subflow-live-step-status.waiting {
+  color: var(--warning);
+}
+
+.run-subflow-live-step-status.failed {
+  color: var(--error);
+}
+
+.run-subflow-live-step-label {
+  font-size: 12px;
+  color: var(--text-primary);
+  font-weight: 700;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .agent-trace-panel {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 10px;
@@ -1943,6 +2085,26 @@ button.primary:hover:not(:disabled) {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-muted);
+}
+
+.agent-trace-copy {
+  margin-left: 6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.6);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.agent-trace-copy:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .agent-trace-badges {
@@ -2089,6 +2251,26 @@ button.primary:hover:not(:disabled) {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.run-details-parent-link {
+  font-size: 11px;
+  color: var(--text-primary);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 3px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.run-details-parent-link:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.run-details-parent-link:active {
+  transform: translateY(1px);
 }
 
 .run-steps-list {

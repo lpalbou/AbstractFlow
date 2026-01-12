@@ -21,6 +21,21 @@ interface AgentSubrunTracePanelProps {
   subRunId?: string | null;
 }
 
+async function copyText(text: string): Promise<void> {
+  const value = String(text || '');
+  if (!value) return;
+  try {
+    await navigator.clipboard.writeText(value);
+  } catch {
+    const el = document.createElement('textarea');
+    el.value = value;
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+  }
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object') return null;
   return value as Record<string, unknown>;
@@ -336,7 +351,24 @@ export function AgentSubrunTracePanel({ rootRunId, events, subRunId }: AgentSubr
         <div className="agent-trace-title">Agent calls</div>
         <div className="agent-trace-subtitle">
           Live per-effect trace (LLM/tool calls).
-          {subRunId ? <span className="agent-trace-subrun"> sub_run_id: {subRunId}</span> : null}
+          {subRunId ? (
+            <span className="agent-trace-subrun">
+              {' '}
+              sub_run_id: {subRunId}
+              <button
+                type="button"
+                className="agent-trace-copy"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void copyText(subRunId);
+                }}
+                title={`Copy sub_run_id: ${subRunId}`}
+                aria-label="Copy sub run id"
+              >
+                ⧉
+              </button>
+            </span>
+          ) : null}
         </div>
       </div>
 
@@ -390,5 +422,3 @@ export function AgentSubrunTracePanel({ rootRunId, events, subRunId }: AgentSubr
     </div>
   );
 }
-
-

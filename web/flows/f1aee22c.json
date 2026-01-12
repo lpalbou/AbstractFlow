@@ -1,0 +1,459 @@
+{
+  "id": "f1aee22c",
+  "name": "has-next-steps",
+  "description": "Designed has ultra simple analyzer : did the model claim it want to do something and stopped there ?",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": {
+        "x": -576.0,
+        "y": 192.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "receiving request",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "p_evaluator",
+            "label": "p_evaluator",
+            "type": "provider"
+          },
+          {
+            "id": "m_evaluator",
+            "label": "m_evaluator",
+            "type": "model"
+          }
+        ],
+        "pinDefaults": {
+          "p_evaluator": "lmstudio",
+          "m_evaluator": "google/gemma-3n-e4b"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-2",
+      "type": "on_flow_end",
+      "position": {
+        "x": 688.0,
+        "y": 336.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "answering",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "has_next_steps",
+            "label": "has_next_steps",
+            "type": "boolean"
+          },
+          {
+            "id": "next_steps",
+            "label": "next_steps",
+            "type": "string"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-3",
+      "type": "llm_call",
+      "position": {
+        "x": -16.0,
+        "y": 192.0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "LLM Call",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "include_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider",
+            "description": "LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model",
+            "description": "LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number",
+            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number",
+            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string",
+            "description": "Optional system prompt for this single call."
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string",
+            "description": "User prompt/content for this single call."
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools",
+            "description": "Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node)."
+          },
+          {
+            "id": "response_schema",
+            "label": "structured_output",
+            "type": "object",
+            "description": "Optional JSON Schema object (type=object) the assistant content must conform to."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string",
+            "description": "Assistant text content (best-effort). For tool calls, content may be empty."
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array",
+            "description": "Normalized tool call requests (same as result.tool_calls). This pin exists to make wiring into Tool Calls / Emit Event nodes simpler."
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object",
+            "description": "Full normalized LLM result (content, tool_calls, usage, provider/model metadata, trace_id)."
+          }
+        ],
+        "pinDefaults": {
+          "system": "You are an expert in evaluating if a LLM finished his task or if it describes additional direct tasks and it seems to have just stopped. If the LLM interrupted its task too early, your goal is then to provide guidance back to the LLM, like a user would do, so that the LLM continue its work until it delivers its final response."
+        },
+        "effectConfig": {
+          "provider": "lmstudio",
+          "model": "google/gemma-3n-e4b"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-4",
+      "type": "break_object",
+      "position": {
+        "x": 304.0,
+        "y": 416.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "data",
+            "label": "data",
+            "type": "any"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "data"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-5",
+      "type": "concat",
+      "position": {
+        "x": -304.0,
+        "y": 304.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "a": "Evaluate if the following response contains next steps :",
+          "c": "\\n\\nIF YES : return \"has_next_steps\" true and \"next_steps\" must be a message to prompt back the model and ask it to continue to work on <next steps> and to request the execution of appropriate tools to accomplish its task. Make it direct, concise, actionable for a LLM"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-6",
+      "type": "literal_json",
+      "position": {
+        "x": -256.0,
+        "y": 576.0
+      },
+      "data": {
+        "nodeType": "literal_json",
+        "label": "JSON",
+        "icon": "{}",
+        "headerColor": "#00FFFF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "object"
+          }
+        ],
+        "literalValue": {
+          "has_next_steps": false,
+          "next_steps": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-8",
+      "type": "break_object",
+      "position": {
+        "x": 304.0,
+        "y": 528.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "has_next_steps",
+            "label": "has_next_steps",
+            "type": "boolean"
+          },
+          {
+            "id": "next_steps",
+            "label": "next_steps",
+            "type": "string"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "has_next_steps",
+            "next_steps"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1768176564580",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-3",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768176567547",
+      "source": "node-3",
+      "sourceHandle": "exec-out",
+      "target": "node-2",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768176609354",
+      "source": "node-3",
+      "sourceHandle": "result",
+      "target": "node-4",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1768176612830",
+      "source": "node-6",
+      "sourceHandle": "value",
+      "target": "node-3",
+      "targetHandle": "response_schema",
+      "animated": false
+    },
+    {
+      "id": "edge-1768176732913",
+      "source": "node-1",
+      "sourceHandle": "response",
+      "target": "node-5",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-1768176805555",
+      "source": "node-4",
+      "sourceHandle": "data",
+      "target": "node-8",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1768176822922",
+      "source": "node-8",
+      "sourceHandle": "has_next_steps",
+      "target": "node-2",
+      "targetHandle": "has_next_steps",
+      "animated": false
+    },
+    {
+      "id": "edge-1768176827313",
+      "source": "node-8",
+      "sourceHandle": "next_steps",
+      "target": "node-2",
+      "targetHandle": "next_steps",
+      "animated": false
+    },
+    {
+      "id": "edge-1768180212633",
+      "source": "node-1",
+      "sourceHandle": "p_evaluator",
+      "target": "node-3",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1768180214734",
+      "source": "node-1",
+      "sourceHandle": "m_evaluator",
+      "target": "node-3",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-1768181006331",
+      "source": "node-5",
+      "sourceHandle": "result",
+      "target": "node-3",
+      "targetHandle": "prompt",
+      "animated": false
+    }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2026-01-12T00:14:35.326916",
+  "updated_at": "2026-01-12T01:23:58.509893"
+}

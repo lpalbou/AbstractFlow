@@ -122,6 +122,20 @@ export function RunSwitcherDropdown({
           ▾
         </span>
       </button>
+      {currentRunId ? (
+        <button
+          type="button"
+          className="run-switcher-copy-current"
+          onClick={(e) => {
+            e.stopPropagation();
+            void copyText(currentRunId);
+          }}
+          title={`Copy run id: ${currentRunId}`}
+          aria-label="Copy run id"
+        >
+          ⧉
+        </button>
+      ) : null}
 
       {open ? (
         <div className="run-switcher-menu" role="menu" aria-label="Runs">
@@ -199,7 +213,6 @@ export function RunSwitcherDropdown({
 }
 
 export default RunSwitcherDropdown;
-
 
 
 

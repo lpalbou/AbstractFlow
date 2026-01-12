@@ -175,6 +175,7 @@ def pack_workflow_bundle(
     flows_dir: Optional[str | Path] = None,
     entrypoints: Optional[List[str]] = None,
     default_entrypoint: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None,
 ) -> PackedWorkflowBundle:
     """Pack a `.flow` bundle from a root VisualFlow JSON file."""
     root_path = Path(root_flow_json).expanduser().resolve()
@@ -244,7 +245,7 @@ def pack_workflow_bundle(
         flows={fid: f"flows/{fid}.json" for fid in sorted(flows_json.keys())},
         artifacts={},
         assets={},
-        metadata={},
+        metadata=dict(metadata) if isinstance(metadata, dict) else {},
     )
     manifest.validate()
 
