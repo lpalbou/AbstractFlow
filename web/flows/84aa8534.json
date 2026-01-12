@@ -1,6 +1,6 @@
 {
   "id": "84aa8534",
-  "name": "ralph-simple-v2",
+  "name": "ralph-agent",
   "description": "",
   "interfaces": [
     "abstractcode.agent.v1"
@@ -133,7 +133,7 @@
       },
       "data": {
         "nodeType": "agent",
-        "label": "Agent",
+        "label": "RALPH Agent",
         "icon": "&#x1F916;",
         "headerColor": "#4488FF",
         "inputs": [
@@ -335,7 +335,7 @@
           "separator": " "
         },
         "pinDefaults": {
-          "a": "You are a helpful, collaborative and highly autonomous agent. You are designed to resolve requests that have already been treated to isolate tasks. Please make sure that you either fulfill ALL the tasks or explain any deviations from the tasks. Do your best effort to follow the tasks.  Being autonomous means you take decisions and you act upon them to have a real world effect. You take action by requesting the execution of tools, observing their effects and continuing the tasks, one by one, until you fully resolve them and the joined request. You are a creative critical creative thinker who generate innovative ideas and strategies, and who balances them with constructive skepticism to filter out the bad and unrealistic ones. Your goal and focus is to resolve FULLY the request by completing each task one by one, meaning taking decisions and actions and executing the tools that are required to do so. ",
+          "a": "You are a helpful, collaborative and highly autonomous ReAct agent. Your autonomy means that you take decisions and take actions. You take actions by requesting the execution of tools that have effects on the real world. You can request the execution of several tools at the same time,  provided they can run in parallel without interfering with each others. \n\nIn addition, you are a pragmatic creative critical creative thinker who generate innovative ideas and strategies, and who balances them with constructive skepticism to filter out the bad and unrealistic ones. Your goal and focus is to FULLY resolve the request.",
           "c": "",
           "b": "\\n\\n============================================================================== RALPH LOOP COMPLETION PROMISE ==============================================================================  To complete this loop, output this EXACT text:\\n",
           "d": "\\n\\nSTRICT REQUIREMENTS (DO NOT VIOLATE): - Use <promise> XML tags EXACTLY as shown above - The statement MUST be completely and unequivocally TRUE - Do NOT output false statements to exit the loop - Do NOT lie even if you think you should exit  IMPORTANT - do not circumvent the loop: even if you believe you’re stuck, the task is impossible, or you’ve been running too long - you MUST NOT output a false promise statement. The loop is designed to continue until the promise is GENUINELY TRUE. Trust the process.  If the loop should stop, the promise statement will become true naturlly. Do not force it by lying. ==============================================================================",
@@ -596,7 +596,7 @@
       "id": "node-20",
       "type": "set_var",
       "position": {
-        "x": 432.0,
+        "x": 496.0,
         "y": 80.0
       },
       "data": {
@@ -647,8 +647,8 @@
       "id": "node-21",
       "type": "not",
       "position": {
-        "x": 192.0,
-        "y": 160.0
+        "x": 176.0,
+        "y": 240.0
       },
       "data": {
         "nodeType": "not",
@@ -818,8 +818,8 @@
       "id": "node-28",
       "type": "literal_array",
       "position": {
-        "x": 624.0,
-        "y": -112.0
+        "x": 816.0,
+        "y": -208.0
       },
       "data": {
         "nodeType": "literal_array",
@@ -835,10 +835,12 @@
           }
         ],
         "literalValue": [
-          "Keep going !",
+          "Keep going, request all the tools you need to complete your task.",
           "Did you actually run and check tests ?",
           "Make sure this is working !",
-          "Can you double check your work ?"
+          "Double check your work. Make sure you have executed all the steps.",
+          "Continue to the next steps.",
+          "Make sure to fully resolve the task this time !"
         ]
       },
       "label": null,
@@ -933,17 +935,51 @@
       "outputs": []
     },
     {
-      "id": "node-31",
-      "type": "answer_user",
+      "id": "node-34",
+      "type": "agent_trace_report",
       "position": {
         "x": 176.0,
-        "y": -48.0
+        "y": 128.0
       },
       "data": {
-        "nodeType": "answer_user",
-        "label": "Answer User",
-        "icon": "&#x1F4AC;",
-        "headerColor": "#9B59B6",
+        "nodeType": "agent_trace_report",
+        "label": "Agent Trace Report",
+        "icon": "&#x1F4CB;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object",
+            "description": "Agent scratchpad object (typically contains node_traces)."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-36",
+      "type": "memory_note",
+      "position": {
+        "x": 640.0,
+        "y": 416.0
+      },
+      "data": {
+        "nodeType": "memory_note",
+        "label": "Memorize",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#2ECC71",
         "inputs": [
           {
             "id": "exec-in",
@@ -951,15 +987,40 @@
             "type": "execution"
           },
           {
-            "id": "message",
-            "label": "message",
-            "type": "string"
+            "id": "keep_in_context",
+            "label": "in_context",
+            "type": "boolean",
+            "description": "When true, also insert the stored note into this run's context.messages (synthetic system message). If the pin is not connected, the node checkbox is used. Default: false."
           },
           {
-            "id": "level",
-            "label": "level",
+            "id": "scope",
+            "label": "scope",
             "type": "string",
-            "description": "Message level for hosts (message|warning|error). Defaults to 'message' when unset."
+            "description": "Where to store/index the note: run (this run), session (all runs with the same session_id; owned by an internal session memory run), or global (shared global memory run). If session_id is missing, session falls back to the run-tree root."
+          },
+          {
+            "id": "content",
+            "label": "content",
+            "type": "string",
+            "description": "The note text to store durably (keep it short; prefer references in sources for large payloads)."
+          },
+          {
+            "id": "location",
+            "label": "location",
+            "type": "string",
+            "description": "Optional location label (where the note was produced, e.g. \"flow:my_flow/node-12\"). Useful for filtering."
+          },
+          {
+            "id": "tags",
+            "label": "tags",
+            "type": "object",
+            "description": "Key/value tags for filtering (e.g. {topic:\"memory\", person:\"laurent\"}). Values must be strings."
+          },
+          {
+            "id": "sources",
+            "label": "sources",
+            "type": "object",
+            "description": "Optional provenance refs (e.g. {run_id, span_ids, message_ids}). The note stores refs, not the full source content."
           }
         ],
         "outputs": [
@@ -969,11 +1030,16 @@
             "type": "execution"
           },
           {
-            "id": "message",
-            "label": "message",
-            "type": "string"
+            "id": "note_id",
+            "label": "note_id",
+            "type": "string",
+            "description": "The stored note’s span_id / artifact_id. Use it for Recall into context (span_ids) or for precise Recall."
           }
-        ]
+        ],
+        "pinDefaults": {
+          "keep_in_context": true,
+          "scope": "run"
+        }
       },
       "label": null,
       "icon": null,
@@ -1005,14 +1071,6 @@
       "sourceHandle": "tools",
       "target": "node-3",
       "targetHandle": "tools",
-      "animated": false
-    },
-    {
-      "id": "edge-1768250051999",
-      "source": "node-1",
-      "sourceHandle": "context",
-      "target": "node-3",
-      "targetHandle": "context",
       "animated": false
     },
     {
@@ -1184,51 +1242,11 @@
       "animated": false
     },
     {
-      "id": "edge-1768253829598",
-      "source": "node-24",
-      "sourceHandle": "value",
-      "target": "node-3",
-      "targetHandle": "task",
-      "animated": false
-    },
-    {
       "id": "edge-1768253854340",
       "source": "node-1",
       "sourceHandle": "request",
       "target": "node-22",
       "targetHandle": "value",
-      "animated": false
-    },
-    {
-      "id": "edge-1768253880674",
-      "source": "node-3",
-      "sourceHandle": "exec-out",
-      "target": "node-31",
-      "targetHandle": "exec-in",
-      "animated": true
-    },
-    {
-      "id": "edge-1768253882748",
-      "source": "node-31",
-      "sourceHandle": "exec-out",
-      "target": "node-20",
-      "targetHandle": "exec-in",
-      "animated": true
-    },
-    {
-      "id": "edge-1768253888806",
-      "source": "node-8",
-      "sourceHandle": "result",
-      "target": "node-31",
-      "targetHandle": "level",
-      "animated": false
-    },
-    {
-      "id": "edge-1768254119583",
-      "source": "node-9",
-      "sourceHandle": "result",
-      "target": "node-31",
-      "targetHandle": "message",
       "animated": false
     },
     {
@@ -1238,9 +1256,41 @@
       "target": "node-5",
       "targetHandle": "c",
       "animated": false
+    },
+    {
+      "id": "edge-1768255650822",
+      "source": "node-24",
+      "sourceHandle": "value",
+      "target": "node-3",
+      "targetHandle": "task",
+      "animated": false
+    },
+    {
+      "id": "edge-1768256881326",
+      "source": "node-34",
+      "sourceHandle": "result",
+      "target": "node-36",
+      "targetHandle": "content",
+      "animated": false
+    },
+    {
+      "id": "edge-1768256884751",
+      "source": "node-3",
+      "sourceHandle": "scratchpad",
+      "target": "node-34",
+      "targetHandle": "scratchpad",
+      "animated": false
+    },
+    {
+      "id": "edge-1768257570206",
+      "source": "node-3",
+      "sourceHandle": "exec-out",
+      "target": "node-20",
+      "targetHandle": "exec-in",
+      "animated": true
     }
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-12T20:48:49.988738",
-  "updated_at": "2026-01-12T21:58:40.355311"
+  "updated_at": "2026-01-12T22:41:51.209833"
 }

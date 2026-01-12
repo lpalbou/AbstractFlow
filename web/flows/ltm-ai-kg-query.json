@@ -7,105 +7,396 @@
     {
       "id": "node-1",
       "type": "on_flow_start",
-      "position": { "x": 96.0, "y": 96.0 },
+      "position": {
+        "x": 96.0,
+        "y": 96.0
+      },
       "data": {
         "nodeType": "on_flow_start",
         "label": "Start",
         "icon": "&#x1F3C1;",
         "headerColor": "#C0392B",
         "inputs": [],
-	        "outputs": [
-	          { "id": "exec-out", "label": "", "type": "execution" },
-	          { "id": "query_text", "label": "query_text", "type": "string" },
-	          { "id": "subject", "label": "subject", "type": "string" },
-	          { "id": "predicate", "label": "predicate", "type": "string" },
-	          { "id": "object", "label": "object", "type": "string" },
-	          { "id": "scope", "label": "scope", "type": "string" },
-	          { "id": "limit", "label": "limit", "type": "number" }
-	        ],
-        "pinDefaults": { "scope": "all", "limit": 50 }
-      }
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "query_text",
+            "label": "query_text",
+            "type": "string"
+          },
+          {
+            "id": "subject",
+            "label": "subject",
+            "type": "string"
+          },
+          {
+            "id": "predicate",
+            "label": "predicate",
+            "type": "string"
+          },
+          {
+            "id": "object",
+            "label": "object",
+            "type": "string"
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string"
+          },
+          {
+            "id": "limit",
+            "label": "limit",
+            "type": "number"
+          }
+        ],
+        "pinDefaults": {
+          "scope": "all",
+          "limit": 50
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
     },
     {
       "id": "node-2",
       "type": "memory_kg_query",
-      "position": { "x": 384.0, "y": 96.0 },
+      "position": {
+        "x": 384.0,
+        "y": 96.0
+      },
       "data": {
         "nodeType": "memory_kg_query",
         "label": "KG query",
         "icon": "&#x1F50E;",
         "headerColor": "#8E44AD",
-	        "inputs": [
-	          { "id": "exec-in", "label": "", "type": "execution" },
-	          { "id": "query_text", "label": "query_text", "type": "string" },
-	          { "id": "subject", "label": "subject", "type": "string" },
-	          { "id": "predicate", "label": "predicate", "type": "string" },
-	          { "id": "object", "label": "object", "type": "string" },
-	          { "id": "scope", "label": "scope", "type": "string" },
-	          { "id": "limit", "label": "limit", "type": "number" }
-	        ],
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "query_text",
+            "label": "query_text",
+            "type": "string",
+            "description": "Optional semantic query. Requires embeddings to be configured in the host."
+          },
+          {
+            "id": "subject",
+            "label": "subject",
+            "type": "string",
+            "description": "Optional canonical subject filter (trim + lower; stable exact match after canonicalization)."
+          },
+          {
+            "id": "predicate",
+            "label": "predicate",
+            "type": "string",
+            "description": "Optional canonical predicate filter (trim + lower; stable exact match after canonicalization)."
+          },
+          {
+            "id": "object",
+            "label": "object",
+            "type": "string",
+            "description": "Optional canonical object filter (trim + lower; stable exact match after canonicalization)."
+          },
+          {
+            "id": "since",
+            "label": "since",
+            "type": "string",
+            "description": "Optional observed_at lower bound (ISO8601)."
+          },
+          {
+            "id": "until",
+            "label": "until",
+            "type": "string",
+            "description": "Optional observed_at upper bound (ISO8601)."
+          },
+          {
+            "id": "active_at",
+            "label": "active_at",
+            "type": "string",
+            "description": "Optional validity window selector (ISO8601). Filters assertions active at that time."
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string",
+            "description": "run | session | global | all (fan-out over run+session+global)."
+          },
+          {
+            "id": "owner_id",
+            "label": "owner_id",
+            "type": "string",
+            "description": "Optional explicit owner id override (advanced; normally derived from scope)."
+          },
+          {
+            "id": "limit",
+            "label": "limit",
+            "type": "number",
+            "description": "Max assertions to return (default 100)."
+          }
+        ],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "items", "label": "items", "type": "array" },
-          { "id": "count", "label": "count", "type": "number" },
-          { "id": "ok", "label": "ok", "type": "boolean" },
-          { "id": "raw", "label": "raw", "type": "object" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "items",
+            "label": "items",
+            "type": "array",
+            "description": "List of triple assertions (dicts)."
+          },
+          {
+            "id": "count",
+            "label": "count",
+            "type": "number",
+            "description": "Number of returned assertions."
+          },
+          {
+            "id": "ok",
+            "label": "ok",
+            "type": "boolean",
+            "description": "True when query succeeded."
+          },
+          {
+            "id": "raw",
+            "label": "raw",
+            "type": "object"
+          }
         ]
-      }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
     },
     {
       "id": "node-3",
       "type": "stringify_json",
-      "position": { "x": 640.0, "y": 160.0 },
+      "position": {
+        "x": 640.0,
+        "y": 160.0
+      },
       "data": {
         "nodeType": "stringify_json",
         "label": "Render items",
         "icon": "&#x1F4DD;",
         "headerColor": "#3498DB",
         "inputs": [
-          { "id": "value", "label": "value", "type": "any" },
-          { "id": "pretty", "label": "pretty", "type": "boolean" }
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any",
+            "description": "JSON value (or JSON-ish string) to stringify."
+          },
+          {
+            "id": "mode",
+            "label": "mode",
+            "type": "string",
+            "description": "Rendering mode: none | beautify | minified. Default beautify."
+          },
+          {
+            "id": "pretty",
+            "label": "pretty",
+            "type": "boolean"
+          }
         ],
-        "outputs": [{ "id": "result", "label": "result", "type": "string" }],
-        "pinDefaults": { "pretty": true }
-      }
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "pretty": true
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
     },
     {
       "id": "node-4",
       "type": "on_flow_end",
-      "position": { "x": 880.0, "y": 96.0 },
+      "position": {
+        "x": 880.0,
+        "y": 96.0
+      },
       "data": {
         "nodeType": "on_flow_end",
         "label": "End",
         "icon": "&#x23F9;",
         "headerColor": "#C0392B",
-	        "inputs": [
-	          { "id": "exec-in", "label": "", "type": "execution" },
-	          { "id": "items", "label": "items", "type": "array" },
-	          { "id": "count", "label": "count", "type": "number" },
-	          { "id": "ok", "label": "ok", "type": "boolean" },
-	          { "id": "rendered", "label": "rendered", "type": "string" },
-	          { "id": "raw", "label": "raw", "type": "object" }
-	        ],
-	        "outputs": []
-	      }
-	    }
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "items",
+            "label": "items",
+            "type": "array"
+          },
+          {
+            "id": "count",
+            "label": "count",
+            "type": "number"
+          },
+          {
+            "id": "ok",
+            "label": "ok",
+            "type": "boolean"
+          },
+          {
+            "id": "rendered",
+            "label": "rendered",
+            "type": "string"
+          },
+          {
+            "id": "raw",
+            "label": "raw",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
   ],
-		  "edges": [
-		    { "id": "edge-1", "source": "node-1", "sourceHandle": "exec-out", "target": "node-2", "targetHandle": "exec-in", "animated": true },
-		    { "id": "edge-2", "source": "node-1", "sourceHandle": "query_text", "target": "node-2", "targetHandle": "query_text", "animated": false },
-		    { "id": "edge-3", "source": "node-1", "sourceHandle": "subject", "target": "node-2", "targetHandle": "subject", "animated": false },
-		    { "id": "edge-4", "source": "node-1", "sourceHandle": "predicate", "target": "node-2", "targetHandle": "predicate", "animated": false },
-		    { "id": "edge-5", "source": "node-1", "sourceHandle": "object", "target": "node-2", "targetHandle": "object", "animated": false },
-		    { "id": "edge-6", "source": "node-1", "sourceHandle": "scope", "target": "node-2", "targetHandle": "scope", "animated": false },
-		    { "id": "edge-7", "source": "node-1", "sourceHandle": "limit", "target": "node-2", "targetHandle": "limit", "animated": false },
-    { "id": "edge-8", "source": "node-2", "sourceHandle": "items", "target": "node-3", "targetHandle": "value", "animated": false },
-    { "id": "edge-9", "source": "node-3", "sourceHandle": "result", "target": "node-4", "targetHandle": "rendered", "animated": false },
-	    { "id": "edge-10", "source": "node-2", "sourceHandle": "items", "target": "node-4", "targetHandle": "items", "animated": false },
-	    { "id": "edge-11", "source": "node-2", "sourceHandle": "count", "target": "node-4", "targetHandle": "count", "animated": false },
-	    { "id": "edge-12", "source": "node-2", "sourceHandle": "ok", "target": "node-4", "targetHandle": "ok", "animated": false },
-	    { "id": "edge-12b", "source": "node-2", "sourceHandle": "raw", "target": "node-4", "targetHandle": "raw", "animated": false },
-	    { "id": "edge-13", "source": "node-2", "sourceHandle": "exec-out", "target": "node-4", "targetHandle": "exec-in", "animated": true }
-	  ],
-	  "entryNode": "node-1"
-	}
+  "edges": [
+    {
+      "id": "edge-1",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-2",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-2",
+      "source": "node-1",
+      "sourceHandle": "query_text",
+      "target": "node-2",
+      "targetHandle": "query_text",
+      "animated": false
+    },
+    {
+      "id": "edge-3",
+      "source": "node-1",
+      "sourceHandle": "subject",
+      "target": "node-2",
+      "targetHandle": "subject",
+      "animated": false
+    },
+    {
+      "id": "edge-4",
+      "source": "node-1",
+      "sourceHandle": "predicate",
+      "target": "node-2",
+      "targetHandle": "predicate",
+      "animated": false
+    },
+    {
+      "id": "edge-5",
+      "source": "node-1",
+      "sourceHandle": "object",
+      "target": "node-2",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-6",
+      "source": "node-1",
+      "sourceHandle": "scope",
+      "target": "node-2",
+      "targetHandle": "scope",
+      "animated": false
+    },
+    {
+      "id": "edge-7",
+      "source": "node-1",
+      "sourceHandle": "limit",
+      "target": "node-2",
+      "targetHandle": "limit",
+      "animated": false
+    },
+    {
+      "id": "edge-8",
+      "source": "node-2",
+      "sourceHandle": "items",
+      "target": "node-3",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-9",
+      "source": "node-3",
+      "sourceHandle": "result",
+      "target": "node-4",
+      "targetHandle": "rendered",
+      "animated": false
+    },
+    {
+      "id": "edge-10",
+      "source": "node-2",
+      "sourceHandle": "items",
+      "target": "node-4",
+      "targetHandle": "items",
+      "animated": false
+    },
+    {
+      "id": "edge-11",
+      "source": "node-2",
+      "sourceHandle": "count",
+      "target": "node-4",
+      "targetHandle": "count",
+      "animated": false
+    },
+    {
+      "id": "edge-12",
+      "source": "node-2",
+      "sourceHandle": "ok",
+      "target": "node-4",
+      "targetHandle": "ok",
+      "animated": false
+    },
+    {
+      "id": "edge-12b",
+      "source": "node-2",
+      "sourceHandle": "raw",
+      "target": "node-4",
+      "targetHandle": "raw",
+      "animated": false
+    },
+    {
+      "id": "edge-13",
+      "source": "node-2",
+      "sourceHandle": "exec-out",
+      "target": "node-4",
+      "targetHandle": "exec-in",
+      "animated": true
+    }
+  ],
+  "entryNode": "node-1",
+  "created_at": null,
+  "updated_at": "2026-01-12T23:38:26.452319"
+}

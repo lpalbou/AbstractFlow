@@ -526,6 +526,87 @@ export function RunFlowModal({
 
     const safeString = (value: unknown) => (typeof value === 'string' ? value : value == null ? '' : String(value));
 
+    const extractSubRunId = (value: unknown): string | null => {
+      if (!value || typeof value !== 'object') return null;
+      const obj = value as Record<string, unknown>;
+      const pick = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+
+      // Common shapes:
+      // - { sub_run_id: "..." }
+      // - { result: { sub_run_id: "..." } }
+      // - { scratchpad: { sub_run_id: "..." } }
+      // - { scratchpad: { sub_run_id: "..." }, result: {...} } (Agent node output)
+      const direct =
+        pick(obj['sub_run_id']) ?? pick(obj['sub_runId']) ?? pick(obj['subRunId']);
+      if (direct) return direct;
+
+      const nestedResult = obj['result'];
+      if (nestedResult && typeof nestedResult === 'object') {
+        const r = nestedResult as Record<string, unknown>;
+        const fromResult = pick(r['sub_run_id']) ?? pick(r['sub_runId']) ?? pick(r['subRunId']);
+        if (fromResult) return fromResult;
+      }
+
+      const scratchpad = obj['scratchpad'];
+      if (scratchpad && typeof scratchpad === 'object') {
+        const sp = scratchpad as Record<string, unknown>;
+        const fromScratch = pick(sp['sub_run_id']) ?? pick(sp['sub_runId']) ?? pick(sp['subRunId']);
+        if (fromScratch) return fromScratch;
+      }
+
+      return null;
+    };
+
+    const mergeMetricsPreferLonger = (
+      prior?: ExecutionMetrics | null,
+      next?: ExecutionMetrics | null
+    ): ExecutionMetrics | undefined => {
+      if (!prior) return next ?? undefined;
+      if (!next) return prior ?? undefined;
+
+      const num = (v: unknown): number | null =>
+        typeof v === 'number' && Number.isFinite(v) ? v : null;
+
+      const priorDur = num(prior.duration_ms);
+      const nextDur = num(next.duration_ms);
+      const preferNext = nextDur != null && (priorDur == null || nextDur > priorDur);
+      const primary = preferNext ? next : prior;
+      const secondary = preferNext ? prior : next;
+
+      const merged: ExecutionMetrics = {
+        duration_ms: num(primary.duration_ms) ?? num(secondary.duration_ms) ?? undefined,
+        input_tokens:
+          typeof primary.input_tokens === 'number'
+            ? primary.input_tokens
+            : typeof secondary.input_tokens === 'number'
+              ? secondary.input_tokens
+              : undefined,
+        output_tokens:
+          typeof primary.output_tokens === 'number'
+            ? primary.output_tokens
+            : typeof secondary.output_tokens === 'number'
+              ? secondary.output_tokens
+              : undefined,
+        tokens_per_s:
+          typeof primary.tokens_per_s === 'number'
+            ? primary.tokens_per_s
+            : typeof secondary.tokens_per_s === 'number'
+              ? secondary.tokens_per_s
+              : undefined,
+      };
+
+      // Avoid returning an object with all fields undefined.
+      if (
+        merged.duration_ms == null &&
+        merged.input_tokens == null &&
+        merged.output_tokens == null &&
+        merged.tokens_per_s == null
+      ) {
+        return undefined;
+      }
+      return merged;
+    };
+
     const extractModelInfo = (value: unknown): { provider?: string; model?: string } => {
       if (!value || typeof value !== 'object') return {};
       const obj = value as Record<string, unknown>;
@@ -668,7 +749,41 @@ export function RunFlowModal({
           openByNode.delete(key);
           continue;
         }
+
+        // Dedupe: some runs can emit a duplicate `node_complete` for an Agent node
+        // (same node + same sub_run_id) due to start_subworkflow/wait/resume edge cases.
+        // Prefer to merge into the most recent completed step rather than rendering two.
         const meta = nodeMeta(nodeId);
+        if (meta?.type === 'agent' && nodeId && typeof ev.runId === 'string' && ev.runId.trim()) {
+          const subRunId = extractSubRunId(ev.result);
+          if (subRunId) {
+            const rid = ev.runId.trim();
+            let deduped = false;
+            for (let j = all.length - 1; j >= 0; j--) {
+              const prior = all[j];
+              if (prior.status !== 'completed') continue;
+              if (prior.runId !== rid) continue;
+              if (prior.nodeId !== nodeId) continue;
+              const priorSub = extractSubRunId(prior.output);
+              if (!priorSub || priorSub !== subRunId) continue;
+
+              all[j] = {
+                ...prior,
+                output: ev.result ?? prior.output,
+                summary: summarize(ev.result ?? prior.output),
+                metrics: mergeMetricsPreferLonger(prior.metrics ?? null, ev.meta ?? null),
+                provider: mi.provider ?? prior.provider,
+                model: mi.model ?? prior.model,
+                endedAt: typeof ev.ts === 'string' ? ev.ts : prior.endedAt,
+              };
+              // Do not append a duplicate step.
+              deduped = true;
+              break;
+            }
+            if (deduped) continue;
+          }
+        }
+
         all.push({
           id: `node_complete:${nodeId || 'unknown'}:${i}`,
           status: 'completed',

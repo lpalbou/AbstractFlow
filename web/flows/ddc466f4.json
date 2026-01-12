@@ -1,0 +1,1360 @@
+{
+  "id": "ddc466f4",
+  "name": "test-memory-llm (copy)",
+  "description": "",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": {
+        "x": -736.0,
+        "y": -80.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-2",
+      "type": "while",
+      "position": {
+        "x": -384.0,
+        "y": -80.0
+      },
+      "data": {
+        "nodeType": "while",
+        "label": "While",
+        "icon": "&#x267B;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "loop",
+            "label": "loop",
+            "type": "execution"
+          },
+          {
+            "id": "done",
+            "label": "done",
+            "type": "execution"
+          },
+          {
+            "id": "item",
+            "label": "item",
+            "type": "any"
+          },
+          {
+            "id": "index",
+            "label": "index",
+            "type": "number"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-3",
+      "type": "set_var",
+      "position": {
+        "x": 784.0,
+        "y": -64.0
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Set continue",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "continue"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-4",
+      "type": "bool_var",
+      "position": {
+        "x": -656.0,
+        "y": 48.0
+      },
+      "data": {
+        "nodeType": "bool_var",
+        "label": "Bool Variable",
+        "icon": "&#x1F7E5;",
+        "headerColor": "#16A085",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "boolean"
+          }
+        ],
+        "literalValue": {
+          "name": "continue",
+          "default": true
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-6",
+      "type": "answer_user",
+      "position": {
+        "x": 624.0,
+        "y": -384.0
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          },
+          {
+            "id": "level",
+            "label": "level",
+            "type": "string",
+            "description": "Message level for hosts (message|warning|error). Defaults to 'message' when unset."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-8",
+      "type": "if",
+      "position": {
+        "x": 512.0,
+        "y": -64.0
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "If/Else",
+        "icon": "&#x2753;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-9",
+      "type": "compare",
+      "position": {
+        "x": 512.0,
+        "y": 64.0
+      },
+      "data": {
+        "nodeType": "compare",
+        "label": "Compare",
+        "icon": "=?",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "any"
+          },
+          {
+            "id": "op",
+            "label": "op",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "boolean"
+          }
+        ],
+        "pinDefaults": {
+          "op": ">="
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-10",
+      "type": "literal_number",
+      "position": {
+        "x": 512.0,
+        "y": 208.0
+      },
+      "data": {
+        "nodeType": "literal_number",
+        "label": "Number",
+        "icon": "#",
+        "headerColor": "#00FF00",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "number"
+          }
+        ],
+        "literalValue": 5
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-11",
+      "type": "literal_boolean",
+      "position": {
+        "x": 784.0,
+        "y": 64.0
+      },
+      "data": {
+        "nodeType": "literal_boolean",
+        "label": "Boolean",
+        "icon": "?",
+        "headerColor": "#FF0000",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "boolean"
+          }
+        ],
+        "literalValue": false
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-12",
+      "type": "get_context",
+      "position": {
+        "x": -448.0,
+        "y": 320.0
+      },
+      "data": {
+        "nodeType": "get_context",
+        "label": "Get Context",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#16A085",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object",
+            "description": "Full context object from workflow state (run.vars.context)."
+          },
+          {
+            "id": "task",
+            "label": "task",
+            "type": "string",
+            "description": "Convenience output for context.task."
+          },
+          {
+            "id": "messages",
+            "label": "messages",
+            "type": "array",
+            "description": "Convenience output for context.messages (conversation history)."
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-13",
+      "type": "answer_user",
+      "position": {
+        "x": -64.0,
+        "y": 256.0
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          },
+          {
+            "id": "level",
+            "label": "level",
+            "type": "string",
+            "description": "Message level for hosts (message|warning|error). Defaults to 'message' when unset."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-14",
+      "type": "stringify_json",
+      "position": {
+        "x": -432.0,
+        "y": 496.0
+      },
+      "data": {
+        "nodeType": "stringify_json",
+        "label": "Stringify JSON",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any",
+            "description": "JSON value (or JSON-ish string) to stringify."
+          },
+          {
+            "id": "mode",
+            "label": "mode",
+            "type": "string",
+            "description": "Rendering mode: none | beautify | minified. Default beautify."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-15",
+      "type": "join",
+      "position": {
+        "x": -208.0,
+        "y": 400.0
+      },
+      "data": {
+        "nodeType": "join",
+        "label": "Join",
+        "icon": "&#x1F517;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "items",
+            "label": "items",
+            "type": "array"
+          },
+          {
+            "id": "delimiter",
+            "label": "delimiter",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "delimiter": "\\n\\n"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-16",
+      "type": "memory_note",
+      "position": {
+        "x": 480.0,
+        "y": -736.0
+      },
+      "data": {
+        "nodeType": "memory_note",
+        "label": "Memorize",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#2ECC71",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "keep_in_context",
+            "label": "in_context",
+            "type": "boolean",
+            "description": "When true, also insert the stored note into this run's context.messages (synthetic system message). If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string",
+            "description": "Where to store/index the note: run (this run), session (all runs with the same session_id; owned by an internal session memory run), or global (shared global memory run). If session_id is missing, session falls back to the run-tree root."
+          },
+          {
+            "id": "content",
+            "label": "content",
+            "type": "string",
+            "description": "The note text to store durably (keep it short; prefer references in sources for large payloads)."
+          },
+          {
+            "id": "location",
+            "label": "location",
+            "type": "string",
+            "description": "Optional location label (where the note was produced, e.g. \"flow:my_flow/node-12\"). Useful for filtering."
+          },
+          {
+            "id": "tags",
+            "label": "tags",
+            "type": "object",
+            "description": "Key/value tags for filtering (e.g. {topic:\"memory\", person:\"laurent\"}). Values must be strings."
+          },
+          {
+            "id": "sources",
+            "label": "sources",
+            "type": "object",
+            "description": "Optional provenance refs (e.g. {run_id, span_ids, message_ids}). The note stores refs, not the full source content."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "note_id",
+            "label": "note_id",
+            "type": "string",
+            "description": "The stored note’s span_id / artifact_id. Use it for Recall into context (span_ids) or for precise Recall."
+          }
+        ],
+        "pinDefaults": {
+          "keep_in_context": true
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-17",
+      "type": "set_var",
+      "position": {
+        "x": 160.0,
+        "y": -544.0
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Set manual_context",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "manual_context"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-18",
+      "type": "get_var",
+      "position": {
+        "x": -112.0,
+        "y": -720.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get manual_context",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "manual_context"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-19",
+      "type": "concat",
+      "position": {
+        "x": -112.0,
+        "y": -608.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "b": "\\n"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-20",
+      "type": "set_var",
+      "position": {
+        "x": -544.0,
+        "y": -256.0
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Set manual_context",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "manual_context"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-21",
+      "type": "literal_string",
+      "position": {
+        "x": -544.0,
+        "y": -336.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "String",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": ""
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-22",
+      "type": "get_var",
+      "position": {
+        "x": -304.0,
+        "y": -400.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get manual_context",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "manual_context"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-23",
+      "type": "concat",
+      "position": {
+        "x": -256.0,
+        "y": -256.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "b": "\\n",
+          "a": "Write exactly one sentence."
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-24",
+      "type": "make_context",
+      "position": {
+        "x": -384.0,
+        "y": 128.0
+      },
+      "data": {
+        "nodeType": "make_context",
+        "label": "Make Context",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "task",
+            "label": "task",
+            "type": "string",
+            "description": "Task / user request string (context.task)."
+          },
+          {
+            "id": "messages",
+            "label": "messages",
+            "type": "array",
+            "description": "Conversation messages list (context.messages)."
+          },
+          {
+            "id": "extra",
+            "label": "extra",
+            "type": "object",
+            "description": "Optional additional fields merged into the context (task/messages win)."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object",
+            "description": "Context object {task, messages, ...extra}."
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-26",
+      "type": "agent",
+      "position": {
+        "x": 16.0,
+        "y": -320.0
+      },
+      "data": {
+        "nodeType": "agent",
+        "label": "Agent",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "include_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) as agent history. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider",
+            "description": "LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model",
+            "description": "LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number",
+            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number",
+            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number",
+            "description": "Maximum internal ReAct iterations (safety cap). Higher values allow more tool-use steps."
+          },
+          {
+            "id": "max_input_tokens",
+            "label": "max_input_tokens",
+            "type": "number",
+            "description": "Optional per-agent input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for the agent sub-run."
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string",
+            "description": "Optional system prompt for this agent instance (high priority instructions)."
+          },
+          {
+            "id": "task",
+            "label": "prompt",
+            "type": "string",
+            "description": "The task/user prompt for the agent to solve."
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools",
+            "description": "Allowlist of tool names this agent can call (defense-in-depth; runtime still enforces allowlists)."
+          },
+          {
+            "id": "response_schema",
+            "label": "structured_output",
+            "type": "object",
+            "description": "Optional JSON Schema object (type=object) the final answer must conform to."
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object",
+            "description": "Optional explicit context object for the agent (e.g. {messages:[...]}). If provided, it can override inherited run context."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object",
+            "description": "Structured final agent result (answer + metadata/tool calls depending on agent)."
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array",
+            "description": "Best-effort list of tool call requests extracted from the agent scratchpad trace (post-run). For real-time tool observability, subscribe to the ledger/node_traces stream."
+          },
+          {
+            "id": "tool_results",
+            "label": "tool_results",
+            "type": "array",
+            "description": "Best-effort list of tool results extracted from the agent scratchpad trace (post-run). For real-time tool observability, subscribe to the ledger/node_traces stream."
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object",
+            "description": "Runtime-owned execution trace/scratchpad for observability (LLM/tool steps, timings)."
+          }
+        ],
+        "pinDefaults": {
+          "include_context": true
+        },
+        "agentConfig": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-27",
+      "type": "get_context",
+      "position": {
+        "x": -240.0,
+        "y": 16.0
+      },
+      "data": {
+        "nodeType": "get_context",
+        "label": "Get Context",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#16A085",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object",
+            "description": "Full context object from workflow state (run.vars.context)."
+          },
+          {
+            "id": "task",
+            "label": "task",
+            "type": "string",
+            "description": "Convenience output for context.task."
+          },
+          {
+            "id": "messages",
+            "label": "messages",
+            "type": "array",
+            "description": "Convenience output for context.messages (conversation history)."
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-28",
+      "type": "break_object",
+      "position": {
+        "x": 288.0,
+        "y": 48.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "result"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1768257818763",
+      "source": "node-4",
+      "sourceHandle": "value",
+      "target": "node-2",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "edge-1768257916081",
+      "source": "node-6",
+      "sourceHandle": "exec-out",
+      "target": "node-8",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768257936357",
+      "source": "node-2",
+      "sourceHandle": "index",
+      "target": "node-9",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-1768257949432",
+      "source": "node-10",
+      "sourceHandle": "value",
+      "target": "node-9",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-1768257951415",
+      "source": "node-9",
+      "sourceHandle": "result",
+      "target": "node-8",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "edge-1768257958349",
+      "source": "node-8",
+      "sourceHandle": "true",
+      "target": "node-3",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768257964478",
+      "source": "node-11",
+      "sourceHandle": "value",
+      "target": "node-3",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-1768258053973",
+      "source": "node-2",
+      "sourceHandle": "done",
+      "target": "node-13",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768258074668",
+      "source": "node-12",
+      "sourceHandle": "messages",
+      "target": "node-15",
+      "targetHandle": "items",
+      "animated": false
+    },
+    {
+      "id": "edge-1768258078006",
+      "source": "node-15",
+      "sourceHandle": "result",
+      "target": "node-13",
+      "targetHandle": "message",
+      "animated": false
+    },
+    {
+      "id": "edge-1768258287607",
+      "source": "node-18",
+      "sourceHandle": "value",
+      "target": "node-19",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-1768258369698",
+      "source": "node-19",
+      "sourceHandle": "result",
+      "target": "node-17",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-1768258422510",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-20",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768258424866",
+      "source": "node-20",
+      "sourceHandle": "exec-out",
+      "target": "node-2",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768258432065",
+      "source": "node-21",
+      "sourceHandle": "value",
+      "target": "node-20",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-1768258969656",
+      "source": "node-17",
+      "sourceHandle": "exec-out",
+      "target": "node-16",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768260238399",
+      "source": "node-17",
+      "sourceHandle": "value",
+      "target": "node-16",
+      "targetHandle": "content",
+      "animated": false
+    },
+    {
+      "id": "edge-1768260256023",
+      "source": "node-2",
+      "sourceHandle": "loop",
+      "target": "node-26",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768260298299",
+      "source": "node-23",
+      "sourceHandle": "result",
+      "target": "node-26",
+      "targetHandle": "task",
+      "animated": false
+    },
+    {
+      "id": "edge-1768260348707",
+      "source": "node-26",
+      "sourceHandle": "result",
+      "target": "node-28",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1768260464766",
+      "source": "node-26",
+      "sourceHandle": "exec-out",
+      "target": "node-6",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768260469783",
+      "source": "node-28",
+      "sourceHandle": "result",
+      "target": "node-6",
+      "targetHandle": "message",
+      "animated": false
+    }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2026-01-12T23:24:03.961884",
+  "updated_at": "2026-01-12T23:29:09.463592"
+}

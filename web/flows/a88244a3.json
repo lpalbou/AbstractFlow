@@ -1,0 +1,164 @@
+{
+  "id": "a88244a3",
+  "name": "Untitled Flow",
+  "description": "",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": {
+        "x": 0.0,
+        "y": 304.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-2",
+      "type": "memory_kg_query",
+      "position": {
+        "x": 304.0,
+        "y": 304.0
+      },
+      "data": {
+        "nodeType": "memory_kg_query",
+        "label": "KG Query",
+        "icon": "&#x1F50E;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "query_text",
+            "label": "query_text",
+            "type": "string",
+            "description": "Optional semantic query. Requires embeddings to be configured in the host."
+          },
+          {
+            "id": "subject",
+            "label": "subject",
+            "type": "string",
+            "description": "Optional canonical subject filter (trim + lower; stable exact match after canonicalization)."
+          },
+          {
+            "id": "predicate",
+            "label": "predicate",
+            "type": "string",
+            "description": "Optional canonical predicate filter (trim + lower; stable exact match after canonicalization)."
+          },
+          {
+            "id": "object",
+            "label": "object",
+            "type": "string",
+            "description": "Optional canonical object filter (trim + lower; stable exact match after canonicalization)."
+          },
+          {
+            "id": "since",
+            "label": "since",
+            "type": "string",
+            "description": "Optional observed_at lower bound (ISO8601)."
+          },
+          {
+            "id": "until",
+            "label": "until",
+            "type": "string",
+            "description": "Optional observed_at upper bound (ISO8601)."
+          },
+          {
+            "id": "active_at",
+            "label": "active_at",
+            "type": "string",
+            "description": "Optional validity window selector (ISO8601). Filters assertions active at that time."
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string",
+            "description": "run | session | global | all (fan-out over run+session+global)."
+          },
+          {
+            "id": "owner_id",
+            "label": "owner_id",
+            "type": "string",
+            "description": "Optional explicit owner id override (advanced; normally derived from scope)."
+          },
+          {
+            "id": "limit",
+            "label": "limit",
+            "type": "number",
+            "description": "Max assertions to return (default 100)."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "items",
+            "label": "items",
+            "type": "array",
+            "description": "List of triple assertions (dicts)."
+          },
+          {
+            "id": "count",
+            "label": "count",
+            "type": "number",
+            "description": "Number of returned assertions."
+          },
+          {
+            "id": "ok",
+            "label": "ok",
+            "type": "boolean",
+            "description": "True when query succeeded."
+          }
+        ],
+        "pinDefaults": {
+          "query_text": "",
+          "subject": "picard",
+          "scope": "global"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1768260594008",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-2",
+      "targetHandle": "exec-in",
+      "animated": true
+    }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2026-01-12T23:30:01.673894",
+  "updated_at": "2026-01-12T23:32:03.521570"
+}

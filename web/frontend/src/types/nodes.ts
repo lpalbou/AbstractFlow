@@ -213,6 +213,21 @@ const CORE_NODES: NodeTemplate[] = [
     category: 'core',
   },
   {
+    type: 'add_message',
+    icon: '&#x1F4AC;', // Speech bubble
+    label: 'Add Message',
+    description: 'Build a canonical message object for context.messages.',
+    headerColor: '#3498DB',
+    inputs: [
+      { id: 'role', label: 'role', type: 'string', description: 'Message role (e.g. user, assistant, system, tool).' },
+      { id: 'content', label: 'content', type: 'string', description: 'Message content.' },
+    ],
+    outputs: [
+      { id: 'message', label: 'message', type: 'object', description: 'Message object {role, content, timestamp, metadata.message_id}.' },
+    ],
+    category: 'core',
+  },
+  {
     type: 'agent',
     icon: '&#x1F916;', // Robot
     label: 'Agent',
