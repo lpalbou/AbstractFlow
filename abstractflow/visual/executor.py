@@ -9,6 +9,7 @@ semantics engine across the framework.
 from __future__ import annotations
 
 import os
+import threading
 from typing import Any, Dict, Optional, cast
 
 from ..core.flow import Flow
@@ -16,6 +17,11 @@ from ..runner import FlowRunner
 
 from .agent_ids import visual_react_workflow_id
 from .models import VisualFlow
+
+
+_MEMORY_KG_STORE_CACHE_LOCK = threading.Lock()
+# Keyed by (store_base_dir, embedding_provider, embedding_model).
+_MEMORY_KG_STORE_CACHE: dict[tuple[str, str, str], Any] = {}
 
 
 def create_visual_runner(
@@ -454,7 +460,7 @@ def create_visual_runner(
                     pass
                 sys.path.insert(0, mem_src_str)
 
-            from abstractmemory import InMemoryTripleStore, LanceDBTripleStore
+            from abstractmemory import LanceDBTripleStore
             from abstractruntime.integrations.abstractmemory.effect_handlers import build_memory_kg_effect_handlers
             from abstractruntime.storage.artifacts import utc_now_iso
         except Exception as e:
@@ -485,19 +491,19 @@ def create_visual_runner(
                     base_dir = None
 
         embedder = None
+        emb_provider = (
+            os.getenv("ABSTRACTFLOW_EMBEDDING_PROVIDER")
+            or os.getenv("ABSTRACTGATEWAY_EMBEDDING_PROVIDER")
+            or "lmstudio"
+        )
+        emb_model = (
+            os.getenv("ABSTRACTFLOW_EMBEDDING_MODEL")
+            or os.getenv("ABSTRACTGATEWAY_EMBEDDING_MODEL")
+            or "text-embedding-nomic-embed-text-v1.5@q6_k"
+        )
         try:
             from abstractruntime.integrations.abstractcore.embeddings_client import AbstractCoreEmbeddingsClient
 
-            emb_provider = (
-                os.getenv("ABSTRACTFLOW_EMBEDDING_PROVIDER")
-                or os.getenv("ABSTRACTGATEWAY_EMBEDDING_PROVIDER")
-                or "lmstudio"
-            )
-            emb_model = (
-                os.getenv("ABSTRACTFLOW_EMBEDDING_MODEL")
-                or os.getenv("ABSTRACTGATEWAY_EMBEDDING_MODEL")
-                or "text-embedding-nomic-embed-text-v1.5@q6_k"
-            )
             cache_dir = (base_dir.parent if base_dir is not None else Path.cwd()) / "abstractcore" / "embeddings"
 
             emb_client = AbstractCoreEmbeddingsClient(
@@ -517,15 +523,26 @@ def create_visual_runner(
         except Exception:
             embedder = None
 
-        store_obj: Any
-        if base_dir is not None:
+        if base_dir is None:
+            raise RuntimeError(
+                "This flow uses memory_kg_* nodes, but no durable memory directory could be resolved. "
+                "Set `ABSTRACTFLOW_MEMORY_DIR` (or `ABSTRACTMEMORY_DIR`), or run with a file-backed ArtifactStore."
+            )
+
+        base_dir.mkdir(parents=True, exist_ok=True)
+        cache_key = (str(base_dir), str(emb_provider).strip().lower(), str(emb_model).strip())
+        with _MEMORY_KG_STORE_CACHE_LOCK:
+            store_obj = _MEMORY_KG_STORE_CACHE.get(cache_key)
+        if store_obj is None:
             try:
-                base_dir.mkdir(parents=True, exist_ok=True)
                 store_obj = LanceDBTripleStore(base_dir / "kg", embedder=embedder)
-            except Exception:
-                store_obj = InMemoryTripleStore(embedder=embedder)
-        else:
-            store_obj = InMemoryTripleStore(embedder=embedder)
+            except Exception as e:
+                raise RuntimeError(
+                    "This flow uses memory_kg_* nodes, which require a LanceDB-backed store. "
+                    "Install `lancedb` and ensure the host runs under the same environment."
+                ) from e
+            with _MEMORY_KG_STORE_CACHE_LOCK:
+                _MEMORY_KG_STORE_CACHE[cache_key] = store_obj
 
         extra_effect_handlers = build_memory_kg_effect_handlers(store=store_obj, run_store=run_store, now_iso=utc_now_iso)
 

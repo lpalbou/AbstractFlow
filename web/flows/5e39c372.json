@@ -1,0 +1,1426 @@
+{
+  "id": "5e39c372",
+  "name": "react",
+  "description": "",
+  "interfaces": [
+    "abstractcode.agent.v1"
+  ],
+  "nodes": [
+    {
+      "id": "node-3",
+      "type": "on_flow_start",
+      "position": {
+        "x": -48.0,
+        "y": 176.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-4",
+      "type": "on_flow_end",
+      "position": {
+        "x": 2032.0,
+        "y": -32.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          },
+          {
+            "id": "raw_result",
+            "label": "raw_result",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-5",
+      "type": "llm_call",
+      "position": {
+        "x": 336.0,
+        "y": 176.0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "LLM Call",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "include_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "max_input_tokens",
+            "label": "max_input_tokens",
+            "type": "number",
+            "description": "Optional per-call input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for this call."
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider",
+            "description": "LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model",
+            "description": "LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number",
+            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number",
+            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string",
+            "description": "Optional system prompt for this single call."
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string",
+            "description": "User prompt/content for this single call."
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools",
+            "description": "Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node)."
+          },
+          {
+            "id": "response_schema",
+            "label": "structured_output",
+            "type": "object",
+            "description": "Optional JSON Schema object (type=object) the assistant content must conform to."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string",
+            "description": "Assistant text content (best-effort). For tool calls, content may be empty."
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array",
+            "description": "Normalized tool call requests (same as result.tool_calls). This pin exists to make wiring into Tool Calls / Emit Event nodes simpler."
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object",
+            "description": "Full normalized LLM result (content, tool_calls, usage, provider/model metadata, trace_id)."
+          }
+        ],
+        "pinDefaults": {
+          "system": "You are a highly autonomous ReAct agent who requests the execution of tools to your host in order to fullfill the user REQUEST. You work with the highest standards of rigor and profesionalism, you do not skip any task or test, you continue until your work is done, fully done.\n\nWhen you are done, return the following : <promise>I have completed ",
+          "include_context": true
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-6",
+      "type": "literal_string",
+      "position": {
+        "x": -112.0,
+        "y": 688.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "PROMISE",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "<promise>I have completed the task and all its subtasks. The implementation is verified and all the relevant tests pass. I have not taken any shortcut and the code is production ready</promise>."
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-7",
+      "type": "literal_string",
+      "position": {
+        "x": -112.0,
+        "y": 576.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "SYSTEM PROMPT",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "You are a highly autonomous ReAct agent who requests the execution of tools to your host in order to fullfill the user REQUEST. You work with the highest standards of rigor and profesionalism, you do not skip any task or test, you continue until your work is done, fully done.When you are done, return the following : "
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-8",
+      "type": "concat",
+      "position": {
+        "x": 112.0,
+        "y": 592.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-11",
+      "type": "has_tools",
+      "position": {
+        "x": 672.0,
+        "y": 320.0
+      },
+      "data": {
+        "nodeType": "has_tools",
+        "label": "Has Tools",
+        "icon": "&#x1F9F0;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "array",
+            "label": "array",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "boolean"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-12",
+      "type": "if",
+      "position": {
+        "x": 672.0,
+        "y": 176.0
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "IF HAS TOOLS",
+        "icon": "&#x2753;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-13",
+      "type": "subflow",
+      "position": {
+        "x": 1744.0,
+        "y": -32.0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Subflow",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean",
+            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          },
+          {
+            "id": "raw_result",
+            "label": "raw_result",
+            "type": "object"
+          }
+        ],
+        "subflowId": "87962987",
+        "pinDefaults": {
+          "inherit_context": true
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-14",
+      "type": "subtract",
+      "position": {
+        "x": 608.0,
+        "y": 624.0
+      },
+      "data": {
+        "nodeType": "subtract",
+        "label": "Subtract",
+        "icon": "-",
+        "headerColor": "#27AE60",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "number"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "number"
+          }
+        ],
+        "pinDefaults": {
+          "b": 1
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-15",
+      "type": "on_flow_end",
+      "position": {
+        "x": 1152.0,
+        "y": 752.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          },
+          {
+            "id": "raw_result",
+            "label": "raw_result",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-16",
+      "type": "break_object",
+      "position": {
+        "x": 608.0,
+        "y": 512.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "metadata",
+            "label": "metadata",
+            "type": "object"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "metadata"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-19",
+      "type": "call_tool",
+      "position": {
+        "x": 1184.0,
+        "y": -32.0
+      },
+      "data": {
+        "nodeType": "call_tool",
+        "label": "Call Tool",
+        "icon": "&#x1F527;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "tool_call",
+            "label": "tool_call",
+            "type": "object",
+            "description": "Single tool call request shape: {name, arguments, call_id?}."
+          },
+          {
+            "id": "allowed_tools",
+            "label": "allowed_tools",
+            "type": "array",
+            "description": "Optional allowlist of tool names enforced by the runtime effect handler (empty list => allow none). If not connected, the node config (if any) is used."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "any",
+            "description": "Tool output when success=true; otherwise the error string."
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean",
+            "description": "True if the tool executed successfully."
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-20",
+      "type": "loop",
+      "position": {
+        "x": 960.0,
+        "y": -32.0
+      },
+      "data": {
+        "nodeType": "loop",
+        "label": "FOR EACH TOOL",
+        "icon": "&#x1F501;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "items",
+            "label": "items",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "loop",
+            "label": "loop",
+            "type": "execution"
+          },
+          {
+            "id": "done",
+            "label": "done",
+            "type": "execution"
+          },
+          {
+            "id": "item",
+            "label": "item",
+            "type": "any"
+          },
+          {
+            "id": "index",
+            "label": "index",
+            "type": "number"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-21",
+      "type": "if",
+      "position": {
+        "x": 1392.0,
+        "y": -32.0
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "IF TOOL SUCCEED",
+        "icon": "&#x2753;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-22",
+      "type": "answer_user",
+      "position": {
+        "x": 1888.0,
+        "y": 288.0
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          },
+          {
+            "id": "level",
+            "label": "level",
+            "type": "string",
+            "description": "Message level for hosts (message|warning|error). Defaults to 'message' when unset."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "level": "error",
+          "message": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-23",
+      "type": "concat",
+      "position": {
+        "x": 1888.0,
+        "y": 432.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "a": "Could not execute tool : "
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-24",
+      "type": "on_flow_end",
+      "position": {
+        "x": 1456.0,
+        "y": 208.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          },
+          {
+            "id": "raw_result",
+            "label": "raw_result",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-25",
+      "type": "subflow",
+      "position": {
+        "x": 1184.0,
+        "y": 208.0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Subflow",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean",
+            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          },
+          {
+            "id": "raw_result",
+            "label": "raw_result",
+            "type": "object"
+          }
+        ],
+        "subflowId": "87962987",
+        "pinDefaults": {
+          "inherit_context": true
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1768242035200",
+      "source": "node-3",
+      "sourceHandle": "exec-out",
+      "target": "node-5",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768242040965",
+      "source": "node-3",
+      "sourceHandle": "request",
+      "target": "node-5",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "edge-1768242047876",
+      "source": "node-3",
+      "sourceHandle": "tools",
+      "target": "node-5",
+      "targetHandle": "tools",
+      "animated": false
+    },
+    {
+      "id": "edge-1768242050132",
+      "source": "node-3",
+      "sourceHandle": "model",
+      "target": "node-5",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-1768242052001",
+      "source": "node-3",
+      "sourceHandle": "provider",
+      "target": "node-5",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1768242428048",
+      "source": "node-7",
+      "sourceHandle": "value",
+      "target": "node-8",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-1768242430344",
+      "source": "node-6",
+      "sourceHandle": "value",
+      "target": "node-8",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-1768242474061",
+      "source": "node-8",
+      "sourceHandle": "result",
+      "target": "node-5",
+      "targetHandle": "system",
+      "animated": false
+    },
+    {
+      "id": "edge-1768243339610",
+      "source": "node-5",
+      "sourceHandle": "tool_calls",
+      "target": "node-11",
+      "targetHandle": "array",
+      "animated": false
+    },
+    {
+      "id": "edge-1768243362948",
+      "source": "node-5",
+      "sourceHandle": "exec-out",
+      "target": "node-12",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768243366192",
+      "source": "node-11",
+      "sourceHandle": "result",
+      "target": "node-12",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "edge-1768243384217",
+      "source": "node-13",
+      "sourceHandle": "exec-out",
+      "target": "node-4",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768243412536",
+      "source": "node-13",
+      "sourceHandle": "response",
+      "target": "node-4",
+      "targetHandle": "response",
+      "animated": false
+    },
+    {
+      "id": "edge-1768243414310",
+      "source": "node-13",
+      "sourceHandle": "meta",
+      "target": "node-4",
+      "targetHandle": "meta",
+      "animated": false
+    },
+    {
+      "id": "edge-1768243415858",
+      "source": "node-13",
+      "sourceHandle": "scratchpad",
+      "target": "node-4",
+      "targetHandle": "scratchpad",
+      "animated": false
+    },
+    {
+      "id": "edge-1768243417766",
+      "source": "node-13",
+      "sourceHandle": "raw_result",
+      "target": "node-4",
+      "targetHandle": "raw_result",
+      "animated": false
+    },
+    {
+      "id": "edge-1768243430800",
+      "source": "node-3",
+      "sourceHandle": "request",
+      "target": "node-13",
+      "targetHandle": "request",
+      "animated": false
+    },
+    {
+      "id": "edge-1768243433981",
+      "source": "node-3",
+      "sourceHandle": "provider",
+      "target": "node-13",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1768243436764",
+      "source": "node-3",
+      "sourceHandle": "model",
+      "target": "node-13",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-1768243440221",
+      "source": "node-3",
+      "sourceHandle": "tools",
+      "target": "node-13",
+      "targetHandle": "tools",
+      "animated": false
+    },
+    {
+      "id": "edge-1768243443378",
+      "source": "node-3",
+      "sourceHandle": "context",
+      "target": "node-13",
+      "targetHandle": "context",
+      "animated": false
+    },
+    {
+      "id": "edge-1768243464892",
+      "source": "node-3",
+      "sourceHandle": "max_iterations",
+      "target": "node-14",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-1768243469608",
+      "source": "node-14",
+      "sourceHandle": "result",
+      "target": "node-13",
+      "targetHandle": "max_iterations",
+      "animated": false
+    },
+    {
+      "id": "edge-1768243499554",
+      "source": "node-5",
+      "sourceHandle": "response",
+      "target": "node-15",
+      "targetHandle": "response",
+      "animated": false
+    },
+    {
+      "id": "edge-1768243507436",
+      "source": "node-5",
+      "sourceHandle": "result",
+      "target": "node-16",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1768243521556",
+      "source": "node-16",
+      "sourceHandle": "metadata",
+      "target": "node-15",
+      "targetHandle": "meta",
+      "animated": false
+    },
+    {
+      "id": "edge-1768244839357",
+      "source": "node-12",
+      "sourceHandle": "true",
+      "target": "node-20",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768244845568",
+      "source": "node-5",
+      "sourceHandle": "tool_calls",
+      "target": "node-20",
+      "targetHandle": "items",
+      "animated": false
+    },
+    {
+      "id": "edge-1768244850408",
+      "source": "node-20",
+      "sourceHandle": "loop",
+      "target": "node-19",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768244860740",
+      "source": "node-3",
+      "sourceHandle": "tools",
+      "target": "node-19",
+      "targetHandle": "allowed_tools",
+      "animated": false
+    },
+    {
+      "id": "edge-1768244864840",
+      "source": "node-20",
+      "sourceHandle": "item",
+      "target": "node-19",
+      "targetHandle": "tool_call",
+      "animated": false
+    },
+    {
+      "id": "edge-1768244936023",
+      "source": "node-19",
+      "sourceHandle": "exec-out",
+      "target": "node-21",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768244939473",
+      "source": "node-19",
+      "sourceHandle": "success",
+      "target": "node-21",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "edge-1768244951702",
+      "source": "node-21",
+      "sourceHandle": "true",
+      "target": "node-13",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768245063462",
+      "source": "node-21",
+      "sourceHandle": "false",
+      "target": "node-22",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768245087416",
+      "source": "node-23",
+      "sourceHandle": "result",
+      "target": "node-22",
+      "targetHandle": "message",
+      "animated": false
+    },
+    {
+      "id": "edge-1768245103269",
+      "source": "node-19",
+      "sourceHandle": "result",
+      "target": "node-23",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-1768245222792",
+      "source": "node-20",
+      "sourceHandle": "done",
+      "target": "node-25",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768245229151",
+      "source": "node-25",
+      "sourceHandle": "exec-out",
+      "target": "node-24",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768245231542",
+      "source": "node-25",
+      "sourceHandle": "response",
+      "target": "node-24",
+      "targetHandle": "response",
+      "animated": false
+    },
+    {
+      "id": "edge-1768245233683",
+      "source": "node-25",
+      "sourceHandle": "meta",
+      "target": "node-24",
+      "targetHandle": "meta",
+      "animated": false
+    },
+    {
+      "id": "edge-1768245235675",
+      "source": "node-25",
+      "sourceHandle": "scratchpad",
+      "target": "node-24",
+      "targetHandle": "scratchpad",
+      "animated": false
+    },
+    {
+      "id": "edge-1768245237473",
+      "source": "node-25",
+      "sourceHandle": "raw_result",
+      "target": "node-24",
+      "targetHandle": "raw_result",
+      "animated": false
+    },
+    {
+      "id": "edge-1768245245796",
+      "source": "node-3",
+      "sourceHandle": "request",
+      "target": "node-25",
+      "targetHandle": "request",
+      "animated": false
+    },
+    {
+      "id": "edge-1768245253162",
+      "source": "node-3",
+      "sourceHandle": "provider",
+      "target": "node-25",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1768245256686",
+      "source": "node-3",
+      "sourceHandle": "model",
+      "target": "node-25",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-1768245260115",
+      "source": "node-3",
+      "sourceHandle": "tools",
+      "target": "node-25",
+      "targetHandle": "tools",
+      "animated": false
+    },
+    {
+      "id": "edge-1768245264611",
+      "source": "node-3",
+      "sourceHandle": "context",
+      "target": "node-25",
+      "targetHandle": "context",
+      "animated": false
+    },
+    {
+      "id": "edge-1768245271548",
+      "source": "node-14",
+      "sourceHandle": "result",
+      "target": "node-25",
+      "targetHandle": "max_iterations",
+      "animated": false
+    },
+    {
+      "id": "edge-1768245289884",
+      "source": "node-12",
+      "sourceHandle": "false",
+      "target": "node-15",
+      "targetHandle": "exec-in",
+      "animated": true
+    }
+  ],
+  "entryNode": "node-3",
+  "created_at": "2026-01-12T19:16:16.287091",
+  "updated_at": "2026-01-12T20:23:35.772514"
+}

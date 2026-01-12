@@ -1,0 +1,414 @@
+{
+  "id": "a89471e4",
+  "name": "test-retrieval",
+  "description": "",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": {
+        "x": 304.0,
+        "y": -128.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-2",
+      "type": "subflow",
+      "position": {
+        "x": 624.0,
+        "y": -128.0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Subflow",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean",
+            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          },
+          {
+            "id": "query_text",
+            "label": "query_text",
+            "type": "string"
+          },
+          {
+            "id": "subject",
+            "label": "subject",
+            "type": "string"
+          },
+          {
+            "id": "predicate",
+            "label": "predicate",
+            "type": "string"
+          },
+          {
+            "id": "object",
+            "label": "object",
+            "type": "string"
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string"
+          },
+          {
+            "id": "limit",
+            "label": "limit",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "items",
+            "label": "items",
+            "type": "array"
+          },
+          {
+            "id": "count",
+            "label": "count",
+            "type": "number"
+          },
+          {
+            "id": "ok",
+            "label": "ok",
+            "type": "boolean"
+          },
+          {
+            "id": "rendered",
+            "label": "rendered",
+            "type": "string"
+          }
+        ],
+        "subflowId": "ltm-ai-kg-query",
+        "pinDefaults": {
+          "query_text": "",
+          "limit": 10,
+          "scope": "all",
+          "subject": "",
+          "predicate": "occurs_in"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-3",
+      "type": "loop",
+      "position": {
+        "x": 944.0,
+        "y": -96.0
+      },
+      "data": {
+        "nodeType": "loop",
+        "label": "ForEach",
+        "icon": "&#x1F501;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "items",
+            "label": "items",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "loop",
+            "label": "loop",
+            "type": "execution"
+          },
+          {
+            "id": "done",
+            "label": "done",
+            "type": "execution"
+          },
+          {
+            "id": "item",
+            "label": "item",
+            "type": "any"
+          },
+          {
+            "id": "index",
+            "label": "index",
+            "type": "number"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-4",
+      "type": "answer_user",
+      "position": {
+        "x": 1200.0,
+        "y": -64.0
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          },
+          {
+            "id": "level",
+            "label": "level",
+            "type": "string",
+            "description": "Message level for hosts (message|warning|error). Defaults to 'message' when unset."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-5",
+      "type": "answer_user",
+      "position": {
+        "x": 1120.0,
+        "y": 128.0
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          },
+          {
+            "id": "level",
+            "label": "level",
+            "type": "string",
+            "description": "Message level for hosts (message|warning|error). Defaults to 'message' when unset."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-6",
+      "type": "answer_user",
+      "position": {
+        "x": 832.0,
+        "y": 224.0
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          },
+          {
+            "id": "level",
+            "label": "level",
+            "type": "string",
+            "description": "Message level for hosts (message|warning|error). Defaults to 'message' when unset."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1768241369217",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-2",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768241529717",
+      "source": "node-2",
+      "sourceHandle": "items",
+      "target": "node-3",
+      "targetHandle": "items",
+      "animated": false
+    },
+    {
+      "id": "edge-1768241539667",
+      "source": "node-3",
+      "sourceHandle": "loop",
+      "target": "node-4",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768241541709",
+      "source": "node-3",
+      "sourceHandle": "item",
+      "target": "node-4",
+      "targetHandle": "message",
+      "animated": false
+    },
+    {
+      "id": "edge-1768241547671",
+      "source": "node-3",
+      "sourceHandle": "done",
+      "target": "node-5",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768241551116",
+      "source": "node-2",
+      "sourceHandle": "rendered",
+      "target": "node-5",
+      "targetHandle": "message",
+      "animated": false
+    },
+    {
+      "id": "edge-1768241560984",
+      "source": "node-2",
+      "sourceHandle": "exec-out",
+      "target": "node-6",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768241563234",
+      "source": "node-6",
+      "sourceHandle": "exec-out",
+      "target": "node-3",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768241565440",
+      "source": "node-2",
+      "sourceHandle": "ok",
+      "target": "node-6",
+      "targetHandle": "message",
+      "animated": false
+    }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2026-01-12T18:12:47.739450",
+  "updated_at": "2026-01-12T18:17:52.373294"
+}

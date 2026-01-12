@@ -6,6 +6,28 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ExecutionEvent } from '../types/flow';
 import { useFlowStore } from './useFlow';
 
+function getOrCreateStableSessionId(): string | undefined {
+  // Stable per browser tab (sessionStorage), used to back AbstractRuntime `session` scope
+  // across multiple flow executions within the same UI session.
+  //
+  // IMPORTANT: do not use connection_id fallbacks because AbstractFlow creates one WebSocket
+  // per flow, so switching flows would create a new session owner partition.
+  try {
+    const key = 'abstractflow_session_id_v1';
+    const existing = window.sessionStorage.getItem(key);
+    if (existing && existing.trim()) return existing.trim();
+
+    const next =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `af_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
+    window.sessionStorage.setItem(key, next);
+    return next;
+  } catch {
+    return undefined;
+  }
+}
+
 interface UseWebSocketOptions {
   flowId: string;
   onEvent?: (event: ExecutionEvent) => void;
@@ -23,6 +45,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
   const wsRef = useRef<WebSocket | null>(null);
   const wsFlowIdRef = useRef<string>(flowId);
   const pingTimerRef = useRef<number | null>(null);
+  const stableSessionIdRef = useRef<string | undefined>(undefined);
   const [connected, setConnected] = useState(false);
   const [isWaiting, setIsWaiting] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -420,10 +443,23 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
   const runFlow = useCallback(
     (inputData: Record<string, unknown> = {}) => {
       connect();
+
+      // Ensure `session` scope is stable across flows in the same UI session.
+      // (AbstractFlow uses one WS per flow, so connection_id is not stable.)
+      if (stableSessionIdRef.current === undefined) stableSessionIdRef.current = getOrCreateStableSessionId();
+      const stableSessionId = stableSessionIdRef.current;
+
+      const mergedInputData: Record<string, unknown> = { ...(inputData || {}) };
+      const hasExplicitSessionId =
+        typeof mergedInputData.sessionId === 'string' && mergedInputData.sessionId.trim().length > 0;
+      const hasExplicitSessionIdSnake =
+        typeof mergedInputData.session_id === 'string' && mergedInputData.session_id.trim().length > 0;
+      if (stableSessionId && !hasExplicitSessionId && !hasExplicitSessionIdSnake) mergedInputData.sessionId = stableSessionId;
+
       // Wait for connection then send run command
       const checkAndSend = () => {
         if (wsRef.current?.readyState === WebSocket.OPEN) {
-          send({ type: 'run', input_data: inputData });
+          send({ type: 'run', input_data: mergedInputData });
         } else {
           setTimeout(checkAndSend, 100);
         }

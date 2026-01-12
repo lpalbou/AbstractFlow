@@ -293,6 +293,24 @@ async def execute_with_updates(
     visual_flow = _flows[flow_id]
 
     try:
+        # Session semantics:
+        # - Runtime scope `session` depends on `RunState.session_id`.
+        # - WebSocket executions should default to a stable session_id so multiple
+        #   flow runs in the same UI session can share session-scoped memory.
+        #
+        # Priority:
+        # - explicit session id from client input_data (session_id / sessionId)
+        # - otherwise: connection_id (stable for the lifetime of this socket)
+        session_id = None
+        try:
+            raw = input_data.get("session_id") or input_data.get("sessionId")
+            if isinstance(raw, str) and raw.strip():
+                session_id = raw.strip()
+        except Exception:
+            session_id = None
+        if session_id is None:
+            session_id = str(connection_id or "").strip() or None
+
         gate = _control_gates.get(connection_id)
         if gate is not None:
             gate.set()
@@ -316,7 +334,7 @@ async def execute_with_updates(
         _active_runners[connection_id] = runner
 
         # Start execution
-        run_id = runner.start(input_data)
+        run_id = runner.start(input_data, session_id=session_id)
         if isinstance(run_id, str) and run_id:
             _active_run_ids[connection_id] = run_id
             if workspace_dir is not None:

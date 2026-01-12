@@ -929,6 +929,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
             p.id === 'scope' &&
             (data.nodeType === 'memory_note' ||
               data.nodeType === 'memory_query' ||
+              data.nodeType === 'memory_tag' ||
               data.nodeType === 'memory_kg_assert' ||
               data.nodeType === 'memory_kg_query')
           )
@@ -967,11 +968,18 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 pin.id === 'scope' &&
                 (data.nodeType === 'memory_note' ||
                   data.nodeType === 'memory_query' ||
+                  data.nodeType === 'memory_tag' ||
                   data.nodeType === 'memory_kg_assert' ||
-                  data.nodeType === 'memory_kg_query')
+                  data.nodeType === 'memory_kg_query' ||
+                  data.nodeType === 'subflow')
               ) {
                 const current = typeof raw === 'string' && raw.trim() ? raw.trim() : 'run';
-                const allowAll = data.nodeType === 'memory_query' || data.nodeType === 'memory_kg_query';
+                const allowAll =
+                  data.nodeType === 'memory_query' ||
+                  data.nodeType === 'memory_tag' ||
+                  data.nodeType === 'memory_kg_query' ||
+                  (data.nodeType === 'subflow' &&
+                    data.inputs.some((p) => p.id === 'query_text' || p.id === 'query'));
                 const options = allowAll ? ['run', 'session', 'global', 'all'] : ['run', 'session', 'global'];
                 return (
                   <div key={pin.id} className="property-group">
@@ -1701,6 +1709,150 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                   </div>
                   <span className="property-hint">
                     These paths are extracted from the input object at runtime and exposed as output pins.
+                  </span>
+                </div>
+              </>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* Create JSON (Make Object) node properties */}
+      {data.nodeType === 'make_object' && (
+        <div className="property-section">
+          <label className="property-label">Create JSON</label>
+          {(() => {
+            const existingPins: Pin[] = (data.inputs || []).filter((p) => p.type !== 'execution');
+
+            const syncPins = (nextPins: Pin[]) => {
+              // Preserve output pins (result) and other node metadata; only mutate dynamic inputs.
+              updateNodeData(node.id, {
+                inputs: nextPins,
+              });
+            };
+
+            const removeField = (pinId: string) => {
+              // Remove incoming edges that referenced this input handle.
+              const nextEdges = edges.filter((e) => !(e.target === node.id && e.targetHandle === pinId));
+              if (nextEdges.length !== edges.length) setEdges(nextEdges);
+
+              // Remove pinned defaults for the deleted field.
+              const prevDefaults = data.pinDefaults || {};
+              if (pinId in prevDefaults) {
+                const { [pinId]: _removed, ...rest } = prevDefaults as Record<string, any>;
+                updateNodeData(node.id, { pinDefaults: rest });
+              }
+
+              syncPins(existingPins.filter((p) => p.id !== pinId));
+            };
+
+            const updateField = (pinId: string, patch: Partial<Pin>) => {
+              const nextPins = existingPins.map((p) => (p.id === pinId ? { ...p, ...patch } : p));
+              syncPins(nextPins);
+            };
+
+            const commitRenameField = (pinId: string) => {
+              const draft = ioPinNameDrafts[pinId];
+              if (draft === undefined) return;
+              const nextName = draft.trim();
+              if (!nextName) {
+                setIoPinNameDrafts((prev) => {
+                  const { [pinId]: _removed, ...rest } = prev;
+                  return rest;
+                });
+                return;
+              }
+
+              const usedWithoutSelf = new Set(existingPins.filter((p) => p.id !== pinId).map((p) => p.id));
+              const nextId = uniquePinId(nextName, usedWithoutSelf);
+
+              // Update incoming edges to this input handle.
+              const nextEdges = edges.map((e) => {
+                if (e.target === node.id && e.targetHandle === pinId) {
+                  return { ...e, targetHandle: nextId };
+                }
+                return e;
+              });
+              setEdges(nextEdges);
+
+              // Move pinned defaults under the new key when present.
+              const prevDefaults = data.pinDefaults || {};
+              if (pinId in prevDefaults && nextId !== pinId) {
+                const { [pinId]: moved, ...rest } = prevDefaults as Record<string, any>;
+                updateNodeData(node.id, { pinDefaults: { ...rest, [nextId]: moved } });
+              }
+
+              const nextPins = existingPins.map((p) =>
+                p.id === pinId
+                  ? { ...p, id: nextId, label: nextId }
+                  : p
+              );
+              syncPins(nextPins);
+
+              setIoPinNameDrafts((prev) => {
+                const { [pinId]: _removed, ...rest } = prev;
+                return nextId === pinId ? rest : { ...rest, [nextId]: nextId };
+              });
+            };
+
+            const addField = () => {
+              const used = new Set(existingPins.map((p) => p.id));
+              let n = 1;
+              while (used.has(`field${n}`)) n++;
+              const id = `field${n}`;
+              const nextPins: Pin[] = [...existingPins, { id, label: id, type: 'any' as const }];
+              syncPins(nextPins);
+              setIoPinNameDrafts((prev) => ({ ...prev, [id]: id }));
+            };
+
+            return (
+              <>
+                <span className="property-hint">
+                  Define flat fields for the output object. Each field becomes an input pin; if unconnected, the node uses its default value.
+                </span>
+
+                <div className="property-group">
+                  <label className="property-sublabel">Fields</label>
+                  <div className="array-editor">
+                    {existingPins.map((pin) => (
+                      <div key={pin.id} className="array-item">
+                        <input
+                          type="text"
+                          className="property-input array-item-input io-pin-name"
+                          value={ioPinNameDrafts[pin.id] ?? pin.id}
+                          onChange={(e) => setIoPinNameDrafts((prev) => ({ ...prev, [pin.id]: e.target.value }))}
+                          onBlur={() => commitRenameField(pin.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') e.currentTarget.blur();
+                          }}
+                          placeholder="field name (e.g. my_var1)"
+                        />
+                        <select
+                          className="property-select io-pin-type"
+                          value={pin.type}
+                          onChange={(e) => updateField(pin.id, { type: e.target.value as DataPinType })}
+                        >
+                          {DATA_PIN_TYPES.map((t) => (
+                            <option key={t} value={t}>
+                              {t}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          className="array-item-remove"
+                          onClick={() => removeField(pin.id)}
+                          title="Remove field"
+                        >
+                          &times;
+                        </button>
+                      </div>
+                    ))}
+                    <button className="array-add-button" onClick={addField}>
+                      + Add Field
+                    </button>
+                  </div>
+                  <span className="property-hint">
+                    Output object keys are the field names above (flat only; use <code>Set Property</code> for nested paths).
                   </span>
                 </div>
               </>
@@ -2670,6 +2822,33 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                     clearable
                     onChange={(vals) => setPinDefault(pin.id, vals.length > 0 ? vals : undefined)}
                   />
+                );
+              }
+
+              if (pin.id === 'scope') {
+                const allowAll = nodes.some((n) => {
+                  const t = n?.data?.nodeType;
+                  if (t === 'memory_query' || t === 'memory_tag' || t === 'memory_kg_query') return true;
+                  if (t === 'subflow') {
+                    const ins = Array.isArray(n?.data?.inputs) ? n.data.inputs : [];
+                    return ins.some((p: any) => p && (p.id === 'query_text' || p.id === 'query'));
+                  }
+                  return false;
+                });
+                const options = allowAll ? ['run', 'session', 'global', 'all'] : ['run', 'session', 'global'];
+                const current = typeof raw === 'string' && raw.trim() ? raw.trim() : 'run';
+                return (
+                  <select
+                    className="property-select"
+                    value={options.includes(current) ? current : 'run'}
+                    onChange={(e) => setPinDefault(pin.id, e.target.value)}
+                  >
+                    {options.map((v) => (
+                      <option key={v} value={v}>
+                        {v}
+                      </option>
+                    ))}
+                  </select>
                 );
               }
 

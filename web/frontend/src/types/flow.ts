@@ -69,13 +69,21 @@ export type NodeType =
   | 'subflow'
   // Math - Pure functions (no exec pins)
   | 'add' | 'subtract' | 'multiply' | 'divide' | 'modulo' | 'power' | 'abs' | 'round'
+  | 'random_int' | 'random_float'
   // String - Pure functions (no exec pins)
   | 'concat' | 'split' | 'join' | 'format' | 'string_template' | 'uppercase' | 'lowercase' | 'trim' | 'substring' | 'length'
+  | 'contains' | 'replace'
   // Control - if/loop/while have exec, logic gates are pure
   | 'if' | 'switch' | 'loop' | 'while' | 'sequence' | 'parallel' | 'compare' | 'not' | 'and' | 'or' | 'coalesce'
   | 'for'
   // Data - Pure functions (no exec pins)
   | 'get' | 'set' | 'merge' | 'make_array' | 'array_map' | 'array_filter' | 'array_concat' | 'array_length' | 'array_append' | 'array_dedup'
+  | 'make_object'
+  | 'get_element'
+  | 'get_random_element'
+  | 'make_context' | 'make_meta' | 'make_scratchpad' | 'make_raw_result'
+  | 'has_tools'
+  | 'get_context'
   | 'get_var' | 'set_var' | 'set_vars' | 'set_var_property'
   | 'parse_json' | 'stringify_json' | 'agent_trace_report' | 'break_object' | 'system_datetime'
   | 'provider_catalog' | 'provider_models'
@@ -102,6 +110,7 @@ export type NodeType =
   | 'memory_kg_assert'
   | 'memory_kg_query'
   | 'tool_calls'
+  | 'call_tool'
   | 'tools_allowlist'
   | 'bool_var'
   | 'var_decl';

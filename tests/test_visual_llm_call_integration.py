@@ -96,7 +96,14 @@ def test_visual_llm_call_executes_and_is_ledgered() -> None:
     )
 
     runner = create_visual_runner(visual, flows={flow_id: visual})
-    result = runner.run({})
+    try:
+        result = runner.run({})
+    except RuntimeError as e:
+        # LMStudio often lists installed models in `/v1/models` even when they are not
+        # currently loaded/servable. Treat that as a "not ready" environment and skip.
+        if "model unloaded" in str(e).lower():
+            pytest.skip(f"LMStudio model '{model}' is installed but not loaded/servable ({e})")
+        raise
     assert result.get("success") is True
 
     text = result.get("result", {}).get("text")
@@ -162,7 +169,12 @@ def test_visual_llm_call_can_be_terminal_node() -> None:
     )
 
     runner = create_visual_runner(visual, flows={flow_id: visual})
-    result = runner.run({})
+    try:
+        result = runner.run({})
+    except RuntimeError as e:
+        if "model unloaded" in str(e).lower():
+            pytest.skip(f"LMStudio model '{model}' is installed but not loaded/servable ({e})")
+        raise
     assert result.get("success") is True
 
     payload = result.get("result")
@@ -259,7 +271,14 @@ def test_visual_llm_call_can_use_multiple_models_in_one_flow() -> None:
     )
 
     runner = create_visual_runner(visual, flows={flow_id: visual})
-    result = runner.run({})
+    try:
+        result = runner.run({})
+    except RuntimeError as e:
+        # Some LMStudio setups serve only the currently loaded model; other installed models
+        # return "Model unloaded" when selected. Skip rather than fail the test suite.
+        if "model unloaded" in str(e).lower():
+            pytest.skip(f"LMStudio multi-model run not supported without loading models ({e})")
+        raise
     assert result.get("success") is True
 
     ledger = runner.get_ledger()

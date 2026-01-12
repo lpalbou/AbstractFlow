@@ -341,14 +341,43 @@ const CORE_NODES: NodeTemplate[] = [
         label: 'results',
         type: 'array',
         description:
-          'Per-call results in input order (each entry includes output/error metadata). Use this for debugging or to feed structured tool outputs into the graph.',
+          "Per-call results in input order. Each entry shape: {call_id, name, success, output, error}. When success=true, output contains the tool output and error is null; when success=false, error contains the failure message and output is null (or best-effort structured output for some tools).",
       },
       {
         id: 'success',
         label: 'success',
         type: 'boolean',
-        description: 'True if all tool calls succeeded (no per-call error).',
+        description: 'Aggregate: true only if all per-call results have success=true (see results[].success/results[].error for per-call failures).',
       },
+    ],
+    category: 'core',
+  },
+  {
+    type: 'call_tool',
+    icon: '&#x1F527;', // Wrench
+    label: 'Call Tool',
+    description: 'Execute a single tool call via the runtime. Outputs tool result (or error) and a success boolean.',
+    headerColor: '#16A085', // Teal - IO/tools
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      {
+        id: 'tool_call',
+        label: 'tool_call',
+        type: 'object',
+        description: 'Single tool call request shape: {name, arguments, call_id?}.',
+      },
+      {
+        id: 'allowed_tools',
+        label: 'allowed_tools',
+        type: 'array',
+        description:
+          'Optional allowlist of tool names enforced by the runtime effect handler (empty list => allow none). If not connected, the node config (if any) is used.',
+      },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'result', label: 'result', type: 'any', description: 'Tool output when success=true; otherwise the error string.' },
+      { id: 'success', label: 'success', type: 'boolean', description: 'True if the tool executed successfully.' },
     ],
     category: 'core',
   },
@@ -419,6 +448,8 @@ const MATH_NODES: NodeTemplate[] = [
   { type: 'power', icon: 'x^y', label: 'Power', description: 'Compute base ** exp.', headerColor: '#27AE60', inputs: [{ id: 'base', label: 'base', type: 'number' }, { id: 'exp', label: 'exp', type: 'number' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'math' },
   { type: 'abs', icon: '|x|', label: 'Absolute', description: 'Absolute value of a number.', headerColor: '#27AE60', inputs: [{ id: 'value', label: 'value', type: 'number' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'math' },
   { type: 'round', icon: '&#x223C;', label: 'Round', description: 'Round a number to N decimals.', headerColor: '#27AE60', inputs: [{ id: 'value', label: 'value', type: 'number' }, { id: 'decimals', label: 'decimals', type: 'number' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'math' },
+  { type: 'random_int', icon: '&#x1F3B2;', label: 'Random Int', description: 'Generate a random integer in [min, max] (inclusive).', headerColor: '#27AE60', inputs: [{ id: 'min', label: 'min', type: 'number', description: 'Minimum integer (inclusive).' }, { id: 'max', label: 'max', type: 'number', description: 'Maximum integer (inclusive).' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'math' },
+  { type: 'random_float', icon: '&#x1F3B2;', label: 'Random Float', description: 'Generate a random float in [min, max].', headerColor: '#27AE60', inputs: [{ id: 'min', label: 'min', type: 'number', description: 'Minimum (inclusive).' }, { id: 'max', label: 'max', type: 'number', description: 'Maximum (inclusive).' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'math' },
 ];
 
 // String nodes - Pure functions (no execution pins, just data in/out)
@@ -431,6 +462,8 @@ const STRING_NODES: NodeTemplate[] = [
   { type: 'uppercase', icon: 'AA', label: 'Uppercase', description: 'Convert text to UPPERCASE.', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
   { type: 'lowercase', icon: 'aa', label: 'Lowercase', description: 'Convert text to lowercase.', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
   { type: 'trim', icon: '&#x2702;', label: 'Trim', description: 'Trim whitespace from both ends of a string.', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
+  { type: 'contains', icon: 'in', label: 'Contains', description: 'True if text contains pattern.', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }, { id: 'pattern', label: 'pattern', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'boolean' }], category: 'string' },
+  { type: 'replace', icon: '&#x21BA;', label: 'Replace', description: 'Replace pattern with replacement (mode: first|all).', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }, { id: 'pattern', label: 'pattern', type: 'string' }, { id: 'replacement', label: 'replacement', type: 'string' }, { id: 'mode', label: 'mode', type: 'string', description: "Replacement mode: 'first' or 'all' (default: all)." }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
   { type: 'substring', icon: '&#x1F4CC;', label: 'Substring', description: 'Extract a substring by start/end indices (end is optional).', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }, { id: 'start', label: 'start', type: 'number' }, { id: 'end', label: 'end', type: 'number' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
   { type: 'length', icon: '#', label: 'Length', description: 'String length (number of characters).', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'string' },
 ];
@@ -514,10 +547,115 @@ const CONTROL_NODES: NodeTemplate[] = [
 const DATA_NODES: NodeTemplate[] = [
   { type: 'coalesce', icon: '&#x21C4;', label: 'Coalesce', description: 'Return the first non-null value (A, then B, ...).', headerColor: '#3498DB', inputs: [{ id: 'a', label: 'a', type: 'any' }, { id: 'b', label: 'b', type: 'any' }], outputs: [{ id: 'result', label: 'result', type: 'any' }], category: 'data' },
   { type: 'get', icon: '&#x1F4E5;', label: 'Get Property', description: 'Safely read a nested path from an object (dot/bracket path) with an optional default.', headerColor: '#3498DB', inputs: [{ id: 'object', label: 'object', type: 'object' }, { id: 'key', label: 'key', type: 'string' }, { id: 'default', label: 'default', type: 'any' }], outputs: [{ id: 'value', label: 'value', type: 'any' }], category: 'data' },
+  {
+    type: 'get_element',
+    icon: '&#x1F449;', // Pointing hand
+    label: 'Get Element',
+    description: 'Get a single array element by index (supports negative indices).',
+    headerColor: '#3498DB',
+    inputs: [
+      { id: 'array', label: 'array', type: 'array', description: 'Input array (list/tuple).' },
+      { id: 'index', label: 'index', type: 'number', description: '0-based index (negative allowed; -1 is last).' },
+      { id: 'default', label: 'default', type: 'any', description: 'Fallback value when index is invalid (default null).' },
+    ],
+    outputs: [
+      { id: 'result', label: 'result', type: 'any', description: 'Element value (or default when not found).' },
+      { id: 'found', label: 'found', type: 'boolean', description: 'True when index is valid for the given array.' },
+    ],
+    category: 'data',
+  },
+  {
+    type: 'get_random_element',
+    icon: '&#x1F3B2;', // Die
+    label: 'Get Random Element',
+    description: 'Pick a random element from an array.',
+    headerColor: '#3498DB',
+    inputs: [
+      { id: 'array', label: 'array', type: 'array', description: 'Input array (list/tuple).' },
+      { id: 'default', label: 'default', type: 'any', description: 'Fallback value when the array is empty (default null).' },
+    ],
+    outputs: [
+      { id: 'result', label: 'result', type: 'any', description: 'Random element (or default when not found).' },
+      { id: 'found', label: 'found', type: 'boolean', description: 'True when an element was selected.' },
+    ],
+    category: 'data',
+  },
   { type: 'set', icon: '&#x1F4E4;', label: 'Set Property', description: 'Pure transform: return a new object with key set. To persist state, use Set Variable (dotted path) or Set Variable Property.', headerColor: '#3498DB', inputs: [{ id: 'object', label: 'object', type: 'object' }, { id: 'key', label: 'key', type: 'string' }, { id: 'value', label: 'value', type: 'any' }], outputs: [{ id: 'result', label: 'result', type: 'object' }], category: 'data' },
   { type: 'merge', icon: '&#x1F517;', label: 'Merge Objects', description: 'Shallow merge two objects (b overrides a).', headerColor: '#3498DB', inputs: [{ id: 'a', label: 'a', type: 'object' }, { id: 'b', label: 'b', type: 'object' }], outputs: [{ id: 'result', label: 'result', type: 'object' }], category: 'data' },
   { type: 'make_array', icon: '[]', label: 'Make Array', description: 'Build an array from 1+ inputs in pin order (Blueprint-style). Skips null/unset inputs.', headerColor: '#3498DB', inputs: [{ id: 'a', label: 'a', type: 'any' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'data' },
+  { type: 'make_object', icon: '{}', label: 'Create JSON', description: 'Build a flat JSON object from dynamically configured input fields (set fields in the Properties panel).', headerColor: '#3498DB', inputs: [], outputs: [{ id: 'result', label: 'result', type: 'object' }], category: 'data' },
+  {
+    type: 'make_context',
+    icon: '&#x1F4AC;', // Speech bubble
+    label: 'Make Context',
+    description: 'Build a context object {task, messages, ...extra}.',
+    headerColor: '#3498DB',
+    inputs: [
+      { id: 'task', label: 'task', type: 'string', description: 'Task / user request string (context.task).' },
+      { id: 'messages', label: 'messages', type: 'array', description: 'Conversation messages list (context.messages).' },
+      { id: 'extra', label: 'extra', type: 'object', description: 'Optional additional fields merged into the context (task/messages win).' },
+    ],
+    outputs: [{ id: 'context', label: 'context', type: 'object', description: 'Context object {task, messages, ...extra}.' }],
+    category: 'data',
+  },
+  {
+    type: 'make_meta',
+    icon: '&#x1F4CC;', // Pushpin (meta/info)
+    label: 'Make Meta',
+    description: 'Build a host-facing meta envelope for AbstractCode/clients.',
+    headerColor: '#3498DB',
+    inputs: [
+      { id: 'schema', label: 'schema', type: 'string', description: 'Schema identifier (default: abstractcode.agent.v1.meta).' },
+      { id: 'version', label: 'version', type: 'number', description: 'Schema version number (default: 1).' },
+      { id: 'provider', label: 'provider', type: 'provider', description: 'Provider id/name (e.g. lmstudio).' },
+      { id: 'model', label: 'model', type: 'model', description: 'Model id/name.' },
+      { id: 'usage', label: 'usage', type: 'object', description: 'Usage object (e.g. {input_tokens, output_tokens}).' },
+      { id: 'trace_id', label: 'trace_id', type: 'string', description: 'Optional trace id (stored under meta.trace.trace_id).' },
+      { id: 'warnings', label: 'warnings', type: 'array', description: 'Optional list of warning strings.' },
+      { id: 'debug', label: 'debug', type: 'object', description: 'Optional debug payload (host-facing).' },
+      { id: 'extra', label: 'extra', type: 'object', description: 'Optional extra fields merged into the meta object (reserved keys win).' },
+    ],
+    outputs: [{ id: 'meta', label: 'meta', type: 'object', description: 'Meta object (portable host-friendly envelope).' }],
+    category: 'data',
+  },
+  {
+    type: 'make_scratchpad',
+    icon: '&#x1F4DD;', // Memo
+    label: 'Make Scratchpad',
+    description: 'Build a scratchpad/trace envelope (commonly from Agent outputs).',
+    headerColor: '#3498DB',
+    inputs: [
+      { id: 'sub_run_id', label: 'sub_run_id', type: 'string', description: 'Optional sub-run id associated with the trace.' },
+      { id: 'workflow_id', label: 'workflow_id', type: 'string', description: 'Optional workflow id associated with the trace.' },
+      { id: 'node_traces', label: 'node_traces', type: 'object', description: 'Per-node trace mapping (node_id -> trace object).' },
+      { id: 'steps', label: 'steps', type: 'array', description: 'Flattened trace steps list (optional; used by some UIs).' },
+      { id: 'extra', label: 'extra', type: 'object', description: 'Optional extra fields merged into the scratchpad object.' },
+    ],
+    outputs: [{ id: 'scratchpad', label: 'scratchpad', type: 'object', description: 'Scratchpad object containing trace info.' }],
+    category: 'data',
+  },
+  {
+    type: 'make_raw_result',
+    icon: '&#x1F50E;', // Magnifying glass
+    label: 'Make Raw Result',
+    description: 'Build a normalized raw LLM result envelope (content/tool_calls/usage/metadata/etc).',
+    headerColor: '#3498DB',
+    inputs: [
+      { id: 'content', label: 'content', type: 'string', description: 'Assistant text content (or null/empty when using structured output).' },
+      { id: 'data', label: 'data', type: 'object', description: 'Structured output payload (when using structured output).' },
+      { id: 'tool_calls', label: 'tool_calls', type: 'array', description: 'Tool call requests (if any).' },
+      { id: 'usage', label: 'usage', type: 'object', description: 'Usage object (provider-specific; typically tokens).' },
+      { id: 'model', label: 'model', type: 'model', description: 'Model id/name.' },
+      { id: 'finish_reason', label: 'finish_reason', type: 'string', description: 'Finish reason (e.g. stop, length, tool_calls).' },
+      { id: 'metadata', label: 'metadata', type: 'object', description: 'Provider/runtime metadata (debug/observability).' },
+      { id: 'trace_id', label: 'trace_id', type: 'string', description: 'Optional trace id.' },
+      { id: 'extra', label: 'extra', type: 'object', description: 'Optional extra fields merged into the raw_result object (reserved keys win).' },
+    ],
+    outputs: [{ id: 'raw_result', label: 'raw_result', type: 'object', description: 'Raw result envelope.' }],
+    category: 'data',
+  },
   { type: 'array_length', icon: '#', label: 'Array Length', description: 'Return the length of an array.', headerColor: '#3498DB', inputs: [{ id: 'array', label: 'array', type: 'array' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'data' },
+  { type: 'has_tools', icon: '&#x1F9F0;', label: 'Has Tools', description: 'True if the input array has at least one element (commonly: LLM tool_calls).', headerColor: '#3498DB', inputs: [{ id: 'array', label: 'array', type: 'array' }], outputs: [{ id: 'result', label: 'result', type: 'boolean' }], category: 'data' },
   { type: 'array_append', icon: '&#x2795;', label: 'Array Append', description: 'Append an item to an array (returns a new array).', headerColor: '#3498DB', inputs: [{ id: 'array', label: 'array', type: 'array' }, { id: 'item', label: 'item', type: 'any' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'data' },
   { type: 'array_dedup', icon: '&#x1F5C3;', label: 'Array Dedup', description: 'Stable-order dedup for arrays (optionally by key path).', headerColor: '#3498DB', inputs: [{ id: 'array', label: 'array', type: 'array' }, { id: 'key', label: 'key', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'data' },
   { type: 'array_map', icon: '&#x1F5FA;', label: 'Map Array', description: 'Map array items by extracting a field (key) from objects.', headerColor: '#3498DB', inputs: [{ id: 'items', label: 'items', type: 'array' }, { id: 'key', label: 'key', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'data' },
@@ -597,6 +735,20 @@ const VARIABLE_NODES: NodeTemplate[] = [
     headerColor: '#16A085', // Teal
     inputs: [{ id: 'name', label: 'name', type: 'string' }],
     outputs: [{ id: 'value', label: 'value', type: 'any' }],
+    category: 'variables',
+  },
+  {
+    type: 'get_context',
+    icon: '&#x1F4AC;', // Speech bubble
+    label: 'Get Context',
+    description: "Read the current run's context namespace (run.vars.context).",
+    headerColor: '#16A085', // Teal
+    inputs: [],
+    outputs: [
+      { id: 'context', label: 'context', type: 'object', description: 'Full context object from workflow state (run.vars.context).' },
+      { id: 'task', label: 'task', type: 'string', description: 'Convenience output for context.task.' },
+      { id: 'messages', label: 'messages', type: 'array', description: 'Convenience output for context.messages (conversation history).' },
+    ],
     category: 'variables',
   },
   {
@@ -948,9 +1100,9 @@ const MEMORY_NODES: NodeTemplate[] = [
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
       { id: 'query_text', label: 'query_text', type: 'string', description: 'Optional semantic query. Requires embeddings to be configured in the host.' },
-      { id: 'subject', label: 'subject', type: 'string', description: 'Optional exact-match subject filter.' },
-      { id: 'predicate', label: 'predicate', type: 'string', description: 'Optional exact-match predicate filter.' },
-      { id: 'object', label: 'object', type: 'string', description: 'Optional exact-match object filter.' },
+      { id: 'subject', label: 'subject', type: 'string', description: 'Optional canonical subject filter (trim + lower; stable exact match after canonicalization).' },
+      { id: 'predicate', label: 'predicate', type: 'string', description: 'Optional canonical predicate filter (trim + lower; stable exact match after canonicalization).' },
+      { id: 'object', label: 'object', type: 'string', description: 'Optional canonical object filter (trim + lower; stable exact match after canonicalization).' },
       { id: 'since', label: 'since', type: 'string', description: 'Optional observed_at lower bound (ISO8601).' },
       { id: 'until', label: 'until', type: 'string', description: 'Optional observed_at upper bound (ISO8601).' },
       { id: 'active_at', label: 'active_at', type: 'string', description: 'Optional validity window selector (ISO8601). Filters assertions active at that time.' },

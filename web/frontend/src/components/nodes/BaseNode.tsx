@@ -570,10 +570,14 @@ export const BaseNode = memo(function BaseNode({
   const isDelayNode = data.nodeType === 'wait_until';
   const isOnEventNode = data.nodeType === 'on_event';
   const isOnScheduleNode = data.nodeType === 'on_schedule';
+  const isSubflowNode = data.nodeType === 'subflow';
   const isWriteFileNode = data.nodeType === 'write_file';
   const isMemoryNoteNode = data.nodeType === 'memory_note';
   const isMemoryQueryNode = data.nodeType === 'memory_query';
+  const isMemoryTagNode = data.nodeType === 'memory_tag';
   const isMemoryRehydrateNode = data.nodeType === 'memory_rehydrate';
+  const isMemoryKgAssertNode = data.nodeType === 'memory_kg_assert';
+  const isMemoryKgQueryNode = data.nodeType === 'memory_kg_query';
   // NOTE: Subflow control pins (inherit_context) are configured via pin defaults on the pin row.
   // We intentionally avoid a separate non-pin checkbox to keep the UI single-source-of-truth.
 
@@ -1524,7 +1528,10 @@ export const BaseNode = memo(function BaseNode({
                 const isWriteFileContentPin = isWriteFileNode && pin.id === 'content';
                 const isCompareOpPin = isCompareNode && pin.id === 'op';
                 const isStringifyJsonModePin = isStringifyJsonNode && pin.id === 'mode';
-                const isMemoryScopePin = (isMemoryNoteNode || isMemoryQueryNode) && pin.id === 'scope';
+                const isMemoryScopePin =
+                  (isMemoryNoteNode || isMemoryQueryNode || isMemoryTagNode || isMemoryKgAssertNode || isMemoryKgQueryNode) &&
+                  pin.id === 'scope';
+                const isSubflowScopePin = isSubflowNode && pin.id === 'scope';
                 const isMemoryTagsModePin = isMemoryQueryNode && pin.id === 'tags_mode';
                 const isMemoryPlacementPin = isMemoryRehydrateNode && pin.id === 'placement';
                 const hasSpecialControl =
@@ -1541,6 +1548,7 @@ export const BaseNode = memo(function BaseNode({
                   isOnScheduleRecurrentPin ||
                   isWriteFileContentPin ||
                   isMemoryScopePin ||
+                  isSubflowScopePin ||
                   isMemoryTagsModePin ||
                   isMemoryPlacementPin;
 
@@ -1591,12 +1599,17 @@ export const BaseNode = memo(function BaseNode({
                   );
                 }
 
-                if (isMemoryScopePin && !connected) {
+                if ((isMemoryScopePin || isSubflowScopePin) && !connected) {
                   const raw = pinDefaults.scope;
                   const currentScope =
                     typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : 'run';
 
-                  const options = isMemoryQueryNode
+                  const allowAll =
+                    isMemoryQueryNode ||
+                    isMemoryTagNode ||
+                    isMemoryKgQueryNode ||
+                    (isSubflowScopePin && inputData.some((p) => p.id === 'query_text' || p.id === 'query'));
+                  const options = allowAll
                     ? [
                         { value: 'run', label: 'run' },
                         { value: 'session', label: 'session' },

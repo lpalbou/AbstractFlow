@@ -111,7 +111,13 @@ class FlowRunner:
             max_steps=max_steps,
         )
 
-    def run(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def run(
+        self,
+        input_data: Optional[Dict[str, Any]] = None,
+        *,
+        actor_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """Execute flow to completion.
 
         This method starts the flow and runs until it completes, fails,
@@ -129,7 +135,7 @@ class FlowRunner:
         """
         from abstractruntime.core.models import RunStatus, WaitReason
 
-        self.start(input_data)
+        self.start(input_data, actor_id=actor_id, session_id=session_id)
 
         while True:
             state = self.runtime.tick(

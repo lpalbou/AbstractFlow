@@ -82,7 +82,13 @@ class VisualSessionRunner(FlowRunner):
 
         return run_id
 
-    def run(self, input_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def run(
+        self,
+        input_data: Optional[Dict[str, Any]] = None,
+        *,
+        actor_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """Execute the root run and drive session-level listener runs.
 
         Rationale:
@@ -91,7 +97,7 @@ class VisualSessionRunner(FlowRunner):
         """
         from abstractruntime.core.models import RunStatus, WaitReason
 
-        run_id = self.start(input_data)
+        run_id = self.start(input_data, actor_id=actor_id, session_id=session_id)
         runtime = self.runtime
 
         def _list_session_runs() -> List[str]:
@@ -174,4 +180,3 @@ class VisualSessionRunner(FlowRunner):
                     "state": state,
                     "wait_key": state.waiting.wait_key if state.waiting else None,
                 }
-

@@ -222,6 +222,21 @@ export function RunFlowModal({
 }: RunFlowModalProps) {
   const { nodes, edges, flowName, flowId, lastLoopProgress, loopProgressByNodeId } = useFlowStore();
 
+  const memoryScopeOptions = useMemo(() => {
+    // Heuristic: `scope` is a platform-wide memory routing enum.
+    // - `all` is only meaningful for query-like operations (fan-out over run+session+global).
+    const allowAll = nodes.some((n) => {
+      const t = n?.data?.nodeType;
+      if (t === 'memory_query' || t === 'memory_tag' || t === 'memory_kg_query') return true;
+      if (t === 'subflow') {
+        const ins = Array.isArray(n?.data?.inputs) ? n.data.inputs : [];
+        return ins.some((p: any) => p && (p.id === 'query_text' || p.id === 'query'));
+      }
+      return false;
+    });
+    return allowAll ? ['run', 'session', 'global', 'all'] : ['run', 'session', 'global'];
+  }, [nodes]);
+
   const nodeById = useMemo(() => {
     const map = new Map<string, (typeof nodes)[number]>();
     nodes.forEach((n) => map.set(n.id, n));
@@ -2610,6 +2625,26 @@ export function RunFlowModal({
                               clearable
                               minPopoverWidth={340}
                               onChange={(next) => setToolsValues((prev) => ({ ...prev, [pin.id]: next }))}
+                            />
+                          </div>
+                        );
+                      }
+
+                      if (pin.id === 'scope') {
+                        const options = memoryScopeOptions.map((v) => ({ value: v, label: v }));
+                        return (
+                          <div key={pin.id} className="run-form-field">
+                            <label className="run-form-label">
+                              {pin.label}
+                              <span className="run-form-type">({pin.type})</span>
+                            </label>
+                            <AfSelect
+                              value={value}
+                              placeholder="run"
+                              options={options}
+                              searchable={false}
+                              disabled={isRunning}
+                              onChange={(v) => handleFieldChange(pin.id, v || 'run')}
                             />
                           </div>
                         );

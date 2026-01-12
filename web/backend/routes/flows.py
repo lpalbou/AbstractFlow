@@ -405,6 +405,13 @@ async def run_flow(flow_id: str, request: FlowRunRequest):
 
     try:
         input_data = dict(request.input_data or {})
+        session_id = None
+        try:
+            raw = input_data.get("session_id") or input_data.get("sessionId")
+            if isinstance(raw, str) and raw.strip():
+                session_id = raw.strip()
+        except Exception:
+            session_id = None
         workspace_dir = ensure_default_workspace_root(input_data)
         scope = WorkspaceScope.from_input_data(input_data)
         tool_executor = build_scoped_tool_executor(scope=scope) if scope is not None else None
@@ -419,7 +426,7 @@ async def run_flow(flow_id: str, request: FlowRunRequest):
             tool_executor=tool_executor,
             input_data=input_data,
         )
-        result = runner.run(input_data)
+        result = runner.run(input_data, session_id=session_id)
         if workspace_dir is not None and isinstance(runner.run_id, str) and runner.run_id.strip():
             ensure_run_id_workspace_alias(run_id=runner.run_id.strip(), workspace_dir=workspace_dir)
 
