@@ -34,6 +34,11 @@
             "type": "string"
           },
           {
+            "id": "min_score",
+            "label": "min_score",
+            "type": "number"
+          },
+          {
             "id": "limit",
             "label": "limit",
             "type": "number"
@@ -51,6 +56,7 @@
         ],
         "pinDefaults": {
           "scope": "session",
+          "min_score": 0.25,
           "limit": 80,
           "max_input_tokens": 2000,
           "model": "qwen/qwen3-next-80b"
@@ -99,6 +105,11 @@
             "id": "scope",
             "label": "scope",
             "type": "string"
+          },
+          {
+            "id": "min_score",
+            "label": "min_score",
+            "type": "number"
           },
           {
             "id": "limit",
@@ -699,6 +710,14 @@
       "sourceHandle": "limit",
       "target": "node-2",
       "targetHandle": "limit",
+      "animated": false
+    },
+    {
+      "id": "edge-4b",
+      "source": "node-1",
+      "sourceHandle": "min_score",
+      "target": "node-2",
+      "targetHandle": "min_score",
       "animated": false
     },
     {
