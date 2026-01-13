@@ -90,12 +90,23 @@ def test_visual_agent_passes_system_prompt_and_allowed_tools_to_subworkflow() ->
 
     payload = captured.get("payload")
     assert isinstance(payload, dict)
-    assert payload.get("system_prompt") == "SYS"
+    system_prompt = payload.get("system_prompt")
+    assert isinstance(system_prompt, str)
+    # Visual Agent `system` pin is appended to the canonical ReAct prompt (not a full override),
+    # so we preserve tool-use/evidence rules while still honoring node-specific guidance.
+    assert "## MY PERSONA" in system_prompt
+    assert "SYS" in system_prompt
 
     tools_payload = payload.get("tools")
     assert isinstance(tools_payload, list)
     tool_names = [t.get("name") for t in tools_payload if isinstance(t, dict)]
     assert tool_names == ["tool_b"]
+
+    params = payload.get("params")
+    assert isinstance(params, dict)
+    # Tool calling is formatting-sensitive; the ReAct adapter biases toward a low temperature
+    # when tools are present. Visual Agent defaults must not override this behavior.
+    assert params.get("temperature") == 0.2
 
 
 def test_visual_agent_uses_agent_config_tools_when_tools_pin_unconnected() -> None:

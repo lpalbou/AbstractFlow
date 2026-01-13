@@ -86,7 +86,7 @@ export type NodeType =
   | 'has_tools'
   | 'get_context'
   | 'get_var' | 'set_var' | 'set_vars' | 'set_var_property'
-  | 'parse_json' | 'stringify_json' | 'agent_trace_report' | 'break_object' | 'system_datetime'
+  | 'parse_json' | 'stringify_json' | 'format_tool_results' | 'agent_trace_report' | 'break_object' | 'system_datetime'
   | 'provider_catalog' | 'provider_models'
   // Backward-compat: deprecated
   | 'model_catalog'

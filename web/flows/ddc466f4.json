@@ -172,55 +172,6 @@
       "outputs": []
     },
     {
-      "id": "node-6",
-      "type": "answer_user",
-      "position": {
-        "x": 624.0,
-        "y": -384.0
-      },
-      "data": {
-        "nodeType": "answer_user",
-        "label": "Answer User",
-        "icon": "&#x1F4AC;",
-        "headerColor": "#9B59B6",
-        "inputs": [
-          {
-            "id": "exec-in",
-            "label": "",
-            "type": "execution"
-          },
-          {
-            "id": "message",
-            "label": "message",
-            "type": "string"
-          },
-          {
-            "id": "level",
-            "label": "level",
-            "type": "string",
-            "description": "Message level for hosts (message|warning|error). Defaults to 'message' when unset."
-          }
-        ],
-        "outputs": [
-          {
-            "id": "exec-out",
-            "label": "",
-            "type": "execution"
-          },
-          {
-            "id": "message",
-            "label": "message",
-            "type": "string"
-          }
-        ]
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
       "id": "node-8",
       "type": "if",
       "position": {
@@ -868,7 +819,7 @@
       "id": "node-23",
       "type": "concat",
       "position": {
-        "x": -256.0,
+        "x": -464.0,
         "y": -256.0
       },
       "data": {
@@ -1084,7 +1035,7 @@
           }
         ],
         "pinDefaults": {
-          "include_context": true
+          "include_context": false
         },
         "agentConfig": {
           "provider": "lmstudio",
@@ -1101,8 +1052,8 @@
       "id": "node-27",
       "type": "get_context",
       "position": {
-        "x": -240.0,
-        "y": 16.0
+        "x": 896.0,
+        "y": -208.0
       },
       "data": {
         "nodeType": "get_context",
@@ -1142,7 +1093,7 @@
       "type": "break_object",
       "position": {
         "x": 288.0,
-        "y": 48.0
+        "y": -16.0
       },
       "data": {
         "nodeType": "break_object",
@@ -1161,12 +1112,418 @@
             "id": "result",
             "label": "result",
             "type": "string"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          },
+          {
+            "id": "task",
+            "label": "task",
+            "type": "string"
           }
         ],
         "breakConfig": {
           "selectedPaths": [
-            "result"
+            "result",
+            "context",
+            "task"
           ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-31",
+      "type": "stringify_json",
+      "position": {
+        "x": 304.0,
+        "y": -176.0
+      },
+      "data": {
+        "nodeType": "stringify_json",
+        "label": "Stringify JSON",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any",
+            "description": "JSON value (or JSON-ish string) to stringify."
+          },
+          {
+            "id": "mode",
+            "label": "mode",
+            "type": "string",
+            "description": "Rendering mode: none | beautify | minified. Default beautify."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-32",
+      "type": "add_message",
+      "position": {
+        "x": 608.0,
+        "y": -352.0
+      },
+      "data": {
+        "nodeType": "add_message",
+        "label": "Add Message",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "role",
+            "label": "role",
+            "type": "string",
+            "description": "Message role (e.g. user, assistant, system, tool)."
+          },
+          {
+            "id": "content",
+            "label": "content",
+            "type": "string",
+            "description": "Message content."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "object",
+            "description": "Message object {role, content, timestamp, metadata.message_id}."
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object",
+            "description": "Updated active context object (run.vars.context)."
+          },
+          {
+            "id": "task",
+            "label": "task",
+            "type": "string",
+            "description": "Convenience output for context.task."
+          },
+          {
+            "id": "messages",
+            "label": "messages",
+            "type": "array",
+            "description": "Updated context.messages list."
+          }
+        ],
+        "pinDefaults": {
+          "role": "assistant"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-33",
+      "type": "answer_user",
+      "position": {
+        "x": 1120.0,
+        "y": -384.0
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          },
+          {
+            "id": "level",
+            "label": "level",
+            "type": "string",
+            "description": "Message level for hosts (message|warning|error). Defaults to 'message' when unset."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-34",
+      "type": "stringify_json",
+      "position": {
+        "x": 1088.0,
+        "y": -208.0
+      },
+      "data": {
+        "nodeType": "stringify_json",
+        "label": "Stringify JSON",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any",
+            "description": "JSON value (or JSON-ish string) to stringify."
+          },
+          {
+            "id": "mode",
+            "label": "mode",
+            "type": "string",
+            "description": "Rendering mode: none | beautify | minified. Default beautify."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-35",
+      "type": "add_message",
+      "position": {
+        "x": -368.0,
+        "y": -384.0
+      },
+      "data": {
+        "nodeType": "add_message",
+        "label": "Add Message",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "role",
+            "label": "role",
+            "type": "string",
+            "description": "Message role (e.g. user, assistant, system, tool)."
+          },
+          {
+            "id": "content",
+            "label": "content",
+            "type": "string",
+            "description": "Message content."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "object",
+            "description": "Message object {role, content, timestamp, metadata.message_id}."
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object",
+            "description": "Updated active context object (run.vars.context)."
+          },
+          {
+            "id": "task",
+            "label": "task",
+            "type": "string",
+            "description": "Convenience output for context.task."
+          },
+          {
+            "id": "messages",
+            "label": "messages",
+            "type": "array",
+            "description": "Updated context.messages list."
+          }
+        ],
+        "pinDefaults": {
+          "role": "assistant"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-37",
+      "type": "answer_user",
+      "position": {
+        "x": 1072.0,
+        "y": -32.0
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          },
+          {
+            "id": "level",
+            "label": "level",
+            "type": "string",
+            "description": "Message level for hosts (message|warning|error). Defaults to 'message' when unset."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-38",
+      "type": "add_message",
+      "position": {
+        "x": 304.0,
+        "y": -352.0
+      },
+      "data": {
+        "nodeType": "add_message",
+        "label": "Add Message",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "role",
+            "label": "role",
+            "type": "string",
+            "description": "Message role (e.g. user, assistant, system, tool)."
+          },
+          {
+            "id": "content",
+            "label": "content",
+            "type": "string",
+            "description": "Message content."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "object",
+            "description": "Message object {role, content, timestamp, metadata.message_id}."
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object",
+            "description": "Updated active context object (run.vars.context)."
+          },
+          {
+            "id": "task",
+            "label": "task",
+            "type": "string",
+            "description": "Convenience output for context.task."
+          },
+          {
+            "id": "messages",
+            "label": "messages",
+            "type": "array",
+            "description": "Updated context.messages list."
+          }
+        ],
+        "pinDefaults": {
+          "role": "user"
         }
       },
       "label": null,
@@ -1184,14 +1541,6 @@
       "target": "node-2",
       "targetHandle": "condition",
       "animated": false
-    },
-    {
-      "id": "edge-1768257916081",
-      "source": "node-6",
-      "sourceHandle": "exec-out",
-      "target": "node-8",
-      "targetHandle": "exec-in",
-      "animated": true
     },
     {
       "id": "edge-1768257936357",
@@ -1314,14 +1663,6 @@
       "animated": false
     },
     {
-      "id": "edge-1768260256023",
-      "source": "node-2",
-      "sourceHandle": "loop",
-      "target": "node-26",
-      "targetHandle": "exec-in",
-      "animated": true
-    },
-    {
       "id": "edge-1768260298299",
       "source": "node-23",
       "sourceHandle": "result",
@@ -1338,23 +1679,87 @@
       "animated": false
     },
     {
-      "id": "edge-1768260464766",
-      "source": "node-26",
-      "sourceHandle": "exec-out",
-      "target": "node-6",
+      "id": "edge-1768285044805",
+      "source": "node-28",
+      "sourceHandle": "context",
+      "target": "node-31",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-1768286117297",
+      "source": "node-28",
+      "sourceHandle": "result",
+      "target": "node-32",
+      "targetHandle": "content",
+      "animated": false
+    },
+    {
+      "id": "edge-1768286188124",
+      "source": "node-34",
+      "sourceHandle": "result",
+      "target": "node-33",
+      "targetHandle": "message",
+      "animated": false
+    },
+    {
+      "id": "edge-1768286297383",
+      "source": "node-27",
+      "sourceHandle": "context",
+      "target": "node-34",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-1768286412558",
+      "source": "node-2",
+      "sourceHandle": "loop",
+      "target": "node-26",
       "targetHandle": "exec-in",
       "animated": true
     },
     {
-      "id": "edge-1768260469783",
+      "id": "edge-1768286435751",
       "source": "node-28",
       "sourceHandle": "result",
-      "target": "node-6",
+      "target": "node-37",
       "targetHandle": "message",
+      "animated": false
+    },
+    {
+      "id": "edge-1768286484639",
+      "source": "node-26",
+      "sourceHandle": "exec-out",
+      "target": "node-38",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768286488331",
+      "source": "node-38",
+      "sourceHandle": "exec-out",
+      "target": "node-32",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768286493834",
+      "source": "node-32",
+      "sourceHandle": "exec-out",
+      "target": "node-33",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768286514526",
+      "source": "node-28",
+      "sourceHandle": "task",
+      "target": "node-38",
+      "targetHandle": "content",
       "animated": false
     }
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-12T23:24:03.961884",
-  "updated_at": "2026-01-12T23:29:09.463592"
+  "updated_at": "2026-01-13T06:41:55.982670"
 }

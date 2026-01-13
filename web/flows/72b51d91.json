@@ -87,6 +87,12 @@
             "description": "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false."
           },
           {
+            "id": "max_input_tokens",
+            "label": "max_input_tokens",
+            "type": "number",
+            "description": "Optional per-call input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for this call."
+          },
+          {
             "id": "provider",
             "label": "provider",
             "type": "provider",
@@ -172,8 +178,8 @@
       "id": "node-4",
       "type": "concat",
       "position": {
-        "x": -1184.0,
-        "y": 80.0
+        "x": -1216.0,
+        "y": 112.0
       },
       "data": {
         "nodeType": "concat",
@@ -217,7 +223,7 @@
       "type": "json_schema",
       "position": {
         "x": -1184.0,
-        "y": 256.0
+        "y": 272.0
       },
       "data": {
         "nodeType": "json_schema",
@@ -411,6 +417,17 @@
             "type": "execution"
           },
           {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean",
+            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          },
+          {
             "id": "state",
             "label": "state",
             "type": "string"
@@ -556,5 +573,5 @@
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-08T21:31:43.667552",
-  "updated_at": "2026-01-11T12:11:13.488845"
+  "updated_at": "2026-01-13T13:38:53.284741"
 }

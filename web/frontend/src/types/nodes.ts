@@ -696,6 +696,23 @@ const DATA_NODES: NodeTemplate[] = [
     category: 'data',
   },
   {
+    type: 'format_tool_results',
+    icon: '&#x1F4CB;', // Clipboard
+    label: 'Format Tool Results',
+    description: 'Convert Tool Calls results [{call_id,name,success,output,error}, ...] into a condensed human-readable digest string.',
+    headerColor: '#3498DB',
+    inputs: [
+      {
+        id: 'tool_results',
+        label: 'tool_results',
+        type: 'array',
+        description: 'Array of tool results (typically from Tool Calls.results).',
+      },
+    ],
+    outputs: [{ id: 'result', label: 'result', type: 'string' }],
+    category: 'data',
+  },
+  {
     type: 'agent_trace_report',
     icon: '&#x1F4CB;', // Clipboard
     label: 'Agent Trace Report',
