@@ -49,6 +49,11 @@
             "type": "string"
           },
           {
+            "id": "min_score",
+            "label": "min_score",
+            "type": "number"
+          },
+          {
             "id": "limit",
             "label": "limit",
             "type": "number"
@@ -56,6 +61,7 @@
         ],
         "pinDefaults": {
           "scope": "all",
+          "min_score": 0.25,
           "limit": 50
         }
       },
@@ -136,6 +142,12 @@
             "label": "owner_id",
             "type": "string",
             "description": "Optional explicit owner id override (advanced; normally derived from scope)."
+          },
+          {
+            "id": "min_score",
+            "label": "min_score",
+            "type": "number",
+            "description": "Optional cosine similarity threshold (semantic query_text only). Range ~[-1..1]; start with 0.2–0.4."
           },
           {
             "id": "limit",
@@ -337,6 +349,14 @@
       "sourceHandle": "limit",
       "target": "node-2",
       "targetHandle": "limit",
+      "animated": false
+    },
+    {
+      "id": "edge-7b",
+      "source": "node-1",
+      "sourceHandle": "min_score",
+      "target": "node-2",
+      "targetHandle": "min_score",
       "animated": false
     },
     {

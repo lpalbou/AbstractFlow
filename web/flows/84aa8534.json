@@ -969,17 +969,17 @@
       "outputs": []
     },
     {
-      "id": "node-36",
-      "type": "memory_note",
+      "id": "node-35",
+      "type": "answer_user",
       "position": {
-        "x": 640.0,
-        "y": 416.0
+        "x": 192.0,
+        "y": -144.0
       },
       "data": {
-        "nodeType": "memory_note",
-        "label": "Memorize",
-        "icon": "&#x1F4DD;",
-        "headerColor": "#2ECC71",
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
         "inputs": [
           {
             "id": "exec-in",
@@ -987,40 +987,15 @@
             "type": "execution"
           },
           {
-            "id": "keep_in_context",
-            "label": "in_context",
-            "type": "boolean",
-            "description": "When true, also insert the stored note into this run's context.messages (synthetic system message). If the pin is not connected, the node checkbox is used. Default: false."
+            "id": "message",
+            "label": "message",
+            "type": "string"
           },
           {
-            "id": "scope",
-            "label": "scope",
+            "id": "level",
+            "label": "level",
             "type": "string",
-            "description": "Where to store/index the note: run (this run), session (all runs with the same session_id; owned by an internal session memory run), or global (shared global memory run). If session_id is missing, session falls back to the run-tree root."
-          },
-          {
-            "id": "content",
-            "label": "content",
-            "type": "string",
-            "description": "The note text to store durably (keep it short; prefer references in sources for large payloads)."
-          },
-          {
-            "id": "location",
-            "label": "location",
-            "type": "string",
-            "description": "Optional location label (where the note was produced, e.g. \"flow:my_flow/node-12\"). Useful for filtering."
-          },
-          {
-            "id": "tags",
-            "label": "tags",
-            "type": "object",
-            "description": "Key/value tags for filtering (e.g. {topic:\"memory\", person:\"laurent\"}). Values must be strings."
-          },
-          {
-            "id": "sources",
-            "label": "sources",
-            "type": "object",
-            "description": "Optional provenance refs (e.g. {run_id, span_ids, message_ids}). The note stores refs, not the full source content."
+            "description": "Message level for hosts (message|warning|error). Defaults to 'message' when unset."
           }
         ],
         "outputs": [
@@ -1030,16 +1005,132 @@
             "type": "execution"
           },
           {
-            "id": "note_id",
-            "label": "note_id",
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-36",
+      "type": "get_context",
+      "position": {
+        "x": -448.0,
+        "y": -48.0
+      },
+      "data": {
+        "nodeType": "get_context",
+        "label": "Get Context",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#16A085",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object",
+            "description": "Full context object from workflow state (run.vars.context)."
+          },
+          {
+            "id": "task",
+            "label": "task",
             "type": "string",
-            "description": "The stored note’s span_id / artifact_id. Use it for Recall into context (span_ids) or for precise Recall."
+            "description": "Convenience output for context.task."
+          },
+          {
+            "id": "messages",
+            "label": "messages",
+            "type": "array",
+            "description": "Convenience output for context.messages (conversation history)."
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-37",
+      "type": "join",
+      "position": {
+        "x": -128.0,
+        "y": -144.0
+      },
+      "data": {
+        "nodeType": "join",
+        "label": "Join",
+        "icon": "&#x1F517;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "items",
+            "label": "items",
+            "type": "array"
+          },
+          {
+            "id": "delimiter",
+            "label": "delimiter",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
           }
         ],
         "pinDefaults": {
-          "keep_in_context": true,
-          "scope": "run"
+          "delimiter": "\\n\\n"
         }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-39",
+      "type": "stringify_json",
+      "position": {
+        "x": -224.0,
+        "y": -32.0
+      },
+      "data": {
+        "nodeType": "stringify_json",
+        "label": "Stringify JSON",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any",
+            "description": "JSON value (or JSON-ish string) to stringify."
+          },
+          {
+            "id": "mode",
+            "label": "mode",
+            "type": "string",
+            "description": "Rendering mode: none | beautify | minified. Default beautify."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ]
       },
       "label": null,
       "icon": null,
@@ -1144,14 +1235,6 @@
       "target": "node-18",
       "targetHandle": "condition",
       "animated": false
-    },
-    {
-      "id": "edge-1768251013665",
-      "source": "node-18",
-      "sourceHandle": "loop",
-      "target": "node-3",
-      "targetHandle": "exec-in",
-      "animated": true
     },
     {
       "id": "edge-1768251055988",
@@ -1266,14 +1349,6 @@
       "animated": false
     },
     {
-      "id": "edge-1768256881326",
-      "source": "node-34",
-      "sourceHandle": "result",
-      "target": "node-36",
-      "targetHandle": "content",
-      "animated": false
-    },
-    {
       "id": "edge-1768256884751",
       "source": "node-3",
       "sourceHandle": "scratchpad",
@@ -1288,9 +1363,49 @@
       "target": "node-20",
       "targetHandle": "exec-in",
       "animated": true
+    },
+    {
+      "id": "edge-1768262482094",
+      "source": "node-18",
+      "sourceHandle": "loop",
+      "target": "node-35",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768262485118",
+      "source": "node-35",
+      "sourceHandle": "exec-out",
+      "target": "node-3",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768262506992",
+      "source": "node-36",
+      "sourceHandle": "messages",
+      "target": "node-37",
+      "targetHandle": "items",
+      "animated": false
+    },
+    {
+      "id": "edge-1768262708134",
+      "source": "node-36",
+      "sourceHandle": "context",
+      "target": "node-39",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-1768262713259",
+      "source": "node-39",
+      "sourceHandle": "result",
+      "target": "node-35",
+      "targetHandle": "message",
+      "animated": false
     }
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-12T20:48:49.988738",
-  "updated_at": "2026-01-12T22:41:51.209833"
+  "updated_at": "2026-01-13T00:15:58.262886"
 }

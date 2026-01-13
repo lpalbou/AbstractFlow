@@ -216,14 +216,19 @@ const CORE_NODES: NodeTemplate[] = [
     type: 'add_message',
     icon: '&#x1F4AC;', // Speech bubble
     label: 'Add Message',
-    description: 'Build a canonical message object for context.messages.',
+    description: 'Append a canonical message to the run active context (context.messages).',
     headerColor: '#3498DB',
     inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
       { id: 'role', label: 'role', type: 'string', description: 'Message role (e.g. user, assistant, system, tool).' },
       { id: 'content', label: 'content', type: 'string', description: 'Message content.' },
     ],
     outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
       { id: 'message', label: 'message', type: 'object', description: 'Message object {role, content, timestamp, metadata.message_id}.' },
+      { id: 'context', label: 'context', type: 'object', description: 'Updated active context object (run.vars.context).' },
+      { id: 'task', label: 'task', type: 'string', description: 'Convenience output for context.task.' },
+      { id: 'messages', label: 'messages', type: 'array', description: 'Updated context.messages list.' },
     ],
     category: 'core',
   },
@@ -1123,6 +1128,7 @@ const MEMORY_NODES: NodeTemplate[] = [
       { id: 'active_at', label: 'active_at', type: 'string', description: 'Optional validity window selector (ISO8601). Filters assertions active at that time.' },
       { id: 'scope', label: 'scope', type: 'string', description: 'run | session | global | all (fan-out over run+session+global).' },
       { id: 'owner_id', label: 'owner_id', type: 'string', description: 'Optional explicit owner id override (advanced; normally derived from scope).' },
+      { id: 'min_score', label: 'min_score', type: 'number', description: 'Optional cosine similarity threshold (semantic query_text only). Range ~[-1..1]; start with 0.2–0.4.' },
       { id: 'limit', label: 'limit', type: 'number', description: 'Max assertions to return (default 100).' },
     ],
     outputs: [
