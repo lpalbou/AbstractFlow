@@ -153,10 +153,9 @@
             "description": "Runtime-owned execution trace/scratchpad for observability (LLM/tool steps, timings)."
           }
         ],
-    "pinDefaults": {
-      "system": "Test contract: use tools to make progress (no long plans). Start by calling list_files.",
-      "task": "basic-react-test (multi-turn tool loop)\n\nYou are in an EMPTY workspace. Complete the following by using tools (do not just describe):\n\n1) Call list_files(directory_path='.', recursive=true) to confirm the workspace is empty.\n2) Create a folder structure: rtype_clone/{assets,scripts,sounds,images} using execute_command.\n3) Create rtype_clone/main.py using write_file with a minimal runnable pygame program (opens a window and moves a ship rectangle with arrow keys). Keep it short.\n4) Call list_files(directory_path='rtype_clone', recursive=true) to verify files exist.\n\nFinish with a short summary of what you created and where.\n\nRules:\n- Keep assistant text short; prefer tool calls.\n- Do not output large code blocks; write code via write_file/edit_file."
-    },
+        "pinDefaults": {
+          "task": "create a SOTA python clone of the game r-type. all the assets, visuals and audio must be generated procedurally. there must be waves of ennemies, the usual power ups for r-type and visual effects. reproduce the same game mechanics and remember the game scroll horizontally with the starship traveling towards the right end of the screen\n"
+        },
         "agentConfig": {
           "tools": [
             "list_files",
@@ -168,7 +167,7 @@
             "execute_command"
           ],
           "provider": "lmstudio",
-          "model": "qwen/qwen3-next-80b"
+          "model": "openai/gpt-oss-20b"
         }
       },
       "label": null,
@@ -225,5 +224,5 @@
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-13T09:48:44.941991",
-  "updated_at": "2026-01-13T12:35:19.226382"
+  "updated_at": "2026-01-14T02:08:09.686292"
 }

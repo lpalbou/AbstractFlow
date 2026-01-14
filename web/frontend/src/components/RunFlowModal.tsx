@@ -1055,11 +1055,15 @@ export function RunFlowModal({
       return sr;
     };
 
-    const childRunIdFromStep = (s: Step): string | null => {
-      const fromOutput = childRunIdFromOutput(s.output);
-      if (fromOutput) return fromOutput;
-      const parentRunId = pick(s.runId);
-      const parentNodeId = pick(s.nodeId);
+	    const childRunIdFromStep = (s: Step): string | null => {
+	      // Agent nodes have their own dedicated live trace panel; expanding the internal
+	      // ReAct sub-run nodes (init/reason/act/...) in the execution list is noisy and
+	      // not actionable (they are not VisualFlow nodes and typically have no details).
+	      if (s.nodeType === 'agent') return null;
+	      const fromOutput = childRunIdFromOutput(s.output);
+	      if (fromOutput) return fromOutput;
+	      const parentRunId = pick(s.runId);
+	      const parentNodeId = pick(s.nodeId);
       if (!parentRunId || !parentNodeId) return null;
       return subworkflowLinks.get(`${parentRunId}:${parentNodeId}`) || null;
     };

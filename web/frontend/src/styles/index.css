@@ -2147,6 +2147,159 @@ button.primary:hover:not(:disabled) {
   margin-top: 10px;
 }
 
+.agent-cycle-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.agent-cycle-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.agent-cycle {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+}
+
+.agent-cycle-summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  user-select: none;
+}
+
+.agent-cycle-summary::-webkit-details-marker {
+  display: none;
+}
+
+.agent-cycle-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 800;
+}
+
+.agent-cycle-index {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+  font-weight: 800;
+}
+
+.agent-cycle-spacer {
+  flex: 1;
+  min-width: 10px;
+}
+
+.agent-cycle-preview {
+  max-width: 560px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agent-cycle-body {
+  padding: 0 12px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.agent-cycle-stage {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-secondary);
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.agent-trace-preview-inline {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.agent-observe-body {
+  padding: 0 12px 12px 12px;
+}
+
+.agent-observe-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 6px 0 0;
+}
+
+.agent-observe-results {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.agent-observe-result {
+  border: 1px solid var(--bg-tertiary);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+}
+
+.agent-observe-summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  user-select: none;
+}
+
+.agent-observe-summary::-webkit-details-marker {
+  display: none;
+}
+
+.agent-observe-name {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+  font-weight: 800;
+}
+
+.agent-observe-callid {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.agent-cycle-others {
+  margin-top: 4px;
+}
+
+.agent-cycle-others-title {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 4px 0 6px;
+}
+
 .agent-trace-entry {
   border: 1px solid var(--bg-tertiary);
   border-radius: 10px;

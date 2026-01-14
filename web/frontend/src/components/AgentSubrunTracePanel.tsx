@@ -15,6 +15,14 @@ type TraceItem = {
   step: TraceStep;
 };
 
+type ToolResult = {
+  call_id?: string;
+  name: string;
+  success: boolean;
+  output?: unknown;
+  error?: unknown;
+};
+
 interface AgentSubrunTracePanelProps {
   rootRunId: string | null;
   events: ExecutionEvent[];
@@ -92,6 +100,29 @@ function asNumber(value: unknown): number | null {
     if (Number.isFinite(n)) return n;
   }
   return null;
+}
+
+function toolResultsForStep(step: TraceStep): ToolResult[] {
+  const t = effectTypeOf(step);
+  if (t !== 'tool_calls') return [];
+  const res = resultOf(step);
+  const raw = res && Array.isArray(res.results) ? res.results : null;
+  if (!raw) return [];
+  const out: ToolResult[] = [];
+  for (const r of raw) {
+    const ro = asRecord(r);
+    if (!ro) continue;
+    const name = typeof ro.name === 'string' ? ro.name.trim() : '';
+    if (!name) continue;
+    out.push({
+      call_id: typeof ro.call_id === 'string' ? ro.call_id : typeof ro.callId === 'string' ? ro.callId : undefined,
+      name,
+      success: ro.success === true,
+      output: ro.output,
+      error: ro.error,
+    });
+  }
+  return out;
 }
 
 function tokenBadgesForStep(step: TraceStep): Array<{ label: string; value: number }> {
@@ -181,6 +212,25 @@ function previewForStep(step: TraceStep): string {
   }
 
   return '';
+}
+
+type AgentCycle = {
+  id: string;
+  index: number;
+  items: TraceItem[];
+  think: TraceItem | null;
+  acts: TraceItem[];
+  others: TraceItem[];
+  status: string;
+  ts?: string;
+};
+
+function combineStatus(items: TraceItem[]): string {
+  const statuses = items.map((i) => i.status);
+  if (statuses.some((s) => s === 'failed')) return 'failed';
+  if (statuses.some((s) => s === 'waiting')) return 'waiting';
+  if (statuses.some((s) => s === 'running')) return 'running';
+  return 'completed';
 }
 
 function visibleTabs(tabs: TabSpec[]): TabSpec[] {
@@ -305,6 +355,91 @@ function PanelBody({ item }: { item: TraceItem }) {
   );
 }
 
+function TraceStepCard({ item, label }: { item: TraceItem; label: string }) {
+  const step = item.step;
+  const statusRaw = item.status;
+  const statusLabel =
+    statusRaw === 'completed' ? 'OK' : statusRaw === 'failed' ? 'FAILED' : statusRaw === 'waiting' ? 'WAITING' : statusRaw.toUpperCase();
+  const title = titleForStep(step);
+  const preview = previewForStep(step);
+  const tokenBadges = tokenBadgesForStep(step);
+  const toolNames = toolNamesForStep(step);
+
+  return (
+    <details className={`agent-trace-entry ${statusRaw}`} open={false}>
+      <summary className="agent-trace-summary">
+        <span className={`agent-trace-status ${statusRaw}`}>{statusLabel}</span>
+        <span className="agent-cycle-stage">{label}</span>
+        <span className="agent-trace-kind">{title}</span>
+        {tokenBadges.length ? (
+          <span className="agent-trace-badges">
+            {tokenBadges.map((b) => (
+              <span key={b.label} className="run-metric-badge metric-tokens">
+                {b.label}: {b.value}
+              </span>
+            ))}
+          </span>
+        ) : null}
+        {toolNames.length ? (
+          <span className="agent-trace-badges">
+            {toolNames.slice(0, 6).map((n) => (
+              <span key={n} className="run-metric-badge metric-tool">
+                {n}
+              </span>
+            ))}
+            {toolNames.length > 6 ? <span className="run-metric-badge metric-tool">+{toolNames.length - 6}</span> : null}
+          </span>
+        ) : null}
+      </summary>
+      {preview ? <div className="agent-trace-preview">{preview}</div> : null}
+      <PanelBody item={item} />
+    </details>
+  );
+}
+
+function ObserveCard({ acts }: { acts: TraceItem[] }) {
+  const all = acts.flatMap((a) => toolResultsForStep(a.step));
+  const ok = all.filter((r) => r.success).length;
+  const failed = all.filter((r) => !r.success).length;
+  const header = all.length ? `${ok} ok${failed ? ` · ${failed} failed` : ''}` : '(none)';
+  const status = failed > 0 ? 'failed' : 'completed';
+  const statusLabel = failed > 0 ? 'ERROR' : 'OK';
+
+  return (
+    <details className={`agent-trace-entry ${status}`} open={false}>
+      <summary className="agent-trace-summary">
+        <span className={`agent-trace-status ${status}`}>{statusLabel}</span>
+        <span className="agent-cycle-stage">observe</span>
+        <span className="agent-trace-kind">OBSERVATIONS</span>
+        <span className="agent-trace-preview-inline">{header}</span>
+      </summary>
+      <div className="agent-observe-body">
+        {all.length === 0 ? (
+          <div className="agent-observe-empty">(no tool results)</div>
+        ) : (
+          <div className="agent-observe-results">
+            {all.map((r, idx) => {
+              const status = r.success ? 'completed' : 'failed';
+              const badge = r.success ? 'OK' : 'ERROR';
+              const output = r.success ? r.output : r.error ?? r.output;
+              return (
+                <details key={`${r.name}:${r.call_id || ''}:${idx}`} className={`agent-observe-result ${status}`} open={false}>
+                  <summary className="agent-observe-summary">
+                    <span className={`agent-trace-status ${status}`}>{badge}</span>
+                    <span className="agent-observe-name">{r.name}</span>
+                    {r.call_id ? <span className="agent-observe-callid">{r.call_id}</span> : null}
+                  </summary>
+                  <pre className="run-details-output">{formatJson(output) || '(none)'}</pre>
+                </details>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </details>
+  );
+}
+
 export function AgentSubrunTracePanel({
   rootRunId,
   events,
@@ -352,6 +487,53 @@ export function AgentSubrunTracePanel({
 
     return out;
   }, [events, rootRunId, subRunId]);
+
+  const cycles = useMemo<AgentCycle[]>(() => {
+    const out: AgentCycle[] = [];
+    let current: AgentCycle | null = null;
+    let idx = 0;
+
+    for (const item of items) {
+      const kind = effectTypeOf(item.step);
+      if (kind === 'llm_call') {
+        idx += 1;
+        current = {
+          id: `cycle:${item.runId}:${idx}:${item.ts || ''}`,
+          index: idx,
+          items: [item],
+          think: item,
+          acts: [],
+          others: [],
+          status: item.status,
+          ts: item.ts,
+        };
+        out.push(current);
+        continue;
+      }
+
+      if (!current) {
+        idx += 1;
+        current = {
+          id: `cycle:${item.runId}:${idx}:${item.ts || ''}`,
+          index: idx,
+          items: [],
+          think: null,
+          acts: [],
+          others: [],
+          status: item.status,
+          ts: item.ts,
+        };
+        out.push(current);
+      }
+
+      current.items.push(item);
+      if (kind === 'tool_calls') current.acts.push(item);
+      else current.others.push(item);
+      current.status = combineStatus(current.items);
+    }
+
+    return out;
+  }, [items]);
 
   if (!rootRunId) return null;
 
@@ -402,45 +584,46 @@ export function AgentSubrunTracePanel({
       {items.length === 0 ? (
         <div className="agent-trace-empty">No trace entries yet.</div>
       ) : (
-        <div className="agent-trace-list">
-          {items.map((item) => {
-            const statusRaw = item.status;
-            const statusLabel = statusRaw === 'completed' ? 'OK' : statusRaw === 'failed' ? 'FAILED' : statusRaw === 'waiting' ? 'WAITING' : statusRaw.toUpperCase();
-            const title = titleForStep(item.step);
-            const preview = previewForStep(item.step);
-            const tokenBadges = tokenBadgesForStep(item.step);
-            const toolNames = toolNamesForStep(item.step);
+        <div className="agent-cycle-list">
+          <div className="agent-cycle-meta">{cycles.length} cycle(s)</div>
+          {cycles.map((c) => {
+            const statusRaw = c.status;
+            const statusLabel =
+              statusRaw === 'completed'
+                ? 'OK'
+                : statusRaw === 'failed'
+                  ? 'FAILED'
+                  : statusRaw === 'waiting'
+                    ? 'WAITING'
+                    : statusRaw.toUpperCase();
+            const thinkPreview = c.think ? previewForStep(c.think.step) : '';
+            const toolCount = c.acts.flatMap((a) => toolResultsForStep(a.step)).length;
+            const openByDefault = c.index === cycles.length;
             return (
-              <details key={item.id} className={`agent-trace-entry ${statusRaw}`} open={false}>
-                <summary className="agent-trace-summary">
+              <details key={c.id} className={`agent-cycle ${statusRaw}`} open={openByDefault}>
+                <summary className="agent-cycle-summary">
                   <span className={`agent-trace-status ${statusRaw}`}>{statusLabel}</span>
-                  <span className="agent-trace-kind">{title}</span>
-                  {tokenBadges.length ? (
-                    <span className="agent-trace-badges">
-                      {tokenBadges.map((b) => (
-                        <span key={b.label} className="run-metric-badge metric-tokens">
-                          {b.label}: {b.value}
-                        </span>
-                      ))}
-                    </span>
-                  ) : null}
-                  {toolNames.length ? (
-                    <span className="agent-trace-badges">
-                      {toolNames.slice(0, 6).map((n) => (
-                        <span key={n} className="run-metric-badge metric-tool">
-                          {n}
-                        </span>
-                      ))}
-                      {toolNames.length > 6 ? (
-                        <span className="run-metric-badge metric-tool">+{toolNames.length - 6}</span>
-                      ) : null}
-                    </span>
-                  ) : null}
-                  <span className="agent-trace-node">{item.nodeId}</span>
-                  <span className="agent-trace-run">{item.runId}</span>
+                  <span className="agent-cycle-label">cycle</span>
+                  <span className="agent-cycle-index">#{c.index}</span>
+                  {toolCount ? <span className="run-metric-badge metric-tool">{toolCount} tool result(s)</span> : null}
+                  <span className="agent-cycle-spacer" />
+                  {thinkPreview ? <span className="agent-cycle-preview">{thinkPreview}</span> : null}
                 </summary>
-                {preview ? <div className="agent-trace-preview">{preview}</div> : null}
-                <PanelBody item={item} />
+                <div className="agent-cycle-body">
+                  {c.think ? <TraceStepCard item={c.think} label="think" /> : null}
+                  {c.acts.map((a) => (
+                    <TraceStepCard key={a.id} item={a} label="act" />
+                  ))}
+                  <ObserveCard acts={c.acts} />
+                  {c.others.length ? (
+                    <div className="agent-cycle-others">
+                      <div className="agent-cycle-others-title">other</div>
+                      {c.others.map((o) => (
+                        <TraceStepCard key={o.id} item={o} label="other" />
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
               </details>
             );
           })}
