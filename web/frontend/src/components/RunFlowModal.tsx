@@ -1454,6 +1454,20 @@ export function RunFlowModal({
     }
   };
 
+  const openWorkspaceFolder = async () => {
+    if (!rootRunId) return;
+    try {
+      const res = await fetch(`/api/runs/${encodeURIComponent(rootRunId)}/open-workspace`, { method: 'POST' });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `Failed to open workspace (HTTP ${res.status})`);
+      }
+    } catch (e) {
+      console.error(e);
+      window.alert(e instanceof Error ? e.message : 'Failed to open workspace');
+    }
+  };
+
   const outputPreview = useMemo(() => {
     if (!selectedStep?.output) return null;
     const value = selectedStep.output;
@@ -2351,6 +2365,8 @@ export function RunFlowModal({
                                   const isProvider = k === 'provider' && typeof v === 'string' && v.trim();
                                   const isModel = k === 'model' && typeof v === 'string' && v.trim();
                                   const isRequest = k === 'request' && typeof v === 'string' && v.trim();
+                                  const isSessionId = k === 'sessionId' && typeof v === 'string' && v.trim();
+                                  const isWorkspaceRoot = k === 'workspace_root' && typeof v === 'string' && v.trim();
 
                                   return (
                                     <div key={k} className="run-param-row">
@@ -2360,6 +2376,49 @@ export function RunFlowModal({
                                           <span className="run-metric-badge metric-provider">{String(v).trim()}</span>
                                         ) : isModel ? (
                                           <span className="run-metric-badge metric-model">{String(v).trim()}</span>
+                                        ) : isSessionId ? (
+                                          <div className="run-param-inline">
+                                            <span className="run-param-text">{String(v)}</span>
+                                            <button
+                                              type="button"
+                                              className="run-param-copy"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                void copyToClipboard(v);
+                                              }}
+                                              title="Copy session id"
+                                              aria-label="Copy session id"
+                                            >
+                                              ⧉
+                                            </button>
+                                          </div>
+                                        ) : isWorkspaceRoot ? (
+                                          <div className="run-param-inline">
+                                            <button
+                                              type="button"
+                                              className="run-param-link"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                void openWorkspaceFolder();
+                                              }}
+                                              title="Open workspace folder"
+                                              aria-label="Open workspace folder"
+                                            >
+                                              {String(v)}
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="run-param-copy"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                void copyToClipboard(v);
+                                              }}
+                                              title="Copy workspace path"
+                                              aria-label="Copy workspace path"
+                                            >
+                                              ⧉
+                                            </button>
+                                          </div>
                                         ) : typeof v === 'boolean' ? (
                                           <span className="run-metric-badge metric-bool">{v ? 'true' : 'false'}</span>
                                         ) : typeof v === 'number' ? (

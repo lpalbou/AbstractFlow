@@ -12,10 +12,15 @@ Design notes:
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import os
+from pathlib import Path
+import subprocess
+import sys
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
+from ..services.execution_workspace import resolve_base_execution_dir
 from ..services.runtime_stores import get_runtime_stores
 
 router = APIRouter(prefix="/runs", tags=["runs"])
@@ -238,6 +243,103 @@ async def get_run(run_id: str) -> Dict[str, Any]:
     return _run_summary(run)
 
 
+def _resolve_no_strict(path: Path) -> Path:
+    try:
+        return path.expanduser().resolve(strict=False)
+    except TypeError:  # pragma: no cover (older python)
+        return path.expanduser().resolve()
+
+
+def _is_under_dir(path: Path, base: Path) -> bool:
+    try:
+        return _resolve_no_strict(path).is_relative_to(_resolve_no_strict(base))
+    except Exception:
+        # Fallback for older runtimes (best-effort).
+        p = str(_resolve_no_strict(path))
+        b = str(_resolve_no_strict(base))
+        return p.startswith(b.rstrip("/") + "/") or p == b
+
+
+def _open_directory(path: Path) -> None:
+    # Best-effort OS open. This endpoint is intended for local desktop UX.
+    if os.name == "nt":
+        os.startfile(str(path))  # type: ignore[attr-defined]  # Windows-only
+        return
+
+    cmd: list[str]
+    if sys.platform.startswith("darwin"):
+        cmd = ["open", str(path)]
+    else:
+        cmd = ["xdg-open", str(path)]
+
+    subprocess.Popen(  # noqa: S603 (local UX helper; path validated below)
+        cmd,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+
+
+@router.post("/{run_id}/open-workspace")
+async def open_workspace(run_id: str) -> Dict[str, Any]:
+    """Open this run's workspace folder in the OS file explorer.
+
+    Security:
+    - Only allows opening folders under `ABSTRACTFLOW_BASE_EXECUTION` (or its default).
+    - Prefers the stable alias `<base>/<run_id>` when present, otherwise falls back to `run.vars.workspace_root`.
+    """
+    rid = str(run_id or "").strip()
+    if not rid:
+        raise HTTPException(status_code=400, detail="run_id is required")
+
+    run_store, _, _ = get_runtime_stores()
+    try:
+        run = run_store.load(rid)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load run: {e}")
+    if run is None:
+        raise HTTPException(status_code=404, detail=f"Run '{rid}' not found")
+
+    base = resolve_base_execution_dir()
+
+    alias = _resolve_no_strict(base / rid)
+    candidate: Optional[Path] = None
+    try:
+        if alias.exists() or alias.is_symlink():
+            candidate = alias
+    except Exception:
+        candidate = None
+
+    if candidate is None:
+        vars0 = getattr(run, "vars", None)
+        raw = vars0.get("workspace_root") if isinstance(vars0, dict) else None
+        if isinstance(raw, str) and raw.strip():
+            candidate = _resolve_no_strict(Path(raw.strip()))
+
+    if candidate is None:
+        raise HTTPException(status_code=404, detail=f"No workspace_root recorded for run '{rid}'")
+
+    if not _is_under_dir(candidate, base):
+        raise HTTPException(status_code=403, detail="Refusing to open workspace outside ABSTRACTFLOW_BASE_EXECUTION")
+
+    try:
+        if not candidate.exists():
+            raise HTTPException(status_code=404, detail=f"Workspace path not found: {candidate}")
+        if not candidate.is_dir():
+            raise HTTPException(status_code=400, detail=f"Workspace path is not a directory: {candidate}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to validate workspace path: {e}")
+
+    try:
+        _open_directory(candidate)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to open folder: {e}")
+
+    return {"ok": True, "path": str(candidate)}
+
+
 @router.get("/{run_id}/artifacts/{artifact_id}")
 async def get_run_artifact(run_id: str, artifact_id: str) -> Dict[str, Any]:
     """Fetch a stored artifact payload by id.
@@ -437,5 +539,4 @@ async def get_run_history(run_id: str) -> Dict[str, Any]:
             )
 
     return {"run": summary, "events": events}
-
 
