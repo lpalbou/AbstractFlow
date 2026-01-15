@@ -36,6 +36,7 @@ async def list_tools() -> List[Dict[str, Any]]:
             from abstractagent.logic.builtins import (  # type: ignore
                 ASK_USER_TOOL,
                 COMPACT_MEMORY_TOOL,
+                DELEGATE_AGENT_TOOL,
                 INSPECT_VARS_TOOL,
                 RECALL_MEMORY_TOOL,
                 REMEMBER_TOOL,
@@ -49,6 +50,7 @@ async def list_tools() -> List[Dict[str, Any]]:
             (INSPECT_VARS_TOOL, "memory", ["builtin", "debug"]),
             (REMEMBER_TOOL, "memory", ["builtin", "memory"]),
             (COMPACT_MEMORY_TOOL, "memory", ["builtin", "memory"]),
+            (DELEGATE_AGENT_TOOL, "system", ["builtin", "agent"]),
         ]
 
         seen = {str(s.get("name") or "") for s in specs if isinstance(s, dict)}

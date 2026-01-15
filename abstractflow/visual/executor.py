@@ -831,12 +831,20 @@ def create_visual_runner(
                 from abstractagent.logic.builtins import (  # type: ignore
                     ASK_USER_TOOL,
                     COMPACT_MEMORY_TOOL,
+                    DELEGATE_AGENT_TOOL,
                     INSPECT_VARS_TOOL,
                     RECALL_MEMORY_TOOL,
                     REMEMBER_TOOL,
                 )
 
-                builtin_defs = [ASK_USER_TOOL, RECALL_MEMORY_TOOL, INSPECT_VARS_TOOL, REMEMBER_TOOL, COMPACT_MEMORY_TOOL]
+                builtin_defs = [
+                    ASK_USER_TOOL,
+                    RECALL_MEMORY_TOOL,
+                    INSPECT_VARS_TOOL,
+                    REMEMBER_TOOL,
+                    COMPACT_MEMORY_TOOL,
+                    DELEGATE_AGENT_TOOL,
+                ]
                 seen_names = {t.name for t in all_tool_defs if getattr(t, "name", None)}
                 for t in builtin_defs:
                     if getattr(t, "name", None) and t.name not in seen_names:
