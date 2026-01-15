@@ -540,6 +540,7 @@ function PanelBody({ item }: { item: TraceItem }) {
 
 function TraceStepCard({ item, label, toolDefs }: { item: TraceItem; label: string; toolDefs: Map<string, string[]> }) {
   const step = item.step;
+  const [open, setOpen] = useState(false);
   const statusRaw = effectiveStatusForItem(item);
   const statusLabel =
     statusRaw === 'completed' ? 'OK' : statusRaw === 'failed' ? 'ERROR' : statusRaw === 'waiting' ? 'WAITING' : statusRaw.toUpperCase();
@@ -559,7 +560,11 @@ function TraceStepCard({ item, label, toolDefs }: { item: TraceItem; label: stri
   }, [step, toolDefs]);
 
   return (
-    <details className={`agent-trace-entry ${statusRaw}`} open={false}>
+    <details
+      className={`agent-trace-entry ${statusRaw}`}
+      open={open}
+      onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}
+    >
       <summary className="agent-trace-summary">
         <span className={`agent-trace-status ${statusRaw}`}>{statusText}</span>
         <span className="agent-cycle-stage">{label}</span>
@@ -594,7 +599,7 @@ function TraceStepCard({ item, label, toolDefs }: { item: TraceItem; label: stri
         ) : null}
       </summary>
       {preview ? <div className="agent-trace-preview">{preview}</div> : null}
-      <PanelBody item={item} />
+      {open ? <PanelBody item={item} /> : null}
     </details>
   );
 }

@@ -1245,6 +1245,13 @@ export function RunFlowModal({
     return stepById.get(selectedStepId) || null;
   }, [selectedStepId, stepById]);
 
+  // Keep the per-step Raw JSON section predictably unfolded when switching steps.
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!selectedStepId) return;
+    setRawJsonOpen(true);
+  }, [isOpen, selectedStepId]);
+
   const parentRunId = useMemo(() => {
     const raw = runSummary?.parent_run_id;
     const pid = typeof raw === 'string' ? raw.trim() : '';
@@ -2810,7 +2817,7 @@ export function RunFlowModal({
                         onToggle={(e) => setRawJsonOpen((e.currentTarget as HTMLDetailsElement).open)}
                       >
                         <summary>Raw JSON</summary>
-                        <JsonViewer value={selectedStep.output} />
+                        {rawJsonOpen ? <JsonViewer key={selectedStep.id} value={selectedStep.output} /> : null}
                       </details>
                     </>
                   ) : (

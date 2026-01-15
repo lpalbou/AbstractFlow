@@ -55,7 +55,7 @@
       "id": "node-2",
       "type": "agent",
       "position": {
-        "x": -304.0,
+        "x": -384.0,
         "y": 384.0
       },
       "data": {
@@ -187,7 +187,7 @@
           "model": "qwen/qwen3-next-80b"
         },
         "pinDefaults": {
-          "system": "You are a highly autonomous coder. you create code, make sure they launch and if they fail, or if you just want to improve it, you analyze code to make specific edits",
+          "system": "You are a highly autonomous coder. you create clean, simple and efficient codes and make sure they launch. If they fail, or just to improve the implementations or create new features, you analyze code to make specific edits",
           "max_iterations": 25
         }
       },
@@ -201,7 +201,7 @@
       "id": "node-3",
       "type": "subflow",
       "position": {
-        "x": -656.0,
+        "x": -800.0,
         "y": 384.0
       },
       "data": {
@@ -342,5 +342,5 @@
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-15T06:28:58.147970",
-  "updated_at": "2026-01-15T06:41:33.435348"
+  "updated_at": "2026-01-15T14:20:51.586663"
 }
