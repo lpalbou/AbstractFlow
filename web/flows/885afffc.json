@@ -1,0 +1,480 @@
+{
+  "id": "885afffc",
+  "name": "task-scheduler",
+  "description": "",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": {
+        "x": -352.0,
+        "y": 192.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools"
+          }
+        ],
+        "pinDefaults": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b",
+          "request": "create a SOTA python clone of the game r-type. all the assets, visuals and audio must be generated procedurally. there must be waves of ennemies, the usual power ups for r-type and visual effects. reproduce the same game mechanics and remember the game scroll horizontally with the starship traveling towards the right end of the screen. ensure the game launch without errors.",
+          "tools": [
+            "analyze_code",
+            "ask_user",
+            "compact_memory",
+            "edit_file",
+            "execute_command",
+            "fetch_url",
+            "list_files",
+            "read_file",
+            "recall_memory",
+            "inspect_vars",
+            "remember",
+            "search_files",
+            "web_search",
+            "write_file"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-2",
+      "type": "llm_call",
+      "position": {
+        "x": -32.0,
+        "y": 192.0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "LLM Call",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "include_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "max_input_tokens",
+            "label": "max_input_tokens",
+            "type": "number",
+            "description": "Optional per-call input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for this call."
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider",
+            "description": "LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model",
+            "description": "LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number",
+            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number",
+            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string",
+            "description": "Optional system prompt for this single call."
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string",
+            "description": "User prompt/content for this single call."
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools",
+            "description": "Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node)."
+          },
+          {
+            "id": "response_schema",
+            "label": "structured_output",
+            "type": "object",
+            "description": "Optional JSON Schema object (type=object) the assistant content must conform to."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string",
+            "description": "Assistant text content (best-effort). For tool calls, content may be empty."
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array",
+            "description": "Normalized tool call requests (same as result.tool_calls). This pin exists to make wiring into Tool Calls / Emit Event nodes simpler."
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object",
+            "description": "Full normalized LLM result (content, tool_calls, usage, provider/model metadata, trace_id)."
+          }
+        ],
+        "pinDefaults": {
+          "system": "You are an expert in understanding the underlying intents of a request and the requirements to produce the expected outcomes. Based on this analysis, you decompose the request into a series of small, actionable \"tasks\" following the task decomposition JSON schema.\n\nFor each task, you must specify:\n\n- **task_id**: Unique identifier (e.g., \"task_0\", \"task_1\", \"task_2\")\n- **description**: Clear, concise description of what this task accomplishes\n- **model**: LLM size required - MUST be one of: \"small\", \"medium\", or \"large\"\n  - small: Simple, deterministic tasks (searches, listings, basic edits)\n  - medium: Moderate reasoning (code analysis, implementations, testing)\n  - large: Complex reasoning (architectural decisions, design, planning)\n- **tools**: Array of tool names this task needs access to. ONLY select from these 14 available tools:\n  - analyze_code\n  - ask_user\n  - compact_memory\n  - edit_file\n  - execute_command\n  - fetch_url\n  - list_files\n  - read_file\n  - recall_memory\n  - inspect_vars\n  - remember\n  - search_files\n  - web_search\n  - write_file\n- **prompt**: Dedicated prompt designed for the selected LLM and tools to achieve the expected outcomes\n- **priority**: Integer (0, 1, 2, 3...) defining execution order. Lower numbers execute first. Tasks with the same priority can run in parallel if they have no dependencies.\n- **dependencies**: (Optional) Array of task_ids that must complete before this task starts (e.g., [\"task_0\", \"task_1\"])\n\nOutput must be valid JSON conforming to the task decomposition schema with these top-level fields:\n- request: The original user request\n- intent_analysis: Your analysis of underlying intent and requirements\n- tasks: Array of task objects as defined above\n- execution_notes: (Optional) High-level notes about execution plan\n\nExample priority ordering:\n- Priority 0: Analysis tasks (can run in parallel)\n- Priority 1: Design/planning (waits for analysis)\n- Priority 2-3: Implementation (sequential or parallel based on dependencies)\n- Priority 4+: Testing and finalization"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-3",
+      "type": "json_schema",
+      "position": {
+        "x": -240.0,
+        "y": 528.0
+      },
+      "data": {
+        "nodeType": "json_schema",
+        "label": "JSON Schema",
+        "icon": "&#x1F4CB;",
+        "headerColor": "#00FFFF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "schema",
+            "type": "object"
+          }
+        ],
+        "literalValue": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "Task Decomposition Schema",
+          "description": "Schema for decomposing user requests into actionable tasks with model, tools, prompt, and priority specifications",
+          "type": "object",
+          "properties": {
+            "request": {
+              "type": "string",
+              "description": "The original user request being decomposed"
+            },
+            "intent_analysis": {
+              "type": "string",
+              "description": "Analysis of the underlying intent and requirements to produce the expected outcomes"
+            },
+            "tasks": {
+              "type": "array",
+              "description": "Series of small, actionable tasks that together fulfill the request",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "task_id": {
+                    "type": "string",
+                    "description": "Unique identifier for the task (e.g., 'task_0', 'task_1')",
+                    "pattern": "^task_[0-9]+$"
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "Clear, concise description of what this task accomplishes"
+                  },
+                  "model": {
+                    "type": "string",
+                    "enum": [
+                      "small",
+                      "medium",
+                      "large"
+                    ],
+                    "description": "Size of LLM required to complete the task. Small: simple, deterministic tasks. Medium: moderate reasoning. Large: complex reasoning and planning."
+                  },
+                  "tools": {
+                    "type": "array",
+                    "description": "Subset of available tools that this task needs access to",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "analyze_code",
+                        "ask_user",
+                        "compact_memory",
+                        "edit_file",
+                        "execute_command",
+                        "fetch_url",
+                        "list_files",
+                        "read_file",
+                        "recall_memory",
+                        "inspect_vars",
+                        "remember",
+                        "search_files",
+                        "web_search",
+                        "write_file"
+                      ]
+                    },
+                    "uniqueItems": true
+                  },
+                  "prompt": {
+                    "type": "string",
+                    "description": "Dedicated prompt designed for the selected LLM and tools to achieve the expected outcomes for this specific task"
+                  },
+                  "priority": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Execution priority ordering. Tasks with the same priority number can be executed in parallel. Tasks with lower numbers execute before higher numbers. (e.g., priority 0 runs first, then priority 1, etc.)"
+                  },
+                  "dependencies": {
+                    "type": "array",
+                    "description": "Optional explicit list of task_ids that must complete successfully before this task can start. Provides additional clarity beyond priority ordering.",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^task_[0-9]+$"
+                    },
+                    "uniqueItems": true
+                  },
+                  "expected_outputs": {
+                    "type": "array",
+                    "description": "Optional list of expected outputs or artifacts this task should produce",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "success_criteria": {
+                    "type": "string",
+                    "description": "Optional criteria to determine if this task completed successfully"
+                  }
+                },
+                "required": [
+                  "task_id",
+                  "description",
+                  "model",
+                  "tools",
+                  "prompt",
+                  "priority"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 1
+            },
+            "execution_notes": {
+              "type": "string",
+              "description": "Optional high-level notes about the execution plan, dependencies, or coordination between tasks"
+            }
+          },
+          "required": [
+            "request",
+            "intent_analysis",
+            "tasks"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-4",
+      "type": "on_flow_end",
+      "position": {
+        "x": 512.0,
+        "y": 192.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "schedule",
+            "label": "schedule",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-5",
+      "type": "break_object",
+      "position": {
+        "x": 240.0,
+        "y": 512.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "data",
+            "label": "data",
+            "type": "any"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "data"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1768444243097",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-2",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768444246015",
+      "source": "node-1",
+      "sourceHandle": "provider",
+      "target": "node-2",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1768444247949",
+      "source": "node-1",
+      "sourceHandle": "model",
+      "target": "node-2",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-1768444249965",
+      "source": "node-1",
+      "sourceHandle": "request",
+      "target": "node-2",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "edge-1768444272939",
+      "source": "node-1",
+      "sourceHandle": "tools",
+      "target": "node-2",
+      "targetHandle": "tools",
+      "animated": false
+    },
+    {
+      "id": "edge-1768444610063",
+      "source": "node-3",
+      "sourceHandle": "value",
+      "target": "node-2",
+      "targetHandle": "response_schema",
+      "animated": false
+    },
+    {
+      "id": "edge-1768444627687",
+      "source": "node-2",
+      "sourceHandle": "exec-out",
+      "target": "node-4",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768444656851",
+      "source": "node-2",
+      "sourceHandle": "result",
+      "target": "node-5",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1768444665687",
+      "source": "node-5",
+      "sourceHandle": "data",
+      "target": "node-4",
+      "targetHandle": "schedule",
+      "animated": false
+    }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2026-01-15T02:36:57.360910",
+  "updated_at": "2026-01-15T03:09:51.822375"
+}

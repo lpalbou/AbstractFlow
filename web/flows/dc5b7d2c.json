@@ -1,6 +1,6 @@
 {
-  "id": "db535990",
-  "name": "agent-semantics",
+  "id": "dc5b7d2c",
+  "name": "expert-coder",
   "description": "",
   "interfaces": [],
   "nodes": [
@@ -8,8 +8,8 @@
       "id": "node-1",
       "type": "on_flow_start",
       "position": {
-        "x": -400.0,
-        "y": 192.0
+        "x": -912.0,
+        "y": 384.0
       },
       "data": {
         "nodeType": "on_flow_start",
@@ -24,6 +24,11 @@
             "type": "execution"
           },
           {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
             "id": "provider",
             "label": "provider",
             "type": "provider"
@@ -32,25 +37,12 @@
             "id": "model",
             "label": "model",
             "type": "model"
-          },
-          {
-            "id": "request",
-            "label": "request",
-            "type": "string"
-          },
-          {
-            "id": "tools",
-            "label": "tools",
-            "type": "tools"
           }
         ],
         "pinDefaults": {
+          "request": "create a SOTA python clone in 3D of the game r-type. all the assets, visuals and audio must be generated procedurally. there must be waves of ennemies, the usual power ups for r-type and visual effects with system particles. reproduce the same game mechanics with the various weapons and upgrades. and remember the game scroll horizontally with the starship traveling towards the right end of the screen",
           "provider": "lmstudio",
-          "model": "qwen/qwen3-next-80b",
-          "tools": [
-            "fetch_url",
-            "web_search"
-          ]
+          "model": "qwen/qwen3-next-80b"
         }
       },
       "label": null,
@@ -60,48 +52,11 @@
       "outputs": []
     },
     {
-      "id": "node-4",
-      "type": "on_flow_end",
-      "position": {
-        "x": 576.0,
-        "y": 192.0
-      },
-      "data": {
-        "nodeType": "on_flow_end",
-        "label": "On Flow End",
-        "icon": "&#x23F9;",
-        "headerColor": "#C0392B",
-        "inputs": [
-          {
-            "id": "exec-in",
-            "label": "",
-            "type": "execution"
-          },
-          {
-            "id": "result",
-            "label": "result",
-            "type": "object"
-          },
-          {
-            "id": "scratchpad",
-            "label": "scratchpad",
-            "type": "object"
-          }
-        ],
-        "outputs": []
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
-      "id": "node-6",
+      "id": "node-2",
       "type": "agent",
       "position": {
-        "x": 96.0,
-        "y": 192.0
+        "x": -304.0,
+        "y": 384.0
       },
       "data": {
         "nodeType": "agent",
@@ -218,8 +173,22 @@
             "description": "Runtime-owned execution trace/scratchpad for observability (LLM/tool steps, timings)."
           }
         ],
+        "agentConfig": {
+          "tools": [
+            "analyze_code",
+            "write_file",
+            "read_file",
+            "edit_file",
+            "search_files",
+            "execute_command",
+            "list_files"
+          ],
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b"
+        },
         "pinDefaults": {
-          "system": "You do web searches and return the information extracted as a set of clean, unitary and informative triples { subject - predicate - object }. subject and object must always be generic enough and expressed in a consistent manner so we can build and correlate knowledge about them. Use the requested response_schema to encode that knowledge."
+          "system": "You are a highly autonomous coder. you create code, make sure they launch and if they fail, or if you just want to improve it, you analyze code to make specific edits",
+          "max_iterations": 25
         }
       },
       "label": null,
@@ -229,39 +198,74 @@
       "outputs": []
     },
     {
-      "id": "node-7",
-      "type": "json_schema",
+      "id": "node-3",
+      "type": "subflow",
       "position": {
-        "x": -112.0,
-        "y": 544.0
+        "x": -656.0,
+        "y": 384.0
       },
       "data": {
-        "nodeType": "json_schema",
-        "label": "JSON Schema",
-        "icon": "&#x1F4CB;",
-        "headerColor": "#00FFFF",
-        "inputs": [],
-        "outputs": [
+        "nodeType": "subflow",
+        "label": "Subflow",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
           {
-            "id": "value",
-            "label": "schema",
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean",
+            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "input",
+            "label": "input",
             "type": "object"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
           }
         ],
-        "literalValue": {
-          "type": "object",
-          "properties": {
-            "field": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
           },
-          "required": [
-            "field"
-          ]
-        }
+          {
+            "id": "enriched_request",
+            "label": "enriched_request",
+            "type": "string"
+          }
+        ],
+        "subflowId": "72b51d91",
+        "pinDefaults": {}
       },
       "label": null,
       "icon": null,
@@ -272,79 +276,71 @@
   ],
   "edges": [
     {
-      "id": "edge-1768442833104",
+      "id": "edge-1768456424158",
       "source": "node-1",
-      "sourceHandle": "provider",
-      "target": "node-6",
-      "targetHandle": "provider",
-      "animated": false
+      "sourceHandle": "exec-out",
+      "target": "node-3",
+      "targetHandle": "exec-in",
+      "animated": true
     },
     {
-      "id": "edge-1768442835856",
-      "source": "node-1",
-      "sourceHandle": "model",
-      "target": "node-6",
-      "targetHandle": "model",
-      "animated": false
+      "id": "edge-1768456426942",
+      "source": "node-3",
+      "sourceHandle": "exec-out",
+      "target": "node-2",
+      "targetHandle": "exec-in",
+      "animated": true
     },
     {
-      "id": "edge-1768442838371",
+      "id": "edge-1768456491692",
       "source": "node-1",
       "sourceHandle": "request",
-      "target": "node-6",
+      "target": "node-3",
+      "targetHandle": "request",
+      "animated": false
+    },
+    {
+      "id": "edge-1768456494517",
+      "source": "node-3",
+      "sourceHandle": "enriched_request",
+      "target": "node-2",
       "targetHandle": "task",
       "animated": false
     },
     {
-      "id": "edge-1768442840914",
+      "id": "edge-1768456539469",
       "source": "node-1",
-      "sourceHandle": "tools",
-      "target": "node-6",
-      "targetHandle": "tools",
+      "sourceHandle": "provider",
+      "target": "node-3",
+      "targetHandle": "provider",
       "animated": false
     },
     {
-      "id": "edge-1768442847920",
+      "id": "edge-1768456542254",
       "source": "node-1",
-      "sourceHandle": "exec-out",
-      "target": "node-6",
-      "targetHandle": "exec-in",
-      "animated": true
-    },
-    {
-      "id": "edge-1768442850120",
-      "source": "node-6",
-      "sourceHandle": "exec-out",
-      "target": "node-4",
-      "targetHandle": "exec-in",
-      "animated": true
-    },
-    {
-      "id": "edge-1768442868288",
-      "source": "node-7",
-      "sourceHandle": "value",
-      "target": "node-6",
-      "targetHandle": "response_schema",
+      "sourceHandle": "provider",
+      "target": "node-2",
+      "targetHandle": "provider",
       "animated": false
     },
     {
-      "id": "edge-1768443407690",
-      "source": "node-6",
-      "sourceHandle": "result",
-      "target": "node-4",
-      "targetHandle": "result",
+      "id": "edge-1768456547177",
+      "source": "node-1",
+      "sourceHandle": "model",
+      "target": "node-2",
+      "targetHandle": "model",
       "animated": false
     },
     {
-      "id": "edge-1768443410633",
-      "source": "node-6",
-      "sourceHandle": "scratchpad",
-      "target": "node-4",
-      "targetHandle": "scratchpad",
+      "id": "edge-1768456551243",
+      "source": "node-1",
+      "sourceHandle": "model",
+      "target": "node-3",
+      "targetHandle": "model",
       "animated": false
     }
   ],
   "entryNode": "node-1",
-  "created_at": "2026-01-12T21:42:49.244679",
-  "updated_at": "2026-01-15T02:16:57.343507"
+  "created_at": "2026-01-15T05:36:30.693659",
+  "updated_at": "2026-01-15T06:28:53.366975"
 }

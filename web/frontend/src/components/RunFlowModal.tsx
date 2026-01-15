@@ -16,8 +16,9 @@ import AfSelect from './inputs/AfSelect';
 import AfMultiSelect from './inputs/AfMultiSelect';
 import { useProviders, useModels } from '../hooks/useProviders';
 import { useTools } from '../hooks/useTools';
+import { useExecutionWorkspace } from '../hooks/useExecutionWorkspace';
 import { RunSwitcherDropdown } from './RunSwitcherDropdown';
-import { JsonCodeBlock } from './JsonCodeBlock';
+import { JsonViewer } from './JsonViewer';
 
 interface RunFlowModalProps {
   isOpen: boolean;
@@ -66,6 +67,43 @@ function stringifyJson(value: unknown): string {
   } catch {
     return '';
   }
+}
+
+function randomUuidHex(): string {
+  try {
+    if (typeof globalThis.crypto?.randomUUID === 'function') {
+      return globalThis.crypto.randomUUID().replace(/-/g, '');
+    }
+  } catch {
+    // ignore
+  }
+  try {
+    if (typeof globalThis.crypto?.getRandomValues === 'function') {
+      const bytes = new Uint8Array(16);
+      globalThis.crypto.getRandomValues(bytes);
+      return Array.from(bytes)
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+    }
+  } catch {
+    // ignore
+  }
+  // Non-crypto fallback (best-effort; still unique enough for UI defaults).
+  return (
+    Math.random().toString(16).slice(2).padEnd(16, '0') +
+    Math.random().toString(16).slice(2).padEnd(16, '0')
+  ).slice(0, 32);
+}
+
+function joinPath(base: string, child: string): string {
+  const b = String(base || '');
+  const c = String(child || '');
+  if (!b) return c;
+  if (!c) return b;
+  const sep = b.includes('\\') ? '\\' : '/';
+  const b2 = b.endsWith('/') || b.endsWith('\\') ? b.slice(0, -1) : b;
+  const c2 = c.replace(/^[/\\]+/, '');
+  return `${b2}${sep}${c2}`;
 }
 
 function ArrayParamEditor({
@@ -259,9 +297,16 @@ export function RunFlowModal({
     return entryNode.data.outputs.filter(p => p.type !== 'execution');
   }, [entryNode]);
 
+  const formInputPins = useMemo(() => {
+    return inputPins.filter((p) => p.id !== 'workspace_root');
+  }, [inputPins]);
+
   // Form state for each input pin
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [toolsValues, setToolsValues] = useState<Record<string, string[]>>({});
+  const [workspaceRandom, setWorkspaceRandom] = useState(true);
+  const [workspaceRoot, setWorkspaceRoot] = useState('');
+  const [manualWorkspaceRoot, setManualWorkspaceRoot] = useState('');
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   // Nested subflow observability: folded by default; per-step expansion keyed by the
   // parent step id (stable across this modal's event stream).
@@ -273,22 +318,22 @@ export function RunFlowModal({
   const [rehydrateArtifactLoading, setRehydrateArtifactLoading] = useState(false);
 
   const providerPinId = useMemo(() => {
-    const pin = inputPins.find((p) => p.type === 'provider' || p.id === 'provider');
+    const pin = formInputPins.find((p) => p.type === 'provider' || p.id === 'provider');
     return pin?.id || null;
-  }, [inputPins]);
+  }, [formInputPins]);
 
   const selectedProvider = useMemo(() => {
     return providerPinId ? (formValues[providerPinId] || '') : '';
   }, [formValues, providerPinId]);
 
-  const wantProviderDropdown = Boolean(isOpen && inputPins.some((p) => p.type === 'provider' || p.id === 'provider'));
-  const wantModelDropdown = Boolean(isOpen && inputPins.some((p) => p.type === 'model' || p.id === 'model'));
+  const wantProviderDropdown = Boolean(isOpen && formInputPins.some((p) => p.type === 'provider' || p.id === 'provider'));
+  const wantModelDropdown = Boolean(isOpen && formInputPins.some((p) => p.type === 'model' || p.id === 'model'));
   const providersQuery = useProviders(wantProviderDropdown);
   const modelsQuery = useModels(selectedProvider || undefined, wantModelDropdown);
   const providers = Array.isArray(providersQuery.data) ? providersQuery.data : [];
   const models = Array.isArray(modelsQuery.data) ? modelsQuery.data : [];
 
-  const wantToolsDropdown = Boolean(isOpen && inputPins.some((p) => p.type === 'tools'));
+  const wantToolsDropdown = Boolean(isOpen && formInputPins.some((p) => p.type === 'tools'));
   const toolsQuery = useTools(wantToolsDropdown);
   const toolSpecs = Array.isArray(toolsQuery.data) ? toolsQuery.data : [];
   const toolOptions = useMemo(() => {
@@ -299,21 +344,40 @@ export function RunFlowModal({
     return out;
   }, [toolSpecs]);
 
+  const executionWorkspaceQuery = useExecutionWorkspace(isOpen);
+  const defaultRandomRoot =
+    executionWorkspaceQuery.data && typeof executionWorkspaceQuery.data.default_random_root === 'string'
+      ? executionWorkspaceQuery.data.default_random_root
+      : '';
+  const createRandomWorkspaceRoot = useCallback(() => {
+    const base = String(defaultRandomRoot || '').trim();
+    if (!base) return '';
+    return joinPath(base, randomUuidHex());
+  }, [defaultRandomRoot]);
+
   // When the modal is opened, start expanded (predictable UX).
   useEffect(() => {
     if (isOpen) setIsMinimized(false);
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!workspaceRandom) return;
+    if (workspaceRoot.trim()) return;
+    const next = createRandomWorkspaceRoot();
+    if (next) setWorkspaceRoot(next);
+  }, [createRandomWorkspaceRoot, isOpen, workspaceRandom, workspaceRoot]);
+
   // Initialize form values when modal opens
   useEffect(() => {
-    if (isOpen && inputPins.length > 0) {
+    if (isOpen && formInputPins.length > 0) {
       const initialValues: Record<string, string> = {};
       const initialTools: Record<string, string[]> = {};
       const defaults =
         entryNode && entryNode.data && typeof (entryNode.data as any).pinDefaults === 'object'
           ? ((entryNode.data as any).pinDefaults as Record<string, unknown>)
           : null;
-      inputPins.forEach(pin => {
+      formInputPins.forEach(pin => {
         if (pin.type === 'tools') {
           const raw = defaults && pin.id in defaults ? defaults[pin.id] : undefined;
           if (Array.isArray(raw)) {
@@ -364,7 +428,7 @@ export function RunFlowModal({
       setFormValues(initialValues);
       setToolsValues(initialTools);
     }
-  }, [isOpen, inputPins, entryNode]);
+  }, [isOpen, formInputPins, entryNode]);
 
   // Clear resume draft when leaving waiting state
   useEffect(() => {
@@ -376,12 +440,34 @@ export function RunFlowModal({
     setFormValues(prev => ({ ...prev, [pinId]: value }));
   }, []);
 
+  const handleWorkspaceRootChange = useCallback(
+    (next: string) => {
+      setWorkspaceRoot(next);
+      if (!workspaceRandom) setManualWorkspaceRoot(next);
+    },
+    [workspaceRandom]
+  );
+
+  const handleWorkspaceRandomChange = useCallback(
+    (checked: boolean) => {
+      if (checked) {
+        setWorkspaceRandom(true);
+        const next = createRandomWorkspaceRoot();
+        if (next) setWorkspaceRoot(next);
+        return;
+      }
+      setWorkspaceRandom(false);
+      if (manualWorkspaceRoot.trim()) setWorkspaceRoot(manualWorkspaceRoot);
+    },
+    [createRandomWorkspaceRoot, manualWorkspaceRoot]
+  );
+
   // Submit the form
   const handleSubmit = useCallback(() => {
     // Build input data from form values
     const inputData: Record<string, unknown> = {};
 
-    inputPins.forEach(pin => {
+    formInputPins.forEach(pin => {
       if (pin.type === 'tools') {
         inputData[pin.id] = Array.isArray(toolsValues[pin.id]) ? toolsValues[pin.id] : [];
         return;
@@ -409,8 +495,13 @@ export function RunFlowModal({
       }
     });
 
+    const workspaceValue = String(workspaceRoot || '').trim();
+    if (workspaceValue) {
+      inputData.workspace_root = workspaceValue;
+    }
+
     onRun(inputData);
-  }, [formValues, inputPins, onRun, toolsValues]);
+  }, [formInputPins, formValues, onRun, toolsValues, workspaceRoot]);
 
   type StepStatus = 'running' | 'completed' | 'waiting' | 'failed';
   type Step = {
@@ -2430,7 +2521,7 @@ export function RunFlowModal({
                                         ) : typeof v === 'string' ? (
                                           <span className="run-param-text">{v}</span>
                                         ) : (
-                                          <pre className="run-details-output run-param-json">{formatValue(v)}</pre>
+                                          <JsonViewer value={v} className="run-param-json" />
                                         )}
                                       </div>
                                     </div>
@@ -2546,7 +2637,7 @@ export function RunFlowModal({
 	                              return (
 	                                <div className="run-output-section">
 	                                  <div className="run-output-title">Model output</div>
-	                                  <JsonCodeBlock value={modelOutput} className="run-details-output" />
+	                                  <JsonViewer value={modelOutput} />
 	                                </div>
 	                              );
 	                            })()
@@ -2574,21 +2665,21 @@ export function RunFlowModal({
 	                          {outputPreview?.benchmark && outputPreview.benchmark.expected != null ? (
 	                            <details className="run-raw-details">
 	                              <summary>Expected</summary>
-	                              <JsonCodeBlock value={outputPreview.benchmark.expected} className="run-details-output" />
+	                              <JsonViewer value={outputPreview.benchmark.expected} />
 	                            </details>
 	                          ) : null}
 
                           {outputPreview?.benchmark && outputPreview.benchmark.metrics != null ? (
                             <details className="run-raw-details">
                               <summary>Metrics</summary>
-                              <JsonCodeBlock value={outputPreview.benchmark.metrics} className="run-details-output" />
+                              <JsonViewer value={outputPreview.benchmark.metrics} />
                             </details>
                           ) : null}
 
                           {outputPreview?.benchmark && outputPreview.benchmark.debug != null ? (
                             <details className="run-raw-details">
                               <summary>Debug</summary>
-                              <JsonCodeBlock value={outputPreview.benchmark.debug} className="run-details-output" />
+                              <JsonViewer value={outputPreview.benchmark.debug} />
                             </details>
                           ) : null}
 
@@ -2614,7 +2705,7 @@ export function RunFlowModal({
                                 {outputPreview?.usage ? (
                                   <div>
                                     <span className="run-output-meta-key">Usage</span>
-                                    <span className="run-output-meta-val">
+                                    <div className="run-output-meta-val">
                                       {usageBadges.length ? (
                                         <span className="run-output-meta-badges">
                                           {usageBadges.map((b) => (
@@ -2624,9 +2715,9 @@ export function RunFlowModal({
                                           ))}
                                         </span>
                                       ) : (
-                                        formatValue(outputPreview.usage)
+                                        <JsonViewer value={outputPreview.usage} className="run-output-meta-json" />
                                       )}
-                                    </span>
+                                    </div>
                                   </div>
                                 ) : null}
                               </div>
@@ -2672,13 +2763,13 @@ export function RunFlowModal({
 
                               <details className="run-raw-details">
                                 <summary>Trace JSON</summary>
-                                <JsonCodeBlock value={outputPreview?.scratchpad} className="run-details-output" />
+                                <JsonViewer value={outputPreview?.scratchpad} />
                               </details>
                             </div>
                           ) : selectedStep?.nodeType !== 'agent' && outputPreview?.scratchpad != null ? (
                             <details className="run-raw-details">
                               <summary>Scratchpad</summary>
-                              <JsonCodeBlock value={outputPreview?.scratchpad} className="run-details-output" />
+                              <JsonViewer value={outputPreview?.scratchpad} />
                             </details>
                           ) : null}
                         </div>
@@ -2686,7 +2777,7 @@ export function RunFlowModal({
 
                       <details className="run-raw-details" open={!outputPreview}>
                         <summary>Raw JSON</summary>
-                        <JsonCodeBlock value={selectedStep.output} className="run-details-output" />
+                        <JsonViewer value={selectedStep.output} />
                       </details>
                     </>
                   ) : (
@@ -2706,7 +2797,7 @@ export function RunFlowModal({
                       {result.error ? (
                         <div className="run-details-error">{result.error}</div>
                       ) : (
-                        <pre className="run-details-output">{formatValue(result.result)}</pre>
+                        <JsonViewer value={result.result} />
                       )}
                     </div>
                   ) : null}
@@ -2729,13 +2820,61 @@ export function RunFlowModal({
                     Entry point: <strong>{entryNode.data.label}</strong>
                   </p>
 
-                  {inputPins.length === 0 ? (
-                    <p className="run-form-note">
-                      This flow has no input parameters. Click Run to execute.
-                    </p>
-                  ) : (
-                    <div className="run-form-fields">
-                      {inputPins.map(pin => {
+                  <div className="run-form-fields">
+                    <div className="run-form-field">
+                      <label className="run-form-label">
+                        Execution folder
+                        <span className="run-form-type">(workspace_root)</span>
+                        <span className="run-form-required">required</span>
+                      </label>
+
+                      <div className="run-form-inline">
+                        <input
+                          type="text"
+                          className="run-form-input"
+                          value={workspaceRoot}
+                          onChange={(e) => handleWorkspaceRootChange(e.target.value)}
+                          placeholder={
+                            workspaceRandom && !workspaceRoot.trim()
+                              ? executionWorkspaceQuery.isLoading
+                                ? 'Generating…'
+                                : 'Will be generated on Run'
+                              : 'Folder path…'
+                          }
+                          readOnly={workspaceRandom}
+                          disabled={isRunning}
+                        />
+
+                        <label className="run-form-checkbox run-form-inline-checkbox">
+                          <input
+                            type="checkbox"
+                            checked={workspaceRandom}
+                            onChange={(e) => handleWorkspaceRandomChange(e.target.checked)}
+                            disabled={isRunning}
+                          />
+                          <span>Random</span>
+                          <span
+                            className="run-form-tooltip"
+                            title="When enabled, a new folder is generated for the next execution to keep runs isolated. Uncheck to run in a specific folder."
+                            aria-label="Execution folder randomization help"
+                          >
+                            i
+                          </span>
+                        </label>
+                      </div>
+
+                      {executionWorkspaceQuery.isError ? (
+                        <p className="run-form-note">Could not fetch defaults; the server will generate a folder on Run.</p>
+                      ) : null}
+                    </div>
+
+                    {formInputPins.length === 0 ? (
+                      <p className="run-form-note">
+                        This flow has no input parameters. Click Run to execute.
+                      </p>
+                    ) : null}
+
+                    {formInputPins.map(pin => {
                       const inputType = getInputTypeForPin(pin.type);
                       const value = formValues[pin.id] || '';
 
@@ -2883,8 +3022,7 @@ export function RunFlowModal({
                           </div>
                         );
                       })}
-                    </div>
-                  )}
+                  </div>
                 </div>
               ) : (
                 <p className="run-form-note">
@@ -2931,7 +3069,9 @@ export function RunFlowModal({
             <button
               className="modal-button primary"
               onClick={handleSubmit}
-              disabled={isRunning || !entryNode}
+              disabled={
+                isRunning || !entryNode || (!workspaceRoot.trim() && !(workspaceRandom && executionWorkspaceQuery.isError))
+              }
             >
               {isRunning ? 'Running...' : 'Run'}
             </button>
@@ -2941,6 +3081,10 @@ export function RunFlowModal({
             <button
               className="modal-button primary"
               onClick={() => {
+                if (workspaceRandom) {
+                  const next = createRandomWorkspaceRoot();
+                  if (next) setWorkspaceRoot(next);
+                }
                 onRunAgain();
               }}
               disabled={isRunning}

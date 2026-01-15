@@ -231,6 +231,23 @@ async def list_runs(
         raise HTTPException(status_code=500, detail=f"Failed to list runs: {e}")
 
 
+@router.get("/execution-workspace")
+async def get_execution_workspace() -> Dict[str, Any]:
+    """Return server-side execution workspace defaults for the UI.
+
+    Notes:
+    - This is used to prefill the Run Flow form with the per-run workspace folder path.
+    - `workspace_root` defaults to a random directory under `<base>/.abstractflow/runs/<uuid>`.
+    """
+    base = resolve_base_execution_dir()
+    random_root = base / ".abstractflow" / "runs"
+    return {
+        "base_execution_dir": str(base),
+        "default_random_root": str(random_root),
+        "alias_pattern": "<base>/<run_id>",
+    }
+
+
 @router.get("/{run_id}")
 async def get_run(run_id: str) -> Dict[str, Any]:
     run_store, _, _ = get_runtime_stores()
@@ -539,4 +556,3 @@ async def get_run_history(run_id: str) -> Dict[str, Any]:
             )
 
     return {"run": summary, "events": events}
-

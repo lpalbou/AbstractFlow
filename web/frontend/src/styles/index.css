@@ -1689,6 +1689,62 @@ button.primary:hover:not(:disabled) {
   opacity: 0.6;
 }
 
+.run-form-input[readonly] {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.run-form-inline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.run-form-inline .run-form-input {
+  flex: 1 1 320px;
+}
+
+.run-form-inline-checkbox {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.run-form-inline-checkbox:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.run-form-required {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(233, 69, 96, 0.5);
+  background: rgba(233, 69, 96, 0.12);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.run-form-tooltip {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.8);
+  cursor: help;
+  user-select: none;
+}
+
 .run-form-checkbox {
   display: flex;
   align-items: center;
@@ -2746,6 +2802,72 @@ button.primary:hover:not(:disabled) {
   font-style: italic;
 }
 
+.json-viewer {
+  /* Override run-details-output wrapping for tree readability. */
+  white-space: normal;
+  word-break: normal;
+}
+
+.json-viewer__toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
+}
+
+.json-viewer__copy {
+  font-size: 11px;
+  padding: 6px 10px;
+}
+
+.json-viewer__tree {
+  white-space: pre;
+}
+
+.json-viewer__line,
+.json-viewer__summary {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.json-viewer__details {
+  margin: 0;
+}
+
+.json-viewer__summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.json-viewer__summary::-webkit-details-marker {
+  display: none;
+}
+
+.json-viewer__summary::marker {
+  content: '';
+}
+
+.json-viewer__punct {
+  color: var(--text-muted);
+}
+
+.json-viewer__caret {
+  display: inline-block;
+  width: 14px;
+  margin-right: 4px;
+  color: var(--text-muted);
+  opacity: 0.9;
+}
+
+.json-viewer__children {
+  margin-top: 2px;
+}
+
 .run-output-preview {
   display: flex;
   flex-direction: column;
@@ -2890,6 +3012,10 @@ button.primary:hover:not(:disabled) {
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+.run-output-meta-json {
+  max-height: 240px;
 }
 
 .run-trace {

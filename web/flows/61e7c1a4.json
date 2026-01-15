@@ -1,0 +1,1142 @@
+{
+  "id": "61e7c1a4",
+  "name": "keywords",
+  "description": "",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "node-3",
+      "type": "on_flow_start",
+      "position": {
+        "x": 112.0,
+        "y": -112.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-4",
+      "type": "memory_query",
+      "position": {
+        "x": 1744.0,
+        "y": 256.0
+      },
+      "data": {
+        "nodeType": "memory_query",
+        "label": "Recall",
+        "icon": "&#x1F50D;",
+        "headerColor": "#2ECC71",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "query",
+            "label": "query",
+            "type": "string",
+            "description": "Keyword query (substring match over span metadata and small previews). Combined with tags/authors/locations using AND semantics."
+          },
+          {
+            "id": "limit",
+            "label": "limit",
+            "type": "number",
+            "description": "Maximum number of spans to return (limit_spans). Default: 5."
+          },
+          {
+            "id": "tags",
+            "label": "tags",
+            "type": "object",
+            "description": "Tag filters as key→string or key→list[string]. Reserved key \"kind\" is ignored."
+          },
+          {
+            "id": "tags_mode",
+            "label": "tags_mode",
+            "type": "string",
+            "description": "How to combine tag keys: all (AND) or any (OR). Within a single key, list values are OR."
+          },
+          {
+            "id": "usernames",
+            "label": "usernames",
+            "type": "array",
+            "description": "Filter by created_by (actor id). Case-insensitive exact match. Empty means no filter."
+          },
+          {
+            "id": "locations",
+            "label": "locations",
+            "type": "array",
+            "description": "Filter by location metadata (or tags.location). Case-insensitive exact match."
+          },
+          {
+            "id": "since",
+            "label": "since",
+            "type": "string",
+            "description": "ISO8601 start time. Matches spans whose [from,to] intersects this range."
+          },
+          {
+            "id": "until",
+            "label": "until",
+            "type": "string",
+            "description": "ISO8601 end time. Matches spans whose [from,to] intersects this range."
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string",
+            "description": "Which span index to query: run | session | global | all. (all queries run+session+global. session uses session_id authority; if session_id is missing, it falls back to the run-tree root.)"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "results",
+            "label": "results",
+            "type": "array",
+            "description": "Structured match list (meta.matches). Use it to extract span_ids for Recall into context."
+          },
+          {
+            "id": "rendered",
+            "label": "rendered",
+            "type": "string",
+            "description": "Human-readable recall summary (tool-style output string)."
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-5",
+      "type": "while",
+      "position": {
+        "x": 640.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "while",
+        "label": "While",
+        "icon": "&#x267B;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "loop",
+            "label": "loop",
+            "type": "execution"
+          },
+          {
+            "id": "done",
+            "label": "done",
+            "type": "execution"
+          },
+          {
+            "id": "item",
+            "label": "item",
+            "type": "any"
+          },
+          {
+            "id": "index",
+            "label": "index",
+            "type": "number"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-6",
+      "type": "if",
+      "position": {
+        "x": 880.0,
+        "y": 16.0
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "If/Else",
+        "icon": "&#x2753;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-7",
+      "type": "set_var",
+      "position": {
+        "x": 336.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Set discuss",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "discuss"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-8",
+      "type": "literal_boolean",
+      "position": {
+        "x": 144.0,
+        "y": 80.0
+      },
+      "data": {
+        "nodeType": "literal_boolean",
+        "label": "Boolean",
+        "icon": "?",
+        "headerColor": "#FF0000",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "boolean"
+          }
+        ],
+        "literalValue": true
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-9",
+      "type": "contains",
+      "position": {
+        "x": 880.0,
+        "y": 144.0
+      },
+      "data": {
+        "nodeType": "contains",
+        "label": "Contains",
+        "icon": "in",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "text",
+            "label": "text",
+            "type": "string"
+          },
+          {
+            "id": "pattern",
+            "label": "pattern",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "boolean"
+          }
+        ],
+        "pinDefaults": {
+          "text": "/q",
+          "pattern": "/q"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-11",
+      "type": "set_var",
+      "position": {
+        "x": 1168.0,
+        "y": -304.0
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Set discuss",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "discuss"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-12",
+      "type": "literal_boolean",
+      "position": {
+        "x": 1168.0,
+        "y": -176.0
+      },
+      "data": {
+        "nodeType": "literal_boolean",
+        "label": "Boolean",
+        "icon": "?",
+        "headerColor": "#FF0000",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "boolean"
+          }
+        ],
+        "literalValue": false
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-13",
+      "type": "get_var",
+      "position": {
+        "x": 400.0,
+        "y": 80.0
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get discuss",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "discuss"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-14",
+      "type": "contains",
+      "position": {
+        "x": 1296.0,
+        "y": 160.0
+      },
+      "data": {
+        "nodeType": "contains",
+        "label": "Contains",
+        "icon": "in",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "text",
+            "label": "text",
+            "type": "string"
+          },
+          {
+            "id": "pattern",
+            "label": "pattern",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "boolean"
+          }
+        ],
+        "pinDefaults": {
+          "text": "/mem",
+          "pattern": "/mem"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-15",
+      "type": "if",
+      "position": {
+        "x": 1296.0,
+        "y": 32.0
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "If/Else",
+        "icon": "&#x2753;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-16",
+      "type": "memory_note",
+      "position": {
+        "x": 1856.0,
+        "y": -352.0
+      },
+      "data": {
+        "nodeType": "memory_note",
+        "label": "Memorize",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#2ECC71",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "keep_in_context",
+            "label": "in_context",
+            "type": "boolean",
+            "description": "When true, also insert the stored note into this run's context.messages (synthetic system message). If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string",
+            "description": "Where to store/index the note: run (this run), session (all runs with the same session_id; owned by an internal session memory run), or global (shared global memory run). If session_id is missing, session falls back to the run-tree root."
+          },
+          {
+            "id": "content",
+            "label": "content",
+            "type": "string",
+            "description": "The note text to store durably (keep it short; prefer references in sources for large payloads)."
+          },
+          {
+            "id": "location",
+            "label": "location",
+            "type": "string",
+            "description": "Optional location label (where the note was produced, e.g. \"flow:my_flow/node-12\"). Useful for filtering."
+          },
+          {
+            "id": "tags",
+            "label": "tags",
+            "type": "object",
+            "description": "Key/value tags for filtering (e.g. {topic:\"memory\", person:\"laurent\"}). Values must be strings."
+          },
+          {
+            "id": "sources",
+            "label": "sources",
+            "type": "object",
+            "description": "Optional provenance refs (e.g. {run_id, span_ids, message_ids}). The note stores refs, not the full source content."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "note_id",
+            "label": "note_id",
+            "type": "string",
+            "description": "The stored note’s span_id / artifact_id. Use it for Recall into context (span_ids) or for precise Recall."
+          }
+        ],
+        "pinDefaults": {}
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-17",
+      "type": "on_flow_end",
+      "position": {
+        "x": 848.0,
+        "y": 448.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-18",
+      "type": "replace",
+      "position": {
+        "x": 1408.0,
+        "y": -176.0
+      },
+      "data": {
+        "nodeType": "replace",
+        "label": "Replace",
+        "icon": "&#x21BA;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "text",
+            "label": "text",
+            "type": "string"
+          },
+          {
+            "id": "pattern",
+            "label": "pattern",
+            "type": "string"
+          },
+          {
+            "id": "replacement",
+            "label": "replacement",
+            "type": "string"
+          },
+          {
+            "id": "mode",
+            "label": "mode",
+            "type": "string",
+            "description": "Replacement mode: 'first' or 'all' (default: all)."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "pattern": "/mem "
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-19",
+      "type": "ask_user",
+      "position": {
+        "x": 688.0,
+        "y": -144.0
+      },
+      "data": {
+        "nodeType": "ask_user",
+        "label": "Ask User",
+        "icon": "&#x2753;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "choices",
+            "label": "choices",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "prompt": "/mem x to remember x, otherwise just a tag:sentence"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-20",
+      "type": "split",
+      "position": {
+        "x": 1424.0,
+        "y": -288.0
+      },
+      "data": {
+        "nodeType": "split",
+        "label": "Split",
+        "icon": "&#x2702;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "text",
+            "label": "text",
+            "type": "string"
+          },
+          {
+            "id": "delimiter",
+            "label": "delimiter",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "array"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-21",
+      "type": "get_element",
+      "position": {
+        "x": 1408.0,
+        "y": -608.0
+      },
+      "data": {
+        "nodeType": "get_element",
+        "label": "Get Element",
+        "icon": "&#x1F449;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "array",
+            "label": "array",
+            "type": "array",
+            "description": "Input array (list/tuple)."
+          },
+          {
+            "id": "index",
+            "label": "index",
+            "type": "number",
+            "description": "0-based index (negative allowed; -1 is last)."
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any",
+            "description": "Fallback value when index is invalid (default null)."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "any",
+            "description": "Element value (or default when not found)."
+          },
+          {
+            "id": "found",
+            "label": "found",
+            "type": "boolean",
+            "description": "True when index is valid for the given array."
+          }
+        ],
+        "pinDefaults": {
+          "index": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-22",
+      "type": "make_object",
+      "position": {
+        "x": 1744.0,
+        "y": -544.0
+      },
+      "data": {
+        "nodeType": "make_object",
+        "label": "Create JSON",
+        "icon": "{}",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "tag",
+            "label": "tag",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-23",
+      "type": "get_element",
+      "position": {
+        "x": 1488.0,
+        "y": -544.0
+      },
+      "data": {
+        "nodeType": "get_element",
+        "label": "Get Element",
+        "icon": "&#x1F449;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "array",
+            "label": "array",
+            "type": "array",
+            "description": "Input array (list/tuple)."
+          },
+          {
+            "id": "index",
+            "label": "index",
+            "type": "number",
+            "description": "0-based index (negative allowed; -1 is last)."
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any",
+            "description": "Fallback value when index is invalid (default null)."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "any",
+            "description": "Element value (or default when not found)."
+          },
+          {
+            "id": "found",
+            "label": "found",
+            "type": "boolean",
+            "description": "True when index is valid for the given array."
+          }
+        ],
+        "pinDefaults": {
+          "index": 1
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1768438265570",
+      "source": "node-3",
+      "sourceHandle": "exec-out",
+      "target": "node-7",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768438267522",
+      "source": "node-7",
+      "sourceHandle": "exec-out",
+      "target": "node-5",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768438285346",
+      "source": "node-8",
+      "sourceHandle": "value",
+      "target": "node-7",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-1768438356222",
+      "source": "node-9",
+      "sourceHandle": "result",
+      "target": "node-6",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "edge-1768438380782",
+      "source": "node-6",
+      "sourceHandle": "true",
+      "target": "node-11",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768438392481",
+      "source": "node-12",
+      "sourceHandle": "value",
+      "target": "node-11",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-1768438423362",
+      "source": "node-13",
+      "sourceHandle": "value",
+      "target": "node-5",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "edge-1768438463630",
+      "source": "node-15",
+      "sourceHandle": "true",
+      "target": "node-16",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768438471990",
+      "source": "node-15",
+      "sourceHandle": "false",
+      "target": "node-4",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768438501874",
+      "source": "node-5",
+      "sourceHandle": "done",
+      "target": "node-17",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768438511605",
+      "source": "node-14",
+      "sourceHandle": "result",
+      "target": "node-15",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "edge-1768438594306",
+      "source": "node-5",
+      "sourceHandle": "loop",
+      "target": "node-19",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768438596272",
+      "source": "node-19",
+      "sourceHandle": "exec-out",
+      "target": "node-6",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768438644075",
+      "source": "node-19",
+      "sourceHandle": "response",
+      "target": "node-9",
+      "targetHandle": "text",
+      "animated": false
+    },
+    {
+      "id": "edge-1768438654949",
+      "source": "node-19",
+      "sourceHandle": "response",
+      "target": "node-14",
+      "targetHandle": "text",
+      "animated": false
+    },
+    {
+      "id": "edge-1768438695566",
+      "source": "node-19",
+      "sourceHandle": "response",
+      "target": "node-18",
+      "targetHandle": "text",
+      "animated": false
+    },
+    {
+      "id": "edge-1768438734159",
+      "source": "node-18",
+      "sourceHandle": "result",
+      "target": "node-20",
+      "targetHandle": "text",
+      "animated": false
+    },
+    {
+      "id": "edge-1768438743850",
+      "source": "node-20",
+      "sourceHandle": "result",
+      "target": "node-21",
+      "targetHandle": "array",
+      "animated": false
+    },
+    {
+      "id": "edge-1768438921571",
+      "source": "node-21",
+      "sourceHandle": "result",
+      "target": "node-22",
+      "targetHandle": "tag",
+      "animated": false
+    },
+    {
+      "id": "edge-1768438928522",
+      "source": "node-20",
+      "sourceHandle": "result",
+      "target": "node-23",
+      "targetHandle": "array",
+      "animated": false
+    },
+    {
+      "id": "edge-1768438932529",
+      "source": "node-23",
+      "sourceHandle": "result",
+      "target": "node-22",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-1768438936104",
+      "source": "node-22",
+      "sourceHandle": "result",
+      "target": "node-16",
+      "targetHandle": "tags",
+      "animated": false
+    },
+    {
+      "id": "edge-1768438975488",
+      "source": "node-6",
+      "sourceHandle": "false",
+      "target": "node-15",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768438986305",
+      "source": "node-19",
+      "sourceHandle": "response",
+      "target": "node-4",
+      "targetHandle": "query",
+      "animated": false
+    }
+  ],
+  "entryNode": "node-3",
+  "created_at": "2026-01-15T01:03:10.113645",
+  "updated_at": "2026-01-15T01:03:44.107275"
+}

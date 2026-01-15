@@ -1,0 +1,1024 @@
+{
+  "id": "6b2a43ff",
+  "name": "auto-task-scheduler",
+  "description": "",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": {
+        "x": -352.0,
+        "y": 192.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools"
+          }
+        ],
+        "pinDefaults": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b",
+          "request": "create a SOTA python clone of the game r-type. all the assets, visuals and audio must be generated procedurally. there must be waves of ennemies, the usual power ups for r-type and visual effects. reproduce the same game mechanics and remember the game scroll horizontally with the starship traveling towards the right end of the screen. ensure the game launch without errors.",
+          "tools": [
+            "analyze_code",
+            "ask_user",
+            "compact_memory",
+            "edit_file",
+            "execute_command",
+            "fetch_url",
+            "list_files",
+            "read_file",
+            "recall_memory",
+            "inspect_vars",
+            "remember",
+            "search_files",
+            "web_search",
+            "write_file"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-2",
+      "type": "llm_call",
+      "position": {
+        "x": -32.0,
+        "y": 192.0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "LLM Call",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "include_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "max_input_tokens",
+            "label": "max_input_tokens",
+            "type": "number",
+            "description": "Optional per-call input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for this call."
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider",
+            "description": "LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model",
+            "description": "LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number",
+            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number",
+            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string",
+            "description": "Optional system prompt for this single call."
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string",
+            "description": "User prompt/content for this single call."
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools",
+            "description": "Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node)."
+          },
+          {
+            "id": "response_schema",
+            "label": "structured_output",
+            "type": "object",
+            "description": "Optional JSON Schema object (type=object) the assistant content must conform to."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string",
+            "description": "Assistant text content (best-effort). For tool calls, content may be empty."
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array",
+            "description": "Normalized tool call requests (same as result.tool_calls). This pin exists to make wiring into Tool Calls / Emit Event nodes simpler."
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object",
+            "description": "Full normalized LLM result (content, tool_calls, usage, provider/model metadata, trace_id)."
+          }
+        ],
+        "pinDefaults": {
+          "system": "# Task Decomposition Agent System Prompt\n\nYou are an expert in understanding the underlying intents of a request and the requirements to produce the expected outcomes. Based on this analysis, you decompose the request into a series of small, actionable \"tasks\" following the task decomposition JSON schema.\n\nFor each task, you must specify:\n\n- **task_id**: Unique identifier (e.g., \"task_0\", \"task_1\", \"task_2\")\n- **title**: Short, user-facing title (max 60 characters) displayed while the agent works on this task\n  - Use present progressive tense (e.g., \"Analyzing authentication code\", \"Implementing JWT utilities\", \"Writing unit tests\")\n  - Be specific but concise\n  - Examples: \"Setting up project structure\", \"Generating visual assets\", \"Testing API endpoints\"\n- **description**: Clear, concise description of what this task accomplishes\n- **model**: LLM size required - MUST be one of: \"small\", \"medium\", or \"large\"\n  - small: Simple, deterministic tasks (searches, listings, basic edits)\n  - medium: Moderate reasoning (code analysis, implementations, testing)\n  - large: Complex reasoning (architectural decisions, design, planning)\n- **tools**: Array of tool names this task needs access to. ONLY select from these 14 available tools:\n  - analyze_code\n  - ask_user\n  - compact_memory\n  - edit_file\n  - execute_command\n  - fetch_url\n  - list_files\n  - read_file\n  - recall_memory\n  - inspect_vars\n  - remember\n  - search_files\n  - web_search\n  - write_file\n- **prompt**: Dedicated prompt designed for the selected LLM and tools to achieve the expected outcomes\n- **priority**: Integer (0, 1, 2, 3...) defining execution order. Lower numbers execute first. Tasks with the same priority can run in parallel if they have no dependencies.\n- **dependencies**: (Optional) Array of task_ids that must complete before this task starts (e.g., [\"task_0\", \"task_1\"])\n- **expected_outputs**: (Optional) Array of expected outputs or artifacts this task should produce\n- **success_criteria**: (Optional) Criteria to determine if this task completed successfully\n\n## Output Format\n\nYour output must be valid JSON conforming to the task decomposition schema with these top-level fields:\n\n```json\n{\n  \"request\": \"The original user request\",\n  \"intent_analysis\": \"Your analysis of underlying intent and requirements\",\n  \"tasks\": [\n    {\n      \"task_id\": \"task_0\",\n      \"title\": \"Short user-facing title\",\n      \"description\": \"What this task does\",\n      \"model\": \"small|medium|large\",\n      \"tools\": [\"tool1\", \"tool2\"],\n      \"prompt\": \"Detailed prompt for the LLM executing this task\",\n      \"priority\": 0,\n      \"dependencies\": [\"task_x\"],\n      \"expected_outputs\": [\"output1\"],\n      \"success_criteria\": \"How to verify success\"\n    }\n  ],\n  \"execution_notes\": \"Optional high-level notes about execution plan\"\n}\n```\n\n## Execution Priority Guidelines\n\n- **Priority 0**: Analysis and discovery tasks (can run in parallel)\n- **Priority 1**: Design, planning, and architectural decisions (waits for analysis)\n- **Priority 2-3**: Core implementation tasks (sequential or parallel based on dependencies)\n- **Priority 4+**: Testing, verification, and finalization\n\n## Best Practices\n\n1. **Keep tasks atomic**: Each task should accomplish one clear objective\n2. **Minimize tool access**: Only give each task the tools it actually needs\n3. **Write specific prompts**: Include context, expected behavior, and success criteria\n4. **Enable parallelism**: Use same priority for independent tasks\n5. **Clear titles**: User should understand what's happening from the title alone\n6. **Explicit dependencies**: Use dependencies array when tasks must run in sequence\n\n## Example Title Patterns\n\nGood titles:\n- \"Analyzing authentication system\"\n- \"Implementing JWT token generation\"\n- \"Writing integration tests\"\n- \"Updating API documentation\"\n- \"Refactoring user service\"\n\nBad titles:\n- \"Task 1\" (not descriptive)\n- \"Do the thing\" (vague)\n- \"Analyze, implement, and test the entire authentication refactor\" (too long, multiple tasks)\n"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-3",
+      "type": "json_schema",
+      "position": {
+        "x": -240.0,
+        "y": 528.0
+      },
+      "data": {
+        "nodeType": "json_schema",
+        "label": "JSON Schema",
+        "icon": "&#x1F4CB;",
+        "headerColor": "#00FFFF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "schema",
+            "type": "object"
+          }
+        ],
+        "literalValue": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "Task Decomposition Schema",
+          "description": "Schema for decomposing user requests into actionable tasks with model, tools, prompt, and priority specifications",
+          "type": "object",
+          "properties": {
+            "request": {
+              "type": "string",
+              "description": "The original user request being decomposed"
+            },
+            "intent_analysis": {
+              "type": "string",
+              "description": "Analysis of the underlying intent and requirements to produce the expected outcomes"
+            },
+            "tasks": {
+              "type": "array",
+              "description": "Series of small, actionable tasks that together fulfill the request",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "task_id": {
+                    "type": "string",
+                    "description": "Unique identifier for the task (e.g., 'task_0', 'task_1')",
+                    "pattern": "^task_[0-9]+$"
+                  },
+                  "title": {
+                    "type": "string",
+                    "description": "Short, user-facing title displayed while the agent works on this task (e.g., 'Analyzing codebase', 'Implementing JWT utilities')",
+                    "maxLength": 60
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "Clear, concise description of what this task accomplishes"
+                  },
+                  "model": {
+                    "type": "string",
+                    "enum": [
+                      "small",
+                      "medium",
+                      "large"
+                    ],
+                    "description": "Size of LLM required to complete the task. Small: simple, deterministic tasks. Medium: moderate reasoning. Large: complex reasoning and planning."
+                  },
+                  "tools": {
+                    "type": "array",
+                    "description": "Subset of available tools that this task needs access to",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "analyze_code",
+                        "ask_user",
+                        "compact_memory",
+                        "edit_file",
+                        "execute_command",
+                        "fetch_url",
+                        "list_files",
+                        "read_file",
+                        "recall_memory",
+                        "inspect_vars",
+                        "remember",
+                        "search_files",
+                        "web_search",
+                        "write_file"
+                      ]
+                    },
+                    "uniqueItems": true
+                  },
+                  "prompt": {
+                    "type": "string",
+                    "description": "Dedicated prompt designed for the selected LLM and tools to achieve the expected outcomes for this specific task"
+                  },
+                  "priority": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Execution priority ordering. Tasks with the same priority number can be executed in parallel. Tasks with lower numbers execute before higher numbers. (e.g., priority 0 runs first, then priority 1, etc.)"
+                  },
+                  "dependencies": {
+                    "type": "array",
+                    "description": "Optional explicit list of task_ids that must complete successfully before this task can start. Provides additional clarity beyond priority ordering.",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^task_[0-9]+$"
+                    },
+                    "uniqueItems": true
+                  },
+                  "expected_outputs": {
+                    "type": "array",
+                    "description": "Optional list of expected outputs or artifacts this task should produce",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "success_criteria": {
+                    "type": "string",
+                    "description": "Optional criteria to determine if this task completed successfully"
+                  }
+                },
+                "required": [
+                  "task_id",
+                  "title",
+                  "description",
+                  "model",
+                  "tools",
+                  "prompt",
+                  "priority"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 1
+            },
+            "execution_notes": {
+              "type": "string",
+              "description": "Optional high-level notes about the execution plan, dependencies, or coordination between tasks"
+            }
+          },
+          "required": [
+            "request",
+            "intent_analysis",
+            "tasks"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-4",
+      "type": "on_flow_end",
+      "position": {
+        "x": 656.0,
+        "y": 592.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "schedule",
+            "label": "schedule",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-5",
+      "type": "break_object",
+      "position": {
+        "x": 240.0,
+        "y": 512.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "data",
+            "label": "data",
+            "type": "any"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "data"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-6",
+      "type": "loop",
+      "position": {
+        "x": 304.0,
+        "y": 192.0
+      },
+      "data": {
+        "nodeType": "loop",
+        "label": "ForEach",
+        "icon": "&#x1F501;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "items",
+            "label": "items",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "loop",
+            "label": "loop",
+            "type": "execution"
+          },
+          {
+            "id": "done",
+            "label": "done",
+            "type": "execution"
+          },
+          {
+            "id": "item",
+            "label": "item",
+            "type": "any"
+          },
+          {
+            "id": "index",
+            "label": "index",
+            "type": "number"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-7",
+      "type": "break_object",
+      "position": {
+        "x": 240.0,
+        "y": 400.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "tasks",
+            "label": "tasks",
+            "type": "array"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "tasks"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-8",
+      "type": "break_object",
+      "position": {
+        "x": 528.0,
+        "y": 336.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "title",
+            "label": "title",
+            "type": "string"
+          },
+          {
+            "id": "description",
+            "label": "description",
+            "type": "string"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "title",
+            "description",
+            "model",
+            "prompt",
+            "tools"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-9",
+      "type": "agent",
+      "position": {
+        "x": 1008.0,
+        "y": 96.0
+      },
+      "data": {
+        "nodeType": "agent",
+        "label": "Agent",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "include_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) as agent history. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider",
+            "description": "LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model",
+            "description": "LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number",
+            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number",
+            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number",
+            "description": "Maximum internal ReAct iterations (safety cap). Higher values allow more tool-use steps."
+          },
+          {
+            "id": "max_input_tokens",
+            "label": "max_input_tokens",
+            "type": "number",
+            "description": "Optional per-agent input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for the agent sub-run."
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string",
+            "description": "Optional system prompt for this agent instance (high priority instructions)."
+          },
+          {
+            "id": "task",
+            "label": "prompt",
+            "type": "string",
+            "description": "The task/user prompt for the agent to solve."
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools",
+            "description": "Allowlist of tool names this agent can call (defense-in-depth; runtime still enforces allowlists)."
+          },
+          {
+            "id": "response_schema",
+            "label": "structured_output",
+            "type": "object",
+            "description": "Optional JSON Schema object (type=object) the final answer must conform to."
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object",
+            "description": "Optional explicit context object for the agent (e.g. {messages:[...]}). If provided, it can override inherited run context."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object",
+            "description": "Structured final agent result (answer + metadata/tool calls depending on agent)."
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array",
+            "description": "Best-effort list of tool call requests extracted from the agent scratchpad trace (post-run). For real-time tool observability, subscribe to the ledger/node_traces stream."
+          },
+          {
+            "id": "tool_results",
+            "label": "tool_results",
+            "type": "array",
+            "description": "Best-effort list of tool results extracted from the agent scratchpad trace (post-run). For real-time tool observability, subscribe to the ledger/node_traces stream."
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object",
+            "description": "Runtime-owned execution trace/scratchpad for observability (LLM/tool steps, timings)."
+          }
+        ],
+        "agentConfig": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b"
+        },
+        "pinDefaults": {
+          "system": "You are a highly autonomous agent who takes actions by requesting the execution of one or more available tools. Your goal is to FULLY resolve the request and achieve ALL the expected outcomes."
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-10",
+      "type": "answer_user",
+      "position": {
+        "x": 608.0,
+        "y": 96.0
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          },
+          {
+            "id": "level",
+            "label": "level",
+            "type": "string",
+            "description": "Message level for hosts (message|warning|error). Defaults to 'message' when unset."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-11",
+      "type": "concat",
+      "position": {
+        "x": 304.0,
+        "y": -32.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          },
+          {
+            "id": "d",
+            "label": "d",
+            "type": "string"
+          },
+          {
+            "id": "e",
+            "label": "e",
+            "type": "string"
+          },
+          {
+            "id": "f",
+            "label": "f",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "a": "TASK: ",
+          "c": "\\nDESCRIPTION: ",
+          "e": "\\nTOOLS: "
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-12",
+      "type": "join",
+      "position": {
+        "x": 608.0,
+        "y": 256.0
+      },
+      "data": {
+        "nodeType": "join",
+        "label": "Join",
+        "icon": "&#x1F517;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "items",
+            "label": "items",
+            "type": "array"
+          },
+          {
+            "id": "delimiter",
+            "label": "delimiter",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1768444243097",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-2",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768444246015",
+      "source": "node-1",
+      "sourceHandle": "provider",
+      "target": "node-2",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1768444247949",
+      "source": "node-1",
+      "sourceHandle": "model",
+      "target": "node-2",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-1768444249965",
+      "source": "node-1",
+      "sourceHandle": "request",
+      "target": "node-2",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "edge-1768444272939",
+      "source": "node-1",
+      "sourceHandle": "tools",
+      "target": "node-2",
+      "targetHandle": "tools",
+      "animated": false
+    },
+    {
+      "id": "edge-1768444610063",
+      "source": "node-3",
+      "sourceHandle": "value",
+      "target": "node-2",
+      "targetHandle": "response_schema",
+      "animated": false
+    },
+    {
+      "id": "edge-1768444656851",
+      "source": "node-2",
+      "sourceHandle": "result",
+      "target": "node-5",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1768444665687",
+      "source": "node-5",
+      "sourceHandle": "data",
+      "target": "node-4",
+      "targetHandle": "schedule",
+      "animated": false
+    },
+    {
+      "id": "edge-1768446788964",
+      "source": "node-2",
+      "sourceHandle": "exec-out",
+      "target": "node-6",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768446807355",
+      "source": "node-5",
+      "sourceHandle": "data",
+      "target": "node-7",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1768446834705",
+      "source": "node-7",
+      "sourceHandle": "tasks",
+      "target": "node-6",
+      "targetHandle": "items",
+      "animated": false
+    },
+    {
+      "id": "edge-1768446972613",
+      "source": "node-6",
+      "sourceHandle": "item",
+      "target": "node-8",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1768447085986",
+      "source": "node-6",
+      "sourceHandle": "loop",
+      "target": "node-10",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768447102222",
+      "source": "node-8",
+      "sourceHandle": "title",
+      "target": "node-11",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-1768447121145",
+      "source": "node-8",
+      "sourceHandle": "description",
+      "target": "node-11",
+      "targetHandle": "d",
+      "animated": false
+    },
+    {
+      "id": "edge-1768447126627",
+      "source": "node-11",
+      "sourceHandle": "result",
+      "target": "node-10",
+      "targetHandle": "message",
+      "animated": false
+    },
+    {
+      "id": "edge-1768447129537",
+      "source": "node-10",
+      "sourceHandle": "exec-out",
+      "target": "node-9",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768447154955",
+      "source": "node-8",
+      "sourceHandle": "prompt",
+      "target": "node-9",
+      "targetHandle": "task",
+      "animated": false
+    },
+    {
+      "id": "edge-1768447157837",
+      "source": "node-8",
+      "sourceHandle": "tools",
+      "target": "node-9",
+      "targetHandle": "tools",
+      "animated": false
+    },
+    {
+      "id": "edge-1768447176370",
+      "source": "node-8",
+      "sourceHandle": "tools",
+      "target": "node-12",
+      "targetHandle": "items",
+      "animated": false
+    },
+    {
+      "id": "edge-1768447179753",
+      "source": "node-12",
+      "sourceHandle": "result",
+      "target": "node-11",
+      "targetHandle": "f",
+      "animated": false
+    }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2026-01-15T03:12:30.833705",
+  "updated_at": "2026-01-15T03:20:38.874469"
+}

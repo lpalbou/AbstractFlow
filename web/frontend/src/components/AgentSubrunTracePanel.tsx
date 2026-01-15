@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import type { ExecutionEvent } from '../types/flow';
+import { JsonViewer } from './JsonViewer';
 
-type TabId = 'system' | 'user' | 'tools' | 'response' | 'errors' | 'raw';
+type TabId = 'system' | 'user' | 'tools' | 'response' | 'reasoning' | 'errors' | 'raw';
 type TabSpec = { id: TabId; label: string; hidden?: boolean };
 
 type TraceStep = Record<string, unknown>;
@@ -21,6 +22,12 @@ type ToolResult = {
   success: boolean;
   output?: unknown;
   error?: unknown;
+};
+
+type ToolCall = {
+  call_id?: string;
+  name: string;
+  args: Record<string, unknown>;
 };
 
 interface AgentSubrunTracePanelProps {
@@ -58,14 +65,11 @@ function safeString(value: unknown): string {
   return String(value);
 }
 
-function formatJson(value: unknown): string {
-  if (value == null) return '';
-  if (typeof value === 'string') return value;
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
+function clampInline(text: string, maxLen: number): string {
+  const value = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!value) return '';
+  if (value.length <= maxLen) return value;
+  return `${value.slice(0, Math.max(0, maxLen - 1)).trimEnd()}…`;
 }
 
 function effectOf(step: TraceStep): Record<string, unknown> | null {
@@ -125,6 +129,49 @@ function toolResultsForStep(step: TraceStep): ToolResult[] {
   return out;
 }
 
+function reasoningTextOfResult(res: Record<string, unknown> | null): string {
+  const direct = res?.reasoning;
+  if (typeof direct === 'string' && direct.trim()) return direct.trim();
+
+  const raw =
+    asRecord(res?.raw_response) ||
+    asRecord(res?.raw) ||
+    asRecord((res as any)?.rawResponse) ||
+    null;
+
+  const fromMessage = (msg: unknown): string => {
+    const mo = asRecord(msg);
+    if (!mo) return '';
+    const candidates = [
+      mo.reasoning,
+      (mo as any).reasoning_content,
+      (mo as any).thinking,
+      (mo as any).thinking_content,
+    ];
+    for (const c of candidates) {
+      if (typeof c === 'string' && c.trim()) return c.trim();
+    }
+    return '';
+  };
+
+  if (raw) {
+    const choices = Array.isArray(raw.choices) ? raw.choices : null;
+    if (choices) {
+      for (const c of choices) {
+        const co = asRecord(c);
+        const r = fromMessage(co?.message);
+        if (r) return r;
+        const r2 = fromMessage(co?.delta);
+        if (r2) return r2;
+      }
+    }
+    const top = fromMessage(raw.message);
+    if (top) return top;
+  }
+
+  return '';
+}
+
 function tokenBadgesForStep(step: TraceStep): Array<{ label: string; value: number }> {
   const t = effectTypeOf(step);
   if (t !== 'llm_call') return [];
@@ -166,9 +213,103 @@ function toolNamesForStep(step: TraceStep): string[] {
   return Array.from(new Set(names));
 }
 
+function toolCallsForStep(step: TraceStep): ToolCall[] {
+  const t = effectTypeOf(step);
+  if (t !== 'tool_calls') return [];
+  const payload = payloadOf(step);
+  const calls =
+    (Array.isArray(payload?.tool_calls) ? payload?.tool_calls : null) ||
+    (Array.isArray(payload?.tool_calls_raw) ? payload?.tool_calls_raw : null) ||
+    (Array.isArray(payload?.calls) ? payload?.calls : null) ||
+    null;
+  if (!calls) return [];
+
+  const out: ToolCall[] = [];
+  for (const c of calls) {
+    const co = asRecord(c);
+    if (!co) continue;
+    const name = typeof co.name === 'string' ? co.name.trim() : '';
+    if (!name) continue;
+    const args = (asRecord(co.arguments) ?? {}) as Record<string, unknown>;
+    out.push({
+      call_id: typeof co.call_id === 'string' ? co.call_id : typeof co.callId === 'string' ? co.callId : undefined,
+      name,
+      args,
+    });
+  }
+  return out;
+}
+
+function toolDefsFromThinkStep(step: TraceStep): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  if (effectTypeOf(step) !== 'llm_call') return out;
+  const payload = payloadOf(step);
+  const tools = Array.isArray(payload?.tools) ? payload?.tools : null;
+  if (!tools) return out;
+
+  for (const t of tools) {
+    const to = asRecord(t);
+    const name = typeof to?.name === 'string' ? to.name.trim() : '';
+    if (!name) continue;
+
+    const requiredArgs = Array.isArray(to?.required_args) ? to?.required_args : Array.isArray((to as any)?.requiredArgs) ? (to as any).requiredArgs : null;
+    const required = (requiredArgs || []).filter((v: unknown): v is string => typeof v === 'string' && v.trim().length > 0);
+
+    const params = asRecord(to?.parameters);
+    const paramKeys = params ? Object.keys(params) : [];
+
+    const order: string[] = [];
+    for (const r of required) {
+      if (!order.includes(r)) order.push(r);
+    }
+    for (const k of paramKeys) {
+      if (!order.includes(k)) order.push(k);
+    }
+
+    out.set(name, order);
+  }
+
+  return out;
+}
+
+function formatToolSignature(toolName: string, args: Record<string, unknown>, paramOrder: string[] | null): string {
+  const order = Array.isArray(paramOrder) && paramOrder.length ? paramOrder : Object.keys(args || {});
+  const primaryKey = order.length ? order[0] : '';
+  const primaryValue = primaryKey ? (args || {})[primaryKey] : undefined;
+  const rendered =
+    primaryKey && primaryValue !== undefined
+      ? typeof primaryValue === 'string'
+        ? JSON.stringify(primaryValue)
+        : Array.isArray(primaryValue) || (primaryValue && typeof primaryValue === 'object')
+          ? JSON.stringify(primaryValue)
+          : String(primaryValue)
+      : '';
+  const inside = rendered ? clampInline(rendered, 90) : '…';
+  return `${toolName}(${inside})`;
+}
+
 function errorTextOf(step: TraceStep): string {
   const direct = step.error;
   if (typeof direct === 'string' && direct.trim()) return direct.trim();
+
+  const effectType = effectTypeOf(step);
+  if (effectType === 'llm_call') {
+    const res = resultOf(step);
+    const finish =
+      (typeof res?.finish_reason === 'string' ? res.finish_reason : '') ||
+      (typeof (res as any)?.finishReason === 'string' ? (res as any).finishReason : '');
+    const toolCalls = Array.isArray(res?.tool_calls) ? res.tool_calls : null;
+    const hasToolCalls = Boolean(toolCalls && toolCalls.length > 0);
+    const content = typeof res?.content === 'string' ? res.content.trim() : '';
+    const reasoning = reasoningTextOfResult(res);
+    if (finish === 'length' && !hasToolCalls && !content && !reasoning) {
+      return 'LLM output was truncated (finish_reason=length) and no tool calls were parsed.';
+    }
+    if (finish === 'length' && !hasToolCalls) {
+      return 'LLM output was truncated (finish_reason=length).';
+    }
+  }
+
   const res = resultOf(step);
   const results = res && Array.isArray(res.results) ? res.results : null;
   if (!results) return '';
@@ -192,10 +333,22 @@ function previewForStep(step: TraceStep): string {
   const payload = payloadOf(step);
   const res = resultOf(step);
 
+  const clamp = (s: string, maxLen: number) => {
+    const text = s.replace(/\s+/g, ' ').trim();
+    if (!text) return '';
+    if (text.length <= maxLen) return text;
+    return `${text.slice(0, Math.max(0, maxLen - 1)).trimEnd()}…`;
+  };
+
   if (t === 'llm_call') {
     const content = res?.content;
     const text = typeof content === 'string' ? content.replace(/\s+/g, ' ').trim() : '';
-    return text;
+    const reasoning = reasoningTextOfResult(res);
+    const toolCalls = Array.isArray(res?.tool_calls) ? res?.tool_calls : null;
+    const hasToolCalls = Boolean(toolCalls && toolCalls.length > 0);
+    // Prefer reasoning for tool-using turns; prefer response for the final turn.
+    const preferred = hasToolCalls ? reasoning || text : text || reasoning;
+    return clamp(preferred, 220);
   }
 
   if (t === 'tool_calls') {
@@ -225,8 +378,16 @@ type AgentCycle = {
   ts?: string;
 };
 
+function effectiveStatusForItem(item: TraceItem): string {
+  const status = typeof item.status === 'string' ? item.status : 'unknown';
+  if (status === 'failed') return 'failed';
+  const errs = errorTextOf(item.step);
+  if (errs) return 'failed';
+  return status;
+}
+
 function combineStatus(items: TraceItem[]): string {
-  const statuses = items.map((i) => i.status);
+  const statuses = items.map((i) => effectiveStatusForItem(i));
   if (statuses.some((s) => s === 'failed')) return 'failed';
   if (statuses.some((s) => s === 'waiting')) return 'waiting';
   if (statuses.some((s) => s === 'running')) return 'running';
@@ -246,6 +407,7 @@ function tabsForStep(step: TraceStep): TabSpec[] {
       { id: 'user', label: 'User' },
       { id: 'tools', label: 'Tools' },
       { id: 'response', label: 'Response' },
+      { id: 'reasoning', label: 'Reasoning' },
       { id: 'errors', label: 'Errors', hidden: !errs },
       { id: 'raw', label: 'Raw' },
     ]);
@@ -294,22 +456,27 @@ function renderUser(step: TraceStep): string {
   return chunks.join('\n\n---\n\n');
 }
 
-function renderTools(step: TraceStep): string {
+function renderTools(step: TraceStep): unknown {
   const t = effectTypeOf(step);
   if (t === 'tool_calls') {
     const payload = payloadOf(step);
-    return formatJson(payload?.tool_calls ?? payload?.tool_calls_raw ?? payload?.calls ?? payload) || '';
+    return payload?.tool_calls ?? payload?.tool_calls_raw ?? payload?.calls ?? payload ?? null;
   }
   // For llm_call, show the *available tools* config (if present).
   const payload = payloadOf(step);
-  return formatJson(payload?.tools) || '';
+  return payload?.tools ?? null;
 }
 
 function renderResponse(step: TraceStep): string {
   const res = resultOf(step);
-  const content = res?.content;
-  if (typeof content === 'string') return content;
-  return formatJson(res) || '';
+  const content = typeof res?.content === 'string' ? res.content : '';
+  return content && content.trim() ? content : '';
+}
+
+function renderReasoning(step: TraceStep): string {
+  const res = resultOf(step);
+  const reasoning = reasoningTextOfResult(res);
+  return reasoning && reasoning.trim() ? reasoning : '';
 }
 
 function PanelBody({ item }: { item: TraceItem }) {
@@ -324,14 +491,30 @@ function PanelBody({ item }: { item: TraceItem }) {
   const user = renderUser(step);
   const tools = renderTools(step);
   const response = renderResponse(step);
+  const reasoning = renderReasoning(step);
+
+  const rawResponseValue = useMemo(() => {
+    if (effectTypeOf(step) !== 'llm_call') return null;
+    const res = resultOf(step);
+    return (
+      res?.raw_response ||
+      res?.raw ||
+      (res as any)?.rawResponse ||
+      (res as any)?.raw_response ||
+      null
+    );
+  }, [step]);
 
   const render = () => {
     if (active === 'system') return <pre className="run-details-output">{system || '(none)'}</pre>;
     if (active === 'user') return <pre className="run-details-output">{user || '(none)'}</pre>;
-    if (active === 'tools') return <pre className="run-details-output">{tools || '(none)'}</pre>;
-    if (active === 'response') return <pre className="run-details-output">{response || '(none)'}</pre>;
+    if (active === 'tools')
+      return tools ? <JsonViewer value={tools} collapseAfterDepth={1} /> : <div className="run-details-output">(none)</div>;
+    if (active === 'response') return <pre className="run-details-output">{response || '(empty)'}</pre>;
+    if (active === 'reasoning') return <pre className="run-details-output">{reasoning || '(none)'}</pre>;
     if (active === 'errors') return <pre className="run-details-output">{errors || '(none)'}</pre>;
-    return <pre className="run-details-output">{formatJson(step) || '(none)'}</pre>;
+    const rawValue = rawResponseValue ?? step;
+    return <JsonViewer value={rawValue} collapseAfterDepth={1} />;
   };
 
   return (
@@ -355,20 +538,30 @@ function PanelBody({ item }: { item: TraceItem }) {
   );
 }
 
-function TraceStepCard({ item, label }: { item: TraceItem; label: string }) {
+function TraceStepCard({ item, label, toolDefs }: { item: TraceItem; label: string; toolDefs: Map<string, string[]> }) {
   const step = item.step;
-  const statusRaw = item.status;
+  const statusRaw = effectiveStatusForItem(item);
   const statusLabel =
-    statusRaw === 'completed' ? 'OK' : statusRaw === 'failed' ? 'FAILED' : statusRaw === 'waiting' ? 'WAITING' : statusRaw.toUpperCase();
+    statusRaw === 'completed' ? 'OK' : statusRaw === 'failed' ? 'ERROR' : statusRaw === 'waiting' ? 'WAITING' : statusRaw.toUpperCase();
+  const statusIcon = statusRaw === 'completed' ? '✓' : statusRaw === 'failed' ? '✗' : '';
+  const statusText = statusIcon ? `${statusIcon} ${statusLabel}` : statusLabel;
   const title = titleForStep(step);
   const preview = previewForStep(step);
   const tokenBadges = tokenBadgesForStep(step);
   const toolNames = toolNamesForStep(step);
+  const toolCallSigs = useMemo(() => {
+    if (effectTypeOf(step) !== 'tool_calls') return [];
+    const calls = toolCallsForStep(step);
+    return calls.map((c) => {
+      const order = toolDefs.get(c.name) || null;
+      return formatToolSignature(c.name, c.args, order);
+    });
+  }, [step, toolDefs]);
 
   return (
     <details className={`agent-trace-entry ${statusRaw}`} open={false}>
       <summary className="agent-trace-summary">
-        <span className={`agent-trace-status ${statusRaw}`}>{statusLabel}</span>
+        <span className={`agent-trace-status ${statusRaw}`}>{statusText}</span>
         <span className="agent-cycle-stage">{label}</span>
         <span className="agent-trace-kind">{title}</span>
         {tokenBadges.length ? (
@@ -380,7 +573,16 @@ function TraceStepCard({ item, label }: { item: TraceItem; label: string }) {
             ))}
           </span>
         ) : null}
-        {toolNames.length ? (
+        {toolCallSigs.length ? (
+          <span className="agent-trace-badges">
+            {toolCallSigs.slice(0, 4).map((sig) => (
+              <span key={sig} className="run-metric-badge metric-tool" title={sig}>
+                {clampInline(sig, 56)}
+              </span>
+            ))}
+            {toolCallSigs.length > 4 ? <span className="run-metric-badge metric-tool">+{toolCallSigs.length - 4}</span> : null}
+          </span>
+        ) : toolNames.length ? (
           <span className="agent-trace-badges">
             {toolNames.slice(0, 6).map((n) => (
               <span key={n} className="run-metric-badge metric-tool">
@@ -429,7 +631,11 @@ function ObserveCard({ acts }: { acts: TraceItem[] }) {
                     <span className="agent-observe-name">{r.name}</span>
                     {r.call_id ? <span className="agent-observe-callid">{r.call_id}</span> : null}
                   </summary>
-                  <pre className="run-details-output">{formatJson(output) || '(none)'}</pre>
+                  {typeof output === 'string' ? (
+                    <pre className="run-details-output">{output || '(none)'}</pre>
+                  ) : (
+                    <JsonViewer value={output} collapseAfterDepth={1} />
+                  )}
                 </details>
               );
             })}
@@ -504,7 +710,7 @@ export function AgentSubrunTracePanel({
           think: item,
           acts: [],
           others: [],
-          status: item.status,
+          status: effectiveStatusForItem(item),
           ts: item.ts,
         };
         out.push(current);
@@ -520,7 +726,7 @@ export function AgentSubrunTracePanel({
           think: null,
           acts: [],
           others: [],
-          status: item.status,
+          status: effectiveStatusForItem(item),
           ts: item.ts,
         };
         out.push(current);
@@ -592,34 +798,49 @@ export function AgentSubrunTracePanel({
               statusRaw === 'completed'
                 ? 'OK'
                 : statusRaw === 'failed'
-                  ? 'FAILED'
-                  : statusRaw === 'waiting'
-                    ? 'WAITING'
+                  ? 'ERROR'
+                : statusRaw === 'waiting'
+                  ? 'WAITING'
                     : statusRaw.toUpperCase();
+            const statusIcon = statusRaw === 'completed' ? '✓' : statusRaw === 'failed' ? '✗' : '';
+            const statusText = statusIcon ? `${statusIcon} ${statusLabel}` : statusLabel;
             const thinkPreview = c.think ? previewForStep(c.think.step) : '';
-            const toolCount = c.acts.flatMap((a) => toolResultsForStep(a.step)).length;
+            const toolDefs = c.think ? toolDefsFromThinkStep(c.think.step) : new Map<string, string[]>();
+            const cycleToolCalls = c.acts.flatMap((a) => toolCallsForStep(a.step));
+            const cycleToolSigs = cycleToolCalls.map((tc) => formatToolSignature(tc.name, tc.args, toolDefs.get(tc.name) || null));
             const openByDefault = c.index === cycles.length;
             return (
               <details key={c.id} className={`agent-cycle ${statusRaw}`} open={openByDefault}>
                 <summary className="agent-cycle-summary">
-                  <span className={`agent-trace-status ${statusRaw}`}>{statusLabel}</span>
+                  <span className={`agent-trace-status ${statusRaw}`}>{statusText}</span>
                   <span className="agent-cycle-label">cycle</span>
                   <span className="agent-cycle-index">#{c.index}</span>
-                  {toolCount ? <span className="run-metric-badge metric-tool">{toolCount} tool result(s)</span> : null}
+                  {cycleToolSigs.length ? (
+                    <span className="agent-trace-badges">
+                      {cycleToolSigs.slice(0, 3).map((sig) => (
+                        <span key={sig} className="run-metric-badge metric-tool" title={sig}>
+                          {clampInline(sig, 62)}
+                        </span>
+                      ))}
+                      {cycleToolSigs.length > 3 ? (
+                        <span className="run-metric-badge metric-tool">+{cycleToolSigs.length - 3}</span>
+                      ) : null}
+                    </span>
+                  ) : null}
                   <span className="agent-cycle-spacer" />
                   {thinkPreview ? <span className="agent-cycle-preview">{thinkPreview}</span> : null}
                 </summary>
                 <div className="agent-cycle-body">
-                  {c.think ? <TraceStepCard item={c.think} label="think" /> : null}
+                  {c.think ? <TraceStepCard item={c.think} label="think" toolDefs={toolDefs} /> : null}
                   {c.acts.map((a) => (
-                    <TraceStepCard key={a.id} item={a} label="act" />
+                    <TraceStepCard key={a.id} item={a} label="act" toolDefs={toolDefs} />
                   ))}
                   <ObserveCard acts={c.acts} />
                   {c.others.length ? (
                     <div className="agent-cycle-others">
                       <div className="agent-cycle-others-title">other</div>
                       {c.others.map((o) => (
-                        <TraceStepCard key={o.id} item={o} label="other" />
+                        <TraceStepCard key={o.id} item={o} label="other" toolDefs={toolDefs} />
                       ))}
                     </div>
                   ) : null}

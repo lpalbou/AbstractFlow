@@ -1,0 +1,828 @@
+{
+  "id": "462808d4",
+  "name": "agent-semantics-v2",
+  "description": "",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": {
+        "x": -400.0,
+        "y": 192.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools"
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          }
+        ],
+        "pinDefaults": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b",
+          "tools": [
+            "fetch_url",
+            "web_search"
+          ],
+          "request": "what are the latest news ?",
+          "max_iterations": 10
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-4",
+      "type": "on_flow_end",
+      "position": {
+        "x": 576.0,
+        "y": 192.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-6",
+      "type": "agent",
+      "position": {
+        "x": 96.0,
+        "y": 192.0
+      },
+      "data": {
+        "nodeType": "agent",
+        "label": "Agent",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "include_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) as agent history. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider",
+            "description": "LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model",
+            "description": "LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number",
+            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number",
+            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number",
+            "description": "Maximum internal ReAct iterations (safety cap). Higher values allow more tool-use steps."
+          },
+          {
+            "id": "max_input_tokens",
+            "label": "max_input_tokens",
+            "type": "number",
+            "description": "Optional per-agent input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for the agent sub-run."
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string",
+            "description": "Optional system prompt for this agent instance (high priority instructions)."
+          },
+          {
+            "id": "task",
+            "label": "prompt",
+            "type": "string",
+            "description": "The task/user prompt for the agent to solve."
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools",
+            "description": "Allowlist of tool names this agent can call (defense-in-depth; runtime still enforces allowlists)."
+          },
+          {
+            "id": "response_schema",
+            "label": "structured_output",
+            "type": "object",
+            "description": "Optional JSON Schema object (type=object) the final answer must conform to."
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object",
+            "description": "Optional explicit context object for the agent (e.g. {messages:[...]}). If provided, it can override inherited run context."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object",
+            "description": "Structured final agent result (answer + metadata/tool calls depending on agent)."
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array",
+            "description": "Best-effort list of tool call requests extracted from the agent scratchpad trace (post-run). For real-time tool observability, subscribe to the ledger/node_traces stream."
+          },
+          {
+            "id": "tool_results",
+            "label": "tool_results",
+            "type": "array",
+            "description": "Best-effort list of tool results extracted from the agent scratchpad trace (post-run). For real-time tool observability, subscribe to the ledger/node_traces stream."
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object",
+            "description": "Runtime-owned execution trace/scratchpad for observability (LLM/tool steps, timings)."
+          }
+        ],
+        "pinDefaults": {
+          "system": "You do web searches and return the information extracted as a set of clean, unitary and informative triples { subject - predicate - object }. subject and object must always be generic enough and expressed in a consistent manner so we can build and correlate knowledge about them. Use the requested response_schema to encode that knowledge."
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-8",
+      "type": "concat",
+      "position": {
+        "x": -416.0,
+        "y": 544.0
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "a": "You do web searches and return the information extracted as a set of clean, unitary and informative triples  ",
+          "b": "\nSEMANTIC EXTRACTION RULES:\n"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-9",
+      "type": "literal_string",
+      "position": {
+        "x": -656.0,
+        "y": 784.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "SEMANTIC EXTRACTOR RULES V1",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "# Semantic Triple Writer Prompt (v4 optimized)\n\nTask: extract **high-signal semantic knowledge** from the input as triples.\n\nOutput (strict):\n- Output **ONLY** a JSON object that matches the enforced schema: `{\"triples\":[...]}`\n- Do **not** output chat/completion wrappers (`id`, `choices`, `usage`, etc.).\n- No prose, no markdown.\n\nPrefixes (use CURIEs everywhere possible):\n- `dcterms:` `http://purl.org/dc/terms/`\n- `schema:` `https://schema.org/`\n- `skos:` `http://www.w3.org/2004/02/skos/core#`\n- `cito:` `http://purl.org/spar/cito/`\n- `rdf:` `http://www.w3.org/1999/02/22-rdf-syntax-ns#`\n- `ex:` instance namespace (your only custom namespace)\n\nTriple rules (each item in `triples`):\n- `s`,`p`,`o` are **strings**.\n- `s` and `p` MUST be CURIEs: `prefix:local`.\n- `o` SHOULD be a CURIE when it’s an entity; otherwise a literal string (ISO-8601 for times/dates; full URL allowed).\n- Always set `type` ∈ {`semantic`,`episodic`,`relational`}.\n- If `type==\"episodic\"`, set `time` to the event time (ISO-8601 date-time).\n- Set `src` (short provenance token like hostname/doc-id/user/system) and `conf` in `[0,1]` (1.0 if explicit; ≤0.6 if inferred/guessed).\n\nID policy (instances):\n- Create new entities only as `ex:{kind}-{kebab-case}` (lowercase, stable).\n- Reuse IDs; don’t create duplicates.\n\nOntology choice (minimal + high adoption; keep cohesion):\n- Documents/structure/metadata → `dcterms:`\n- Concepts/definitions/taxonomy → `skos:`\n- Agents/general entities/content links → `schema:`\n- Claims/evidence/citations → `cito:`\n- Class membership → `rdf:type`\n\nMinimal completeness (for every `ex:*` entity you introduce):\n- Add `rdf:type` and exactly one primary label:\n  - documents/sections → `dcterms:title`\n  - concepts → `skos:prefLabel`\n  - other entities/agents → `schema:name`\n\nPreferred predicates (use before inventing `ex:*` predicates):\n- Structure: `dcterms:hasPart`, `dcterms:isPartOf`, `schema:nextItem`, `schema:previousItem`\n- Metadata: `dcterms:identifier`, `dcterms:created`, `dcterms:modified`, `dcterms:creator`, `dcterms:publisher`, `dcterms:subject`\n- Content links: `schema:about`, `schema:mentions`, `dcterms:references`, `schema:sameAs`\n- Concepts: `skos:definition`, `skos:altLabel`, `skos:broader`, `skos:narrower`, `skos:related`, `skos:exactMatch`, `skos:closeMatch`\n- Evidence: `cito:supports`, `cito:disagreesWith`, `cito:usesDataFrom`, `cito:providesDataFor`, `cito:extends`, `cito:discusses`, `cito:confirms`\n\nExtraction policy:\n- Assert only what the input supports (open-world; no negatives; no guessing).\n- Each triple = one atomic fact (no “and”, no multi-clause objects).\n- Prefer fewer, higher-value triples over exhaustive coverage.\n- If no standard predicate fits, use an `ex:` predicate and set `conf <= 0.6`."
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-10",
+      "type": "literal_string",
+      "position": {
+        "x": -656.0,
+        "y": 880.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "SEMANTIC EXTRACTOR RULES V2",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "# Semantic Triple Writer Prompt (v4 optimized)\n\nTask: extract **high-signal semantic knowledge** from the input as triples.\n\nOutput (strict):\n- Output **ONLY** a JSON object that matches the enforced schema: `{\"triples\":[...]}`\n- Do **not** output chat/completion wrappers (`id`, `choices`, `usage`, etc.).\n- No prose, no markdown.\n\nPrefixes (use CURIEs everywhere possible):\n- `dcterms:` `http://purl.org/dc/terms/`\n- `schema:` `https://schema.org/`\n- `skos:` `http://www.w3.org/2004/02/skos/core#`\n- `cito:` `http://purl.org/spar/cito/`\n- `rdf:` `http://www.w3.org/1999/02/22-rdf-syntax-ns#`\n- `ex:` instance namespace (your only custom namespace)\n\nTriple rules (each item in `triples`):\n- `s`,`p`,`o` are **strings**.\n- `s` and `p` MUST be CURIEs: `prefix:local`.\n- `o` SHOULD be a CURIE when it’s an entity; otherwise a literal string (ISO-8601 for times/dates; full URL allowed).\n- Always set `type` ∈ {`semantic`,`episodic`,`relational`}.\n- If `type==\"episodic\"`, set `time` to the event time (ISO-8601 date-time).\n- Set `src` (short provenance token like hostname/doc-id/user/system) and `conf` in `[0,1]` (1.0 if explicit; ≤0.6 if inferred/guessed).\n\nID policy (instances):\n- Create new entities only as `ex:{kind}-{kebab-case}` (lowercase, stable).\n- Reuse IDs; don’t create duplicates.\n\nOntology choice (minimal + high adoption; keep cohesion):\n- Documents/structure/metadata → `dcterms:`\n- Concepts/definitions/taxonomy → `skos:`\n- Agents/general entities/content links → `schema:`\n- Claims/evidence/citations → `cito:`\n- Class membership → `rdf:type`\n\nMinimal completeness (for every `ex:*` entity you introduce):\n- Add `rdf:type` and exactly one primary label:\n  - documents/sections → `dcterms:title`\n  - concepts → `skos:prefLabel`\n  - other entities/agents → `schema:name`\n\nPreferred predicates (use before inventing `ex:*` predicates):\n* Structure: `dcterms:hasPart`, `dcterms:isPartOf`, `schema:nextItem`, `schema:previousItem`\n* Metadata: `dcterms:identifier`, `dcterms:created`, `dcterms:modified`, `dcterms:creator`, `dcterms:publisher`, `dcterms:subject`, `schema:genre`\n* Context & Entities: `schema:about`, `schema:mentions`, `dcterms:references`, `schema:sameAs`, `schema:location`, `schema:temporalCoverage`\n* Action & Participants: `schema:participant`, `schema:organizer`, `schema:result`, `schema:instrument`\n* Concepts: `skos:definition`, `skos:altLabel`, `skos:broader`, `skos:narrower`, `skos:related`, `skos:exactMatch`, `skos:closeMatch`\n* Evidence: `cito:supports`, `cito:disagreesWith`, `cito:usesDataFrom`, `cito:providesDataFor`, `cito:extends`, `cito:discusses`, `cito:confirms`\n\nExtraction policy:\n- Assert only what the input supports (open-world; no negatives; no guessing).\n- Each triple = one atomic fact (no “and”, no multi-clause objects).\n- Prefer fewer, higher-value triples over exhaustive coverage.\n- If no standard predicate fits, use an `ex:` predicate and set `conf <= 0.6`."
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-11",
+      "type": "literal_string",
+      "position": {
+        "x": -656.0,
+        "y": 976.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "SEMANTIC EXTRACTOR RULES V3",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "# Semantic Triple Writer Prompt\n\nTask: extract **high-signal semantic knowledge** from the input as triples.\n\nOutput (strict):\n- Output **ONLY** a JSON object that matches the enforced schema: `{\"triples\":[...]}`\n- Do **not** output chat/completion wrappers (`id`, `choices`, `usage`, etc.).\n- No prose, no markdown.\n\nPrefixes (use CURIEs everywhere possible):\n- `dcterms:` `http://purl.org/dc/terms/`\n- `schema:` `https://schema.org/`\n- `skos:` `http://www.w3.org/2004/02/skos/core#`\n- `cito:` `http://purl.org/spar/cito/`\n- `rdf:` `http://www.w3.org/1999/02/22-rdf-syntax-ns#`\n- `ex:` instance namespace (your only custom namespace)\n\nTriple rules (each item in `triples`):\n- `s`,`p`,`o` are **strings**.\n- `s` and `p` MUST be CURIEs: `prefix:local`.\n- `o` SHOULD be a CURIE when it’s an entity; otherwise a literal string (ISO-8601 for times/dates; full URL allowed).\n- Always set `type` ∈ {`semantic`,`episodic`,`relational`}.\n- If `type==\"episodic\"`, set `time` to the event time (ISO-8601 date-time).\n- Set `src` (short provenance token like hostname/doc-id/user/system) and `conf` in `[0,1]` (1.0 if explicit; ≤0.6 if inferred/guessed).\n\nID policy (instances):\n- Create new entities only as `ex:{kind}-{kebab-case}` (lowercase, stable).\n- Reuse IDs; don’t create duplicates.\n\nOntology choice (minimal + high adoption; keep cohesion):\n- Documents/structure/metadata → `dcterms:`\n- Concepts/definitions/taxonomy → `skos:`\n- Reality (events/places/actors/actions/outcomes) → `schema:`\n- Claims/evidence/citations → `cito:`\n- Class membership → `rdf:type`\n\nReality extraction (prevents “orphaned events”):\n- For each distinct **happening** in the input, create an event node `ex:event-*` with `rdf:type` = `schema:Event` and a short `schema:name`.\n- Anchor each event with at most one primary `schema:location` and one time anchor (`schema:startDate` or `schema:temporalCoverage`) when present.\n- Attach actors with `schema:participant` (and `schema:organizer` only when explicitly an organizer).\n- Attach explicit outcomes/stats with `schema:result` (no implied causality).\n\nMinimal completeness (for every `ex:*` entity you introduce):\n- Add `rdf:type` and exactly one primary label:\n  - documents/sections → `dcterms:title`\n  - concepts → `skos:prefLabel`\n  - other entities/agents → `schema:name`\n\nPreferred predicates (use before inventing `ex:*` predicates):\n- Structure: `dcterms:hasPart`, `dcterms:isPartOf`, `schema:nextItem`, `schema:previousItem`\n- Metadata: `dcterms:identifier`, `dcterms:created`, `dcterms:modified`, `dcterms:creator`, `dcterms:publisher`, `dcterms:subject`, `schema:genre`\n- Context & anchors: `schema:about`, `schema:mentions`, `dcterms:references`, `schema:sameAs`, `schema:location`, `schema:temporalCoverage`\n- Action & participants: `schema:participant`, `schema:organizer`, `schema:result`, `schema:instrument`, `schema:startDate`, `schema:endDate`\n- Concepts: `skos:definition`, `skos:altLabel`, `skos:broader`, `skos:narrower`, `skos:related`, `skos:exactMatch`, `skos:closeMatch`\n- Evidence: `cito:supports`, `cito:disagreesWith`, `cito:usesDataFrom`, `cito:providesDataFor`, `cito:extends`, `cito:discusses`, `cito:confirms`\n\nExtraction policy:\n- Assert only what the input supports (open-world; no negatives; no guessing).\n- Each triple = one atomic fact (no “and”, no multi-clause objects).\n- Prefer fewer, higher-value triples over exhaustive coverage.\n- Avoid graph explosion: create location/time/participant nodes only for **primary** context (skip incidental mentions).\n- Disambiguate roles: `dcterms:creator` = author/outlet; `schema:participant` = people/orgs in the story.\n- If no standard predicate fits, use an `ex:` predicate and set `conf <= 0.6`."
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-12",
+      "type": "json_schema",
+      "position": {
+        "x": -144.0,
+        "y": 880.0
+      },
+      "data": {
+        "nodeType": "json_schema",
+        "label": "SCHEMA V2&V3",
+        "icon": "&#x1F4CB;",
+        "headerColor": "#00FFFF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "schema",
+            "type": "object"
+          }
+        ],
+        "literalValue": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "Minimal Triple Store",
+          "description": "Minimal schema for extracting facts, events, people, and knowledge as triples",
+          "type": "object",
+          "properties": {
+            "triples": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "s": {
+                    "type": "string",
+                    "description": "Subject (entity ID or label)"
+                  },
+                  "p": {
+                    "type": "string",
+                    "description": "Predicate (relationship or property name)"
+                  },
+                  "o": {
+                    "type": "string",
+                    "description": "Object (CURIE/entity ID/label/URI/literal as string)"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "semantic",
+                      "episodic",
+                      "relational"
+                    ],
+                    "description": "Triple category"
+                  },
+                  "time": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "When (for events) or when observed"
+                  },
+                  "conf": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Confidence score (0-1)"
+                  },
+                  "src": {
+                    "type": "string",
+                    "description": "Source of this knowledge"
+                  }
+                },
+                "required": [
+                  "s",
+                  "p",
+                  "o",
+                  "type"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "triples"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-13",
+      "type": "literal_string",
+      "position": {
+        "x": -784.0,
+        "y": 32.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "Python translate json -> ttl string",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "import json\nfrom collections import defaultdict\n\ndef triples_to_turtle_v1(triples_data):\n    # 1. Group triples by Subject\n    # Structure: grouped[subject][predicate] = [object1, object2, ...]\n    grouped = defaultdict(lambda: defaultdict(list))\n    \n    for triple in triples_data:\n        s = triple['s']\n        p = triple['p']\n        o = triple['o']\n        grouped[s][p].append(o)\n\n    # 2. Define Mappings for Predicates (to match your Version 1 shorthand)\n    # Maps full JSON predicate -> Condensed output predicate\n    pred_map = {\n        \"dcterms:title\": \"title\",\n        \"dcterms:description\": \"desc\",\n        \"skos:prefLabel\": \"label\",\n        \"dcterms:references\": \"refs\",\n        \"rdf:type\": \"type\",\n        \"dcterms:hasPart\": \"hasPart\",\n        \"dcterms:creator\": \"creator\",\n        \"dcterms:date\": \"date\",\n        \"dcterms:subject\": \"subject\",\n        \"cito:discusses\": \"discusses\",\n        \"cito:supports\": \"supports\",\n        \"cito:providesDataFor\": \"providesDataFor\",\n        \"cito:usesDataFrom\": \"usesDataFrom\",\n        \"cito:extends\": \"extends\",\n        \"cito:cites\": \"cites\",\n        \"schema:name\": \"name\",\n        \"schema:url\": \"url\"\n    }\n\n    output_lines = []\n\n    # 3. Iterate through grouped data to build strings\n    for subject, predicates in grouped.items():\n        line_parts = [subject] # Start with Subject (e.g., ex:news-cnn)\n        \n        # Build list of \"predicate objects\" strings\n        # e.g. ['title \"Breaking News\"', 'refs ex:news-cnn, ex:news-ap']\n        pred_strings = []\n        \n        for p, objects in predicates.items():\n            # Apply mapping or strip common prefixes if no mapping exists\n            clean_pred = pred_map.get(p, p)\n            \n            formatted_objects = []\n            for o in objects:\n                # formatting logic for Objects\n                if o.startswith(\"ex:\") or o.startswith(\"dcterms:\"):\n                    # It's an entity/node -> No quotes\n                    formatted_objects.append(o)\n                elif p == \"rdf:type\" and o.startswith(\"schema:\"):\n                    # Special case for types: \"schema:NewsEvent\" -> \"NewsEvent\"\n                    formatted_objects.append(o.replace(\"schema:\", \"\"))\n                elif o.startswith(\"http\"):\n                    # It's a raw URL -> Enclose in <> or quotes? \n                    # Your version 1 didn't show URLs, but quotes are safer for simple text\n                    formatted_objects.append(f'\"{o}\"')\n                else:\n                    # It's a literal string/date -> Enclose in quotes\n                    formatted_objects.append(f'\"{o}\"')\n            \n            # Join multiple objects with commas (e.g., refs ex:a, ex:b)\n            obj_str = \", \".join(formatted_objects)\n            pred_strings.append(f\"{clean_pred} {obj_str}\")\n        \n        # Join all predicate-object groups with semicolons\n        full_statement = \" ; \".join(pred_strings)\n        \n        # End with a dot\n        output_lines.append(f\"{line_parts[0]} {full_statement} .\")\n\n    return \"\\n\".join(output_lines)\n\n# Example Usage with your variable 'input_json'\n# Assuming input_json is defined as the list of dictionaries\nif __name__ == \"__main__\":\n    # For testing purposes, paste your input_json here or ensure it's in scope\n    # input_json = [...] \n    \n    # Check if input_json exists (mimicking your environment)\n    try:\n        result = triples_to_turtle_v1(input_json)\n        print(result)\n    except NameError:\n        print(\"Error: 'input_json' variable not found. Please define it before running.\")"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-15",
+      "type": "literal_json",
+      "position": {
+        "x": -1232.0,
+        "y": -64.0
+      },
+      "data": {
+        "nodeType": "literal_json",
+        "label": "JSON",
+        "icon": "{}",
+        "headerColor": "#00FFFF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "object"
+          }
+        ],
+        "literalValue": {}
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-17",
+      "type": "literal_string",
+      "position": {
+        "x": -1328.0,
+        "y": 96.0
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "String",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": " [\n\n{\n\n\"s\": \"ex:news-cnn\",\n\n\"p\": \"dcterms:title\",\n\n\"o\": \"Breaking News, Latest News and Videos | CNN\"\n\n},\n\n{\n\n\"s\": \"ex:news-ap\",\n\n\"p\": \"dcterms:title\",\n\n\"o\": \"Associated Press News: Breaking News, Latest Headlines and Videos | AP News\"\n\n},\n\n{\n\n\"s\": \"ex:news-cnn\",\n\n\"p\": \"dcterms:description\",\n\n\"o\": \"View the latest news and breaking news today for U.S., world, weather, entertainment, politics and health at CNN.com.\"\n\n},\n\n{\n\n\"s\": \"ex:news-ap\",\n\n\"p\": \"dcterms:description\",\n\n\"o\": \"Read the latest headlines, breaking news, and videos at APNews.com, the definitive source for independent journalism from every corner of the globe.\"\n\n},\n\n{\n\n\"s\": \"ex:news-cnn\",\n\n\"p\": \"dcterms:hasPart\",\n\n\"o\": \"ex:gaza-ceasefire\"\n\n},\n\n{\n\n\"s\": \"ex:news-ap\",\n\n\"p\": \"dcterms:hasPart\",\n\n\"o\": \"ex:iran-airspace-closure\"\n\n},\n\n{\n\n\"s\": \"ex:gaza-ceasefire\",\n\n\"p\": \"skos:prefLabel\",\n\n\"o\": \"US announces next phase of Gaza ceasefire plan\"\n\n},\n\n{\n\n\"s\": \"ex:iran-airspace-closure\",\n\n\"p\": \"skos:prefLabel\",\n\n\"o\": \"Iran closes its airspace without explanation\"\n\n},\n\n{\n\n\"s\": \"ex:iran-airspace-closure\",\n\n\"p\": \"cito:discusses\",\n\n\"o\": \"ex:iran-protests\"\n\n},\n\n{\n\n\"s\": \"ex:iran-protests\",\n\n\"p\": \"skos:prefLabel\",\n\n\"o\": \"Iran protests and potential executions\"\n\n},\n\n{\n\n\"s\": \"ex:iran-protests\",\n\n\"p\": \"cito:supports\",\n\n\"o\": \"ex:death-toll-2000\"\n\n},\n\n{\n\n\"s\": \"ex:death-toll-2000\",\n\n\"p\": \"skos:prefLabel\",\n\n\"o\": \"Activists say death toll in Iran protests passes 2,000\"\n\n},\n\n{\n\n\"s\": \"ex:news-ap\",\n\n\"p\": \"dcterms:hasPart\",\n\n\"o\": \"ex:fbi-washington-post-search\"\n\n},\n\n{\n\n\"s\": \"ex:fbi-washington-post-search\",\n\n\"p\": \"skos:prefLabel\",\n\n\"o\": \"FBI searches home of Washington Post reporter in a leak investigation\"\n\n},\n\n{\n\n\"s\": \"ex:news-cnn\",\n\n\"p\": \"dcterms:hasPart\",\n\n\"o\": \"ex:fbi-washington-post-search\"\n\n},\n\n{\n\n\"s\": \"ex:us-immigration-policy\",\n\n\"p\": \"skos:prefLabel\",\n\n\"o\": \"US suspending immigrant visa processing for 75 countries\"\n\n},\n\n{\n\n\"s\": \"ex:us-immigration-policy\",\n\n\"p\": \"dcterms:references\",\n\n\"o\": \"ex:news-cnn\"\n\n},\n\n{\n\n\"s\": \"ex:us-immigration-policy\",\n\n\"p\": \"dcterms:references\",\n\n\"o\": \"ex:news-ap\"\n\n},\n\n{\n\n\"s\": \"ex:greenland-control\",\n\n\"p\": \"skos:prefLabel\",\n\n\"o\": \"Trump says ‘anything less’ than US control of Greenland is ‘unacceptable’\"\n\n},\n\n{\n\n\"s\": \"ex:greenland-control\",\n\n\"p\": \"dcterms:references\",\n\n\"o\": \"ex:news-cnn\"\n\n},\n\n{\n\n\"s\": \"ex:greenland-control\",\n\n\"p\": \"dcterms:references\",\n\n\"o\": \"ex:news-ap\"\n\n},\n\n{\n\n\"s\": \"ex:nasa-astronaut-evacuation\",\n\n\"p\": \"skos:prefLabel\",\n\n\"o\": \"NASA sends 4 astronauts back to Earth in first medical evacuation\"\n\n},\n\n{\n\n\"s\": \"ex:nasa-astronaut-evacuation\",\n\n\"p\": \"dcterms:references\",\n\n\"o\": \"ex:news-ap\"\n\n},\n\n{\n\n\"s\": \"ex:verizon-outage\",\n\n\"p\": \"skos:prefLabel\",\n\n\"o\": \"Verizon outage disrupts calling and data services for wireless customers across the US\"\n\n},\n\n{\n\n\"s\": \"ex:verizon-outage\",\n\n\"p\": \"dcterms:references\",\n\n\"o\": \"ex:news-ap\"\n\n},\n\n{\n\n\"s\": \"ex:us-trump-tariffs\",\n\n\"p\": \"skos:prefLabel\",\n\n\"o\": \"Trump enacts 25% tariff on chips – with a caveat\"\n\n},\n\n{\n\n\"s\": \"ex:us-trump-tariffs\",\n\n\"p\": \"dcterms:references\",\n\n\"o\": \"ex:news-cnn\"\n\n},\n\n{\n\n\"s\": \"ex:trump-venezuela-war-powers\",\n\n\"p\": \"skos:prefLabel\",\n\n\"o\": \"Senate GOP shields Trump from limits to his war powers in Venezuela after Vance breaks tie\"\n\n},\n\n{\n\n\"s\": \"ex:trump-venezuela-war-powers\",\n\n\"p\": \"dcterms:references\",\n\n\"o\": \"ex:news-cnn\"\n\n},\n\n{\n\n\"s\": \"ex:china-viral-app\",\n\n\"p\": \"skos:prefLabel\",\n\n\"o\": \"‘Are You Dead?’: Viral app in China taps into national loneliness\"\n\n},\n\n{\n\n\"s\": \"ex:china-viral-app\",\n\n\"p\": \"dcterms:references\",\n\n\"o\": \"ex:news-cnn\"\n\n},\n\n{\n\n\"s\": \"ex:uganda-election\",\n\n\"p\": \"skos:prefLabel\",\n\n\"o\": \"Ugandan president Museveni aims to extend his 40-year rule in upcoming elections\"\n\n},\n\n{\n\n\"s\": \"ex:uganda-election\",\n\n\"p\": \"dcterms:references\",\n\n\"o\": \"ex:news-cnn\"\n\n},\n\n{\n\n\"s\": \"ex:uganda-election\",\n\n\"p\": \"dcterms:references\",\n\n\"o\": \"ex:news-ap\"\n\n},\n\n{\n\n\"s\": \"ex:pandorogate\",\n\n\"p\": \"skos:prefLabel\",\n\n\"o\": \"Italian influencer cleared of fraud charges in ‘Pandorogate’ cake scandal\"\n\n},\n\n{\n\n\"s\": \"ex:pandorogate\",\n\n\"p\": \"dcterms:references\",\n\n\"o\": \"ex:news-cnn\"\n\n},\n\n{\n\n\"s\": \"ex:stress-proof-body\",\n\n\"p\": \"skos:prefLabel\",\n\n\"o\": \"How to stress-proof your body\"\n\n},\n\n{\n\n\"s\": \"ex:stress-proof-body\",\n\n\"p\": \"dcterms:references\",\n\n\"o\": \"ex:news-cnn\"\n\n},\n\n{\n\n\"s\": \"ex:us-iran-strike-analysis\",\n\n\"p\": \"skos:prefLabel\",\n\n\"o\": \"Analysis: The weapons the US could employ in any new strike on Iran\"\n\n},\n\n{\n\n\"s\": \"ex:us-iran-strike-analysis\",\n\n\"p\": \"dcterms:references\",\n\n\"o\": \"ex:news-cnn\"\n\n},\n\n{\n\n\"s\": \"ex:nasa-astronaut-evacuation\",\n\n\"p\": \"cito:providesDataFor\",\n\n\"o\": \"ex:health-policy\"\n\n},\n\n{\n\n\"s\": \"ex:health-policy\",\n\n\"p\": \"skos:prefLabel\",\n\n\"o\": \"US health policy under Trump administration\"\n\n},\n\n{\n\n\"s\": \"ex:trump-venezuela-war-powers\",\n\n\"p\": \"cito:extends\",\n\n\"o\": \"ex:us-war-powers\"\n\n},\n\n{\n\n\"s\": \"ex:us-war-powers\",\n\n\"p\": \"skos:prefLabel\",\n\n\"o\": \"US presidential war powers\"\n\n},\n\n{\n\n\"s\": \"ex:verizon-outage\",\n\n\"p\": \"cito:usesDataFrom\",\n\n\"o\": \"ex:telecom-infrastructure\"\n\n},\n\n{\n\n\"s\": \"ex:telecom-infrastructure\",\n\n\"p\": \"skos:prefLabel\",\n\n\"o\": \"US telecommunications infrastructure\"\n\n},\n\n{\n\n\"s\": \"ex:greenland-control\",\n\n\"p\": \"cito:discusses\",\n\n\"o\": \"ex:nato-denmark-relations\"\n\n},\n\n{\n\n\"s\": \"ex:nato-denmark-relations\",\n\n\"p\": \"skos:prefLabel\",\n\n\"o\": \"NATO-Denmark-US relations over Greenland\"\n\n},\n\n{\n\n\"s\": \"ex:news-cnn\",\n\n\"p\": \"dcterms:creator\",\n\n\"o\": \"ex:cnn\"\n\n},\n\n{\n\n\"s\": \"ex:news-ap\",\n\n\"p\": \"dcterms:creator\",\n\n\"o\": \"ex:associated-press\"\n\n},\n\n{\n\n\"s\": \"ex:cnn\",\n\n\"p\": \"schema:name\",\n\n\"o\": \"CNN\"\n\n},\n\n{\n\n\"s\": \"ex:associated-press\",\n\n\"p\": \"schema:name\",\n\n\"o\": \"Associated Press\"\n\n},\n\n{\n\n\"s\": \"ex:news-cnn\",\n\n\"p\": \"dcterms:publisher\",\n\n\"o\": \"ex:cnn\"\n\n},\n\n{\n\n\"s\": \"ex:news-ap\",\n\n\"p\": \"dcterms:publisher\",\n\n\"o\": \"ex:associated-press\"\n\n},\n\n{\n\n\"s\": \"ex:news-cnn\",\n\n\"p\": \"dcterms:date\",\n\n\"o\": \"2026-01-15\"\n\n},\n\n{\n\n\"s\": \"ex:news-ap\",\n\n\"p\": \"dcterms:date\",\n\n\"o\": \"2026-01-15\"\n\n},\n\n{\n\n\"s\": \"ex:news-cnn\",\n\n\"p\": \"schema:url\",\n\n\"o\": \"https://edition.cnn.com/\"\n\n},\n\n{\n\n\"s\": \"ex:news-ap\",\n\n\"p\": \"schema:url\",\n\n\"o\": \"https://apnews.com/\"\n\n},\n\n{\n\n\"s\": \"ex:news-cnn\",\n\n\"p\": \"cito:cites\",\n\n\"o\": \"ex:news-ap\"\n\n},\n\n{\n\n\"s\": \"ex:news-ap\",\n\n\"p\": \"cito:cites\",\n\n\"o\": \"ex:news-cnn\"\n\n},\n\n{\n\n\"s\": \"ex:gaza-ceasefire\",\n\n\"p\": \"dcterms:subject\",\n\n\"o\": \"Middle East conflict\"\n\n},\n\n{\n\n\"s\": \"ex:iran-airspace-closure\",\n\n\"p\": \"dcterms:subject\",\n\n\"o\": \"Iran human rights\"\n\n},\n\n{\n\n\"s\": \"ex:us-immigration-policy\",\n\n\"p\": \"dcterms:subject\",\n\n\"o\": \"US immigration policy\"\n\n},\n\n{\n\n\"s\": \"ex:greenland-control\",\n\n\"p\": \"dcterms:subject\",\n\n\"o\": \"US foreign policy\"\n\n},\n\n{\n\n\"s\": \"ex:nasa-astronaut-evacuation\",\n\n\"p\": \"dcterms:subject\",\n\n\"o\": \"space medicine\"\n\n},\n\n{\n\n\"s\": \"ex:verizon-outage\",\n\n\"p\": \"dcterms:subject\",\n\n\"o\": \"telecommunications\"\n\n},\n\n{\n\n\"s\": \"ex:us-trump-tariffs\",\n\n\"p\": \"dcterms:subject\",\n\n\"o\": \"trade policy\"\n\n},\n\n{\n\n\"s\": \"ex:trump-venezuela-war-powers\",\n\n\"p\": \"dcterms:subject\",\n\n\"o\": \"US military authority\"\n\n},\n\n{\n\n\"s\": \"ex:china-viral-app\",\n\n\"p\": \"dcterms:subject\",\n\n\"o\": \"mental health technology\"\n\n},\n\n{\n\n\"s\": \"ex:uganda-election\",\n\n\"p\": \"dcterms:subject\",\n\n\"o\": \"African politics\"\n\n},\n\n{\n\n\"s\": \"ex:pandorogate\",\n\n\"p\": \"dcterms:subject\",\n\n\"o\": \"influencer scandal\"\n\n},\n\n{\n\n\"s\": \"ex:stress-proof-body\",\n\n\"p\": \"dcterms:subject\",\n\n\"o\": \"health and wellness\"\n\n},\n\n{\n\n\"s\": \"ex:us-iran-strike-analysis\",\n\n\"p\": \"dcterms:subject\",\n\n\"o\": \"military strategy\"\n\n},\n\n{\n\n\"s\": \"ex:news-cnn\",\n\n\"p\": \"dcterms:isPartOf\",\n\n\"o\": \"ex:news-media\"\n\n},\n\n{\n\n\"s\": \"ex:news-ap\",\n\n\"p\": \"dcterms:isPartOf\",\n\n\"o\": \"ex:news-media\"\n\n},\n\n{\n\n\"s\": \"ex:news-media\",\n\n\"p\": \"skos:prefLabel\",\n\n\"o\": \"News media outlets\"\n\n},\n\n{\n\n\"s\": \"ex:news-cnn\",\n\n\"p\": \"rdf:type\",\n\n\"o\": \"schema:NewsArticle\"\n\n},\n\n{\n\n\"s\": \"ex:news-ap\",\n\n\"p\": \"rdf:type\",\n\n\"o\": \"schema:NewsArticle\"\n\n},\n\n{\n\n\"s\": \"ex:gaza-ceasefire\",\n\n\"p\": \"rdf:type\",\n\n\"o\": \"schema:NewsEvent\"\n\n},\n\n{\n\n\"s\": \"ex:iran-airspace-closure\",\n\n\"p\": \"rdf:type\",\n\n\"o\": \"schema:NewsEvent\"\n\n},\n\n{\n\n\"s\": \"ex:fbi-washington-post-search\",\n\n\"p\": \"rdf:type\",\n\n\"o\": \"schema:NewsEvent\"\n\n},\n\n{\n\n\"s\": \"ex:us-immigration-policy\",\n\n\"p\": \"rdf:type\",\n\n\"o\": \"schema:GovernmentAgency\"\n\n},\n\n{\n\n\"s\": \"ex:greenland-control\",\n\n\"p\": \"rdf:type\",\n\n\"o\": \"schema:PoliticalEvent\"\n\n},\n\n{\n\n\"s\": \"ex:nasa-astronaut-evacuation\",\n\n\"p\": \"rdf:type\",\n\n\"o\": \"schema:MedicalEvent\"\n\n},\n\n{\n\n\"s\": \"ex:verizon-outage\",\n\n\"p\": \"rdf:type\",\n\n\"o\": \"schema:TechnicalEvent\"\n\n},\n\n{\n\n\"s\": \"ex:us-trump-tariffs\",\n\n\"p\": \"rdf:type\",\n\n\"o\": \"schema:EconomicEvent\"\n\n},\n\n{\n\n\"s\": \"ex:trump-venezuela-war-powers\",\n\n\"p\": \"rdf:type\",\n\n\"o\": \"schema:LegalEvent\"\n\n},\n\n{\n\n\"s\": \"ex:china-viral-app\",\n\n\"p\": \"rdf:type\",\n\n\"o\": \"schema:Technology\"\n\n},\n\n{\n\n\"s\": \"ex:uganda-election\",\n\n\"p\": \"rdf:type\",\n\n\"o\": \"schema:PoliticalEvent\"\n\n},\n\n{\n\n\"s\": \"ex:pandorogate\",\n\n\"p\": \"rdf:type\",\n\n\"o\": \"schema:Scandal\"\n\n},\n\n{\n\n\"s\": \"ex:stress-proof-body\",\n\n\"p\": \"rdf:type\",\n\n\"o\": \"schema:HealthCondition\"\n\n},\n\n{\n\n\"s\": \"ex:us-iran-strike-analysis\",\n\n\"p\": \"rdf:type\",\n\n\"o\": \"schema:Analysis\"\n\n},\n\n{\n\n\"s\": \"ex:cnn\",\n\n\"p\": \"rdf:type\",\n\n\"o\": \"schema:Organization\"\n\n},\n\n{\n\n\"s\": \"ex:associated-press\",\n\n\"p\": \"rdf:type\",\n\n\"o\": \"schema:Organization\"\n\n},\n\n{\n\n\"s\": \"ex:news-media\",\n\n\"p\": \"rdf:type\",\n\n\"o\": \"skos:Concept\"\n\n}\n\n] "
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-18",
+      "type": "answer_user",
+      "position": {
+        "x": -480.0,
+        "y": -144.0
+      },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          },
+          {
+            "id": "level",
+            "label": "level",
+            "type": "string",
+            "description": "Message level for hosts (message|warning|error). Defaults to 'message' when unset."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-19",
+      "type": "parse_json",
+      "position": {
+        "x": -1040.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "parse_json",
+        "label": "Parse JSON",
+        "icon": "&#x1F5C2;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "text",
+            "label": "text",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-21",
+      "type": "json_schema",
+      "position": {
+        "x": -144.0,
+        "y": 784.0
+      },
+      "data": {
+        "nodeType": "json_schema",
+        "label": "SCHEMA V1",
+        "icon": "&#x1F4CB;",
+        "headerColor": "#00FFFF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "schema",
+            "type": "object"
+          }
+        ],
+        "literalValue": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "Minimal Triple Store",
+          "description": "Minimal schema for extracting facts, events, people, and knowledge as triples",
+          "type": "object",
+          "properties": {
+            "triples": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "s": {
+                    "type": "string",
+                    "description": "Subject (entity ID or label)"
+                  },
+                  "p": {
+                    "type": "string",
+                    "description": "Predicate (relationship or property name)"
+                  },
+                  "o": {
+                    "type": "string",
+                    "description": "Object (CURIE/entity ID/label/URI/literal as string)"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "semantic",
+                      "episodic",
+                      "relational"
+                    ],
+                    "description": "Triple category"
+                  },
+                  "time": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "When (for events) or when observed"
+                  },
+                  "conf": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Confidence score (0-1)"
+                  },
+                  "src": {
+                    "type": "string",
+                    "description": "Source of this knowledge"
+                  }
+                },
+                "required": [
+                  "s",
+                  "p",
+                  "o",
+                  "type"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "triples"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1768442833104",
+      "source": "node-1",
+      "sourceHandle": "provider",
+      "target": "node-6",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1768442835856",
+      "source": "node-1",
+      "sourceHandle": "model",
+      "target": "node-6",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-1768442838371",
+      "source": "node-1",
+      "sourceHandle": "request",
+      "target": "node-6",
+      "targetHandle": "task",
+      "animated": false
+    },
+    {
+      "id": "edge-1768442840914",
+      "source": "node-1",
+      "sourceHandle": "tools",
+      "target": "node-6",
+      "targetHandle": "tools",
+      "animated": false
+    },
+    {
+      "id": "edge-1768442850120",
+      "source": "node-6",
+      "sourceHandle": "exec-out",
+      "target": "node-4",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768443407690",
+      "source": "node-6",
+      "sourceHandle": "result",
+      "target": "node-4",
+      "targetHandle": "result",
+      "animated": false
+    },
+    {
+      "id": "edge-1768443410633",
+      "source": "node-6",
+      "sourceHandle": "scratchpad",
+      "target": "node-4",
+      "targetHandle": "scratchpad",
+      "animated": false
+    },
+    {
+      "id": "edge-1768448606422",
+      "source": "node-8",
+      "sourceHandle": "result",
+      "target": "node-6",
+      "targetHandle": "system",
+      "animated": false
+    },
+    {
+      "id": "edge-1768453005634",
+      "source": "node-1",
+      "sourceHandle": "max_iterations",
+      "target": "node-6",
+      "targetHandle": "max_iterations",
+      "animated": false
+    },
+    {
+      "id": "edge-1768454044709",
+      "source": "node-17",
+      "sourceHandle": "value",
+      "target": "node-19",
+      "targetHandle": "text",
+      "animated": false
+    },
+    {
+      "id": "edge-1768454114945",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-6",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768454153117",
+      "source": "node-9",
+      "sourceHandle": "value",
+      "target": "node-8",
+      "targetHandle": "c",
+      "animated": false
+    },
+    {
+      "id": "edge-1768454292177",
+      "source": "node-21",
+      "sourceHandle": "value",
+      "target": "node-6",
+      "targetHandle": "response_schema",
+      "animated": false
+    }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2026-01-15T02:55:19.061956",
+  "updated_at": "2026-01-15T05:32:56.589474"
+}
