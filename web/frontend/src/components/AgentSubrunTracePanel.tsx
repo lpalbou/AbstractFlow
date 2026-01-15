@@ -509,12 +509,12 @@ function PanelBody({ item }: { item: TraceItem }) {
     if (active === 'system') return <pre className="run-details-output">{system || '(none)'}</pre>;
     if (active === 'user') return <pre className="run-details-output">{user || '(none)'}</pre>;
     if (active === 'tools')
-      return tools ? <JsonViewer value={tools} collapseAfterDepth={1} /> : <div className="run-details-output">(none)</div>;
+      return tools ? <JsonViewer value={tools} /> : <div className="run-details-output">(none)</div>;
     if (active === 'response') return <pre className="run-details-output">{response || '(empty)'}</pre>;
     if (active === 'reasoning') return <pre className="run-details-output">{reasoning || '(none)'}</pre>;
     if (active === 'errors') return <pre className="run-details-output">{errors || '(none)'}</pre>;
     const rawValue = rawResponseValue ?? step;
-    return <JsonViewer value={rawValue} collapseAfterDepth={1} />;
+    return <JsonViewer value={rawValue} />;
   };
 
   return (
@@ -634,7 +634,7 @@ function ObserveCard({ acts }: { acts: TraceItem[] }) {
                   {typeof output === 'string' ? (
                     <pre className="run-details-output">{output || '(none)'}</pre>
                   ) : (
-                    <JsonViewer value={output} collapseAfterDepth={1} />
+                    <JsonViewer value={output} />
                   )}
                 </details>
               );

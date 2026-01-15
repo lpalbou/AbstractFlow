@@ -178,7 +178,7 @@ export function JsonViewer(props: {
   showCopy?: boolean;
 }) {
   const { value, className, showCopy = true } = props;
-  const collapseAfterDepth = Number.isFinite(props.collapseAfterDepth ?? NaN) ? Number(props.collapseAfterDepth) : 1;
+  const collapseAfterDepth = Number.isFinite(props.collapseAfterDepth ?? NaN) ? Number(props.collapseAfterDepth) : 3;
 
   const displayValue = useMemo(() => {
     if (typeof value === 'string') return tryParseJsonString(value);

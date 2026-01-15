@@ -5,7 +5,7 @@
  * Shows execution progress and results.
  */
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useFlowStore } from '../hooks/useFlow';
 import type { ExecutionEvent, ExecutionMetrics, Pin, FlowRunResult, RunSummary } from '../types/flow';
 import { isEntryNodeType } from '../types/flow';
@@ -308,6 +308,7 @@ export function RunFlowModal({
   const [workspaceRoot, setWorkspaceRoot] = useState('');
   const [manualWorkspaceRoot, setManualWorkspaceRoot] = useState('');
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
+  const [rawJsonOpen, setRawJsonOpen] = useState(true);
   // Nested subflow observability: folded by default; per-step expansion keyed by the
   // parent step id (stable across this modal's event stream).
   const [expandedSubflows, setExpandedSubflows] = useState<Record<string, boolean>>({});
@@ -1918,6 +1919,34 @@ export function RunFlowModal({
     return entries;
   }, [selectedStep]);
 
+  const shouldDefaultRawJsonOpen = useMemo(() => {
+    if (!selectedStep || selectedStep.output == null) return false;
+    const hasPreviewBlocks =
+      Boolean(memorizeContentPreview) ||
+      Boolean(recallIntoContextDisplay) ||
+      (selectedStep.nodeType === 'on_flow_start' && Boolean(onFlowStartParams)) ||
+      Boolean(outputPreview?.task) ||
+      Boolean(outputPreview?.benchmark) ||
+      Boolean(outputPreview?.previewText) ||
+      Boolean(outputPreview?.usage) ||
+      Boolean(outputPreview?.provider) ||
+      Boolean(outputPreview?.model) ||
+      outputPreview?.scratchpad != null;
+    return !hasPreviewBlocks;
+  }, [memorizeContentPreview, onFlowStartParams, outputPreview, recallIntoContextDisplay, selectedStep]);
+
+  const lastRawJsonStepIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const id = selectedStep?.id || null;
+    if (!id) {
+      lastRawJsonStepIdRef.current = null;
+      return;
+    }
+    if (lastRawJsonStepIdRef.current === id) return;
+    lastRawJsonStepIdRef.current = id;
+    setRawJsonOpen(shouldDefaultRawJsonOpen);
+  }, [selectedStep?.id, shouldDefaultRawJsonOpen]);
+
   const usageBadges = useMemo(() => getUsageBadges(outputPreview?.usage), [outputPreview?.usage]);
 
   const traceSteps = useMemo(() => {
@@ -2775,7 +2804,11 @@ export function RunFlowModal({
                         </div>
                       ) : null}
 
-                      <details className="run-raw-details" open={!outputPreview}>
+                      <details
+                        className="run-raw-details"
+                        open={rawJsonOpen}
+                        onToggle={(e) => setRawJsonOpen((e.currentTarget as HTMLDetailsElement).open)}
+                      >
                         <summary>Raw JSON</summary>
                         <JsonViewer value={selectedStep.output} />
                       </details>
