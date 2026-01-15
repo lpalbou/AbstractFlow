@@ -1,8 +1,10 @@
 {
   "id": "462808d4",
-  "name": "agent-semantics-v2",
+  "name": "agent-semantics",
   "description": "",
-  "interfaces": [],
+  "interfaces": [
+    "abstractcode.agent.v1"
+  ],
   "nodes": [
     {
       "id": "node-1",
@@ -47,6 +49,11 @@
             "id": "max_iterations",
             "label": "max_iterations",
             "type": "number"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
           }
         ],
         "pinDefaults": {
@@ -54,48 +61,12 @@
           "model": "qwen/qwen3-next-80b",
           "tools": [
             "fetch_url",
-            "web_search"
+            "web_search",
+            "write_file"
           ],
           "request": "what are the latest news ?",
           "max_iterations": 10
         }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
-      "id": "node-4",
-      "type": "on_flow_end",
-      "position": {
-        "x": 576.0,
-        "y": 192.0
-      },
-      "data": {
-        "nodeType": "on_flow_end",
-        "label": "On Flow End",
-        "icon": "&#x23F9;",
-        "headerColor": "#C0392B",
-        "inputs": [
-          {
-            "id": "exec-in",
-            "label": "",
-            "type": "execution"
-          },
-          {
-            "id": "result",
-            "label": "result",
-            "type": "object"
-          },
-          {
-            "id": "scratchpad",
-            "label": "scratchpad",
-            "type": "object"
-          }
-        ],
-        "outputs": []
       },
       "label": null,
       "icon": null,
@@ -714,6 +685,91 @@
       "headerColor": null,
       "inputs": [],
       "outputs": []
+    },
+    {
+      "id": "node-22",
+      "type": "on_flow_end",
+      "position": {
+        "x": 544.0,
+        "y": 192.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          },
+          {
+            "id": "raw_result",
+            "label": "raw_result",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-23",
+      "type": "break_object",
+      "position": {
+        "x": 384.0,
+        "y": 416.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "result"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
     }
   ],
   "edges": [
@@ -750,30 +806,6 @@
       "animated": false
     },
     {
-      "id": "edge-1768442850120",
-      "source": "node-6",
-      "sourceHandle": "exec-out",
-      "target": "node-4",
-      "targetHandle": "exec-in",
-      "animated": true
-    },
-    {
-      "id": "edge-1768443407690",
-      "source": "node-6",
-      "sourceHandle": "result",
-      "target": "node-4",
-      "targetHandle": "result",
-      "animated": false
-    },
-    {
-      "id": "edge-1768443410633",
-      "source": "node-6",
-      "sourceHandle": "scratchpad",
-      "target": "node-4",
-      "targetHandle": "scratchpad",
-      "animated": false
-    },
-    {
       "id": "edge-1768448606422",
       "source": "node-8",
       "sourceHandle": "result",
@@ -806,23 +838,71 @@
       "animated": true
     },
     {
-      "id": "edge-1768486892533",
-      "source": "node-11",
+      "id": "edge-1768500977257",
+      "source": "node-6",
+      "sourceHandle": "result",
+      "target": "node-22",
+      "targetHandle": "raw_result",
+      "animated": false
+    },
+    {
+      "id": "edge-1768500980805",
+      "source": "node-6",
+      "sourceHandle": "scratchpad",
+      "target": "node-22",
+      "targetHandle": "scratchpad",
+      "animated": false
+    },
+    {
+      "id": "edge-1768500986508",
+      "source": "node-6",
+      "sourceHandle": "exec-out",
+      "target": "node-22",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768500999994",
+      "source": "node-6",
+      "sourceHandle": "result",
+      "target": "node-23",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1768501016504",
+      "source": "node-23",
+      "sourceHandle": "result",
+      "target": "node-22",
+      "targetHandle": "response",
+      "animated": false
+    },
+    {
+      "id": "edge-1768501035640",
+      "source": "node-9",
       "sourceHandle": "value",
       "target": "node-8",
       "targetHandle": "c",
       "animated": false
     },
     {
-      "id": "edge-1768486896550",
-      "source": "node-12",
+      "id": "edge-1768501044312",
+      "source": "node-21",
       "sourceHandle": "value",
       "target": "node-6",
       "targetHandle": "response_schema",
+      "animated": false
+    },
+    {
+      "id": "edge-1768501068473",
+      "source": "node-1",
+      "sourceHandle": "context",
+      "target": "node-6",
+      "targetHandle": "context",
       "animated": false
     }
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-15T02:55:19.061956",
-  "updated_at": "2026-01-15T14:21:38.013609"
+  "updated_at": "2026-01-15T18:20:24.946026"
 }

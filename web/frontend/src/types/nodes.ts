@@ -267,22 +267,28 @@ const CORE_NODES: NodeTemplate[] = [
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
-      { id: 'result', label: 'result', type: 'object', description: 'Structured final agent result (answer + metadata/tool calls depending on agent).' },
       {
-        id: 'tool_calls',
-        label: 'tool_calls',
-        type: 'array',
+        id: 'response',
+        label: 'response',
+        type: 'string',
         description:
-          'Best-effort list of tool call requests extracted from the agent scratchpad trace (post-run). For real-time tool observability, subscribe to the ledger/node_traces stream.',
+          'Best-effort final answer string (convenience pin). In structured-output mode, this reflects the unstructured answer prior to the schema post-pass.',
       },
       {
-        id: 'tool_results',
-        label: 'tool_results',
-        type: 'array',
+        id: 'meta',
+        label: 'meta',
+        type: 'object',
         description:
-          'Best-effort list of tool results extracted from the agent scratchpad trace (post-run). For real-time tool observability, subscribe to the ledger/node_traces stream.',
+          'Host-facing meta envelope (schema=abstractcode.agent.v1.meta). Includes provider/model and lightweight execution metadata.',
       },
-      { id: 'scratchpad', label: 'scratchpad', type: 'object', description: 'Runtime-owned execution trace/scratchpad for observability (LLM/tool steps, timings).' },
+      {
+        id: 'scratchpad',
+        label: 'scratchpad',
+        type: 'object',
+        description:
+          'Runtime-owned execution trace/scratchpad for observability (LLM/tool steps, timings). Includes best-effort tool_calls/tool_results extracted post-run.',
+      },
+      { id: 'result', label: 'result', type: 'object', description: 'Structured final agent result (answer or structured output object).' },
     ],
     category: 'core',
   },

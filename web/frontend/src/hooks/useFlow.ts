@@ -170,8 +170,32 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
     const updatedNodes = applyNodeChanges(changes, state.nodes);
 
+    // Keep PropertiesPanel selection in sync with ReactFlow's `node.selected` flags.
+    // This avoids "double click to select" glitches when a click becomes a tiny drag,
+    // or when selection happens through handles/marquee instead of onNodeClick.
+    const selectedNodes = updatedNodes.filter((n) => Boolean(n.selected));
+    let lastSelectedId: string | null = null;
+    for (const c of changes) {
+      if (c.type === 'select' && (c as any).selected) lastSelectedId = c.id;
+    }
+
+    const nextSelectedNode = (() => {
+      if (lastSelectedId) return updatedNodes.find((n) => n.id === lastSelectedId) || null;
+      if (selectedNodes.length === 0) return null;
+      const curId = state.selectedNode?.id;
+      if (curId && selectedNodes.some((n) => n.id === curId)) {
+        return updatedNodes.find((n) => n.id === curId) || selectedNodes[selectedNodes.length - 1] || null;
+      }
+      return selectedNodes[selectedNodes.length - 1] || null;
+    })();
+
     if (removedNodeIds.length === 0) {
-      set({ nodes: updatedNodes });
+      set({
+        nodes: updatedNodes,
+        selectedNode: nextSelectedNode,
+        // Clear edge selection when a node is selected; otherwise preserve.
+        selectedEdge: nextSelectedNode ? null : state.selectedEdge,
+      });
       return;
     }
 
@@ -180,16 +204,13 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       (e) => !removed.has(e.source) && !removed.has(e.target)
     );
 
-    const selectedNode =
-      state.selectedNode && removed.has(state.selectedNode.id)
-        ? null
-        : state.selectedNode;
+    const selectedNode = nextSelectedNode && removed.has(nextSelectedNode.id) ? null : nextSelectedNode;
 
     const selectedEdge =
-      state.selectedEdge &&
+      (selectedNode ? null : state.selectedEdge) &&
       !remainingEdges.some((e) => e.id === state.selectedEdge?.id)
         ? null
-        : state.selectedEdge;
+        : (selectedNode ? null : state.selectedEdge);
 
     set({
       nodes: updatedNodes,
@@ -207,16 +228,36 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
     const updatedEdges = applyEdgeChanges(changes, state.edges);
 
+    // Keep PropertiesPanel selection in sync with ReactFlow's `edge.selected` flags.
+    const selectedEdges = updatedEdges.filter((e) => Boolean((e as any).selected));
+    let lastSelectedEdgeId: string | null = null;
+    for (const c of changes) {
+      if (c.type === 'select' && (c as any).selected) lastSelectedEdgeId = c.id;
+    }
+
+    const nextSelectedEdge = (() => {
+      if (lastSelectedEdgeId) return updatedEdges.find((e) => e.id === lastSelectedEdgeId) || null;
+      if (selectedEdges.length === 0) return null;
+      const curId = state.selectedEdge?.id;
+      if (curId && selectedEdges.some((e) => e.id === curId)) {
+        return updatedEdges.find((e) => e.id === curId) || selectedEdges[selectedEdges.length - 1] || null;
+      }
+      return selectedEdges[selectedEdges.length - 1] || null;
+    })();
+
     if (removedEdgeIds.length === 0) {
-      set({ edges: updatedEdges });
+      set({
+        edges: updatedEdges,
+        selectedEdge: nextSelectedEdge,
+        // Clear node selection when an edge is selected; otherwise preserve.
+        selectedNode: nextSelectedEdge ? null : state.selectedNode,
+      });
       return;
     }
 
     const removed = new Set(removedEdgeIds);
     const selectedEdge =
-      state.selectedEdge && removed.has(state.selectedEdge.id)
-        ? null
-        : state.selectedEdge;
+      nextSelectedEdge && removed.has(nextSelectedEdge.id) ? null : nextSelectedEdge;
 
     set({
       edges: updatedEdges,
@@ -552,6 +593,34 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         const dropIds = data.nodeType === 'llm_call' ? new Set(['write_context', 'writeContext']) : new Set<string>();
         const extras = existingInputs.filter((p) => !used.has(p.id) && !dropIds.has(p.id));
         data = { ...data, inputs: [...canonicalInputs, ...extras] };
+
+        // Canonical ordering for Agent output pins.
+        // Pins are addressable by id (edges), so reordering is safe.
+        if (data.nodeType === 'agent') {
+          const existingOutputs = Array.isArray(data.outputs) ? data.outputs : [];
+          const byOutId = new Map(existingOutputs.map((p) => [p.id, p] as const));
+          const usedOut = new Set<string>();
+
+          const wantOut = (pin: Pin): Pin => {
+            const prev = byOutId.get(pin.id);
+            usedOut.add(pin.id);
+            if (!prev) return pin;
+            if (prev.label === pin.label && prev.type === pin.type) return prev;
+            return { ...prev, label: pin.label, type: pin.type };
+          };
+
+          const execOut = wantOut({ id: 'exec-out', label: '', type: 'execution' });
+          const canonicalOutputs: Pin[] = [
+            execOut,
+            wantOut({ id: 'response', label: 'response', type: 'string' }),
+            wantOut({ id: 'meta', label: 'meta', type: 'object' }),
+            wantOut({ id: 'scratchpad', label: 'scratchpad', type: 'object' }),
+            wantOut({ id: 'result', label: 'result', type: 'object' }),
+          ];
+
+          const extraOutputs = existingOutputs.filter((p) => !usedOut.has(p.id));
+          data = { ...data, outputs: [...canonicalOutputs, ...extraOutputs] };
+        }
 
         // Migration: legacy config booleans -> pinDefaults
         //

@@ -1489,26 +1489,89 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 sample = { value: inferred ?? '' };
               }
             } else if (sourceNode?.data.nodeType === 'agent') {
-              const outputSchema = sourceNode.data.agentConfig?.outputSchema;
-              if (outputSchema?.enabled && outputSchema.jsonSchema && typeof outputSchema.jsonSchema === 'object') {
-                schema = outputSchema.jsonSchema;
-              } else {
-                // Best-effort schema for legacy Agent result payload.
+              const sourceHandle = inputEdge?.sourceHandle;
+
+              if (sourceHandle === 'scratchpad') {
+                // Agent scratchpad is runtime-owned; we expose a stable subset for observability.
                 sample = {
-                  result: '',
-                  task: '',
-                  context: {},
-                  success: true,
+                  sub_run_id: '',
+                  workflow_id: '',
+                  node_traces: {},
+                  steps: [],
+                  tool_calls: [
+                    {
+                      call_id: '',
+                      name: '',
+                      arguments: {},
+                    },
+                  ],
+                  tool_results: [
+                    {
+                      call_id: '',
+                      name: '',
+                      success: true,
+                      output: {},
+                      error: null,
+                      meta: {},
+                    },
+                  ],
+                };
+              } else if (sourceHandle === 'meta') {
+                sample = {
+                  schema: 'abstractcode.agent.v1.meta',
+                  version: 1,
                   provider: '',
                   model: '',
-                  usage: {
-                    input_tokens: 0,
-                    output_tokens: 0,
-                    total_tokens: 0,
-                    prompt_tokens: 0,
-                    completion_tokens: 0,
-                  },
+                  sub_run_id: '',
+                  iterations: 0,
+                  tool_calls: 0,
+                  tool_results: 0,
+                  trace: { trace_id: '' },
+                  warnings: [],
+                  debug: {},
                 };
+              } else {
+                // Default: assume the Agent `result` output.
+                const outputSchema = sourceNode.data.agentConfig?.outputSchema;
+                if (outputSchema?.enabled && outputSchema.jsonSchema && typeof outputSchema.jsonSchema === 'object') {
+                  schema = outputSchema.jsonSchema;
+                } else {
+                  // Best-effort schema for Agent result payload (unstructured mode).
+                  sample = {
+                    result: '',
+                    task: '',
+                    context: {},
+                    success: true,
+                    provider: '',
+                    model: '',
+                    sub_run_id: '',
+                    iterations: 0,
+                    tool_calls: [
+                      {
+                        call_id: '',
+                        name: '',
+                        arguments: {},
+                      },
+                    ],
+                    tool_results: [
+                      {
+                        call_id: '',
+                        name: '',
+                        success: true,
+                        output: {},
+                        error: null,
+                        meta: {},
+                      },
+                    ],
+                    usage: {
+                      input_tokens: 0,
+                      output_tokens: 0,
+                      total_tokens: 0,
+                      prompt_tokens: 0,
+                      completion_tokens: 0,
+                    },
+                  };
+                }
               }
             } else if (sourceNode?.data.nodeType === 'llm_call') {
               // Best-effort schema for AbstractRuntime normalized LLM_CALL result payload.

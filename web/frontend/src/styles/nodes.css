@@ -96,6 +96,12 @@
   min-width: 0;
 }
 
+/* Cyan headers (object pins) need dark text for contrast. */
+.flow-node.flow-node--literal_json .node-header,
+.flow-node.flow-node--json_schema .node-header {
+  color: #0b1320;
+}
+
 .node-progress-badge {
   position: absolute;
   top: 6px;

@@ -10,7 +10,7 @@
       "id": "node-2",
       "type": "on_flow_start",
       "position": {
-        "x": -32.0,
+        "x": -288.0,
         "y": 208.0
       },
       "data": {
@@ -55,7 +55,24 @@
             "label": "max_iterations",
             "type": "number"
           }
-        ]
+        ],
+        "pinDefaults": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b",
+          "tools": [
+            "analyze_code",
+            "ask_user",
+            "delegate_agent",
+            "edit_file",
+            "execute_command",
+            "fetch_url",
+            "list_files",
+            "read_file",
+            "search_files",
+            "web_search",
+            "write_file"
+          ]
+        }
       },
       "label": null,
       "icon": null,
@@ -67,7 +84,7 @@
       "id": "node-3",
       "type": "on_flow_end",
       "position": {
-        "x": 592.0,
+        "x": 720.0,
         "y": 208.0
       },
       "data": {
@@ -109,10 +126,392 @@
       "headerColor": null,
       "inputs": [],
       "outputs": []
+    },
+    {
+      "id": "node-4",
+      "type": "agent",
+      "position": {
+        "x": 288.0,
+        "y": 208.0
+      },
+      "data": {
+        "nodeType": "agent",
+        "label": "Agent",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "include_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) as agent history. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider",
+            "description": "LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model",
+            "description": "LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number",
+            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number",
+            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number",
+            "description": "Maximum internal ReAct iterations (safety cap). Higher values allow more tool-use steps."
+          },
+          {
+            "id": "max_input_tokens",
+            "label": "max_input_tokens",
+            "type": "number",
+            "description": "Optional per-agent input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for the agent sub-run."
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string",
+            "description": "Optional system prompt for this agent instance (high priority instructions)."
+          },
+          {
+            "id": "task",
+            "label": "prompt",
+            "type": "string",
+            "description": "The task/user prompt for the agent to solve."
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools",
+            "description": "Allowlist of tool names this agent can call (defense-in-depth; runtime still enforces allowlists)."
+          },
+          {
+            "id": "response_schema",
+            "label": "structured_output",
+            "type": "object",
+            "description": "Optional JSON Schema object (type=object) the final answer must conform to."
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object",
+            "description": "Optional explicit context object for the agent (e.g. {messages:[...]}). If provided, it can override inherited run context."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object",
+            "description": "Structured final agent result (answer + metadata/tool calls depending on agent)."
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array",
+            "description": "Best-effort list of tool call requests extracted from the agent scratchpad trace (post-run). For real-time tool observability, subscribe to the ledger/node_traces stream."
+          },
+          {
+            "id": "tool_results",
+            "label": "tool_results",
+            "type": "array",
+            "description": "Best-effort list of tool results extracted from the agent scratchpad trace (post-run). For real-time tool observability, subscribe to the ledger/node_traces stream."
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object",
+            "description": "Runtime-owned execution trace/scratchpad for observability (LLM/tool steps, timings)."
+          }
+        ],
+        "pinDefaults": {
+          "system": "You are an experience manager and solution architect. You have autonomy thanks to your capacity to request the execution of tools that gives you agency. Your roe is to dispatch tasks with just the right level of information to other agents so they can execute either in parallel (you can request several agents to do tasks in parallel by requesting several tool calls in one turn) or in sequence (agent1, then wait for result, then agent2). When one of your agent finishes its job, you take into account its results and plan for the next steps and continue to delegate until you fullfill all the expected outcomes of the request."
+        },
+        "agentConfig": {
+          "tools": [
+            "ask_user",
+            "write_file",
+            "search_files",
+            "read_file",
+            "list_files",
+            "execute_command",
+            "edit_file",
+            "delegate_agent",
+            "analyze_code",
+            "fetch_url",
+            "web_search"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-5",
+      "type": "subflow",
+      "position": {
+        "x": 0.0,
+        "y": 208.0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Subflow",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean",
+            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "enriched_request",
+            "label": "enriched_request",
+            "type": "string"
+          }
+        ],
+        "subflowId": "72b51d91",
+        "pinDefaults": {}
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-6",
+      "type": "break_object",
+      "position": {
+        "x": 640.0,
+        "y": 464.0
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "result"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
     }
   ],
-  "edges": [],
+  "edges": [
+    {
+      "id": "edge-1768494504594",
+      "source": "node-2",
+      "sourceHandle": "exec-out",
+      "target": "node-5",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768494506929",
+      "source": "node-5",
+      "sourceHandle": "exec-out",
+      "target": "node-4",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768494520445",
+      "source": "node-2",
+      "sourceHandle": "request",
+      "target": "node-5",
+      "targetHandle": "request",
+      "animated": false
+    },
+    {
+      "id": "edge-1768494523079",
+      "source": "node-5",
+      "sourceHandle": "enriched_request",
+      "target": "node-4",
+      "targetHandle": "task",
+      "animated": false
+    },
+    {
+      "id": "edge-1768494532146",
+      "source": "node-2",
+      "sourceHandle": "max_iterations",
+      "target": "node-4",
+      "targetHandle": "max_iterations",
+      "animated": false
+    },
+    {
+      "id": "edge-1768494540004",
+      "source": "node-4",
+      "sourceHandle": "exec-out",
+      "target": "node-3",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768494598763",
+      "source": "node-4",
+      "sourceHandle": "result",
+      "target": "node-6",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1768494610030",
+      "source": "node-4",
+      "sourceHandle": "scratchpad",
+      "target": "node-3",
+      "targetHandle": "scratchpad",
+      "animated": false
+    },
+    {
+      "id": "edge-1768494614138",
+      "source": "node-4",
+      "sourceHandle": "result",
+      "target": "node-3",
+      "targetHandle": "raw_result",
+      "animated": false
+    },
+    {
+      "id": "edge-1768495226878",
+      "source": "node-2",
+      "sourceHandle": "provider",
+      "target": "node-5",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1768495228596",
+      "source": "node-2",
+      "sourceHandle": "model",
+      "target": "node-5",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-1768495234680",
+      "source": "node-2",
+      "sourceHandle": "context",
+      "target": "node-4",
+      "targetHandle": "context",
+      "animated": false
+    },
+    {
+      "id": "edge-1768495451127",
+      "source": "node-2",
+      "sourceHandle": "provider",
+      "target": "node-4",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1768495454675",
+      "source": "node-2",
+      "sourceHandle": "model",
+      "target": "node-4",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-1768495478509",
+      "source": "node-6",
+      "sourceHandle": "result",
+      "target": "node-3",
+      "targetHandle": "response",
+      "animated": false
+    }
+  ],
   "entryNode": "node-2",
   "created_at": "2026-01-15T16:23:22.843839",
-  "updated_at": "2026-01-15T16:23:29.546672"
+  "updated_at": "2026-01-15T16:46:36.378172"
 }

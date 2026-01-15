@@ -551,7 +551,14 @@ export const BaseNode = memo(function BaseNode({
     }
     return true;
   });
-  const outputData = data.outputs.filter((p) => p.type !== 'execution');
+  const outputData = data.outputs.filter((p) => {
+    if (p.type === 'execution') return false;
+    // Keep legacy Agent pins hidden unless explicitly wired (cleaner UI without breaking old flows).
+    if (data.nodeType === 'agent' && (p.id === 'tool_calls' || p.id === 'tool_results') && !isPinConnected(p.id, false)) {
+      return false;
+    }
+    return true;
+  });
 
   const codeParams = useMemo(() => data.inputs.filter((p) => p.type !== 'execution'), [data.inputs]);
   const currentCodeBody = useMemo(() => {
@@ -581,19 +588,35 @@ export const BaseNode = memo(function BaseNode({
   // NOTE: Subflow control pins (inherit_context) are configured via pin defaults on the pin row.
   // We intentionally avoid a separate non-pin checkbox to keep the UI single-source-of-truth.
 
-  const hasModelControls = isLlmNode || isAgentNode;
-  const hasProviderDropdown = hasModelControls || isProviderModelsNode;
+  const subflowHasProviderPin = isSubflowNode && data.inputs.some((p) => p.id === 'provider' || p.type === 'provider');
+  const subflowHasModelPin = isSubflowNode && data.inputs.some((p) => p.id === 'model' || p.type === 'model');
+  const subflowHasToolsPin = isSubflowNode && data.inputs.some((p) => p.id === 'tools' || p.type === 'tools');
+
+  const hasModelControls = isLlmNode || isAgentNode || subflowHasModelPin;
+  const hasProviderDropdown = hasModelControls || isProviderModelsNode || subflowHasProviderPin;
 
   const providerConnected = hasProviderDropdown ? isPinConnected('provider', true) : false;
   const modelConnected = hasModelControls ? isPinConnected('model', true) : false;
-  const toolsConnected = (isAgentNode || isLlmNode) ? isPinConnected('tools', true) : false;
+  const toolsConnected = (isAgentNode || isLlmNode || subflowHasToolsPin) ? isPinConnected('tools', true) : false;
 
+  const pinnedProvider = typeof pinDefaults.provider === 'string' ? pinDefaults.provider.trim() : '';
+  const pinnedModel = typeof pinDefaults.model === 'string' ? pinDefaults.model.trim() : '';
   const selectedProvider = isAgentNode
     ? data.agentConfig?.provider
     : isLlmNode
       ? data.effectConfig?.provider
-      : data.providerModelsConfig?.provider;
-  const selectedModel = isAgentNode ? data.agentConfig?.model : data.effectConfig?.model;
+      : isProviderModelsNode
+        ? data.providerModelsConfig?.provider
+        : subflowHasProviderPin
+          ? pinnedProvider
+          : '';
+  const selectedModel = isAgentNode
+    ? data.agentConfig?.model
+    : isLlmNode
+      ? data.effectConfig?.model
+      : subflowHasModelPin
+        ? pinnedModel
+        : '';
 
 
   const providersQuery = useProviders(hasProviderDropdown && (!providerConnected || !modelConnected));
@@ -601,7 +624,7 @@ export const BaseNode = memo(function BaseNode({
     selectedProvider,
     (hasModelControls && !modelConnected) || (isProviderModelsNode && !providerConnected)
   );
-  const toolsQuery = useTools((isAgentNode || isLlmNode || isToolsAllowlistNode || isVarDeclNode || isToolParametersNode) && !toolsConnected);
+  const toolsQuery = useTools((isAgentNode || isLlmNode || isToolsAllowlistNode || isVarDeclNode || isToolParametersNode || subflowHasToolsPin) && !toolsConnected);
 
   const providers = Array.isArray(providersQuery.data) ? providersQuery.data : [];
   const models = Array.isArray(modelsQuery.data) ? modelsQuery.data : [];
@@ -757,8 +780,17 @@ export const BaseNode = memo(function BaseNode({
       return Array.from(new Set(cleaned));
     }
 
+    if (subflowHasToolsPin) {
+      const raw = pinDefaults.tools;
+      if (!Array.isArray(raw)) return [];
+      const cleaned = raw
+        .filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
+        .map((t) => t.trim());
+      return Array.from(new Set(cleaned));
+    }
+
     return [];
-  }, [data.agentConfig?.tools, data.effectConfig?.tools, data.literalValue, isAgentNode, isLlmNode, isToolsAllowlistNode]);
+  }, [data.agentConfig?.tools, data.effectConfig?.tools, data.literalValue, isAgentNode, isLlmNode, isToolsAllowlistNode, pinDefaults.tools, subflowHasToolsPin]);
 
   const selectedProviderModels = useMemo(() => {
     if (!isProviderModelsNode) return [];
@@ -785,6 +817,19 @@ export const BaseNode = memo(function BaseNode({
 
   const setProviderModel = useCallback(
     (provider: string | undefined, model: string | undefined) => {
+      if (isSubflowNode) {
+        const prev = data.pinDefaults || {};
+        const next: typeof prev = { ...prev };
+
+        if (!provider) delete next.provider;
+        else next.provider = provider;
+
+        if (!model) delete next.model;
+        else next.model = model;
+
+        updateNodeData(id, { pinDefaults: next });
+        return;
+      }
       if (isAgentNode) {
         const prev = data.agentConfig || {};
         updateNodeData(id, { agentConfig: { ...prev, provider: provider || undefined, model: model || undefined } });
@@ -800,7 +845,7 @@ export const BaseNode = memo(function BaseNode({
         updateNodeData(id, { providerModelsConfig: { ...prev, provider: provider || undefined, allowedModels: [] } });
       }
     },
-    [data.agentConfig, data.effectConfig, data.providerModelsConfig, id, isAgentNode, isLlmNode, isProviderModelsNode, updateNodeData]
+    [data.agentConfig, data.effectConfig, data.pinDefaults, data.providerModelsConfig, id, isAgentNode, isLlmNode, isProviderModelsNode, isSubflowNode, updateNodeData]
   );
 
   const setNodeTools = useCallback(
@@ -824,9 +869,21 @@ export const BaseNode = memo(function BaseNode({
 
       if (isToolsAllowlistNode) {
         updateNodeData(id, { literalValue: unique });
+        return;
+      }
+
+      if (isSubflowNode) {
+        const prev = data.pinDefaults || {};
+        const next: typeof prev = { ...prev };
+        if (unique.length > 0) {
+          next.tools = unique;
+        } else {
+          delete next.tools;
+        }
+        updateNodeData(id, { pinDefaults: next });
       }
     },
-    [data.agentConfig, data.effectConfig, id, isAgentNode, isLlmNode, isToolsAllowlistNode, updateNodeData]
+    [data.agentConfig, data.effectConfig, data.pinDefaults, id, isAgentNode, isLlmNode, isSubflowNode, isToolsAllowlistNode, updateNodeData]
   );
 
   const boolVarConfig = useMemo(() => {
@@ -883,7 +940,7 @@ export const BaseNode = memo(function BaseNode({
   );
 
   const setPinDefault = useCallback(
-    (pinId: string, value: string | number | boolean | undefined) => {
+    (pinId: string, value: JsonValue | undefined) => {
       const prev = data.pinDefaults || {};
       const next: typeof prev = { ...prev };
       if (value === undefined) {
@@ -1534,13 +1591,13 @@ export const BaseNode = memo(function BaseNode({
                 const isSubflowScopePin = isSubflowNode && pin.id === 'scope';
                 const isMemoryTagsModePin = isMemoryQueryNode && pin.id === 'tags_mode';
                 const isMemoryPlacementPin = isMemoryRehydrateNode && pin.id === 'placement';
-                const hasSpecialControl =
-                  (hasProviderDropdown && pin.id === 'provider') ||
-                  (hasModelControls && pin.id === 'model') ||
-                  ((isAgentNode || isLlmNode) && pin.id === 'tools') ||
-                  (isVarNode && pin.id === 'name') ||
-                  isCompareOpPin ||
-                  isStringifyJsonModePin ||
+	                const hasSpecialControl =
+	                  (hasProviderDropdown && pin.id === 'provider') ||
+	                  (hasModelControls && pin.id === 'model') ||
+	                  ((isAgentNode || isLlmNode || subflowHasToolsPin) && pin.id === 'tools') ||
+	                  (isVarNode && pin.id === 'name') ||
+	                  isCompareOpPin ||
+	                  isStringifyJsonModePin ||
                   isEmitEventName ||
                   isEmitEventScopePin ||
                   isOnEventScopePin ||
@@ -1928,10 +1985,10 @@ export const BaseNode = memo(function BaseNode({
                   );
                 }
 
-                if ((isAgentNode || isLlmNode) && pin.id === 'tools' && !toolsConnected) {
-                  controls.push(
-                    <AfMultiSelect
-                      key="tools"
+	                if ((isAgentNode || isLlmNode || subflowHasToolsPin) && pin.id === 'tools' && !toolsConnected) {
+	                  controls.push(
+	                    <AfMultiSelect
+	                      key="tools"
                       variant="pin"
                       values={selectedTools}
                       placeholder={toolsQuery.isLoading ? 'Loading…' : 'Select…'}
