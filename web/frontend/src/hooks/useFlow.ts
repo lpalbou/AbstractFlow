@@ -594,9 +594,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         const extras = existingInputs.filter((p) => !used.has(p.id) && !dropIds.has(p.id));
         data = { ...data, inputs: [...canonicalInputs, ...extras] };
 
-        // Canonical ordering for Agent output pins.
+        // Canonical ordering for Agent and LLM Call output pins.
         // Pins are addressable by id (edges), so reordering is safe.
-        if (data.nodeType === 'agent') {
+        if (data.nodeType === 'agent' || data.nodeType === 'llm_call') {
           const existingOutputs = Array.isArray(data.outputs) ? data.outputs : [];
           const byOutId = new Map(existingOutputs.map((p) => [p.id, p] as const));
           const usedOut = new Set<string>();
@@ -610,13 +610,22 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           };
 
           const execOut = wantOut({ id: 'exec-out', label: '', type: 'execution' });
-          const canonicalOutputs: Pin[] = [
-            execOut,
-            wantOut({ id: 'response', label: 'response', type: 'string' }),
-            wantOut({ id: 'meta', label: 'meta', type: 'object' }),
-            wantOut({ id: 'scratchpad', label: 'scratchpad', type: 'object' }),
-            wantOut({ id: 'result', label: 'result', type: 'object' }),
-          ];
+          const canonicalOutputs: Pin[] =
+            data.nodeType === 'llm_call'
+              ? [
+                  execOut,
+                  wantOut({ id: 'response', label: 'response', type: 'string' }),
+                  wantOut({ id: 'success', label: 'success', type: 'boolean' }),
+                  wantOut({ id: 'meta', label: 'meta', type: 'object' }),
+                  wantOut({ id: 'tool_calls', label: 'tool_calls', type: 'array' }),
+                ]
+              : [
+                  execOut,
+                  wantOut({ id: 'response', label: 'response', type: 'string' }),
+                  wantOut({ id: 'success', label: 'success', type: 'boolean' }),
+                  wantOut({ id: 'meta', label: 'meta', type: 'object' }),
+                  wantOut({ id: 'scratchpad', label: 'scratchpad', type: 'object' }),
+                ];
 
           const extraOutputs = existingOutputs.filter((p) => !usedOut.has(p.id));
           data = { ...data, outputs: [...canonicalOutputs, ...extraOutputs] };

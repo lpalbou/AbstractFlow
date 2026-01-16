@@ -104,7 +104,7 @@ def test_ws_answer_user_emits_message_and_continues() -> None:
 
                 assert completed is not None
                 assert completed["result"]["success"] is True
-                assert completed["result"]["result"]["final"] == "Hello from flow"
+                assert completed["result"]["final"] == "Hello from flow"
 
                 answer_complete = next(
                     (m for m in messages if m.get("type") == "node_complete" and m.get("nodeId") == "n2"),
@@ -114,4 +114,3 @@ def test_ws_answer_user_emits_message_and_continues() -> None:
                 assert answer_complete.get("result", {}).get("message") == "Hello from flow"
     finally:
         _flows.pop(flow_id, None)
-

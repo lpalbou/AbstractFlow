@@ -105,7 +105,7 @@ def test_visual_llm_call_tools_pin_overrides_config_even_when_empty_list() -> No
     assert payload.get("tools") == []
 
 
-def test_visual_llm_call_node_outputs_include_result_object_after_effect_completion() -> None:
+def test_visual_llm_call_node_outputs_expose_response_meta_and_tool_calls_after_effect_completion() -> None:
     visual = _build_minimal_visual_llm_flow(tools_pin_value=None, config_tools=None)
     flow = visual_to_flow(visual)
 
@@ -133,8 +133,18 @@ def test_visual_llm_call_node_outputs_include_result_object_after_effect_complet
     assert isinstance(out, dict)
     assert out.get("response") == "pong"
     assert out.get("tool_calls") == raw_result.get("tool_calls")
-    assert out.get("result") == raw_result
-    assert out.get("gen_time") == 12.3
-    assert out.get("ttft_ms") == 4.5
-    assert out.get("raw") == raw_result
+    assert out.get("success") is True
+    assert "result" not in out
+    assert "raw" not in out
+    assert "gen_time" not in out
+    assert "ttft_ms" not in out
 
+    meta = out.get("meta")
+    assert isinstance(meta, dict)
+    assert meta.get("schema") == "abstractflow.llm_call.v1.meta"
+    assert meta.get("version") == 1
+    assert meta.get("output_mode") == "unstructured"
+    assert meta.get("tool_calls") == 1
+    assert meta.get("gen_time") == 12.3
+    assert meta.get("ttft_ms") == 4.5
+    assert meta.get("trace") == {"trace_id": "trace-1"}

@@ -149,7 +149,12 @@ def test_visual_agent_exposes_runtime_backed_scratchpad_output() -> None:
 
     node_output = flow._node_outputs.get("agent1")
     assert isinstance(node_output, dict)
-    assert "result" in node_output
+    assert "result" not in node_output
+    assert node_output.get("success") is True
+    meta = node_output.get("meta")
+    assert isinstance(meta, dict)
+    assert meta.get("schema") == "abstractcode.agent.v1.meta"
+    assert "success" not in meta
     scratchpad = node_output.get("scratchpad")
     assert isinstance(scratchpad, dict)
     messages = scratchpad.get("messages")

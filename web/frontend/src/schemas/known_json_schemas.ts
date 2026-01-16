@@ -13,6 +13,7 @@ export type JsonSchema = {
 
 const TRACE_SCHEMA: JsonSchema = {
   type: 'object',
+  title: 'Trace',
   description: 'Lightweight trace identifiers for correlating UI/ledger with provider logs.',
   properties: {
     trace_id: {
@@ -25,6 +26,7 @@ const TRACE_SCHEMA: JsonSchema = {
 
 const USAGE_SCHEMA: JsonSchema = {
   type: 'object',
+  title: 'Usage',
   description: 'Token usage counters (provider-dependent; fields may be missing).',
   properties: {
     input_tokens: { type: 'number', description: 'Input tokens used (best-effort).' },
@@ -38,6 +40,7 @@ const USAGE_SCHEMA: JsonSchema = {
 
 const MESSAGE_SCHEMA: JsonSchema = {
   type: 'object',
+  title: 'Message',
   description: 'Canonical chat message (role + content) used by context/agents/LLM calls.',
   properties: {
     role: {
@@ -76,6 +79,7 @@ export const CONTEXT_SCHEMA: JsonSchema = {
 
 const TOOL_CALL_SCHEMA: JsonSchema = {
   type: 'object',
+  title: 'Tool Call',
   description: 'Single tool call request: tool name + JSON-safe arguments.',
   properties: {
     call_id: { type: 'string', description: 'Optional stable id for matching results (call_id).' },
@@ -87,6 +91,7 @@ const TOOL_CALL_SCHEMA: JsonSchema = {
 
 const TOOL_RESULT_SCHEMA: JsonSchema = {
   type: 'object',
+  title: 'Tool Result',
   description: 'Single tool execution result (matched to a tool call by call_id).',
   properties: {
     call_id: { type: 'string', description: 'Tool call id this result corresponds to (call_id).' },
@@ -114,9 +119,14 @@ export const AGENT_META_SCHEMA: JsonSchema = {
     schema: {
       type: 'string',
       description:
-        'Schema identifier for this meta envelope (e.g. abstractcode.agent.v1.meta). Not the structured output schema.',
+        'Envelope type identifier for this meta object (so clients know which fields to expect). Useful for compatibility checks/migrations. Example: `abstractcode.agent.v1.meta`.',
     },
     version: { type: 'number', description: 'Schema version (currently 1).' },
+    output_mode: {
+      type: 'string',
+      description: 'Agent output mode: unstructured (default) or structured (when a response schema is used).',
+      enum: ['unstructured', 'structured'],
+    },
     provider: { type: 'string', description: 'Provider id/name (e.g. lmstudio).' },
     model: { type: 'string', description: 'Model id/name.' },
     sub_run_id: { type: 'string', description: 'ReAct sub-run id used to execute this Agent node.' },
@@ -141,6 +151,12 @@ export const AGENT_SCRATCHPAD_SCHEMA: JsonSchema = {
   properties: {
     sub_run_id: { type: 'string', description: 'ReAct sub-run id.' },
     workflow_id: { type: 'string', description: 'Workflow id used for the ReAct subworkflow (implementation detail).' },
+    task: { type: 'string', description: 'Agent task/prompt string for this run.' },
+    context_extra: {
+      type: 'object',
+      description: 'Additional context fields passed into the agent (excluding task/messages).',
+      additionalProperties: true,
+    },
     messages: {
       type: 'array',
       description: 'Agent-internal message transcript for this run (subworkflow context.messages).',
@@ -165,18 +181,45 @@ export const AGENT_SCRATCHPAD_SCHEMA: JsonSchema = {
 
 export const AGENT_RESULT_SCHEMA: JsonSchema = {
   type: 'object',
-  title: 'Agent Result (Unstructured)',
-  description: 'Default Agent result payload (when structured output is disabled).',
+  title: 'Agent Result',
+  description:
+    'Agent `result` output. In unstructured mode this is a minimal object (e.g. `{success:true}`). In structured-output mode this is the JSON object produced by the response schema.',
   properties: {
-    result: { type: 'string', description: 'Final answer string.' },
-    task: { type: 'string', description: 'Task/prompt given to the agent.' },
-    context: CONTEXT_SCHEMA,
     success: { type: 'boolean', description: 'True if the agent completed successfully.' },
-    provider: { type: 'string', description: 'Resolved provider.' },
-    model: { type: 'string', description: 'Resolved model.' },
-    iterations: { type: 'number', description: 'Internal iteration count (best-effort).' },
-    sub_run_id: { type: 'string', description: 'ReAct sub-run id.' },
+  },
+  additionalProperties: true,
+};
+
+export const LLM_META_SCHEMA: JsonSchema = {
+  type: 'object',
+  title: 'LLM Meta',
+  description: 'Host-facing meta envelope for a single LLM Call node (small, stable fields).',
+  properties: {
+    schema: {
+      type: 'string',
+      description:
+        'Envelope type identifier for this meta object (so clients know which fields to expect). Useful for compatibility checks/migrations. Example: `abstractflow.llm_call.v1.meta`.',
+    },
+    version: { type: 'number', description: 'Schema version (currently 1).' },
+    output_mode: {
+      type: 'string',
+      description: 'LLM output mode: unstructured (default) or structured (when a response schema is used).',
+      enum: ['unstructured', 'structured'],
+    },
+    provider: { type: 'string', description: 'Provider id/name (e.g. lmstudio).' },
+    model: { type: 'string', description: 'Model id/name.' },
+    finish_reason: { type: 'string', description: 'Finish reason (e.g. stop, length, tool_calls).' },
+    tool_calls: { type: 'number', description: 'Count of requested tool calls.' },
     usage: USAGE_SCHEMA,
+    trace: TRACE_SCHEMA,
+    gen_time: { type: 'number', description: 'Generation time (best-effort, provider-dependent).' },
+    ttft_ms: { type: 'number', description: 'Time to first token in milliseconds (best-effort, provider-dependent).' },
+    warnings: { type: 'array', description: 'Optional warnings list (strings).', items: { type: 'string' } },
+    debug: {
+      type: 'object',
+      description: 'Optional debug payload (host-facing). Prefer small, stable keys.',
+      additionalProperties: true,
+    },
   },
   additionalProperties: true,
 };
@@ -223,4 +266,3 @@ export const EVENT_ENVELOPE_SCHEMA: JsonSchema = {
   },
   additionalProperties: true,
 };
-

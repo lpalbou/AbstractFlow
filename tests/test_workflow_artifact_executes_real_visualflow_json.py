@@ -41,8 +41,7 @@ def test_visualflow_compiler_executes_real_visualflow_json_without_abstractflow_
 
     assert run.status == "completed"
     assert isinstance(run.output, dict)
-    result = run.output.get("result")
-    assert isinstance(result, dict)
-    assert result.get("enriched_request") == "enriched"
-    assert result.get("tasks") == ["t1", "t2"]
-
+    assert run.output.get("success") is True
+    assert "result" not in run.output
+    assert run.output.get("enriched_request") == "enriched"
+    assert run.output.get("tasks") == ["t1", "t2"]

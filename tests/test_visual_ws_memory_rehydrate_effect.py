@@ -190,7 +190,7 @@ def test_ws_memory_query_meta_then_rehydrate_inserts_messages(monkeypatch) -> No
 
                 assert completed is not None
                 assert completed["result"]["success"] is True
-                output = completed["result"]["result"]
+                output = completed["result"]
                 assert isinstance(output, dict)
 
                 # We should see the original system message + the rehydrated span messages.
@@ -200,5 +200,4 @@ def test_ws_memory_query_meta_then_rehydrate_inserts_messages(monkeypatch) -> No
                 assert msgs[1:3] == ["u1", "a1"]
     finally:
         _flows.pop(flow_id, None)
-
 

@@ -128,7 +128,7 @@ def test_ws_memory_note_and_query_work_with_in_memory_artifacts() -> None:
 
                 assert completed is not None
                 assert completed["result"]["success"] is True
-                output = completed["result"]["result"]
+                output = completed["result"]
                 assert isinstance(output, dict)
                 assert isinstance(output.get("note_id"), str)
                 assert output["note_id"]
@@ -137,4 +137,3 @@ def test_ws_memory_note_and_query_work_with_in_memory_artifacts() -> None:
                 assert output.get("has_memory_in_context") is True
     finally:
         _flows.pop(flow_id, None)
-

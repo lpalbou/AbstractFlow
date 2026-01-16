@@ -236,7 +236,7 @@ const CORE_NODES: NodeTemplate[] = [
     type: 'agent',
     icon: '&#x1F916;', // Robot
     label: 'Agent',
-    description: 'Run an agent (ReAct) that can call tools. Outputs a structured result and scratchpad.',
+    description: 'Run an agent (ReAct) that can call tools. Outputs response, success, meta, and a runtime scratchpad.',
     headerColor: '#4488FF',
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
@@ -272,9 +272,14 @@ const CORE_NODES: NodeTemplate[] = [
         label: 'response',
         type: 'string',
         description:
-          'Best-effort final answer string (convenience pin). In structured-output mode, this reflects the unstructured answer prior to the schema post-pass.',
+          'Final response string. In structured-output mode (when structured_output is enabled), this is a JSON string matching the response schema.',
       },
-      { id: 'result', label: 'result', type: 'object', description: 'Structured final agent result (answer or structured output object).' },
+      {
+        id: 'success',
+        label: 'success',
+        type: 'boolean',
+        description: 'True if the Agent node completed successfully.',
+      },
       {
         id: 'meta',
         label: 'meta',
@@ -326,14 +331,21 @@ const CORE_NODES: NodeTemplate[] = [
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
       { id: 'response', label: 'response', type: 'string', description: 'Assistant text content (best-effort). For tool calls, content may be empty.' },
+      { id: 'success', label: 'success', type: 'boolean', description: 'True if the LLM call completed successfully.' },
+      {
+        id: 'meta',
+        label: 'meta',
+        type: 'object',
+        description:
+          'Host-facing meta envelope (schema=abstractflow.llm_call.v1.meta). Includes provider/model, usage, trace ids, and lightweight execution metadata.',
+      },
       {
         id: 'tool_calls',
         label: 'tool_calls',
         type: 'array',
         description:
-          'Normalized tool call requests (same as result.tool_calls). This pin exists to make wiring into Tool Calls / Emit Event nodes simpler.',
+          'Normalized tool call requests. This pin exists to make wiring into Tool Calls / Emit Event nodes simpler.',
       },
-      { id: 'result', label: 'result', type: 'object', description: 'Full normalized LLM result (content, tool_calls, usage, provider/model metadata, trace_id).' },
     ],
     category: 'core',
   },
@@ -350,7 +362,7 @@ const CORE_NODES: NodeTemplate[] = [
         label: 'tool_calls',
         type: 'array',
         description:
-          'List of tool call requests. Each entry shape: {name, arguments, call_id?}. Often comes from LLM Call.result.tool_calls.',
+          'List of tool call requests. Each entry shape: {name, arguments, call_id?}. Often comes from LLM Call.tool_calls.',
       },
       {
         id: 'allowed_tools',
@@ -736,7 +748,7 @@ const DATA_NODES: NodeTemplate[] = [
     label: 'Break Object',
     description: 'Expose selected fields of an object as individual output pins (configured paths).',
     headerColor: '#3498DB',
-    inputs: [{ id: 'object', label: 'object', type: 'object' }],
+    inputs: [{ id: 'object', label: 'object', type: 'object', description: 'Input object to decompose into selected output fields.' }],
     outputs: [], // Dynamic pins based on selected paths
     category: 'data',
   },

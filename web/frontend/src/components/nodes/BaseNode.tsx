@@ -23,6 +23,16 @@ import AfMultiSelect from '../inputs/AfMultiSelect';
 import { getNodeTemplate } from '../../types/nodes';
 import { AfTooltip } from '../AfTooltip';
 import { CodeEditorModal } from '../CodeEditorModal';
+import {
+  AGENT_META_SCHEMA,
+  AGENT_RESULT_SCHEMA,
+  AGENT_SCRATCHPAD_SCHEMA,
+  CONTEXT_SCHEMA,
+  EVENT_ENVELOPE_SCHEMA,
+  LLM_META_SCHEMA,
+  LLM_RESULT_SCHEMA,
+  type JsonSchema,
+} from '../../schemas/known_json_schemas';
 
 const OnEventNameInline = memo(function OnEventNameInline({
   nodeId,
@@ -539,6 +549,97 @@ export const BaseNode = memo(function BaseNode({
     disconnectPin(id, pinId, isInput);
   };
 
+  const getSchemaByPath = useCallback((schema: JsonSchema, path: string): JsonSchema | undefined => {
+    if (!path) return undefined;
+    const parts = path.split('.');
+    let cur: JsonSchema | undefined = schema;
+
+    for (const part of parts) {
+      if (!cur || typeof cur !== 'object') return undefined;
+      const type = cur.type;
+
+      if (type === 'object') {
+        const properties: Record<string, JsonSchema> | undefined = cur.properties;
+        if (!properties) return undefined;
+        cur = properties[part];
+        continue;
+      }
+
+      if (type === 'array') {
+        if (!/^\d+$/.test(part)) return undefined;
+        cur = cur.items;
+        continue;
+      }
+
+      return undefined;
+    }
+
+    return cur;
+  }, []);
+
+  const schemaTooltipForPath = useCallback(
+    (schema: JsonSchema, path: string): string => {
+      const leaf = getSchemaByPath(schema, path);
+      if (!leaf) return '';
+
+      const type = typeof leaf.type === 'string' ? leaf.type.trim() : '';
+      const format = typeof leaf.format === 'string' ? leaf.format.trim() : '';
+      const title = typeof leaf.title === 'string' ? leaf.title.trim() : '';
+      const desc = typeof leaf.description === 'string' ? leaf.description.trim() : '';
+
+      let typeLabel = type;
+      if (type === 'array') {
+        const itemTitle =
+          leaf.items && typeof leaf.items === 'object' && typeof leaf.items.title === 'string' ? String(leaf.items.title) : '';
+        const itemType =
+          leaf.items && typeof leaf.items === 'object' && typeof leaf.items.type === 'string' ? String(leaf.items.type) : '';
+        const inner = (itemTitle || itemType || '').trim();
+        typeLabel = inner ? `array<${inner}>` : 'array';
+      } else if (type === 'object' && title) {
+        typeLabel = `object (${title})`;
+      }
+
+      const lines: string[] = [];
+      lines.push(path);
+      if (typeLabel) lines.push(`Type: ${typeLabel}${format ? ` (${format})` : ''}`);
+      if (desc) lines.push(desc);
+      return lines.join('\n');
+    },
+    [getSchemaByPath]
+  );
+
+  const breakObjectSchema = useMemo((): JsonSchema | null => {
+    if (data.nodeType !== 'break_object') return null;
+    const inputEdge = edges.find((e) => e.target === id && e.targetHandle === 'object');
+    if (!inputEdge) return null;
+    const sourceHandle = typeof inputEdge.sourceHandle === 'string' ? inputEdge.sourceHandle : '';
+    const sourceNode = allNodes.find((n) => n.id === inputEdge.source);
+    if (!sourceNode) return null;
+
+    if (sourceHandle === 'context') return CONTEXT_SCHEMA;
+
+    const nodeType = sourceNode.data?.nodeType;
+    if (nodeType === 'make_meta') return AGENT_META_SCHEMA;
+    if (nodeType === 'make_scratchpad') return AGENT_SCRATCHPAD_SCHEMA;
+    if (nodeType === 'make_raw_result') return LLM_RESULT_SCHEMA;
+    if (nodeType === 'on_event' && sourceHandle === 'event') return EVENT_ENVELOPE_SCHEMA;
+	    if (nodeType === 'agent') {
+	      if (sourceHandle === 'scratchpad') return AGENT_SCRATCHPAD_SCHEMA;
+	      if (sourceHandle === 'meta') return AGENT_META_SCHEMA;
+	      const outputSchema = sourceNode.data?.agentConfig?.outputSchema;
+	      if (outputSchema?.enabled && outputSchema.jsonSchema && typeof outputSchema.jsonSchema === 'object') {
+	        return outputSchema.jsonSchema as JsonSchema;
+	      }
+	      return AGENT_RESULT_SCHEMA;
+	    }
+	    if (nodeType === 'llm_call') {
+	      if (sourceHandle === 'meta') return LLM_META_SCHEMA;
+	      return LLM_RESULT_SCHEMA;
+	    }
+
+    return null;
+  }, [allNodes, data.nodeType, edges, id]);
+
   // Separate execution pins from data pins
   const inputExec = isTriggerNode ? undefined : data.inputs.find((p) => p.type === 'execution');
   const outputExecs = data.outputs.filter((p) => p.type === 'execution');
@@ -551,14 +652,26 @@ export const BaseNode = memo(function BaseNode({
     }
     return true;
   });
-  const outputData = data.outputs.filter((p) => {
-    if (p.type === 'execution') return false;
-    // Keep legacy Agent pins hidden unless explicitly wired (cleaner UI without breaking old flows).
-    if (data.nodeType === 'agent' && (p.id === 'tool_calls' || p.id === 'tool_results') && !isPinConnected(p.id, false)) {
-      return false;
-    }
-    return true;
-  });
+	  const outputData = data.outputs.filter((p) => {
+	    if (p.type === 'execution') return false;
+	    // Keep legacy Agent pins hidden unless explicitly wired (cleaner UI without breaking old flows).
+	    if (
+	      data.nodeType === 'agent' &&
+	      (p.id === 'tool_calls' || p.id === 'tool_results' || p.id === 'result') &&
+	      !isPinConnected(p.id, false)
+	    ) {
+	      return false;
+	    }
+	    // Keep legacy LLM Call pins hidden unless explicitly wired.
+	    if (
+	      data.nodeType === 'llm_call' &&
+	      (p.id === 'result' || p.id === 'raw' || p.id === 'gen_time' || p.id === 'ttft_ms') &&
+	      !isPinConnected(p.id, false)
+	    ) {
+	      return false;
+	    }
+	    return true;
+	  });
 
   const codeParams = useMemo(() => data.inputs.filter((p) => p.type !== 'execution'), [data.inputs]);
   const currentCodeBody = useMemo(() => {
@@ -1547,26 +1660,28 @@ export const BaseNode = memo(function BaseNode({
           {inputData.map((pin) => (
             <Fragment key={pin.id}>
               <div className="pin-row input">
-                <AfTooltip content={pin.description} delayMs={2000} priority={2}>
-                  <span
-                    className="pin-shape"
-                    style={{ color: PIN_COLORS[pin.type] }}
-                    onClick={(e) => handlePinClick(e, pin.id, true)}
-                    onMouseDownCapture={(e) => handlePinClick(e, pin.id, true)}
-                  >
-                    <PinShape type={pin.type} size={10} filled={isPinConnected(pin.id, true)} />
-                    <Handle
-                      type="target"
-                      position={Position.Left}
-                      id={pin.id}
-                      className={`pin ${pin.type}`}
-                      style={overlayHandleStyle}
-                      onMouseDownCapture={(e) => handlePinClick(e, pin.id, true)}
+                <AfTooltip content={pin.description} delayMs={700} priority={2}>
+                  <span className="pin-hit">
+                    <span
+                      className="pin-shape"
+                      style={{ color: PIN_COLORS[pin.type] }}
                       onClick={(e) => handlePinClick(e, pin.id, true)}
-                    />
+                      onMouseDownCapture={(e) => handlePinClick(e, pin.id, true)}
+                    >
+                      <PinShape type={pin.type} size={10} filled={isPinConnected(pin.id, true)} />
+                      <Handle
+                        type="target"
+                        position={Position.Left}
+                        id={pin.id}
+                        className={`pin ${pin.type}`}
+                        style={overlayHandleStyle}
+                        onMouseDownCapture={(e) => handlePinClick(e, pin.id, true)}
+                        onClick={(e) => handlePinClick(e, pin.id, true)}
+                      />
+                    </span>
+                    <span className="pin-label">{pin.label}</span>
                   </span>
                 </AfTooltip>
-                <span className="pin-label">{pin.label}</span>
                 {(() => {
                   const connected = isPinConnected(pin.id, true);
                   const controls: ReactNode[] = [];
@@ -2081,28 +2196,37 @@ export const BaseNode = memo(function BaseNode({
         <div className="pins-right">
           {(isToolParametersNode ? outputData.filter((p) => p.id === 'tool_call') : outputData).map((pin) => (
             <div key={pin.id} className="pin-row output">
-              <span className="pin-label">{pin.label}</span>
-              <AfTooltip content={pin.description} delayMs={2000} priority={2}>
-                <span
-                  className="pin-shape"
-                  style={{ color: PIN_COLORS[pin.type] }}
-                  onClick={(e) => handlePinClick(e, pin.id, false)}
-                >
-                  <PinShape
-                    type={pin.type}
-                    size={10}
-                    filled={isPinConnected(pin.id, false)}
-                  />
-                  <Handle
-                    type="source"
-                    position={Position.Right}
-                    id={pin.id}
-                    className={`pin ${pin.type}`}
-                    style={overlayHandleStyle}
-                    onClick={(e) => handlePinClick(e, pin.id, false)}
-                  />
-                </span>
-              </AfTooltip>
+              {(() => {
+                const tooltip =
+                  pin.description ||
+                  (data.nodeType === 'break_object' && breakObjectSchema ? schemaTooltipForPath(breakObjectSchema, pin.id) : '');
+                return (
+                  <AfTooltip content={tooltip} delayMs={700} priority={2}>
+                    <span className="pin-hit">
+                      <span className="pin-label">{pin.label}</span>
+                      <span
+                        className="pin-shape"
+                        style={{ color: PIN_COLORS[pin.type] }}
+                        onClick={(e) => handlePinClick(e, pin.id, false)}
+                      >
+                        <PinShape
+                          type={pin.type}
+                          size={10}
+                          filled={isPinConnected(pin.id, false)}
+                        />
+                        <Handle
+                          type="source"
+                          position={Position.Right}
+                          id={pin.id}
+                          className={`pin ${pin.type}`}
+                          style={overlayHandleStyle}
+                          onClick={(e) => handlePinClick(e, pin.id, false)}
+                        />
+                      </span>
+                    </span>
+                  </AfTooltip>
+                );
+              })()}
             </div>
           ))}
         </div>

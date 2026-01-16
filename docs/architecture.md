@@ -112,8 +112,11 @@ This wires:
 - `EffectType.TOOL_CALLS` via a host-configured `ToolExecutor` (typically `MappingToolExecutor.from_tools(...)`)
 
 Visual node outputs are designed to be easy to wire:
-- **LLM Call** exposes both `result` (full normalized object) and a convenience `tool_calls` output (so you can connect directly into **Tool Calls** or event nodes).
-- **Agent** exposes `response`, `meta`, `scratchpad`, and `result`.
+- **LLM Call** exposes `response`, `success`, `meta`, and a convenience `tool_calls` output (so you can connect directly into **Tool Calls** or event nodes).
+  - In structured-output mode, `response` is a JSON string of the structured object (matching the schema).
+  - Older saved flows may still have legacy pins (e.g. `result`); new nodes do not generate them.
+- **Agent** exposes `response`, `success`, `meta`, and `scratchpad`.
+  - In structured-output mode, `response` is a JSON string of the structured object (matching the schema).
   - `scratchpad` is runtime-owned observability data and includes:
     - `messages`: the agent’s internal message transcript/history for this run
     - `node_traces`: the structured per-node trace produced by the ReAct subworkflow

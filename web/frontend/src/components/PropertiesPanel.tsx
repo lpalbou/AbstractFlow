@@ -28,6 +28,7 @@ import {
   AGENT_SCRATCHPAD_SCHEMA,
   CONTEXT_SCHEMA,
   EVENT_ENVELOPE_SCHEMA,
+  LLM_META_SCHEMA,
   LLM_RESULT_SCHEMA,
 } from '../schemas/known_json_schemas';
 
@@ -1493,23 +1494,23 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 	                // Minimal, still useful: exposes the stable `{ value }` wrapper field.
 	                sample = { value: inferred ?? '' };
 	              }
-	            } else if (sourceNode?.data.nodeType === 'agent') {
-	              if (sourceHandle === 'scratchpad') {
-	                schema = AGENT_SCRATCHPAD_SCHEMA;
-	              } else if (sourceHandle === 'meta') {
-	                schema = AGENT_META_SCHEMA;
-	              } else {
-	                // Default: assume the Agent `result` output.
-	                const outputSchema = sourceNode.data.agentConfig?.outputSchema;
-	                if (outputSchema?.enabled && outputSchema.jsonSchema && typeof outputSchema.jsonSchema === 'object') {
-	                  schema = outputSchema.jsonSchema;
-	                } else {
-	                  schema = AGENT_RESULT_SCHEMA;
-	                }
-	              }
-	            } else if (sourceNode?.data.nodeType === 'llm_call') {
-	              schema = LLM_RESULT_SCHEMA;
-	            }
+		            } else if (sourceNode?.data.nodeType === 'agent') {
+		              if (sourceHandle === 'scratchpad') {
+		                schema = AGENT_SCRATCHPAD_SCHEMA;
+		              } else if (sourceHandle === 'meta') {
+		                schema = AGENT_META_SCHEMA;
+		              } else {
+		                // Legacy: assume the Agent `result` output (deprecated pin).
+		                const outputSchema = sourceNode.data.agentConfig?.outputSchema;
+		                if (outputSchema?.enabled && outputSchema.jsonSchema && typeof outputSchema.jsonSchema === 'object') {
+		                  schema = outputSchema.jsonSchema;
+		                } else {
+		                  schema = AGENT_RESULT_SCHEMA;
+		                }
+		              }
+		            } else if (sourceNode?.data.nodeType === 'llm_call') {
+		              schema = sourceHandle === 'meta' ? LLM_META_SCHEMA : LLM_RESULT_SCHEMA;
+		            }
 
             const available = schema
               ? flattenSchemaPaths(schema).sort()
@@ -1614,6 +1615,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 	              const s = leaf as Record<string, unknown>;
 	              const t = typeof s.type === 'string' ? s.type.trim() : '';
 	              const fmt = typeof s.format === 'string' ? s.format.trim() : '';
+	              const title = typeof s.title === 'string' ? s.title.trim() : '';
 	              const desc = typeof s.description === 'string' ? s.description.trim() : '';
 	              const enumVals = Array.isArray(s.enum)
 	                ? s.enum
@@ -1625,9 +1627,14 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 	              let typeLabel = t;
 	              if (t === 'array') {
 	                const items = (s as any).items;
+	                const itemTitle =
+	                  items && typeof items === 'object' && typeof (items as any).title === 'string' ? String((items as any).title) : '';
 	                const itemType =
 	                  items && typeof items === 'object' && typeof (items as any).type === 'string' ? String((items as any).type) : '';
-	                typeLabel = itemType ? `array<${itemType}>` : 'array';
+	                const inner = (itemTitle || itemType || '').trim();
+	                typeLabel = inner ? `array<${inner}>` : 'array';
+	              } else if (t === 'object' && title) {
+	                typeLabel = `object (${title})`;
 	              }
 
 	              const lines: string[] = [];
@@ -2344,17 +2351,17 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                   </div>
                 )}
 
-                <span className="property-hint">
-                  When enabled, the Agent&apos;s <code>result</code> output is a JSON object matching this schema.
-                </span>
+	                <span className="property-hint">
+	                  When enabled, the Agent&apos;s <code>response</code> output is a JSON string matching this schema.
+	                </span>
               </>
             )}
 
-            {!agentSchemaEnabled && (
-              <span className="property-hint">
-                Disabled: the Agent returns a free-form result object (still on the <code>result</code> pin).
-              </span>
-            )}
+	            {!agentSchemaEnabled && (
+	              <span className="property-hint">
+	                Disabled: the Agent returns a free-form response string.
+	              </span>
+	            )}
           </div>
         </div>
       )}

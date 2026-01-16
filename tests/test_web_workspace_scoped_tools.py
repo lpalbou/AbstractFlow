@@ -49,3 +49,60 @@ def test_workspace_scoped_tool_executor_rewrites_relative_paths_and_blocks_escap
     assert not (tmp_path / "oops.txt").exists()
 
 
+def test_workspace_scoped_tool_executor_allows_absolute_paths_when_all_except_ignored(tmp_path: Path) -> None:
+    scope = WorkspaceScope.from_input_data(
+        {"workspace_root": "proj", "workspace_access_mode": "all_except_ignored"},
+        base_dir=tmp_path,
+    )
+    assert scope is not None
+
+    from abstractcore.tools.common_tools import write_file
+    from abstractruntime.integrations.abstractcore.tool_executor import MappingToolExecutor
+
+    delegate = MappingToolExecutor.from_tools([write_file])
+    executor = WorkspaceScopedToolExecutor(scope=scope, delegate=delegate)
+
+    outside = tmp_path / "outside.txt"
+    ok = executor.execute(
+        tool_calls=[
+            {
+                "name": "write_file",
+                "call_id": "1",
+                "arguments": {"file_path": str(outside), "content": "hi"},
+            }
+        ]
+    )
+    assert ok.get("mode") == "executed"
+    assert isinstance(ok.get("results"), list) and ok["results"]
+    assert ok["results"][0]["success"] is True
+    assert outside.read_text(encoding="utf-8") == "hi"
+
+
+def test_workspace_scoped_tool_executor_blocks_ignored_paths(tmp_path: Path) -> None:
+    scope = WorkspaceScope.from_input_data(
+        {"workspace_root": "proj", "workspace_ignored_paths": ["blocked"]},
+        base_dir=tmp_path,
+    )
+    assert scope is not None
+
+    from abstractcore.tools.common_tools import write_file
+    from abstractruntime.integrations.abstractcore.tool_executor import MappingToolExecutor
+
+    delegate = MappingToolExecutor.from_tools([write_file])
+    executor = WorkspaceScopedToolExecutor(scope=scope, delegate=delegate)
+
+    blocked = executor.execute(
+        tool_calls=[
+            {
+                "name": "write_file",
+                "call_id": "1",
+                "arguments": {"file_path": "blocked/hello.txt", "content": "hi"},
+            }
+        ]
+    )
+    assert blocked.get("mode") == "executed"
+    assert isinstance(blocked.get("results"), list) and blocked["results"]
+    assert blocked["results"][0]["success"] is False
+    assert "workspace_ignored_paths" in str(blocked["results"][0].get("error") or "")
+    assert not (tmp_path / "proj" / "blocked" / "hello.txt").exists()
+

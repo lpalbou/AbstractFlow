@@ -307,6 +307,8 @@ export function RunFlowModal({
   const [workspaceRandom, setWorkspaceRandom] = useState(true);
   const [workspaceRoot, setWorkspaceRoot] = useState('');
   const [manualWorkspaceRoot, setManualWorkspaceRoot] = useState('');
+  const [workspaceAccessMode, setWorkspaceAccessMode] = useState<'workspace_only' | 'all_except_ignored'>('workspace_only');
+  const [workspaceIgnoredPathsText, setWorkspaceIgnoredPathsText] = useState('');
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [rawJsonOpen, setRawJsonOpen] = useState(true);
   // Nested subflow observability: folded by default; per-step expansion keyed by the
@@ -500,9 +502,17 @@ export function RunFlowModal({
     if (workspaceValue) {
       inputData.workspace_root = workspaceValue;
     }
+    inputData.workspace_access_mode = workspaceAccessMode;
+    const ignored = String(workspaceIgnoredPathsText || '')
+      .split('\n')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    if (ignored.length > 0) {
+      inputData.workspace_ignored_paths = ignored;
+    }
 
     onRun(inputData);
-  }, [formInputPins, formValues, onRun, toolsValues, workspaceRoot]);
+  }, [formInputPins, formValues, onRun, toolsValues, workspaceAccessMode, workspaceIgnoredPathsText, workspaceRoot]);
 
   type StepStatus = 'running' | 'completed' | 'waiting' | 'failed';
   type Step = {
@@ -2906,6 +2916,47 @@ export function RunFlowModal({
                       {executionWorkspaceQuery.isError ? (
                         <p className="run-form-note">Could not fetch defaults; the server will generate a folder on Run.</p>
                       ) : null}
+                    </div>
+
+                    <div className="run-form-field">
+                      <label className="run-form-label">
+                        Filesystem access
+                        <span className="run-form-type">(workspace_access_mode)</span>
+                      </label>
+                      <AfSelect
+                        value={workspaceAccessMode}
+                        placeholder="workspace_only"
+                        options={[
+                          { value: 'workspace_only', label: 'workspace_only (restrict to workspace_root)' },
+                          { value: 'all_except_ignored', label: 'all_except_ignored (allow absolute paths outside workspace_root)' },
+                        ]}
+                        searchable={false}
+                        disabled={isRunning}
+                        onChange={(v) =>
+                          setWorkspaceAccessMode(v === 'all_except_ignored' ? 'all_except_ignored' : 'workspace_only')
+                        }
+                      />
+                      <p className="run-form-note">
+                        Relative paths still resolve under <code>workspace_root</code>. This only affects absolute paths.
+                      </p>
+                    </div>
+
+                    <div className="run-form-field">
+                      <label className="run-form-label">
+                        Ignored folders (denylist)
+                        <span className="run-form-type">(workspace_ignored_paths)</span>
+                      </label>
+                      <textarea
+                        className="run-form-input run-form-textarea"
+                        value={workspaceIgnoredPathsText}
+                        onChange={(e) => setWorkspaceIgnoredPathsText(e.target.value)}
+                        placeholder={'.git\nnode_modules\n.venv\n~/Library\n/Users/albou/.ssh'}
+                        rows={5}
+                        disabled={isRunning}
+                      />
+                      <p className="run-form-note">
+                        One path per line. Relative entries are resolved under <code>workspace_root</code>.
+                      </p>
                     </div>
 
                     {formInputPins.length === 0 ? (

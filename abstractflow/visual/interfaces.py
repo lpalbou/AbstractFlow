@@ -81,10 +81,10 @@ def get_interface_specs() -> Dict[str, VisualFlowInterfaceSpec]:
             },
             recommended_end_inputs={
                 # Optional but commonly wired for host UX:
-                # - `result`: full object output (structured data / raw envelope / debug object)
+                # - `success`: did the workflow complete successfully?
                 # - `meta`: small host-facing metadata envelope
                 # - `scratchpad`: runtime trace (may be large)
-                "result": "object",
+                "success": "boolean",
                 "meta": "object",
                 "scratchpad": "object",
             },
@@ -362,25 +362,35 @@ def apply_visual_flow_interface_scaffold(
             end_data["inputs"] = inputs
             changed = True
 
-        # Backward-compat: rename legacy `raw_result` interface pin to `result` when applicable.
-        if "result" in end_pins and "raw_result" not in end_pins:
-            has_result = any(isinstance(p, dict) and p.get("id") == "result" for p in inputs)
-            if not has_result:
-                for p in inputs:
-                    if isinstance(p, dict) and p.get("id") == "raw_result":
-                        p["id"] = "result"
-                        if p.get("label") in ("raw_result", "", None):
-                            p["label"] = "result"
-                        changed = True
-                        # Update edges that pointed at the old pin id (best-effort).
-                        try:
-                            for e in getattr(flow, "edges", []) or []:
-                                if getattr(e, "target", None) == getattr(end, "id", None) and getattr(e, "targetHandle", None) == "raw_result":
-                                    setattr(e, "targetHandle", "result")
-                                    changed = True
-                        except Exception:
-                            pass
-                        break
+        # Backward-compat cleanup: remove deprecated interface pins (`result` / `raw_result`)
+        # when they are not part of the current desired contract.
+        deprecated_end_pins = {"result", "raw_result"}
+        if not any(pid in end_pins for pid in deprecated_end_pins):
+            removed: set[str] = set()
+            kept: list[Any] = []
+            for p in inputs:
+                pid = p.get("id") if isinstance(p, dict) else None
+                if isinstance(pid, str) and pid in deprecated_end_pins:
+                    removed.add(pid)
+                    changed = True
+                    continue
+                kept.append(p)
+            if removed:
+                inputs[:] = kept
+                # Remove edges that targeted the deprecated pins (best-effort).
+                try:
+                    flow_edges = getattr(flow, "edges", None)
+                    if isinstance(flow_edges, list):
+                        flow.edges = [
+                            e
+                            for e in flow_edges
+                            if not (
+                                getattr(e, "target", None) == getattr(end, "id", None)
+                                and getattr(e, "targetHandle", None) in removed
+                            )
+                        ]
+                except Exception:
+                    pass
 
         changed = _ensure_exec_pin(inputs, pin_id="exec-in", direction="in") or changed
         for pid, t in end_pins.items():

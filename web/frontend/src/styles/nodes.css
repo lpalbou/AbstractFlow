@@ -359,6 +359,13 @@
   color: var(--text-secondary);
 }
 
+.pin-hit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
 .pin-shape {
   display: flex;
   align-items: center;

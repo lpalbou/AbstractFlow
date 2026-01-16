@@ -225,6 +225,24 @@
             "type": "execution"
           },
           {
+            "id": "response",
+            "label": "response",
+            "type": "string",
+            "description": "Best-effort final answer string (convenience pin). In structured-output mode, this reflects the unstructured answer prior to the schema post-pass."
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object",
+            "description": "Host-facing meta envelope (schema=abstractcode.agent.v1.meta). Includes provider/model and lightweight execution metadata."
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object",
+            "description": "Runtime-owned execution trace/scratchpad for observability (LLM/tool steps, timings)."
+          },
+          {
             "id": "result",
             "label": "result",
             "type": "object",
@@ -241,12 +259,6 @@
             "label": "tool_results",
             "type": "array",
             "description": "Best-effort list of tool results extracted from the agent scratchpad trace (post-run). For real-time tool observability, subscribe to the ledger/node_traces stream."
-          },
-          {
-            "id": "scratchpad",
-            "label": "scratchpad",
-            "type": "object",
-            "description": "Runtime-owned execution trace/scratchpad for observability (LLM/tool steps, timings)."
           }
         ],
         "pinDefaults": {
@@ -349,44 +361,6 @@
       "headerColor": null,
       "inputs": [],
       "outputs": []
-    },
-    {
-      "id": "node-6",
-      "type": "break_object",
-      "position": {
-        "x": 640.0,
-        "y": 464.0
-      },
-      "data": {
-        "nodeType": "break_object",
-        "label": "Break Object",
-        "icon": "&#x1F9E9;",
-        "headerColor": "#3498DB",
-        "inputs": [
-          {
-            "id": "object",
-            "label": "object",
-            "type": "object"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "result",
-            "label": "result",
-            "type": "string"
-          }
-        ],
-        "breakConfig": {
-          "selectedPaths": [
-            "result"
-          ]
-        }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
     }
   ],
   "edges": [
@@ -439,30 +413,6 @@
       "animated": true
     },
     {
-      "id": "edge-1768494598763",
-      "source": "node-4",
-      "sourceHandle": "result",
-      "target": "node-6",
-      "targetHandle": "object",
-      "animated": false
-    },
-    {
-      "id": "edge-1768494610030",
-      "source": "node-4",
-      "sourceHandle": "scratchpad",
-      "target": "node-3",
-      "targetHandle": "scratchpad",
-      "animated": false
-    },
-    {
-      "id": "edge-1768494614138",
-      "source": "node-4",
-      "sourceHandle": "result",
-      "target": "node-3",
-      "targetHandle": "result",
-      "animated": false
-    },
-    {
       "id": "edge-1768495226878",
       "source": "node-2",
       "sourceHandle": "provider",
@@ -503,9 +453,41 @@
       "animated": false
     },
     {
-      "id": "edge-1768495478509",
-      "source": "node-6",
+      "id": "edge-1768547682892",
+      "source": "node-2",
+      "sourceHandle": "tools",
+      "target": "node-4",
+      "targetHandle": "tools",
+      "animated": false
+    },
+    {
+      "id": "edge-1768547716252",
+      "source": "node-4",
       "sourceHandle": "result",
+      "target": "node-3",
+      "targetHandle": "result",
+      "animated": false
+    },
+    {
+      "id": "edge-1768547719393",
+      "source": "node-4",
+      "sourceHandle": "meta",
+      "target": "node-3",
+      "targetHandle": "meta",
+      "animated": false
+    },
+    {
+      "id": "edge-1768547722076",
+      "source": "node-4",
+      "sourceHandle": "scratchpad",
+      "target": "node-3",
+      "targetHandle": "scratchpad",
+      "animated": false
+    },
+    {
+      "id": "edge-1768547724234",
+      "source": "node-4",
+      "sourceHandle": "response",
       "target": "node-3",
       "targetHandle": "response",
       "animated": false
@@ -513,5 +495,5 @@
   ],
   "entryNode": "node-2",
   "created_at": "2026-01-15T16:23:22.843839",
-  "updated_at": "2026-01-15T16:46:36.378172"
+  "updated_at": "2026-01-16T07:15:26.096972"
 }

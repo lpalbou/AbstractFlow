@@ -139,6 +139,6 @@ def test_ws_ask_user_waiting_then_resume_completes() -> None:
 
                 assert completed is not None
                 assert completed["result"]["success"] is True
-                assert completed["result"]["result"]["final"] == "beta"
+                assert completed["result"]["final"] == "beta"
     finally:
         _flows.pop(flow_id, None)

@@ -33,7 +33,6 @@ def test_visualflow_compiler_executes_without_ui_fields() -> None:
 
     assert run.status == "completed"
     assert isinstance(run.output, dict)
-    result = run.output.get("result")
-    assert isinstance(result, dict)
-    assert result.get("message") == "hi"
-
+    assert run.output.get("success") is True
+    assert "result" not in run.output
+    assert run.output.get("message") == "hi"

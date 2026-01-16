@@ -172,6 +172,24 @@
             "type": "execution"
           },
           {
+            "id": "response",
+            "label": "response",
+            "type": "string",
+            "description": "Best-effort final answer string (convenience pin). In structured-output mode, this reflects the unstructured answer prior to the schema post-pass."
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object",
+            "description": "Host-facing meta envelope (schema=abstractcode.agent.v1.meta). Includes provider/model and lightweight execution metadata."
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object",
+            "description": "Runtime-owned execution trace/scratchpad for observability (LLM/tool steps, timings)."
+          },
+          {
             "id": "result",
             "label": "result",
             "type": "object",
@@ -188,12 +206,6 @@
             "label": "tool_results",
             "type": "array",
             "description": "Best-effort list of tool results extracted from the agent scratchpad trace (post-run). For real-time tool observability, subscribe to the ledger/node_traces stream."
-          },
-          {
-            "id": "scratchpad",
-            "label": "scratchpad",
-            "type": "object",
-            "description": "Runtime-owned execution trace/scratchpad for observability (LLM/tool steps, timings)."
           }
         ],
         "pinDefaults": {
@@ -246,7 +258,7 @@
           "separator": " "
         },
         "pinDefaults": {
-          "a": "You do web searches and return the information extracted as a set of clean, unitary and informative triples  ",
+          "a": "ROLE:\nYou do web searches and return the information extracted as a set of clean, unitary and informative triples  Your answer MUST only be triples matching the provided json schema. Optionally, if you are asked to write a report, this report must match your answer and be the same triples matching the provided json schema.",
           "b": "\nSEMANTIC EXTRACTION RULES:\n"
         }
       },
@@ -732,44 +744,6 @@
       "headerColor": null,
       "inputs": [],
       "outputs": []
-    },
-    {
-      "id": "node-23",
-      "type": "break_object",
-      "position": {
-        "x": 384.0,
-        "y": 416.0
-      },
-      "data": {
-        "nodeType": "break_object",
-        "label": "Break Object",
-        "icon": "&#x1F9E9;",
-        "headerColor": "#3498DB",
-        "inputs": [
-          {
-            "id": "object",
-            "label": "object",
-            "type": "object"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "result",
-            "label": "result",
-            "type": "string"
-          }
-        ],
-        "breakConfig": {
-          "selectedPaths": [
-            "result"
-          ]
-        }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
     }
   ],
   "edges": [
@@ -862,22 +836,6 @@
       "animated": true
     },
     {
-      "id": "edge-1768500999994",
-      "source": "node-6",
-      "sourceHandle": "result",
-      "target": "node-23",
-      "targetHandle": "object",
-      "animated": false
-    },
-    {
-      "id": "edge-1768501016504",
-      "source": "node-23",
-      "sourceHandle": "result",
-      "target": "node-22",
-      "targetHandle": "response",
-      "animated": false
-    },
-    {
       "id": "edge-1768501035640",
       "source": "node-9",
       "sourceHandle": "value",
@@ -900,9 +858,25 @@
       "target": "node-6",
       "targetHandle": "context",
       "animated": false
+    },
+    {
+      "id": "edge-1768542502821",
+      "source": "node-6",
+      "sourceHandle": "meta",
+      "target": "node-22",
+      "targetHandle": "meta",
+      "animated": false
+    },
+    {
+      "id": "edge-1768542519321",
+      "source": "node-6",
+      "sourceHandle": "response",
+      "target": "node-22",
+      "targetHandle": "response",
+      "animated": false
     }
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-15T02:55:19.061956",
-  "updated_at": "2026-01-15T18:20:24.946026"
+  "updated_at": "2026-01-16T05:52:26.713888"
 }

@@ -109,7 +109,7 @@ def test_ws_subflow_runs_child_and_returns_output() -> None:
 
                 assert completed is not None
                 assert completed["result"]["success"] is True
-                assert completed["result"]["result"]["from_child"] == {"child": 7}
+                assert completed["result"]["from_child"] == {"child": 7, "success": True}
     finally:
         _flows.pop(child_id, None)
         _flows.pop(parent_id, None)
@@ -283,13 +283,13 @@ def test_ws_subflow_child_ask_user_waits_then_resume_completes() -> None:
 
                 assert subflow_complete is not None
                 assert isinstance(subflow_complete.get("result"), dict)
-                assert subflow_complete["result"].get("output") == {"answer": "beta"}
+                assert subflow_complete["result"].get("output") == {"answer": "beta", "success": True}
                 assert isinstance(subflow_complete.get("meta"), dict)
                 assert isinstance(subflow_complete["meta"].get("duration_ms"), (int, float))
 
                 assert completed is not None
                 assert completed["result"]["success"] is True
-                assert completed["result"]["result"]["child_answer"] == {"answer": "beta"}
+                assert completed["result"]["child_answer"] == {"answer": "beta", "success": True}
     finally:
         _flows.pop(child_id, None)
         _flows.pop(parent_id, None)
@@ -392,7 +392,7 @@ def test_ws_subflow_can_inherit_parent_context_messages_when_configured() -> Non
 
                 assert completed is not None
                 assert completed["result"]["success"] is True
-                assert completed["result"]["result"]["inherited"] is True
+                assert completed["result"]["inherited"] is True
     finally:
         _flows.pop(child_id, None)
         _flows.pop(parent_id, None)
