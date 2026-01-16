@@ -26,6 +26,16 @@
             "type": "execution"
           },
           {
+            "id": "use_context",
+            "label": "use_context",
+            "type": "boolean"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          },
+          {
             "id": "provider",
             "label": "provider",
             "type": "provider"
@@ -34,6 +44,11 @@
             "id": "model",
             "label": "model",
             "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
           },
           {
             "id": "prompt",
@@ -51,8 +66,23 @@
             "type": "number"
           },
           {
-            "id": "context",
-            "label": "context",
+            "id": "max_in_tokens",
+            "label": "max_in_tokens",
+            "type": "number"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
             "type": "object"
           }
         ],
@@ -64,8 +94,11 @@
             "web_search",
             "write_file"
           ],
-          "request": "what are the latest news ?",
-          "max_iterations": 10
+          "use_context": false,
+          "prompt": "what are the latest news ?",
+          "max_iterations": 10,
+          "temperature": 0.7,
+          "seed": -1
         }
       },
       "label": null,
@@ -722,9 +755,9 @@
             "type": "string"
           },
           {
-            "id": "result",
-            "label": "result",
-            "type": "object"
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
           },
           {
             "id": "meta",
@@ -768,7 +801,7 @@
       "source": "node-1",
       "sourceHandle": "prompt",
       "target": "node-6",
-      "targetHandle": "task",
+      "targetHandle": "prompt",
       "animated": false
     },
     {
@@ -812,11 +845,11 @@
       "animated": true
     },
     {
-      "id": "edge-1768500977257",
+      "id": "edge-1768600000201",
       "source": "node-6",
-      "sourceHandle": "result",
+      "sourceHandle": "success",
       "target": "node-22",
-      "targetHandle": "result",
+      "targetHandle": "success",
       "animated": false
     },
     {
@@ -848,7 +881,7 @@
       "source": "node-21",
       "sourceHandle": "value",
       "target": "node-6",
-      "targetHandle": "response_schema",
+      "targetHandle": "resp_schema",
       "animated": false
     },
     {

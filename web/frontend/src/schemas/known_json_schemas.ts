@@ -58,6 +58,57 @@ const MESSAGE_SCHEMA: JsonSchema = {
   additionalProperties: true,
 };
 
+const CONTEXT_SESSION_TURN_SCHEMA: JsonSchema = {
+  type: 'object',
+  title: 'Turn',
+  description: 'Best-effort snapshot of one prior user/assistant turn (host-provided).',
+  properties: {
+    prompt: { type: 'string', description: 'User prompt for this turn.' },
+    answer: { type: 'string', description: 'Assistant response for this turn.' },
+    run_id: { type: 'string', description: 'Run id that produced this turn (best-effort).' },
+    tools: { type: 'array', description: 'Tools used during this turn (best-effort).', items: { type: 'object', additionalProperties: true } },
+  },
+  additionalProperties: true,
+};
+
+const CONTEXT_SESSION_SCHEMA: JsonSchema = {
+  type: 'object',
+  title: 'Session',
+  description: 'Client session snapshot (host-provided; used by chat-like UIs).',
+  properties: {
+    id: { type: 'string', description: 'Client session id.' },
+    last_run_id: { type: 'string', description: 'Most recent run id in this session (best-effort).' },
+    turns: {
+      type: 'array',
+      description: 'Recent turns summary (best-effort; shape is host-dependent).',
+      items: CONTEXT_SESSION_TURN_SCHEMA,
+    },
+  },
+  additionalProperties: true,
+};
+
+const ATTACHMENT_SCHEMA: JsonSchema = {
+  type: 'object',
+  title: 'Attachment',
+  description: 'Attachment reference (file/media). Shape is host-dependent.',
+  properties: {
+    path: { type: 'string', description: 'File path or URI (best-effort).' },
+    mime_type: { type: 'string', description: 'MIME type (best-effort).' },
+  },
+  additionalProperties: true,
+};
+
+const CONTEXT_EXTRA_SCHEMA: JsonSchema = {
+  type: 'object',
+  title: 'Context Extra',
+  description: 'Extra context fields beyond task/messages (host-defined; safe to treat as opaque).',
+  properties: {
+    session: CONTEXT_SESSION_SCHEMA,
+    attachments: { type: 'array', description: 'Optional attachments list (files/media).', items: ATTACHMENT_SCHEMA },
+  },
+  additionalProperties: true,
+};
+
 export const CONTEXT_SCHEMA: JsonSchema = {
   type: 'object',
   title: 'Context',
@@ -73,6 +124,8 @@ export const CONTEXT_SCHEMA: JsonSchema = {
       description: 'Conversation transcript (context.messages). Newest message should be last.',
       items: MESSAGE_SCHEMA,
     },
+    session: CONTEXT_SESSION_SCHEMA,
+    attachments: { type: 'array', description: 'Optional attachments list (files/media).', items: ATTACHMENT_SCHEMA },
   },
   additionalProperties: true,
 };
@@ -153,9 +206,9 @@ export const AGENT_SCRATCHPAD_SCHEMA: JsonSchema = {
     workflow_id: { type: 'string', description: 'Workflow id used for the ReAct subworkflow (implementation detail).' },
     task: { type: 'string', description: 'Agent task/prompt string for this run.' },
     context_extra: {
-      type: 'object',
-      description: 'Additional context fields passed into the agent (excluding task/messages).',
-      additionalProperties: true,
+      ...CONTEXT_EXTRA_SCHEMA,
+      description:
+        'Additional context fields passed into the agent (excluding task/messages). This is typically derived from the input context object.',
     },
     messages: {
       type: 'array',

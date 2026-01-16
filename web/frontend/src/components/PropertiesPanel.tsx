@@ -1391,12 +1391,44 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
             const inputEdge = edges.find(
               (e) => e.target === node.id && e.targetHandle === 'object'
             );
-	            const sourceNode = inputEdge
-	              ? nodes.find((n) => n.id === inputEdge.source)
-	              : undefined;
-	            let sample: unknown = undefined;
-	            let schema: unknown = undefined;
-	            const sourceHandle = typeof inputEdge?.sourceHandle === 'string' ? inputEdge.sourceHandle : '';
+		            const sourceNode = inputEdge
+		              ? nodes.find((n) => n.id === inputEdge.source)
+		              : undefined;
+		            let sample: unknown = undefined;
+		            let schema: unknown = undefined;
+		            const sourceHandle = typeof inputEdge?.sourceHandle === 'string' ? inputEdge.sourceHandle : '';
+
+		            const inferSchemaForOutput = (n: any, handle: string, depth: number): unknown => {
+		              if (!n || depth > 6) return undefined;
+		              const nodeType = n?.data?.nodeType;
+		              if (handle === 'context') return CONTEXT_SCHEMA;
+		              if (nodeType === 'make_context' && handle === 'context') return CONTEXT_SCHEMA;
+		              if (nodeType === 'make_scratchpad' && handle === 'scratchpad') return AGENT_SCRATCHPAD_SCHEMA;
+		              if (nodeType === 'make_meta' && handle === 'meta') return AGENT_META_SCHEMA;
+		              if (nodeType === 'on_event' && handle === 'event') return EVENT_ENVELOPE_SCHEMA;
+		              if (nodeType === 'agent') {
+		                if (handle === 'scratchpad') return AGENT_SCRATCHPAD_SCHEMA;
+		                if (handle === 'meta') return AGENT_META_SCHEMA;
+		                const outputSchema = n.data.agentConfig?.outputSchema;
+		                if (outputSchema?.enabled && outputSchema.jsonSchema && typeof outputSchema.jsonSchema === 'object') {
+		                  return outputSchema.jsonSchema;
+		                }
+		                return AGENT_RESULT_SCHEMA;
+		              }
+		              if (nodeType === 'llm_call') {
+		                return handle === 'meta' ? LLM_META_SCHEMA : LLM_RESULT_SCHEMA;
+		              }
+		              if (nodeType === 'break_object') {
+		                const inputEdge2 = edges.find((e) => e.target === n.id && e.targetHandle === 'object');
+		                if (!inputEdge2) return undefined;
+		                const srcNode2 = nodes.find((nn) => nn.id === inputEdge2.source);
+		                const srcHandle2 = typeof inputEdge2.sourceHandle === 'string' ? inputEdge2.sourceHandle : '';
+		                const base = inferSchemaForOutput(srcNode2, srcHandle2, depth + 1);
+		                if (!base) return undefined;
+		                return getSchemaByPath(base, handle);
+		              }
+		              return undefined;
+		            };
 
 	            if (sourceNode?.data.nodeType === 'literal_json') {
 	              sample = sourceNode.data.literalValue;
@@ -1506,12 +1538,12 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 	                // Minimal, still useful: exposes the stable `{ value }` wrapper field.
 	                sample = { value: inferred ?? '' };
 	              }
-		            } else if (sourceNode?.data.nodeType === 'agent') {
-		              if (sourceHandle === 'scratchpad') {
-		                schema = AGENT_SCRATCHPAD_SCHEMA;
-		              } else if (sourceHandle === 'meta') {
-		                schema = AGENT_META_SCHEMA;
-		              } else {
+			            } else if (sourceNode?.data.nodeType === 'agent') {
+			              if (sourceHandle === 'scratchpad') {
+			                schema = AGENT_SCRATCHPAD_SCHEMA;
+			              } else if (sourceHandle === 'meta') {
+			                schema = AGENT_META_SCHEMA;
+			              } else {
 		                // Legacy: assume the Agent `result` output (deprecated pin).
 		                const outputSchema = sourceNode.data.agentConfig?.outputSchema;
 		                if (outputSchema?.enabled && outputSchema.jsonSchema && typeof outputSchema.jsonSchema === 'object') {
@@ -1520,9 +1552,11 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 		                  schema = AGENT_RESULT_SCHEMA;
 		                }
 		              }
-		            } else if (sourceNode?.data.nodeType === 'llm_call') {
-		              schema = sourceHandle === 'meta' ? LLM_META_SCHEMA : LLM_RESULT_SCHEMA;
-		            }
+			            } else if (sourceNode?.data.nodeType === 'llm_call') {
+			              schema = sourceHandle === 'meta' ? LLM_META_SCHEMA : LLM_RESULT_SCHEMA;
+			            } else if (sourceNode?.data.nodeType === 'break_object') {
+			              schema = inferSchemaForOutput(sourceNode, sourceHandle, 0);
+			            }
 
             const available = schema
               ? flattenSchemaPaths(schema).sort()

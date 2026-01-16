@@ -540,6 +540,74 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         ? { ...createNodeData(template), ...vn.data }
         : (vn.data as FlowNodeData);
 
+      // Backward-compat: normalize prompt pin id (`request`/`task` -> `prompt`) on entry nodes.
+      if (data.nodeType === 'on_flow_start') {
+        const rename = (pins: Pin[] | undefined, renames: Record<string, string>): Pin[] | undefined => {
+          if (!Array.isArray(pins) || !pins.length) return pins;
+          const out: Pin[] = [];
+          const seen = new Set<string>();
+          for (const p of pins) {
+            const nextId = renames[p.id] || p.id;
+            if (seen.has(nextId)) continue;
+            seen.add(nextId);
+            out.push(nextId === p.id ? p : { ...p, id: nextId, label: p.label === p.id ? nextId : p.label });
+          }
+          return out;
+        };
+
+        const startRenames: Record<string, string> = { request: 'prompt', task: 'prompt' };
+        const outputs = rename(data.outputs, startRenames);
+        if (outputs) data = { ...data, outputs };
+
+        const prevDefaults =
+          data.pinDefaults && typeof data.pinDefaults === 'object' ? (data.pinDefaults as Record<string, JsonValue>) : undefined;
+        if (prevDefaults) {
+          const nextDefaults: Record<string, JsonValue> = { ...prevDefaults };
+          let changed = false;
+          for (const [from, to] of Object.entries(startRenames)) {
+            if (!(from in nextDefaults)) continue;
+            if (!(to in nextDefaults)) nextDefaults[to] = nextDefaults[from];
+            delete nextDefaults[from];
+            changed = true;
+          }
+          if (changed) data = { ...data, pinDefaults: nextDefaults };
+        }
+
+        // Prefer a stable, interface-aligned output order when pins are present.
+        const existingOutputs = Array.isArray(data.outputs) ? data.outputs : [];
+        if (existingOutputs.length) {
+          const byId = new Map(existingOutputs.map((p) => [p.id, p] as const));
+          const desiredIds = [
+            'exec-out',
+            'use_context',
+            'context',
+            'provider',
+            'model',
+            'system',
+            'prompt',
+            'tools',
+            'max_iterations',
+            'max_in_tokens',
+            'temperature',
+            'seed',
+            'resp_schema',
+          ];
+          const ordered: Pin[] = [];
+          const seen = new Set<string>();
+          for (const id of desiredIds) {
+            const p = byId.get(id);
+            if (!p) continue;
+            ordered.push(p);
+            seen.add(id);
+          }
+          for (const p of existingOutputs) {
+            if (seen.has(p.id)) continue;
+            ordered.push(p);
+          }
+          data = { ...data, outputs: ordered };
+        }
+      }
+
       // Backward-compat + canonical ordering for Agent and LLM Call nodes.
       // Pins are addressable by id (edges), so reordering is safe.
         if (data.nodeType === 'agent' || data.nodeType === 'llm_call') {
@@ -549,11 +617,14 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                   include_context: 'use_context',
                   max_input_tokens: 'max_in_tokens',
                   response_schema: 'resp_schema',
+                  request: 'prompt',
                 }
               : {
                   include_context: 'use_context',
                   max_input_tokens: 'max_in_tokens',
                   response_schema: 'resp_schema',
+                  request: 'prompt',
+                  task: 'prompt',
                 };
 
         const prevDefaultsForRenames =
@@ -1322,30 +1393,41 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       animated: ve.animated ?? ve.sourceHandle === 'exec-out',
     }));
 
-    const nodeById = new Map(nodes.map((n) => [n.id, n]));
-    const migratedEdges = edges.map((e) => {
-      const target = nodeById.get(e.target);
-      if (!target || !e.targetHandle) return e;
+	    const nodeById = new Map(nodes.map((n) => [n.id, n]));
+	    const migratedEdges = edges.map((e) => {
+	      const source = nodeById.get(e.source);
+	      const target = nodeById.get(e.target);
+	      if (!source || !target || !e.sourceHandle || !e.targetHandle) return e;
 
-      const targetType = target.data.nodeType;
-      if (targetType !== 'agent' && targetType !== 'llm_call') return e;
+	      let nextSourceHandle = e.sourceHandle;
+	      if (source.data.nodeType === 'on_flow_start' && (nextSourceHandle === 'request' || nextSourceHandle === 'task')) {
+	        nextSourceHandle = 'prompt';
+	      }
 
-      const renames: Record<string, string> =
-        targetType === 'llm_call'
-          ? {
-              include_context: 'use_context',
-              max_input_tokens: 'max_in_tokens',
-              response_schema: 'resp_schema',
-            }
-          : {
-              include_context: 'use_context',
-              max_input_tokens: 'max_in_tokens',
-              response_schema: 'resp_schema',
-            };
+	      let nextTargetHandle = e.targetHandle;
+	      const targetType = target.data.nodeType;
+	      if (targetType === 'agent' || targetType === 'llm_call') {
+	        const renames: Record<string, string> =
+	          targetType === 'llm_call'
+	            ? {
+	                include_context: 'use_context',
+	                max_input_tokens: 'max_in_tokens',
+	                response_schema: 'resp_schema',
+	                request: 'prompt',
+	              }
+	            : {
+	                include_context: 'use_context',
+	                max_input_tokens: 'max_in_tokens',
+	                response_schema: 'resp_schema',
+	                request: 'prompt',
+	                task: 'prompt',
+	              };
+	        nextTargetHandle = renames[nextTargetHandle] || nextTargetHandle;
+	      }
 
-      const nextHandle = renames[e.targetHandle] || e.targetHandle;
-      return nextHandle === e.targetHandle ? e : { ...e, targetHandle: nextHandle };
-    });
+	      if (nextSourceHandle === e.sourceHandle && nextTargetHandle === e.targetHandle) return e;
+	      return { ...e, sourceHandle: nextSourceHandle, targetHandle: nextTargetHandle };
+	    });
 
     // Drop edges that reference missing pins (prevents invisible edges).
     const validEdges = migratedEdges.filter((e) => {

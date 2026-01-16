@@ -3,6 +3,14 @@
 import type React from "react";
 
 declare global {
+  interface ImportMetaEnv {
+    readonly VITE_MONITOR_GPU?: string;
+  }
+
+  interface ImportMeta {
+    readonly env: ImportMetaEnv;
+  }
+
   interface Window {
     __ABSTRACT_UI_CONFIG__?: {
       monitor_gpu?: boolean;

@@ -172,7 +172,7 @@
           "model": "devstral-2-123b-instruct-2512"
         },
         "pinDefaults": {
-          "request": "do you have anything in active context ?",
+          "prompt": "do you have anything in active context ?",
           "prompt": "do you know anything about me ? "
         }
       },
@@ -569,7 +569,7 @@
         "pinDefaults": {
           "system": "",
           "use_context": false,
-          "request": "do you know who i am ?",
+          "prompt": "do you know who i am ?",
           "prompt": "do you know anything about me ? "
         }
       },
@@ -707,7 +707,7 @@
         },
         "pinDefaults": {
           "use_context": true,
-          "request": "do you know who i am ?",
+          "prompt": "do you know who i am ?",
           "prompt": "do you know anything about me ? "
         }
       },
@@ -948,7 +948,7 @@
         },
         "pinDefaults": {
           "use_context": false,
-          "request": "do you know who i am ?",
+          "prompt": "do you know who i am ?",
           "prompt": "do you know anything about me ? "
         }
       },
@@ -1086,7 +1086,7 @@
         },
         "pinDefaults": {
           "use_context": false,
-          "request": "do you know who i am ?",
+          "prompt": "do you know who i am ?",
           "prompt": "do you know anything about me ? "
         }
       },

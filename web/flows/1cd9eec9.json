@@ -358,44 +358,6 @@
       "outputs": []
     },
     {
-      "id": "node-9",
-      "type": "break_object",
-      "position": {
-        "x": -832.0,
-        "y": 288.0
-      },
-      "data": {
-        "nodeType": "break_object",
-        "label": "Break Object",
-        "icon": "&#x1F9E9;",
-        "headerColor": "#3498DB",
-        "inputs": [
-          {
-            "id": "object",
-            "label": "object",
-            "type": "object"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "data",
-            "label": "data",
-            "type": "any"
-          }
-        ],
-        "breakConfig": {
-          "selectedPaths": [
-            "data"
-          ]
-        }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
       "id": "node-17",
       "type": "subflow",
       "position": {
@@ -606,15 +568,7 @@
     {
       "id": "edge-1767707551748",
       "source": "node-3",
-      "sourceHandle": "result",
-      "target": "node-9",
-      "targetHandle": "object",
-      "animated": false
-    },
-    {
-      "id": "edge-1767707560698",
-      "source": "node-9",
-      "sourceHandle": "data",
+      "sourceHandle": "response",
       "target": "node-8",
       "targetHandle": "text",
       "animated": false

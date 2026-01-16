@@ -26,9 +26,14 @@
             "type": "execution"
           },
           {
-            "id": "prompt",
-            "label": "prompt",
-            "type": "string"
+            "id": "use_context",
+            "label": "use_context",
+            "type": "boolean"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
           },
           {
             "id": "provider",
@@ -41,23 +46,51 @@
             "type": "model"
           },
           {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
             "id": "tools",
             "label": "tools",
             "type": "tools"
           },
           {
-            "id": "context",
-            "label": "context",
-            "type": "object"
-          },
-          {
             "id": "max_iterations",
             "label": "max_iterations",
             "type": "number"
+          },
+          {
+            "id": "max_in_tokens",
+            "label": "max_in_tokens",
+            "type": "number"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "object"
           }
         ],
         "pinDefaults": {
-          "max_iterations": 5
+          "use_context": false,
+          "max_iterations": 5,
+          "temperature": 0.7,
+          "seed": -1
         }
       },
       "label": null,
@@ -90,9 +123,9 @@
             "type": "string"
           },
           {
-            "id": "result",
-            "label": "result",
-            "type": "object"
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
           },
           {
             "id": "meta",
@@ -179,9 +212,9 @@
             "type": "string"
           },
           {
-            "id": "result",
-            "label": "result",
-            "type": "object"
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
           },
           {
             "id": "meta",
@@ -342,9 +375,9 @@
     {
       "id": "edge-1767684761292",
       "source": "node-16",
-      "sourceHandle": "result",
+      "sourceHandle": "success",
       "target": "node-2",
-      "targetHandle": "result",
+      "targetHandle": "success",
       "animated": false
     },
     {

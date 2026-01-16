@@ -188,12 +188,12 @@
           { "id": "template", "label": "template", "type": "string" },
           { "id": "vars", "label": "vars", "type": "object" }
         ],
-        "outputs": [{ "id": "result", "label": "result", "type": "string" }],
-        "pinDefaults": {
-          "template": "Extract a compact, append-only set of temporal triples (subject-predicate-object) from the conversation CONTENT that was recalled into CONTEXT.\\n\\nFocus domain: {{domain_focus}}\\n\\nRules:\\n- Prefer stable facts, commitments, relationships, and system components.\\n- Use concise strings for subject/predicate/object.\\n- Do not invent facts.\\n- Aim for <= 30 triples unless the text is very dense.\\n- Confidence is optional (0..1).\\n- Use valid_from/valid_until only when explicitly temporal."
-        }
-      }
-    },
+	        "outputs": [{ "id": "result", "label": "result", "type": "string" }],
+	        "pinDefaults": {
+	          "template": "You are a semantic triple writer for an AI long-term memory system.\\n\\nGoal: extract high-signal, append-only assertions (subject-predicate-object) from the conversation content recalled into CONTEXT (context.messages).\\n\\nDomain focus: {{domain_focus}}\\n\\nRules:\\n- Output ONLY what is directly supported by CONTEXT (no external knowledge).\\n- Output MUST match the enforced structured-output schema.\\n- Predicates MUST be one of the allowed CURIEs in the schema (do not invent new ones).\\n- Typing: when adding attributes.subject_type/object_type, use a minimal, widely adopted type such as schema:Thing, schema:Person, schema:Organization, schema:Event, schema:Place, skos:Concept, dcterms:Text.\\n- IDs: prefer CURIEs for known entities. For new entities, mint stable ids as ex:{kind}-{kebab-case} (lowercase, no spaces).\\n- Prefer 5-15 assertions (max 30). If CONTEXT contains any concrete facts/entities, do not return an empty list."
+	        }
+	      }
+	    },
     {
       "id": "node-11",
       "type": "json_schema",
@@ -214,7 +214,54 @@
                 "type": "object",
                 "properties": {
                   "subject": { "type": "string" },
-                  "predicate": { "type": "string" },
+	                  "predicate": {
+	                    "type": "string",
+	                    "enum": [
+	                      "rdf:type",
+	                      "dcterms:hasPart",
+	                      "dcterms:isPartOf",
+	                      "schema:nextItem",
+	                      "schema:previousItem",
+	                      "dcterms:identifier",
+	                      "dcterms:title",
+	                      "schema:name",
+	                      "dcterms:description",
+	                      "dcterms:abstract",
+	                      "dcterms:created",
+	                      "dcterms:modified",
+	                      "dcterms:creator",
+	                      "dcterms:publisher",
+	                      "dcterms:subject",
+	                      "schema:genre",
+	                      "schema:about",
+	                      "schema:mentions",
+	                      "dcterms:references",
+	                      "schema:sameAs",
+	                      "schema:location",
+	                      "schema:temporalCoverage",
+	                      "schema:participant",
+	                      "schema:organizer",
+	                      "schema:result",
+	                      "schema:instrument",
+	                      "schema:startDate",
+	                      "schema:endDate",
+	                      "skos:definition",
+	                      "skos:prefLabel",
+	                      "skos:altLabel",
+	                      "skos:broader",
+	                      "skos:narrower",
+	                      "skos:related",
+	                      "skos:exactMatch",
+	                      "skos:closeMatch",
+	                      "cito:supports",
+	                      "cito:disagreesWith",
+	                      "cito:usesDataFrom",
+	                      "cito:providesDataFor",
+	                      "cito:extends",
+	                      "cito:discusses",
+	                      "cito:confirms"
+	                    ]
+	                  },
                   "object": { "type": "string" },
                   "confidence": { "type": "number" },
                   "valid_from": { "type": "string" },
@@ -258,11 +305,11 @@
           { "id": "tool_calls", "label": "tool_calls", "type": "array" },
           { "id": "result", "label": "result", "type": "object" }
         ],
-        "effectConfig": { "provider": "lmstudio", "model": "qwen/qwen3-next-80b", "temperature": 0.2, "structured_output_fallback": true },
-        "pinDefaults": {
-          "include_context": true,
-          "system": "You are a semantic extractor for an AI long-term memory system. Always comply with the provided structured output schema."
-        }
+	        "effectConfig": { "provider": "lmstudio", "model": "qwen/qwen3-next-80b", "temperature": 0.2, "structured_output_fallback": false },
+	        "pinDefaults": {
+	          "include_context": true,
+	          "system": "You are a semantic extractor for an AI long-term memory system. Always comply with the provided structured output schema."
+	        }
       }
     },
     {

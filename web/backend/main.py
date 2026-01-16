@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse
 
-from .routes import flows_router, gateway_metrics_router, providers_router, runs_router, semantics_router, tools_router, ws_router
+from .routes import flows_router, gateway_metrics_router, providers_router, runs_router, semantics_router, tools_router, ui_config_router, ws_router
 
 # Create FastAPI app
 app = FastAPI(
@@ -35,6 +35,7 @@ app.include_router(providers_router, prefix="/api")
 app.include_router(runs_router, prefix="/api")
 app.include_router(semantics_router, prefix="/api")
 app.include_router(tools_router, prefix="/api")
+app.include_router(ui_config_router, prefix="/api")
 app.include_router(ws_router, prefix="/api")
 
 @app.get("/api/health")

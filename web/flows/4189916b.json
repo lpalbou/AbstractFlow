@@ -15,7 +15,7 @@
       },
       "data": {
         "nodeType": "on_flow_start",
-        "label": "RECEIVING REQUEST",
+        "label": "RECEIVING PROMPT",
         "icon": "&#x1F3C1;",
         "headerColor": "#C0392B",
         "inputs": [],
@@ -26,9 +26,14 @@
             "type": "execution"
           },
           {
-            "id": "prompt",
-            "label": "prompt",
-            "type": "string"
+            "id": "use_context",
+            "label": "use_context",
+            "type": "boolean"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
           },
           {
             "id": "provider",
@@ -41,18 +46,28 @@
             "type": "model"
           },
           {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
             "id": "tools",
             "label": "tools",
             "type": "tools"
           },
           {
-            "id": "context",
-            "label": "context",
-            "type": "object"
-          },
-          {
             "id": "max_iterations",
             "label": "max_iterations",
+            "type": "number"
+          },
+          {
+            "id": "max_in_tokens",
+            "label": "max_in_tokens",
             "type": "number"
           },
           {
@@ -64,8 +79,19 @@
             "id": "seed",
             "label": "seed",
             "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "object"
           }
-        ]
+        ],
+        "pinDefaults": {
+          "use_context": false,
+          "max_iterations": 20,
+          "temperature": 0.7,
+          "seed": -1
+        }
       },
       "label": null,
       "icon": null,
@@ -97,9 +123,9 @@
             "type": "string"
           },
           {
-            "id": "result",
-            "label": "result",
-            "type": "object"
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
           },
           {
             "id": "meta",
@@ -245,50 +271,6 @@
         "pinDefaults": {
           "include_context": true,
           "system": "You are a highly autonomous ReAct agent who requests the execution of tools to your host in order to fullfill ALL the USER REQUEST and ALL their associated TASKS. You work with the highest standards of rigor and profesionalism, you do not skip test, you continue until your work is done, fully done."
-        }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
-      "id": "node-3",
-      "type": "break_object",
-      "position": {
-        "x": 736.0,
-        "y": 304.0
-      },
-      "data": {
-        "nodeType": "break_object",
-        "label": "Break Object",
-        "icon": "&#x1F9E9;",
-        "headerColor": "#3498DB",
-        "inputs": [
-          {
-            "id": "object",
-            "label": "object",
-            "type": "object"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "result",
-            "label": "result",
-            "type": "string"
-          },
-          {
-            "id": "usage",
-            "label": "usage",
-            "type": "object"
-          }
-        ],
-        "breakConfig": {
-          "selectedPaths": [
-            "result",
-            "usage"
-          ]
         }
       },
       "label": null,
@@ -834,25 +816,25 @@
       "animated": false
     },
     {
-      "id": "edge-1768015038917",
+      "id": "edge-1768600000101",
       "source": "node-2",
-      "sourceHandle": "result",
-      "target": "node-3",
-      "targetHandle": "object",
-      "animated": false
-    },
-    {
-      "id": "edge-1768015060982",
-      "source": "node-3",
-      "sourceHandle": "result",
+      "sourceHandle": "response",
       "target": "end",
       "targetHandle": "response",
       "animated": false
     },
     {
-      "id": "edge-1768015066098",
-      "source": "node-3",
-      "sourceHandle": "usage",
+      "id": "edge-1768600000102",
+      "source": "node-2",
+      "sourceHandle": "success",
+      "target": "end",
+      "targetHandle": "success",
+      "animated": false
+    },
+    {
+      "id": "edge-1768600000103",
+      "source": "node-2",
+      "sourceHandle": "meta",
       "target": "end",
       "targetHandle": "meta",
       "animated": false
@@ -863,14 +845,6 @@
       "sourceHandle": "scratchpad",
       "target": "end",
       "targetHandle": "scratchpad",
-      "animated": false
-    },
-    {
-      "id": "edge-1768015071706",
-      "source": "node-2",
-      "sourceHandle": "result",
-      "target": "end",
-      "targetHandle": "result",
       "animated": false
     },
     {
@@ -1046,7 +1020,7 @@
       "source": "node-9",
       "sourceHandle": "result",
       "target": "node-2",
-      "targetHandle": "task",
+      "targetHandle": "prompt",
       "animated": false
     },
     {

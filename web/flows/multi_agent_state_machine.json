@@ -3751,7 +3751,7 @@
       },
       "data": {
         "nodeType": "set",
-        "label": "state.request",
+        "label": "state.prompt",
         "icon": "&#x1F4E4;",
         "headerColor": "#3498DB",
         "inputs": [
@@ -3779,7 +3779,7 @@
           }
         ],
         "pinDefaults": {
-          "key": "request"
+          "key": "prompt"
         }
       },
       "label": null,

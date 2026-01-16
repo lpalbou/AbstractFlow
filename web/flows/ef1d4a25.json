@@ -136,7 +136,7 @@
         ],
         "subflowId": "af0e80f8",
         "pinDefaults": {
-          "request": "You find a restaurant you absolutely love. For your next celebration dinner, do you go there or try a new highly-rated place?",
+          "prompt": "You find a restaurant you absolutely love. For your next celebration dinner, do you go there or try a new highly-rated place?",
           "rules": "REPEAT_FAVORITE: Exploit Strategy (Regret minimization); valuing guaranteed satisfaction over potential discovery.  TRY_NEW_PLACE: Explore Strategy (Information gain); valuing the possibility of a better outcome over known safety."
         }
       },
@@ -282,7 +282,7 @@
         ],
         "subflowId": "af0e80f8",
         "pinDefaults": {
-          "request": "You worked hard on a project, but it failed completely due to a sudden market shift. What is your immediate thought?",
+          "prompt": "You worked hard on a project, but it failed completely due to a sudden market shift. What is your immediate thought?",
           "rules": "I_SHOULD_HAVE_FORESEEN_IT: Internal Locus of Control; taking ownership of the outcome (Empowerment / Self-blame risk).  IT_WAS_BAD_LUCK: External Locus of Control; attributing outcome to environment (Self-esteem protection / Passivity risk)."
         }
       },
@@ -365,7 +365,7 @@
         ],
         "subflowId": "af0e80f8",
         "pinDefaults": {
-          "request": "A close friend is venting to you about a problem they clearly caused themselves. How do you react?",
+          "prompt": "A close friend is venting to you about a problem they clearly caused themselves. How do you react?",
           "rules": "OFFER_SOLUTIONS: Systemizing; focus on fixing the mechanical cause of the distress.  OFFER_SYMPATHY: Empathizing; focus on validating and regulating the emotional state."
         }
       },
@@ -448,7 +448,7 @@
         ],
         "subflowId": "af0e80f8",
         "pinDefaults": {
-          "request": "You are in a debate and realize midway through that your argument is actually incorrect.",
+          "prompt": "You are in a debate and realize midway through that your argument is actually incorrect.",
           "rules": "ADMIT_ERROR: Intellectual Humility; prioritizing truth accuracy over social status.  CHANGE_TOPIC: Social Preservation; maintaining status without acknowledging defeat.  DOUBLE_DOWN: Ego Protection; prioritizing internal consistency over external reality."
         }
       },
@@ -531,7 +531,7 @@
         ],
         "subflowId": "af0e80f8",
         "pinDefaults": {
-          "request": "Your boss gives you a project with very vague instructions and no clear deadline.",
+          "prompt": "Your boss gives you a project with very vague instructions and no clear deadline.",
           "rules": "ASK_FOR_DETAILS: Uncertainty Avoidance; preference for structure, clarity, and minimizing error.  START_WORKING: Ambiguity Tolerance; preference for autonomy, interpretation, and speed."
         }
       },

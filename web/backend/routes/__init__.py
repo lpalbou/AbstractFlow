@@ -6,6 +6,7 @@ from .providers import router as providers_router
 from .runs import router as runs_router
 from .semantics import router as semantics_router
 from .tools import router as tools_router
+from .ui_config import router as ui_config_router
 from .ws import router as ws_router
 
 __all__ = [
@@ -15,5 +16,6 @@ __all__ = [
     "runs_router",
     "semantics_router",
     "tools_router",
+    "ui_config_router",
     "ws_router",
 ]

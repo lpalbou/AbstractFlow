@@ -625,29 +625,43 @@ export const BaseNode = memo(function BaseNode({
     const sourceNode = allNodes.find((n) => n.id === inputEdge.source);
     if (!sourceNode) return null;
 
-    if (sourceHandle === 'context') return CONTEXT_SCHEMA;
+    const inferSchemaForOutput = (n: any, handle: string, depth: number): JsonSchema | null => {
+      if (!n || depth > 6) return null;
+      const nodeType = n.data?.nodeType;
+      if (handle === 'context') return CONTEXT_SCHEMA;
+      if (nodeType === 'make_context' && handle === 'context') return CONTEXT_SCHEMA;
+      if (nodeType === 'make_meta' && handle === 'meta') return AGENT_META_SCHEMA;
+      if (nodeType === 'make_scratchpad' && handle === 'scratchpad') return AGENT_SCRATCHPAD_SCHEMA;
+      if (nodeType === 'make_raw_result' && handle === 'result') return LLM_RESULT_SCHEMA;
+      if (nodeType === 'on_event' && handle === 'event') return EVENT_ENVELOPE_SCHEMA;
+      if (nodeType === 'agent') {
+        if (handle === 'scratchpad') return AGENT_SCRATCHPAD_SCHEMA;
+        if (handle === 'meta') return AGENT_META_SCHEMA;
+        const outputSchema = n.data?.agentConfig?.outputSchema;
+        if (outputSchema?.enabled && outputSchema.jsonSchema && typeof outputSchema.jsonSchema === 'object') {
+          return outputSchema.jsonSchema as JsonSchema;
+        }
+        return AGENT_RESULT_SCHEMA;
+      }
+      if (nodeType === 'llm_call') {
+        if (handle === 'meta') return LLM_META_SCHEMA;
+        return LLM_RESULT_SCHEMA;
+      }
+      if (nodeType === 'break_object') {
+        const inputEdge2 = edges.find((e) => e.target === n.id && e.targetHandle === 'object');
+        if (!inputEdge2) return null;
+        const srcNode2 = allNodes.find((nn) => nn.id === inputEdge2.source);
+        if (!srcNode2) return null;
+        const srcHandle2 = typeof inputEdge2.sourceHandle === 'string' ? inputEdge2.sourceHandle : '';
+        const base = inferSchemaForOutput(srcNode2, srcHandle2, depth + 1);
+        if (!base) return null;
+        return getSchemaByPath(base, handle) ?? null;
+      }
+      return null;
+    };
 
-    const nodeType = sourceNode.data?.nodeType;
-    if (nodeType === 'make_meta') return AGENT_META_SCHEMA;
-    if (nodeType === 'make_scratchpad') return AGENT_SCRATCHPAD_SCHEMA;
-    if (nodeType === 'make_raw_result') return LLM_RESULT_SCHEMA;
-    if (nodeType === 'on_event' && sourceHandle === 'event') return EVENT_ENVELOPE_SCHEMA;
-	    if (nodeType === 'agent') {
-	      if (sourceHandle === 'scratchpad') return AGENT_SCRATCHPAD_SCHEMA;
-	      if (sourceHandle === 'meta') return AGENT_META_SCHEMA;
-	      const outputSchema = sourceNode.data?.agentConfig?.outputSchema;
-	      if (outputSchema?.enabled && outputSchema.jsonSchema && typeof outputSchema.jsonSchema === 'object') {
-	        return outputSchema.jsonSchema as JsonSchema;
-	      }
-	      return AGENT_RESULT_SCHEMA;
-	    }
-	    if (nodeType === 'llm_call') {
-	      if (sourceHandle === 'meta') return LLM_META_SCHEMA;
-	      return LLM_RESULT_SCHEMA;
-	    }
-
-    return null;
-  }, [allNodes, data.nodeType, edges, id]);
+    return inferSchemaForOutput(sourceNode, sourceHandle, 0);
+  }, [allNodes, data.nodeType, edges, getSchemaByPath, id]);
 
   // Separate execution pins from data pins
   const inputExec = isTriggerNode ? undefined : data.inputs.find((p) => p.type === 'execution');

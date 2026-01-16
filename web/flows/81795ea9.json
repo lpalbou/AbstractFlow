@@ -15,7 +15,7 @@
       },
       "data": {
         "nodeType": "on_flow_start",
-        "label": "RECEIVING REQUEST",
+        "label": "RECEIVING PROMPT",
         "icon": "&#x1F3C1;",
         "headerColor": "#C0392B",
         "inputs": [],
@@ -26,9 +26,14 @@
             "type": "execution"
           },
           {
-            "id": "prompt",
-            "label": "prompt",
-            "type": "string"
+            "id": "use_context",
+            "label": "use_context",
+            "type": "boolean"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
           },
           {
             "id": "provider",
@@ -41,18 +46,28 @@
             "type": "model"
           },
           {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
             "id": "tools",
             "label": "tools",
             "type": "tools"
           },
           {
-            "id": "context",
-            "label": "context",
-            "type": "object"
-          },
-          {
             "id": "max_iterations",
             "label": "max_iterations",
+            "type": "number"
+          },
+          {
+            "id": "max_in_tokens",
+            "label": "max_in_tokens",
             "type": "number"
           },
           {
@@ -64,11 +79,20 @@
             "id": "seed",
             "label": "seed",
             "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "object"
           }
         ],
         "pinDefaults": {
           "provider": "lmstudio",
           "model": "qwen/qwen3-next-80b",
+          "use_context": false,
+          "max_iterations": 20,
+          "temperature": 0.7,
+          "seed": -1,
           "tools": [
             "edit_file",
             "analyze_code",
@@ -255,24 +279,6 @@
             "label": "scratchpad",
             "type": "object",
             "description": "Runtime-owned execution trace/scratchpad for observability (LLM/tool steps, timings)."
-          },
-          {
-            "id": "result",
-            "label": "result",
-            "type": "object",
-            "description": "Structured final agent result (answer + metadata/tool calls depending on agent)."
-          },
-          {
-            "id": "tool_calls",
-            "label": "tool_calls",
-            "type": "array",
-            "description": "Best-effort list of tool call requests extracted from the agent scratchpad trace (post-run). For real-time tool observability, subscribe to the ledger/node_traces stream."
-          },
-          {
-            "id": "tool_results",
-            "label": "tool_results",
-            "type": "array",
-            "description": "Best-effort list of tool results extracted from the agent scratchpad trace (post-run). For real-time tool observability, subscribe to the ledger/node_traces stream."
           }
         ],
         "pinDefaults": {}
@@ -419,6 +425,14 @@
       "animated": false
     },
     {
+      "id": "edge-1768600000001",
+      "source": "node-1",
+      "sourceHandle": "use_context",
+      "target": "node-2",
+      "targetHandle": "use_context",
+      "animated": false
+    },
+    {
       "id": "edge-1768015017449",
       "source": "node-1",
       "sourceHandle": "model",
@@ -432,6 +446,14 @@
       "sourceHandle": "provider",
       "target": "node-2",
       "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1768600000002",
+      "source": "node-1",
+      "sourceHandle": "system",
+      "target": "node-2",
+      "targetHandle": "system",
       "animated": false
     },
     {
@@ -451,6 +473,14 @@
       "animated": false
     },
     {
+      "id": "edge-1768600000003",
+      "source": "node-1",
+      "sourceHandle": "max_in_tokens",
+      "target": "node-2",
+      "targetHandle": "max_in_tokens",
+      "animated": false
+    },
+    {
       "id": "edge-1768020010001",
       "source": "node-1",
       "sourceHandle": "temperature",
@@ -464,6 +494,14 @@
       "sourceHandle": "seed",
       "target": "node-2",
       "targetHandle": "seed",
+      "animated": false
+    },
+    {
+      "id": "edge-1768600000004",
+      "source": "node-1",
+      "sourceHandle": "resp_schema",
+      "target": "node-2",
+      "targetHandle": "resp_schema",
       "animated": false
     },
     {

@@ -95,6 +95,11 @@
             "type": "string"
           },
           {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
             "id": "meta",
             "label": "meta",
             "type": "object"
@@ -102,11 +107,6 @@
           {
             "id": "scratchpad",
             "label": "scratchpad",
-            "type": "object"
-          },
-          {
-            "id": "raw_result",
-            "label": "raw_result",
             "type": "object"
           }
         ],
@@ -213,44 +213,6 @@
         "pinDefaults": {
           "system": "You are a helpful, collaborative and highly autonomous agent. You are designed to resolve requests that have already been treated to isolate tasks. Please make sure that you either fulfill ALL the tasks or explain why you needed to change that plan. Being autonomous means taking decisions and taking actions to have a real world effect. You take action by requesting the execution of tools, observing their effects and continuing the plan until you fully resolve the request you received. You are a critical creative thinker to generate innovative ideas and you balance it with constructive skepticism to filter out the bad and unrealistic ones. Your primary goal and focus is to resolve FULLY the request by taking decisions and actions.",
           "include_context": true
-        }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
-      "id": "node-4",
-      "type": "break_object",
-      "position": {
-        "x": -880.0,
-        "y": 560.0
-      },
-      "data": {
-        "nodeType": "break_object",
-        "label": "Break Object",
-        "icon": "&#x1F9E9;",
-        "headerColor": "#3498DB",
-        "inputs": [
-          {
-            "id": "object",
-            "label": "object",
-            "type": "object"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "result",
-            "label": "result",
-            "type": "string"
-          }
-        ],
-        "breakConfig": {
-          "selectedPaths": [
-            "result"
-          ]
         }
       },
       "label": null,
@@ -543,35 +505,30 @@
     },
     {
       "id": "node-12",
-      "type": "break_object",
+      "type": "parse_json",
       "position": {
         "x": -192.0,
         "y": 320.0
       },
       "data": {
-        "nodeType": "break_object",
-        "label": "Break Object",
-        "icon": "&#x1F9E9;",
+        "nodeType": "parse_json",
+        "label": "Parse JSON",
+        "icon": "&#x1F5C2;",
         "headerColor": "#3498DB",
         "inputs": [
           {
-            "id": "object",
-            "label": "object",
-            "type": "object"
+            "id": "text",
+            "label": "text",
+            "type": "string"
           }
         ],
         "outputs": [
           {
-            "id": "data",
-            "label": "data",
-            "type": "any"
+            "id": "result",
+            "label": "result",
+            "type": "object"
           }
-        ],
-        "breakConfig": {
-          "selectedPaths": [
-            "data"
-          ]
-        }
+        ]
       },
       "label": null,
       "icon": null,
@@ -702,6 +659,11 @@
             "type": "string"
           },
           {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
             "id": "meta",
             "label": "meta",
             "type": "object"
@@ -709,11 +671,6 @@
           {
             "id": "scratchpad",
             "label": "scratchpad",
-            "type": "object"
-          },
-          {
-            "id": "raw_result",
-            "label": "raw_result",
             "type": "object"
           }
         ],
@@ -750,6 +707,11 @@
             "type": "string"
           },
           {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
             "id": "meta",
             "label": "meta",
             "type": "object"
@@ -757,11 +719,6 @@
           {
             "id": "scratchpad",
             "label": "scratchpad",
-            "type": "object"
-          },
-          {
-            "id": "raw_result",
-            "label": "raw_result",
             "type": "object"
           }
         ],
@@ -1533,25 +1490,25 @@
     {
       "id": "edge-1767681029305",
       "source": "node-3",
-      "sourceHandle": "result",
-      "target": "node-2",
-      "targetHandle": "raw_result",
-      "animated": false
-    },
-    {
-      "id": "edge-1767681031174",
-      "source": "node-3",
       "sourceHandle": "scratchpad",
       "target": "node-2",
       "targetHandle": "scratchpad",
       "animated": false
     },
     {
-      "id": "edge-1767681045125",
-      "source": "node-3",
-      "sourceHandle": "result",
-      "target": "node-4",
-      "targetHandle": "object",
+      "id": "edge-1768600000301",
+      "source": "node-41",
+      "sourceHandle": "success",
+      "target": "node-2",
+      "targetHandle": "success",
+      "animated": false
+    },
+    {
+      "id": "edge-1768600000302",
+      "source": "node-41",
+      "sourceHandle": "meta",
+      "target": "node-2",
+      "targetHandle": "meta",
       "animated": false
     },
     {
@@ -1559,7 +1516,7 @@
       "source": "node-7",
       "sourceHandle": "result",
       "target": "node-3",
-      "targetHandle": "task",
+      "targetHandle": "prompt",
       "animated": false
     },
     {
@@ -1597,15 +1554,15 @@
     {
       "id": "edge-1767682947808",
       "source": "node-8",
-      "sourceHandle": "result",
+      "sourceHandle": "response",
       "target": "node-12",
-      "targetHandle": "object",
+      "targetHandle": "text",
       "animated": false
     },
     {
       "id": "edge-1767683022608",
       "source": "node-12",
-      "sourceHandle": "data",
+      "sourceHandle": "result",
       "target": "node-15",
       "targetHandle": "object",
       "animated": false
@@ -1683,11 +1640,11 @@
       "animated": false
     },
     {
-      "id": "edge-1767683690753",
+      "id": "edge-1768600000303",
       "source": "node-16",
-      "sourceHandle": "raw_result",
+      "sourceHandle": "success",
       "target": "node-18",
-      "targetHandle": "raw_result",
+      "targetHandle": "success",
       "animated": false
     },
     {
@@ -1733,7 +1690,7 @@
     {
       "id": "edge-1767736498248",
       "source": "node-12",
-      "sourceHandle": "data",
+      "sourceHandle": "result",
       "target": "node-28",
       "targetHandle": "default",
       "animated": false

@@ -40,7 +40,7 @@
           }
         ],
         "pinDefaults": {
-          "request": "create a SOTA python clone in 3D of the game r-type. all the assets, visuals and audio must be generated procedurally. there must be waves of ennemies, the usual power ups for r-type and visual effects with system particles. reproduce the same game mechanics with the various weapons and upgrades. and remember the game scroll horizontally with the starship traveling towards the right end of the screen",
+          "prompt": "create a SOTA python clone in 3D of the game r-type. all the assets, visuals and audio must be generated procedurally. there must be waves of ennemies, the usual power ups for r-type and visual effects with system particles. reproduce the same game mechanics with the various weapons and upgrades. and remember the game scroll horizontally with the starship traveling towards the right end of the screen",
           "provider": "lmstudio",
           "model": "qwen/qwen3-next-80b"
         }

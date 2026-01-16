@@ -297,7 +297,7 @@
           "seed": -1,
           "temperature": 0.7,
           "use_context": false,
-          "request": "Write exactly one sentence."
+          "prompt": "Write exactly one sentence."
         },
         "effectConfig": {
           "provider": "lmstudio",
