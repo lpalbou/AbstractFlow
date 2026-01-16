@@ -113,7 +113,12 @@ This wires:
 
 Visual node outputs are designed to be easy to wire:
 - **LLM Call** exposes both `result` (full normalized object) and a convenience `tool_calls` output (so you can connect directly into **Tool Calls** or event nodes).
-- **Agent** exposes `scratchpad` (runtime-owned trace) plus best-effort `tool_calls` / `tool_results` extracted from that trace (post-run).
+- **Agent** exposes `response`, `meta`, `scratchpad`, and `result`.
+  - `scratchpad` is runtime-owned observability data and includes:
+    - `messages`: the agent’s internal message transcript/history for this run
+    - `node_traces`: the structured per-node trace produced by the ReAct subworkflow
+    - `steps`: a flattened list derived from `node_traces` (easier for UI rendering)
+    - best-effort `tool_calls` / `tool_results` extracted post-run from `steps`
 
 When a visual flow contains memory nodes, the host must also configure:
 - an `ArtifactStore` (for archived spans, notes, and rehydration source artifacts)
@@ -158,4 +163,3 @@ The web backend also exposes run-history endpoints (list runs + replay) to suppo
 
 ## Acknowledgements (inspiration)
 - The visual editor UX is inspired by **Unreal Engine (UE4/UE5) Blueprints**: execution pins, typed pins with color coding, and “graph-as-program” ergonomics.
-

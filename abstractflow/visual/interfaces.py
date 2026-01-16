@@ -80,9 +80,13 @@ def get_interface_specs() -> Dict[str, VisualFlowInterfaceSpec]:
                 "max_iterations": "number",
             },
             recommended_end_inputs={
+                # Optional but commonly wired for host UX:
+                # - `result`: full object output (structured data / raw envelope / debug object)
+                # - `meta`: small host-facing metadata envelope
+                # - `scratchpad`: runtime trace (may be large)
+                "result": "object",
                 "meta": "object",
                 "scratchpad": "object",
-                "raw_result": "object",
             },
         ),
     }
@@ -211,6 +215,39 @@ def apply_visual_flow_interface_scaffold(
         pins.insert(0, {"id": pin_id, "label": "", "type": "execution"})
         return True
 
+    def _reorder_pins(pins: list[Any], *, desired_ids: list[str]) -> bool:
+        """Reorder pins in-place so interface pins appear in a stable, readable order."""
+        if not isinstance(pins, list) or not desired_ids:
+            return False
+        ordered: list[Any] = []
+        seen: set[str] = set()
+
+        def _first_pin(pid: str) -> Any | None:
+            for p in pins:
+                if isinstance(p, dict) and p.get("id") == pid:
+                    return p
+            return None
+
+        for pid in desired_ids:
+            if pid in seen:
+                continue
+            p = _first_pin(pid)
+            if p is None:
+                continue
+            ordered.append(p)
+            seen.add(pid)
+
+        for p in pins:
+            pid = p.get("id") if isinstance(p, dict) else None
+            if isinstance(pid, str) and pid in seen:
+                continue
+            ordered.append(p)
+
+        if ordered == pins:
+            return False
+        pins[:] = ordered
+        return True
+
     # Desired pins (required + optional recommended).
     start_pins = dict(spec.required_start_outputs)
     end_pins = dict(spec.required_end_inputs)
@@ -324,9 +361,34 @@ def apply_visual_flow_interface_scaffold(
             inputs = []
             end_data["inputs"] = inputs
             changed = True
+
+        # Backward-compat: rename legacy `raw_result` interface pin to `result` when applicable.
+        if "result" in end_pins and "raw_result" not in end_pins:
+            has_result = any(isinstance(p, dict) and p.get("id") == "result" for p in inputs)
+            if not has_result:
+                for p in inputs:
+                    if isinstance(p, dict) and p.get("id") == "raw_result":
+                        p["id"] = "result"
+                        if p.get("label") in ("raw_result", "", None):
+                            p["label"] = "result"
+                        changed = True
+                        # Update edges that pointed at the old pin id (best-effort).
+                        try:
+                            for e in getattr(flow, "edges", []) or []:
+                                if getattr(e, "target", None) == getattr(end, "id", None) and getattr(e, "targetHandle", None) == "raw_result":
+                                    setattr(e, "targetHandle", "result")
+                                    changed = True
+                        except Exception:
+                            pass
+                        break
+
         changed = _ensure_exec_pin(inputs, pin_id="exec-in", direction="in") or changed
         for pid, t in end_pins.items():
             changed = _ensure_pin(inputs, pin_id=str(pid), type_str=str(t), label=str(pid)) or changed
+
+        # Keep interface pins in a predictable order for UX.
+        desired_end_order = ["exec-in", *list(end_pins.keys())]
+        changed = _reorder_pins(inputs, desired_ids=desired_end_order) or changed
 
     # Write back nodes list if it was reconstructed.
     try:
@@ -344,4 +406,3 @@ def apply_visual_flow_interface_scaffold(
         pass
 
     return bool(changed)
-

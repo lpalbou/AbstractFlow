@@ -87,6 +87,11 @@
             "type": "string"
           },
           {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          },
+          {
             "id": "meta",
             "label": "meta",
             "type": "object"
@@ -94,11 +99,6 @@
           {
             "id": "scratchpad",
             "label": "scratchpad",
-            "type": "object"
-          },
-          {
-            "id": "raw_result",
-            "label": "raw_result",
             "type": "object"
           }
         ],
@@ -470,6 +470,11 @@
             "type": "string"
           },
           {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          },
+          {
             "id": "meta",
             "label": "meta",
             "type": "object"
@@ -477,11 +482,6 @@
           {
             "id": "scratchpad",
             "label": "scratchpad",
-            "type": "object"
-          },
-          {
-            "id": "raw_result",
-            "label": "raw_result",
             "type": "object"
           }
         ],
@@ -561,6 +561,11 @@
             "type": "string"
           },
           {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          },
+          {
             "id": "meta",
             "label": "meta",
             "type": "object"
@@ -568,11 +573,6 @@
           {
             "id": "scratchpad",
             "label": "scratchpad",
-            "type": "object"
-          },
-          {
-            "id": "raw_result",
-            "label": "raw_result",
             "type": "object"
           }
         ],
@@ -896,6 +896,11 @@
             "type": "string"
           },
           {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          },
+          {
             "id": "meta",
             "label": "meta",
             "type": "object"
@@ -903,11 +908,6 @@
           {
             "id": "scratchpad",
             "label": "scratchpad",
-            "type": "object"
-          },
-          {
-            "id": "raw_result",
-            "label": "raw_result",
             "type": "object"
           }
         ],
@@ -991,6 +991,11 @@
             "type": "string"
           },
           {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          },
+          {
             "id": "meta",
             "label": "meta",
             "type": "object"
@@ -998,11 +1003,6 @@
           {
             "id": "scratchpad",
             "label": "scratchpad",
-            "type": "object"
-          },
-          {
-            "id": "raw_result",
-            "label": "raw_result",
             "type": "object"
           }
         ],
@@ -1142,9 +1142,9 @@
     {
       "id": "edge-1768243417766",
       "source": "node-13",
-      "sourceHandle": "raw_result",
+      "sourceHandle": "result",
       "target": "node-4",
-      "targetHandle": "raw_result",
+      "targetHandle": "result",
       "animated": false
     },
     {
@@ -1358,9 +1358,9 @@
     {
       "id": "edge-1768245237473",
       "source": "node-25",
-      "sourceHandle": "raw_result",
+      "sourceHandle": "result",
       "target": "node-24",
-      "targetHandle": "raw_result",
+      "targetHandle": "result",
       "animated": false
     },
     {

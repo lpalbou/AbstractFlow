@@ -90,6 +90,11 @@
             "type": "string"
           },
           {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          },
+          {
             "id": "meta",
             "label": "meta",
             "type": "object"
@@ -97,11 +102,6 @@
           {
             "id": "scratchpad",
             "label": "scratchpad",
-            "type": "object"
-          },
-          {
-            "id": "raw_result",
-            "label": "raw_result",
             "type": "object"
           }
         ],
@@ -179,6 +179,11 @@
             "type": "string"
           },
           {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          },
+          {
             "id": "meta",
             "label": "meta",
             "type": "object"
@@ -186,11 +191,6 @@
           {
             "id": "scratchpad",
             "label": "scratchpad",
-            "type": "object"
-          },
-          {
-            "id": "raw_result",
-            "label": "raw_result",
             "type": "object"
           }
         ],
@@ -342,9 +342,9 @@
     {
       "id": "edge-1767684761292",
       "source": "node-16",
-      "sourceHandle": "raw_result",
+      "sourceHandle": "result",
       "target": "node-2",
-      "targetHandle": "raw_result",
+      "targetHandle": "result",
       "animated": false
     },
     {

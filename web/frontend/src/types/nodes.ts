@@ -274,6 +274,7 @@ const CORE_NODES: NodeTemplate[] = [
         description:
           'Best-effort final answer string (convenience pin). In structured-output mode, this reflects the unstructured answer prior to the schema post-pass.',
       },
+      { id: 'result', label: 'result', type: 'object', description: 'Structured final agent result (answer or structured output object).' },
       {
         id: 'meta',
         label: 'meta',
@@ -288,7 +289,6 @@ const CORE_NODES: NodeTemplate[] = [
         description:
           'Runtime-owned execution trace/scratchpad for observability (LLM/tool steps, timings). Includes best-effort tool_calls/tool_results extracted post-run.',
       },
-      { id: 'result', label: 'result', type: 'object', description: 'Structured final agent result (answer or structured output object).' },
     ],
     category: 'core',
   },
@@ -663,8 +663,8 @@ const DATA_NODES: NodeTemplate[] = [
   {
     type: 'make_raw_result',
     icon: '&#x1F50E;', // Magnifying glass
-    label: 'Make Raw Result',
-    description: 'Build a normalized raw LLM result envelope (content/tool_calls/usage/metadata/etc).',
+    label: 'Make Result',
+    description: 'Build a normalized LLM result envelope (content/tool_calls/usage/metadata/etc).',
     headerColor: '#3498DB',
     inputs: [
       { id: 'content', label: 'content', type: 'string', description: 'Assistant text content (or null/empty when using structured output).' },
@@ -675,9 +675,9 @@ const DATA_NODES: NodeTemplate[] = [
       { id: 'finish_reason', label: 'finish_reason', type: 'string', description: 'Finish reason (e.g. stop, length, tool_calls).' },
       { id: 'metadata', label: 'metadata', type: 'object', description: 'Provider/runtime metadata (debug/observability).' },
       { id: 'trace_id', label: 'trace_id', type: 'string', description: 'Optional trace id.' },
-      { id: 'extra', label: 'extra', type: 'object', description: 'Optional extra fields merged into the raw_result object (reserved keys win).' },
+      { id: 'extra', label: 'extra', type: 'object', description: 'Optional extra fields merged into the result object (reserved keys win).' },
     ],
-    outputs: [{ id: 'raw_result', label: 'raw_result', type: 'object', description: 'Raw result envelope.' }],
+    outputs: [{ id: 'result', label: 'result', type: 'object', description: 'Result envelope.' }],
     category: 'data',
   },
   { type: 'array_length', icon: '#', label: 'Array Length', description: 'Return the length of an array.', headerColor: '#3498DB', inputs: [{ id: 'array', label: 'array', type: 'array' }], outputs: [{ id: 'result', label: 'result', type: 'number' }], category: 'data' },

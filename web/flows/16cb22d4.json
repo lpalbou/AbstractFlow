@@ -1,6 +1,6 @@
 {
-  "id": "81795ea9",
-  "name": "basic-agent",
+  "id": "16cb22d4",
+  "name": "refactoring",
   "description": "",
   "interfaces": [
     "abstractcode.agent.v1"
@@ -10,12 +10,12 @@
       "id": "node-1",
       "type": "on_flow_start",
       "position": {
-        "x": -528.0,
+        "x": -112.0,
         "y": 112.0
       },
       "data": {
         "nodeType": "on_flow_start",
-        "label": "RECEIVING REQUEST",
+        "label": "On Flow Start",
         "icon": "&#x1F3C1;",
         "headerColor": "#C0392B",
         "inputs": [],
@@ -54,65 +54,18 @@
             "id": "max_iterations",
             "label": "max_iterations",
             "type": "number"
-          },
-          {
-            "id": "temperature",
-            "label": "temperature",
-            "type": "number"
-          },
-          {
-            "id": "seed",
-            "label": "seed",
-            "type": "number"
-          }
-        ]
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
-      "id": "end",
-      "type": "on_flow_end",
-      "position": {
-        "x": 656.0,
-        "y": 112.0
-      },
-      "data": {
-        "nodeType": "on_flow_end",
-        "label": "ANSWERING",
-        "icon": "&#x23F9;",
-        "headerColor": "#C0392B",
-        "inputs": [
-          {
-            "id": "exec-in",
-            "label": "",
-            "type": "execution"
-          },
-          {
-            "id": "response",
-            "label": "response",
-            "type": "string"
-          },
-          {
-            "id": "result",
-            "label": "result",
-            "type": "object"
-          },
-          {
-            "id": "meta",
-            "label": "meta",
-            "type": "object"
-          },
-          {
-            "id": "scratchpad",
-            "label": "scratchpad",
-            "type": "object"
           }
         ],
-        "outputs": []
+        "pinDefaults": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b",
+          "tools": [
+            "list_files",
+            "read_file",
+            "search_files",
+            "analyze_code"
+          ]
+        }
       },
       "label": null,
       "icon": null,
@@ -124,12 +77,12 @@
       "id": "node-2",
       "type": "agent",
       "position": {
-        "x": 16.0,
+        "x": 112.0,
         "y": 112.0
       },
       "data": {
         "nodeType": "agent",
-        "label": "Agentic Loop",
+        "label": "Agent",
         "icon": "&#x1F916;",
         "headerColor": "#4488FF",
         "inputs": [
@@ -175,6 +128,12 @@
             "description": "Maximum internal ReAct iterations (safety cap). Higher values allow more tool-use steps."
           },
           {
+            "id": "max_input_tokens",
+            "label": "max_input_tokens",
+            "type": "number",
+            "description": "Optional per-agent input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for the agent sub-run."
+          },
+          {
             "id": "system",
             "label": "system",
             "type": "string",
@@ -212,28 +171,28 @@
             "type": "execution"
           },
           {
-            "id": "result",
-            "label": "result",
+            "id": "response",
+            "label": "response",
+            "type": "string",
+            "description": "Best-effort final answer string (convenience pin). In structured-output mode, this reflects the unstructured answer prior to the schema post-pass."
+          },
+          {
+            "id": "meta",
+            "label": "meta",
             "type": "object",
-            "description": "Structured final agent result (answer + metadata/tool calls depending on agent)."
-          },
-          {
-            "id": "tool_calls",
-            "label": "tool_calls",
-            "type": "array",
-            "description": "Best-effort list of tool call requests extracted from the agent scratchpad trace (post-run). For real-time tool observability, subscribe to the ledger/node_traces stream."
-          },
-          {
-            "id": "tool_results",
-            "label": "tool_results",
-            "type": "array",
-            "description": "Best-effort list of tool results extracted from the agent scratchpad trace (post-run). For real-time tool observability, subscribe to the ledger/node_traces stream."
+            "description": "Host-facing meta envelope (schema=abstractcode.agent.v1.meta). Includes provider/model and lightweight execution metadata."
           },
           {
             "id": "scratchpad",
             "label": "scratchpad",
             "type": "object",
-            "description": "Runtime-owned execution trace/scratchpad for observability (LLM/tool steps, timings)."
+            "description": "Runtime-owned execution trace/scratchpad for observability (LLM/tool steps, timings). Includes best-effort tool_calls/tool_results extracted post-run."
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object",
+            "description": "Structured final agent result (answer or structured output object)."
           }
         ],
         "pinDefaults": {}
@@ -246,10 +205,57 @@
     },
     {
       "id": "node-3",
+      "type": "on_flow_end",
+      "position": {
+        "x": 720.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-4",
       "type": "break_object",
       "position": {
-        "x": 640.0,
-        "y": 272.0
+        "x": 384.0,
+        "y": 464.0
       },
       "data": {
         "nodeType": "break_object",
@@ -265,20 +271,14 @@
         ],
         "outputs": [
           {
-            "id": "result",
-            "label": "result",
-            "type": "string"
-          },
-          {
-            "id": "usage",
-            "label": "usage",
-            "type": "object"
+            "id": "messages",
+            "label": "messages",
+            "type": "array"
           }
         ],
         "breakConfig": {
           "selectedPaths": [
-            "result",
-            "usage"
+            "messages"
           ]
         }
       },
@@ -289,56 +289,36 @@
       "outputs": []
     },
     {
-      "id": "node-4",
-      "type": "subflow",
+      "id": "node-6",
+      "type": "join",
       "position": {
-        "x": -272.0,
-        "y": 112.0
+        "x": 384.0,
+        "y": 304.0
       },
       "data": {
-        "nodeType": "subflow",
-        "label": "Thinking",
-        "icon": "&#x1F4E6;",
-        "headerColor": "#00CCCC",
+        "nodeType": "join",
+        "label": "Join",
+        "icon": "&#x1F517;",
+        "headerColor": "#E74C3C",
         "inputs": [
           {
-            "id": "exec-in",
-            "label": "",
-            "type": "execution"
+            "id": "items",
+            "label": "items",
+            "type": "array"
           },
           {
-            "id": "inherit_context",
-            "label": "inherit_context",
-            "type": "boolean",
-            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
-          },
-          {
-            "id": "input",
-            "label": "input",
-            "type": "object"
-          },
-          {
-            "id": "state",
-            "label": "state",
+            "id": "delimiter",
+            "label": "delimiter",
             "type": "string"
-          },
-          {
-            "id": "post_delay",
-            "label": "post_delay",
-            "type": "number"
           }
         ],
         "outputs": [
           {
-            "id": "exec-out",
-            "label": "",
-            "type": "execution"
+            "id": "result",
+            "label": "result",
+            "type": "string"
           }
-        ],
-        "subflowId": "15f19f7f",
-        "pinDefaults": {
-          "state": "Thinking..."
-        }
+        ]
       },
       "label": null,
       "icon": null,
@@ -347,17 +327,17 @@
       "outputs": []
     },
     {
-      "id": "node-5",
-      "type": "subflow",
+      "id": "node-7",
+      "type": "answer_user",
       "position": {
-        "x": 336.0,
+        "x": 400.0,
         "y": 112.0
       },
       "data": {
-        "nodeType": "subflow",
-        "label": "DONE",
-        "icon": "&#x1F4E6;",
-        "headerColor": "#00CCCC",
+        "nodeType": "answer_user",
+        "label": "Answer User",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
         "inputs": [
           {
             "id": "exec-in",
@@ -365,25 +345,15 @@
             "type": "execution"
           },
           {
-            "id": "inherit_context",
-            "label": "inherit_context",
-            "type": "boolean",
-            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
-          },
-          {
-            "id": "input",
-            "label": "input",
-            "type": "object"
-          },
-          {
-            "id": "state",
-            "label": "state",
+            "id": "message",
+            "label": "message",
             "type": "string"
           },
           {
-            "id": "post_delay",
-            "label": "post_delay",
-            "type": "number"
+            "id": "level",
+            "label": "level",
+            "type": "string",
+            "description": "Message level for hosts (message|warning|error). Defaults to 'message' when unset."
           }
         ],
         "outputs": [
@@ -391,13 +361,13 @@
             "id": "exec-out",
             "label": "",
             "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
           }
-        ],
-        "subflowId": "15f19f7f",
-        "pinDefaults": {
-          "state": "Done",
-          "post_delay": 3
-        }
+        ]
       },
       "label": null,
       "icon": null,
@@ -408,39 +378,55 @@
   ],
   "edges": [
     {
-      "id": "edge-1768015010520",
-      "source": "node-1",
-      "sourceHandle": "request",
-      "target": "node-2",
-      "targetHandle": "task",
+      "id": "edge-1768523115291",
+      "source": "node-2",
+      "sourceHandle": "scratchpad",
+      "target": "node-4",
+      "targetHandle": "object",
       "animated": false
     },
     {
-      "id": "edge-1768015012692",
-      "source": "node-1",
-      "sourceHandle": "tools",
-      "target": "node-2",
-      "targetHandle": "tools",
+      "id": "edge-1768523178796",
+      "source": "node-2",
+      "sourceHandle": "exec-out",
+      "target": "node-7",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768523181309",
+      "source": "node-7",
+      "sourceHandle": "exec-out",
+      "target": "node-3",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768523185196",
+      "source": "node-6",
+      "sourceHandle": "result",
+      "target": "node-7",
+      "targetHandle": "message",
       "animated": false
     },
     {
-      "id": "edge-1768015015156",
-      "source": "node-1",
-      "sourceHandle": "context",
-      "target": "node-2",
-      "targetHandle": "context",
+      "id": "edge-1768523188318",
+      "source": "node-4",
+      "sourceHandle": "messages",
+      "target": "node-6",
+      "targetHandle": "items",
       "animated": false
     },
     {
-      "id": "edge-1768015017449",
+      "id": "edge-1768523192196",
       "source": "node-1",
-      "sourceHandle": "model",
+      "sourceHandle": "exec-out",
       "target": "node-2",
-      "targetHandle": "model",
-      "animated": false
+      "targetHandle": "exec-in",
+      "animated": true
     },
     {
-      "id": "edge-1768015019109",
+      "id": "edge-1768523198047",
       "source": "node-1",
       "sourceHandle": "provider",
       "target": "node-2",
@@ -448,47 +434,31 @@
       "animated": false
     },
     {
-      "id": "edge-1768015038917",
-      "source": "node-2",
-      "sourceHandle": "result",
-      "target": "node-3",
-      "targetHandle": "object",
+      "id": "edge-1768523199917",
+      "source": "node-1",
+      "sourceHandle": "model",
+      "target": "node-2",
+      "targetHandle": "model",
       "animated": false
     },
     {
-      "id": "edge-1768015060982",
-      "source": "node-3",
-      "sourceHandle": "result",
-      "target": "end",
-      "targetHandle": "response",
+      "id": "edge-1768523203077",
+      "source": "node-1",
+      "sourceHandle": "tools",
+      "target": "node-2",
+      "targetHandle": "tools",
       "animated": false
     },
     {
-      "id": "edge-1768015066098",
-      "source": "node-3",
-      "sourceHandle": "usage",
-      "target": "end",
-      "targetHandle": "meta",
+      "id": "edge-1768523206414",
+      "source": "node-1",
+      "sourceHandle": "request",
+      "target": "node-2",
+      "targetHandle": "task",
       "animated": false
     },
     {
-      "id": "edge-1768015068923",
-      "source": "node-2",
-      "sourceHandle": "scratchpad",
-      "target": "end",
-      "targetHandle": "scratchpad",
-      "animated": false
-    },
-    {
-      "id": "edge-1768015071706",
-      "source": "node-2",
-      "sourceHandle": "result",
-      "target": "end",
-      "targetHandle": "result",
-      "animated": false
-    },
-    {
-      "id": "edge-1768015078148",
+      "id": "edge-1768523212553",
       "source": "node-1",
       "sourceHandle": "max_iterations",
       "target": "node-2",
@@ -496,55 +466,47 @@
       "animated": false
     },
     {
-      "id": "edge-1768020010001",
+      "id": "edge-1768523216119",
       "source": "node-1",
-      "sourceHandle": "temperature",
+      "sourceHandle": "context",
       "target": "node-2",
-      "targetHandle": "temperature",
+      "targetHandle": "context",
       "animated": false
     },
     {
-      "id": "edge-1768020010002",
-      "source": "node-1",
-      "sourceHandle": "seed",
-      "target": "node-2",
-      "targetHandle": "seed",
-      "animated": false
-    },
-    {
-      "id": "edge-1768015183387",
-      "source": "node-1",
-      "sourceHandle": "exec-out",
-      "target": "node-4",
-      "targetHandle": "exec-in",
-      "animated": true
-    },
-    {
-      "id": "edge-1768015189054",
-      "source": "node-4",
-      "sourceHandle": "exec-out",
-      "target": "node-2",
-      "targetHandle": "exec-in",
-      "animated": true
-    },
-    {
-      "id": "edge-1768015206686",
+      "id": "edge-1768523339648",
       "source": "node-2",
-      "sourceHandle": "exec-out",
-      "target": "node-5",
-      "targetHandle": "exec-in",
-      "animated": true
+      "sourceHandle": "response",
+      "target": "node-3",
+      "targetHandle": "response",
+      "animated": false
     },
     {
-      "id": "edge-1768015210518",
-      "source": "node-5",
-      "sourceHandle": "exec-out",
-      "target": "end",
-      "targetHandle": "exec-in",
-      "animated": true
+      "id": "edge-1768523342210",
+      "source": "node-2",
+      "sourceHandle": "meta",
+      "target": "node-3",
+      "targetHandle": "meta",
+      "animated": false
+    },
+    {
+      "id": "edge-1768523344770",
+      "source": "node-2",
+      "sourceHandle": "scratchpad",
+      "target": "node-3",
+      "targetHandle": "scratchpad",
+      "animated": false
+    },
+    {
+      "id": "edge-1768523347128",
+      "source": "node-2",
+      "sourceHandle": "result",
+      "target": "node-3",
+      "targetHandle": "result",
+      "animated": false
     }
   ],
   "entryNode": "node-1",
-  "created_at": "2026-01-10T03:16:28.522693",
-  "updated_at": "2026-01-11T02:06:04.324373"
+  "created_at": "2026-01-16T00:24:24.892015",
+  "updated_at": "2026-01-16T00:33:01.373746"
 }

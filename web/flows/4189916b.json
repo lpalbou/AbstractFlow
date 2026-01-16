@@ -97,6 +97,11 @@
             "type": "string"
           },
           {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          },
+          {
             "id": "meta",
             "label": "meta",
             "type": "object"
@@ -104,11 +109,6 @@
           {
             "id": "scratchpad",
             "label": "scratchpad",
-            "type": "object"
-          },
-          {
-            "id": "raw_result",
-            "label": "raw_result",
             "type": "object"
           }
         ],
@@ -870,7 +870,7 @@
       "source": "node-2",
       "sourceHandle": "result",
       "target": "end",
-      "targetHandle": "raw_result",
+      "targetHandle": "result",
       "animated": false
     },
     {

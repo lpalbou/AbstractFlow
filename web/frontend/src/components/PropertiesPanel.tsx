@@ -12,6 +12,7 @@ import { CodeEditorModal } from './CodeEditorModal';
 import ProviderModelsPanel from './ProviderModelsPanel';
 import { JsonSchemaNodeEditor } from './JsonSchemaNodeEditor';
 import { JsonValueEditor } from './JsonValueEditor';
+import { AfTooltip } from './AfTooltip';
 import AfSelect from './inputs/AfSelect';
 import AfMultiSelect from './inputs/AfMultiSelect';
 import {
@@ -21,6 +22,14 @@ import {
   upsertPythonAvailableVariablesComments,
 } from '../utils/codegen';
 import { collectCustomEventNames } from '../utils/events';
+import {
+  AGENT_META_SCHEMA,
+  AGENT_RESULT_SCHEMA,
+  AGENT_SCRATCHPAD_SCHEMA,
+  CONTEXT_SCHEMA,
+  EVENT_ENVELOPE_SCHEMA,
+  LLM_RESULT_SCHEMA,
+} from '../schemas/known_json_schemas';
 
 interface PropertiesPanelProps {
   node: Node<FlowNodeData> | null;
@@ -1369,16 +1378,17 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
             const inputEdge = edges.find(
               (e) => e.target === node.id && e.targetHandle === 'object'
             );
-            const sourceNode = inputEdge
-              ? nodes.find((n) => n.id === inputEdge.source)
-              : undefined;
-            let sample: unknown = undefined;
-            let schema: unknown = undefined;
+	            const sourceNode = inputEdge
+	              ? nodes.find((n) => n.id === inputEdge.source)
+	              : undefined;
+	            let sample: unknown = undefined;
+	            let schema: unknown = undefined;
+	            const sourceHandle = typeof inputEdge?.sourceHandle === 'string' ? inputEdge.sourceHandle : '';
 
-            if (sourceNode?.data.nodeType === 'literal_json') {
-              sample = sourceNode.data.literalValue;
-            } else if (sourceNode?.data.nodeType === 'literal_array') {
-              sample = sourceNode.data.literalValue;
+	            if (sourceNode?.data.nodeType === 'literal_json') {
+	              sample = sourceNode.data.literalValue;
+	            } else if (sourceNode?.data.nodeType === 'literal_array') {
+	              sample = sourceNode.data.literalValue;
             } else if (sourceNode?.data.nodeType === 'parse_json') {
               // Best-effort: if Parse JSON is fed by a pinned literal string, parse it so users
               // can discover fields and expose them as Break Object output pins.
@@ -1433,26 +1443,21 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 }
               };
 
-              if (typeof candidateText === 'string' && candidateText.trim()) {
-                const parsed = tryParse(candidateText);
-                if (parsed !== undefined) sample = parsed;
-              }
-            } else if (sourceNode?.data.nodeType === 'on_event' && inputEdge?.sourceHandle === 'event') {
-              // Best-effort sample of AbstractRuntime's event envelope so users can break it into fields.
-              sample = {
-                event_id: 'run:node:1',
-                name: 'my_event',
-                scope: 'session',
-                session_id: 'run_id_or_session_id',
-                payload: {},
-                emitted_at: '2025-01-01T00:00:00Z',
-                emitter: {
-                  run_id: 'run_id',
-                  workflow_id: 'workflow_id',
-                  node_id: 'node_id',
-                },
-              };
-            } else if (sourceNode?.data.nodeType === 'on_event' && inputEdge?.sourceHandle === 'payload') {
+	              if (typeof candidateText === 'string' && candidateText.trim()) {
+	                const parsed = tryParse(candidateText);
+	                if (parsed !== undefined) sample = parsed;
+	              }
+	            } else if (sourceHandle === 'context') {
+	              schema = CONTEXT_SCHEMA;
+	            } else if (sourceNode?.data.nodeType === 'make_meta') {
+	              schema = AGENT_META_SCHEMA;
+	            } else if (sourceNode?.data.nodeType === 'make_scratchpad') {
+	              schema = AGENT_SCRATCHPAD_SCHEMA;
+	            } else if (sourceNode?.data.nodeType === 'make_raw_result') {
+	              schema = LLM_RESULT_SCHEMA;
+	            } else if (sourceNode?.data.nodeType === 'on_event' && inputEdge?.sourceHandle === 'event') {
+	              schema = EVENT_ENVELOPE_SCHEMA;
+	            } else if (sourceNode?.data.nodeType === 'on_event' && inputEdge?.sourceHandle === 'payload') {
               // Payload is always a JSON object in our event envelope; for non-object payloads we wrap them as `{ value: ... }`.
               // When possible, infer a payload sample from a matching Emit Event node in the current graph.
               const eventName = (sourceNode.data.eventConfig?.name || '').trim();
@@ -1482,123 +1487,29 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 }
               }
 
-              if (inferred && typeof inferred === 'object') {
-                sample = inferred;
-              } else {
-                // Minimal, still useful: exposes the stable `{ value }` wrapper field.
-                sample = { value: inferred ?? '' };
-              }
-            } else if (sourceNode?.data.nodeType === 'agent') {
-              const sourceHandle = inputEdge?.sourceHandle;
-
-              if (sourceHandle === 'scratchpad') {
-                // Agent scratchpad is runtime-owned; we expose a stable subset for observability.
-                sample = {
-                  sub_run_id: '',
-                  workflow_id: '',
-                  node_traces: {},
-                  steps: [],
-                  tool_calls: [
-                    {
-                      call_id: '',
-                      name: '',
-                      arguments: {},
-                    },
-                  ],
-                  tool_results: [
-                    {
-                      call_id: '',
-                      name: '',
-                      success: true,
-                      output: {},
-                      error: null,
-                      meta: {},
-                    },
-                  ],
-                };
-              } else if (sourceHandle === 'meta') {
-                sample = {
-                  schema: 'abstractcode.agent.v1.meta',
-                  version: 1,
-                  provider: '',
-                  model: '',
-                  sub_run_id: '',
-                  iterations: 0,
-                  tool_calls: 0,
-                  tool_results: 0,
-                  trace: { trace_id: '' },
-                  warnings: [],
-                  debug: {},
-                };
-              } else {
-                // Default: assume the Agent `result` output.
-                const outputSchema = sourceNode.data.agentConfig?.outputSchema;
-                if (outputSchema?.enabled && outputSchema.jsonSchema && typeof outputSchema.jsonSchema === 'object') {
-                  schema = outputSchema.jsonSchema;
-                } else {
-                  // Best-effort schema for Agent result payload (unstructured mode).
-                  sample = {
-                    result: '',
-                    task: '',
-                    context: {},
-                    success: true,
-                    provider: '',
-                    model: '',
-                    sub_run_id: '',
-                    iterations: 0,
-                    tool_calls: [
-                      {
-                        call_id: '',
-                        name: '',
-                        arguments: {},
-                      },
-                    ],
-                    tool_results: [
-                      {
-                        call_id: '',
-                        name: '',
-                        success: true,
-                        output: {},
-                        error: null,
-                        meta: {},
-                      },
-                    ],
-                    usage: {
-                      input_tokens: 0,
-                      output_tokens: 0,
-                      total_tokens: 0,
-                      prompt_tokens: 0,
-                      completion_tokens: 0,
-                    },
-                  };
-                }
-              }
-            } else if (sourceNode?.data.nodeType === 'llm_call') {
-              // Best-effort schema for AbstractRuntime normalized LLM_CALL result payload.
-              sample = {
-                content: '',
-                reasoning: '',
-                data: null,
-                tool_calls: [
-                  {
-                    name: '',
-                    arguments: {},
-                    call_id: '',
-                  },
-                ],
-                usage: {
-                  input_tokens: 0,
-                  output_tokens: 0,
-                  total_tokens: 0,
-                  prompt_tokens: 0,
-                  completion_tokens: 0,
-                },
-                model: '',
-                finish_reason: '',
-                metadata: {},
-                trace_id: '',
-              };
-            }
+	              if (inferred && typeof inferred === 'object') {
+	                sample = inferred;
+	              } else {
+	                // Minimal, still useful: exposes the stable `{ value }` wrapper field.
+	                sample = { value: inferred ?? '' };
+	              }
+	            } else if (sourceNode?.data.nodeType === 'agent') {
+	              if (sourceHandle === 'scratchpad') {
+	                schema = AGENT_SCRATCHPAD_SCHEMA;
+	              } else if (sourceHandle === 'meta') {
+	                schema = AGENT_META_SCHEMA;
+	              } else {
+	                // Default: assume the Agent `result` output.
+	                const outputSchema = sourceNode.data.agentConfig?.outputSchema;
+	                if (outputSchema?.enabled && outputSchema.jsonSchema && typeof outputSchema.jsonSchema === 'object') {
+	                  schema = outputSchema.jsonSchema;
+	                } else {
+	                  schema = AGENT_RESULT_SCHEMA;
+	                }
+	              }
+	            } else if (sourceNode?.data.nodeType === 'llm_call') {
+	              schema = LLM_RESULT_SCHEMA;
+	            }
 
             const available = schema
               ? flattenSchemaPaths(schema).sort()
@@ -1681,11 +1592,11 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               setIoPinNameDrafts((prev) => ({ ...prev, [id]: id }));
             };
 
-            const togglePath = (path: string) => {
-              if (existingPins.some((p) => p.id === path)) {
-                removeField(path);
-                return;
-              }
+	            const togglePath = (path: string) => {
+	              if (existingPins.some((p) => p.id === path)) {
+	                removeField(path);
+	                return;
+	              }
               const inferredType = (schema
                 ? inferPinTypeFromSchema(getSchemaByPath(schema, path))
                 : inferPinType(getByPath(sample, path))) as DataPinType;
@@ -1693,11 +1604,46 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 ...existingPins,
                 { id: path, label: path.split('.').slice(-1)[0] || path, type: inferredType },
               ];
-              syncPins(nextPins);
-            };
+	              syncPins(nextPins);
+	            };
 
-            return (
-              <>
+	            const tooltipForPath = (path: string): string => {
+	              if (!schema) return '';
+	              const leaf = getSchemaByPath(schema, path);
+	              if (!leaf || typeof leaf !== 'object') return '';
+	              const s = leaf as Record<string, unknown>;
+	              const t = typeof s.type === 'string' ? s.type.trim() : '';
+	              const fmt = typeof s.format === 'string' ? s.format.trim() : '';
+	              const desc = typeof s.description === 'string' ? s.description.trim() : '';
+	              const enumVals = Array.isArray(s.enum)
+	                ? s.enum
+	                    .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+	                    .map((v) => v.trim())
+	                    .slice(0, 12)
+	                : [];
+
+	              let typeLabel = t;
+	              if (t === 'array') {
+	                const items = (s as any).items;
+	                const itemType =
+	                  items && typeof items === 'object' && typeof (items as any).type === 'string' ? String((items as any).type) : '';
+	                typeLabel = itemType ? `array<${itemType}>` : 'array';
+	              }
+
+	              const lines: string[] = [];
+	              lines.push(path);
+	              if (typeLabel) lines.push(`Type: ${typeLabel}${fmt ? ` (${fmt})` : ''}`);
+	              if (enumVals.length) {
+	                lines.push(
+	                  `Enum: ${enumVals.join(' | ')}${Array.isArray(s.enum) && s.enum.length > enumVals.length ? ' …' : ''}`
+	                );
+	              }
+	              if (desc) lines.push(desc);
+	              return lines.join('\n');
+	            };
+
+	            return (
+	              <>
                 {!inputEdge && (
                   <span className="property-hint">
                     Connect an object to the <code>object</code> input to auto-discover fields, or add fields manually below.
@@ -1710,24 +1656,26 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                   </span>
                 )}
 
-                {inputEdge && available.length > 0 && (
-                  <div className="property-group">
-                    <div className="checkbox-list">
-                      {available.map((path) => (
-                        <label key={path} className="checkbox-item">
-                          <input
-                            type="checkbox"
-                            checked={existingPins.some((p) => p.id === path)}
-                            onChange={() => togglePath(path)}
-                          />
-                          <span className="checkbox-label">{path}</span>
-                        </label>
-                      ))}
-                    </div>
-                    <span className="property-hint">
-                      Select fields to expose as output pins.
-                    </span>
-                  </div>
+	                {inputEdge && available.length > 0 && (
+	                  <div className="property-group">
+	                    <div className="checkbox-list">
+	                      {available.map((path) => (
+	                        <AfTooltip key={path} content={tooltipForPath(path) || undefined} delayMs={700} priority={1} block>
+	                          <label className="checkbox-item">
+	                            <input
+	                              type="checkbox"
+	                              checked={existingPins.some((p) => p.id === path)}
+	                              onChange={() => togglePath(path)}
+	                            />
+	                            <span className="checkbox-label">{path}</span>
+	                          </label>
+	                        </AfTooltip>
+	                      ))}
+	                    </div>
+	                    <span className="property-hint">
+	                      Select fields to expose as output pins.
+	                    </span>
+	                  </div>
                 )}
 
                 <div className="property-group">

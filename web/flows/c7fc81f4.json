@@ -101,6 +101,11 @@
             "type": "string"
           },
           {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          },
+          {
             "id": "meta",
             "label": "meta",
             "type": "object"
@@ -108,11 +113,6 @@
           {
             "id": "scratchpad",
             "label": "scratchpad",
-            "type": "object"
-          },
-          {
-            "id": "raw_result",
-            "label": "raw_result",
             "type": "object"
           }
         ],
@@ -442,6 +442,11 @@
             "type": "string"
           },
           {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          },
+          {
             "id": "meta",
             "label": "meta",
             "type": "object"
@@ -449,11 +454,6 @@
           {
             "id": "scratchpad",
             "label": "scratchpad",
-            "type": "object"
-          },
-          {
-            "id": "raw_result",
-            "label": "raw_result",
             "type": "object"
           }
         ],
@@ -536,6 +536,11 @@
             "type": "string"
           },
           {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          },
+          {
             "id": "meta",
             "label": "meta",
             "type": "object"
@@ -543,11 +548,6 @@
           {
             "id": "scratchpad",
             "label": "scratchpad",
-            "type": "object"
-          },
-          {
-            "id": "raw_result",
-            "label": "raw_result",
             "type": "object"
           }
         ],
@@ -728,7 +728,7 @@
       "source": "node-4",
       "sourceHandle": "result",
       "target": "node-8",
-      "targetHandle": "raw_result",
+      "targetHandle": "result",
       "animated": false
     },
     {
@@ -838,9 +838,9 @@
     {
       "id": "edge-1768180777002",
       "source": "node-6",
-      "sourceHandle": "raw_result",
+      "sourceHandle": "result",
       "target": "node-2",
-      "targetHandle": "raw_result",
+      "targetHandle": "result",
       "animated": false
     }
   ],

@@ -152,6 +152,10 @@ def test_visual_agent_exposes_runtime_backed_scratchpad_output() -> None:
     assert "result" in node_output
     scratchpad = node_output.get("scratchpad")
     assert isinstance(scratchpad, dict)
+    messages = scratchpad.get("messages")
+    assert isinstance(messages, list)
+    assert any(isinstance(m, dict) and m.get("role") == "user" for m in messages)
+    assert any(isinstance(m, dict) and m.get("role") == "assistant" for m in messages)
     steps = scratchpad.get("steps")
     assert isinstance(steps, list)
     assert any(
