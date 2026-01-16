@@ -24,8 +24,8 @@
             "type": "execution"
           },
           {
-            "id": "request",
-            "label": "request",
+            "id": "prompt",
+            "label": "prompt",
             "type": "string"
           },
           {
@@ -655,8 +655,8 @@
             "type": "object"
           },
           {
-            "id": "request",
-            "label": "request",
+            "id": "prompt",
+            "label": "prompt",
             "type": "string"
           },
           {
@@ -1613,9 +1613,9 @@
     {
       "id": "edge-1767683406198",
       "source": "node-1",
-      "sourceHandle": "request",
+      "sourceHandle": "prompt",
       "target": "node-16",
-      "targetHandle": "request",
+      "targetHandle": "prompt",
       "animated": false
     },
     {
@@ -1693,7 +1693,7 @@
     {
       "id": "edge-1767683999836",
       "source": "node-1",
-      "sourceHandle": "request",
+      "sourceHandle": "prompt",
       "target": "node-7",
       "targetHandle": "b",
       "animated": false
@@ -1877,7 +1877,7 @@
     {
       "id": "edge-1767904279049",
       "source": "node-1",
-      "sourceHandle": "request",
+      "sourceHandle": "prompt",
       "target": "node-42",
       "targetHandle": "b",
       "animated": false

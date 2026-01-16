@@ -66,6 +66,38 @@ class FlowRunner:
         """Get the current run ID."""
         return self._current_run_id
 
+    @staticmethod
+    def _normalize_completed_output(raw: Any) -> Dict[str, Any]:
+        """Normalize workflow completion output for host callers.
+
+        Runtime-level workflows may complete with various output shapes:
+        - VisualFlow On Flow End: {"my_output": ..., "success": True}
+        - Terminal node returning scalar: {"response": 123, "success": True}
+        - Legacy / explicit: {"result": ..., "success": True}
+
+        AbstractFlow's public contract is: {"success": bool, "result": Any, ...}.
+        """
+        if not isinstance(raw, dict):
+            return {"success": True, "result": raw}
+
+        success = raw.get("success")
+        if success is False:
+            # Preserve error shape (tests + callers expect top-level "error"/"node", etc).
+            return raw
+
+        # Prefer explicit `result` when present (visual flows may also keep
+        # top-level keys for UI/WS convenience).
+        if "result" in raw:
+            return {"success": True, "result": raw.get("result")}
+
+        payload = {k: v for k, v in raw.items() if k != "success"}
+        if len(payload) == 1:
+            (only_key, only_val) = next(iter(payload.items()))
+            if only_key in {"result", "response"}:
+                return {"success": True, "result": only_val}
+
+        return {"success": True, "result": payload}
+
     def start(
         self,
         input_data: Optional[Dict[str, Any]] = None,
@@ -144,7 +176,7 @@ class FlowRunner:
             )
 
             if state.status == RunStatus.COMPLETED:
-                return state.output or {}
+                return self._normalize_completed_output(state.output)
 
             if state.status == RunStatus.FAILED:
                 raise RuntimeError(f"Flow failed: {state.error}")
@@ -297,13 +329,21 @@ class FlowRunner:
         if not self._current_run_id:
             raise ValueError("No active run to resume.")
 
-        return self.runtime.resume(
+        state = self.runtime.resume(
             workflow=self.workflow,
             run_id=self._current_run_id,
             wait_key=wait_key,
             payload=payload or {},
             max_steps=max_steps,
         )
+        try:
+            from abstractruntime.core.models import RunStatus
+
+            if getattr(state, "status", None) == RunStatus.COMPLETED:
+                state.output = self._normalize_completed_output(getattr(state, "output", None))  # type: ignore[attr-defined]
+        except Exception:
+            pass
+        return state
 
     def get_state(self) -> Optional["RunState"]:
         """Get the current run state.

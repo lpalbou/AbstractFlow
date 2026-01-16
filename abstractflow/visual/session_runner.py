@@ -166,7 +166,7 @@ class VisualSessionRunner(FlowRunner):
                                 runtime.cancel_run(cid, reason="Session completed")
                             except Exception:
                                 pass
-                    return state.output or {}
+                    return self._normalize_completed_output(state.output)
                 # Otherwise, keep driving until children settle into waits/terminal.
                 continue
 

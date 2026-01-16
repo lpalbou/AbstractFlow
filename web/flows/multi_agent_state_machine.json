@@ -6,7 +6,10 @@
     {
       "id": "node-1",
       "type": "on_flow_start",
-      "position": { "x": -1024.0, "y": 64.0 },
+      "position": {
+        "x": -1024.0,
+        "y": 64.0
+      },
       "data": {
         "nodeType": "on_flow_start",
         "label": "On Flow Start",
@@ -14,16 +17,56 @@
         "headerColor": "#C0392B",
         "inputs": [],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "request", "label": "request", "type": "string" },
-          { "id": "provider", "label": "provider", "type": "string" },
-          { "id": "model", "label": "model", "type": "string" },
-          { "id": "max_cycles", "label": "max_cycles", "type": "number" },
-          { "id": "max_iterations", "label": "max_iterations", "type": "number" },
-          { "id": "skip_clarifications", "label": "skip_clarifications", "type": "boolean" },
-          { "id": "max_web_search", "label": "max_web_search", "type": "number" },
-          { "id": "max_fetch_url", "label": "max_fetch_url", "type": "number" },
-          { "id": "workspace_root", "label": "workspace_root", "type": "string" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "string"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "string"
+          },
+          {
+            "id": "max_cycles",
+            "label": "max_cycles",
+            "type": "number"
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          },
+          {
+            "id": "skip_clarifications",
+            "label": "skip_clarifications",
+            "type": "boolean"
+          },
+          {
+            "id": "max_web_search",
+            "label": "max_web_search",
+            "type": "number"
+          },
+          {
+            "id": "max_fetch_url",
+            "label": "max_fetch_url",
+            "type": "number"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          }
         ]
       },
       "label": null,
@@ -32,18 +75,32 @@
       "inputs": [],
       "outputs": []
     },
-
     {
       "id": "node-2",
       "type": "trim",
-      "position": { "x": -768.0, "y": -192.0 },
+      "position": {
+        "x": -768.0,
+        "y": -192.0
+      },
       "data": {
         "nodeType": "trim",
         "label": "Trim Provider",
         "icon": "&#x2795;",
         "headerColor": "#E74C3C",
-        "inputs": [{ "id": "text", "label": "text", "type": "string" }],
-        "outputs": [{ "id": "result", "label": "result", "type": "string" }]
+        "inputs": [
+          {
+            "id": "text",
+            "label": "text",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ]
       },
       "label": null,
       "icon": null,
@@ -54,14 +111,29 @@
     {
       "id": "node-3",
       "type": "length",
-      "position": { "x": -512.0, "y": -192.0 },
+      "position": {
+        "x": -512.0,
+        "y": -192.0
+      },
       "data": {
         "nodeType": "length",
         "label": "Provider Length",
         "icon": "#",
         "headerColor": "#E74C3C",
-        "inputs": [{ "id": "text", "label": "text", "type": "string" }],
-        "outputs": [{ "id": "result", "label": "result", "type": "number" }]
+        "inputs": [
+          {
+            "id": "text",
+            "label": "text",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "number"
+          }
+        ]
       },
       "label": null,
       "icon": null,
@@ -72,19 +144,43 @@
     {
       "id": "node-4",
       "type": "compare",
-      "position": { "x": -256.0, "y": -192.0 },
+      "position": {
+        "x": -256.0,
+        "y": -192.0
+      },
       "data": {
         "nodeType": "compare",
         "label": "Provider Set?",
         "icon": "=?",
         "headerColor": "#F39C12",
         "inputs": [
-          { "id": "a", "label": "a", "type": "any" },
-          { "id": "op", "label": "op", "type": "string" },
-          { "id": "b", "label": "b", "type": "any" }
+          {
+            "id": "a",
+            "label": "a",
+            "type": "any"
+          },
+          {
+            "id": "op",
+            "label": "op",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "any"
+          }
         ],
-        "outputs": [{ "id": "result", "label": "result", "type": "boolean" }],
-        "pinDefaults": { "op": ">", "b": 0 }
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "boolean"
+          }
+        ],
+        "pinDefaults": {
+          "op": ">",
+          "b": 0
+        }
       },
       "label": null,
       "icon": null,
@@ -95,15 +191,32 @@
     {
       "id": "node-5",
       "type": "concat",
-      "position": { "x": 0.0, "y": -192.0 },
+      "position": {
+        "x": 0.0,
+        "y": -192.0
+      },
       "data": {
         "nodeType": "concat",
         "label": "Provider Bool→String",
         "icon": "&#x2795;",
         "headerColor": "#E74C3C",
-        "inputs": [{ "id": "a", "label": "a", "type": "boolean" }],
-        "outputs": [{ "id": "result", "label": "result", "type": "string" }],
-        "concatConfig": { "separator": "" }
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": ""
+        }
       },
       "label": null,
       "icon": null,
@@ -114,15 +227,27 @@
     {
       "id": "node-6",
       "type": "literal_json",
-      "position": { "x": -256.0, "y": -320.0 },
+      "position": {
+        "x": -256.0,
+        "y": -320.0
+      },
       "data": {
         "nodeType": "literal_json",
         "label": "Provider Map",
         "icon": "{}",
         "headerColor": "#00FFFF",
         "inputs": [],
-        "outputs": [{ "id": "value", "label": "value", "type": "object" }],
-        "literalValue": { "True": "", "False": "lmstudio" }
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "object"
+          }
+        ],
+        "literalValue": {
+          "True": "",
+          "False": "lmstudio"
+        }
       },
       "label": null,
       "icon": null,
@@ -133,19 +258,42 @@
     {
       "id": "node-7",
       "type": "set",
-      "position": { "x": 0.0, "y": -320.0 },
+      "position": {
+        "x": 0.0,
+        "y": -320.0
+      },
       "data": {
         "nodeType": "set",
         "label": "Provider Select Map",
         "icon": "&#x1F4E4;",
         "headerColor": "#3498DB",
         "inputs": [
-          { "id": "object", "label": "object", "type": "object" },
-          { "id": "key", "label": "key", "type": "string" },
-          { "id": "value", "label": "value", "type": "any" }
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
         ],
-        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
-        "pinDefaults": { "key": "True" }
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "key": "True"
+        }
       },
       "label": null,
       "icon": null,
@@ -156,19 +304,42 @@
     {
       "id": "node-8",
       "type": "get",
-      "position": { "x": 256.0, "y": -320.0 },
+      "position": {
+        "x": 256.0,
+        "y": -320.0
+      },
       "data": {
         "nodeType": "get",
         "label": "Selected Provider",
         "icon": "&#x1F4E5;",
         "headerColor": "#3498DB",
         "inputs": [
-          { "id": "object", "label": "object", "type": "object" },
-          { "id": "key", "label": "key", "type": "string" },
-          { "id": "default", "label": "default", "type": "any" }
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
         ],
-        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
-        "pinDefaults": { "default": "lmstudio" }
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "default": "lmstudio"
+        }
       },
       "label": null,
       "icon": null,
@@ -176,18 +347,32 @@
       "inputs": [],
       "outputs": []
     },
-
     {
       "id": "node-9",
       "type": "trim",
-      "position": { "x": -768.0, "y": -64.0 },
+      "position": {
+        "x": -768.0,
+        "y": -64.0
+      },
       "data": {
         "nodeType": "trim",
         "label": "Trim Model",
         "icon": "&#x2795;",
         "headerColor": "#E74C3C",
-        "inputs": [{ "id": "text", "label": "text", "type": "string" }],
-        "outputs": [{ "id": "result", "label": "result", "type": "string" }]
+        "inputs": [
+          {
+            "id": "text",
+            "label": "text",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ]
       },
       "label": null,
       "icon": null,
@@ -198,14 +383,29 @@
     {
       "id": "node-10",
       "type": "length",
-      "position": { "x": -512.0, "y": -64.0 },
+      "position": {
+        "x": -512.0,
+        "y": -64.0
+      },
       "data": {
         "nodeType": "length",
         "label": "Model Length",
         "icon": "#",
         "headerColor": "#E74C3C",
-        "inputs": [{ "id": "text", "label": "text", "type": "string" }],
-        "outputs": [{ "id": "result", "label": "result", "type": "number" }]
+        "inputs": [
+          {
+            "id": "text",
+            "label": "text",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "number"
+          }
+        ]
       },
       "label": null,
       "icon": null,
@@ -216,19 +416,43 @@
     {
       "id": "node-11",
       "type": "compare",
-      "position": { "x": -256.0, "y": -64.0 },
+      "position": {
+        "x": -256.0,
+        "y": -64.0
+      },
       "data": {
         "nodeType": "compare",
         "label": "Model Set?",
         "icon": "=?",
         "headerColor": "#F39C12",
         "inputs": [
-          { "id": "a", "label": "a", "type": "any" },
-          { "id": "op", "label": "op", "type": "string" },
-          { "id": "b", "label": "b", "type": "any" }
+          {
+            "id": "a",
+            "label": "a",
+            "type": "any"
+          },
+          {
+            "id": "op",
+            "label": "op",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "any"
+          }
         ],
-        "outputs": [{ "id": "result", "label": "result", "type": "boolean" }],
-        "pinDefaults": { "op": ">", "b": 0 }
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "boolean"
+          }
+        ],
+        "pinDefaults": {
+          "op": ">",
+          "b": 0
+        }
       },
       "label": null,
       "icon": null,
@@ -239,15 +463,32 @@
     {
       "id": "node-12",
       "type": "concat",
-      "position": { "x": 0.0, "y": -64.0 },
+      "position": {
+        "x": 0.0,
+        "y": -64.0
+      },
       "data": {
         "nodeType": "concat",
         "label": "Model Bool→String",
         "icon": "&#x2795;",
         "headerColor": "#E74C3C",
-        "inputs": [{ "id": "a", "label": "a", "type": "boolean" }],
-        "outputs": [{ "id": "result", "label": "result", "type": "string" }],
-        "concatConfig": { "separator": "" }
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": ""
+        }
       },
       "label": null,
       "icon": null,
@@ -258,15 +499,27 @@
     {
       "id": "node-13",
       "type": "literal_json",
-      "position": { "x": -256.0, "y": -448.0 },
+      "position": {
+        "x": -256.0,
+        "y": -448.0
+      },
       "data": {
         "nodeType": "literal_json",
         "label": "Model Map",
         "icon": "{}",
         "headerColor": "#00FFFF",
         "inputs": [],
-        "outputs": [{ "id": "value", "label": "value", "type": "object" }],
-        "literalValue": { "True": "", "False": "qwen/qwen3-next-80b" }
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "object"
+          }
+        ],
+        "literalValue": {
+          "True": "",
+          "False": "qwen/qwen3-next-80b"
+        }
       },
       "label": null,
       "icon": null,
@@ -277,19 +530,42 @@
     {
       "id": "node-14",
       "type": "set",
-      "position": { "x": 0.0, "y": -448.0 },
+      "position": {
+        "x": 0.0,
+        "y": -448.0
+      },
       "data": {
         "nodeType": "set",
         "label": "Model Select Map",
         "icon": "&#x1F4E4;",
         "headerColor": "#3498DB",
         "inputs": [
-          { "id": "object", "label": "object", "type": "object" },
-          { "id": "key", "label": "key", "type": "string" },
-          { "id": "value", "label": "value", "type": "any" }
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
         ],
-        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
-        "pinDefaults": { "key": "True" }
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "key": "True"
+        }
       },
       "label": null,
       "icon": null,
@@ -300,19 +576,42 @@
     {
       "id": "node-15",
       "type": "get",
-      "position": { "x": 256.0, "y": -448.0 },
+      "position": {
+        "x": 256.0,
+        "y": -448.0
+      },
       "data": {
         "nodeType": "get",
         "label": "Selected Model",
         "icon": "&#x1F4E5;",
         "headerColor": "#3498DB",
         "inputs": [
-          { "id": "object", "label": "object", "type": "object" },
-          { "id": "key", "label": "key", "type": "string" },
-          { "id": "default", "label": "default", "type": "any" }
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
         ],
-        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
-        "pinDefaults": { "default": "qwen/qwen3-next-80b" }
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "default": "qwen/qwen3-next-80b"
+        }
       },
       "label": null,
       "icon": null,
@@ -320,23 +619,46 @@
       "inputs": [],
       "outputs": []
     },
-
     {
       "id": "node-16",
       "type": "compare",
-      "position": { "x": -768.0, "y": 256.0 },
+      "position": {
+        "x": -768.0,
+        "y": 256.0
+      },
       "data": {
         "nodeType": "compare",
         "label": "max_cycles Set?",
         "icon": "=?",
         "headerColor": "#F39C12",
         "inputs": [
-          { "id": "a", "label": "a", "type": "any" },
-          { "id": "op", "label": "op", "type": "string" },
-          { "id": "b", "label": "b", "type": "any" }
+          {
+            "id": "a",
+            "label": "a",
+            "type": "any"
+          },
+          {
+            "id": "op",
+            "label": "op",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "any"
+          }
         ],
-        "outputs": [{ "id": "result", "label": "result", "type": "boolean" }],
-        "pinDefaults": { "op": ">", "b": 0 }
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "boolean"
+          }
+        ],
+        "pinDefaults": {
+          "op": ">",
+          "b": 0
+        }
       },
       "label": null,
       "icon": null,
@@ -347,15 +669,32 @@
     {
       "id": "node-17",
       "type": "concat",
-      "position": { "x": -512.0, "y": 256.0 },
+      "position": {
+        "x": -512.0,
+        "y": 256.0
+      },
       "data": {
         "nodeType": "concat",
         "label": "max_cycles Bool→String",
         "icon": "&#x2795;",
         "headerColor": "#E74C3C",
-        "inputs": [{ "id": "a", "label": "a", "type": "boolean" }],
-        "outputs": [{ "id": "result", "label": "result", "type": "string" }],
-        "concatConfig": { "separator": "" }
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": ""
+        }
       },
       "label": null,
       "icon": null,
@@ -366,15 +705,27 @@
     {
       "id": "node-18",
       "type": "literal_json",
-      "position": { "x": -512.0, "y": 384.0 },
+      "position": {
+        "x": -512.0,
+        "y": 384.0
+      },
       "data": {
         "nodeType": "literal_json",
         "label": "max_cycles Map",
         "icon": "{}",
         "headerColor": "#00FFFF",
         "inputs": [],
-        "outputs": [{ "id": "value", "label": "value", "type": "object" }],
-        "literalValue": { "True": 0, "False": 2 }
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "object"
+          }
+        ],
+        "literalValue": {
+          "True": 0,
+          "False": 2
+        }
       },
       "label": null,
       "icon": null,
@@ -385,19 +736,42 @@
     {
       "id": "node-19",
       "type": "set",
-      "position": { "x": -256.0, "y": 384.0 },
+      "position": {
+        "x": -256.0,
+        "y": 384.0
+      },
       "data": {
         "nodeType": "set",
         "label": "max_cycles Select Map",
         "icon": "&#x1F4E4;",
         "headerColor": "#3498DB",
         "inputs": [
-          { "id": "object", "label": "object", "type": "object" },
-          { "id": "key", "label": "key", "type": "string" },
-          { "id": "value", "label": "value", "type": "any" }
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
         ],
-        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
-        "pinDefaults": { "key": "True" }
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "key": "True"
+        }
       },
       "label": null,
       "icon": null,
@@ -408,19 +782,42 @@
     {
       "id": "node-20",
       "type": "get",
-      "position": { "x": 0.0, "y": 384.0 },
+      "position": {
+        "x": 0.0,
+        "y": 384.0
+      },
       "data": {
         "nodeType": "get",
         "label": "Selected max_cycles",
         "icon": "&#x1F4E5;",
         "headerColor": "#3498DB",
         "inputs": [
-          { "id": "object", "label": "object", "type": "object" },
-          { "id": "key", "label": "key", "type": "string" },
-          { "id": "default", "label": "default", "type": "any" }
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
         ],
-        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
-        "pinDefaults": { "default": 2 }
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "default": 2
+        }
       },
       "label": null,
       "icon": null,
@@ -428,23 +825,46 @@
       "inputs": [],
       "outputs": []
     },
-
     {
       "id": "node-21",
       "type": "compare",
-      "position": { "x": -768.0, "y": 352.0 },
+      "position": {
+        "x": -768.0,
+        "y": 352.0
+      },
       "data": {
         "nodeType": "compare",
         "label": "max_iterations Set?",
         "icon": "=?",
         "headerColor": "#F39C12",
         "inputs": [
-          { "id": "a", "label": "a", "type": "any" },
-          { "id": "op", "label": "op", "type": "string" },
-          { "id": "b", "label": "b", "type": "any" }
+          {
+            "id": "a",
+            "label": "a",
+            "type": "any"
+          },
+          {
+            "id": "op",
+            "label": "op",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "any"
+          }
         ],
-        "outputs": [{ "id": "result", "label": "result", "type": "boolean" }],
-        "pinDefaults": { "op": ">", "b": 0 }
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "boolean"
+          }
+        ],
+        "pinDefaults": {
+          "op": ">",
+          "b": 0
+        }
       },
       "label": null,
       "icon": null,
@@ -455,15 +875,32 @@
     {
       "id": "node-22",
       "type": "concat",
-      "position": { "x": -512.0, "y": 352.0 },
+      "position": {
+        "x": -512.0,
+        "y": 352.0
+      },
       "data": {
         "nodeType": "concat",
         "label": "max_iterations Bool→String",
         "icon": "&#x2795;",
         "headerColor": "#E74C3C",
-        "inputs": [{ "id": "a", "label": "a", "type": "boolean" }],
-        "outputs": [{ "id": "result", "label": "result", "type": "string" }],
-        "concatConfig": { "separator": "" }
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": ""
+        }
       },
       "label": null,
       "icon": null,
@@ -474,15 +911,27 @@
     {
       "id": "node-23",
       "type": "literal_json",
-      "position": { "x": -512.0, "y": 512.0 },
+      "position": {
+        "x": -512.0,
+        "y": 512.0
+      },
       "data": {
         "nodeType": "literal_json",
         "label": "max_iterations Map",
         "icon": "{}",
         "headerColor": "#00FFFF",
         "inputs": [],
-        "outputs": [{ "id": "value", "label": "value", "type": "object" }],
-        "literalValue": { "True": 0, "False": 60 }
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "object"
+          }
+        ],
+        "literalValue": {
+          "True": 0,
+          "False": 60
+        }
       },
       "label": null,
       "icon": null,
@@ -493,19 +942,42 @@
     {
       "id": "node-24",
       "type": "set",
-      "position": { "x": -256.0, "y": 512.0 },
+      "position": {
+        "x": -256.0,
+        "y": 512.0
+      },
       "data": {
         "nodeType": "set",
         "label": "max_iterations Select Map",
         "icon": "&#x1F4E4;",
         "headerColor": "#3498DB",
         "inputs": [
-          { "id": "object", "label": "object", "type": "object" },
-          { "id": "key", "label": "key", "type": "string" },
-          { "id": "value", "label": "value", "type": "any" }
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
         ],
-        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
-        "pinDefaults": { "key": "True" }
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "key": "True"
+        }
       },
       "label": null,
       "icon": null,
@@ -516,19 +988,42 @@
     {
       "id": "node-25",
       "type": "get",
-      "position": { "x": 0.0, "y": 512.0 },
+      "position": {
+        "x": 0.0,
+        "y": 512.0
+      },
       "data": {
         "nodeType": "get",
         "label": "Selected max_iterations",
         "icon": "&#x1F4E5;",
         "headerColor": "#3498DB",
         "inputs": [
-          { "id": "object", "label": "object", "type": "object" },
-          { "id": "key", "label": "key", "type": "string" },
-          { "id": "default", "label": "default", "type": "any" }
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
         ],
-        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
-        "pinDefaults": { "default": 60 }
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "default": 60
+        }
       },
       "label": null,
       "icon": null,
@@ -536,31 +1031,81 @@
       "inputs": [],
       "outputs": []
     },
-
     {
       "id": "node-26",
       "type": "subflow",
-      "position": { "x": -768.0, "y": 64.0 },
+      "position": {
+        "x": -768.0,
+        "y": 64.0
+      },
       "data": {
         "nodeType": "subflow",
         "label": "Deep Researcher",
         "icon": "&#x1F4E6;",
         "headerColor": "#00CCCC",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "request", "label": "request", "type": "string" },
-          { "id": "provider", "label": "provider", "type": "string" },
-          { "id": "model", "label": "model", "type": "string" },
-          { "id": "skip_clarifications", "label": "skip_clarifications", "type": "boolean" },
-          { "id": "max_web_search", "label": "max_web_search", "type": "number" },
-          { "id": "max_fetch_url", "label": "max_fetch_url", "type": "number" },
-          { "id": "max_iterations", "label": "max_iterations", "type": "number" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "string"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "string"
+          },
+          {
+            "id": "skip_clarifications",
+            "label": "skip_clarifications",
+            "type": "boolean"
+          },
+          {
+            "id": "max_web_search",
+            "label": "max_web_search",
+            "type": "number"
+          },
+          {
+            "id": "max_fetch_url",
+            "label": "max_fetch_url",
+            "type": "number"
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          }
         ],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "report", "label": "report", "type": "string" },
-          { "id": "dossier", "label": "dossier", "type": "string" },
-          { "id": "clarifications", "label": "clarifications", "type": "string" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "report",
+            "label": "report",
+            "type": "string"
+          },
+          {
+            "id": "dossier",
+            "label": "dossier",
+            "type": "string"
+          },
+          {
+            "id": "clarifications",
+            "label": "clarifications",
+            "type": "string"
+          }
         ],
         "subflowId": "role_deep_researcher"
       },
@@ -573,24 +1118,57 @@
     {
       "id": "node-27",
       "type": "memory_note",
-      "position": { "x": -512.0, "y": 64.0 },
+      "position": {
+        "x": -512.0,
+        "y": 64.0
+      },
       "data": {
         "nodeType": "memory_note",
         "label": "Memorize Research",
         "icon": "&#x1F4DD;",
         "headerColor": "#2ECC71",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "content", "label": "content", "type": "string" },
-          { "id": "tags", "label": "tags", "type": "object" },
-          { "id": "sources", "label": "sources", "type": "object" },
-          { "id": "scope", "label": "scope", "type": "string" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "content",
+            "label": "content",
+            "type": "string"
+          },
+          {
+            "id": "tags",
+            "label": "tags",
+            "type": "object"
+          },
+          {
+            "id": "sources",
+            "label": "sources",
+            "type": "object"
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string"
+          }
         ],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "note_id", "label": "note_id", "type": "string" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "note_id",
+            "label": "note_id",
+            "type": "string"
+          }
         ],
-        "pinDefaults": { "scope": "session" }
+        "pinDefaults": {
+          "scope": "session"
+        }
       },
       "label": null,
       "icon": null,
@@ -601,25 +1179,68 @@
     {
       "id": "node-28",
       "type": "subflow",
-      "position": { "x": -256.0, "y": 64.0 },
+      "position": {
+        "x": -256.0,
+        "y": 64.0
+      },
       "data": {
         "nodeType": "subflow",
         "label": "Architect",
         "icon": "&#x1F4E6;",
         "headerColor": "#00CCCC",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "request", "label": "request", "type": "string" },
-          { "id": "research_report", "label": "research_report", "type": "string" },
-          { "id": "research_dossier", "label": "research_dossier", "type": "string" },
-          { "id": "provider", "label": "provider", "type": "string" },
-          { "id": "model", "label": "model", "type": "string" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "research_report",
+            "label": "research_report",
+            "type": "string"
+          },
+          {
+            "id": "research_dossier",
+            "label": "research_dossier",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "string"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "string"
+          }
         ],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "spec", "label": "spec", "type": "object" },
-          { "id": "requirements_md", "label": "requirements_md", "type": "string" },
-          { "id": "raw_response", "label": "raw_response", "type": "string" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "spec",
+            "label": "spec",
+            "type": "object"
+          },
+          {
+            "id": "requirements_md",
+            "label": "requirements_md",
+            "type": "string"
+          },
+          {
+            "id": "raw_response",
+            "label": "raw_response",
+            "type": "string"
+          }
         ],
         "subflowId": "role_architect"
       },
@@ -632,24 +1253,57 @@
     {
       "id": "node-29",
       "type": "memory_note",
-      "position": { "x": 0.0, "y": 64.0 },
+      "position": {
+        "x": 0.0,
+        "y": 64.0
+      },
       "data": {
         "nodeType": "memory_note",
         "label": "Memorize Requirements",
         "icon": "&#x1F4DD;",
         "headerColor": "#2ECC71",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "content", "label": "content", "type": "string" },
-          { "id": "tags", "label": "tags", "type": "object" },
-          { "id": "sources", "label": "sources", "type": "object" },
-          { "id": "scope", "label": "scope", "type": "string" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "content",
+            "label": "content",
+            "type": "string"
+          },
+          {
+            "id": "tags",
+            "label": "tags",
+            "type": "object"
+          },
+          {
+            "id": "sources",
+            "label": "sources",
+            "type": "object"
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string"
+          }
         ],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "note_id", "label": "note_id", "type": "string" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "note_id",
+            "label": "note_id",
+            "type": "string"
+          }
         ],
-        "pinDefaults": { "scope": "session" }
+        "pinDefaults": {
+          "scope": "session"
+        }
       },
       "label": null,
       "icon": null,
@@ -660,22 +1314,47 @@
     {
       "id": "node-30",
       "type": "set_var",
-      "position": { "x": 256.0, "y": 64.0 },
+      "position": {
+        "x": 256.0,
+        "y": 64.0
+      },
       "data": {
         "nodeType": "set_var",
         "label": "Set requirements_md",
         "icon": "&#x1F4E4;",
         "headerColor": "#16A085",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "name", "label": "name", "type": "string" },
-          { "id": "value", "label": "value", "type": "string" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
         ],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "value", "label": "value", "type": "string" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
         ],
-        "pinDefaults": { "name": "requirements_md" }
+        "pinDefaults": {
+          "name": "requirements_md"
+        }
       },
       "label": null,
       "icon": null,
@@ -686,26 +1365,73 @@
     {
       "id": "node-31",
       "type": "subflow",
-      "position": { "x": 512.0, "y": 64.0 },
+      "position": {
+        "x": 512.0,
+        "y": 64.0
+      },
       "data": {
         "nodeType": "subflow",
         "label": "Manager",
         "icon": "&#x1F4E6;",
         "headerColor": "#00CCCC",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "request", "label": "request", "type": "string" },
-          { "id": "requirements_md", "label": "requirements_md", "type": "string" },
-          { "id": "provider", "label": "provider", "type": "string" },
-          { "id": "model", "label": "model", "type": "string" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "requirements_md",
+            "label": "requirements_md",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "string"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "string"
+          }
         ],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "plan", "label": "plan", "type": "object" },
-          { "id": "plan_md", "label": "plan_md", "type": "string" },
-          { "id": "tasks", "label": "tasks", "type": "array" },
-          { "id": "test_plan", "label": "test_plan", "type": "array" },
-          { "id": "raw_response", "label": "raw_response", "type": "string" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "plan",
+            "label": "plan",
+            "type": "object"
+          },
+          {
+            "id": "plan_md",
+            "label": "plan_md",
+            "type": "string"
+          },
+          {
+            "id": "tasks",
+            "label": "tasks",
+            "type": "array"
+          },
+          {
+            "id": "test_plan",
+            "label": "test_plan",
+            "type": "array"
+          },
+          {
+            "id": "raw_response",
+            "label": "raw_response",
+            "type": "string"
+          }
         ],
         "subflowId": "role_manager"
       },
@@ -718,24 +1444,57 @@
     {
       "id": "node-32",
       "type": "memory_note",
-      "position": { "x": 768.0, "y": 64.0 },
+      "position": {
+        "x": 768.0,
+        "y": 64.0
+      },
       "data": {
         "nodeType": "memory_note",
         "label": "Memorize Plan",
         "icon": "&#x1F4DD;",
         "headerColor": "#2ECC71",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "content", "label": "content", "type": "string" },
-          { "id": "tags", "label": "tags", "type": "object" },
-          { "id": "sources", "label": "sources", "type": "object" },
-          { "id": "scope", "label": "scope", "type": "string" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "content",
+            "label": "content",
+            "type": "string"
+          },
+          {
+            "id": "tags",
+            "label": "tags",
+            "type": "object"
+          },
+          {
+            "id": "sources",
+            "label": "sources",
+            "type": "object"
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string"
+          }
         ],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "note_id", "label": "note_id", "type": "string" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "note_id",
+            "label": "note_id",
+            "type": "string"
+          }
         ],
-        "pinDefaults": { "scope": "session" }
+        "pinDefaults": {
+          "scope": "session"
+        }
       },
       "label": null,
       "icon": null,
@@ -746,22 +1505,47 @@
     {
       "id": "node-33",
       "type": "set_var",
-      "position": { "x": 1024.0, "y": 16.0 },
+      "position": {
+        "x": 1024.0,
+        "y": 16.0
+      },
       "data": {
         "nodeType": "set_var",
         "label": "Set plan_md",
         "icon": "&#x1F4E4;",
         "headerColor": "#16A085",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "name", "label": "name", "type": "string" },
-          { "id": "value", "label": "value", "type": "string" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
         ],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "value", "label": "value", "type": "string" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
         ],
-        "pinDefaults": { "name": "plan_md" }
+        "pinDefaults": {
+          "name": "plan_md"
+        }
       },
       "label": null,
       "icon": null,
@@ -772,22 +1556,47 @@
     {
       "id": "node-34",
       "type": "set_var",
-      "position": { "x": 1024.0, "y": 96.0 },
+      "position": {
+        "x": 1024.0,
+        "y": 96.0
+      },
       "data": {
         "nodeType": "set_var",
         "label": "Set tasks",
         "icon": "&#x1F4E4;",
         "headerColor": "#16A085",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "name", "label": "name", "type": "string" },
-          { "id": "value", "label": "value", "type": "array" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "array"
+          }
         ],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "value", "label": "value", "type": "array" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "array"
+          }
         ],
-        "pinDefaults": { "name": "tasks" }
+        "pinDefaults": {
+          "name": "tasks"
+        }
       },
       "label": null,
       "icon": null,
@@ -798,22 +1607,47 @@
     {
       "id": "node-35",
       "type": "set_var",
-      "position": { "x": 1024.0, "y": 176.0 },
+      "position": {
+        "x": 1024.0,
+        "y": 176.0
+      },
       "data": {
         "nodeType": "set_var",
         "label": "Set test_plan",
         "icon": "&#x1F4E4;",
         "headerColor": "#16A085",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "name", "label": "name", "type": "string" },
-          { "id": "value", "label": "value", "type": "array" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "array"
+          }
         ],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "value", "label": "value", "type": "array" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "array"
+          }
         ],
-        "pinDefaults": { "name": "test_plan" }
+        "pinDefaults": {
+          "name": "test_plan"
+        }
       },
       "label": null,
       "icon": null,
@@ -821,26 +1655,51 @@
       "inputs": [],
       "outputs": []
     },
-
     {
       "id": "node-36",
       "type": "set_var",
-      "position": { "x": 1280.0, "y": 16.0 },
+      "position": {
+        "x": 1280.0,
+        "y": 16.0
+      },
       "data": {
         "nodeType": "set_var",
         "label": "Init cycle",
         "icon": "&#x1F4E4;",
         "headerColor": "#16A085",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "name", "label": "name", "type": "string" },
-          { "id": "value", "label": "value", "type": "number" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "number"
+          }
         ],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "value", "label": "value", "type": "number" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "number"
+          }
         ],
-        "pinDefaults": { "name": "cycle", "value": 0 }
+        "pinDefaults": {
+          "name": "cycle",
+          "value": 0
+        }
       },
       "label": null,
       "icon": null,
@@ -851,22 +1710,48 @@
     {
       "id": "node-37",
       "type": "set_var",
-      "position": { "x": 1280.0, "y": 96.0 },
+      "position": {
+        "x": 1280.0,
+        "y": 96.0
+      },
       "data": {
         "nodeType": "set_var",
         "label": "Init feedback",
         "icon": "&#x1F4E4;",
         "headerColor": "#16A085",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "name", "label": "name", "type": "string" },
-          { "id": "value", "label": "value", "type": "string" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
         ],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "value", "label": "value", "type": "string" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
         ],
-        "pinDefaults": { "name": "feedback", "value": "" }
+        "pinDefaults": {
+          "name": "feedback",
+          "value": ""
+        }
       },
       "label": null,
       "icon": null,
@@ -877,22 +1762,48 @@
     {
       "id": "node-38",
       "type": "set_var",
-      "position": { "x": 1280.0, "y": 176.0 },
+      "position": {
+        "x": 1280.0,
+        "y": 176.0
+      },
       "data": {
         "nodeType": "set_var",
         "label": "Init condition",
         "icon": "&#x1F4E4;",
         "headerColor": "#16A085",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "name", "label": "name", "type": "string" },
-          { "id": "value", "label": "value", "type": "boolean" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "boolean"
+          }
         ],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "value", "label": "value", "type": "boolean" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "boolean"
+          }
         ],
-        "pinDefaults": { "name": "condition", "value": true }
+        "pinDefaults": {
+          "name": "condition",
+          "value": true
+        }
       },
       "label": null,
       "icon": null,
@@ -903,22 +1814,48 @@
     {
       "id": "node-39",
       "type": "set_var",
-      "position": { "x": 1280.0, "y": 256.0 },
+      "position": {
+        "x": 1280.0,
+        "y": 256.0
+      },
       "data": {
         "nodeType": "set_var",
         "label": "Init approved",
         "icon": "&#x1F4E4;",
         "headerColor": "#16A085",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "name", "label": "name", "type": "string" },
-          { "id": "value", "label": "value", "type": "boolean" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "boolean"
+          }
         ],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "value", "label": "value", "type": "boolean" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "boolean"
+          }
         ],
-        "pinDefaults": { "name": "approved", "value": false }
+        "pinDefaults": {
+          "name": "approved",
+          "value": false
+        }
       },
       "label": null,
       "icon": null,
@@ -929,22 +1866,48 @@
     {
       "id": "node-40",
       "type": "set_var",
-      "position": { "x": 1280.0, "y": 336.0 },
+      "position": {
+        "x": 1280.0,
+        "y": 336.0
+      },
       "data": {
         "nodeType": "set_var",
         "label": "Init coder_summary_md",
         "icon": "&#x1F4E4;",
         "headerColor": "#16A085",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "name", "label": "name", "type": "string" },
-          { "id": "value", "label": "value", "type": "string" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
         ],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "value", "label": "value", "type": "string" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
         ],
-        "pinDefaults": { "name": "coder_summary_md", "value": "" }
+        "pinDefaults": {
+          "name": "coder_summary_md",
+          "value": ""
+        }
       },
       "label": null,
       "icon": null,
@@ -955,22 +1918,48 @@
     {
       "id": "node-41",
       "type": "set_var",
-      "position": { "x": 1280.0, "y": 416.0 },
+      "position": {
+        "x": 1280.0,
+        "y": 416.0
+      },
       "data": {
         "nodeType": "set_var",
         "label": "Init review_findings_md",
         "icon": "&#x1F4E4;",
         "headerColor": "#16A085",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "name", "label": "name", "type": "string" },
-          { "id": "value", "label": "value", "type": "string" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
         ],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "value", "label": "value", "type": "string" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
         ],
-        "pinDefaults": { "name": "review_findings_md", "value": "" }
+        "pinDefaults": {
+          "name": "review_findings_md",
+          "value": ""
+        }
       },
       "label": null,
       "icon": null,
@@ -978,19 +1967,35 @@
       "inputs": [],
       "outputs": []
     },
-
     {
       "id": "node-42",
       "type": "get_var",
-      "position": { "x": 1536.0, "y": 176.0 },
+      "position": {
+        "x": 1536.0,
+        "y": 176.0
+      },
       "data": {
         "nodeType": "get_var",
         "label": "Get condition",
         "icon": "&#x1F4E5;",
         "headerColor": "#16A085",
-        "inputs": [{ "id": "name", "label": "name", "type": "string" }],
-        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
-        "pinDefaults": { "name": "condition" }
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "condition"
+        }
       },
       "label": null,
       "icon": null,
@@ -1001,20 +2006,43 @@
     {
       "id": "node-43",
       "type": "while",
-      "position": { "x": 1792.0, "y": 176.0 },
+      "position": {
+        "x": 1792.0,
+        "y": 176.0
+      },
       "data": {
         "nodeType": "while",
         "label": "While",
         "icon": "&#x267B;",
         "headerColor": "#F39C12",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "condition", "label": "condition", "type": "boolean" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
         ],
         "outputs": [
-          { "id": "loop", "label": "loop", "type": "execution" },
-          { "id": "done", "label": "done", "type": "execution" },
-          { "id": "index", "label": "index", "type": "number" }
+          {
+            "id": "loop",
+            "label": "loop",
+            "type": "execution"
+          },
+          {
+            "id": "done",
+            "label": "done",
+            "type": "execution"
+          },
+          {
+            "id": "index",
+            "label": "index",
+            "type": "number"
+          }
         ]
       },
       "label": null,
@@ -1023,19 +2051,35 @@
       "inputs": [],
       "outputs": []
     },
-
     {
       "id": "node-44",
       "type": "get_var",
-      "position": { "x": 1792.0, "y": 32.0 },
+      "position": {
+        "x": 1792.0,
+        "y": 32.0
+      },
       "data": {
         "nodeType": "get_var",
         "label": "Get feedback",
         "icon": "&#x1F4E5;",
         "headerColor": "#16A085",
-        "inputs": [{ "id": "name", "label": "name", "type": "string" }],
-        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
-        "pinDefaults": { "name": "feedback" }
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "feedback"
+        }
       },
       "label": null,
       "icon": null,
@@ -1046,15 +2090,32 @@
     {
       "id": "node-45",
       "type": "get_var",
-      "position": { "x": 1792.0, "y": 96.0 },
+      "position": {
+        "x": 1792.0,
+        "y": 96.0
+      },
       "data": {
         "nodeType": "get_var",
         "label": "Get requirements_md",
         "icon": "&#x1F4E5;",
         "headerColor": "#16A085",
-        "inputs": [{ "id": "name", "label": "name", "type": "string" }],
-        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
-        "pinDefaults": { "name": "requirements_md" }
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "requirements_md"
+        }
       },
       "label": null,
       "icon": null,
@@ -1065,15 +2126,32 @@
     {
       "id": "node-46",
       "type": "get_var",
-      "position": { "x": 1792.0, "y": 160.0 },
+      "position": {
+        "x": 1792.0,
+        "y": 160.0
+      },
       "data": {
         "nodeType": "get_var",
         "label": "Get plan_md",
         "icon": "&#x1F4E5;",
         "headerColor": "#16A085",
-        "inputs": [{ "id": "name", "label": "name", "type": "string" }],
-        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
-        "pinDefaults": { "name": "plan_md" }
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "plan_md"
+        }
       },
       "label": null,
       "icon": null,
@@ -1084,15 +2162,32 @@
     {
       "id": "node-47",
       "type": "get_var",
-      "position": { "x": 1792.0, "y": 224.0 },
+      "position": {
+        "x": 1792.0,
+        "y": 224.0
+      },
       "data": {
         "nodeType": "get_var",
         "label": "Get tasks",
         "icon": "&#x1F4E5;",
         "headerColor": "#16A085",
-        "inputs": [{ "id": "name", "label": "name", "type": "string" }],
-        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
-        "pinDefaults": { "name": "tasks" }
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "tasks"
+        }
       },
       "label": null,
       "icon": null,
@@ -1103,15 +2198,32 @@
     {
       "id": "node-48",
       "type": "get_var",
-      "position": { "x": 1792.0, "y": 288.0 },
+      "position": {
+        "x": 1792.0,
+        "y": 288.0
+      },
       "data": {
         "nodeType": "get_var",
         "label": "Get test_plan",
         "icon": "&#x1F4E5;",
         "headerColor": "#16A085",
-        "inputs": [{ "id": "name", "label": "name", "type": "string" }],
-        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
-        "pinDefaults": { "name": "test_plan" }
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "test_plan"
+        }
       },
       "label": null,
       "icon": null,
@@ -1119,32 +2231,86 @@
       "inputs": [],
       "outputs": []
     },
-
     {
       "id": "node-49",
       "type": "subflow",
-      "position": { "x": 2048.0, "y": 176.0 },
+      "position": {
+        "x": 2048.0,
+        "y": 176.0
+      },
       "data": {
         "nodeType": "subflow",
         "label": "Coder",
         "icon": "&#x1F4E6;",
         "headerColor": "#00CCCC",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "request", "label": "request", "type": "string" },
-          { "id": "requirements_md", "label": "requirements_md", "type": "string" },
-          { "id": "plan_md", "label": "plan_md", "type": "string" },
-          { "id": "tasks", "label": "tasks", "type": "array" },
-          { "id": "feedback", "label": "feedback", "type": "string" },
-          { "id": "provider", "label": "provider", "type": "string" },
-          { "id": "model", "label": "model", "type": "string" },
-          { "id": "max_iterations", "label": "max_iterations", "type": "number" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "requirements_md",
+            "label": "requirements_md",
+            "type": "string"
+          },
+          {
+            "id": "plan_md",
+            "label": "plan_md",
+            "type": "string"
+          },
+          {
+            "id": "tasks",
+            "label": "tasks",
+            "type": "array"
+          },
+          {
+            "id": "feedback",
+            "label": "feedback",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "string"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "string"
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          }
         ],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "coder", "label": "coder", "type": "object" },
-          { "id": "summary_md", "label": "summary_md", "type": "string" },
-          { "id": "raw_result", "label": "raw_result", "type": "string" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "coder",
+            "label": "coder",
+            "type": "object"
+          },
+          {
+            "id": "summary_md",
+            "label": "summary_md",
+            "type": "string"
+          },
+          {
+            "id": "raw_result",
+            "label": "raw_result",
+            "type": "string"
+          }
         ],
         "subflowId": "role_coder"
       },
@@ -1157,22 +2323,47 @@
     {
       "id": "node-50",
       "type": "set_var",
-      "position": { "x": 2304.0, "y": 176.0 },
+      "position": {
+        "x": 2304.0,
+        "y": 176.0
+      },
       "data": {
         "nodeType": "set_var",
         "label": "Set coder_summary_md",
         "icon": "&#x1F4E4;",
         "headerColor": "#16A085",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "name", "label": "name", "type": "string" },
-          { "id": "value", "label": "value", "type": "string" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
         ],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "value", "label": "value", "type": "string" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
         ],
-        "pinDefaults": { "name": "coder_summary_md" }
+        "pinDefaults": {
+          "name": "coder_summary_md"
+        }
       },
       "label": null,
       "icon": null,
@@ -1183,29 +2374,88 @@
     {
       "id": "node-51",
       "type": "subflow",
-      "position": { "x": 2560.0, "y": 176.0 },
+      "position": {
+        "x": 2560.0,
+        "y": 176.0
+      },
       "data": {
         "nodeType": "subflow",
         "label": "Reviewer",
         "icon": "&#x1F4E6;",
         "headerColor": "#00CCCC",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "request", "label": "request", "type": "string" },
-          { "id": "requirements_md", "label": "requirements_md", "type": "string" },
-          { "id": "plan_md", "label": "plan_md", "type": "string" },
-          { "id": "tasks", "label": "tasks", "type": "array" },
-          { "id": "test_plan", "label": "test_plan", "type": "array" },
-          { "id": "coder_summary_md", "label": "coder_summary_md", "type": "string" },
-          { "id": "provider", "label": "provider", "type": "string" },
-          { "id": "model", "label": "model", "type": "string" },
-          { "id": "max_iterations", "label": "max_iterations", "type": "number" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "requirements_md",
+            "label": "requirements_md",
+            "type": "string"
+          },
+          {
+            "id": "plan_md",
+            "label": "plan_md",
+            "type": "string"
+          },
+          {
+            "id": "tasks",
+            "label": "tasks",
+            "type": "array"
+          },
+          {
+            "id": "test_plan",
+            "label": "test_plan",
+            "type": "array"
+          },
+          {
+            "id": "coder_summary_md",
+            "label": "coder_summary_md",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "string"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "string"
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          }
         ],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "approved", "label": "approved", "type": "boolean" },
-          { "id": "findings_md", "label": "findings_md", "type": "string" },
-          { "id": "review", "label": "review", "type": "object" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "approved",
+            "label": "approved",
+            "type": "boolean"
+          },
+          {
+            "id": "findings_md",
+            "label": "findings_md",
+            "type": "string"
+          },
+          {
+            "id": "review",
+            "label": "review",
+            "type": "object"
+          }
         ],
         "subflowId": "role_reviewer"
       },
@@ -1218,24 +2468,57 @@
     {
       "id": "node-52",
       "type": "memory_note",
-      "position": { "x": 2816.0, "y": 176.0 },
+      "position": {
+        "x": 2816.0,
+        "y": 176.0
+      },
       "data": {
         "nodeType": "memory_note",
         "label": "Memorize Review",
         "icon": "&#x1F4DD;",
         "headerColor": "#2ECC71",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "content", "label": "content", "type": "string" },
-          { "id": "tags", "label": "tags", "type": "object" },
-          { "id": "sources", "label": "sources", "type": "object" },
-          { "id": "scope", "label": "scope", "type": "string" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "content",
+            "label": "content",
+            "type": "string"
+          },
+          {
+            "id": "tags",
+            "label": "tags",
+            "type": "object"
+          },
+          {
+            "id": "sources",
+            "label": "sources",
+            "type": "object"
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string"
+          }
         ],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "note_id", "label": "note_id", "type": "string" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "note_id",
+            "label": "note_id",
+            "type": "string"
+          }
         ],
-        "pinDefaults": { "scope": "session" }
+        "pinDefaults": {
+          "scope": "session"
+        }
       },
       "label": null,
       "icon": null,
@@ -1246,22 +2529,47 @@
     {
       "id": "node-53",
       "type": "set_var",
-      "position": { "x": 3072.0, "y": 112.0 },
+      "position": {
+        "x": 3072.0,
+        "y": 112.0
+      },
       "data": {
         "nodeType": "set_var",
         "label": "Set approved",
         "icon": "&#x1F4E4;",
         "headerColor": "#16A085",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "name", "label": "name", "type": "string" },
-          { "id": "value", "label": "value", "type": "boolean" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "boolean"
+          }
         ],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "value", "label": "value", "type": "boolean" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "boolean"
+          }
         ],
-        "pinDefaults": { "name": "approved" }
+        "pinDefaults": {
+          "name": "approved"
+        }
       },
       "label": null,
       "icon": null,
@@ -1272,22 +2580,47 @@
     {
       "id": "node-54",
       "type": "set_var",
-      "position": { "x": 3072.0, "y": 240.0 },
+      "position": {
+        "x": 3072.0,
+        "y": 240.0
+      },
       "data": {
         "nodeType": "set_var",
         "label": "Set review_findings_md",
         "icon": "&#x1F4E4;",
         "headerColor": "#16A085",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "name", "label": "name", "type": "string" },
-          { "id": "value", "label": "value", "type": "string" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
         ],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "value", "label": "value", "type": "string" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
         ],
-        "pinDefaults": { "name": "review_findings_md" }
+        "pinDefaults": {
+          "name": "review_findings_md"
+        }
       },
       "label": null,
       "icon": null,
@@ -1295,18 +2628,32 @@
       "inputs": [],
       "outputs": []
     },
-
     {
       "id": "node-56",
       "type": "not",
-      "position": { "x": 2816.0, "y": 304.0 },
+      "position": {
+        "x": 2816.0,
+        "y": 304.0
+      },
       "data": {
         "nodeType": "not",
         "label": "NOT",
         "icon": "!",
         "headerColor": "#F39C12",
-        "inputs": [{ "id": "value", "label": "value", "type": "boolean" }],
-        "outputs": [{ "id": "result", "label": "result", "type": "boolean" }]
+        "inputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "boolean"
+          }
+        ]
       },
       "label": null,
       "icon": null,
@@ -1317,15 +2664,32 @@
     {
       "id": "node-57",
       "type": "concat",
-      "position": { "x": 3072.0, "y": 352.0 },
+      "position": {
+        "x": 3072.0,
+        "y": 352.0
+      },
       "data": {
         "nodeType": "concat",
         "label": "notApproved Bool→String",
         "icon": "&#x2795;",
         "headerColor": "#E74C3C",
-        "inputs": [{ "id": "a", "label": "a", "type": "boolean" }],
-        "outputs": [{ "id": "result", "label": "result", "type": "string" }],
-        "concatConfig": { "separator": "" }
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": ""
+        }
       },
       "label": null,
       "icon": null,
@@ -1336,15 +2700,27 @@
     {
       "id": "node-58",
       "type": "literal_json",
-      "position": { "x": 2816.0, "y": 432.0 },
+      "position": {
+        "x": 2816.0,
+        "y": 432.0
+      },
       "data": {
         "nodeType": "literal_json",
         "label": "Feedback Map",
         "icon": "{}",
         "headerColor": "#00FFFF",
         "inputs": [],
-        "outputs": [{ "id": "value", "label": "value", "type": "object" }],
-        "literalValue": { "True": "", "False": "" }
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "object"
+          }
+        ],
+        "literalValue": {
+          "True": "",
+          "False": ""
+        }
       },
       "label": null,
       "icon": null,
@@ -1355,19 +2731,42 @@
     {
       "id": "node-59",
       "type": "set",
-      "position": { "x": 3072.0, "y": 432.0 },
+      "position": {
+        "x": 3072.0,
+        "y": 432.0
+      },
       "data": {
         "nodeType": "set",
         "label": "Feedback Select Map",
         "icon": "&#x1F4E4;",
         "headerColor": "#3498DB",
         "inputs": [
-          { "id": "object", "label": "object", "type": "object" },
-          { "id": "key", "label": "key", "type": "string" },
-          { "id": "value", "label": "value", "type": "any" }
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
         ],
-        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
-        "pinDefaults": { "key": "True" }
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "key": "True"
+        }
       },
       "label": null,
       "icon": null,
@@ -1378,19 +2777,42 @@
     {
       "id": "node-60",
       "type": "get",
-      "position": { "x": 3328.0, "y": 432.0 },
+      "position": {
+        "x": 3328.0,
+        "y": 432.0
+      },
       "data": {
         "nodeType": "get",
         "label": "Selected Feedback",
         "icon": "&#x1F4E5;",
         "headerColor": "#3498DB",
         "inputs": [
-          { "id": "object", "label": "object", "type": "object" },
-          { "id": "key", "label": "key", "type": "string" },
-          { "id": "default", "label": "default", "type": "any" }
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
         ],
-        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
-        "pinDefaults": { "default": "" }
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "default": ""
+        }
       },
       "label": null,
       "icon": null,
@@ -1401,22 +2823,47 @@
     {
       "id": "node-55",
       "type": "set_var",
-      "position": { "x": 3328.0, "y": 240.0 },
+      "position": {
+        "x": 3328.0,
+        "y": 240.0
+      },
       "data": {
         "nodeType": "set_var",
         "label": "Set feedback",
         "icon": "&#x1F4E4;",
         "headerColor": "#16A085",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "name", "label": "name", "type": "string" },
-          { "id": "value", "label": "value", "type": "string" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
         ],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "value", "label": "value", "type": "string" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
         ],
-        "pinDefaults": { "name": "feedback" }
+        "pinDefaults": {
+          "name": "feedback"
+        }
       },
       "label": null,
       "icon": null,
@@ -1424,19 +2871,35 @@
       "inputs": [],
       "outputs": []
     },
-
     {
       "id": "node-61",
       "type": "get_var",
-      "position": { "x": 3328.0, "y": 32.0 },
+      "position": {
+        "x": 3328.0,
+        "y": 32.0
+      },
       "data": {
         "nodeType": "get_var",
         "label": "Get cycle",
         "icon": "&#x1F4E5;",
         "headerColor": "#16A085",
-        "inputs": [{ "id": "name", "label": "name", "type": "string" }],
-        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
-        "pinDefaults": { "name": "cycle" }
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "cycle"
+        }
       },
       "label": null,
       "icon": null,
@@ -1447,18 +2910,37 @@
     {
       "id": "node-62",
       "type": "add",
-      "position": { "x": 3584.0, "y": 32.0 },
+      "position": {
+        "x": 3584.0,
+        "y": 32.0
+      },
       "data": {
         "nodeType": "add",
         "label": "Add",
         "icon": "+",
         "headerColor": "#27AE60",
         "inputs": [
-          { "id": "a", "label": "a", "type": "number" },
-          { "id": "b", "label": "b", "type": "number" }
+          {
+            "id": "a",
+            "label": "a",
+            "type": "number"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "number"
+          }
         ],
-        "outputs": [{ "id": "result", "label": "result", "type": "number" }],
-        "pinDefaults": { "b": 1 }
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "number"
+          }
+        ],
+        "pinDefaults": {
+          "b": 1
+        }
       },
       "label": null,
       "icon": null,
@@ -1469,22 +2951,47 @@
     {
       "id": "node-63",
       "type": "set_var",
-      "position": { "x": 3840.0, "y": 32.0 },
+      "position": {
+        "x": 3840.0,
+        "y": 32.0
+      },
       "data": {
         "nodeType": "set_var",
         "label": "Set cycle",
         "icon": "&#x1F4E4;",
         "headerColor": "#16A085",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "name", "label": "name", "type": "string" },
-          { "id": "value", "label": "value", "type": "number" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "number"
+          }
         ],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "value", "label": "value", "type": "number" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "number"
+          }
         ],
-        "pinDefaults": { "name": "cycle" }
+        "pinDefaults": {
+          "name": "cycle"
+        }
       },
       "label": null,
       "icon": null,
@@ -1495,19 +3002,42 @@
     {
       "id": "node-64",
       "type": "compare",
-      "position": { "x": 3584.0, "y": 112.0 },
+      "position": {
+        "x": 3584.0,
+        "y": 112.0
+      },
       "data": {
         "nodeType": "compare",
         "label": "cycle < max_cycles",
         "icon": "=?",
         "headerColor": "#F39C12",
         "inputs": [
-          { "id": "a", "label": "a", "type": "any" },
-          { "id": "op", "label": "op", "type": "string" },
-          { "id": "b", "label": "b", "type": "any" }
+          {
+            "id": "a",
+            "label": "a",
+            "type": "any"
+          },
+          {
+            "id": "op",
+            "label": "op",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "any"
+          }
         ],
-        "outputs": [{ "id": "result", "label": "result", "type": "boolean" }],
-        "pinDefaults": { "op": "<" }
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "boolean"
+          }
+        ],
+        "pinDefaults": {
+          "op": "<"
+        }
       },
       "label": null,
       "icon": null,
@@ -1518,17 +3048,34 @@
     {
       "id": "node-65",
       "type": "and",
-      "position": { "x": 3840.0, "y": 112.0 },
+      "position": {
+        "x": 3840.0,
+        "y": 112.0
+      },
       "data": {
         "nodeType": "and",
         "label": "AND",
         "icon": "&&",
         "headerColor": "#F39C12",
         "inputs": [
-          { "id": "a", "label": "a", "type": "boolean" },
-          { "id": "b", "label": "b", "type": "boolean" }
+          {
+            "id": "a",
+            "label": "a",
+            "type": "boolean"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "boolean"
+          }
         ],
-        "outputs": [{ "id": "result", "label": "result", "type": "boolean" }]
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "boolean"
+          }
+        ]
       },
       "label": null,
       "icon": null,
@@ -1539,22 +3086,47 @@
     {
       "id": "node-66",
       "type": "set_var",
-      "position": { "x": 4096.0, "y": 112.0 },
+      "position": {
+        "x": 4096.0,
+        "y": 112.0
+      },
       "data": {
         "nodeType": "set_var",
         "label": "Set condition",
         "icon": "&#x1F4E4;",
         "headerColor": "#16A085",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "name", "label": "name", "type": "string" },
-          { "id": "value", "label": "value", "type": "boolean" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "boolean"
+          }
         ],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "value", "label": "value", "type": "boolean" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "boolean"
+          }
         ],
-        "pinDefaults": { "name": "condition" }
+        "pinDefaults": {
+          "name": "condition"
+        }
       },
       "label": null,
       "icon": null,
@@ -1562,19 +3134,35 @@
       "inputs": [],
       "outputs": []
     },
-
     {
       "id": "node-67",
       "type": "get_var",
-      "position": { "x": 1792.0, "y": 480.0 },
+      "position": {
+        "x": 1792.0,
+        "y": 480.0
+      },
       "data": {
         "nodeType": "get_var",
         "label": "Get approved",
         "icon": "&#x1F4E5;",
         "headerColor": "#16A085",
-        "inputs": [{ "id": "name", "label": "name", "type": "string" }],
-        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
-        "pinDefaults": { "name": "approved" }
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "approved"
+        }
       },
       "label": null,
       "icon": null,
@@ -1585,15 +3173,32 @@
     {
       "id": "node-68",
       "type": "concat",
-      "position": { "x": 2048.0, "y": 480.0 },
+      "position": {
+        "x": 2048.0,
+        "y": 480.0
+      },
       "data": {
         "nodeType": "concat",
         "label": "approved Bool→String",
         "icon": "&#x2795;",
         "headerColor": "#E74C3C",
-        "inputs": [{ "id": "a", "label": "a", "type": "boolean" }],
-        "outputs": [{ "id": "result", "label": "result", "type": "string" }],
-        "concatConfig": { "separator": "" }
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": ""
+        }
       },
       "label": null,
       "icon": null,
@@ -1604,15 +3209,27 @@
     {
       "id": "node-69",
       "type": "literal_json",
-      "position": { "x": 2048.0, "y": 608.0 },
+      "position": {
+        "x": 2048.0,
+        "y": 608.0
+      },
       "data": {
         "nodeType": "literal_json",
         "label": "Status Map",
         "icon": "{}",
         "headerColor": "#00FFFF",
         "inputs": [],
-        "outputs": [{ "id": "value", "label": "value", "type": "object" }],
-        "literalValue": { "True": "APPROVED", "False": "NOT APPROVED" }
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "object"
+          }
+        ],
+        "literalValue": {
+          "True": "APPROVED",
+          "False": "NOT APPROVED"
+        }
       },
       "label": null,
       "icon": null,
@@ -1623,19 +3240,42 @@
     {
       "id": "node-70",
       "type": "get",
-      "position": { "x": 2304.0, "y": 608.0 },
+      "position": {
+        "x": 2304.0,
+        "y": 608.0
+      },
       "data": {
         "nodeType": "get",
         "label": "Selected Status",
         "icon": "&#x1F4E5;",
         "headerColor": "#3498DB",
         "inputs": [
-          { "id": "object", "label": "object", "type": "object" },
-          { "id": "key", "label": "key", "type": "string" },
-          { "id": "default", "label": "default", "type": "any" }
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
         ],
-        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
-        "pinDefaults": { "default": "NOT APPROVED" }
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "default": "NOT APPROVED"
+        }
       },
       "label": null,
       "icon": null,
@@ -1646,15 +3286,32 @@
     {
       "id": "node-71",
       "type": "get_var",
-      "position": { "x": 2048.0, "y": 544.0 },
+      "position": {
+        "x": 2048.0,
+        "y": 544.0
+      },
       "data": {
         "nodeType": "get_var",
         "label": "Get cycle",
         "icon": "&#x1F4E5;",
         "headerColor": "#16A085",
-        "inputs": [{ "id": "name", "label": "name", "type": "string" }],
-        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
-        "pinDefaults": { "name": "cycle" }
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "cycle"
+        }
       },
       "label": null,
       "icon": null,
@@ -1665,15 +3322,32 @@
     {
       "id": "node-72",
       "type": "get_var",
-      "position": { "x": 2048.0, "y": 672.0 },
+      "position": {
+        "x": 2048.0,
+        "y": 672.0
+      },
       "data": {
         "nodeType": "get_var",
         "label": "Get requirements_md",
         "icon": "&#x1F4E5;",
         "headerColor": "#16A085",
-        "inputs": [{ "id": "name", "label": "name", "type": "string" }],
-        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
-        "pinDefaults": { "name": "requirements_md" }
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "requirements_md"
+        }
       },
       "label": null,
       "icon": null,
@@ -1684,15 +3358,32 @@
     {
       "id": "node-73",
       "type": "get_var",
-      "position": { "x": 2048.0, "y": 736.0 },
+      "position": {
+        "x": 2048.0,
+        "y": 736.0
+      },
       "data": {
         "nodeType": "get_var",
         "label": "Get plan_md",
         "icon": "&#x1F4E5;",
         "headerColor": "#16A085",
-        "inputs": [{ "id": "name", "label": "name", "type": "string" }],
-        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
-        "pinDefaults": { "name": "plan_md" }
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "plan_md"
+        }
       },
       "label": null,
       "icon": null,
@@ -1703,15 +3394,32 @@
     {
       "id": "node-74",
       "type": "get_var",
-      "position": { "x": 2048.0, "y": 800.0 },
+      "position": {
+        "x": 2048.0,
+        "y": 800.0
+      },
       "data": {
         "nodeType": "get_var",
         "label": "Get coder_summary_md",
         "icon": "&#x1F4E5;",
         "headerColor": "#16A085",
-        "inputs": [{ "id": "name", "label": "name", "type": "string" }],
-        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
-        "pinDefaults": { "name": "coder_summary_md" }
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "coder_summary_md"
+        }
       },
       "label": null,
       "icon": null,
@@ -1722,15 +3430,32 @@
     {
       "id": "node-75",
       "type": "get_var",
-      "position": { "x": 2048.0, "y": 864.0 },
+      "position": {
+        "x": 2048.0,
+        "y": 864.0
+      },
       "data": {
         "nodeType": "get_var",
         "label": "Get review_findings_md",
         "icon": "&#x1F4E5;",
         "headerColor": "#16A085",
-        "inputs": [{ "id": "name", "label": "name", "type": "string" }],
-        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
-        "pinDefaults": { "name": "review_findings_md" }
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "review_findings_md"
+        }
       },
       "label": null,
       "icon": null,
@@ -1741,31 +3466,102 @@
     {
       "id": "node-76",
       "type": "concat",
-      "position": { "x": 2560.0, "y": 736.0 },
+      "position": {
+        "x": 2560.0,
+        "y": 736.0
+      },
       "data": {
         "nodeType": "concat",
         "label": "Final Message",
         "icon": "&#x2795;",
         "headerColor": "#E74C3C",
         "inputs": [
-          { "id": "a", "label": "a", "type": "string" },
-          { "id": "b", "label": "b", "type": "string" },
-          { "id": "c", "label": "c", "type": "string" },
-          { "id": "d", "label": "d", "type": "number" },
-          { "id": "e", "label": "e", "type": "string" },
-          { "id": "f", "label": "f", "type": "string" },
-          { "id": "g", "label": "g", "type": "string" },
-          { "id": "h", "label": "h", "type": "string" },
-          { "id": "i", "label": "i", "type": "string" },
-          { "id": "j", "label": "j", "type": "string" },
-          { "id": "k", "label": "k", "type": "string" },
-          { "id": "l", "label": "l", "type": "string" },
-          { "id": "m", "label": "m", "type": "string" },
-          { "id": "n", "label": "n", "type": "string" },
-          { "id": "o", "label": "o", "type": "string" }
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          },
+          {
+            "id": "d",
+            "label": "d",
+            "type": "number"
+          },
+          {
+            "id": "e",
+            "label": "e",
+            "type": "string"
+          },
+          {
+            "id": "f",
+            "label": "f",
+            "type": "string"
+          },
+          {
+            "id": "g",
+            "label": "g",
+            "type": "string"
+          },
+          {
+            "id": "h",
+            "label": "h",
+            "type": "string"
+          },
+          {
+            "id": "i",
+            "label": "i",
+            "type": "string"
+          },
+          {
+            "id": "j",
+            "label": "j",
+            "type": "string"
+          },
+          {
+            "id": "k",
+            "label": "k",
+            "type": "string"
+          },
+          {
+            "id": "l",
+            "label": "l",
+            "type": "string"
+          },
+          {
+            "id": "m",
+            "label": "m",
+            "type": "string"
+          },
+          {
+            "id": "n",
+            "label": "n",
+            "type": "string"
+          },
+          {
+            "id": "o",
+            "label": "o",
+            "type": "string"
+          }
         ],
-        "outputs": [{ "id": "result", "label": "result", "type": "string" }],
-        "concatConfig": { "separator": "" },
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": ""
+        },
         "pinDefaults": {
           "a": "# Multi-Agent Result (",
           "c": ")\\n\\n**Cycles:** ",
@@ -1786,19 +3582,38 @@
     {
       "id": "node-77",
       "type": "answer_user",
-      "position": { "x": 2816.0, "y": 736.0 },
+      "position": {
+        "x": 2816.0,
+        "y": 736.0
+      },
       "data": {
         "nodeType": "answer_user",
         "label": "Answer User",
         "icon": "&#x1F4AC;",
         "headerColor": "#9B59B6",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "message", "label": "message", "type": "string" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
         ],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "message", "label": "message", "type": "string" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "message",
+            "label": "message",
+            "type": "string"
+          }
         ]
       },
       "label": null,
@@ -1807,18 +3622,26 @@
       "inputs": [],
       "outputs": []
     },
-
     {
       "id": "node-79",
       "type": "literal_json",
-      "position": { "x": 2560.0, "y": 928.0 },
+      "position": {
+        "x": 2560.0,
+        "y": 928.0
+      },
       "data": {
         "nodeType": "literal_json",
         "label": "State",
         "icon": "{}",
         "headerColor": "#00FFFF",
         "inputs": [],
-        "outputs": [{ "id": "value", "label": "value", "type": "object" }],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "object"
+          }
+        ],
         "literalValue": {}
       },
       "label": null,
@@ -1830,19 +3653,42 @@
     {
       "id": "node-80",
       "type": "set",
-      "position": { "x": 2816.0, "y": 928.0 },
+      "position": {
+        "x": 2816.0,
+        "y": 928.0
+      },
       "data": {
         "nodeType": "set",
         "label": "state.approved",
         "icon": "&#x1F4E4;",
         "headerColor": "#3498DB",
         "inputs": [
-          { "id": "object", "label": "object", "type": "object" },
-          { "id": "key", "label": "key", "type": "string" },
-          { "id": "value", "label": "value", "type": "any" }
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
         ],
-        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
-        "pinDefaults": { "key": "approved" }
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "key": "approved"
+        }
       },
       "label": null,
       "icon": null,
@@ -1853,19 +3699,42 @@
     {
       "id": "node-81",
       "type": "set",
-      "position": { "x": 3072.0, "y": 928.0 },
+      "position": {
+        "x": 3072.0,
+        "y": 928.0
+      },
       "data": {
         "nodeType": "set",
         "label": "state.cycle",
         "icon": "&#x1F4E4;",
         "headerColor": "#3498DB",
         "inputs": [
-          { "id": "object", "label": "object", "type": "object" },
-          { "id": "key", "label": "key", "type": "string" },
-          { "id": "value", "label": "value", "type": "any" }
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
         ],
-        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
-        "pinDefaults": { "key": "cycle" }
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "key": "cycle"
+        }
       },
       "label": null,
       "icon": null,
@@ -1876,19 +3745,42 @@
     {
       "id": "node-82",
       "type": "set",
-      "position": { "x": 3328.0, "y": 928.0 },
+      "position": {
+        "x": 3328.0,
+        "y": 928.0
+      },
       "data": {
         "nodeType": "set",
         "label": "state.request",
         "icon": "&#x1F4E4;",
         "headerColor": "#3498DB",
         "inputs": [
-          { "id": "object", "label": "object", "type": "object" },
-          { "id": "key", "label": "key", "type": "string" },
-          { "id": "value", "label": "value", "type": "any" }
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
         ],
-        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
-        "pinDefaults": { "key": "request" }
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "key": "request"
+        }
       },
       "label": null,
       "icon": null,
@@ -1899,19 +3791,42 @@
     {
       "id": "node-83",
       "type": "set",
-      "position": { "x": 3584.0, "y": 928.0 },
+      "position": {
+        "x": 3584.0,
+        "y": 928.0
+      },
       "data": {
         "nodeType": "set",
         "label": "state.provider",
         "icon": "&#x1F4E4;",
         "headerColor": "#3498DB",
         "inputs": [
-          { "id": "object", "label": "object", "type": "object" },
-          { "id": "key", "label": "key", "type": "string" },
-          { "id": "value", "label": "value", "type": "any" }
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
         ],
-        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
-        "pinDefaults": { "key": "provider" }
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "key": "provider"
+        }
       },
       "label": null,
       "icon": null,
@@ -1922,19 +3837,42 @@
     {
       "id": "node-84",
       "type": "set",
-      "position": { "x": 3840.0, "y": 928.0 },
+      "position": {
+        "x": 3840.0,
+        "y": 928.0
+      },
       "data": {
         "nodeType": "set",
         "label": "state.model",
         "icon": "&#x1F4E4;",
         "headerColor": "#3498DB",
         "inputs": [
-          { "id": "object", "label": "object", "type": "object" },
-          { "id": "key", "label": "key", "type": "string" },
-          { "id": "value", "label": "value", "type": "any" }
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
         ],
-        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
-        "pinDefaults": { "key": "model" }
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "key": "model"
+        }
       },
       "label": null,
       "icon": null,
@@ -1945,19 +3883,42 @@
     {
       "id": "node-85",
       "type": "set",
-      "position": { "x": 4096.0, "y": 928.0 },
+      "position": {
+        "x": 4096.0,
+        "y": 928.0
+      },
       "data": {
         "nodeType": "set",
         "label": "state.requirements_md",
         "icon": "&#x1F4E4;",
         "headerColor": "#3498DB",
         "inputs": [
-          { "id": "object", "label": "object", "type": "object" },
-          { "id": "key", "label": "key", "type": "string" },
-          { "id": "value", "label": "value", "type": "any" }
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
         ],
-        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
-        "pinDefaults": { "key": "requirements_md" }
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "key": "requirements_md"
+        }
       },
       "label": null,
       "icon": null,
@@ -1968,19 +3929,42 @@
     {
       "id": "node-86",
       "type": "set",
-      "position": { "x": 4352.0, "y": 928.0 },
+      "position": {
+        "x": 4352.0,
+        "y": 928.0
+      },
       "data": {
         "nodeType": "set",
         "label": "state.plan_md",
         "icon": "&#x1F4E4;",
         "headerColor": "#3498DB",
         "inputs": [
-          { "id": "object", "label": "object", "type": "object" },
-          { "id": "key", "label": "key", "type": "string" },
-          { "id": "value", "label": "value", "type": "any" }
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
         ],
-        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
-        "pinDefaults": { "key": "plan_md" }
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "key": "plan_md"
+        }
       },
       "label": null,
       "icon": null,
@@ -1991,19 +3975,42 @@
     {
       "id": "node-87",
       "type": "set",
-      "position": { "x": 4608.0, "y": 928.0 },
+      "position": {
+        "x": 4608.0,
+        "y": 928.0
+      },
       "data": {
         "nodeType": "set",
         "label": "state.coder_summary_md",
         "icon": "&#x1F4E4;",
         "headerColor": "#3498DB",
         "inputs": [
-          { "id": "object", "label": "object", "type": "object" },
-          { "id": "key", "label": "key", "type": "string" },
-          { "id": "value", "label": "value", "type": "any" }
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
         ],
-        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
-        "pinDefaults": { "key": "coder_summary_md" }
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "key": "coder_summary_md"
+        }
       },
       "label": null,
       "icon": null,
@@ -2014,19 +4021,42 @@
     {
       "id": "node-88",
       "type": "set",
-      "position": { "x": 4864.0, "y": 928.0 },
+      "position": {
+        "x": 4864.0,
+        "y": 928.0
+      },
       "data": {
         "nodeType": "set",
         "label": "state.review_findings_md",
         "icon": "&#x1F4E4;",
         "headerColor": "#3498DB",
         "inputs": [
-          { "id": "object", "label": "object", "type": "object" },
-          { "id": "key", "label": "key", "type": "string" },
-          { "id": "value", "label": "value", "type": "any" }
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
         ],
-        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
-        "pinDefaults": { "key": "review_findings_md" }
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "key": "review_findings_md"
+        }
       },
       "label": null,
       "icon": null,
@@ -2034,20 +4064,34 @@
       "inputs": [],
       "outputs": []
     },
-
     {
       "id": "node-78",
       "type": "on_flow_end",
-      "position": { "x": 3072.0, "y": 736.0 },
+      "position": {
+        "x": 3072.0,
+        "y": 736.0
+      },
       "data": {
         "nodeType": "on_flow_end",
         "label": "On Flow End",
         "icon": "&#x23F9;",
         "headerColor": "#C0392B",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "final_message", "label": "final_message", "type": "string" },
-          { "id": "state", "label": "state", "type": "object" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "final_message",
+            "label": "final_message",
+            "type": "string"
+          },
+          {
+            "id": "state",
+            "label": "state",
+            "type": "object"
+          }
         ],
         "outputs": []
       },
@@ -2058,189 +4102,1185 @@
       "outputs": []
     }
   ],
-
   "edges": [
-    { "id": "edge-1", "source": "node-1", "sourceHandle": "provider", "target": "node-2", "targetHandle": "text", "animated": false },
-    { "id": "edge-2", "source": "node-2", "sourceHandle": "result", "target": "node-3", "targetHandle": "text", "animated": false },
-    { "id": "edge-3", "source": "node-3", "sourceHandle": "result", "target": "node-4", "targetHandle": "a", "animated": false },
-    { "id": "edge-4", "source": "node-4", "sourceHandle": "result", "target": "node-5", "targetHandle": "a", "animated": false },
-    { "id": "edge-5", "source": "node-6", "sourceHandle": "value", "target": "node-7", "targetHandle": "object", "animated": false },
-    { "id": "edge-6", "source": "node-2", "sourceHandle": "result", "target": "node-7", "targetHandle": "value", "animated": false },
-    { "id": "edge-7", "source": "node-7", "sourceHandle": "result", "target": "node-8", "targetHandle": "object", "animated": false },
-    { "id": "edge-8", "source": "node-5", "sourceHandle": "result", "target": "node-8", "targetHandle": "key", "animated": false },
-
-    { "id": "edge-9", "source": "node-1", "sourceHandle": "model", "target": "node-9", "targetHandle": "text", "animated": false },
-    { "id": "edge-10", "source": "node-9", "sourceHandle": "result", "target": "node-10", "targetHandle": "text", "animated": false },
-    { "id": "edge-11", "source": "node-10", "sourceHandle": "result", "target": "node-11", "targetHandle": "a", "animated": false },
-    { "id": "edge-12", "source": "node-11", "sourceHandle": "result", "target": "node-12", "targetHandle": "a", "animated": false },
-    { "id": "edge-13", "source": "node-13", "sourceHandle": "value", "target": "node-14", "targetHandle": "object", "animated": false },
-    { "id": "edge-14", "source": "node-9", "sourceHandle": "result", "target": "node-14", "targetHandle": "value", "animated": false },
-    { "id": "edge-15", "source": "node-14", "sourceHandle": "result", "target": "node-15", "targetHandle": "object", "animated": false },
-    { "id": "edge-16", "source": "node-12", "sourceHandle": "result", "target": "node-15", "targetHandle": "key", "animated": false },
-
-    { "id": "edge-17", "source": "node-1", "sourceHandle": "max_cycles", "target": "node-16", "targetHandle": "a", "animated": false },
-    { "id": "edge-18", "source": "node-16", "sourceHandle": "result", "target": "node-17", "targetHandle": "a", "animated": false },
-    { "id": "edge-19", "source": "node-18", "sourceHandle": "value", "target": "node-19", "targetHandle": "object", "animated": false },
-    { "id": "edge-20", "source": "node-1", "sourceHandle": "max_cycles", "target": "node-19", "targetHandle": "value", "animated": false },
-    { "id": "edge-21", "source": "node-19", "sourceHandle": "result", "target": "node-20", "targetHandle": "object", "animated": false },
-    { "id": "edge-22", "source": "node-17", "sourceHandle": "result", "target": "node-20", "targetHandle": "key", "animated": false },
-
-    { "id": "edge-23", "source": "node-1", "sourceHandle": "max_iterations", "target": "node-21", "targetHandle": "a", "animated": false },
-    { "id": "edge-24", "source": "node-21", "sourceHandle": "result", "target": "node-22", "targetHandle": "a", "animated": false },
-    { "id": "edge-25", "source": "node-23", "sourceHandle": "value", "target": "node-24", "targetHandle": "object", "animated": false },
-    { "id": "edge-26", "source": "node-1", "sourceHandle": "max_iterations", "target": "node-24", "targetHandle": "value", "animated": false },
-    { "id": "edge-27", "source": "node-24", "sourceHandle": "result", "target": "node-25", "targetHandle": "object", "animated": false },
-    { "id": "edge-28", "source": "node-22", "sourceHandle": "result", "target": "node-25", "targetHandle": "key", "animated": false },
-
-    { "id": "edge-29", "source": "node-1", "sourceHandle": "exec-out", "target": "node-26", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-30", "source": "node-1", "sourceHandle": "request", "target": "node-26", "targetHandle": "request", "animated": false },
-    { "id": "edge-31", "source": "node-8", "sourceHandle": "value", "target": "node-26", "targetHandle": "provider", "animated": false },
-    { "id": "edge-32", "source": "node-15", "sourceHandle": "value", "target": "node-26", "targetHandle": "model", "animated": false },
-    { "id": "edge-33", "source": "node-1", "sourceHandle": "skip_clarifications", "target": "node-26", "targetHandle": "skip_clarifications", "animated": false },
-    { "id": "edge-34", "source": "node-1", "sourceHandle": "max_web_search", "target": "node-26", "targetHandle": "max_web_search", "animated": false },
-    { "id": "edge-35", "source": "node-1", "sourceHandle": "max_fetch_url", "target": "node-26", "targetHandle": "max_fetch_url", "animated": false },
-    { "id": "edge-36", "source": "node-25", "sourceHandle": "value", "target": "node-26", "targetHandle": "max_iterations", "animated": false },
-
-    { "id": "edge-37", "source": "node-26", "sourceHandle": "exec-out", "target": "node-27", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-38", "source": "node-26", "sourceHandle": "report", "target": "node-27", "targetHandle": "content", "animated": false },
-
-    { "id": "edge-39", "source": "node-27", "sourceHandle": "exec-out", "target": "node-28", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-40", "source": "node-1", "sourceHandle": "request", "target": "node-28", "targetHandle": "request", "animated": false },
-    { "id": "edge-41", "source": "node-26", "sourceHandle": "report", "target": "node-28", "targetHandle": "research_report", "animated": false },
-    { "id": "edge-42", "source": "node-26", "sourceHandle": "dossier", "target": "node-28", "targetHandle": "research_dossier", "animated": false },
-    { "id": "edge-43", "source": "node-8", "sourceHandle": "value", "target": "node-28", "targetHandle": "provider", "animated": false },
-    { "id": "edge-44", "source": "node-15", "sourceHandle": "value", "target": "node-28", "targetHandle": "model", "animated": false },
-
-    { "id": "edge-45", "source": "node-28", "sourceHandle": "exec-out", "target": "node-29", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-46", "source": "node-28", "sourceHandle": "requirements_md", "target": "node-29", "targetHandle": "content", "animated": false },
-
-    { "id": "edge-47", "source": "node-29", "sourceHandle": "exec-out", "target": "node-30", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-48", "source": "node-28", "sourceHandle": "requirements_md", "target": "node-30", "targetHandle": "value", "animated": false },
-
-    { "id": "edge-49", "source": "node-30", "sourceHandle": "exec-out", "target": "node-31", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-50", "source": "node-1", "sourceHandle": "request", "target": "node-31", "targetHandle": "request", "animated": false },
-    { "id": "edge-51", "source": "node-30", "sourceHandle": "value", "target": "node-31", "targetHandle": "requirements_md", "animated": false },
-    { "id": "edge-52", "source": "node-8", "sourceHandle": "value", "target": "node-31", "targetHandle": "provider", "animated": false },
-    { "id": "edge-53", "source": "node-15", "sourceHandle": "value", "target": "node-31", "targetHandle": "model", "animated": false },
-
-    { "id": "edge-54", "source": "node-31", "sourceHandle": "exec-out", "target": "node-32", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-55", "source": "node-31", "sourceHandle": "plan_md", "target": "node-32", "targetHandle": "content", "animated": false },
-
-    { "id": "edge-56", "source": "node-32", "sourceHandle": "exec-out", "target": "node-33", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-57", "source": "node-31", "sourceHandle": "plan_md", "target": "node-33", "targetHandle": "value", "animated": false },
-    { "id": "edge-58", "source": "node-33", "sourceHandle": "exec-out", "target": "node-34", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-59", "source": "node-31", "sourceHandle": "tasks", "target": "node-34", "targetHandle": "value", "animated": false },
-    { "id": "edge-60", "source": "node-34", "sourceHandle": "exec-out", "target": "node-35", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-61", "source": "node-31", "sourceHandle": "test_plan", "target": "node-35", "targetHandle": "value", "animated": false },
-
-    { "id": "edge-62", "source": "node-35", "sourceHandle": "exec-out", "target": "node-36", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-63", "source": "node-36", "sourceHandle": "exec-out", "target": "node-37", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-64", "source": "node-37", "sourceHandle": "exec-out", "target": "node-38", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-65", "source": "node-38", "sourceHandle": "exec-out", "target": "node-39", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-66", "source": "node-39", "sourceHandle": "exec-out", "target": "node-40", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-67", "source": "node-40", "sourceHandle": "exec-out", "target": "node-41", "targetHandle": "exec-in", "animated": true },
-
-    { "id": "edge-68", "source": "node-41", "sourceHandle": "exec-out", "target": "node-43", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-69", "source": "node-42", "sourceHandle": "value", "target": "node-43", "targetHandle": "condition", "animated": false },
-
-    { "id": "edge-70", "source": "node-43", "sourceHandle": "loop", "target": "node-49", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-71", "source": "node-1", "sourceHandle": "request", "target": "node-49", "targetHandle": "request", "animated": false },
-    { "id": "edge-72", "source": "node-45", "sourceHandle": "value", "target": "node-49", "targetHandle": "requirements_md", "animated": false },
-    { "id": "edge-73", "source": "node-46", "sourceHandle": "value", "target": "node-49", "targetHandle": "plan_md", "animated": false },
-    { "id": "edge-74", "source": "node-47", "sourceHandle": "value", "target": "node-49", "targetHandle": "tasks", "animated": false },
-    { "id": "edge-75", "source": "node-44", "sourceHandle": "value", "target": "node-49", "targetHandle": "feedback", "animated": false },
-    { "id": "edge-76", "source": "node-8", "sourceHandle": "value", "target": "node-49", "targetHandle": "provider", "animated": false },
-    { "id": "edge-77", "source": "node-15", "sourceHandle": "value", "target": "node-49", "targetHandle": "model", "animated": false },
-    { "id": "edge-78", "source": "node-25", "sourceHandle": "value", "target": "node-49", "targetHandle": "max_iterations", "animated": false },
-
-    { "id": "edge-79", "source": "node-49", "sourceHandle": "exec-out", "target": "node-50", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-80", "source": "node-49", "sourceHandle": "summary_md", "target": "node-50", "targetHandle": "value", "animated": false },
-
-    { "id": "edge-81", "source": "node-50", "sourceHandle": "exec-out", "target": "node-51", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-82", "source": "node-1", "sourceHandle": "request", "target": "node-51", "targetHandle": "request", "animated": false },
-    { "id": "edge-83", "source": "node-45", "sourceHandle": "value", "target": "node-51", "targetHandle": "requirements_md", "animated": false },
-    { "id": "edge-84", "source": "node-46", "sourceHandle": "value", "target": "node-51", "targetHandle": "plan_md", "animated": false },
-    { "id": "edge-85", "source": "node-47", "sourceHandle": "value", "target": "node-51", "targetHandle": "tasks", "animated": false },
-    { "id": "edge-86", "source": "node-48", "sourceHandle": "value", "target": "node-51", "targetHandle": "test_plan", "animated": false },
-    { "id": "edge-87", "source": "node-50", "sourceHandle": "value", "target": "node-51", "targetHandle": "coder_summary_md", "animated": false },
-    { "id": "edge-88", "source": "node-8", "sourceHandle": "value", "target": "node-51", "targetHandle": "provider", "animated": false },
-    { "id": "edge-89", "source": "node-15", "sourceHandle": "value", "target": "node-51", "targetHandle": "model", "animated": false },
-    { "id": "edge-90", "source": "node-25", "sourceHandle": "value", "target": "node-51", "targetHandle": "max_iterations", "animated": false },
-
-    { "id": "edge-91", "source": "node-51", "sourceHandle": "exec-out", "target": "node-52", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-92", "source": "node-51", "sourceHandle": "findings_md", "target": "node-52", "targetHandle": "content", "animated": false },
-
-    { "id": "edge-93", "source": "node-52", "sourceHandle": "exec-out", "target": "node-53", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-94", "source": "node-51", "sourceHandle": "approved", "target": "node-53", "targetHandle": "value", "animated": false },
-
-    { "id": "edge-95", "source": "node-53", "sourceHandle": "exec-out", "target": "node-54", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-96", "source": "node-51", "sourceHandle": "findings_md", "target": "node-54", "targetHandle": "value", "animated": false },
-
-    { "id": "edge-97", "source": "node-51", "sourceHandle": "approved", "target": "node-56", "targetHandle": "value", "animated": false },
-    { "id": "edge-98", "source": "node-56", "sourceHandle": "result", "target": "node-57", "targetHandle": "a", "animated": false },
-    { "id": "edge-99", "source": "node-58", "sourceHandle": "value", "target": "node-59", "targetHandle": "object", "animated": false },
-    { "id": "edge-100", "source": "node-51", "sourceHandle": "findings_md", "target": "node-59", "targetHandle": "value", "animated": false },
-    { "id": "edge-101", "source": "node-59", "sourceHandle": "result", "target": "node-60", "targetHandle": "object", "animated": false },
-    { "id": "edge-102", "source": "node-57", "sourceHandle": "result", "target": "node-60", "targetHandle": "key", "animated": false },
-
-    { "id": "edge-103", "source": "node-54", "sourceHandle": "exec-out", "target": "node-55", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-104", "source": "node-60", "sourceHandle": "value", "target": "node-55", "targetHandle": "value", "animated": false },
-
-    { "id": "edge-105", "source": "node-55", "sourceHandle": "exec-out", "target": "node-63", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-106", "source": "node-61", "sourceHandle": "value", "target": "node-62", "targetHandle": "a", "animated": false },
-    { "id": "edge-107", "source": "node-62", "sourceHandle": "result", "target": "node-63", "targetHandle": "value", "animated": false },
-
-    { "id": "edge-108", "source": "node-62", "sourceHandle": "result", "target": "node-64", "targetHandle": "a", "animated": false },
-    { "id": "edge-109", "source": "node-20", "sourceHandle": "value", "target": "node-64", "targetHandle": "b", "animated": false },
-    { "id": "edge-110", "source": "node-64", "sourceHandle": "result", "target": "node-65", "targetHandle": "b", "animated": false },
-    { "id": "edge-111", "source": "node-56", "sourceHandle": "result", "target": "node-65", "targetHandle": "a", "animated": false },
-
-    { "id": "edge-112", "source": "node-63", "sourceHandle": "exec-out", "target": "node-66", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-113", "source": "node-65", "sourceHandle": "result", "target": "node-66", "targetHandle": "value", "animated": false },
-    { "id": "edge-114", "source": "node-66", "sourceHandle": "exec-out", "target": "node-43", "targetHandle": "exec-in", "animated": true },
-
-    { "id": "edge-115", "source": "node-43", "sourceHandle": "done", "target": "node-77", "targetHandle": "exec-in", "animated": true },
-
-    { "id": "edge-116", "source": "node-67", "sourceHandle": "value", "target": "node-68", "targetHandle": "a", "animated": false },
-    { "id": "edge-117", "source": "node-69", "sourceHandle": "value", "target": "node-70", "targetHandle": "object", "animated": false },
-    { "id": "edge-118", "source": "node-68", "sourceHandle": "result", "target": "node-70", "targetHandle": "key", "animated": false },
-
-    { "id": "edge-119", "source": "node-70", "sourceHandle": "value", "target": "node-76", "targetHandle": "b", "animated": false },
-    { "id": "edge-120", "source": "node-71", "sourceHandle": "value", "target": "node-76", "targetHandle": "d", "animated": false },
-    { "id": "edge-121", "source": "node-1", "sourceHandle": "request", "target": "node-76", "targetHandle": "f", "animated": false },
-    { "id": "edge-122", "source": "node-72", "sourceHandle": "value", "target": "node-76", "targetHandle": "h", "animated": false },
-    { "id": "edge-123", "source": "node-73", "sourceHandle": "value", "target": "node-76", "targetHandle": "j", "animated": false },
-    { "id": "edge-124", "source": "node-74", "sourceHandle": "value", "target": "node-76", "targetHandle": "l", "animated": false },
-    { "id": "edge-125", "source": "node-75", "sourceHandle": "value", "target": "node-76", "targetHandle": "n", "animated": false },
-
-    { "id": "edge-126", "source": "node-76", "sourceHandle": "result", "target": "node-77", "targetHandle": "message", "animated": false },
-    { "id": "edge-127", "source": "node-77", "sourceHandle": "exec-out", "target": "node-78", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-128", "source": "node-76", "sourceHandle": "result", "target": "node-78", "targetHandle": "final_message", "animated": false },
-
-    { "id": "edge-129", "source": "node-79", "sourceHandle": "value", "target": "node-80", "targetHandle": "object", "animated": false },
-    { "id": "edge-130", "source": "node-67", "sourceHandle": "value", "target": "node-80", "targetHandle": "value", "animated": false },
-    { "id": "edge-131", "source": "node-80", "sourceHandle": "result", "target": "node-81", "targetHandle": "object", "animated": false },
-    { "id": "edge-132", "source": "node-71", "sourceHandle": "value", "target": "node-81", "targetHandle": "value", "animated": false },
-    { "id": "edge-133", "source": "node-81", "sourceHandle": "result", "target": "node-82", "targetHandle": "object", "animated": false },
-    { "id": "edge-134", "source": "node-1", "sourceHandle": "request", "target": "node-82", "targetHandle": "value", "animated": false },
-    { "id": "edge-135", "source": "node-82", "sourceHandle": "result", "target": "node-83", "targetHandle": "object", "animated": false },
-    { "id": "edge-136", "source": "node-8", "sourceHandle": "value", "target": "node-83", "targetHandle": "value", "animated": false },
-    { "id": "edge-137", "source": "node-83", "sourceHandle": "result", "target": "node-84", "targetHandle": "object", "animated": false },
-    { "id": "edge-138", "source": "node-15", "sourceHandle": "value", "target": "node-84", "targetHandle": "value", "animated": false },
-    { "id": "edge-139", "source": "node-84", "sourceHandle": "result", "target": "node-85", "targetHandle": "object", "animated": false },
-    { "id": "edge-140", "source": "node-72", "sourceHandle": "value", "target": "node-85", "targetHandle": "value", "animated": false },
-    { "id": "edge-141", "source": "node-85", "sourceHandle": "result", "target": "node-86", "targetHandle": "object", "animated": false },
-    { "id": "edge-142", "source": "node-73", "sourceHandle": "value", "target": "node-86", "targetHandle": "value", "animated": false },
-    { "id": "edge-143", "source": "node-86", "sourceHandle": "result", "target": "node-87", "targetHandle": "object", "animated": false },
-    { "id": "edge-144", "source": "node-74", "sourceHandle": "value", "target": "node-87", "targetHandle": "value", "animated": false },
-    { "id": "edge-145", "source": "node-87", "sourceHandle": "result", "target": "node-88", "targetHandle": "object", "animated": false },
-    { "id": "edge-146", "source": "node-75", "sourceHandle": "value", "target": "node-88", "targetHandle": "value", "animated": false },
-    { "id": "edge-147", "source": "node-88", "sourceHandle": "result", "target": "node-78", "targetHandle": "state", "animated": false }
+    {
+      "id": "edge-1",
+      "source": "node-1",
+      "sourceHandle": "provider",
+      "target": "node-2",
+      "targetHandle": "text",
+      "animated": false
+    },
+    {
+      "id": "edge-2",
+      "source": "node-2",
+      "sourceHandle": "result",
+      "target": "node-3",
+      "targetHandle": "text",
+      "animated": false
+    },
+    {
+      "id": "edge-3",
+      "source": "node-3",
+      "sourceHandle": "result",
+      "target": "node-4",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-4",
+      "source": "node-4",
+      "sourceHandle": "result",
+      "target": "node-5",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-5",
+      "source": "node-6",
+      "sourceHandle": "value",
+      "target": "node-7",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-6",
+      "source": "node-2",
+      "sourceHandle": "result",
+      "target": "node-7",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-7",
+      "source": "node-7",
+      "sourceHandle": "result",
+      "target": "node-8",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-8",
+      "source": "node-5",
+      "sourceHandle": "result",
+      "target": "node-8",
+      "targetHandle": "key",
+      "animated": false
+    },
+    {
+      "id": "edge-9",
+      "source": "node-1",
+      "sourceHandle": "model",
+      "target": "node-9",
+      "targetHandle": "text",
+      "animated": false
+    },
+    {
+      "id": "edge-10",
+      "source": "node-9",
+      "sourceHandle": "result",
+      "target": "node-10",
+      "targetHandle": "text",
+      "animated": false
+    },
+    {
+      "id": "edge-11",
+      "source": "node-10",
+      "sourceHandle": "result",
+      "target": "node-11",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-12",
+      "source": "node-11",
+      "sourceHandle": "result",
+      "target": "node-12",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-13",
+      "source": "node-13",
+      "sourceHandle": "value",
+      "target": "node-14",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-14",
+      "source": "node-9",
+      "sourceHandle": "result",
+      "target": "node-14",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-15",
+      "source": "node-14",
+      "sourceHandle": "result",
+      "target": "node-15",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-16",
+      "source": "node-12",
+      "sourceHandle": "result",
+      "target": "node-15",
+      "targetHandle": "key",
+      "animated": false
+    },
+    {
+      "id": "edge-17",
+      "source": "node-1",
+      "sourceHandle": "max_cycles",
+      "target": "node-16",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-18",
+      "source": "node-16",
+      "sourceHandle": "result",
+      "target": "node-17",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-19",
+      "source": "node-18",
+      "sourceHandle": "value",
+      "target": "node-19",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-20",
+      "source": "node-1",
+      "sourceHandle": "max_cycles",
+      "target": "node-19",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-21",
+      "source": "node-19",
+      "sourceHandle": "result",
+      "target": "node-20",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-22",
+      "source": "node-17",
+      "sourceHandle": "result",
+      "target": "node-20",
+      "targetHandle": "key",
+      "animated": false
+    },
+    {
+      "id": "edge-23",
+      "source": "node-1",
+      "sourceHandle": "max_iterations",
+      "target": "node-21",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-24",
+      "source": "node-21",
+      "sourceHandle": "result",
+      "target": "node-22",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-25",
+      "source": "node-23",
+      "sourceHandle": "value",
+      "target": "node-24",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-26",
+      "source": "node-1",
+      "sourceHandle": "max_iterations",
+      "target": "node-24",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-27",
+      "source": "node-24",
+      "sourceHandle": "result",
+      "target": "node-25",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-28",
+      "source": "node-22",
+      "sourceHandle": "result",
+      "target": "node-25",
+      "targetHandle": "key",
+      "animated": false
+    },
+    {
+      "id": "edge-29",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-26",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-30",
+      "source": "node-1",
+      "sourceHandle": "prompt",
+      "target": "node-26",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "edge-31",
+      "source": "node-8",
+      "sourceHandle": "value",
+      "target": "node-26",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-32",
+      "source": "node-15",
+      "sourceHandle": "value",
+      "target": "node-26",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-33",
+      "source": "node-1",
+      "sourceHandle": "skip_clarifications",
+      "target": "node-26",
+      "targetHandle": "skip_clarifications",
+      "animated": false
+    },
+    {
+      "id": "edge-34",
+      "source": "node-1",
+      "sourceHandle": "max_web_search",
+      "target": "node-26",
+      "targetHandle": "max_web_search",
+      "animated": false
+    },
+    {
+      "id": "edge-35",
+      "source": "node-1",
+      "sourceHandle": "max_fetch_url",
+      "target": "node-26",
+      "targetHandle": "max_fetch_url",
+      "animated": false
+    },
+    {
+      "id": "edge-36",
+      "source": "node-25",
+      "sourceHandle": "value",
+      "target": "node-26",
+      "targetHandle": "max_iterations",
+      "animated": false
+    },
+    {
+      "id": "edge-37",
+      "source": "node-26",
+      "sourceHandle": "exec-out",
+      "target": "node-27",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-38",
+      "source": "node-26",
+      "sourceHandle": "report",
+      "target": "node-27",
+      "targetHandle": "content",
+      "animated": false
+    },
+    {
+      "id": "edge-39",
+      "source": "node-27",
+      "sourceHandle": "exec-out",
+      "target": "node-28",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-40",
+      "source": "node-1",
+      "sourceHandle": "prompt",
+      "target": "node-28",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "edge-41",
+      "source": "node-26",
+      "sourceHandle": "report",
+      "target": "node-28",
+      "targetHandle": "research_report",
+      "animated": false
+    },
+    {
+      "id": "edge-42",
+      "source": "node-26",
+      "sourceHandle": "dossier",
+      "target": "node-28",
+      "targetHandle": "research_dossier",
+      "animated": false
+    },
+    {
+      "id": "edge-43",
+      "source": "node-8",
+      "sourceHandle": "value",
+      "target": "node-28",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-44",
+      "source": "node-15",
+      "sourceHandle": "value",
+      "target": "node-28",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-45",
+      "source": "node-28",
+      "sourceHandle": "exec-out",
+      "target": "node-29",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-46",
+      "source": "node-28",
+      "sourceHandle": "requirements_md",
+      "target": "node-29",
+      "targetHandle": "content",
+      "animated": false
+    },
+    {
+      "id": "edge-47",
+      "source": "node-29",
+      "sourceHandle": "exec-out",
+      "target": "node-30",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-48",
+      "source": "node-28",
+      "sourceHandle": "requirements_md",
+      "target": "node-30",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-49",
+      "source": "node-30",
+      "sourceHandle": "exec-out",
+      "target": "node-31",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-50",
+      "source": "node-1",
+      "sourceHandle": "prompt",
+      "target": "node-31",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "edge-51",
+      "source": "node-30",
+      "sourceHandle": "value",
+      "target": "node-31",
+      "targetHandle": "requirements_md",
+      "animated": false
+    },
+    {
+      "id": "edge-52",
+      "source": "node-8",
+      "sourceHandle": "value",
+      "target": "node-31",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-53",
+      "source": "node-15",
+      "sourceHandle": "value",
+      "target": "node-31",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-54",
+      "source": "node-31",
+      "sourceHandle": "exec-out",
+      "target": "node-32",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-55",
+      "source": "node-31",
+      "sourceHandle": "plan_md",
+      "target": "node-32",
+      "targetHandle": "content",
+      "animated": false
+    },
+    {
+      "id": "edge-56",
+      "source": "node-32",
+      "sourceHandle": "exec-out",
+      "target": "node-33",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-57",
+      "source": "node-31",
+      "sourceHandle": "plan_md",
+      "target": "node-33",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-58",
+      "source": "node-33",
+      "sourceHandle": "exec-out",
+      "target": "node-34",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-59",
+      "source": "node-31",
+      "sourceHandle": "tasks",
+      "target": "node-34",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-60",
+      "source": "node-34",
+      "sourceHandle": "exec-out",
+      "target": "node-35",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-61",
+      "source": "node-31",
+      "sourceHandle": "test_plan",
+      "target": "node-35",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-62",
+      "source": "node-35",
+      "sourceHandle": "exec-out",
+      "target": "node-36",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-63",
+      "source": "node-36",
+      "sourceHandle": "exec-out",
+      "target": "node-37",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-64",
+      "source": "node-37",
+      "sourceHandle": "exec-out",
+      "target": "node-38",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-65",
+      "source": "node-38",
+      "sourceHandle": "exec-out",
+      "target": "node-39",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-66",
+      "source": "node-39",
+      "sourceHandle": "exec-out",
+      "target": "node-40",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-67",
+      "source": "node-40",
+      "sourceHandle": "exec-out",
+      "target": "node-41",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-68",
+      "source": "node-41",
+      "sourceHandle": "exec-out",
+      "target": "node-43",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-69",
+      "source": "node-42",
+      "sourceHandle": "value",
+      "target": "node-43",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "edge-70",
+      "source": "node-43",
+      "sourceHandle": "loop",
+      "target": "node-49",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-71",
+      "source": "node-1",
+      "sourceHandle": "prompt",
+      "target": "node-49",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "edge-72",
+      "source": "node-45",
+      "sourceHandle": "value",
+      "target": "node-49",
+      "targetHandle": "requirements_md",
+      "animated": false
+    },
+    {
+      "id": "edge-73",
+      "source": "node-46",
+      "sourceHandle": "value",
+      "target": "node-49",
+      "targetHandle": "plan_md",
+      "animated": false
+    },
+    {
+      "id": "edge-74",
+      "source": "node-47",
+      "sourceHandle": "value",
+      "target": "node-49",
+      "targetHandle": "tasks",
+      "animated": false
+    },
+    {
+      "id": "edge-75",
+      "source": "node-44",
+      "sourceHandle": "value",
+      "target": "node-49",
+      "targetHandle": "feedback",
+      "animated": false
+    },
+    {
+      "id": "edge-76",
+      "source": "node-8",
+      "sourceHandle": "value",
+      "target": "node-49",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-77",
+      "source": "node-15",
+      "sourceHandle": "value",
+      "target": "node-49",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-78",
+      "source": "node-25",
+      "sourceHandle": "value",
+      "target": "node-49",
+      "targetHandle": "max_iterations",
+      "animated": false
+    },
+    {
+      "id": "edge-79",
+      "source": "node-49",
+      "sourceHandle": "exec-out",
+      "target": "node-50",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-80",
+      "source": "node-49",
+      "sourceHandle": "summary_md",
+      "target": "node-50",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-81",
+      "source": "node-50",
+      "sourceHandle": "exec-out",
+      "target": "node-51",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-82",
+      "source": "node-1",
+      "sourceHandle": "prompt",
+      "target": "node-51",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "edge-83",
+      "source": "node-45",
+      "sourceHandle": "value",
+      "target": "node-51",
+      "targetHandle": "requirements_md",
+      "animated": false
+    },
+    {
+      "id": "edge-84",
+      "source": "node-46",
+      "sourceHandle": "value",
+      "target": "node-51",
+      "targetHandle": "plan_md",
+      "animated": false
+    },
+    {
+      "id": "edge-85",
+      "source": "node-47",
+      "sourceHandle": "value",
+      "target": "node-51",
+      "targetHandle": "tasks",
+      "animated": false
+    },
+    {
+      "id": "edge-86",
+      "source": "node-48",
+      "sourceHandle": "value",
+      "target": "node-51",
+      "targetHandle": "test_plan",
+      "animated": false
+    },
+    {
+      "id": "edge-87",
+      "source": "node-50",
+      "sourceHandle": "value",
+      "target": "node-51",
+      "targetHandle": "coder_summary_md",
+      "animated": false
+    },
+    {
+      "id": "edge-88",
+      "source": "node-8",
+      "sourceHandle": "value",
+      "target": "node-51",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-89",
+      "source": "node-15",
+      "sourceHandle": "value",
+      "target": "node-51",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-90",
+      "source": "node-25",
+      "sourceHandle": "value",
+      "target": "node-51",
+      "targetHandle": "max_iterations",
+      "animated": false
+    },
+    {
+      "id": "edge-91",
+      "source": "node-51",
+      "sourceHandle": "exec-out",
+      "target": "node-52",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-92",
+      "source": "node-51",
+      "sourceHandle": "findings_md",
+      "target": "node-52",
+      "targetHandle": "content",
+      "animated": false
+    },
+    {
+      "id": "edge-93",
+      "source": "node-52",
+      "sourceHandle": "exec-out",
+      "target": "node-53",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-94",
+      "source": "node-51",
+      "sourceHandle": "approved",
+      "target": "node-53",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-95",
+      "source": "node-53",
+      "sourceHandle": "exec-out",
+      "target": "node-54",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-96",
+      "source": "node-51",
+      "sourceHandle": "findings_md",
+      "target": "node-54",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-97",
+      "source": "node-51",
+      "sourceHandle": "approved",
+      "target": "node-56",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-98",
+      "source": "node-56",
+      "sourceHandle": "result",
+      "target": "node-57",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-99",
+      "source": "node-58",
+      "sourceHandle": "value",
+      "target": "node-59",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-100",
+      "source": "node-51",
+      "sourceHandle": "findings_md",
+      "target": "node-59",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-101",
+      "source": "node-59",
+      "sourceHandle": "result",
+      "target": "node-60",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-102",
+      "source": "node-57",
+      "sourceHandle": "result",
+      "target": "node-60",
+      "targetHandle": "key",
+      "animated": false
+    },
+    {
+      "id": "edge-103",
+      "source": "node-54",
+      "sourceHandle": "exec-out",
+      "target": "node-55",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-104",
+      "source": "node-60",
+      "sourceHandle": "value",
+      "target": "node-55",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-105",
+      "source": "node-55",
+      "sourceHandle": "exec-out",
+      "target": "node-63",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-106",
+      "source": "node-61",
+      "sourceHandle": "value",
+      "target": "node-62",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-107",
+      "source": "node-62",
+      "sourceHandle": "result",
+      "target": "node-63",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-108",
+      "source": "node-62",
+      "sourceHandle": "result",
+      "target": "node-64",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-109",
+      "source": "node-20",
+      "sourceHandle": "value",
+      "target": "node-64",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-110",
+      "source": "node-64",
+      "sourceHandle": "result",
+      "target": "node-65",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-111",
+      "source": "node-56",
+      "sourceHandle": "result",
+      "target": "node-65",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-112",
+      "source": "node-63",
+      "sourceHandle": "exec-out",
+      "target": "node-66",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-113",
+      "source": "node-65",
+      "sourceHandle": "result",
+      "target": "node-66",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-114",
+      "source": "node-66",
+      "sourceHandle": "exec-out",
+      "target": "node-43",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-115",
+      "source": "node-43",
+      "sourceHandle": "done",
+      "target": "node-77",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-116",
+      "source": "node-67",
+      "sourceHandle": "value",
+      "target": "node-68",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-117",
+      "source": "node-69",
+      "sourceHandle": "value",
+      "target": "node-70",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-118",
+      "source": "node-68",
+      "sourceHandle": "result",
+      "target": "node-70",
+      "targetHandle": "key",
+      "animated": false
+    },
+    {
+      "id": "edge-119",
+      "source": "node-70",
+      "sourceHandle": "value",
+      "target": "node-76",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-120",
+      "source": "node-71",
+      "sourceHandle": "value",
+      "target": "node-76",
+      "targetHandle": "d",
+      "animated": false
+    },
+    {
+      "id": "edge-121",
+      "source": "node-1",
+      "sourceHandle": "prompt",
+      "target": "node-76",
+      "targetHandle": "f",
+      "animated": false
+    },
+    {
+      "id": "edge-122",
+      "source": "node-72",
+      "sourceHandle": "value",
+      "target": "node-76",
+      "targetHandle": "h",
+      "animated": false
+    },
+    {
+      "id": "edge-123",
+      "source": "node-73",
+      "sourceHandle": "value",
+      "target": "node-76",
+      "targetHandle": "j",
+      "animated": false
+    },
+    {
+      "id": "edge-124",
+      "source": "node-74",
+      "sourceHandle": "value",
+      "target": "node-76",
+      "targetHandle": "l",
+      "animated": false
+    },
+    {
+      "id": "edge-125",
+      "source": "node-75",
+      "sourceHandle": "value",
+      "target": "node-76",
+      "targetHandle": "n",
+      "animated": false
+    },
+    {
+      "id": "edge-126",
+      "source": "node-76",
+      "sourceHandle": "result",
+      "target": "node-77",
+      "targetHandle": "message",
+      "animated": false
+    },
+    {
+      "id": "edge-127",
+      "source": "node-77",
+      "sourceHandle": "exec-out",
+      "target": "node-78",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-128",
+      "source": "node-76",
+      "sourceHandle": "result",
+      "target": "node-78",
+      "targetHandle": "final_message",
+      "animated": false
+    },
+    {
+      "id": "edge-129",
+      "source": "node-79",
+      "sourceHandle": "value",
+      "target": "node-80",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-130",
+      "source": "node-67",
+      "sourceHandle": "value",
+      "target": "node-80",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-131",
+      "source": "node-80",
+      "sourceHandle": "result",
+      "target": "node-81",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-132",
+      "source": "node-71",
+      "sourceHandle": "value",
+      "target": "node-81",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-133",
+      "source": "node-81",
+      "sourceHandle": "result",
+      "target": "node-82",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-134",
+      "source": "node-1",
+      "sourceHandle": "prompt",
+      "target": "node-82",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-135",
+      "source": "node-82",
+      "sourceHandle": "result",
+      "target": "node-83",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-136",
+      "source": "node-8",
+      "sourceHandle": "value",
+      "target": "node-83",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-137",
+      "source": "node-83",
+      "sourceHandle": "result",
+      "target": "node-84",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-138",
+      "source": "node-15",
+      "sourceHandle": "value",
+      "target": "node-84",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-139",
+      "source": "node-84",
+      "sourceHandle": "result",
+      "target": "node-85",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-140",
+      "source": "node-72",
+      "sourceHandle": "value",
+      "target": "node-85",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-141",
+      "source": "node-85",
+      "sourceHandle": "result",
+      "target": "node-86",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-142",
+      "source": "node-73",
+      "sourceHandle": "value",
+      "target": "node-86",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-143",
+      "source": "node-86",
+      "sourceHandle": "result",
+      "target": "node-87",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-144",
+      "source": "node-74",
+      "sourceHandle": "value",
+      "target": "node-87",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-145",
+      "source": "node-87",
+      "sourceHandle": "result",
+      "target": "node-88",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-146",
+      "source": "node-75",
+      "sourceHandle": "value",
+      "target": "node-88",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-147",
+      "source": "node-88",
+      "sourceHandle": "result",
+      "target": "node-78",
+      "targetHandle": "state",
+      "animated": false
+    }
   ],
-
   "entryNode": "node-1",
   "created_at": "2026-01-01T00:00:00Z",
   "updated_at": "2026-01-02T00:00:00Z"
 }
-
-

@@ -83,6 +83,15 @@ export function areTypesCompatible(
     return true;
   }
 
+  // Assertion is an object-like type; allow assertion <-> object.
+  if (
+    (sourceType === 'assertion' && targetType === 'object') ||
+    (sourceType === 'object' && targetType === 'assertion') ||
+    (sourceType === 'assertion' && targetType === 'assertion')
+  ) {
+    return true;
+  }
+
   // Array can connect to object (objects can represent arrays)
   if (sourceType === 'array' && targetType === 'object') {
     return true;

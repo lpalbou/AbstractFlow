@@ -36,7 +36,7 @@ def test_visualflow_compiler_executes_real_visualflow_json_without_abstractflow_
         ledger_store=InMemoryLedgerStore(),
         effect_handlers={EffectType.LLM_CALL: _llm_handler},
     )
-    run_id = rt.start(workflow=spec, vars={"request": "hello"})
+    run_id = rt.start(workflow=spec, vars={"prompt": "hello"})
     run = rt.tick(workflow=spec, run_id=run_id, max_steps=200)
 
     assert run.status == "completed"

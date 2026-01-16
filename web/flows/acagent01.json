@@ -1,7 +1,7 @@
 {
   "id": "acagent01",
   "name": "AbstractCode Agent Example (v1)",
-  "description": "Example workflow implementing abstractcode.agent.v1. It echoes the incoming request as the response.",
+  "description": "Example workflow implementing abstractcode.agent.v1. It echoes the incoming prompt as the response.",
   "interfaces": [
     "abstractcode.agent.v1"
   ],
@@ -26,8 +26,8 @@
             "type": "execution"
           },
           {
-            "id": "request",
-            "label": "request",
+            "id": "prompt",
+            "label": "prompt",
             "type": "string"
           },
           {
@@ -58,8 +58,8 @@
           "type": "execution"
         },
         {
-          "id": "request",
-          "label": "request",
+          "id": "prompt",
+          "label": "prompt",
           "type": "string"
         },
         {
@@ -202,7 +202,7 @@
     {
       "id": "edge-start-echo-request",
       "source": "start",
-      "sourceHandle": "request",
+      "sourceHandle": "prompt",
       "target": "echo",
       "targetHandle": "input",
       "animated": false

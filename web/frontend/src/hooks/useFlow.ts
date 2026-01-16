@@ -542,8 +542,44 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
       // Backward-compat + canonical ordering for Agent and LLM Call nodes.
       // Pins are addressable by id (edges), so reordering is safe.
-      if (data.nodeType === 'agent' || data.nodeType === 'llm_call') {
-        const existingInputs = Array.isArray(data.inputs) ? data.inputs : [];
+        if (data.nodeType === 'agent' || data.nodeType === 'llm_call') {
+          const inputIdRenames: Record<string, string> =
+            data.nodeType === 'llm_call'
+              ? {
+                  include_context: 'use_context',
+                  max_input_tokens: 'max_in_tokens',
+                  response_schema: 'resp_schema',
+                }
+              : {
+                  include_context: 'use_context',
+                  max_input_tokens: 'max_in_tokens',
+                  response_schema: 'resp_schema',
+                };
+
+        const prevDefaultsForRenames =
+          data.pinDefaults && typeof data.pinDefaults === 'object' ? data.pinDefaults : undefined;
+        if (prevDefaultsForRenames) {
+          const nextDefaults: Record<string, JsonValue> = { ...prevDefaultsForRenames };
+          let changed = false;
+          for (const [from, to] of Object.entries(inputIdRenames)) {
+            if (!(from in nextDefaults)) continue;
+            if (!(to in nextDefaults)) nextDefaults[to] = nextDefaults[from];
+            delete nextDefaults[from];
+            changed = true;
+          }
+          if (changed) data = { ...data, pinDefaults: nextDefaults };
+        }
+
+        const existingInputsRaw = Array.isArray(data.inputs) ? data.inputs : [];
+        const existingInputs: Pin[] = [];
+        const seen = new Set<string>();
+        for (const p of existingInputsRaw) {
+          const nextId = inputIdRenames[p.id] || p.id;
+          if (seen.has(nextId)) continue;
+          seen.add(nextId);
+          existingInputs.push(nextId === p.id ? p : { ...p, id: nextId });
+        }
+
         const byId = new Map(existingInputs.map((p) => [p.id, p] as const));
         const used = new Set<string>();
 
@@ -561,31 +597,32 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           data.nodeType === 'llm_call'
             ? [
                 execIn,
-                want({ id: 'include_context', label: 'use_context', type: 'boolean' }),
-                want({ id: 'max_input_tokens', label: 'max_input_tokens', type: 'number' }),
+                want({ id: 'use_context', label: 'use_context', type: 'boolean' }),
+                want({ id: 'context', label: 'context', type: 'object' }),
                 want({ id: 'provider', label: 'provider', type: 'provider' }),
                 want({ id: 'model', label: 'model', type: 'model' }),
-                want({ id: 'temperature', label: 'temperature', type: 'number' }),
-                want({ id: 'seed', label: 'seed', type: 'number' }),
                 want({ id: 'system', label: 'system', type: 'string' }),
                 want({ id: 'prompt', label: 'prompt', type: 'string' }),
                 want({ id: 'tools', label: 'tools', type: 'tools' }),
-                want({ id: 'response_schema', label: 'structured_output', type: 'object' }),
+                want({ id: 'max_in_tokens', label: 'max_in_tokens', type: 'number' }),
+                want({ id: 'temperature', label: 'temperature', type: 'number' }),
+                want({ id: 'seed', label: 'seed', type: 'number' }),
+                want({ id: 'resp_schema', label: 'resp_schema', type: 'object' }),
               ]
             : [
                 execIn,
-                want({ id: 'include_context', label: 'use_context', type: 'boolean' }),
+                want({ id: 'use_context', label: 'use_context', type: 'boolean' }),
+                want({ id: 'context', label: 'context', type: 'object' }),
                 want({ id: 'provider', label: 'provider', type: 'provider' }),
                 want({ id: 'model', label: 'model', type: 'model' }),
+                want({ id: 'system', label: 'system', type: 'string' }),
+                want({ id: 'prompt', label: 'prompt', type: 'string' }),
+                want({ id: 'tools', label: 'tools', type: 'tools' }),
+                want({ id: 'max_iterations', label: 'max_iterations', type: 'number' }),
+                want({ id: 'max_in_tokens', label: 'max_in_tokens', type: 'number' }),
                 want({ id: 'temperature', label: 'temperature', type: 'number' }),
                 want({ id: 'seed', label: 'seed', type: 'number' }),
-                want({ id: 'max_iterations', label: 'max_iterations', type: 'number' }),
-                want({ id: 'max_input_tokens', label: 'max_input_tokens', type: 'number' }),
-                want({ id: 'system', label: 'system', type: 'string' }),
-                want({ id: 'task', label: 'prompt', type: 'string' }),
-                want({ id: 'tools', label: 'tools', type: 'tools' }),
-                want({ id: 'response_schema', label: 'structured_output', type: 'object' }),
-                want({ id: 'context', label: 'context', type: 'object' }),
+                want({ id: 'resp_schema', label: 'resp_schema', type: 'object' }),
               ];
 
         // Drop truly deprecated pins (kept for backward compat in old flows).
@@ -652,8 +689,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                 : cfg && typeof cfg.useContext === 'boolean'
                   ? cfg.useContext
                   : undefined;
-          if (typeof nextDefaults.include_context !== 'boolean' && typeof legacy === 'boolean') {
-            nextDefaults.include_context = legacy;
+          if (typeof nextDefaults.use_context !== 'boolean' && typeof legacy === 'boolean') {
+            nextDefaults.use_context = legacy;
           }
           if (cfg && ('include_context' in cfg || 'use_context' in cfg || 'useContext' in cfg)) {
             // Remove legacy key to keep a single source of truth (pinDefaults).
@@ -672,8 +709,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                 : cfg && typeof cfg.useContext === 'boolean'
                   ? cfg.useContext
                   : undefined;
-          if (typeof nextDefaults.include_context !== 'boolean' && typeof legacy === 'boolean') {
-            nextDefaults.include_context = legacy;
+          if (typeof nextDefaults.use_context !== 'boolean' && typeof legacy === 'boolean') {
+            nextDefaults.use_context = legacy;
           }
           if (cfg && ('include_context' in cfg || 'use_context' in cfg || 'useContext' in cfg)) {
             const { include_context, use_context, useContext, ...rest } = cfg;
@@ -1285,9 +1322,33 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       animated: ve.animated ?? ve.sourceHandle === 'exec-out',
     }));
 
-    // Drop edges that reference missing pins (prevents invisible edges).
     const nodeById = new Map(nodes.map((n) => [n.id, n]));
-    const validEdges = edges.filter((e) => {
+    const migratedEdges = edges.map((e) => {
+      const target = nodeById.get(e.target);
+      if (!target || !e.targetHandle) return e;
+
+      const targetType = target.data.nodeType;
+      if (targetType !== 'agent' && targetType !== 'llm_call') return e;
+
+      const renames: Record<string, string> =
+        targetType === 'llm_call'
+          ? {
+              include_context: 'use_context',
+              max_input_tokens: 'max_in_tokens',
+              response_schema: 'resp_schema',
+            }
+          : {
+              include_context: 'use_context',
+              max_input_tokens: 'max_in_tokens',
+              response_schema: 'resp_schema',
+            };
+
+      const nextHandle = renames[e.targetHandle] || e.targetHandle;
+      return nextHandle === e.targetHandle ? e : { ...e, targetHandle: nextHandle };
+    });
+
+    // Drop edges that reference missing pins (prevents invisible edges).
+    const validEdges = migratedEdges.filter((e) => {
       const source = nodeById.get(e.source);
       const target = nodeById.get(e.target);
       if (!source || !target) return false;

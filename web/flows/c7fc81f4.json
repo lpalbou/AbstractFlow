@@ -26,8 +26,8 @@
             "type": "execution"
           },
           {
-            "id": "request",
-            "label": "request",
+            "id": "prompt",
+            "label": "prompt",
             "type": "string"
           },
           {
@@ -400,8 +400,8 @@
             "type": "object"
           },
           {
-            "id": "request",
-            "label": "request",
+            "id": "prompt",
+            "label": "prompt",
             "type": "string"
           },
           {
@@ -646,7 +646,7 @@
     {
       "id": "edge-1768177173206",
       "source": "start",
-      "sourceHandle": "request",
+      "sourceHandle": "prompt",
       "target": "node-4",
       "targetHandle": "task",
       "animated": false
@@ -760,7 +760,7 @@
       "source": "node-3",
       "sourceHandle": "next_steps",
       "target": "node-6",
-      "targetHandle": "request",
+      "targetHandle": "prompt",
       "animated": false
     },
     {

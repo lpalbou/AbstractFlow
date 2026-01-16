@@ -8,6 +8,7 @@ export default defineConfig({
     alias: {
       '@': resolve(__dirname, './src'),
       '@abstractuic/monitor-flow': resolve(__dirname, '../../../abstractuic/monitor-flow/src'),
+      '@abstractutils/monitor-gpu': resolve(__dirname, '../../../abstractuic/monitor-gpu/src'),
     },
   },
   server: {

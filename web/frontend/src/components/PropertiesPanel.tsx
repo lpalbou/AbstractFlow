@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 import type { FlowNodeData, ProviderInfo, VisualFlow, Pin } from '../types/flow';
 import { isEntryNodeType } from '../types/flow';
 import { useFlowStore } from '../hooks/useFlow';
+import { useSemanticsRegistry } from '../hooks/useSemantics';
 import { CodeEditorModal } from './CodeEditorModal';
 import ProviderModelsPanel from './ProviderModelsPanel';
 import { JsonSchemaNodeEditor } from './JsonSchemaNodeEditor';
@@ -63,6 +64,7 @@ const DATA_PIN_TYPES: DataPinType[] = [
   'number',
   'boolean',
   'object',
+  'assertion',
   'array',
   'tools',
   'provider',
@@ -214,6 +216,16 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
   // Track last fetched provider to prevent duplicate fetches
   const lastFetchedProvider = useRef<string | null>(null);
+
+  const wantsSemanticsRegistry =
+    Boolean(
+      node &&
+        node.data &&
+        node.data.nodeType === 'literal_json' &&
+        Array.isArray(node.data.outputs) &&
+        node.data.outputs.some((p) => p.type === 'assertion')
+    );
+  const semanticsQuery = useSemanticsRegistry(wantsSemanticsRegistry);
 
   useEffect(() => {
     setShowCodeEditor(false);
@@ -3478,12 +3490,99 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
       {/* JSON literal value */}
       {data.nodeType === 'literal_json' && (
-        <JsonValueEditor
-          label="Fields (Object)"
-          rootKind="object"
-          value={data.literalValue ?? {}}
-          onChange={(next) => updateNodeData(node.id, { literalValue: next })}
-        />
+        (() => {
+          const isAssertionLiteral =
+            Array.isArray(data.outputs) && data.outputs.some((p) => p.type === 'assertion');
+          if (!isAssertionLiteral) {
+            return (
+              <JsonValueEditor
+                label="Fields (Object)"
+                rootKind="object"
+                value={data.literalValue ?? {}}
+                onChange={(next) => updateNodeData(node.id, { literalValue: next })}
+              />
+            );
+          }
+
+          const raw = data.literalValue;
+          const obj = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as any) : {};
+          const subject = typeof obj.subject === 'string' ? obj.subject : '';
+          const predicate = typeof obj.predicate === 'string' ? obj.predicate : '';
+          const objectValue = typeof obj.object === 'string' ? obj.object : '';
+
+          const predicates = semanticsQuery.data && Array.isArray(semanticsQuery.data.predicates) ? semanticsQuery.data.predicates : [];
+          const options = predicates
+            .filter((p) => p && typeof p.id === 'string' && p.id.trim())
+            .map((p) => ({
+              id: p.id.trim(),
+              label: typeof p.label === 'string' && p.label.trim() ? `${p.id.trim()} — ${p.label.trim()}` : p.id.trim(),
+            }))
+            .sort((a, b) => a.label.localeCompare(b.label));
+
+          const setField = (key: string, value: unknown) => {
+            updateNodeData(node.id, { literalValue: { ...(obj as any), [key]: value } });
+          };
+
+          return (
+            <div className="property-section">
+              <label className="property-label">Assertion</label>
+              <div className="property-group">
+                <label className="property-sublabel">subject</label>
+                <input
+                  type="text"
+                  className="property-input"
+                  value={subject}
+                  onChange={(e) => setField('subject', e.target.value)}
+                  placeholder="ex:person-john-smith"
+                />
+                <span className="property-hint">Use CURIEs when possible; mint new entities as ex:{'{kind}-{kebab-case}'}.</span>
+              </div>
+              <div className="property-group">
+                <label className="property-sublabel">predicate</label>
+                <select
+                  className="property-select"
+                  value={predicate}
+                  onChange={(e) => setField('predicate', e.target.value)}
+                  disabled={semanticsQuery.isLoading || !!semanticsQuery.error}
+                >
+                  <option value="">
+                    {semanticsQuery.isLoading
+                      ? 'Loading semantics…'
+                      : semanticsQuery.error
+                      ? 'Failed to load semantics'
+                      : 'Select predicate…'}
+                  </option>
+                  {options.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+                {semanticsQuery.error && (
+                  <span className="property-hint" style={{ color: '#e74c3c' }}>
+                    {(semanticsQuery.error as any)?.message || String(semanticsQuery.error)}
+                  </span>
+                )}
+              </div>
+              <div className="property-group">
+                <label className="property-sublabel">object</label>
+                <input
+                  type="text"
+                  className="property-input"
+                  value={objectValue}
+                  onChange={(e) => setField('object', e.target.value)}
+                  placeholder="schema:Person | literal string | URL"
+                />
+              </div>
+              <JsonValueEditor
+                label="Advanced (raw object)"
+                rootKind="object"
+                value={obj}
+                onChange={(next) => updateNodeData(node.id, { literalValue: next })}
+              />
+            </div>
+          );
+        })()
       )}
 
       {/* JSON Schema editor */}

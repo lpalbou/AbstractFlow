@@ -9,6 +9,7 @@ export type PinType =
   | 'number'    // Green #00FF00 - Integer/Float
   | 'boolean'   // Red #FF0000 - True/False
   | 'object'    // Cyan #00FFFF - JSON objects
+  | 'assertion' // Teal - KG assertion object (subject/predicate/object + metadata)
   | 'array'     // Orange #FF8800 - Collections
   | 'tools'     // Orange - Tool allowlist (string[])
   | 'provider'  // Cyan-blue - LLM provider id/name (string-like)
@@ -23,6 +24,7 @@ export const PIN_COLORS: Record<PinType, string> = {
   number: '#00FF00',
   boolean: '#FF0000',
   object: '#00FFFF',
+  assertion: '#00B8D4',
   array: '#FF8800',
   tools: '#FF8800',
   provider: '#00D2FF',
@@ -232,11 +234,11 @@ export interface VisualFlow {
   id: string;
   name: string;
   description?: string;
-  /**
-   * Optional interface markers for host contracts.
-   * Example: ["abstractcode.agent.v1"] to indicate this workflow can be run as an AbstractCode agent.
-   */
-  interfaces?: string[];
+	  /**
+	   * Optional interface markers for host contracts.
+	   * Example: ["abstractcode.agent.v1"] to indicate this workflow can be run as a RunnableFlow in chat-like clients.
+	   */
+	  interfaces?: string[];
   nodes: VisualNode[];
   edges: VisualEdge[];
   entryNode?: string;

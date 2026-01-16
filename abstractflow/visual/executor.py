@@ -20,8 +20,8 @@ from .models import VisualFlow
 
 
 _MEMORY_KG_STORE_CACHE_LOCK = threading.Lock()
-# Keyed by (store_base_dir, embedding_provider, embedding_model).
-_MEMORY_KG_STORE_CACHE: dict[tuple[str, str, str], Any] = {}
+# Keyed by (store_base_dir, gateway_url).
+_MEMORY_KG_STORE_CACHE: dict[tuple[str, str], Any] = {}
 
 
 def create_visual_runner(
@@ -490,38 +490,30 @@ def create_visual_runner(
                 except Exception:
                     base_dir = None
 
-        embedder = None
-        emb_provider = (
-            os.getenv("ABSTRACTFLOW_EMBEDDING_PROVIDER")
-            or os.getenv("ABSTRACTGATEWAY_EMBEDDING_PROVIDER")
-            or "lmstudio"
-        )
-        emb_model = (
-            os.getenv("ABSTRACTFLOW_EMBEDDING_MODEL")
-            or os.getenv("ABSTRACTGATEWAY_EMBEDDING_MODEL")
-            or "text-embedding-nomic-embed-text-v1.5@q6_k"
-        )
+        # Embeddings are a gateway/runtime capability (singleton embedding space per gateway instance).
         try:
-            from abstractruntime.integrations.abstractcore.embeddings_client import AbstractCoreEmbeddingsClient
+            from abstractmemory.embeddings import AbstractGatewayTextEmbedder
+        except Exception as e:
+            raise RuntimeError(
+                "This flow uses memory_kg_* nodes, but AbstractMemory gateway embeddings integration is not available. "
+                "Install `abstractmemory` (src layout) and ensure it is importable."
+            ) from e
 
-            cache_dir = (base_dir.parent if base_dir is not None else Path.cwd()) / "abstractcore" / "embeddings"
-
-            emb_client = AbstractCoreEmbeddingsClient(
-                provider=str(emb_provider).strip().lower(),
-                model=str(emb_model).strip(),
-                manager_kwargs={"cache_dir": cache_dir},
-            )
-
-            class _Embedder:
-                def __init__(self, client: Any) -> None:
-                    self._client = client
-
-                def embed_texts(self, texts):
-                    return self._client.embed_texts(texts).embeddings
-
-            embedder = _Embedder(emb_client)
-        except Exception:
-            embedder = None
+        gateway_url = str(os.getenv("ABSTRACTFLOW_GATEWAY_URL") or os.getenv("ABSTRACTGATEWAY_URL") or "").strip()
+        if not gateway_url:
+            gateway_url = "http://127.0.0.1:8081"
+        auth_token = str(os.getenv("ABSTRACTGATEWAY_AUTH_TOKEN") or os.getenv("ABSTRACTFLOW_GATEWAY_AUTH_TOKEN") or "").strip() or None
+        # Deterministic/offline mode:
+        # - When embeddings are explicitly disabled, allow LanceDB to operate in pattern-only mode.
+        # - Vector search (query_text) will raise in the store when no embedder is configured.
+        embedder = None
+        embed_provider = (
+            os.getenv("ABSTRACTFLOW_EMBEDDING_PROVIDER")
+            or os.getenv("ABSTRACTMEMORY_EMBEDDING_PROVIDER")
+            or os.getenv("ABSTRACTGATEWAY_EMBEDDING_PROVIDER")
+        )
+        if str(embed_provider or "").strip().lower() not in {"__disabled__", "disabled", "none", "off"}:
+            embedder = AbstractGatewayTextEmbedder(base_url=gateway_url, auth_token=auth_token)
 
         if base_dir is None:
             raise RuntimeError(
@@ -530,7 +522,7 @@ def create_visual_runner(
             )
 
         base_dir.mkdir(parents=True, exist_ok=True)
-        cache_key = (str(base_dir), str(emb_provider).strip().lower(), str(emb_model).strip())
+        cache_key = (str(base_dir), gateway_url if embedder is not None else "__embeddings_disabled__")
         with _MEMORY_KG_STORE_CACHE_LOCK:
             store_obj = _MEMORY_KG_STORE_CACHE.get(cache_key)
         if store_obj is None:

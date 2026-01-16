@@ -52,7 +52,7 @@ def test_visual_memory_kg_session_scope_persists_across_separate_runs(tmp_path, 
                 "data": {
                     "nodeType": "literal_array",
                     "outputs": [{"id": "value", "label": "value", "type": "array"}],
-                    "literalValue": [{"subject": "Data", "predicate": "created_by", "object": "Doctor Noonien Soong"}],
+                    "literalValue": [{"subject": "Data", "predicate": "rdf:type", "object": "schema:SoftwareApplication"}],
                 },
             },
             {
@@ -178,4 +178,3 @@ def test_visual_memory_kg_session_scope_persists_across_separate_runs(tmp_path, 
     items = result.get("items")
     assert isinstance(items, list)
     assert any(isinstance(i, dict) and i.get("subject") == "data" and i.get("owner_id") == expected_owner for i in items)
-

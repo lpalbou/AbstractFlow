@@ -1,0 +1,829 @@
+{
+  "id": "3b5d252b",
+  "name": "test-kg",
+  "description": "",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": {
+        "x": 160.0,
+        "y": -288.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-2",
+      "type": "memory_note",
+      "position": {
+        "x": 336.0,
+        "y": 416.0
+      },
+      "data": {
+        "nodeType": "memory_note",
+        "label": "Memorize",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#2ECC71",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "keep_in_context",
+            "label": "in_context",
+            "type": "boolean",
+            "description": "When true, also insert the stored note into this run's context.messages (synthetic system message). If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string",
+            "description": "Where to store/index the note: run (this run), session (all runs with the same session_id; owned by an internal session memory run), or global (shared global memory run). If session_id is missing, session falls back to the run-tree root."
+          },
+          {
+            "id": "content",
+            "label": "content",
+            "type": "string",
+            "description": "The note text to store durably (keep it short; prefer references in sources for large payloads)."
+          },
+          {
+            "id": "location",
+            "label": "location",
+            "type": "string",
+            "description": "Optional location label (where the note was produced, e.g. \"flow:my_flow/node-12\"). Useful for filtering."
+          },
+          {
+            "id": "tags",
+            "label": "tags",
+            "type": "object",
+            "description": "Key/value tags for filtering (e.g. {topic:\"memory\", person:\"laurent\"}). Values must be strings."
+          },
+          {
+            "id": "sources",
+            "label": "sources",
+            "type": "object",
+            "description": "Optional provenance refs (e.g. {run_id, span_ids, message_ids}). The note stores refs, not the full source content."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "note_id",
+            "label": "note_id",
+            "type": "string",
+            "description": "The stored note’s span_id / artifact_id. Use it for Recall into context (span_ids) or for precise Recall."
+          }
+        ],
+        "pinDefaults": {}
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-3",
+      "type": "memory_query",
+      "position": {
+        "x": 656.0,
+        "y": 416.0
+      },
+      "data": {
+        "nodeType": "memory_query",
+        "label": "Recall",
+        "icon": "&#x1F50D;",
+        "headerColor": "#2ECC71",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "query",
+            "label": "query",
+            "type": "string",
+            "description": "Keyword query (substring match over span metadata and small previews). Combined with tags/authors/locations using AND semantics."
+          },
+          {
+            "id": "limit",
+            "label": "limit",
+            "type": "number",
+            "description": "Maximum number of spans to return (limit_spans). Default: 5."
+          },
+          {
+            "id": "tags",
+            "label": "tags",
+            "type": "object",
+            "description": "Tag filters as key→string or key→list[string]. Reserved key \"kind\" is ignored."
+          },
+          {
+            "id": "tags_mode",
+            "label": "tags_mode",
+            "type": "string",
+            "description": "How to combine tag keys: all (AND) or any (OR). Within a single key, list values are OR."
+          },
+          {
+            "id": "usernames",
+            "label": "usernames",
+            "type": "array",
+            "description": "Filter by created_by (actor id). Case-insensitive exact match. Empty means no filter."
+          },
+          {
+            "id": "locations",
+            "label": "locations",
+            "type": "array",
+            "description": "Filter by location metadata (or tags.location). Case-insensitive exact match."
+          },
+          {
+            "id": "since",
+            "label": "since",
+            "type": "string",
+            "description": "ISO8601 start time. Matches spans whose [from,to] intersects this range."
+          },
+          {
+            "id": "until",
+            "label": "until",
+            "type": "string",
+            "description": "ISO8601 end time. Matches spans whose [from,to] intersects this range."
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string",
+            "description": "Which span index to query: run | session | global | all. (all queries run+session+global. session uses session_id authority; if session_id is missing, it falls back to the run-tree root.)"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "results",
+            "label": "results",
+            "type": "array",
+            "description": "Structured match list (meta.matches). Use it to extract span_ids for Recall into context."
+          },
+          {
+            "id": "rendered",
+            "label": "rendered",
+            "type": "string",
+            "description": "Human-readable recall summary (tool-style output string)."
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-4",
+      "type": "memory_tag",
+      "position": {
+        "x": 944.0,
+        "y": 416.0
+      },
+      "data": {
+        "nodeType": "memory_tag",
+        "label": "Tag memory",
+        "icon": "&#x1F3F7;",
+        "headerColor": "#2ECC71",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "span_id",
+            "label": "span_id",
+            "type": "string",
+            "description": "Target span_id (artifact id). Also accepts a 1-based span index as a string/number in some hosts."
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string",
+            "description": "Which span index to tag: run | session | global | all. (all tags every matching record across run+session+global; indices are not allowed with all.)"
+          },
+          {
+            "id": "tags",
+            "label": "tags",
+            "type": "object",
+            "description": "Key/value tags to set (values must be strings). Reserved key \"kind\" is ignored."
+          },
+          {
+            "id": "merge",
+            "label": "merge",
+            "type": "boolean",
+            "description": "When true, merges with existing tags. When false, replaces the tag dict. Default: true."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean",
+            "description": "Whether the tag operation succeeded."
+          },
+          {
+            "id": "rendered",
+            "label": "rendered",
+            "type": "string",
+            "description": "Human-readable result string."
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-5",
+      "type": "memory_compact",
+      "position": {
+        "x": 1280.0,
+        "y": 416.0
+      },
+      "data": {
+        "nodeType": "memory_compact",
+        "label": "Compact memory",
+        "icon": "&#x1F5DC;",
+        "headerColor": "#2ECC71",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "preserve_recent",
+            "label": "preserve_recent",
+            "type": "number",
+            "description": "Number of most recent non-system messages to keep verbatim (default 6)."
+          },
+          {
+            "id": "compression_mode",
+            "label": "compression_mode",
+            "type": "string",
+            "description": "light | standard | heavy (default standard)."
+          },
+          {
+            "id": "focus",
+            "label": "focus",
+            "type": "string",
+            "description": "Optional topic/focus hint for the compaction summary."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "span_id",
+            "label": "span_id",
+            "type": "string",
+            "description": "The archived conversation span_id (artifact id). Use it for tagging or recall."
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-6",
+      "type": "memory_rehydrate",
+      "position": {
+        "x": 944.0,
+        "y": 656.0
+      },
+      "data": {
+        "nodeType": "memory_rehydrate",
+        "label": "Recall into context",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#2ECC71",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "span_ids",
+            "label": "span_ids",
+            "type": "array",
+            "description": "List of span_ids (artifact_ids) to insert into context.messages. Typically comes from Recall results."
+          },
+          {
+            "id": "placement",
+            "label": "placement",
+            "type": "string",
+            "description": "Where to insert: after_summary | after_system | end."
+          },
+          {
+            "id": "max_messages",
+            "label": "max_messages",
+            "type": "number",
+            "description": "Optional cap on inserted messages across all spans (None/empty = unlimited). Useful to avoid huge contexts."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inserted",
+            "label": "inserted",
+            "type": "number",
+            "description": "Number of messages inserted into context.messages."
+          },
+          {
+            "id": "skipped",
+            "label": "skipped",
+            "type": "number",
+            "description": "Number of messages skipped (usually due to dedup)."
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-7",
+      "type": "memory_kg_query",
+      "position": {
+        "x": 832.0,
+        "y": -176.0
+      },
+      "data": {
+        "nodeType": "memory_kg_query",
+        "label": "KG Query",
+        "icon": "&#x1F50E;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "query_text",
+            "label": "query_text",
+            "type": "string",
+            "description": "Optional semantic query. Requires embeddings to be configured in the host."
+          },
+          {
+            "id": "subject",
+            "label": "subject",
+            "type": "string",
+            "description": "Optional canonical subject filter (trim + lower; stable exact match after canonicalization)."
+          },
+          {
+            "id": "predicate",
+            "label": "predicate",
+            "type": "string",
+            "description": "Optional canonical predicate filter (trim + lower; stable exact match after canonicalization)."
+          },
+          {
+            "id": "object",
+            "label": "object",
+            "type": "string",
+            "description": "Optional canonical object filter (trim + lower; stable exact match after canonicalization)."
+          },
+          {
+            "id": "since",
+            "label": "since",
+            "type": "string",
+            "description": "Optional observed_at lower bound (ISO8601)."
+          },
+          {
+            "id": "until",
+            "label": "until",
+            "type": "string",
+            "description": "Optional observed_at upper bound (ISO8601)."
+          },
+          {
+            "id": "active_at",
+            "label": "active_at",
+            "type": "string",
+            "description": "Optional validity window selector (ISO8601). Filters assertions active at that time."
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string",
+            "description": "run | session | global | all (fan-out over run+session+global)."
+          },
+          {
+            "id": "owner_id",
+            "label": "owner_id",
+            "type": "string",
+            "description": "Optional explicit owner id override (advanced; normally derived from scope)."
+          },
+          {
+            "id": "limit",
+            "label": "limit",
+            "type": "number",
+            "description": "Max assertions to return (default 100)."
+          },
+          {
+            "id": "min_score",
+            "label": "min_score",
+            "type": "number",
+            "description": "Optional cosine similarity threshold (semantic query_text only). Range ~[-1..1]; start with 0.2–0.4."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "items",
+            "label": "items",
+            "type": "array",
+            "description": "List of triple assertions (dicts)."
+          },
+          {
+            "id": "count",
+            "label": "count",
+            "type": "number",
+            "description": "Number of returned assertions."
+          },
+          {
+            "id": "ok",
+            "label": "ok",
+            "type": "boolean",
+            "description": "True when query succeeded."
+          }
+        ],
+        "pinDefaults": {
+          "query_text": "",
+          "subject": "laurent",
+          "scope": "all"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-8",
+      "type": "memory_kg_assert",
+      "position": {
+        "x": 832.0,
+        "y": -464.0
+      },
+      "data": {
+        "nodeType": "memory_kg_assert",
+        "label": "KG Assert",
+        "icon": "&#x1F9E0;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "assertions",
+            "label": "assertions",
+            "type": "array",
+            "description": "List of {subject,predicate,object,...} assertion objects."
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string",
+            "description": "run | session | global. Determines the owner_id when not explicitly provided."
+          },
+          {
+            "id": "span_id",
+            "label": "span_id",
+            "type": "string",
+            "description": "Optional provenance pointer to a runtime span/artifact id."
+          },
+          {
+            "id": "owner_id",
+            "label": "owner_id",
+            "type": "string",
+            "description": "Optional explicit owner id override (advanced; normally derived from scope)."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "assertion_ids",
+            "label": "assertion_ids",
+            "type": "array",
+            "description": "IDs assigned by the store (implementation-specific)."
+          },
+          {
+            "id": "count",
+            "label": "count",
+            "type": "number",
+            "description": "Number of asserted triples."
+          },
+          {
+            "id": "ok",
+            "label": "ok",
+            "type": "boolean",
+            "description": "True when assertion succeeded."
+          }
+        ],
+        "pinDefaults": {
+          "scope": "session"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-10",
+      "type": "sequence",
+      "position": {
+        "x": 400.0,
+        "y": -288.0
+      },
+      "data": {
+        "nodeType": "sequence",
+        "label": "Sequence",
+        "icon": "&#x21E5;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "then:0",
+            "label": "Then 0",
+            "type": "execution"
+          },
+          {
+            "id": "then:1",
+            "label": "Then 1",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-13",
+      "type": "literal_json",
+      "position": {
+        "x": 320.0,
+        "y": -608.0
+      },
+      "data": {
+        "nodeType": "literal_json",
+        "label": "JSON",
+        "icon": "{}",
+        "headerColor": "#00FFFF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "object"
+          }
+        ],
+        "literalValue": {
+          "subject": "laurent",
+          "predicate": "is_a",
+          "object": "scientist"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-14",
+      "type": "make_array",
+      "position": {
+        "x": 592.0,
+        "y": -528.0
+      },
+      "data": {
+        "nodeType": "make_array",
+        "label": "Make Array",
+        "icon": "[]",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "any"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "any"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "array"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-15",
+      "type": "literal_json",
+      "position": {
+        "x": 320.0,
+        "y": -512.0
+      },
+      "data": {
+        "nodeType": "literal_json",
+        "label": "JSON",
+        "icon": "{}",
+        "headerColor": "#00FFFF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "object"
+          }
+        ],
+        "literalValue": {
+          "subject": "scientist",
+          "predicate": "part_of",
+          "object": "scientific community"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-16",
+      "type": "literal_json",
+      "position": {
+        "x": 320.0,
+        "y": -416.0
+      },
+      "data": {
+        "nodeType": "literal_json",
+        "label": "JSON",
+        "icon": "{}",
+        "headerColor": "#00FFFF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "object"
+          }
+        ],
+        "literalValue": {
+          "subject": "laurent",
+          "predicate": "is_a",
+          "object": "french"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1768569184590",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-10",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768569192591",
+      "source": "node-10",
+      "sourceHandle": "then:1",
+      "target": "node-7",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768569407835",
+      "source": "node-13",
+      "sourceHandle": "value",
+      "target": "node-14",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-1768569411277",
+      "source": "node-14",
+      "sourceHandle": "result",
+      "target": "node-8",
+      "targetHandle": "assertions",
+      "animated": false
+    },
+    {
+      "id": "edge-1768569488161",
+      "source": "node-15",
+      "sourceHandle": "value",
+      "target": "node-14",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-1768569520737",
+      "source": "node-16",
+      "sourceHandle": "value",
+      "target": "node-14",
+      "targetHandle": "c",
+      "animated": false
+    }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2026-01-16T13:19:05.822333",
+  "updated_at": "2026-01-16T13:22:05.215928"
+}

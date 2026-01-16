@@ -1920,7 +1920,7 @@ export function RunFlowModal({
     if (entries.length === 0) return null;
 
     const weight = (k: string) => {
-      if (k === 'request') return 0;
+      if (k === 'prompt') return 0;
       if (k === 'provider') return 1;
       if (k === 'model') return 2;
       return 10;
@@ -2501,7 +2501,7 @@ export function RunFlowModal({
                                 {onFlowStartParams.map(([k, v]) => {
                                   const isProvider = k === 'provider' && typeof v === 'string' && v.trim();
                                   const isModel = k === 'model' && typeof v === 'string' && v.trim();
-                                  const isRequest = k === 'request' && typeof v === 'string' && v.trim();
+                                  const isPrompt = k === 'prompt' && typeof v === 'string' && v.trim();
                                   const isSessionId = k === 'sessionId' && typeof v === 'string' && v.trim();
                                   const isWorkspaceRoot = k === 'workspace_root' && typeof v === 'string' && v.trim();
 
@@ -2560,7 +2560,7 @@ export function RunFlowModal({
                                           <span className="run-metric-badge metric-bool">{v ? 'true' : 'false'}</span>
                                         ) : typeof v === 'number' ? (
                                           <span className="run-metric-badge metric-number">{String(v)}</span>
-                                        ) : isRequest ? (
+                                        ) : isPrompt ? (
                                           <div className="run-details-markdown run-param-markdown">
                                             <MarkdownRenderer markdown={String(v).trim()} />
                                           </div>

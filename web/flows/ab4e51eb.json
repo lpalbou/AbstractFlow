@@ -26,8 +26,8 @@
             "type": "execution"
           },
           {
-            "id": "request",
-            "label": "request",
+            "id": "prompt",
+            "label": "prompt",
             "type": "string"
           },
           {
@@ -336,8 +336,8 @@
             "type": "number"
           },
           {
-            "id": "request",
-            "label": "request",
+            "id": "prompt",
+            "label": "prompt",
             "type": "string"
           }
         ],
@@ -383,9 +383,9 @@
     {
       "id": "edge-1768494520445",
       "source": "node-2",
-      "sourceHandle": "request",
+      "sourceHandle": "prompt",
       "target": "node-5",
-      "targetHandle": "request",
+      "targetHandle": "prompt",
       "animated": false
     },
     {

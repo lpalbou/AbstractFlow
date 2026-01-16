@@ -29,8 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **VisualFlow Interface System** (`abstractflow/visual/interfaces.py`): Declarative workflow interface markers for portable host validation, enabling workflows to be run as specialized capabilities with known IO contracts
-  - `abstractcode.agent.v1` interface: Host-configurable request → response contract for running a workflow as an AbstractCode agent
-  - Interface validation with required/recommended pin specifications (provider/model/tools/request/response)
+  - `abstractcode.agent.v1` interface: Host-configurable prompt → response contract for running a workflow as an AbstractCode agent
+  - Interface validation with required/recommended pin specifications (provider/model/tools/prompt/response)
   - Auto-scaffolding support: enabling `abstractcode.agent.v1` auto-creates `On Flow Start` / `On Flow End` nodes with required pins
 - **Structured Output Support**: Visual `LLM Call` and `Agent` nodes accept optional `response_schema` input pin (JSON Schema object) for schema-conformant responses
   - New literal node `JSON Schema` (`json_schema`) to author schema objects
@@ -173,5 +173,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - This is a placeholder release to secure the `abstractflow` name on PyPI
 - No functional code is included in this version
 - Follow the GitHub repository for development updates and release timeline
-
 

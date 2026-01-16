@@ -6,7 +6,10 @@
     {
       "id": "node-1",
       "type": "on_flow_start",
-      "position": { "x": -896.0, "y": 64.0 },
+      "position": {
+        "x": -896.0,
+        "y": 64.0
+      },
       "data": {
         "nodeType": "on_flow_start",
         "label": "On Flow Start",
@@ -14,16 +17,56 @@
         "headerColor": "#C0392B",
         "inputs": [],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "request", "label": "request", "type": "string" },
-          { "id": "requirements_md", "label": "requirements_md", "type": "string" },
-          { "id": "plan_md", "label": "plan_md", "type": "string" },
-          { "id": "tasks", "label": "tasks", "type": "array" },
-          { "id": "test_plan", "label": "test_plan", "type": "array" },
-          { "id": "coder_summary_md", "label": "coder_summary_md", "type": "string" },
-          { "id": "provider", "label": "provider", "type": "string" },
-          { "id": "model", "label": "model", "type": "string" },
-          { "id": "max_iterations", "label": "max_iterations", "type": "number" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "requirements_md",
+            "label": "requirements_md",
+            "type": "string"
+          },
+          {
+            "id": "plan_md",
+            "label": "plan_md",
+            "type": "string"
+          },
+          {
+            "id": "tasks",
+            "label": "tasks",
+            "type": "array"
+          },
+          {
+            "id": "test_plan",
+            "label": "test_plan",
+            "type": "array"
+          },
+          {
+            "id": "coder_summary_md",
+            "label": "coder_summary_md",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "string"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "string"
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          }
         ]
       },
       "label": null,
@@ -35,18 +78,37 @@
     {
       "id": "node-3",
       "type": "join",
-      "position": { "x": -640.0, "y": 224.0 },
+      "position": {
+        "x": -640.0,
+        "y": 224.0
+      },
       "data": {
         "nodeType": "join",
         "label": "Join",
         "icon": "&#x1F517;",
         "headerColor": "#E74C3C",
         "inputs": [
-          { "id": "items", "label": "items", "type": "array" },
-          { "id": "delimiter", "label": "delimiter", "type": "string" }
+          {
+            "id": "items",
+            "label": "items",
+            "type": "array"
+          },
+          {
+            "id": "delimiter",
+            "label": "delimiter",
+            "type": "string"
+          }
         ],
-        "outputs": [{ "id": "result", "label": "result", "type": "string" }],
-        "pinDefaults": { "delimiter": "\n- " }
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "delimiter": "\n- "
+        }
       },
       "label": null,
       "icon": null,
@@ -57,18 +119,37 @@
     {
       "id": "node-4",
       "type": "join",
-      "position": { "x": -640.0, "y": 336.0 },
+      "position": {
+        "x": -640.0,
+        "y": 336.0
+      },
       "data": {
         "nodeType": "join",
         "label": "Join",
         "icon": "&#x1F517;",
         "headerColor": "#E74C3C",
         "inputs": [
-          { "id": "items", "label": "items", "type": "array" },
-          { "id": "delimiter", "label": "delimiter", "type": "string" }
+          {
+            "id": "items",
+            "label": "items",
+            "type": "array"
+          },
+          {
+            "id": "delimiter",
+            "label": "delimiter",
+            "type": "string"
+          }
         ],
-        "outputs": [{ "id": "result", "label": "result", "type": "string" }],
-        "pinDefaults": { "delimiter": "\n- " }
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "delimiter": "\n- "
+        }
       },
       "label": null,
       "icon": null,
@@ -79,30 +160,97 @@
     {
       "id": "node-5",
       "type": "concat",
-      "position": { "x": -384.0, "y": 64.0 },
+      "position": {
+        "x": -384.0,
+        "y": 64.0
+      },
       "data": {
         "nodeType": "concat",
         "label": "Concat",
         "icon": "&#x2795;",
         "headerColor": "#E74C3C",
         "inputs": [
-          { "id": "a", "label": "a", "type": "string" },
-          { "id": "b", "label": "b", "type": "string" },
-          { "id": "c", "label": "c", "type": "string" },
-          { "id": "d", "label": "d", "type": "string" },
-          { "id": "e", "label": "e", "type": "string" },
-          { "id": "f", "label": "f", "type": "string" },
-          { "id": "g", "label": "g", "type": "string" },
-          { "id": "h", "label": "h", "type": "string" },
-          { "id": "i", "label": "i", "type": "string" },
-          { "id": "j", "label": "j", "type": "string" },
-          { "id": "k", "label": "k", "type": "string" },
-          { "id": "l", "label": "l", "type": "string" },
-          { "id": "m", "label": "m", "type": "string" },
-          { "id": "n", "label": "n", "type": "string" }
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          },
+          {
+            "id": "d",
+            "label": "d",
+            "type": "string"
+          },
+          {
+            "id": "e",
+            "label": "e",
+            "type": "string"
+          },
+          {
+            "id": "f",
+            "label": "f",
+            "type": "string"
+          },
+          {
+            "id": "g",
+            "label": "g",
+            "type": "string"
+          },
+          {
+            "id": "h",
+            "label": "h",
+            "type": "string"
+          },
+          {
+            "id": "i",
+            "label": "i",
+            "type": "string"
+          },
+          {
+            "id": "j",
+            "label": "j",
+            "type": "string"
+          },
+          {
+            "id": "k",
+            "label": "k",
+            "type": "string"
+          },
+          {
+            "id": "l",
+            "label": "l",
+            "type": "string"
+          },
+          {
+            "id": "m",
+            "label": "m",
+            "type": "string"
+          },
+          {
+            "id": "n",
+            "label": "n",
+            "type": "string"
+          }
         ],
-        "outputs": [{ "id": "result", "label": "result", "type": "string" }],
-        "concatConfig": { "separator": "\n\n" },
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": "\n\n"
+        },
         "pinDefaults": {
           "a": "You are the REVIEWER. Verify the implementation matches the plan + requirements.\n\nHard rules:\n- You MUST run the provided test plan (execute_command).\n- If tests fail, include the error output and propose concrete fixes.\n- If you didn't run a command, don't claim you did.\n\nReturn STRICT JSON only.",
           "b": "## USER REQUEST",
@@ -123,14 +271,23 @@
     {
       "id": "node-6",
       "type": "tools_allowlist",
-      "position": { "x": -384.0, "y": 272.0 },
+      "position": {
+        "x": -384.0,
+        "y": 272.0
+      },
       "data": {
         "nodeType": "tools_allowlist",
         "label": "Tools Allowlist",
         "icon": "&#x1F9F0;",
         "headerColor": "#FF8800",
         "inputs": [],
-        "outputs": [{ "id": "tools", "label": "tools", "type": "array" }],
+        "outputs": [
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          }
+        ],
         "literalValue": [
           "list_files",
           "search_files",
@@ -147,26 +304,73 @@
     {
       "id": "node-7",
       "type": "agent",
-      "position": { "x": -96.0, "y": 64.0 },
+      "position": {
+        "x": -96.0,
+        "y": 64.0
+      },
       "data": {
         "nodeType": "agent",
         "label": "Agent",
         "icon": "&#x1F916;",
         "headerColor": "#4488FF",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "provider", "label": "provider", "type": "string" },
-          { "id": "model", "label": "model", "type": "string" },
-          { "id": "max_iterations", "label": "max_iterations", "type": "number" },
-          { "id": "system", "label": "system", "type": "string" },
-          { "id": "task", "label": "prompt", "type": "string" },
-          { "id": "tools", "label": "tools", "type": "array" },
-          { "id": "context", "label": "context", "type": "object" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "string"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "string"
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "task",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          }
         ],
         "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "result", "label": "result", "type": "object" },
-          { "id": "scratchpad", "label": "scratchpad", "type": "object" }
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          }
         ],
         "agentConfig": {
           "provider": "lmstudio",
@@ -187,15 +391,34 @@
     {
       "id": "node-8",
       "type": "break_object",
-      "position": { "x": 160.0, "y": 64.0 },
+      "position": {
+        "x": 160.0,
+        "y": 64.0
+      },
       "data": {
         "nodeType": "break_object",
         "label": "Break Object",
         "icon": "&#x1F9E9;",
         "headerColor": "#3498DB",
-        "inputs": [{ "id": "object", "label": "object", "type": "object" }],
-        "outputs": [{ "id": "result", "label": "result", "type": "string" }],
-        "breakConfig": { "selectedPaths": ["result"] }
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "result"
+          ]
+        }
       },
       "label": null,
       "icon": null,
@@ -206,14 +429,29 @@
     {
       "id": "node-9",
       "type": "parse_json",
-      "position": { "x": 416.0, "y": 64.0 },
+      "position": {
+        "x": 416.0,
+        "y": 64.0
+      },
       "data": {
         "nodeType": "parse_json",
         "label": "Parse JSON",
         "icon": "&#x1F5C2;",
         "headerColor": "#3498DB",
-        "inputs": [{ "id": "text", "label": "text", "type": "string" }],
-        "outputs": [{ "id": "result", "label": "result", "type": "object" }]
+        "inputs": [
+          {
+            "id": "text",
+            "label": "text",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ]
       },
       "label": null,
       "icon": null,
@@ -224,18 +462,40 @@
     {
       "id": "node-10",
       "type": "break_object",
-      "position": { "x": 672.0, "y": 64.0 },
+      "position": {
+        "x": 672.0,
+        "y": 64.0
+      },
       "data": {
         "nodeType": "break_object",
         "label": "Break Object",
         "icon": "&#x1F9E9;",
         "headerColor": "#3498DB",
-        "inputs": [{ "id": "object", "label": "object", "type": "object" }],
-        "outputs": [
-          { "id": "approved", "label": "approved", "type": "boolean" },
-          { "id": "findings_md", "label": "findings_md", "type": "string" }
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          }
         ],
-        "breakConfig": { "selectedPaths": ["approved", "findings_md"] }
+        "outputs": [
+          {
+            "id": "approved",
+            "label": "approved",
+            "type": "boolean"
+          },
+          {
+            "id": "findings_md",
+            "label": "findings_md",
+            "type": "string"
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "approved",
+            "findings_md"
+          ]
+        }
       },
       "label": null,
       "icon": null,
@@ -246,19 +506,46 @@
     {
       "id": "node-11",
       "type": "on_flow_end",
-      "position": { "x": 960.0, "y": 64.0 },
+      "position": {
+        "x": 960.0,
+        "y": 64.0
+      },
       "data": {
         "nodeType": "on_flow_end",
         "label": "On Flow End",
         "icon": "&#x23F9;",
         "headerColor": "#C0392B",
         "inputs": [
-          { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "approved", "label": "approved", "type": "boolean" },
-          { "id": "findings_md", "label": "findings_md", "type": "string" },
-          { "id": "review", "label": "review", "type": "object" },
-          { "id": "raw_result", "label": "raw_result", "type": "string" },
-          { "id": "scratchpad", "label": "scratchpad", "type": "object" }
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "approved",
+            "label": "approved",
+            "type": "boolean"
+          },
+          {
+            "id": "findings_md",
+            "label": "findings_md",
+            "type": "string"
+          },
+          {
+            "id": "review",
+            "label": "review",
+            "type": "object"
+          },
+          {
+            "id": "raw_result",
+            "label": "raw_result",
+            "type": "string"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          }
         ],
         "outputs": []
       },
@@ -270,38 +557,192 @@
     }
   ],
   "edges": [
-    { "id": "edge-1", "source": "node-1", "sourceHandle": "exec-out", "target": "node-7", "targetHandle": "exec-in", "animated": true },
-    { "id": "edge-3", "source": "node-7", "sourceHandle": "exec-out", "target": "node-11", "targetHandle": "exec-in", "animated": true },
-
-    { "id": "edge-4", "source": "node-1", "sourceHandle": "tasks", "target": "node-3", "targetHandle": "items", "animated": false },
-    { "id": "edge-5", "source": "node-1", "sourceHandle": "test_plan", "target": "node-4", "targetHandle": "items", "animated": false },
-
-    { "id": "edge-6", "source": "node-1", "sourceHandle": "request", "target": "node-5", "targetHandle": "c", "animated": false },
-    { "id": "edge-7", "source": "node-1", "sourceHandle": "requirements_md", "target": "node-5", "targetHandle": "e", "animated": false },
-    { "id": "edge-8", "source": "node-1", "sourceHandle": "plan_md", "target": "node-5", "targetHandle": "g", "animated": false },
-    { "id": "edge-9", "source": "node-3", "sourceHandle": "result", "target": "node-5", "targetHandle": "i", "animated": false },
-    { "id": "edge-10", "source": "node-4", "sourceHandle": "result", "target": "node-5", "targetHandle": "k", "animated": false },
-    { "id": "edge-11", "source": "node-1", "sourceHandle": "coder_summary_md", "target": "node-5", "targetHandle": "m", "animated": false },
-
-    { "id": "edge-12", "source": "node-1", "sourceHandle": "provider", "target": "node-7", "targetHandle": "provider", "animated": false },
-    { "id": "edge-13", "source": "node-1", "sourceHandle": "model", "target": "node-7", "targetHandle": "model", "animated": false },
-    { "id": "edge-13b", "source": "node-1", "sourceHandle": "max_iterations", "target": "node-7", "targetHandle": "max_iterations", "animated": false },
-    { "id": "edge-14", "source": "node-5", "sourceHandle": "result", "target": "node-7", "targetHandle": "task", "animated": false },
-    { "id": "edge-15", "source": "node-6", "sourceHandle": "tools", "target": "node-7", "targetHandle": "tools", "animated": false },
-
-    { "id": "edge-16", "source": "node-7", "sourceHandle": "result", "target": "node-8", "targetHandle": "object", "animated": false },
-    { "id": "edge-17", "source": "node-8", "sourceHandle": "result", "target": "node-9", "targetHandle": "text", "animated": false },
-    { "id": "edge-18", "source": "node-9", "sourceHandle": "result", "target": "node-10", "targetHandle": "object", "animated": false },
-
-    { "id": "edge-19", "source": "node-10", "sourceHandle": "approved", "target": "node-11", "targetHandle": "approved", "animated": false },
-    { "id": "edge-20", "source": "node-10", "sourceHandle": "findings_md", "target": "node-11", "targetHandle": "findings_md", "animated": false },
-    { "id": "edge-21", "source": "node-9", "sourceHandle": "result", "target": "node-11", "targetHandle": "review", "animated": false },
-    { "id": "edge-22", "source": "node-8", "sourceHandle": "result", "target": "node-11", "targetHandle": "raw_result", "animated": false },
-    { "id": "edge-23", "source": "node-7", "sourceHandle": "scratchpad", "target": "node-11", "targetHandle": "scratchpad", "animated": false }
+    {
+      "id": "edge-1",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-7",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-3",
+      "source": "node-7",
+      "sourceHandle": "exec-out",
+      "target": "node-11",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-4",
+      "source": "node-1",
+      "sourceHandle": "tasks",
+      "target": "node-3",
+      "targetHandle": "items",
+      "animated": false
+    },
+    {
+      "id": "edge-5",
+      "source": "node-1",
+      "sourceHandle": "test_plan",
+      "target": "node-4",
+      "targetHandle": "items",
+      "animated": false
+    },
+    {
+      "id": "edge-6",
+      "source": "node-1",
+      "sourceHandle": "prompt",
+      "target": "node-5",
+      "targetHandle": "c",
+      "animated": false
+    },
+    {
+      "id": "edge-7",
+      "source": "node-1",
+      "sourceHandle": "requirements_md",
+      "target": "node-5",
+      "targetHandle": "e",
+      "animated": false
+    },
+    {
+      "id": "edge-8",
+      "source": "node-1",
+      "sourceHandle": "plan_md",
+      "target": "node-5",
+      "targetHandle": "g",
+      "animated": false
+    },
+    {
+      "id": "edge-9",
+      "source": "node-3",
+      "sourceHandle": "result",
+      "target": "node-5",
+      "targetHandle": "i",
+      "animated": false
+    },
+    {
+      "id": "edge-10",
+      "source": "node-4",
+      "sourceHandle": "result",
+      "target": "node-5",
+      "targetHandle": "k",
+      "animated": false
+    },
+    {
+      "id": "edge-11",
+      "source": "node-1",
+      "sourceHandle": "coder_summary_md",
+      "target": "node-5",
+      "targetHandle": "m",
+      "animated": false
+    },
+    {
+      "id": "edge-12",
+      "source": "node-1",
+      "sourceHandle": "provider",
+      "target": "node-7",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-13",
+      "source": "node-1",
+      "sourceHandle": "model",
+      "target": "node-7",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-13b",
+      "source": "node-1",
+      "sourceHandle": "max_iterations",
+      "target": "node-7",
+      "targetHandle": "max_iterations",
+      "animated": false
+    },
+    {
+      "id": "edge-14",
+      "source": "node-5",
+      "sourceHandle": "result",
+      "target": "node-7",
+      "targetHandle": "task",
+      "animated": false
+    },
+    {
+      "id": "edge-15",
+      "source": "node-6",
+      "sourceHandle": "tools",
+      "target": "node-7",
+      "targetHandle": "tools",
+      "animated": false
+    },
+    {
+      "id": "edge-16",
+      "source": "node-7",
+      "sourceHandle": "result",
+      "target": "node-8",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-17",
+      "source": "node-8",
+      "sourceHandle": "result",
+      "target": "node-9",
+      "targetHandle": "text",
+      "animated": false
+    },
+    {
+      "id": "edge-18",
+      "source": "node-9",
+      "sourceHandle": "result",
+      "target": "node-10",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-19",
+      "source": "node-10",
+      "sourceHandle": "approved",
+      "target": "node-11",
+      "targetHandle": "approved",
+      "animated": false
+    },
+    {
+      "id": "edge-20",
+      "source": "node-10",
+      "sourceHandle": "findings_md",
+      "target": "node-11",
+      "targetHandle": "findings_md",
+      "animated": false
+    },
+    {
+      "id": "edge-21",
+      "source": "node-9",
+      "sourceHandle": "result",
+      "target": "node-11",
+      "targetHandle": "review",
+      "animated": false
+    },
+    {
+      "id": "edge-22",
+      "source": "node-8",
+      "sourceHandle": "result",
+      "target": "node-11",
+      "targetHandle": "raw_result",
+      "animated": false
+    },
+    {
+      "id": "edge-23",
+      "source": "node-7",
+      "sourceHandle": "scratchpad",
+      "target": "node-11",
+      "targetHandle": "scratchpad",
+      "animated": false
+    }
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-01T00:00:00Z",
   "updated_at": "2026-01-01T00:00:00Z"
 }
-
-

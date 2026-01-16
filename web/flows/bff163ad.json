@@ -33,7 +33,11 @@
             "label": "model",
             "type": "model"
           }
-        ]
+        ],
+        "pinDefaults": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b"
+        }
       },
       "label": null,
       "icon": null,
@@ -60,10 +64,16 @@
             "type": "execution"
           },
           {
-            "id": "include_context",
+            "id": "use_context",
             "label": "use_context",
             "type": "boolean",
             "description": "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object",
+            "description": "Optional explicit context object for this call (e.g. {messages:[...]}). If provided, context.messages overrides inherited run context messages."
           },
           {
             "id": "provider",
@@ -76,18 +86,6 @@
             "label": "model",
             "type": "model",
             "description": "LLM model id/name. If unset, uses the node’s configured model."
-          },
-          {
-            "id": "temperature",
-            "label": "temperature",
-            "type": "number",
-            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
-          },
-          {
-            "id": "seed",
-            "label": "seed",
-            "type": "number",
-            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
           },
           {
             "id": "system",
@@ -108,8 +106,26 @@
             "description": "Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node)."
           },
           {
-            "id": "response_schema",
-            "label": "structured_output",
+            "id": "max_in_tokens",
+            "label": "max_in_tokens",
+            "type": "number",
+            "description": "Optional per-call input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for this call."
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number",
+            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number",
+            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
             "type": "object",
             "description": "Optional JSON Schema object (type=object) the assistant content must conform to."
           }
@@ -127,6 +143,24 @@
             "description": "Assistant text content (best-effort). For tool calls, content may be empty."
           },
           {
+            "id": "success",
+            "label": "success",
+            "type": "boolean",
+            "description": "True if the LLM call completed successfully."
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object",
+            "description": "Host-facing meta envelope (schema=abstractflow.llm_call.v1.meta). Includes provider/model, usage, trace ids, and lightweight execution metadata."
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array",
+            "description": "Normalized tool call requests. This pin exists to make wiring into Tool Calls / Emit Event nodes simpler."
+          },
+          {
             "id": "result",
             "label": "result",
             "type": "object",
@@ -138,7 +172,8 @@
           "model": "devstral-2-123b-instruct-2512"
         },
         "pinDefaults": {
-          "prompt": "do you have anything in active context ?"
+          "request": "do you have anything in active context ?",
+          "prompt": "do you know anything about me ? "
         }
       },
       "label": null,
@@ -230,7 +265,7 @@
       "type": "memory_rehydrate",
       "position": {
         "x": 1216.0,
-        "y": 240.0
+        "y": 256.0
       },
       "data": {
         "nodeType": "memory_rehydrate",
@@ -397,7 +432,7 @@
             "type": "string"
           }
         ],
-        "literalValue": "i am laurent-philippe, a research scientist"
+        "literalValue": "i am laurent-philippe, a french research scientist"
       },
       "label": null,
       "icon": null,
@@ -410,7 +445,7 @@
       "type": "llm_call",
       "position": {
         "x": 1216.0,
-        "y": -192.0
+        "y": -240.0
       },
       "data": {
         "nodeType": "llm_call",
@@ -424,10 +459,16 @@
             "type": "execution"
           },
           {
-            "id": "include_context",
+            "id": "use_context",
             "label": "use_context",
             "type": "boolean",
             "description": "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object",
+            "description": "Optional explicit context object for this call (e.g. {messages:[...]}). If provided, context.messages overrides inherited run context messages."
           },
           {
             "id": "provider",
@@ -440,18 +481,6 @@
             "label": "model",
             "type": "model",
             "description": "LLM model id/name. If unset, uses the node’s configured model."
-          },
-          {
-            "id": "temperature",
-            "label": "temperature",
-            "type": "number",
-            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
-          },
-          {
-            "id": "seed",
-            "label": "seed",
-            "type": "number",
-            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
           },
           {
             "id": "system",
@@ -472,8 +501,26 @@
             "description": "Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node)."
           },
           {
-            "id": "response_schema",
-            "label": "structured_output",
+            "id": "max_in_tokens",
+            "label": "max_in_tokens",
+            "type": "number",
+            "description": "Optional per-call input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for this call."
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number",
+            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number",
+            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
             "type": "object",
             "description": "Optional JSON Schema object (type=object) the assistant content must conform to."
           }
@@ -489,6 +536,24 @@
             "label": "response",
             "type": "string",
             "description": "Assistant text content (best-effort). For tool calls, content may be empty."
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean",
+            "description": "True if the LLM call completed successfully."
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object",
+            "description": "Host-facing meta envelope (schema=abstractflow.llm_call.v1.meta). Includes provider/model, usage, trace ids, and lightweight execution metadata."
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array",
+            "description": "Normalized tool call requests. This pin exists to make wiring into Tool Calls / Emit Event nodes simpler."
           },
           {
             "id": "result",
@@ -503,8 +568,9 @@
         },
         "pinDefaults": {
           "system": "",
-          "prompt": "do you know who i am ?",
-          "include_context": false
+          "use_context": false,
+          "request": "do you know who i am ?",
+          "prompt": "do you know anything about me ? "
         }
       },
       "label": null,
@@ -518,7 +584,7 @@
       "type": "llm_call",
       "position": {
         "x": 1536.0,
-        "y": 240.0
+        "y": 256.0
       },
       "data": {
         "nodeType": "llm_call",
@@ -532,10 +598,16 @@
             "type": "execution"
           },
           {
-            "id": "include_context",
+            "id": "use_context",
             "label": "use_context",
             "type": "boolean",
             "description": "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object",
+            "description": "Optional explicit context object for this call (e.g. {messages:[...]}). If provided, context.messages overrides inherited run context messages."
           },
           {
             "id": "provider",
@@ -548,18 +620,6 @@
             "label": "model",
             "type": "model",
             "description": "LLM model id/name. If unset, uses the node’s configured model."
-          },
-          {
-            "id": "temperature",
-            "label": "temperature",
-            "type": "number",
-            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
-          },
-          {
-            "id": "seed",
-            "label": "seed",
-            "type": "number",
-            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
           },
           {
             "id": "system",
@@ -580,8 +640,26 @@
             "description": "Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node)."
           },
           {
-            "id": "response_schema",
-            "label": "structured_output",
+            "id": "max_in_tokens",
+            "label": "max_in_tokens",
+            "type": "number",
+            "description": "Optional per-call input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for this call."
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number",
+            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number",
+            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
             "type": "object",
             "description": "Optional JSON Schema object (type=object) the assistant content must conform to."
           }
@@ -599,6 +677,24 @@
             "description": "Assistant text content (best-effort). For tool calls, content may be empty."
           },
           {
+            "id": "success",
+            "label": "success",
+            "type": "boolean",
+            "description": "True if the LLM call completed successfully."
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object",
+            "description": "Host-facing meta envelope (schema=abstractflow.llm_call.v1.meta). Includes provider/model, usage, trace ids, and lightweight execution metadata."
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array",
+            "description": "Normalized tool call requests. This pin exists to make wiring into Tool Calls / Emit Event nodes simpler."
+          },
+          {
             "id": "result",
             "label": "result",
             "type": "object",
@@ -610,8 +706,9 @@
           "model": "gemma-3-1b-it"
         },
         "pinDefaults": {
-          "prompt": "do you know who i am ?",
-          "include_context": true
+          "use_context": true,
+          "request": "do you know who i am ?",
+          "prompt": "do you know anything about me ? "
         }
       },
       "label": null,
@@ -625,7 +722,7 @@
       "type": "memory_query",
       "position": {
         "x": 1216.0,
-        "y": 896.0
+        "y": 992.0
       },
       "data": {
         "nodeType": "memory_query",
@@ -742,10 +839,16 @@
             "type": "execution"
           },
           {
-            "id": "include_context",
+            "id": "use_context",
             "label": "use_context",
             "type": "boolean",
             "description": "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object",
+            "description": "Optional explicit context object for this call (e.g. {messages:[...]}). If provided, context.messages overrides inherited run context messages."
           },
           {
             "id": "provider",
@@ -758,18 +861,6 @@
             "label": "model",
             "type": "model",
             "description": "LLM model id/name. If unset, uses the node’s configured model."
-          },
-          {
-            "id": "temperature",
-            "label": "temperature",
-            "type": "number",
-            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
-          },
-          {
-            "id": "seed",
-            "label": "seed",
-            "type": "number",
-            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
           },
           {
             "id": "system",
@@ -790,8 +881,26 @@
             "description": "Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node)."
           },
           {
-            "id": "response_schema",
-            "label": "structured_output",
+            "id": "max_in_tokens",
+            "label": "max_in_tokens",
+            "type": "number",
+            "description": "Optional per-call input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for this call."
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number",
+            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number",
+            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
             "type": "object",
             "description": "Optional JSON Schema object (type=object) the assistant content must conform to."
           }
@@ -809,6 +918,24 @@
             "description": "Assistant text content (best-effort). For tool calls, content may be empty."
           },
           {
+            "id": "success",
+            "label": "success",
+            "type": "boolean",
+            "description": "True if the LLM call completed successfully."
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object",
+            "description": "Host-facing meta envelope (schema=abstractflow.llm_call.v1.meta). Includes provider/model, usage, trace ids, and lightweight execution metadata."
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array",
+            "description": "Normalized tool call requests. This pin exists to make wiring into Tool Calls / Emit Event nodes simpler."
+          },
+          {
             "id": "result",
             "label": "result",
             "type": "object",
@@ -820,8 +947,9 @@
           "model": "gemma-3-1b-it"
         },
         "pinDefaults": {
-          "prompt": "do you know who i am ?",
-          "include_context": false
+          "use_context": false,
+          "request": "do you know who i am ?",
+          "prompt": "do you know anything about me ? "
         }
       },
       "label": null,
@@ -849,10 +977,16 @@
             "type": "execution"
           },
           {
-            "id": "include_context",
+            "id": "use_context",
             "label": "use_context",
             "type": "boolean",
             "description": "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object",
+            "description": "Optional explicit context object for this call (e.g. {messages:[...]}). If provided, context.messages overrides inherited run context messages."
           },
           {
             "id": "provider",
@@ -865,18 +999,6 @@
             "label": "model",
             "type": "model",
             "description": "LLM model id/name. If unset, uses the node’s configured model."
-          },
-          {
-            "id": "temperature",
-            "label": "temperature",
-            "type": "number",
-            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
-          },
-          {
-            "id": "seed",
-            "label": "seed",
-            "type": "number",
-            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
           },
           {
             "id": "system",
@@ -897,8 +1019,26 @@
             "description": "Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node)."
           },
           {
-            "id": "response_schema",
-            "label": "structured_output",
+            "id": "max_in_tokens",
+            "label": "max_in_tokens",
+            "type": "number",
+            "description": "Optional per-call input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for this call."
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number",
+            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number",
+            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
             "type": "object",
             "description": "Optional JSON Schema object (type=object) the assistant content must conform to."
           }
@@ -916,6 +1056,24 @@
             "description": "Assistant text content (best-effort). For tool calls, content may be empty."
           },
           {
+            "id": "success",
+            "label": "success",
+            "type": "boolean",
+            "description": "True if the LLM call completed successfully."
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object",
+            "description": "Host-facing meta envelope (schema=abstractflow.llm_call.v1.meta). Includes provider/model, usage, trace ids, and lightweight execution metadata."
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array",
+            "description": "Normalized tool call requests. This pin exists to make wiring into Tool Calls / Emit Event nodes simpler."
+          },
+          {
             "id": "result",
             "label": "result",
             "type": "object",
@@ -927,8 +1085,9 @@
           "model": "gemma-3-1b-it"
         },
         "pinDefaults": {
-          "prompt": "do you know who i am ?",
-          "include_context": false
+          "use_context": false,
+          "request": "do you know who i am ?",
+          "prompt": "do you know anything about me ? "
         }
       },
       "label": null,
@@ -1100,5 +1259,5 @@
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-02T19:06:00.895671",
-  "updated_at": "2026-01-11T02:16:33.679030"
+  "updated_at": "2026-01-16T17:13:47.748831"
 }

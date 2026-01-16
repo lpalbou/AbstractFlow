@@ -58,15 +58,15 @@ def test_visual_memory_kg_assert_and_query_runs(tmp_path, monkeypatch) -> None:
                     "headerColor": "#FF8800",
                     "inputs": [],
                     "outputs": [{"id": "value", "label": "value", "type": "array"}],
-                    "literalValue": [
-                        {
-                            "subject": "AbstractFramework",
-                            "predicate": "includes",
-                            "object": "abstractruntime",
-                        }
-                    ],
+                        "literalValue": [
+                            {
+                                "subject": "AbstractFramework",
+                                "predicate": "dcterms:hasPart",
+                                "object": "abstractruntime",
+                            }
+                        ],
+                    },
                 },
-            },
             {
                 "id": "node-3",
                 "type": "memory_kg_assert",
@@ -299,7 +299,11 @@ def test_visual_memory_kg_lancedb_persists_across_store_recreation(tmp_path, mon
                 "id": "assertions",
                 "type": "literal_array",
                 "position": {"x": 320, "y": 160},
-                "data": {"nodeType": "literal_array", "outputs": [{"id": "value", "label": "value", "type": "array"}], "literalValue": [{"subject": "AbstractFramework", "predicate": "includes", "object": "abstractruntime"}]},
+                "data": {
+                    "nodeType": "literal_array",
+                    "outputs": [{"id": "value", "label": "value", "type": "array"}],
+                    "literalValue": [{"subject": "AbstractFramework", "predicate": "dcterms:hasPart", "object": "abstractruntime"}],
+                },
             },
             {
                 "id": "scope",

@@ -18,10 +18,9 @@ def test_visual_interface_abstractcode_agent_v1_validates() -> None:
                     "data": {
                         "outputs": [
                             {"id": "exec-out", "label": "", "type": "execution"},
-                            {"id": "request", "label": "request", "type": "string"},
                             {"id": "provider", "label": "provider", "type": "provider"},
                             {"id": "model", "label": "model", "type": "model"},
-                            {"id": "tools", "label": "tools", "type": "tools"},
+                            {"id": "prompt", "label": "prompt", "type": "string"},
                         ]
                     },
                 },
@@ -33,6 +32,8 @@ def test_visual_interface_abstractcode_agent_v1_validates() -> None:
                         "inputs": [
                             {"id": "exec-in", "label": "", "type": "execution"},
                             {"id": "response", "label": "response", "type": "string"},
+                            {"id": "success", "label": "success", "type": "boolean"},
+                            {"id": "meta", "label": "meta", "type": "object"},
                         ]
                     },
                 },
@@ -74,11 +75,12 @@ def test_visual_interface_abstractcode_agent_v1_missing_pins_errors() -> None:
     )
 
     errors = validate_visual_flow_interface(vf, ABSTRACTCODE_AGENT_V1)
-    assert any("On Flow Start must expose an output pin 'request'" in e for e in errors)
+    assert any("On Flow Start must expose an output pin 'prompt'" in e for e in errors)
     assert any("On Flow Start must expose an output pin 'provider'" in e for e in errors)
     assert any("On Flow Start must expose an output pin 'model'" in e for e in errors)
-    assert any("On Flow Start must expose an output pin 'tools'" in e for e in errors)
     assert any("must expose an input pin 'response'" in e for e in errors)
+    assert any("must expose an input pin 'success'" in e for e in errors)
+    assert any("must expose an input pin 'meta'" in e for e in errors)
 
 
 def test_visual_interface_abstractcode_agent_v1_scaffold_adds_success_meta_scratchpad_and_drops_result() -> None:
@@ -118,6 +120,26 @@ def test_visual_interface_abstractcode_agent_v1_scaffold_adds_success_meta_scrat
 
     changed = apply_visual_flow_interface_scaffold(vf, ABSTRACTCODE_AGENT_V1, include_recommended=True)
     assert changed is True
+
+    start = [n for n in vf.nodes if n.id == "start"][0]
+    start_pins = start.data.get("outputs") if isinstance(start.data, dict) else None
+    assert isinstance(start_pins, list)
+    start_ids = [p.get("id") for p in start_pins if isinstance(p, dict)]
+    assert start_ids[:13] == [
+        "exec-out",
+        "use_context",
+        "context",
+        "provider",
+        "model",
+        "system",
+        "prompt",
+        "tools",
+        "max_iterations",
+        "max_in_tokens",
+        "temperature",
+        "seed",
+        "resp_schema",
+    ]
 
     end = [n for n in vf.nodes if n.id == "end"][0]
     pins = end.data.get("inputs") if isinstance(end.data, dict) else None

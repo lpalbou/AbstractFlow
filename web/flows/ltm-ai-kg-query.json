@@ -62,7 +62,7 @@
         "pinDefaults": {
           "scope": "all",
           "min_score": 0.25,
-          "limit": 50
+          "limit": 10
         }
       },
       "label": null,

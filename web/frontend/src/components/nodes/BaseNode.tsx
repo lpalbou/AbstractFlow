@@ -234,6 +234,7 @@ const VarDeclInline = memo(function VarDeclInline({
     { value: 'provider', label: 'provider' },
     { value: 'model', label: 'model' },
     { value: 'object', label: 'object' },
+    { value: 'assertion', label: 'assertion' },
     { value: 'array', label: 'array' },
     { value: 'tools', label: 'tools' },
     { value: 'any', label: 'any' },
@@ -321,7 +322,14 @@ const VarDeclInline = memo(function VarDeclInline({
       );
     }
 
-    const preview = varType === 'array' ? '[]' : varType === 'object' ? '{}' : 'null';
+    const preview =
+      varType === 'array'
+        ? '[]'
+        : varType === 'object'
+        ? '{}'
+        : varType === 'assertion'
+        ? '{assertion}'
+        : 'null';
     return (
       <input
         className="af-pin-input nodrag"
@@ -484,6 +492,7 @@ export const BaseNode = memo(function BaseNode({
             t === 'provider' ||
             t === 'model' ||
             t === 'object' ||
+            t === 'assertion' ||
             t === 'array' ||
             t === 'tools' ||
             t === 'any'
@@ -1032,6 +1041,7 @@ export const BaseNode = memo(function BaseNode({
         t === 'provider' ||
         t === 'model' ||
         t === 'object' ||
+        t === 'assertion' ||
         t === 'array' ||
         t === 'tools' ||
         t === 'any'

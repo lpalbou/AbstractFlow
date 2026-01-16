@@ -26,8 +26,8 @@
             "type": "execution"
           },
           {
-            "id": "request",
-            "label": "request",
+            "id": "prompt",
+            "label": "prompt",
             "type": "string"
           },
           {
@@ -65,7 +65,22 @@
             "label": "seed",
             "type": "number"
           }
-        ]
+        ],
+        "pinDefaults": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b",
+          "tools": [
+            "edit_file",
+            "analyze_code",
+            "execute_command",
+            "fetch_url",
+            "list_files",
+            "read_file",
+            "search_files",
+            "web_search",
+            "write_file"
+          ]
+        }
       },
       "label": null,
       "icon": null,
@@ -139,10 +154,16 @@
             "type": "execution"
           },
           {
-            "id": "include_context",
+            "id": "use_context",
             "label": "use_context",
             "type": "boolean",
             "description": "When true, include this run's active context messages (context.messages) as agent history. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object",
+            "description": "Optional explicit context object for the agent (e.g. {messages:[...]}). If provided, it can override inherited run context."
           },
           {
             "id": "provider",
@@ -157,6 +178,36 @@
             "description": "LLM model id/name. If unset, uses the node’s configured model."
           },
           {
+            "id": "system",
+            "label": "system",
+            "type": "string",
+            "description": "Optional system prompt for this agent instance (high priority instructions)."
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string",
+            "description": "The task/user prompt for the agent to solve."
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools",
+            "description": "Allowlist of tool names this agent can call (defense-in-depth; runtime still enforces allowlists)."
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number",
+            "description": "Maximum internal ReAct iterations (safety cap). Higher values allow more tool-use steps."
+          },
+          {
+            "id": "max_in_tokens",
+            "label": "max_in_tokens",
+            "type": "number",
+            "description": "Optional per-agent input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for the agent sub-run."
+          },
+          {
             "id": "temperature",
             "label": "temperature",
             "type": "number",
@@ -169,46 +220,10 @@
             "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
           },
           {
-            "id": "max_iterations",
-            "label": "max_iterations",
-            "type": "number",
-            "description": "Maximum internal ReAct iterations (safety cap). Higher values allow more tool-use steps."
-          },
-          {
-            "id": "max_input_tokens",
-            "label": "max_input_tokens",
-            "type": "number",
-            "description": "Optional per-agent input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for the agent sub-run."
-          },
-          {
-            "id": "system",
-            "label": "system",
-            "type": "string",
-            "description": "Optional system prompt for this agent instance (high priority instructions)."
-          },
-          {
-            "id": "task",
-            "label": "prompt",
-            "type": "string",
-            "description": "The task/user prompt for the agent to solve."
-          },
-          {
-            "id": "tools",
-            "label": "tools",
-            "type": "tools",
-            "description": "Allowlist of tool names this agent can call (defense-in-depth; runtime still enforces allowlists)."
-          },
-          {
-            "id": "response_schema",
-            "label": "structured_output",
+            "id": "resp_schema",
+            "label": "resp_schema",
             "type": "object",
             "description": "Optional JSON Schema object (type=object) the final answer must conform to."
-          },
-          {
-            "id": "context",
-            "label": "context",
-            "type": "object",
-            "description": "Optional explicit context object for the agent (e.g. {messages:[...]}). If provided, it can override inherited run context."
           }
         ],
         "outputs": [
@@ -388,14 +403,6 @@
   ],
   "edges": [
     {
-      "id": "edge-1768015010520",
-      "source": "node-1",
-      "sourceHandle": "request",
-      "target": "node-2",
-      "targetHandle": "task",
-      "animated": false
-    },
-    {
       "id": "edge-1768015012692",
       "source": "node-1",
       "sourceHandle": "tools",
@@ -514,9 +521,17 @@
       "target": "end",
       "targetHandle": "response",
       "animated": false
+    },
+    {
+      "id": "edge-1768570874201",
+      "source": "node-1",
+      "sourceHandle": "prompt",
+      "target": "node-2",
+      "targetHandle": "prompt",
+      "animated": false
     }
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-10T03:16:28.522693",
-  "updated_at": "2026-01-16T11:58:19.259186"
+  "updated_at": "2026-01-16T13:41:16.354013"
 }

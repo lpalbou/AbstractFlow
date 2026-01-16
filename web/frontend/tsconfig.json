@@ -20,6 +20,7 @@
       "@/*": ["./src/*"],
       "@abstractuic/monitor-flow": ["../../../abstractuic/monitor-flow/src/index.ts"],
       "@abstractuic/monitor-flow/*": ["../../../abstractuic/monitor-flow/src/*"],
+      "@abstractutils/monitor-gpu": ["../../../abstractuic/monitor-gpu/src/index.d.ts"],
       "react": ["./node_modules/@types/react/index.d.ts"],
       "react/jsx-runtime": ["./node_modules/@types/react/jsx-runtime.d.ts"],
       "react/jsx-dev-runtime": ["./node_modules/@types/react/jsx-dev-runtime.d.ts"]

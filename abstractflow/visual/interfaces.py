@@ -62,30 +62,33 @@ def get_interface_specs() -> Dict[str, VisualFlowInterfaceSpec]:
     return {
         ABSTRACTCODE_AGENT_V1: VisualFlowInterfaceSpec(
             interface_id=ABSTRACTCODE_AGENT_V1,
-            label="AbstractCode Agent (v1)",
+            label="RunnableFlow (v1)",
             description=(
-                "Host-configurable request → response contract for running a workflow as an AbstractCode agent."
+                "Host-configurable prompt → response contract for running a workflow in chat-like clients (AbstractCode, AbstractObserver, etc)."
             ),
-            # NOTE: We require host routing/policy pins (provider/model/tools) so workflows
-            # can be driven by AbstractCode without hardcoding node configs.
             required_start_outputs={
-                "request": "string",
                 "provider": "provider",
                 "model": "model",
-                "tools": "tools",
+                "prompt": "string",
             },
-            required_end_inputs={"response": "string"},
+            required_end_inputs={
+                "response": "string",
+                "success": "boolean",
+                "meta": "object",
+            },
             recommended_start_outputs={
+                "use_context": "boolean",
                 "context": "object",
+                "system": "string",
+                "tools": "tools",
                 "max_iterations": "number",
+                "max_in_tokens": "number",
+                "temperature": "number",
+                "seed": "number",
+                "resp_schema": "object",
             },
             recommended_end_inputs={
                 # Optional but commonly wired for host UX:
-                # - `success`: did the workflow complete successfully?
-                # - `meta`: small host-facing metadata envelope
-                # - `scratchpad`: runtime trace (may be large)
-                "success": "boolean",
-                "meta": "object",
                 "scratchpad": "object",
             },
         ),
@@ -349,6 +352,23 @@ def apply_visual_flow_interface_scaffold(
     for pid, t in start_pins.items():
         changed = _ensure_pin(outputs, pin_id=str(pid), type_str=str(t), label=str(pid)) or changed
 
+    desired_start_order = [
+        "exec-out",
+        "use_context",
+        "context",
+        "provider",
+        "model",
+        "system",
+        "prompt",
+        "tools",
+        "max_iterations",
+        "max_in_tokens",
+        "temperature",
+        "seed",
+        "resp_schema",
+    ]
+    changed = _reorder_pins(outputs, desired_ids=desired_start_order) or changed
+
     # Ensure pins on all end nodes.
     for end in end_nodes:
         end_data = getattr(end, "data", None)
@@ -397,7 +417,7 @@ def apply_visual_flow_interface_scaffold(
             changed = _ensure_pin(inputs, pin_id=str(pid), type_str=str(t), label=str(pid)) or changed
 
         # Keep interface pins in a predictable order for UX.
-        desired_end_order = ["exec-in", *list(end_pins.keys())]
+        desired_end_order = ["exec-in", "response", "success", "meta", "scratchpad"]
         changed = _reorder_pins(inputs, desired_ids=desired_end_order) or changed
 
     # Write back nodes list if it was reconstructed.

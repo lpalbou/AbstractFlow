@@ -237,43 +237,49 @@ const CORE_NODES: NodeTemplate[] = [
     icon: '&#x1F916;', // Robot
     label: 'Agent',
     description: 'Run an agent (ReAct) that can call tools. Outputs response, success, meta, and a runtime scratchpad.',
-    headerColor: '#4488FF',
-    inputs: [
-      { id: 'exec-in', label: '', type: 'execution' },
-      {
-        id: 'include_context',
-        label: 'use_context',
-        type: 'boolean',
-        description:
-          "When true, include this run's active context messages (context.messages) as agent history. If the pin is not connected, the node checkbox is used. Default: false.",
-      },
-      { id: 'provider', label: 'provider', type: 'provider', description: 'LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider.' },
-      { id: 'model', label: 'model', type: 'model', description: 'LLM model id/name. If unset, uses the node’s configured model.' },
-      { id: 'temperature', label: 'temperature', type: 'number', description: 'Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature.' },
-      { id: 'seed', label: 'seed', type: 'number', description: 'Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed.' },
-      { id: 'max_iterations', label: 'max_iterations', type: 'number', description: 'Maximum internal ReAct iterations (safety cap). Higher values allow more tool-use steps.' },
-      {
-        id: 'max_input_tokens',
-        label: 'max_input_tokens',
-        type: 'number',
-        description:
-          "Optional per-agent input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for the agent sub-run.",
-      },
-      { id: 'system', label: 'system', type: 'string', description: 'Optional system prompt for this agent instance (high priority instructions).' },
-      { id: 'task', label: 'prompt', type: 'string', description: 'The task/user prompt for the agent to solve.' },
-      { id: 'tools', label: 'tools', type: 'tools', description: 'Allowlist of tool names this agent can call (defense-in-depth; runtime still enforces allowlists).' },
-      { id: 'response_schema', label: 'structured_output', type: 'object', description: 'Optional JSON Schema object (type=object) the final answer must conform to.' },
-      { id: 'context', label: 'context', type: 'object', description: 'Optional explicit context object for the agent (e.g. {messages:[...]}). If provided, it can override inherited run context.' },
-    ],
-    outputs: [
-      { id: 'exec-out', label: '', type: 'execution' },
-      {
-        id: 'response',
-        label: 'response',
-        type: 'string',
-        description:
-          'Final response string. In structured-output mode (when structured_output is enabled), this is a JSON string matching the response schema.',
-      },
+	    headerColor: '#4488FF',
+	    inputs: [
+	      { id: 'exec-in', label: '', type: 'execution' },
+	      {
+	        id: 'use_context',
+	        label: 'use_context',
+	        type: 'boolean',
+	        description:
+	          "When true, include this run's active context messages (context.messages) as agent history. If the pin is not connected, the node checkbox is used. Default: false.",
+	      },
+	      {
+	        id: 'context',
+	        label: 'context',
+	        type: 'object',
+	        description:
+	          'Optional explicit context object for the agent (e.g. {messages:[...]}). If provided, context.messages overrides the inherited run context messages.',
+	      },
+	      { id: 'provider', label: 'provider', type: 'provider', description: 'LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider.' },
+	      { id: 'model', label: 'model', type: 'model', description: 'LLM model id/name. If unset, uses the node’s configured model.' },
+	      { id: 'system', label: 'system', type: 'string', description: 'Optional system prompt for this agent instance (high priority instructions).' },
+	      { id: 'prompt', label: 'prompt', type: 'string', description: 'User prompt/task string for the agent to solve.' },
+	      { id: 'tools', label: 'tools', type: 'tools', description: 'Allowlist of tool names this agent can call (defense-in-depth; runtime still enforces allowlists).' },
+	      { id: 'max_iterations', label: 'max_iterations', type: 'number', description: 'Maximum internal ReAct iterations (safety cap). Higher values allow more tool-use steps.' },
+	      {
+	        id: 'max_in_tokens',
+	        label: 'max_in_tokens',
+	        type: 'number',
+	        description:
+	          "Optional per-agent input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for the agent sub-run.",
+	      },
+	      { id: 'temperature', label: 'temperature', type: 'number', description: 'Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature.' },
+	      { id: 'seed', label: 'seed', type: 'number', description: 'Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed.' },
+	      { id: 'resp_schema', label: 'resp_schema', type: 'object', description: 'Optional JSON Schema object (type=object) the final answer must conform to.' },
+	    ],
+	    outputs: [
+	      { id: 'exec-out', label: '', type: 'execution' },
+	      {
+	        id: 'response',
+	        label: 'response',
+	        type: 'string',
+	        description:
+	          'Final response string. When resp_schema is provided, this is a JSON string matching the response schema.',
+	      },
       {
         id: 'success',
         label: 'success',
@@ -302,34 +308,41 @@ const CORE_NODES: NodeTemplate[] = [
     icon: '&#x1F4AD;', // Thought bubble
     label: 'LLM Call',
     description: 'Single LLM call (no autonomous loop). Can optionally request tool calls via the tools allowlist.',
-    headerColor: '#3498DB', // Blue - AI
-    inputs: [
-      { id: 'exec-in', label: '', type: 'execution' },
-      {
-        id: 'include_context',
-        label: 'use_context',
-        type: 'boolean',
-        description:
-          "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false.",
-      },
-      {
-        id: 'max_input_tokens',
-        label: 'max_input_tokens',
-        type: 'number',
-        description:
-          "Optional per-call input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for this call.",
-      },
-      { id: 'provider', label: 'provider', type: 'provider', description: 'LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider.' },
-      { id: 'model', label: 'model', type: 'model', description: 'LLM model id/name. If unset, uses the node’s configured model.' },
-      { id: 'temperature', label: 'temperature', type: 'number', description: 'Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature.' },
-      { id: 'seed', label: 'seed', type: 'number', description: 'Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed.' },
-      { id: 'system', label: 'system', type: 'string', description: 'Optional system prompt for this single call.' },
-      { id: 'prompt', label: 'prompt', type: 'string', description: 'User prompt/content for this single call.' },
-      { id: 'tools', label: 'tools', type: 'tools', description: 'Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node).' },
-      { id: 'response_schema', label: 'structured_output', type: 'object', description: 'Optional JSON Schema object (type=object) the assistant content must conform to.' },
-    ],
-    outputs: [
-      { id: 'exec-out', label: '', type: 'execution' },
+	    headerColor: '#3498DB', // Blue - AI
+	    inputs: [
+	      { id: 'exec-in', label: '', type: 'execution' },
+	      {
+	        id: 'use_context',
+	        label: 'use_context',
+	        type: 'boolean',
+	        description:
+	          "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false.",
+	      },
+	      {
+	        id: 'context',
+	        label: 'context',
+	        type: 'object',
+	        description:
+	          'Optional explicit context object for this call (e.g. {messages:[...]}). If provided, context.messages overrides inherited run context messages.',
+	      },
+	      { id: 'provider', label: 'provider', type: 'provider', description: 'LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider.' },
+	      { id: 'model', label: 'model', type: 'model', description: 'LLM model id/name. If unset, uses the node’s configured model.' },
+	      { id: 'system', label: 'system', type: 'string', description: 'Optional system prompt for this single call.' },
+	      { id: 'prompt', label: 'prompt', type: 'string', description: 'User prompt/content for this single call.' },
+	      { id: 'tools', label: 'tools', type: 'tools', description: 'Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node).' },
+	      {
+	        id: 'max_in_tokens',
+	        label: 'max_in_tokens',
+	        type: 'number',
+	        description:
+	          "Optional per-call input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for this call.",
+	      },
+	      { id: 'temperature', label: 'temperature', type: 'number', description: 'Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature.' },
+	      { id: 'seed', label: 'seed', type: 'number', description: 'Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed.' },
+	      { id: 'resp_schema', label: 'resp_schema', type: 'object', description: 'Optional JSON Schema object (type=object) the assistant content must conform to.' },
+	    ],
+	    outputs: [
+	      { id: 'exec-out', label: '', type: 'execution' },
       { id: 'response', label: 'response', type: 'string', description: 'Assistant text content (best-effort). For tool calls, content may be empty.' },
       { id: 'success', label: 'success', type: 'boolean', description: 'True if the LLM call completed successfully.' },
       {
@@ -903,16 +916,26 @@ const LITERAL_NODES: NodeTemplate[] = [
     category: 'literals',
   },
   {
-    type: 'json_schema',
-    icon: '&#x1F4CB;', // Clipboard
-    label: 'JSON Schema',
-    description:
-      'Define a JSON Schema object for structured outputs. Connect to LLM/Agent `structured_output` (response_schema).',
-    headerColor: '#00FFFF', // object pin color (schema is an object)
+    type: 'literal_json',
+    icon: '&#x1F9E0;', // Brain (semantic object)
+    label: 'Assertion',
+    description: 'KG assertion literal value (subject/predicate/object + optional metadata).',
+    headerColor: '#00B8D4', // Assertion pin color
     inputs: [],
-    outputs: [{ id: 'value', label: 'schema', type: 'object' }],
+    outputs: [{ id: 'value', label: 'assertion', type: 'assertion' }],
     category: 'literals',
   },
+  {
+    type: 'json_schema',
+	    icon: '&#x1F4CB;', // Clipboard
+	    label: 'JSON Schema',
+	    description:
+	      'Define a JSON Schema object for schema-constrained responses. Connect to `resp_schema` on LLM Call / Agent nodes.',
+	    headerColor: '#00FFFF', // object pin color (schema is an object)
+	    inputs: [],
+	    outputs: [{ id: 'value', label: 'schema', type: 'object' }],
+	    category: 'literals',
+	  },
   {
     type: 'literal_array',
     icon: '[]',
@@ -1155,9 +1178,9 @@ const MEMORY_NODES: NodeTemplate[] = [
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
       { id: 'query_text', label: 'query_text', type: 'string', description: 'Optional semantic query. Requires embeddings to be configured in the host.' },
-      { id: 'subject', label: 'subject', type: 'string', description: 'Optional canonical subject filter (trim + lower; stable exact match after canonicalization).' },
-      { id: 'predicate', label: 'predicate', type: 'string', description: 'Optional canonical predicate filter (trim + lower; stable exact match after canonicalization).' },
-      { id: 'object', label: 'object', type: 'string', description: 'Optional canonical object filter (trim + lower; stable exact match after canonicalization).' },
+      { id: 'subject', label: 'subject', type: 'string', description: 'Optional subject filter (case-insensitive exact match).' },
+      { id: 'predicate', label: 'predicate', type: 'string', description: 'Optional predicate filter (case-insensitive exact match).' },
+      { id: 'object', label: 'object', type: 'string', description: 'Optional object filter (case-insensitive exact match).' },
       { id: 'since', label: 'since', type: 'string', description: 'Optional observed_at lower bound (ISO8601).' },
       { id: 'until', label: 'until', type: 'string', description: 'Optional observed_at upper bound (ISO8601).' },
       { id: 'active_at', label: 'active_at', type: 'string', description: 'Optional validity window selector (ISO8601). Filters assertions active at that time.' },
@@ -1186,6 +1209,7 @@ const MEMORY_NODES: NodeTemplate[] = [
       { id: 'scope', label: 'scope', type: 'string', description: 'run | session | global. Determines the owner_id when not explicitly provided.' },
       { id: 'span_id', label: 'span_id', type: 'string', description: 'Optional provenance pointer to a runtime span/artifact id.' },
       { id: 'owner_id', label: 'owner_id', type: 'string', description: 'Optional explicit owner id override (advanced; normally derived from scope).' },
+      { id: 'allow_custom_predicates', label: 'allow_custom_predicates', type: 'boolean', description: 'If true, allow custom predicates under the ex:* namespace (advanced; default false).' },
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
@@ -1254,9 +1278,16 @@ export const NODE_CATEGORIES: Record<string, NodeCategory> = {
 };
 
 const ALL_NODE_TEMPLATES: NodeTemplate[] = Object.values(NODE_CATEGORIES).flatMap((cat) => cat.nodes);
-const NODE_TEMPLATE_BY_TYPE: Map<NodeType, NodeTemplate> = new Map(
-  ALL_NODE_TEMPLATES.map((t) => [t.type, t])
-);
+// Keep the *first* template as the canonical “type → template” mapping.
+// Some palette entries intentionally reuse the same `type` with different pin types/UX
+// (e.g. `literal_json` vs `Assertion`), but load/normalization should stay stable.
+const NODE_TEMPLATE_BY_TYPE: Map<NodeType, NodeTemplate> = (() => {
+  const map = new Map<NodeType, NodeTemplate>();
+  for (const t of ALL_NODE_TEMPLATES) {
+    if (!map.has(t.type)) map.set(t.type, t);
+  }
+  return map;
+})();
 
 // Get all node templates flattened
 export function getAllNodeTemplates(): NodeTemplate[] {

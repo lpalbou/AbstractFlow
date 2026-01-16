@@ -23,6 +23,7 @@ class PinType(str, Enum):
     NUMBER = "number"  # Green #00FF00 - Integer/Float
     BOOLEAN = "boolean"  # Red #FF0000 - True/False
     OBJECT = "object"  # Cyan #00FFFF - JSON objects
+    ASSERTION = "assertion"  # Teal - KG assertion object (subject/predicate/object + metadata)
     ARRAY = "array"  # Orange #FF8800 - Collections
     TOOLS = "tools"  # Orange - Tool allowlist (string[])
     PROVIDER = "provider"  # Cyan-blue - LLM provider id/name (string-like)
@@ -197,7 +198,7 @@ class VisualFlow(BaseModel):
     name: str
     description: str = ""
     # Optional interface markers (host contracts).
-    # Example: ["abstractcode.agent.v1"] to indicate this workflow can be run as an AbstractCode agent.
+    # Example: ["abstractcode.agent.v1"] to indicate this workflow can be run as a RunnableFlow in chat-like clients.
     interfaces: List[str] = Field(default_factory=list)
     nodes: List[VisualNode] = Field(default_factory=list)
     edges: List[VisualEdge] = Field(default_factory=list)

@@ -22,9 +22,9 @@ export interface FlowLibraryModalProps {
 const KNOWN_INTERFACES: Array<{ id: string; label: string; description: string }> = [
   {
     id: 'abstractcode.agent.v1',
-    label: 'AbstractCode Agent (v1)',
+    label: 'RunnableFlow (v1)',
     description:
-      "Allows running this workflow as an AbstractCode agent via `abstractcode --agent <flow>` (host-configurable provider/model/tools pins).",
+      'Runnable workflow contract for chat-like clients (AbstractCode, AbstractObserver, etc). Exposes host-configurable provider/model/prompt inputs.',
   },
 ];
 
@@ -515,29 +515,32 @@ export function FlowLibraryModal({
                         );
                       })}
 
-                      <div className="flow-library-interfaces-hint">
-                        <div className="flow-library-interfaces-hint-title">AbstractCode Agent (v1) requirements</div>
-                        <div className="flow-library-interfaces-hint-body">
-                          <div>
-                            On Flow Start: output pin <code>request</code> (string)
-                          </div>
-                          <div>
-                            On Flow Start: output pin <code>provider</code> (provider)
-                          </div>
-                          <div>
-                            On Flow Start: output pin <code>model</code> (model)
-                          </div>
-                          <div>
-                            On Flow Start: output pin <code>tools</code> (tools)
-                          </div>
-                          <div>
-                            On Flow End: input pin <code>response</code> (string)
-                          </div>
-                          <div style={{ marginTop: 6 }}>
-                            <em>Tip:</em> When you enable this interface, the editor will auto-add the required pins.
-                          </div>
-                        </div>
-                      </div>
+	                      <div className="flow-library-interfaces-hint">
+	                        <div className="flow-library-interfaces-hint-title">RunnableFlow (v1) requirements</div>
+	                        <div className="flow-library-interfaces-hint-body">
+	                          <div>
+	                            On Flow Start (required): <code>provider</code> (provider)
+	                          </div>
+	                          <div>
+	                            On Flow Start (required): <code>model</code> (model)
+	                          </div>
+	                          <div>
+	                            On Flow Start (required): <code>prompt</code> (string)
+	                          </div>
+	                          <div>
+	                            On Flow End (required): <code>response</code> (string)
+	                          </div>
+	                          <div>
+	                            On Flow End (required): <code>success</code> (boolean)
+	                          </div>
+	                          <div>
+	                            On Flow End (required): <code>meta</code> (object)
+	                          </div>
+	                          <div style={{ marginTop: 6 }}>
+	                            <em>Tip:</em> When you enable this interface, the editor will auto-add the required pins.
+	                          </div>
+	                        </div>
+	                      </div>
                     </div>
                   ) : null}
                 </div>
