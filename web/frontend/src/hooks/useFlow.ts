@@ -576,11 +576,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         }
       }
 
-      // Canonical ordering for Agent and LLM Call nodes.
-      // Pins are addressable by id (edges), so reordering is safe.
-        if (data.nodeType === 'agent' || data.nodeType === 'llm_call') {
-          const inputIdRenames: Record<string, string> =
-            data.nodeType === 'llm_call'
+	      // Canonical ordering for Agent and LLM Call nodes.
+	      // Pins are addressable by id (edges), so reordering is safe.
+	        if (data.nodeType === 'agent' || data.nodeType === 'llm_call') {
+	          const inputIdRenames: Record<string, string> =
+	            data.nodeType === 'llm_call'
               ? {
                   include_context: 'use_context',
                   max_input_tokens: 'max_in_tokens',
@@ -753,14 +753,106 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             data = { ...data, agentConfig: rest, pinDefaults: nextDefaults };
           } else if (prevDefaults !== nextDefaults) {
             data = { ...data, pinDefaults: nextDefaults };
-          }
-        }
-      }
+	          }
+	        }
+	      }
 
-      // Backward-compat + canonical ordering for Subflow nodes.
-      // Add the inherit_context pin (default false via node config) so it can be driven via data edges.
-      if (data.nodeType === 'subflow') {
-        const existingInputs = Array.isArray(data.inputs) ? data.inputs : [];
+	      // Canonical ordering for Make-* helper nodes.
+	      // These are pure data nodes; keeping their pin shapes stable improves Break Object discovery and UX.
+	      if (
+	        data.nodeType === 'make_context' ||
+	        data.nodeType === 'make_scratchpad' ||
+	        data.nodeType === 'make_meta'
+	      ) {
+	        const inputIdRenames: Record<string, string> =
+	          data.nodeType === 'make_context'
+	            ? { extra: 'context_extra' }
+	            : data.nodeType === 'make_scratchpad'
+	              ? { extra: 'context_extra' }
+	              : { trace_id: 'trace' };
+
+	        const prevDefaultsForRenames =
+	          data.pinDefaults && typeof data.pinDefaults === 'object' ? data.pinDefaults : undefined;
+	        if (prevDefaultsForRenames) {
+	          const nextDefaults: Record<string, JsonValue> = { ...prevDefaultsForRenames };
+	          let changed = false;
+	          for (const [from, to] of Object.entries(inputIdRenames)) {
+	            if (!(from in nextDefaults)) continue;
+	            if (!(to in nextDefaults)) nextDefaults[to] = nextDefaults[from];
+	            delete nextDefaults[from];
+	            changed = true;
+	          }
+	          if (changed) data = { ...data, pinDefaults: nextDefaults };
+	        }
+
+	        const existingInputsRaw = Array.isArray(data.inputs) ? data.inputs : [];
+	        const existingInputs: Pin[] = [];
+	        const seen = new Set<string>();
+	        for (const p of existingInputsRaw) {
+	          const nextId = inputIdRenames[p.id] || p.id;
+	          if (seen.has(nextId)) continue;
+	          seen.add(nextId);
+	          existingInputs.push(nextId === p.id ? p : { ...p, id: nextId });
+	        }
+
+	        const byId = new Map(existingInputs.map((p) => [p.id, p] as const));
+	        const used = new Set<string>();
+
+	        const want = (pin: Pin): Pin => {
+	          const prev = byId.get(pin.id);
+	          used.add(pin.id);
+	          if (!prev) return pin;
+	          if (prev.label === pin.label && prev.type === pin.type) return prev;
+	          return { ...prev, label: pin.label, type: pin.type };
+	        };
+
+	        const canonicalInputs: Pin[] =
+	          data.nodeType === 'make_context'
+	            ? [
+	                want({ id: 'task', label: 'task', type: 'string' }),
+	                want({ id: 'messages', label: 'messages', type: 'array' }),
+	                want({ id: 'context_extra', label: 'context_extra', type: 'object' }),
+	              ]
+	            : data.nodeType === 'make_scratchpad'
+	              ? [
+	                  want({ id: 'sub_run_id', label: 'sub_run_id', type: 'string' }),
+	                  want({ id: 'workflow_id', label: 'workflow_id', type: 'string' }),
+	                  want({ id: 'task', label: 'task', type: 'string' }),
+	                  want({ id: 'messages', label: 'messages', type: 'array' }),
+	                  want({ id: 'context_extra', label: 'context_extra', type: 'object' }),
+	                  want({ id: 'node_traces', label: 'node_traces', type: 'object' }),
+	                  want({ id: 'steps', label: 'steps', type: 'array' }),
+	                  want({ id: 'tool_calls', label: 'tool_calls', type: 'array' }),
+	                  want({ id: 'tool_results', label: 'tool_results', type: 'array' }),
+	                ]
+	              : [
+	                  want({ id: 'schema', label: 'schema', type: 'string' }),
+	                  want({ id: 'version', label: 'version', type: 'number' }),
+	                  want({ id: 'output_mode', label: 'output_mode', type: 'string' }),
+	                  want({ id: 'provider', label: 'provider', type: 'provider' }),
+	                  want({ id: 'model', label: 'model', type: 'model' }),
+	                  want({ id: 'sub_run_id', label: 'sub_run_id', type: 'string' }),
+	                  want({ id: 'iterations', label: 'iterations', type: 'number' }),
+	                  want({ id: 'tool_calls', label: 'tool_calls', type: 'number' }),
+	                  want({ id: 'tool_results', label: 'tool_results', type: 'number' }),
+	                  want({ id: 'finish_reason', label: 'finish_reason', type: 'string' }),
+	                  want({ id: 'gen_time', label: 'gen_time', type: 'number' }),
+	                  want({ id: 'ttft_ms', label: 'ttft_ms', type: 'number' }),
+	                  want({ id: 'usage', label: 'usage', type: 'object' }),
+	                  want({ id: 'trace', label: 'trace', type: 'object' }),
+	                  want({ id: 'warnings', label: 'warnings', type: 'array' }),
+	                  want({ id: 'debug', label: 'debug', type: 'object' }),
+	                  want({ id: 'extra', label: 'extra', type: 'object' }),
+	                ];
+
+	        const extras = existingInputs.filter((p) => !used.has(p.id));
+	        data = { ...data, inputs: [...canonicalInputs, ...extras] };
+	      }
+
+	      // Backward-compat + canonical ordering for Subflow nodes.
+	      // Add the inherit_context pin (default false via node config) so it can be driven via data edges.
+	      if (data.nodeType === 'subflow') {
+	        const existingInputs = Array.isArray(data.inputs) ? data.inputs : [];
         const byId = new Map(existingInputs.map((p) => [p.id, p] as const));
         const used = new Set<string>();
 

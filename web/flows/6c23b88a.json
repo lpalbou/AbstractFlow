@@ -483,6 +483,12 @@
             "description": "Schema version number (default: 1)."
           },
           {
+            "id": "output_mode",
+            "label": "output_mode",
+            "type": "string",
+            "description": "Output mode: unstructured | structured."
+          },
+          {
             "id": "provider",
             "label": "provider",
             "type": "provider",
@@ -495,16 +501,58 @@
             "description": "Model id/name."
           },
           {
+            "id": "sub_run_id",
+            "label": "sub_run_id",
+            "type": "string",
+            "description": "Optional sub-run id (Agent nodes)."
+          },
+          {
+            "id": "iterations",
+            "label": "iterations",
+            "type": "number",
+            "description": "Optional iteration count (Agent nodes)."
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "number",
+            "description": "Optional tool call count."
+          },
+          {
+            "id": "tool_results",
+            "label": "tool_results",
+            "type": "number",
+            "description": "Optional tool result count."
+          },
+          {
+            "id": "finish_reason",
+            "label": "finish_reason",
+            "type": "string",
+            "description": "Optional finish reason (LLM Call nodes)."
+          },
+          {
+            "id": "gen_time",
+            "label": "gen_time",
+            "type": "number",
+            "description": "Optional generation time (LLM Call nodes)."
+          },
+          {
+            "id": "ttft_ms",
+            "label": "ttft_ms",
+            "type": "number",
+            "description": "Optional time-to-first-token in ms (LLM Call nodes)."
+          },
+          {
             "id": "usage",
             "label": "usage",
             "type": "object",
             "description": "Usage object (e.g. {input_tokens, output_tokens})."
           },
           {
-            "id": "trace_id",
-            "label": "trace_id",
-            "type": "string",
-            "description": "Optional trace id (stored under meta.trace.trace_id)."
+            "id": "trace",
+            "label": "trace",
+            "type": "object",
+            "description": "Optional trace object (e.g. {trace_id:\"...\"}). Treat as opaque."
           },
           {
             "id": "warnings",
