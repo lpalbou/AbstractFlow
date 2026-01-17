@@ -1,0 +1,903 @@
+{
+  "id": "91f50635",
+  "name": "enricher-planner-agent",
+  "description": "",
+  "interfaces": [
+    "abstractcode.agent.v1"
+  ],
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": {
+        "x": -1280.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "RECEIVING PROMPT",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "use_context",
+            "label": "use_context",
+            "type": "boolean"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools"
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          },
+          {
+            "id": "max_in_tokens",
+            "label": "max_in_tokens",
+            "type": "number"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b",
+          "use_context": false,
+          "max_iterations": 20,
+          "temperature": 0.7,
+          "seed": -1,
+          "tools": [
+            "edit_file",
+            "analyze_code",
+            "execute_command",
+            "fetch_url",
+            "list_files",
+            "read_file",
+            "search_files",
+            "web_search",
+            "write_file"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 384.0,
+        "y": 544.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "ANSWERING",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-2",
+      "type": "agent",
+      "position": {
+        "x": 304.0,
+        "y": -96.0
+      },
+      "data": {
+        "nodeType": "agent",
+        "label": "Agentic Loop",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "use_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) as agent history. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object",
+            "description": "Optional explicit context object for the agent (e.g. {messages:[...]}). If provided, it can override inherited run context."
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider",
+            "description": "LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model",
+            "description": "LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string",
+            "description": "Optional system prompt for this agent instance (high priority instructions)."
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string",
+            "description": "The task/user prompt for the agent to solve."
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools",
+            "description": "Allowlist of tool names this agent can call (defense-in-depth; runtime still enforces allowlists)."
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number",
+            "description": "Maximum internal ReAct iterations (safety cap). Higher values allow more tool-use steps."
+          },
+          {
+            "id": "max_in_tokens",
+            "label": "max_in_tokens",
+            "type": "number",
+            "description": "Optional per-agent input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for the agent sub-run."
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number",
+            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number",
+            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "object",
+            "description": "Optional JSON Schema object (type=object) the final answer must conform to."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string",
+            "description": "Final response string. In structured-output mode (when structured_output is enabled), this is a JSON string matching the response schema."
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean",
+            "description": "True if the Agent node completed successfully."
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object",
+            "description": "Host-facing meta envelope (schema=abstractcode.agent.v1.meta). Includes provider/model and lightweight execution metadata."
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object",
+            "description": "Runtime-owned execution trace/scratchpad for observability (LLM/tool steps, timings)."
+          }
+        ],
+        "pinDefaults": {}
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-4",
+      "type": "subflow",
+      "position": {
+        "x": -336.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Thinking",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "state",
+            "label": "state",
+            "type": "string"
+          },
+          {
+            "id": "post_delay",
+            "label": "post_delay",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          }
+        ],
+        "subflowId": "15f19f7f",
+        "pinDefaults": {
+          "state": "Thinking..."
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-5",
+      "type": "subflow",
+      "position": {
+        "x": 112.0,
+        "y": 544.0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "AGENTIC LOOP DONE",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "state",
+            "label": "state",
+            "type": "string"
+          },
+          {
+            "id": "post_delay",
+            "label": "post_delay",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          }
+        ],
+        "subflowId": "15f19f7f",
+        "pinDefaults": {
+          "state": "Done",
+          "post_delay": 3
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-6",
+      "type": "subflow",
+      "position": {
+        "x": -752.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Subflow",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "enriched_request",
+            "label": "enriched_request",
+            "type": "string"
+          }
+        ],
+        "subflowId": "72b51d91",
+        "pinDefaults": {}
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-7",
+      "type": "subflow",
+      "position": {
+        "x": -1024.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Enriching",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "state",
+            "label": "state",
+            "type": "string"
+          },
+          {
+            "id": "post_delay",
+            "label": "post_delay",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          }
+        ],
+        "subflowId": "15f19f7f",
+        "pinDefaults": {
+          "state": "Enriching..."
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-8",
+      "type": "subflow",
+      "position": {
+        "x": -544.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Planning",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "tasks",
+            "label": "tasks",
+            "type": "array"
+          }
+        ],
+        "subflowId": "1cd9eec9",
+        "pinDefaults": {}
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-9",
+      "type": "loop",
+      "position": {
+        "x": -16.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "loop",
+        "label": "ForEach",
+        "icon": "&#x1F501;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "items",
+            "label": "items",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "loop",
+            "label": "loop",
+            "type": "execution"
+          },
+          {
+            "id": "done",
+            "label": "done",
+            "type": "execution"
+          },
+          {
+            "id": "item",
+            "label": "item",
+            "type": "any"
+          },
+          {
+            "id": "index",
+            "label": "index",
+            "type": "number"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1768015012692",
+      "source": "node-1",
+      "sourceHandle": "tools",
+      "target": "node-2",
+      "targetHandle": "tools",
+      "animated": false
+    },
+    {
+      "id": "edge-1768015015156",
+      "source": "node-1",
+      "sourceHandle": "context",
+      "target": "node-2",
+      "targetHandle": "context",
+      "animated": false
+    },
+    {
+      "id": "edge-1768600000001",
+      "source": "node-1",
+      "sourceHandle": "use_context",
+      "target": "node-2",
+      "targetHandle": "use_context",
+      "animated": false
+    },
+    {
+      "id": "edge-1768015017449",
+      "source": "node-1",
+      "sourceHandle": "model",
+      "target": "node-2",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-1768015019109",
+      "source": "node-1",
+      "sourceHandle": "provider",
+      "target": "node-2",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1768600000002",
+      "source": "node-1",
+      "sourceHandle": "system",
+      "target": "node-2",
+      "targetHandle": "system",
+      "animated": false
+    },
+    {
+      "id": "edge-1768015068923",
+      "source": "node-2",
+      "sourceHandle": "scratchpad",
+      "target": "end",
+      "targetHandle": "scratchpad",
+      "animated": false
+    },
+    {
+      "id": "edge-1768015078148",
+      "source": "node-1",
+      "sourceHandle": "max_iterations",
+      "target": "node-2",
+      "targetHandle": "max_iterations",
+      "animated": false
+    },
+    {
+      "id": "edge-1768600000003",
+      "source": "node-1",
+      "sourceHandle": "max_in_tokens",
+      "target": "node-2",
+      "targetHandle": "max_in_tokens",
+      "animated": false
+    },
+    {
+      "id": "edge-1768020010001",
+      "source": "node-1",
+      "sourceHandle": "temperature",
+      "target": "node-2",
+      "targetHandle": "temperature",
+      "animated": false
+    },
+    {
+      "id": "edge-1768020010002",
+      "source": "node-1",
+      "sourceHandle": "seed",
+      "target": "node-2",
+      "targetHandle": "seed",
+      "animated": false
+    },
+    {
+      "id": "edge-1768600000004",
+      "source": "node-1",
+      "sourceHandle": "resp_schema",
+      "target": "node-2",
+      "targetHandle": "resp_schema",
+      "animated": false
+    },
+    {
+      "id": "edge-1768564688264",
+      "source": "node-2",
+      "sourceHandle": "meta",
+      "target": "end",
+      "targetHandle": "meta",
+      "animated": false
+    },
+    {
+      "id": "edge-1768564690372",
+      "source": "node-2",
+      "sourceHandle": "success",
+      "target": "end",
+      "targetHandle": "success",
+      "animated": false
+    },
+    {
+      "id": "edge-1768564692830",
+      "source": "node-2",
+      "sourceHandle": "response",
+      "target": "end",
+      "targetHandle": "response",
+      "animated": false
+    },
+    {
+      "id": "edge-1768642472128",
+      "source": "node-1",
+      "sourceHandle": "provider",
+      "target": "node-6",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1768642474470",
+      "source": "node-1",
+      "sourceHandle": "model",
+      "target": "node-6",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-1768642478029",
+      "source": "node-1",
+      "sourceHandle": "temperature",
+      "target": "node-6",
+      "targetHandle": "temperature",
+      "animated": false
+    },
+    {
+      "id": "edge-1768642480829",
+      "source": "node-1",
+      "sourceHandle": "seed",
+      "target": "node-6",
+      "targetHandle": "seed",
+      "animated": false
+    },
+    {
+      "id": "edge-1768642485038",
+      "source": "node-1",
+      "sourceHandle": "prompt",
+      "target": "node-6",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "edge-1768642517453",
+      "source": "node-7",
+      "sourceHandle": "exec-out",
+      "target": "node-6",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768642521380",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-7",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768642597065",
+      "source": "node-6",
+      "sourceHandle": "enriched_request",
+      "target": "node-8",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "edge-1768642602710",
+      "source": "node-1",
+      "sourceHandle": "temperature",
+      "target": "node-8",
+      "targetHandle": "temperature",
+      "animated": false
+    },
+    {
+      "id": "edge-1768642606240",
+      "source": "node-1",
+      "sourceHandle": "seed",
+      "target": "node-8",
+      "targetHandle": "seed",
+      "animated": false
+    },
+    {
+      "id": "edge-1768642609638",
+      "source": "node-1",
+      "sourceHandle": "provider",
+      "target": "node-8",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1768642613072",
+      "source": "node-1",
+      "sourceHandle": "model",
+      "target": "node-8",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-1768642637750",
+      "source": "node-6",
+      "sourceHandle": "exec-out",
+      "target": "node-8",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768642650115",
+      "source": "node-8",
+      "sourceHandle": "exec-out",
+      "target": "node-4",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768642673840",
+      "source": "node-4",
+      "sourceHandle": "exec-out",
+      "target": "node-9",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768642679546",
+      "source": "node-9",
+      "sourceHandle": "loop",
+      "target": "node-2",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768642690399",
+      "source": "node-8",
+      "sourceHandle": "tasks",
+      "target": "node-9",
+      "targetHandle": "items",
+      "animated": false
+    },
+    {
+      "id": "edge-1768642695974",
+      "source": "node-9",
+      "sourceHandle": "item",
+      "target": "node-2",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "edge-1768642743449",
+      "source": "node-9",
+      "sourceHandle": "done",
+      "target": "node-5",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768642748232",
+      "source": "node-5",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": true
+    }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2026-01-17T09:35:46.259348",
+  "updated_at": "2026-01-17T09:39:16.491562"
+}

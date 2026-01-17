@@ -134,6 +134,8 @@ function jsonSchemaFromFields(fields: SchemaField[]): Record<string, any> {
 function validateStructuredOutputSchema(schema: unknown): string | null {
   if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return 'Schema must be a JSON object.';
   const root = schema as Record<string, any>;
+  // Allow `$ref`-only schemas (resolved at runtime, e.g. `abstractsemantics:*`).
+  if (typeof root.$ref === 'string' && root.$ref.trim()) return null;
   if (root.type !== 'object') return 'Root schema must have type "object".';
   const props = root.properties;
   if (!props || typeof props !== 'object' || Array.isArray(props)) {
@@ -456,5 +458,4 @@ export function JsonSchemaNodeEditor({ nodeId, schema, onChange }: JsonSchemaNod
     </div>
   );
 }
-
 

@@ -26,7 +26,7 @@
 		          "provider": "lmstudio",
 		          "model": "qwen/qwen3-next-80b",
 		          "domain_focus": "software / agents / memory systems",
-		          "max_out_tokens": 500
+		          "max_out_tokens": 900
 		        }
 		      }
 		    },
@@ -95,7 +95,7 @@
         ],
 	        "outputs": [{ "id": "result", "label": "result", "type": "string" }],
 	        "pinDefaults": {
-		          "template": "You are a semantic extractor for an AI long-term memory system.\\n\\nTask: extract a small set of high-signal, append-only assertions (subject-predicate-object) from TEXT.\\nDomain focus: {{domain_focus}}\\n\\nHard rules:\\n- Only assert what TEXT directly states (no external knowledge).\\n- Output MUST match the enforced structured-output schema.\\n- Use ONLY predicates from the schema enum (do not invent new predicates; do not emit schema:creator/schema:description).\\n- Evidence: attributes.evidence_quote MUST be an exact verbatim substring of TEXT and MUST be short (<=160 chars). No ellipses.\\n- attributes.original_context is OPTIONAL; if provided, keep it short (<=280 chars) and verbatim.\\n- Prefer 6-10 assertions (max 12). If TEXT is purely a request/command with no factual content, it is OK to return an empty list.\\n\\nModeling guidance:\\n- Events: mint ex:event-* and use rdf:type schema:Event + schema:name + schema:participant + time/location when present.\\n- New entities: mint ex:{kind}-{kebab-case} (lowercase, stable).\\n\\nTEXT:\\n{{text}}"
+		          "template": "You are a semantic extractor for an AI long-term memory system.\\n\\nTask: output BETWEEN 6 and 12 high-signal, append-only assertions (subject-predicate-object) supported by TEXT (aim for ~8).\\nOnly output fewer than 6 if the text truly contains fewer distinct atomic facts.\\nDomain focus (only affects what you keep): {{domain_focus}}\\n\\nHard rules:\\n- Only assert what TEXT directly states (no external knowledge).\\n- Output MUST match the enforced structured-output schema: {\\\"assertions\\\":[...]}.\\n- Use ONLY predicates allowed by the schema enum (do not invent new predicates).\\n- If TEXT contains any factual statement, return >=1 assertion (never return empty just because TEXT is short).\\n- attributes.evidence_quote MUST be an exact verbatim substring of TEXT, <=160 chars, no ellipses.\\n- attributes.original_context (optional) MUST be an exact substring of TEXT, <=280 chars, and include evidence_quote.\\n- IDs: use lowercase stable CURIE-like ids. For new entities use ex:{kind}-{kebab-case}.\\n\\nEntity completeness (important):\\n- For every new ex:* entity you introduce, add:\\n  - rdf:type (to one of: skos:Concept, cito:Claim, schema:Event, schema:Person, schema:Organization, schema:Thing, dcterms:Text)\\n  - one primary label:\\n    - concepts → skos:prefLabel\\n    - claims → skos:definition\\n    - events/people/orgs/places → schema:name\\n    - documents → dcterms:title\\n\\nExtraction strategy (do this unless impossible):\\n- Capture 1–3 main statements as cito:Claim + skos:definition (use verbatim evidence_quote text).\\n- Create skos:Concept nodes for key terms, and link claims to them with schema:about / schema:mentions.\\n- Create schema:Event nodes only for explicit happenings.\\n\\nExample (for \\\"Mistakes are opportunities for growth.\\\"):\\n- ex:claim-mistakes-opportunities rdf:type cito:Claim\\n- ex:claim-mistakes-opportunities skos:definition \\\"mistakes are opportunities for growth\\\"\\n- ex:concept-mistake rdf:type skos:Concept\\n- ex:concept-mistake skos:prefLabel \\\"mistakes\\\"\\n- ex:claim-mistakes-opportunities schema:about ex:concept-mistake\\n\\nTEXT:\\n{{text}}"
 		        }
 		      }
 		    },
@@ -110,138 +110,7 @@
         "headerColor": "#00FFFF",
         "inputs": [],
 	        "outputs": [{ "id": "value", "label": "schema", "type": "object" }],
-	        "literalValue": {
-	          "$ref": "abstractsemantics:kg_assertion_schema_v0",
-	          "type": "object",
-	          "properties": {
-	            "assertions": {
-	              "type": "array",
-	              "items": {
-	                "type": "object",
-	                "properties": {
-	                  "subject": { "type": "string" },
-	                  "predicate": {
-	                    "type": "string",
-	                    "enum": [
-	                      "rdf:type",
-	                      "dcterms:hasPart",
-	                      "dcterms:isPartOf",
-	                      "schema:nextItem",
-	                      "schema:previousItem",
-		                      "dcterms:identifier",
-		                      "dcterms:title",
-		                      "schema:name",
-		                      "dcterms:description",
-	                      "dcterms:abstract",
-	                      "dcterms:created",
-	                      "dcterms:modified",
-	                      "dcterms:creator",
-	                      "dcterms:publisher",
-	                      "dcterms:subject",
-	                      "schema:genre",
-			                      "schema:about",
-			                      "schema:mentions",
-			                      "schema:knowsAbout",
-			                      "dcterms:references",
-			                      "schema:sameAs",
-			                      "schema:location",
-	                      "schema:temporalCoverage",
-	                      "schema:participant",
-	                      "schema:organizer",
-	                      "schema:result",
-	                      "schema:instrument",
-	                      "schema:startDate",
-	                      "schema:endDate",
-	                      "skos:definition",
-	                      "skos:prefLabel",
-	                      "skos:altLabel",
-	                      "skos:broader",
-	                      "skos:narrower",
-	                      "skos:related",
-	                      "skos:exactMatch",
-	                      "skos:closeMatch",
-	                      "cito:supports",
-	                      "cito:disagreesWith",
-		                      "cito:usesDataFrom",
-		                      "cito:providesDataFor",
-		                      "cito:extends",
-		                      "cito:discusses",
-		                      "cito:confirms",
-
-		                      "schema:description",
-		                      "schema:creator",
-		                      "schema:hasParent",
-		                      "schema:hasMember",
-		                      "schema:hasMemorySource",
-		                      "schema:recognizedAs"
-		                    ]
-		                  },
-	                  "object": { "type": "string" },
-	                  "confidence": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
-	                  "valid_from": { "type": ["string", "null"] },
-	                  "valid_until": { "type": ["string", "null"] },
-	                  "provenance": { "type": ["object", "null"] },
-	                  "attributes": {
-	                    "type": "object",
-		                    "properties": {
-		                      "subject_type": {
-		                        "type": "string",
-		                        "enum": [
-		                          "schema:Thing",
-		                          "dcterms:Text",
-		                          "dcterms:Collection",
-		                          "skos:Concept",
-		                          "cito:Claim",
-		                          "schema:Person",
-		                          "schema:Organization",
-		                          "schema:ItemList",
-		                          "schema:SoftwareApplication",
-		                          "schema:Event",
-		                          "schema:Place",
-		                          "schema:Country",
-		                          "schema:Product",
-		                          "schema:Dataset",
-		                          "schema:ImageObject",
-		                          "schema:VideoObject",
-		                          "schema:Table",
-		                          "schema:SoftwareSourceCode"
-		                        ]
-		                      },
-		                      "object_type": {
-		                        "type": "string",
-		                        "enum": [
-		                          "schema:Thing",
-		                          "dcterms:Text",
-		                          "dcterms:Collection",
-		                          "skos:Concept",
-		                          "cito:Claim",
-		                          "schema:Person",
-		                          "schema:Organization",
-		                          "schema:ItemList",
-		                          "schema:SoftwareApplication",
-		                          "schema:Event",
-		                          "schema:Place",
-		                          "schema:Country",
-		                          "schema:Product",
-		                          "schema:Dataset",
-		                          "schema:ImageObject",
-		                          "schema:VideoObject",
-		                          "schema:Table",
-		                          "schema:SoftwareSourceCode"
-		                        ]
-		                      },
-				                      "evidence_quote": { "type": "string", "maxLength": 160 },
-				                      "original_context": { "type": "string", "maxLength": 280 }
-				                    },
-			                    "required": ["evidence_quote"]
-			                  }
-	                },
-	                "required": ["subject", "predicate", "object", "attributes"]
-	              }
-	            }
-	          },
-	          "required": ["assertions"]
-	        }
+	        "literalValue": { "$ref": "abstractsemantics:kg_assertion_schema_v0" }
 	      }
 	    },
     {
@@ -357,7 +226,7 @@
 	          { "id": "output", "label": "output", "type": "any" }
 	        ],
 	        "functionName": "transform",
-	        "code": "def transform(_input):\n    payload = _input.get('input') if isinstance(_input, dict) else None\n    if not isinstance(payload, dict):\n        payload = {}\n\n    text = payload.get('text', '')\n    if not isinstance(text, str):\n        text = str(text or '')\n\n    raw = payload.get('assertions', [])\n    if not isinstance(raw, list):\n        return []\n\n    def _norm_space(s):\n        return ' '.join(s.split()).strip().lower() if isinstance(s, str) else ''\n\n    _pred_aliases = {\n        'schema:description': 'dcterms:description',\n        'schema:creator': 'dcterms:creator',\n        'schema:awareness': 'schema:knowsabout',\n        'schema:hasparent': 'dcterms:ispartof',\n        'schema:hasmember': 'dcterms:haspart',\n        'schema:recognizedas': 'skos:closematch',\n        'schema:hasmemorysource': 'dcterms:references',\n        'schema:haspart': 'dcterms:haspart',\n        'schema:ispartof': 'dcterms:ispartof',\n        'dcterms:has_part': 'dcterms:haspart',\n        'dcterms:is_part_of': 'dcterms:ispartof',\n    }\n\n    def _norm_predicate(p):\n        p2 = _norm_space(p)\n        return _pred_aliases.get(p2, p2)\n\n    def _repair_context(evidence, window=200):\n        if not isinstance(evidence, str) or not evidence:\n            return ''\n        idx = text.find(evidence)\n        if idx < 0:\n            return ''\n        start = idx - int(window)\n        if start < 0:\n            start = 0\n        end = idx + len(evidence) + int(window)\n        if end > len(text):\n            end = len(text)\n        return text[start:end]\n\n    seen = set()\n    out = []\n\n    for a in raw:\n        if not isinstance(a, dict):\n            continue\n\n        subj = _norm_space(a.get('subject'))\n        pred = _norm_predicate(a.get('predicate'))\n        obj = _norm_space(a.get('object'))\n\n        if not subj or not pred or not obj:\n            continue\n\n        attrs = a.get('attributes') if isinstance(a.get('attributes'), dict) else {}\n        ev = attrs.get('evidence_quote')\n        ctx = attrs.get('original_context')\n\n        if not isinstance(ev, str):\n            continue\n        ev2 = ev.strip()\n        if not ev2 or ev2 not in text:\n            continue\n\n        ctx2 = ctx.strip() if isinstance(ctx, str) else ''\n        if not ctx2 or ctx2 not in text:\n            ctx2 = _repair_context(ev2)\n        if not ctx2:\n            # Evidence itself is always acceptable as context.\n            ctx2 = ev2\n        if ctx2 not in text:\n            continue\n\n        key = (subj, pred, obj)\n        if key in seen:\n            continue\n        seen.add(key)\n\n        a2 = {'subject': subj, 'predicate': pred, 'object': obj}\n        for opt_key in ('confidence', 'valid_from', 'valid_until', 'provenance'):\n            if opt_key in a:\n                a2[opt_key] = a.get(opt_key)\n\n        # Preserve semantic typing + grounding fields.\n        a2['attributes'] = {\n            'subject_type': attrs.get('subject_type'),\n            'object_type': attrs.get('object_type'),\n            'evidence_quote': ev2,\n            'original_context': ctx2,\n        }\n\n        out.append(a2)\n        if len(out) >= 30:\n            break\n\n    return out\n"
+	        "code": "def transform(_input):\n    payload = _input.get('input') if isinstance(_input, dict) else None\n    if not isinstance(payload, dict):\n        payload = {}\n\n    text = payload.get('text', '')\n    if not isinstance(text, str):\n        text = str(text or '')\n\n    raw = payload.get('assertions', [])\n    if not isinstance(raw, list):\n        return []\n\n    def _norm_space(s):\n        return ' '.join(s.split()).strip().lower() if isinstance(s, str) else ''\n\n    MAX_EVIDENCE = 160\n    MAX_CONTEXT = 280\n\n    _pred_aliases = {\n        'schema:description': 'dcterms:description',\n        'schema:creator': 'dcterms:creator',\n        'schema:awareness': 'schema:knowsabout',\n        'schema:hasparent': 'dcterms:ispartof',\n        'schema:hasmember': 'dcterms:haspart',\n        'schema:recognizedas': 'skos:closematch',\n        'schema:hasmemorysource': 'dcterms:references',\n        'schema:haspart': 'dcterms:haspart',\n        'schema:ispartof': 'dcterms:ispartof',\n        'dcterms:has_part': 'dcterms:haspart',\n        'dcterms:is_part_of': 'dcterms:ispartof',\n    }\n\n    def _norm_predicate(p):\n        p2 = _norm_space(p)\n        return _pred_aliases.get(p2, p2)\n\n    def _repair_context(evidence, max_len=MAX_CONTEXT):\n        if not isinstance(evidence, str) or not evidence:\n            return ''\n        idx = text.find(evidence)\n        if idx < 0:\n            return ''\n        max_len2 = int(max_len) if isinstance(max_len, (int, float)) else MAX_CONTEXT\n        max_len2 = max(0, max_len2)\n        if max_len2 and max_len2 < len(evidence):\n            max_len2 = len(evidence)\n        window = (max_len2 - len(evidence)) // 2 if max_len2 else 0\n        start = idx - int(window)\n        if start < 0:\n            start = 0\n        end = idx + len(evidence) + int(window)\n        if end > len(text):\n            end = len(text)\n        if max_len2 and (end - start) > max_len2:\n            end = start + max_len2\n        return text[start:end]\n\n    seen = set()\n    out = []\n\n    for a in raw:\n        if not isinstance(a, dict):\n            continue\n\n        subj = _norm_space(a.get('subject'))\n        pred = _norm_predicate(a.get('predicate'))\n        obj = _norm_space(a.get('object'))\n\n        if not subj or not pred or not obj:\n            continue\n\n        attrs = a.get('attributes') if isinstance(a.get('attributes'), dict) else {}\n        ev = attrs.get('evidence_quote')\n        ctx = attrs.get('original_context')\n\n        if not isinstance(ev, str):\n            continue\n        ev2 = ev.strip()\n        if not ev2 or ev2 not in text:\n            continue\n        if len(ev2) > MAX_EVIDENCE:\n            continue\n\n        ctx2 = ctx.strip() if isinstance(ctx, str) else ''\n        if not ctx2 or ctx2 not in text or ev2 not in ctx2:\n            ctx2 = _repair_context(ev2)\n        if not ctx2:\n            # Evidence itself is always acceptable as context.\n            ctx2 = ev2\n        if ctx2 not in text or ev2 not in ctx2:\n            continue\n        if len(ctx2) > MAX_CONTEXT:\n            ctx2 = _repair_context(ev2) or ev2\n\n        key = (subj, pred, obj)\n        if key in seen:\n            continue\n        seen.add(key)\n\n        a2 = {'subject': subj, 'predicate': pred, 'object': obj}\n        for opt_key in ('confidence', 'valid_from', 'valid_until', 'provenance'):\n            if opt_key in a:\n                a2[opt_key] = a.get(opt_key)\n\n        # Preserve semantic typing + grounding fields.\n        a2['attributes'] = {\n            'subject_type': attrs.get('subject_type'),\n            'object_type': attrs.get('object_type'),\n            'evidence_quote': ev2,\n            'original_context': ctx2,\n        }\n\n        out.append(a2)\n        if len(out) >= 12:\n            break\n\n    return out\n"
 	      }
 	    },
 	    {

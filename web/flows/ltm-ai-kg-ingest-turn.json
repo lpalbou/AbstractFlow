@@ -64,7 +64,7 @@
           "model": "qwen/qwen3-next-80b",
           "scope": "session",
           "domain_focus": "software / agents / memory systems",
-          "max_out_tokens": 5000
+          "max_out_tokens": 900
         }
       },
       "label": null,
