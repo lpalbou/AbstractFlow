@@ -94,7 +94,6 @@ class NodeType(str, Enum):
     MAKE_CONTEXT = "make_context"
     MAKE_META = "make_meta"
     MAKE_SCRATCHPAD = "make_scratchpad"
-    MAKE_RAW_RESULT = "make_raw_result"
     GET_ELEMENT = "get_element"
     GET_RANDOM_ELEMENT = "get_random_element"
     ARRAY_MAP = "array_map"

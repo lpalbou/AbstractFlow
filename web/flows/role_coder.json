@@ -265,6 +265,16 @@
             "type": "execution"
           },
           {
+            "id": "use_context",
+            "label": "use_context",
+            "type": "boolean"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          },
+          {
             "id": "provider",
             "label": "provider",
             "type": "string"
@@ -275,17 +285,12 @@
             "type": "string"
           },
           {
-            "id": "max_iterations",
-            "label": "max_iterations",
-            "type": "number"
-          },
-          {
             "id": "system",
             "label": "system",
             "type": "string"
           },
           {
-            "id": "task",
+            "id": "prompt",
             "label": "prompt",
             "type": "string"
           },
@@ -295,8 +300,28 @@
             "type": "array"
           },
           {
-            "id": "context",
-            "label": "context",
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          },
+          {
+            "id": "max_in_tokens",
+            "label": "max_in_tokens",
+            "type": "number"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
             "type": "object"
           }
         ],
@@ -307,8 +332,18 @@
             "type": "execution"
           },
           {
-            "id": "result",
-            "label": "result",
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
             "type": "object"
           },
           {
@@ -325,44 +360,6 @@
         },
         "pinDefaults": {
           "system": "You are an expert software engineer. Be concise, careful, and test your changes."
-        }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
-      "id": "node-7",
-      "type": "break_object",
-      "position": {
-        "x": 160.0,
-        "y": 64.0
-      },
-      "data": {
-        "nodeType": "break_object",
-        "label": "Break Object",
-        "icon": "&#x1F9E9;",
-        "headerColor": "#3498DB",
-        "inputs": [
-          {
-            "id": "object",
-            "label": "object",
-            "type": "object"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "result",
-            "label": "result",
-            "type": "string"
-          }
-        ],
-        "breakConfig": {
-          "selectedPaths": [
-            "result"
-          ]
         }
       },
       "label": null,
@@ -471,8 +468,8 @@
             "type": "string"
           },
           {
-            "id": "raw_result",
-            "label": "raw_result",
+            "id": "response",
+            "label": "response",
             "type": "string"
           },
           {
@@ -584,7 +581,7 @@
       "source": "node-4",
       "sourceHandle": "result",
       "target": "node-6",
-      "targetHandle": "task",
+      "targetHandle": "prompt",
       "animated": false
     },
     {
@@ -598,17 +595,17 @@
     {
       "id": "edge-14",
       "source": "node-6",
-      "sourceHandle": "result",
-      "target": "node-7",
-      "targetHandle": "object",
+      "sourceHandle": "response",
+      "target": "node-8",
+      "targetHandle": "text",
       "animated": false
     },
     {
       "id": "edge-15",
-      "source": "node-7",
-      "sourceHandle": "result",
-      "target": "node-8",
-      "targetHandle": "text",
+      "source": "node-6",
+      "sourceHandle": "response",
+      "target": "node-10",
+      "targetHandle": "response",
       "animated": false
     },
     {
@@ -633,14 +630,6 @@
       "sourceHandle": "summary_md",
       "target": "node-10",
       "targetHandle": "summary_md",
-      "animated": false
-    },
-    {
-      "id": "edge-19",
-      "source": "node-7",
-      "sourceHandle": "result",
-      "target": "node-10",
-      "targetHandle": "raw_result",
       "animated": false
     },
     {

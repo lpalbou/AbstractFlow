@@ -147,13 +147,11 @@ def test_role_and_orchestrator_workflows_compile_and_have_basic_invariants() -> 
         for e in _edges(vf_rev)
     ), "role_reviewer: schema pin 'n' must not be connected."
 
-    # role_deep_researcher: break_object must use breakConfig (runtime handler expects it).
-    vf_dr = _load_visual_flow(flows_dir / "role_deep_researcher.json")
-    breaks = _find_nodes(vf_dr, "break_object")
-    assert breaks, "role_deep_researcher: expected a break_object node."
-    for n in breaks:
-        data = n.data if isinstance(n.data, dict) else {}
-        assert "breakConfig" in data
-        assert "breakObjectConfig" not in data
-
+    # break_object nodes: must use breakConfig (runtime handler expects it).
+    for name in targets:
+        vf_any = _load_visual_flow(flows_dir / name)
+        for n in _find_nodes(vf_any, "break_object"):
+            data = n.data if isinstance(n.data, dict) else {}
+            assert "breakConfig" in data
+            assert "breakObjectConfig" not in data
 

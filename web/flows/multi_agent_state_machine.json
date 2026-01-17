@@ -2307,8 +2307,8 @@
             "type": "string"
           },
           {
-            "id": "raw_result",
-            "label": "raw_result",
+            "id": "response",
+            "label": "response",
             "type": "string"
           }
         ],

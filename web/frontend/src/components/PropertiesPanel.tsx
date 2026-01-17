@@ -27,6 +27,7 @@ import {
   AGENT_META_SCHEMA,
   AGENT_RESULT_SCHEMA,
   AGENT_SCRATCHPAD_SCHEMA,
+  CONTEXT_EXTRA_SCHEMA,
   CONTEXT_SCHEMA,
   EVENT_ENVELOPE_SCHEMA,
   LLM_META_SCHEMA,
@@ -1398,14 +1399,15 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 		            let schema: unknown = undefined;
 		            const sourceHandle = typeof inputEdge?.sourceHandle === 'string' ? inputEdge.sourceHandle : '';
 
-		            const inferSchemaForOutput = (n: any, handle: string, depth: number): unknown => {
-		              if (!n || depth > 6) return undefined;
-		              const nodeType = n?.data?.nodeType;
-		              if (handle === 'context') return CONTEXT_SCHEMA;
-		              if (nodeType === 'make_context' && handle === 'context') return CONTEXT_SCHEMA;
-		              if (nodeType === 'make_scratchpad' && handle === 'scratchpad') return AGENT_SCRATCHPAD_SCHEMA;
-		              if (nodeType === 'make_meta' && handle === 'meta') return AGENT_META_SCHEMA;
-		              if (nodeType === 'on_event' && handle === 'event') return EVENT_ENVELOPE_SCHEMA;
+			            const inferSchemaForOutput = (n: any, handle: string, depth: number): unknown => {
+			              if (!n || depth > 6) return undefined;
+			              const nodeType = n?.data?.nodeType;
+			              if (handle === 'context') return CONTEXT_SCHEMA;
+			              if (handle === 'context_extra') return CONTEXT_EXTRA_SCHEMA;
+			              if (nodeType === 'make_context' && handle === 'context') return CONTEXT_SCHEMA;
+			              if (nodeType === 'make_scratchpad' && handle === 'scratchpad') return AGENT_SCRATCHPAD_SCHEMA;
+			              if (nodeType === 'make_meta' && handle === 'meta') return AGENT_META_SCHEMA;
+			              if (nodeType === 'on_event' && handle === 'event') return EVENT_ENVELOPE_SCHEMA;
 		              if (nodeType === 'agent') {
 		                if (handle === 'scratchpad') return AGENT_SCRATCHPAD_SCHEMA;
 		                if (handle === 'meta') return AGENT_META_SCHEMA;
@@ -1492,17 +1494,17 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 	                const parsed = tryParse(candidateText);
 	                if (parsed !== undefined) sample = parsed;
 	              }
-	            } else if (sourceHandle === 'context') {
-	              schema = CONTEXT_SCHEMA;
-	            } else if (sourceNode?.data.nodeType === 'make_meta') {
-	              schema = AGENT_META_SCHEMA;
-	            } else if (sourceNode?.data.nodeType === 'make_scratchpad') {
-	              schema = AGENT_SCRATCHPAD_SCHEMA;
-	            } else if (sourceNode?.data.nodeType === 'make_raw_result') {
-	              schema = LLM_RESULT_SCHEMA;
-	            } else if (sourceNode?.data.nodeType === 'on_event' && inputEdge?.sourceHandle === 'event') {
-	              schema = EVENT_ENVELOPE_SCHEMA;
-	            } else if (sourceNode?.data.nodeType === 'on_event' && inputEdge?.sourceHandle === 'payload') {
+		            } else if (sourceHandle === 'context') {
+		              schema = CONTEXT_SCHEMA;
+		            } else if (sourceHandle === 'context_extra') {
+		              schema = CONTEXT_EXTRA_SCHEMA;
+		            } else if (sourceNode?.data.nodeType === 'make_meta') {
+		              schema = AGENT_META_SCHEMA;
+		            } else if (sourceNode?.data.nodeType === 'make_scratchpad') {
+		              schema = AGENT_SCRATCHPAD_SCHEMA;
+		            } else if (sourceNode?.data.nodeType === 'on_event' && inputEdge?.sourceHandle === 'event') {
+		              schema = EVENT_ENVELOPE_SCHEMA;
+		            } else if (sourceNode?.data.nodeType === 'on_event' && inputEdge?.sourceHandle === 'payload') {
               // Payload is always a JSON object in our event envelope; for non-object payloads we wrap them as `{ value: ... }`.
               // When possible, infer a payload sample from a matching Emit Event node in the current graph.
               const eventName = (sourceNode.data.eventConfig?.name || '').trim();

@@ -260,17 +260,17 @@ const CORE_NODES: NodeTemplate[] = [
 	      { id: 'prompt', label: 'prompt', type: 'string', description: 'User prompt/task string for the agent to solve.' },
 	      { id: 'tools', label: 'tools', type: 'tools', description: 'Allowlist of tool names this agent can call (defense-in-depth; runtime still enforces allowlists).' },
 	      { id: 'max_iterations', label: 'max_iterations', type: 'number', description: 'Maximum internal ReAct iterations (safety cap). Higher values allow more tool-use steps.' },
-	      {
-	        id: 'max_in_tokens',
-	        label: 'max_in_tokens',
-	        type: 'number',
-	        description:
-	          "Optional per-agent input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for the agent sub-run.",
-	      },
-	      { id: 'temperature', label: 'temperature', type: 'number', description: 'Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature.' },
-	      { id: 'seed', label: 'seed', type: 'number', description: 'Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed.' },
-	      { id: 'resp_schema', label: 'resp_schema', type: 'object', description: 'Optional JSON Schema object (type=object) the final answer must conform to.' },
-	    ],
+		      {
+		        id: 'max_in_tokens',
+		        label: 'max_in_tokens',
+		        type: 'number',
+		        description:
+		          "Optional per-agent input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for the agent sub-run.",
+		      },
+		      { id: 'temperature', label: 'temperature', type: 'number', description: 'Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature.' },
+		      { id: 'seed', label: 'seed', type: 'number', description: 'Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed.' },
+		      { id: 'resp_schema', label: 'resp_schema', type: 'object', description: 'Optional JSON Schema object (type=object) the final answer must conform to.' },
+		    ],
 	    outputs: [
 	      { id: 'exec-out', label: '', type: 'execution' },
 	      {
@@ -330,17 +330,17 @@ const CORE_NODES: NodeTemplate[] = [
 	      { id: 'system', label: 'system', type: 'string', description: 'Optional system prompt for this single call.' },
 	      { id: 'prompt', label: 'prompt', type: 'string', description: 'User prompt/content for this single call.' },
 	      { id: 'tools', label: 'tools', type: 'tools', description: 'Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node).' },
-	      {
-	        id: 'max_in_tokens',
-	        label: 'max_in_tokens',
-	        type: 'number',
-	        description:
-	          "Optional per-call input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for this call.",
-	      },
-	      { id: 'temperature', label: 'temperature', type: 'number', description: 'Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature.' },
-	      { id: 'seed', label: 'seed', type: 'number', description: 'Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed.' },
-	      { id: 'resp_schema', label: 'resp_schema', type: 'object', description: 'Optional JSON Schema object (type=object) the assistant content must conform to.' },
-	    ],
+		      {
+		        id: 'max_in_tokens',
+		        label: 'max_in_tokens',
+		        type: 'number',
+		        description:
+		          "Optional per-call input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for this call.",
+		      },
+		      { id: 'temperature', label: 'temperature', type: 'number', description: 'Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature.' },
+		      { id: 'seed', label: 'seed', type: 'number', description: 'Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed.' },
+		      { id: 'resp_schema', label: 'resp_schema', type: 'object', description: 'Optional JSON Schema object (type=object) the assistant content must conform to.' },
+		    ],
 	    outputs: [
 	      { id: 'exec-out', label: '', type: 'execution' },
       { id: 'response', label: 'response', type: 'string', description: 'Assistant text content (best-effort). For tool calls, content may be empty.' },
@@ -674,7 +674,7 @@ const DATA_NODES: NodeTemplate[] = [
       { id: 'gen_time', label: 'gen_time', type: 'number', description: 'Optional generation time (LLM Call nodes).' },
       { id: 'ttft_ms', label: 'ttft_ms', type: 'number', description: 'Optional time-to-first-token in ms (LLM Call nodes).' },
       { id: 'usage', label: 'usage', type: 'object', description: 'Usage object (e.g. {input_tokens, output_tokens}).' },
-      { id: 'trace_id', label: 'trace_id', type: 'string', description: 'Optional trace id (stored under meta.trace.trace_id).' },
+      { id: 'trace', label: 'trace', type: 'object', description: 'Optional trace object (e.g. {trace_id:"..."}). Treat as opaque.' },
       { id: 'warnings', label: 'warnings', type: 'array', description: 'Optional list of warning strings.' },
       { id: 'debug', label: 'debug', type: 'object', description: 'Optional debug payload (host-facing).' },
       { id: 'extra', label: 'extra', type: 'object', description: 'Optional extra fields merged into the meta object (reserved keys win).' },

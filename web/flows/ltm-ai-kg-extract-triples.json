@@ -14,20 +14,22 @@
         "icon": "&#x1F3C1;",
         "headerColor": "#C0392B",
         "inputs": [],
-        "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "provider", "label": "provider", "type": "provider" },
-          { "id": "model", "label": "model", "type": "model" },
-          { "id": "text", "label": "text", "type": "string" },
-          { "id": "domain_focus", "label": "domain_focus", "type": "string" }
-        ],
-        "pinDefaults": {
-          "provider": "lmstudio",
-          "model": "qwen/qwen3-next-80b",
-          "domain_focus": "software / agents / memory systems"
-        }
-      }
-    },
+	        "outputs": [
+	          { "id": "exec-out", "label": "", "type": "execution" },
+	          { "id": "provider", "label": "provider", "type": "provider" },
+	          { "id": "model", "label": "model", "type": "model" },
+	          { "id": "text", "label": "text", "type": "string" },
+	          { "id": "domain_focus", "label": "domain_focus", "type": "string" },
+	          { "id": "max_out_tokens", "label": "max_out_tokens", "type": "number" }
+	        ],
+		        "pinDefaults": {
+		          "provider": "lmstudio",
+		          "model": "qwen/qwen3-next-80b",
+		          "domain_focus": "software / agents / memory systems",
+		          "max_out_tokens": 500
+		        }
+		      }
+		    },
     {
       "id": "node-2",
       "type": "literal_json",
@@ -93,10 +95,10 @@
         ],
 	        "outputs": [{ "id": "result", "label": "result", "type": "string" }],
 	        "pinDefaults": {
-	          "template": "You are a semantic triple writer for an AI long-term memory system.\\n\\nGoal: extract high-signal, append-only assertions (subject-predicate-object) from TEXT.\\n\\nDomain focus: {{domain_focus}}\\n\\nRules:\\n- Output ONLY what is directly supported by TEXT (no external knowledge).\\n- Output MUST match the enforced structured-output schema.\\n- Predicates MUST be one of the allowed CURIEs in the schema (do not invent new ones).\\n- Typing: set attributes.subject_type and attributes.object_type to one of the allowed entity types in the schema. Use schema:Thing when unsure; use dcterms:Text for literal strings.\\n- IDs: prefer CURIEs for known entities. For new entities, mint stable ids as ex:{kind}-{kebab-case} (lowercase, no spaces). Avoid putting numbers in the id unless the number appears verbatim in TEXT.\\n- Event modeling (recommended): for each distinct happening, create an event node ex:event-* and assert rdf:type schema:Event, schema:name, schema:participant, schema:startDate/schema:endDate, schema:location, plus a short dcterms:description when useful.\\n- For every ex:* entity you introduce, add rdf:type and exactly one primary label: dcterms:title (documents), skos:prefLabel (concepts), or schema:name (other entities).\\n- Grounding: attributes.evidence_quote MUST be an exact verbatim substring of TEXT (copy/paste; no ellipses). attributes.original_context MUST also be a verbatim substring of TEXT and may equal evidence_quote.\\n- Prefer 5-15 assertions (max 30). If TEXT contains any concrete facts/entities, do not return an empty list.\\n\\nTEXT:\\n{{text}}"
-	        }
-	      }
-	    },
+		          "template": "You are a semantic extractor for an AI long-term memory system.\\n\\nTask: extract a small set of high-signal, append-only assertions (subject-predicate-object) from TEXT.\\nDomain focus: {{domain_focus}}\\n\\nHard rules:\\n- Only assert what TEXT directly states (no external knowledge).\\n- Output MUST match the enforced structured-output schema.\\n- Use ONLY predicates from the schema enum (do not invent new predicates; do not emit schema:creator/schema:description).\\n- Evidence: attributes.evidence_quote MUST be an exact verbatim substring of TEXT and MUST be short (<=160 chars). No ellipses.\\n- attributes.original_context is OPTIONAL; if provided, keep it short (<=280 chars) and verbatim.\\n- Prefer 6-10 assertions (max 12). If TEXT is purely a request/command with no factual content, it is OK to return an empty list.\\n\\nModeling guidance:\\n- Events: mint ex:event-* and use rdf:type schema:Event + schema:name + schema:participant + time/location when present.\\n- New entities: mint ex:{kind}-{kebab-case} (lowercase, stable).\\n\\nTEXT:\\n{{text}}"
+		        }
+		      }
+		    },
     {
       "id": "node-6",
       "type": "json_schema",
@@ -136,10 +138,11 @@
 	                      "dcterms:publisher",
 	                      "dcterms:subject",
 	                      "schema:genre",
-	                      "schema:about",
-	                      "schema:mentions",
-	                      "dcterms:references",
-	                      "schema:sameAs",
+		                      "schema:about",
+		                      "schema:mentions",
+		                      "schema:knowsAbout",
+		                      "dcterms:references",
+		                      "schema:sameAs",
 	                      "schema:location",
 	                      "schema:temporalCoverage",
 	                      "schema:participant",
@@ -158,13 +161,20 @@
 	                      "skos:closeMatch",
 	                      "cito:supports",
 	                      "cito:disagreesWith",
-	                      "cito:usesDataFrom",
-	                      "cito:providesDataFor",
-	                      "cito:extends",
-	                      "cito:discusses",
-	                      "cito:confirms"
-	                    ]
-	                  },
+		                      "cito:usesDataFrom",
+		                      "cito:providesDataFor",
+		                      "cito:extends",
+		                      "cito:discusses",
+		                      "cito:confirms",
+
+		                      "schema:description",
+		                      "schema:creator",
+		                      "schema:hasParent",
+		                      "schema:hasMember",
+		                      "schema:hasMemorySource",
+		                      "schema:recognizedAs"
+		                    ]
+		                  },
 	                  "object": { "type": "string" },
 	                  "confidence": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
 	                  "valid_from": { "type": ["string", "null"] },
@@ -219,11 +229,11 @@
 		                          "schema:SoftwareSourceCode"
 		                        ]
 		                      },
-		                      "evidence_quote": { "type": "string" },
-		                      "original_context": { "type": "string" }
-		                    },
-	                    "required": ["subject_type", "object_type", "evidence_quote", "original_context"]
-	                  }
+				                      "evidence_quote": { "type": "string", "maxLength": 160 },
+				                      "original_context": { "type": "string", "maxLength": 280 }
+				                    },
+			                    "required": ["evidence_quote"]
+			                  }
 	                },
 	                "required": ["subject", "predicate", "object", "attributes"]
 	              }
@@ -247,11 +257,12 @@
           { "id": "include_context", "label": "use_context", "type": "boolean" },
           { "id": "provider", "label": "provider", "type": "provider" },
           { "id": "model", "label": "model", "type": "model" },
-          { "id": "temperature", "label": "temperature", "type": "number" },
-          { "id": "seed", "label": "seed", "type": "number" },
-          { "id": "system", "label": "system", "type": "string" },
-          { "id": "prompt", "label": "prompt", "type": "string" },
-          { "id": "tools", "label": "tools", "type": "tools" },
+	          { "id": "temperature", "label": "temperature", "type": "number" },
+	          { "id": "seed", "label": "seed", "type": "number" },
+	          { "id": "max_out_tokens", "label": "max_out_tokens", "type": "number" },
+	          { "id": "system", "label": "system", "type": "string" },
+	          { "id": "prompt", "label": "prompt", "type": "string" },
+	          { "id": "tools", "label": "tools", "type": "tools" },
           { "id": "response_schema", "label": "structured_output", "type": "object" }
         ],
         "outputs": [
@@ -374,9 +385,10 @@
     { "id": "edge-4", "source": "node-1", "sourceHandle": "domain_focus", "target": "node-4", "targetHandle": "value", "animated": false },
     { "id": "edge-5", "source": "node-4", "sourceHandle": "result", "target": "node-5", "targetHandle": "vars", "animated": false },
     { "id": "edge-6", "source": "node-5", "sourceHandle": "result", "target": "node-7", "targetHandle": "prompt", "animated": false },
-    { "id": "edge-7", "source": "node-1", "sourceHandle": "provider", "target": "node-7", "targetHandle": "provider", "animated": false },
-    { "id": "edge-8", "source": "node-1", "sourceHandle": "model", "target": "node-7", "targetHandle": "model", "animated": false },
-    { "id": "edge-9", "source": "node-6", "sourceHandle": "value", "target": "node-7", "targetHandle": "response_schema", "animated": false },
+	    { "id": "edge-7", "source": "node-1", "sourceHandle": "provider", "target": "node-7", "targetHandle": "provider", "animated": false },
+	    { "id": "edge-8", "source": "node-1", "sourceHandle": "model", "target": "node-7", "targetHandle": "model", "animated": false },
+	    { "id": "edge-8b", "source": "node-1", "sourceHandle": "max_out_tokens", "target": "node-7", "targetHandle": "max_out_tokens", "animated": false },
+	    { "id": "edge-9", "source": "node-6", "sourceHandle": "value", "target": "node-7", "targetHandle": "response_schema", "animated": false },
     { "id": "edge-10", "source": "node-1", "sourceHandle": "exec-out", "target": "node-7", "targetHandle": "exec-in", "animated": true },
 	    { "id": "edge-11", "source": "node-7", "sourceHandle": "result", "target": "node-8", "targetHandle": "object", "animated": false },
 	    { "id": "edge-12", "source": "node-8", "sourceHandle": "value", "target": "node-9", "targetHandle": "object", "animated": false },

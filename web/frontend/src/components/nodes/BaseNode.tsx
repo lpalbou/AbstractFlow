@@ -27,6 +27,7 @@ import {
   AGENT_META_SCHEMA,
   AGENT_RESULT_SCHEMA,
   AGENT_SCRATCHPAD_SCHEMA,
+  CONTEXT_EXTRA_SCHEMA,
   CONTEXT_SCHEMA,
   EVENT_ENVELOPE_SCHEMA,
   LLM_META_SCHEMA,
@@ -629,10 +630,10 @@ export const BaseNode = memo(function BaseNode({
       if (!n || depth > 6) return null;
       const nodeType = n.data?.nodeType;
       if (handle === 'context') return CONTEXT_SCHEMA;
+      if (handle === 'context_extra') return CONTEXT_EXTRA_SCHEMA;
       if (nodeType === 'make_context' && handle === 'context') return CONTEXT_SCHEMA;
       if (nodeType === 'make_meta' && handle === 'meta') return AGENT_META_SCHEMA;
       if (nodeType === 'make_scratchpad' && handle === 'scratchpad') return AGENT_SCRATCHPAD_SCHEMA;
-      if (nodeType === 'make_raw_result' && handle === 'result') return LLM_RESULT_SCHEMA;
       if (nodeType === 'on_event' && handle === 'event') return EVENT_ENVELOPE_SCHEMA;
       if (nodeType === 'agent') {
         if (handle === 'scratchpad') return AGENT_SCRATCHPAD_SCHEMA;

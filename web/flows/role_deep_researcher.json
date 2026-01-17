@@ -170,6 +170,16 @@
             "type": "execution"
           },
           {
+            "id": "use_context",
+            "label": "use_context",
+            "type": "boolean"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          },
+          {
             "id": "provider",
             "label": "provider",
             "type": "string"
@@ -193,6 +203,26 @@
             "id": "tools",
             "label": "tools",
             "type": "array"
+          },
+          {
+            "id": "max_in_tokens",
+            "label": "max_in_tokens",
+            "type": "number"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "object"
           }
         ],
         "outputs": [
@@ -207,14 +237,19 @@
             "type": "string"
           },
           {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
             "id": "tool_calls",
             "label": "tool_calls",
             "type": "array"
-          },
-          {
-            "id": "result",
-            "label": "result",
-            "type": "object"
           }
         ],
         "effectConfig": {
@@ -327,6 +362,16 @@
             "type": "execution"
           },
           {
+            "id": "use_context",
+            "label": "use_context",
+            "type": "boolean"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          },
+          {
             "id": "provider",
             "label": "provider",
             "type": "string"
@@ -337,17 +382,12 @@
             "type": "string"
           },
           {
-            "id": "max_iterations",
-            "label": "max_iterations",
-            "type": "number"
-          },
-          {
             "id": "system",
             "label": "system",
             "type": "string"
           },
           {
-            "id": "task",
+            "id": "prompt",
             "label": "prompt",
             "type": "string"
           },
@@ -357,8 +397,28 @@
             "type": "array"
           },
           {
-            "id": "context",
-            "label": "context",
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          },
+          {
+            "id": "max_in_tokens",
+            "label": "max_in_tokens",
+            "type": "number"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
             "type": "object"
           }
         ],
@@ -369,8 +429,18 @@
             "type": "execution"
           },
           {
-            "id": "result",
-            "label": "result",
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
             "type": "object"
           },
           {
@@ -388,44 +458,6 @@
           ],
           "system": "You are the DEEP RESEARCHER. Use tools when needed. Always cite sources. Be explicit about uncertainty.",
           "max_iterations": 40
-        }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
-      "id": "node-8",
-      "type": "break_object",
-      "position": {
-        "x": 864.0,
-        "y": 64.0
-      },
-      "data": {
-        "nodeType": "break_object",
-        "label": "Break Object",
-        "icon": "&#x1F9E9;",
-        "headerColor": "#34495E",
-        "inputs": [
-          {
-            "id": "object",
-            "label": "object",
-            "type": "object"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "result",
-            "label": "result",
-            "type": "string"
-          }
-        ],
-        "breakConfig": {
-          "selectedPaths": [
-            "result"
-          ]
         }
       },
       "label": null,
@@ -497,6 +529,16 @@
             "type": "execution"
           },
           {
+            "id": "use_context",
+            "label": "use_context",
+            "type": "boolean"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          },
+          {
             "id": "provider",
             "label": "provider",
             "type": "string"
@@ -520,6 +562,26 @@
             "id": "tools",
             "label": "tools",
             "type": "array"
+          },
+          {
+            "id": "max_in_tokens",
+            "label": "max_in_tokens",
+            "type": "number"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "object"
           }
         ],
         "outputs": [
@@ -534,14 +596,19 @@
             "type": "string"
           },
           {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
             "id": "tool_calls",
             "label": "tool_calls",
             "type": "array"
-          },
-          {
-            "id": "result",
-            "label": "result",
-            "type": "object"
           }
         ],
         "effectConfig": {
@@ -719,7 +786,7 @@
       "source": "node-6",
       "sourceHandle": "result",
       "target": "node-7",
-      "targetHandle": "task",
+      "targetHandle": "prompt",
       "animated": false
     },
     {
@@ -741,17 +808,17 @@
     {
       "id": "edge-19",
       "source": "node-7",
-      "sourceHandle": "result",
-      "target": "node-8",
-      "targetHandle": "object",
+      "sourceHandle": "response",
+      "target": "node-9",
+      "targetHandle": "b",
       "animated": false
     },
     {
       "id": "edge-20",
-      "source": "node-8",
-      "sourceHandle": "result",
-      "target": "node-9",
-      "targetHandle": "b",
+      "source": "node-7",
+      "sourceHandle": "response",
+      "target": "node-11",
+      "targetHandle": "dossier",
       "animated": false
     },
     {
@@ -792,14 +859,6 @@
       "sourceHandle": "response",
       "target": "node-11",
       "targetHandle": "report",
-      "animated": false
-    },
-    {
-      "id": "edge-26",
-      "source": "node-8",
-      "sourceHandle": "result",
-      "target": "node-11",
-      "targetHandle": "dossier",
       "animated": false
     },
     {

@@ -1079,8 +1079,8 @@
             "description": "Conversation messages list (context.messages)."
           },
           {
-            "id": "extra",
-            "label": "extra",
+            "id": "context_extra",
+            "label": "context_extra",
             "type": "object",
             "description": "Optional additional fields merged into the context (task/messages win)."
           }

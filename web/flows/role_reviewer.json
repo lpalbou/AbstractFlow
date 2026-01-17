@@ -320,6 +320,16 @@
             "type": "execution"
           },
           {
+            "id": "use_context",
+            "label": "use_context",
+            "type": "boolean"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          },
+          {
             "id": "provider",
             "label": "provider",
             "type": "string"
@@ -330,17 +340,12 @@
             "type": "string"
           },
           {
-            "id": "max_iterations",
-            "label": "max_iterations",
-            "type": "number"
-          },
-          {
             "id": "system",
             "label": "system",
             "type": "string"
           },
           {
-            "id": "task",
+            "id": "prompt",
             "label": "prompt",
             "type": "string"
           },
@@ -350,8 +355,28 @@
             "type": "array"
           },
           {
-            "id": "context",
-            "label": "context",
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          },
+          {
+            "id": "max_in_tokens",
+            "label": "max_in_tokens",
+            "type": "number"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
             "type": "object"
           }
         ],
@@ -362,8 +387,18 @@
             "type": "execution"
           },
           {
-            "id": "result",
-            "label": "result",
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
             "type": "object"
           },
           {
@@ -380,44 +415,6 @@
         },
         "pinDefaults": {
           "system": "You are an expert code reviewer. Be strict, evidence-driven, and run tests."
-        }
-      },
-      "label": null,
-      "icon": null,
-      "headerColor": null,
-      "inputs": [],
-      "outputs": []
-    },
-    {
-      "id": "node-8",
-      "type": "break_object",
-      "position": {
-        "x": 160.0,
-        "y": 64.0
-      },
-      "data": {
-        "nodeType": "break_object",
-        "label": "Break Object",
-        "icon": "&#x1F9E9;",
-        "headerColor": "#3498DB",
-        "inputs": [
-          {
-            "id": "object",
-            "label": "object",
-            "type": "object"
-          }
-        ],
-        "outputs": [
-          {
-            "id": "result",
-            "label": "result",
-            "type": "string"
-          }
-        ],
-        "breakConfig": {
-          "selectedPaths": [
-            "result"
-          ]
         }
       },
       "label": null,
@@ -537,8 +534,8 @@
             "type": "object"
           },
           {
-            "id": "raw_result",
-            "label": "raw_result",
+            "id": "response",
+            "label": "response",
             "type": "string"
           },
           {
@@ -666,7 +663,7 @@
       "source": "node-5",
       "sourceHandle": "result",
       "target": "node-7",
-      "targetHandle": "task",
+      "targetHandle": "prompt",
       "animated": false
     },
     {
@@ -680,15 +677,7 @@
     {
       "id": "edge-16",
       "source": "node-7",
-      "sourceHandle": "result",
-      "target": "node-8",
-      "targetHandle": "object",
-      "animated": false
-    },
-    {
-      "id": "edge-17",
-      "source": "node-8",
-      "sourceHandle": "result",
+      "sourceHandle": "response",
       "target": "node-9",
       "targetHandle": "text",
       "animated": false
@@ -727,10 +716,10 @@
     },
     {
       "id": "edge-22",
-      "source": "node-8",
-      "sourceHandle": "result",
+      "source": "node-7",
+      "sourceHandle": "response",
       "target": "node-11",
-      "targetHandle": "raw_result",
+      "targetHandle": "response",
       "animated": false
     },
     {

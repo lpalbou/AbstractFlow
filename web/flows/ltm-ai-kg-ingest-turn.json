@@ -48,19 +48,25 @@
             "label": "span_id",
             "type": "string"
           },
-          {
-            "id": "domain_focus",
-            "label": "domain_focus",
-            "type": "string"
-          }
-        ],
-        "pinDefaults": {
-          "provider": "lmstudio",
-          "model": "qwen/qwen3-next-80b",
-          "scope": "session",
-          "domain_focus": "software / agents / memory systems"
-        }
-      },
+	          {
+	            "id": "domain_focus",
+	            "label": "domain_focus",
+	            "type": "string"
+	          },
+	          {
+	            "id": "max_out_tokens",
+	            "label": "max_out_tokens",
+	            "type": "number"
+	          }
+	        ],
+	        "pinDefaults": {
+	          "provider": "lmstudio",
+	          "model": "qwen/qwen3-next-80b",
+	          "scope": "session",
+	          "domain_focus": "software / agents / memory systems",
+	          "max_out_tokens": 500
+	        }
+	      },
       "label": null,
       "icon": null,
       "headerColor": null,
@@ -233,9 +239,9 @@
       "inputs": [],
       "outputs": []
     },
-    {
-      "id": "node-6",
-      "type": "set",
+	    {
+	      "id": "node-6",
+	      "type": "set",
       "position": {
         "x": 1040.0,
         "y": 288.0
@@ -278,10 +284,56 @@
       "headerColor": null,
       "inputs": [],
       "outputs": []
-    },
-    {
-      "id": "node-7",
-      "type": "subflow",
+	    },
+	    {
+	      "id": "node-11",
+	      "type": "set",
+	      "position": {
+	        "x": 1280.0,
+	        "y": 288.0
+	      },
+	      "data": {
+	        "nodeType": "set",
+	        "label": "Set max_out_tokens",
+	        "icon": "&#x1F4E4;",
+	        "headerColor": "#3498DB",
+	        "inputs": [
+	          {
+	            "id": "object",
+	            "label": "object",
+	            "type": "object"
+	          },
+	          {
+	            "id": "key",
+	            "label": "key",
+	            "type": "string"
+	          },
+	          {
+	            "id": "value",
+	            "label": "value",
+	            "type": "any"
+	          }
+	        ],
+	        "outputs": [
+	          {
+	            "id": "result",
+	            "label": "result",
+	            "type": "object"
+	          }
+	        ],
+	        "pinDefaults": {
+	          "key": "max_out_tokens"
+	        }
+	      },
+	      "label": null,
+	      "icon": null,
+	      "headerColor": null,
+	      "inputs": [],
+	      "outputs": []
+	    },
+	    {
+	      "id": "node-7",
+	      "type": "subflow",
       "position": {
         "x": 1280.0,
         "y": 128.0
@@ -572,14 +624,30 @@
       "targetHandle": "value",
       "animated": false
     },
-    {
-      "id": "edge-9",
-      "source": "node-6",
-      "sourceHandle": "result",
-      "target": "node-7",
-      "targetHandle": "input",
-      "animated": false
-    },
+	    {
+	      "id": "edge-9",
+	      "source": "node-6",
+	      "sourceHandle": "result",
+	      "target": "node-11",
+	      "targetHandle": "object",
+	      "animated": false
+	    },
+	    {
+	      "id": "edge-9b",
+	      "source": "node-1",
+	      "sourceHandle": "max_out_tokens",
+	      "target": "node-11",
+	      "targetHandle": "value",
+	      "animated": false
+	    },
+	    {
+	      "id": "edge-9c",
+	      "source": "node-11",
+	      "sourceHandle": "result",
+	      "target": "node-7",
+	      "targetHandle": "input",
+	      "animated": false
+	    },
     {
       "id": "edge-10",
       "source": "node-1",

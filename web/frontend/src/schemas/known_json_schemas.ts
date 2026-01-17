@@ -98,7 +98,7 @@ const ATTACHMENT_SCHEMA: JsonSchema = {
   additionalProperties: true,
 };
 
-const CONTEXT_EXTRA_SCHEMA: JsonSchema = {
+export const CONTEXT_EXTRA_SCHEMA: JsonSchema = {
   type: 'object',
   title: 'Context Extra',
   description: 'Extra context fields beyond task/messages (host-defined; safe to treat as opaque).',

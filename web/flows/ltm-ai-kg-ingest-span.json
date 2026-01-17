@@ -14,26 +14,28 @@
         "icon": "&#x1F3C1;",
         "headerColor": "#C0392B",
         "inputs": [],
-        "outputs": [
-          { "id": "exec-out", "label": "", "type": "execution" },
-          { "id": "provider", "label": "provider", "type": "provider" },
-          { "id": "model", "label": "model", "type": "model" },
-          { "id": "span_id", "label": "span_id", "type": "string" },
-          { "id": "scope", "label": "scope", "type": "string" },
-          { "id": "domain_focus", "label": "domain_focus", "type": "string" },
-          { "id": "max_messages", "label": "max_messages", "type": "number" },
-          { "id": "max_input_tokens", "label": "max_input_tokens", "type": "number" }
-        ],
-        "pinDefaults": {
-          "provider": "lmstudio",
-          "model": "qwen/qwen3-next-80b",
-          "scope": "session",
-          "domain_focus": "software / agents / memory systems",
-          "max_messages": 80,
-          "max_input_tokens": 12000
-        }
-      }
-    },
+	        "outputs": [
+	          { "id": "exec-out", "label": "", "type": "execution" },
+	          { "id": "provider", "label": "provider", "type": "provider" },
+	          { "id": "model", "label": "model", "type": "model" },
+	          { "id": "span_id", "label": "span_id", "type": "string" },
+	          { "id": "scope", "label": "scope", "type": "string" },
+	          { "id": "domain_focus", "label": "domain_focus", "type": "string" },
+	          { "id": "max_messages", "label": "max_messages", "type": "number" },
+	          { "id": "max_input_tokens", "label": "max_input_tokens", "type": "number" },
+	          { "id": "max_out_tokens", "label": "max_out_tokens", "type": "number" }
+	        ],
+		        "pinDefaults": {
+		          "provider": "lmstudio",
+		          "model": "qwen/qwen3-next-80b",
+		          "scope": "session",
+		          "domain_focus": "software / agents / memory systems",
+		          "max_messages": 80,
+		          "max_input_tokens": 12000,
+		          "max_out_tokens": 500
+		        }
+		      }
+		    },
     {
       "id": "node-2",
       "type": "get_var",
@@ -190,10 +192,10 @@
         ],
 	        "outputs": [{ "id": "result", "label": "result", "type": "string" }],
 	        "pinDefaults": {
-	          "template": "You are a semantic triple writer for an AI long-term memory system.\\n\\nGoal: extract high-signal, append-only assertions (subject-predicate-object) from the conversation content recalled into CONTEXT (context.messages).\\n\\nDomain focus: {{domain_focus}}\\n\\nRules:\\n- Output ONLY what is directly supported by CONTEXT (no external knowledge).\\n- Output MUST match the enforced structured-output schema.\\n- Predicates MUST be one of the allowed CURIEs in the schema (do not invent new ones).\\n- Typing: when adding attributes.subject_type/object_type, use a minimal, widely adopted type such as schema:Thing, schema:Person, schema:Organization, schema:Event, schema:Place, skos:Concept, dcterms:Text.\\n- IDs: prefer CURIEs for known entities. For new entities, mint stable ids as ex:{kind}-{kebab-case} (lowercase, no spaces).\\n- Prefer 5-15 assertions (max 30). If CONTEXT contains any concrete facts/entities, do not return an empty list."
-	        }
-	      }
-	    },
+		          "template": "You are a semantic extractor for an AI long-term memory system.\\n\\nTask: extract a small set of high-signal, append-only assertions (subject-predicate-object) supported by the recalled CONTEXT (context.messages).\\nDomain focus: {{domain_focus}}\\n\\nRules:\\n- Only assert what CONTEXT directly states (no external knowledge).\\n- Output MUST match the enforced structured-output schema.\\n- Use ONLY predicates from the schema enum (do not invent new ones).\\n- Prefer 6-10 assertions (max 12). If CONTEXT contains no concrete facts (only instructions/requests), it is OK to return an empty list."
+		        }
+		      }
+		    },
     {
       "id": "node-11",
       "type": "json_schema",
@@ -255,16 +257,24 @@
 	                      "skos:closeMatch",
 	                      "cito:supports",
 	                      "cito:disagreesWith",
-	                      "cito:usesDataFrom",
-	                      "cito:providesDataFor",
-	                      "cito:extends",
-	                      "cito:discusses",
-	                      "cito:confirms"
-	                    ]
-	                  },
-                  "object": { "type": "string" },
-                  "confidence": { "type": "number" },
-                  "valid_from": { "type": "string" },
+		                      "cito:usesDataFrom",
+		                      "cito:providesDataFor",
+		                      "cito:extends",
+		                      "cito:discusses",
+		                      "cito:confirms",
+
+		                      "schema:description",
+		                      "schema:creator",
+		                      "schema:hasParent",
+			                      "schema:hasMember",
+			                      "schema:hasMemorySource",
+			                      "schema:recognizedAs",
+			                      "schema:knowsAbout"
+			                    ]
+			                  },
+	                  "object": { "type": "string" },
+	                  "confidence": { "type": "number" },
+	                  "valid_from": { "type": "string" },
                   "valid_until": { "type": "string" },
                   "provenance": { "type": "object" },
                   "attributes": { "type": "object" }
@@ -292,11 +302,12 @@
           { "id": "max_input_tokens", "label": "max_input_tokens", "type": "number" },
           { "id": "provider", "label": "provider", "type": "provider" },
           { "id": "model", "label": "model", "type": "model" },
-          { "id": "temperature", "label": "temperature", "type": "number" },
-          { "id": "seed", "label": "seed", "type": "number" },
-          { "id": "system", "label": "system", "type": "string" },
-          { "id": "prompt", "label": "prompt", "type": "string" },
-          { "id": "tools", "label": "tools", "type": "tools" },
+	          { "id": "temperature", "label": "temperature", "type": "number" },
+	          { "id": "seed", "label": "seed", "type": "number" },
+	          { "id": "max_out_tokens", "label": "max_out_tokens", "type": "number" },
+	          { "id": "system", "label": "system", "type": "string" },
+	          { "id": "prompt", "label": "prompt", "type": "string" },
+	          { "id": "tools", "label": "tools", "type": "tools" },
           { "id": "response_schema", "label": "structured_output", "type": "object" }
         ],
         "outputs": [
@@ -441,10 +452,11 @@
     { "id": "edge-13", "source": "node-9", "sourceHandle": "result", "target": "node-10", "targetHandle": "vars", "animated": false },
     { "id": "edge-14", "source": "node-10", "sourceHandle": "result", "target": "node-12", "targetHandle": "prompt", "animated": false },
     { "id": "edge-15", "source": "node-11", "sourceHandle": "value", "target": "node-12", "targetHandle": "response_schema", "animated": false },
-    { "id": "edge-16", "source": "node-1", "sourceHandle": "provider", "target": "node-12", "targetHandle": "provider", "animated": false },
-    { "id": "edge-17", "source": "node-1", "sourceHandle": "model", "target": "node-12", "targetHandle": "model", "animated": false },
-    { "id": "edge-18", "source": "node-1", "sourceHandle": "max_input_tokens", "target": "node-12", "targetHandle": "max_input_tokens", "animated": false },
-    { "id": "edge-19", "source": "node-12", "sourceHandle": "result", "target": "node-13", "targetHandle": "object", "animated": false },
+	    { "id": "edge-16", "source": "node-1", "sourceHandle": "provider", "target": "node-12", "targetHandle": "provider", "animated": false },
+	    { "id": "edge-17", "source": "node-1", "sourceHandle": "model", "target": "node-12", "targetHandle": "model", "animated": false },
+	    { "id": "edge-18", "source": "node-1", "sourceHandle": "max_input_tokens", "target": "node-12", "targetHandle": "max_input_tokens", "animated": false },
+	    { "id": "edge-18b", "source": "node-1", "sourceHandle": "max_out_tokens", "target": "node-12", "targetHandle": "max_out_tokens", "animated": false },
+	    { "id": "edge-19", "source": "node-12", "sourceHandle": "result", "target": "node-13", "targetHandle": "object", "animated": false },
     { "id": "edge-20", "source": "node-13", "sourceHandle": "value", "target": "node-14", "targetHandle": "object", "animated": false },
     { "id": "edge-21", "source": "node-12", "sourceHandle": "exec-out", "target": "node-15", "targetHandle": "exec-in", "animated": true },
     { "id": "edge-22", "source": "node-14", "sourceHandle": "value", "target": "node-15", "targetHandle": "assertions", "animated": false },

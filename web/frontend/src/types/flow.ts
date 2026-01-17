@@ -83,7 +83,7 @@ export type NodeType =
   | 'make_object'
   | 'get_element'
   | 'get_random_element'
-  | 'make_context' | 'make_meta' | 'make_scratchpad' | 'make_raw_result'
+  | 'make_context' | 'make_meta' | 'make_scratchpad'
   | 'add_message'
   | 'has_tools'
   | 'get_context'

@@ -146,6 +146,16 @@
             "type": "execution"
           },
           {
+            "id": "use_context",
+            "label": "use_context",
+            "type": "boolean"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          },
+          {
             "id": "provider",
             "label": "provider",
             "type": "string"
@@ -169,6 +179,26 @@
             "id": "tools",
             "label": "tools",
             "type": "array"
+          },
+          {
+            "id": "max_in_tokens",
+            "label": "max_in_tokens",
+            "type": "number"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "object"
           }
         ],
         "outputs": [
@@ -183,9 +213,19 @@
             "type": "string"
           },
           {
-            "id": "result",
-            "label": "result",
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
             "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
           }
         ],
         "effectConfig": {
