@@ -144,16 +144,16 @@
             "description": "Optional explicit owner id override (advanced; normally derived from scope)."
           },
           {
-            "id": "min_score",
-            "label": "min_score",
-            "type": "number",
-            "description": "Optional cosine similarity threshold (semantic query_text only). Range ~[-1..1]; start with 0.2–0.4."
-          },
-          {
             "id": "limit",
             "label": "limit",
             "type": "number",
             "description": "Max assertions to return (default 100)."
+          },
+          {
+            "id": "min_score",
+            "label": "min_score",
+            "type": "number",
+            "description": "Optional cosine similarity threshold (semantic query_text only). Range ~[-1..1]; start with 0.2–0.4."
           }
         ],
         "outputs": [
@@ -418,5 +418,5 @@
   ],
   "entryNode": "node-1",
   "created_at": null,
-  "updated_at": "2026-01-12T23:38:26.452319"
+  "updated_at": "2026-01-17T07:45:36.934942"
 }

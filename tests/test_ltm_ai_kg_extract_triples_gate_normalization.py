@@ -45,4 +45,3 @@ def test_gate_assertions_canonicalizes_terms_and_aliases_predicates() -> None:
     assert out[0]["predicate"] == "dcterms:creator"
     assert out[0]["object"] == "doctor noonien soong"
     assert out[1]["predicate"] == "schema:knowsabout"
-

@@ -9,6 +9,7 @@ semantics engine across the framework.
 from __future__ import annotations
 
 import os
+import hashlib
 import threading
 from typing import Any, Dict, Optional, cast
 
@@ -20,8 +21,49 @@ from .models import VisualFlow
 
 
 _MEMORY_KG_STORE_CACHE_LOCK = threading.Lock()
-# Keyed by (store_base_dir, gateway_url).
-_MEMORY_KG_STORE_CACHE: dict[tuple[str, str], Any] = {}
+# Keyed by (store_base_dir, gateway_url, token_fingerprint).
+#
+# Why include the token fingerprint:
+# - The embedder captures the auth token at construction time.
+# - The UI can set/update the token at runtime (without restarting the backend).
+# - If we didn't key by token, we'd keep using a cached store with a stale token and get 401s.
+_MEMORY_KG_STORE_CACHE: dict[tuple[str, str, str], Any] = {}
+
+def _resolve_gateway_auth_token() -> str | None:
+    """Resolve the gateway auth token for host-to-gateway calls.
+
+    Canonical env vars:
+    - ABSTRACTGATEWAY_AUTH_TOKEN
+    - ABSTRACTFLOW_GATEWAY_AUTH_TOKEN (legacy compatibility)
+
+    Additional host fallbacks:
+    - ABSTRACTCODE_GATEWAY_TOKEN (AbstractCode CLI convention)
+    - ABSTRACTGATEWAY_AUTH_TOKENS / ABSTRACTFLOW_GATEWAY_AUTH_TOKENS (first token)
+    """
+    candidates = [
+        "ABSTRACTGATEWAY_AUTH_TOKEN",
+        "ABSTRACTFLOW_GATEWAY_AUTH_TOKEN",
+        "ABSTRACTCODE_GATEWAY_TOKEN",
+    ]
+    for name in candidates:
+        raw = os.getenv(name)
+        token = str(raw or "").strip()
+        if token:
+            return token
+
+    token_lists = [
+        "ABSTRACTGATEWAY_AUTH_TOKENS",
+        "ABSTRACTFLOW_GATEWAY_AUTH_TOKENS",
+    ]
+    for name in token_lists:
+        raw = os.getenv(name)
+        if not isinstance(raw, str) or not raw.strip():
+            continue
+        first = raw.split(",", 1)[0].strip()
+        if first:
+            return first
+
+    return None
 
 
 def create_visual_runner(
@@ -502,7 +544,7 @@ def create_visual_runner(
         gateway_url = str(os.getenv("ABSTRACTFLOW_GATEWAY_URL") or os.getenv("ABSTRACTGATEWAY_URL") or "").strip()
         if not gateway_url:
             gateway_url = "http://127.0.0.1:8081"
-        auth_token = str(os.getenv("ABSTRACTGATEWAY_AUTH_TOKEN") or os.getenv("ABSTRACTFLOW_GATEWAY_AUTH_TOKEN") or "").strip() or None
+        auth_token = _resolve_gateway_auth_token()
         # Deterministic/offline mode:
         # - When embeddings are explicitly disabled, allow LanceDB to operate in pattern-only mode.
         # - Vector search (query_text) will raise in the store when no embedder is configured.
@@ -522,7 +564,13 @@ def create_visual_runner(
             )
 
         base_dir.mkdir(parents=True, exist_ok=True)
-        cache_key = (str(base_dir), gateway_url if embedder is not None else "__embeddings_disabled__")
+        token_fingerprint = "embeddings_disabled"
+        if embedder is not None:
+            if auth_token:
+                token_fingerprint = hashlib.sha256(auth_token.encode("utf-8")).hexdigest()[:12]
+            else:
+                token_fingerprint = "missing_token"
+        cache_key = (str(base_dir), gateway_url if embedder is not None else "__embeddings_disabled__", token_fingerprint)
         with _MEMORY_KG_STORE_CACHE_LOCK:
             store_obj = _MEMORY_KG_STORE_CACHE.get(cache_key)
         if store_obj is None:

@@ -20,6 +20,8 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--reload", action="store_true", help="Enable auto-reload (dev)")
     p.add_argument("--log-level", default=os.getenv("LOG_LEVEL", "info"))
     p.add_argument("--monitor-gpu", action="store_true", help="Show the small GPU widget in the UI")
+    p.add_argument("--gateway-url", default=os.getenv("ABSTRACTFLOW_GATEWAY_URL") or os.getenv("ABSTRACTGATEWAY_URL") or "")
+    p.add_argument("--gateway-token", default=os.getenv("ABSTRACTFLOW_GATEWAY_AUTH_TOKEN") or os.getenv("ABSTRACTGATEWAY_AUTH_TOKEN") or os.getenv("ABSTRACTCODE_GATEWAY_TOKEN") or "")
     return p.parse_args(argv)
 
 
@@ -28,6 +30,13 @@ def main(argv: list[str] | None = None) -> None:
 
     if args.monitor_gpu:
         os.environ["ABSTRACTFLOW_MONITOR_GPU"] = "1"
+
+    if isinstance(args.gateway_url, str) and args.gateway_url.strip():
+        os.environ.setdefault("ABSTRACTFLOW_GATEWAY_URL", args.gateway_url.strip())
+    if isinstance(args.gateway_token, str) and args.gateway_token.strip():
+        # Canonical name is ABSTRACTGATEWAY_AUTH_TOKEN; keep legacy var for older callers.
+        os.environ.setdefault("ABSTRACTGATEWAY_AUTH_TOKEN", args.gateway_token.strip())
+        os.environ.setdefault("ABSTRACTFLOW_GATEWAY_AUTH_TOKEN", args.gateway_token.strip())
 
     uvicorn.run(
         "backend.main:app",
@@ -40,4 +49,3 @@ def main(argv: list[str] | None = None) -> None:
 
 if __name__ == "__main__":
     main()
-

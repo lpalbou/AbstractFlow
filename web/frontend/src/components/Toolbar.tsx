@@ -12,6 +12,7 @@ import { RunHistoryModal } from './RunHistoryModal';
 import { UserPromptModal } from './UserPromptModal';
 import { FlowLibraryModal } from './FlowLibraryModal';
 import { PublishFlowModal } from './PublishFlowModal';
+import { GatewayConnectionModal } from './GatewayConnectionModal';
 import type { ExecutionEvent, FlowRunResult, VisualFlow, RunHistoryResponse, RunSummary } from '../types/flow';
 import { computeRunPreflightIssues } from '../utils/preflight';
 
@@ -160,6 +161,7 @@ export function Toolbar() {
   const [showFlowLibrary, setShowFlowLibrary] = useState(false);
   const [showRunHistory, setShowRunHistory] = useState(false);
   const [showPublishModal, setShowPublishModal] = useState(false);
+  const [showConnectionModal, setShowConnectionModal] = useState(false);
   const [runResult, setRunResult] = useState<FlowRunResult | null>(null);
   const [executionEvents, setExecutionEvents] = useState<ExecutionEvent[]>([]);
   const [traceEvents, setTraceEvents] = useState<ExecutionEvent[]>([]);
@@ -622,6 +624,15 @@ export function Toolbar() {
           📥 Import
         </button>
 
+        <button
+          className="toolbar-button"
+          onClick={() => setShowConnectionModal(true)}
+          title="Configure gateway connection (embeddings/token)"
+          aria-label="Open connection settings"
+        >
+          🔌 Connect
+        </button>
+
         {/* Status indicator */}
         <div className="toolbar-status">
           <span
@@ -638,6 +649,8 @@ export function Toolbar() {
           </span>
         </div>
       </div>
+
+      <GatewayConnectionModal isOpen={showConnectionModal} onClose={() => setShowConnectionModal(false)} />
 
       {/* Smart Run Modal */}
       {(() => {
