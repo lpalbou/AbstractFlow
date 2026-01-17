@@ -995,27 +995,30 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                         wantInput({ id: 'placement', label: 'placement', type: 'string' }),
                         wantInput({ id: 'max_messages', label: 'max_messages', type: 'number' }),
                       ]
-                    : data.nodeType === 'memory_kg_assert'
-                      ? [
-                          wantInput({ id: 'exec-in', label: '', type: 'execution' }),
-                          wantInput({ id: 'assertions', label: 'assertions', type: 'array' }),
-                          wantInput({ id: 'scope', label: 'scope', type: 'string' }),
-                          wantInput({ id: 'span_id', label: 'span_id', type: 'string' }),
-                          wantInput({ id: 'owner_id', label: 'owner_id', type: 'string' }),
-                        ]
-                      : [
-                          wantInput({ id: 'exec-in', label: '', type: 'execution' }),
-                          wantInput({ id: 'query_text', label: 'query_text', type: 'string' }),
-                          wantInput({ id: 'subject', label: 'subject', type: 'string' }),
-                          wantInput({ id: 'predicate', label: 'predicate', type: 'string' }),
-                          wantInput({ id: 'object', label: 'object', type: 'string' }),
-                          wantInput({ id: 'since', label: 'since', type: 'string' }),
-                          wantInput({ id: 'until', label: 'until', type: 'string' }),
-                          wantInput({ id: 'active_at', label: 'active_at', type: 'string' }),
-                          wantInput({ id: 'scope', label: 'scope', type: 'string' }),
-                          wantInput({ id: 'owner_id', label: 'owner_id', type: 'string' }),
-                          wantInput({ id: 'limit', label: 'limit', type: 'number' }),
-                        ];
+	                    : data.nodeType === 'memory_kg_assert'
+	                      ? [
+	                          wantInput({ id: 'exec-in', label: '', type: 'execution' }),
+	                          wantInput({ id: 'assertions', label: 'assertions', type: 'assertions' }),
+	                          wantInput({ id: 'scope', label: 'scope', type: 'string' }),
+	                          wantInput({ id: 'span_id', label: 'span_id', type: 'string' }),
+	                          wantInput({ id: 'owner_id', label: 'owner_id', type: 'string' }),
+	                        ]
+	                    : [
+	                          wantInput({ id: 'exec-in', label: '', type: 'execution' }),
+	                          wantInput({ id: 'query_text', label: 'query_text', type: 'string' }),
+	                          wantInput({ id: 'subject', label: 'subject', type: 'string' }),
+	                          wantInput({ id: 'predicate', label: 'predicate', type: 'string' }),
+	                          wantInput({ id: 'object', label: 'object', type: 'string' }),
+	                          wantInput({ id: 'since', label: 'since', type: 'string' }),
+	                          wantInput({ id: 'until', label: 'until', type: 'string' }),
+	                          wantInput({ id: 'active_at', label: 'active_at', type: 'string' }),
+	                          wantInput({ id: 'scope', label: 'scope', type: 'string' }),
+	                          wantInput({ id: 'owner_id', label: 'owner_id', type: 'string' }),
+	                          wantInput({ id: 'min_score', label: 'min_score', type: 'number' }),
+	                          wantInput({ id: 'max_input_tokens', label: 'max_input_tokens', type: 'number' }),
+	                          wantInput({ id: 'model', label: 'model', type: 'model' }),
+	                          wantInput({ id: 'limit', label: 'limit', type: 'number' }),
+	                        ];
 
         const inputExtras = existingInputs.filter((p) => !usedInputs.has(p.id));
 
@@ -1060,19 +1063,25 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                         wantOutput({ id: 'inserted', label: 'inserted', type: 'number' }),
                         wantOutput({ id: 'skipped', label: 'skipped', type: 'number' }),
                       ]
-                    : data.nodeType === 'memory_kg_assert'
-                      ? [
-                          wantOutput({ id: 'exec-out', label: '', type: 'execution' }),
-                          wantOutput({ id: 'assertion_ids', label: 'assertion_ids', type: 'array' }),
-                          wantOutput({ id: 'count', label: 'count', type: 'number' }),
-                          wantOutput({ id: 'ok', label: 'ok', type: 'boolean' }),
-                        ]
-                      : [
-                          wantOutput({ id: 'exec-out', label: '', type: 'execution' }),
-                          wantOutput({ id: 'items', label: 'items', type: 'array' }),
-                          wantOutput({ id: 'count', label: 'count', type: 'number' }),
-                          wantOutput({ id: 'ok', label: 'ok', type: 'boolean' }),
-                        ];
+	                    : data.nodeType === 'memory_kg_assert'
+	                      ? [
+	                          wantOutput({ id: 'exec-out', label: '', type: 'execution' }),
+	                          wantOutput({ id: 'assertion_ids', label: 'assertion_ids', type: 'array' }),
+	                          wantOutput({ id: 'count', label: 'count', type: 'number' }),
+	                          wantOutput({ id: 'ok', label: 'ok', type: 'boolean' }),
+	                        ]
+	                      : [
+	                          wantOutput({ id: 'exec-out', label: '', type: 'execution' }),
+	                          wantOutput({ id: 'items', label: 'items', type: 'assertions' }),
+	                          wantOutput({ id: 'count', label: 'count', type: 'number' }),
+	                          wantOutput({ id: 'ok', label: 'ok', type: 'boolean' }),
+	                          wantOutput({ id: 'packets', label: 'packets', type: 'array' }),
+	                          wantOutput({ id: 'active_memory_text', label: 'active_memory_text', type: 'string' }),
+	                          wantOutput({ id: 'packed_count', label: 'packed_count', type: 'number' }),
+	                          wantOutput({ id: 'dropped', label: 'dropped', type: 'number' }),
+	                          wantOutput({ id: 'estimated_tokens', label: 'estimated_tokens', type: 'number' }),
+	                          wantOutput({ id: 'raw', label: 'raw', type: 'object' }),
+	                        ];
 
         const outputExtras = existingOutputs.filter((p) => !usedOutputs.has(p.id));
 

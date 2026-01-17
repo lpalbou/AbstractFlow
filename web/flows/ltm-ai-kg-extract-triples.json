@@ -111,6 +111,7 @@
         "inputs": [],
 	        "outputs": [{ "id": "value", "label": "schema", "type": "object" }],
 	        "literalValue": {
+	          "$ref": "abstractsemantics:kg_assertion_schema_v0",
 	          "type": "object",
 	          "properties": {
 	            "assertions": {
@@ -370,7 +371,7 @@
         "headerColor": "#C0392B",
         "inputs": [
           { "id": "exec-in", "label": "", "type": "execution" },
-          { "id": "assertions", "label": "assertions", "type": "array" },
+          { "id": "assertions", "label": "assertions", "type": "assertions" },
           { "id": "extraction", "label": "extraction", "type": "object" },
           { "id": "raw", "label": "raw", "type": "string" }
         ],

@@ -42,6 +42,7 @@ export function PinShape({ type, size = 12, filled = false }: PinShapeProps) {
 
     case 'array':
     case 'tools':
+    case 'assertions':
       // Square
       return (
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>

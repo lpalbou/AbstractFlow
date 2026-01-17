@@ -415,8 +415,8 @@ export function RunFlowModal({
           initialValues[pin.id] = raw;
           return;
         }
-        // Objects/arrays (render as JSON in textarea pins).
-        if (pin.type === 'object' || pin.type === 'array') {
+        // Objects/arrays/assertions (render as JSON in textarea pins).
+        if (pin.type === 'object' || pin.type === 'array' || pin.type === 'assertion' || pin.type === 'assertions') {
           try {
             initialValues[pin.id] = JSON.stringify(raw, null, 2);
             return;
@@ -487,10 +487,16 @@ export function RunFlowModal({
           break;
         case 'object':
         case 'array':
+        case 'assertion':
+        case 'assertions':
           try {
-            inputData[pin.id] = JSON.parse(value || (pin.type === 'array' ? '[]' : '{}'));
+            const defaultJson =
+              pin.type === 'array' || pin.type === 'assertions'
+                ? '[]'
+                : '{}';
+            inputData[pin.id] = JSON.parse(value || defaultJson);
           } catch {
-            inputData[pin.id] = pin.type === 'array' ? [] : {};
+            inputData[pin.id] = pin.type === 'array' || pin.type === 'assertions' ? [] : {};
           }
           break;
         default:

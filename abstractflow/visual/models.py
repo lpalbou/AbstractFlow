@@ -24,6 +24,7 @@ class PinType(str, Enum):
     BOOLEAN = "boolean"  # Red #FF0000 - True/False
     OBJECT = "object"  # Cyan #00FFFF - JSON objects
     ASSERTION = "assertion"  # Teal - KG assertion object (subject/predicate/object + metadata)
+    ASSERTIONS = "assertions"  # Teal - List of KG assertion objects (assertion[])
     ARRAY = "array"  # Orange #FF8800 - Collections
     TOOLS = "tools"  # Orange - Tool allowlist (string[])
     PROVIDER = "provider"  # Cyan-blue - LLM provider id/name (string-like)

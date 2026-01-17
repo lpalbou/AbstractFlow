@@ -928,6 +928,16 @@ const LITERAL_NODES: NodeTemplate[] = [
     category: 'literals',
   },
   {
+    type: 'literal_array',
+    icon: '&#x1F9E0;', // Brain (semantic list)
+    label: 'Assertions',
+    description: 'KG assertion list literal value (assertion[]).',
+    headerColor: '#00B8D4', // Assertion pin color
+    inputs: [],
+    outputs: [{ id: 'value', label: 'assertions', type: 'assertions' }],
+    category: 'literals',
+  },
+  {
     type: 'json_schema',
 	    icon: '&#x1F4CB;', // Clipboard
 	    label: 'JSON Schema',
@@ -1189,13 +1199,21 @@ const MEMORY_NODES: NodeTemplate[] = [
       { id: 'scope', label: 'scope', type: 'string', description: 'run | session | global | all (fan-out over run+session+global).' },
       { id: 'owner_id', label: 'owner_id', type: 'string', description: 'Optional explicit owner id override (advanced; normally derived from scope).' },
       { id: 'min_score', label: 'min_score', type: 'number', description: 'Optional cosine similarity threshold (semantic query_text only). Range ~[-1..1]; start with 0.2–0.4.' },
+      { id: 'max_input_tokens', label: 'max_input_tokens', type: 'number', description: 'Optional token budget for Active Memory packing (KG → prompt). If set, returns active_memory_text + packets.' },
+      { id: 'model', label: 'model', type: 'model', description: 'Optional model id used for token estimation (improves budgeting accuracy).' },
       { id: 'limit', label: 'limit', type: 'number', description: 'Max assertions to return (default 100).' },
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
-      { id: 'items', label: 'items', type: 'array', description: 'List of triple assertions (dicts).' },
+      { id: 'items', label: 'items', type: 'assertions', description: 'List of triple assertions (dicts).' },
       { id: 'count', label: 'count', type: 'number', description: 'Number of returned assertions.' },
       { id: 'ok', label: 'ok', type: 'boolean', description: 'True when query succeeded.' },
+      { id: 'packets', label: 'packets', type: 'array', description: 'Packed Memory Packets (v0) for Active Memory injection (when max_input_tokens is set).' },
+      { id: 'active_memory_text', label: 'active_memory_text', type: 'string', description: 'Token-budgeted Active Memory block (when max_input_tokens is set).' },
+      { id: 'packed_count', label: 'packed_count', type: 'number', description: 'Number of packets included in active_memory_text.' },
+      { id: 'dropped', label: 'dropped', type: 'number', description: 'Packets dropped due to the Active Memory token budget.' },
+      { id: 'estimated_tokens', label: 'estimated_tokens', type: 'number', description: 'Estimated token count of active_memory_text.' },
+      { id: 'raw', label: 'raw', type: 'object', description: 'Raw result object (debug).' },
     ],
     category: 'memory',
   },
@@ -1207,7 +1225,7 @@ const MEMORY_NODES: NodeTemplate[] = [
     headerColor: '#8E44AD', // Purple - semantic memory
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
-      { id: 'assertions', label: 'assertions', type: 'array', description: 'List of {subject,predicate,object,...} assertion objects.' },
+      { id: 'assertions', label: 'assertions', type: 'assertions', description: 'List of {subject,predicate,object,...} assertion objects.' },
       { id: 'scope', label: 'scope', type: 'string', description: 'run | session | global. Determines the owner_id when not explicitly provided.' },
       { id: 'span_id', label: 'span_id', type: 'string', description: 'Optional provenance pointer to a runtime span/artifact id.' },
       { id: 'owner_id', label: 'owner_id', type: 'string', description: 'Optional explicit owner id override (advanced; normally derived from scope).' },

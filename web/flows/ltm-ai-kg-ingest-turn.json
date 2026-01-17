@@ -449,12 +449,12 @@
             "label": "",
             "type": "execution"
           },
-          {
-            "id": "assertions",
-            "label": "assertions",
-            "type": "array",
-            "description": "List of {subject,predicate,object,...} assertion objects."
-          },
+	          {
+	            "id": "assertions",
+	            "label": "assertions",
+	            "type": "assertions",
+	            "description": "List of {subject,predicate,object,...} assertion objects."
+	          },
           {
             "id": "scope",
             "label": "scope",

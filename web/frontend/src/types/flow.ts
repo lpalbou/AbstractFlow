@@ -10,6 +10,7 @@ export type PinType =
   | 'boolean'   // Red #FF0000 - True/False
   | 'object'    // Cyan #00FFFF - JSON objects
   | 'assertion' // Teal - KG assertion object (subject/predicate/object + metadata)
+  | 'assertions' // Teal - List of KG assertion objects (assertion[])
   | 'array'     // Orange #FF8800 - Collections
   | 'tools'     // Orange - Tool allowlist (string[])
   | 'provider'  // Cyan-blue - LLM provider id/name (string-like)
@@ -25,6 +26,7 @@ export const PIN_COLORS: Record<PinType, string> = {
   boolean: '#FF0000',
   object: '#00FFFF',
   assertion: '#00B8D4',
+  assertions: '#00B8D4',
   array: '#FF8800',
   tools: '#FF8800',
   provider: '#00D2FF',

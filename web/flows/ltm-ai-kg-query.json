@@ -162,12 +162,12 @@
             "label": "",
             "type": "execution"
           },
-          {
-            "id": "items",
-            "label": "items",
-            "type": "array",
-            "description": "List of triple assertions (dicts)."
-          },
+	          {
+	            "id": "items",
+	            "label": "items",
+	            "type": "assertions",
+	            "description": "List of triple assertions (dicts)."
+	          },
           {
             "id": "count",
             "label": "count",
@@ -259,11 +259,11 @@
             "label": "",
             "type": "execution"
           },
-          {
-            "id": "items",
-            "label": "items",
-            "type": "array"
-          },
+	          {
+	            "id": "items",
+	            "label": "items",
+	            "type": "assertions"
+	          },
           {
             "id": "count",
             "label": "count",

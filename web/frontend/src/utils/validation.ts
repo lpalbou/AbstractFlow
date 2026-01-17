@@ -73,6 +73,15 @@ export function areTypesCompatible(
     return true;
   }
 
+  // Assertions is a specialized array of KG assertions (assertion[]).
+  // Treat it as compatible with `array` (and keep the explicit type for UX).
+  if (
+    (sourceType === 'assertions' && targetType === 'array') ||
+    (sourceType === 'array' && targetType === 'assertions')
+  ) {
+    return true;
+  }
+
   // 'any' type accepts anything
   if (sourceType === 'any' || targetType === 'any') {
     return true;
@@ -89,6 +98,14 @@ export function areTypesCompatible(
     (sourceType === 'object' && targetType === 'assertion') ||
     (sourceType === 'assertion' && targetType === 'assertion')
   ) {
+    return true;
+  }
+
+  // Assertions is array-like; allow assertions -> object for the same reason as array -> object.
+  if (sourceType === 'assertions' && targetType === 'object') {
+    return true;
+  }
+  if (sourceType === 'object' && targetType === 'assertions') {
     return true;
   }
 

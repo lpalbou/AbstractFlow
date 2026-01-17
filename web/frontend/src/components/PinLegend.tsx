@@ -21,6 +21,7 @@ const PIN_INFO: PinInfo[] = [
   { type: 'boolean', label: 'Boolean', shape: '\u25C7', description: 'True/False' },
   { type: 'object', label: 'Object', shape: '\u25CF', description: 'JSON objects' },
   { type: 'assertion', label: 'Assertion', shape: '\u25CF', description: 'KG assertion object' },
+  { type: 'assertions', label: 'Assertions', shape: '\u25A0', description: 'KG assertions list (assertion[])' },
   { type: 'array', label: 'Array', shape: '\u25A0', description: 'Collections' },
   { type: 'tools', label: 'Tools', shape: '\u25A0', description: 'Tool allowlist (string[])' },
   { type: 'provider', label: 'Provider', shape: '\u25CF', description: 'LLM provider id/name (string-like)' },
@@ -66,6 +67,7 @@ export function PinLegend() {
               <li>Array and Object are interchangeable</li>
               <li>Assertion is compatible with Object</li>
               <li>"Tools" is compatible with Array (specialized string[])</li>
+              <li>"Assertions" is compatible with Array (specialized assertion[])</li>
             </ul>
           </div>
         </div>

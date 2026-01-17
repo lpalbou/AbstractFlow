@@ -236,6 +236,7 @@ const VarDeclInline = memo(function VarDeclInline({
     { value: 'model', label: 'model' },
     { value: 'object', label: 'object' },
     { value: 'assertion', label: 'assertion' },
+    { value: 'assertions', label: 'assertion[]' },
     { value: 'array', label: 'array' },
     { value: 'tools', label: 'tools' },
     { value: 'any', label: 'any' },
@@ -330,6 +331,8 @@ const VarDeclInline = memo(function VarDeclInline({
         ? '{}'
         : varType === 'assertion'
         ? '{assertion}'
+        : varType === 'assertions'
+        ? '[assertion]'
         : 'null';
     return (
       <input
@@ -385,6 +388,8 @@ const VarDeclInline = memo(function VarDeclInline({
                     ? ''
                     : nextType === 'tools'
                       ? []
+                      : nextType === 'assertions'
+                        ? []
                     : nextType === 'array'
                       ? []
                       : nextType === 'object'
@@ -494,6 +499,7 @@ export const BaseNode = memo(function BaseNode({
             t === 'model' ||
             t === 'object' ||
             t === 'assertion' ||
+            t === 'assertions' ||
             t === 'array' ||
             t === 'tools' ||
             t === 'any'
@@ -1057,6 +1063,7 @@ export const BaseNode = memo(function BaseNode({
         t === 'model' ||
         t === 'object' ||
         t === 'assertion' ||
+        t === 'assertions' ||
         t === 'array' ||
         t === 'tools' ||
         t === 'any'

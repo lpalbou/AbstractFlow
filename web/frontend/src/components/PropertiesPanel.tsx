@@ -66,6 +66,7 @@ const DATA_PIN_TYPES: DataPinType[] = [
   'boolean',
   'object',
   'assertion',
+  'assertions',
   'array',
   'tools',
   'provider',
@@ -2960,7 +2961,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 );
               }
 
-              if (pin.type === 'object' || pin.type === 'array') {
+              if (pin.type === 'object' || pin.type === 'array' || pin.type === 'assertion' || pin.type === 'assertions') {
                 const fallback =
                   raw === undefined
                     ? ''
@@ -2991,11 +2992,14 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                       }
                       try {
                         const parsed = JSON.parse(v);
-                        if (pin.type === 'object' && (parsed === null || Array.isArray(parsed) || typeof parsed !== 'object')) {
+                        if (
+                          (pin.type === 'object' || pin.type === 'assertion') &&
+                          (parsed === null || Array.isArray(parsed) || typeof parsed !== 'object')
+                        ) {
                           toast.error(`Default for ${pin.id} must be a JSON object`);
                           return;
                         }
-                        if (pin.type === 'array' && !Array.isArray(parsed)) {
+                        if ((pin.type === 'array' || pin.type === 'assertions') && !Array.isArray(parsed)) {
                           toast.error(`Default for ${pin.id} must be a JSON array`);
                           return;
                         }
@@ -3010,7 +3014,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                     }}
                     rows={4}
                     placeholder={
-                      pin.type === 'array'
+                      pin.type === 'array' || pin.type === 'assertions'
                         ? `${defaultHint}\n[\n  \"item\"\n]`
                         : `${defaultHint}\n{\n  \"key\": \"value\"\n}`
                     }
@@ -3273,7 +3277,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 );
               }
 
-              if (pin.type === 'object' || pin.type === 'array') {
+              if (pin.type === 'object' || pin.type === 'array' || pin.type === 'assertion' || pin.type === 'assertions') {
                 const fallback =
                   raw === undefined
                     ? ''
@@ -3304,11 +3308,14 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                       }
                       try {
                         const parsed = JSON.parse(v);
-                        if (pin.type === 'object' && (parsed === null || Array.isArray(parsed) || typeof parsed !== 'object')) {
+                        if (
+                          (pin.type === 'object' || pin.type === 'assertion') &&
+                          (parsed === null || Array.isArray(parsed) || typeof parsed !== 'object')
+                        ) {
                           toast.error(`Default for ${pin.id} must be a JSON object`);
                           return;
                         }
-                        if (pin.type === 'array' && !Array.isArray(parsed)) {
+                        if ((pin.type === 'array' || pin.type === 'assertions') && !Array.isArray(parsed)) {
                           toast.error(`Default for ${pin.id} must be a JSON array`);
                           return;
                         }
@@ -3323,7 +3330,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                     }}
                     rows={4}
                     placeholder={
-                      pin.type === 'array'
+                      pin.type === 'array' || pin.type === 'assertions'
                         ? `${defaultHint}\n[\n  \"item\"\n]`
                         : `${defaultHint}\n{\n  \"key\": \"value\"\n}`
                     }

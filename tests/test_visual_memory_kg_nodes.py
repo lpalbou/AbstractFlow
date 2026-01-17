@@ -57,7 +57,7 @@ def test_visual_memory_kg_assert_and_query_runs(tmp_path, monkeypatch) -> None:
                     "icon": "[]",
                     "headerColor": "#FF8800",
                     "inputs": [],
-                    "outputs": [{"id": "value", "label": "value", "type": "array"}],
+                    "outputs": [{"id": "value", "label": "value", "type": "assertions"}],
                         "literalValue": [
                             {
                                 "subject": "AbstractFramework",
@@ -78,7 +78,7 @@ def test_visual_memory_kg_assert_and_query_runs(tmp_path, monkeypatch) -> None:
                     "headerColor": "#8E44AD",
                     "inputs": [
                         {"id": "exec-in", "label": "", "type": "execution"},
-                        {"id": "assertions", "label": "assertions", "type": "array"},
+                        {"id": "assertions", "label": "assertions", "type": "assertions"},
                         {"id": "scope", "label": "scope", "type": "string"},
                     ],
                     "outputs": [
@@ -121,7 +121,7 @@ def test_visual_memory_kg_assert_and_query_runs(tmp_path, monkeypatch) -> None:
                     ],
                     "outputs": [
                         {"id": "exec-out", "label": "", "type": "execution"},
-                        {"id": "items", "label": "items", "type": "array"},
+                        {"id": "items", "label": "items", "type": "assertions"},
                         {"id": "count", "label": "count", "type": "number"},
                         {"id": "ok", "label": "ok", "type": "boolean"},
                         {"id": "raw", "label": "raw", "type": "object"},
@@ -141,7 +141,7 @@ def test_visual_memory_kg_assert_and_query_runs(tmp_path, monkeypatch) -> None:
                     "inputs": [
                         {"id": "exec-in", "label": "", "type": "execution"},
                         {"id": "count", "label": "count", "type": "number"},
-                        {"id": "items", "label": "items", "type": "array"},
+                        {"id": "items", "label": "items", "type": "assertions"},
                         {"id": "ok", "label": "ok", "type": "boolean"},
                     ],
                     "outputs": [],
@@ -210,7 +210,7 @@ def test_visual_memory_kg_assert_accepts_empty_assertions(tmp_path, monkeypatch)
                 "id": "empty",
                 "type": "literal_array",
                 "position": {"x": 320.0, "y": 96.0},
-                "data": {"nodeType": "literal_array", "outputs": [{"id": "value", "label": "value", "type": "array"}], "literalValue": []},
+                "data": {"nodeType": "literal_array", "outputs": [{"id": "value", "label": "value", "type": "assertions"}], "literalValue": []},
             },
             {
                 "id": "assert",
@@ -220,7 +220,7 @@ def test_visual_memory_kg_assert_accepts_empty_assertions(tmp_path, monkeypatch)
                     "nodeType": "memory_kg_assert",
                     "inputs": [
                         {"id": "exec-in", "label": "", "type": "execution"},
-                        {"id": "assertions", "label": "assertions", "type": "array"},
+                        {"id": "assertions", "label": "assertions", "type": "assertions"},
                     ],
                     "outputs": [
                         {"id": "exec-out", "label": "", "type": "execution"},
@@ -301,7 +301,7 @@ def test_visual_memory_kg_lancedb_persists_across_store_recreation(tmp_path, mon
                 "position": {"x": 320, "y": 160},
                 "data": {
                     "nodeType": "literal_array",
-                    "outputs": [{"id": "value", "label": "value", "type": "array"}],
+                    "outputs": [{"id": "value", "label": "value", "type": "assertions"}],
                     "literalValue": [{"subject": "AbstractFramework", "predicate": "dcterms:hasPart", "object": "abstractruntime"}],
                 },
             },
@@ -319,7 +319,7 @@ def test_visual_memory_kg_lancedb_persists_across_store_recreation(tmp_path, mon
                     "nodeType": "memory_kg_assert",
                     "inputs": [
                         {"id": "exec-in", "label": "", "type": "execution"},
-                        {"id": "assertions", "label": "assertions", "type": "array"},
+                        {"id": "assertions", "label": "assertions", "type": "assertions"},
                         {"id": "scope", "label": "scope", "type": "string"},
                     ],
                     "outputs": [
@@ -378,7 +378,7 @@ def test_visual_memory_kg_lancedb_persists_across_store_recreation(tmp_path, mon
                     ],
                     "outputs": [
                         {"id": "exec-out", "label": "", "type": "execution"},
-                        {"id": "items", "label": "items", "type": "array"},
+                        {"id": "items", "label": "items", "type": "assertions"},
                         {"id": "count", "label": "count", "type": "number"},
                         {"id": "ok", "label": "ok", "type": "boolean"},
                     ],
@@ -395,7 +395,7 @@ def test_visual_memory_kg_lancedb_persists_across_store_recreation(tmp_path, mon
                         {"id": "exec-in", "label": "", "type": "execution"},
                         {"id": "ok", "label": "ok", "type": "boolean"},
                         {"id": "count", "label": "count", "type": "number"},
-                        {"id": "items", "label": "items", "type": "array"},
+                        {"id": "items", "label": "items", "type": "assertions"},
                     ],
                 },
             },
