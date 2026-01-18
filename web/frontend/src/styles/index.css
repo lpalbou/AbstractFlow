@@ -1265,12 +1265,21 @@ button.primary:hover:not(:disabled) {
 .run-maximize-btn {
   width: 30px;
   height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   border-radius: 8px;
   border: 1px solid var(--bg-tertiary);
   background: rgba(255, 255, 255, 0.04);
   color: var(--text-secondary);
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, transform 0.05s;
+}
+
+.run-minimize-btn svg,
+.run-maximize-btn svg {
+  display: block;
 }
 
 .run-minimize-btn:hover,

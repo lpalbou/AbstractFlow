@@ -1,4 +1,3 @@
-import { ReactFlowProvider } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Canvas } from './components/Canvas';
@@ -49,63 +48,61 @@ function App() {
   }, [gpu_enabled]);
 
   return (
-    <ReactFlowProvider>
-      <div className="app-container">
-        {/* Header */}
-        <header className="app-header">
-          <div className="logo">
-            <span className="logo-icon">&#x1F300;</span>
-            <span className="logo-text">AbstractFlow</span>
-          </div>
-          <Toolbar />
-          {gpu_enabled ? (
-            <monitor-gpu
-              ref={monitor_gpu_ref as any}
-              mode="icon"
-              history-size="5"
-              tick-ms="1500"
-              title="GPU usage (host)"
-              style={
-                {
-                  ['--monitor-gpu-width' as any]: '34px',
-                  ['--monitor-gpu-bars-height' as any]: '22px',
-                  ['--monitor-gpu-padding' as any]: '2px 4px',
-                  ['--monitor-gpu-radius' as any]: '999px',
-                  ['--monitor-gpu-bg' as any]: 'rgba(0,0,0,0.18)',
-                  ['--monitor-gpu-border' as any]: 'rgba(255,255,255,0.16)',
-                  position: 'relative',
-                  zIndex: 1100,
-                  flexShrink: 0,
-                } as CSSProperties
-              }
-            />
-          ) : null}
-        </header>
+    <div className="app-container">
+      {/* Header */}
+      <header className="app-header">
+        <div className="logo">
+          <span className="logo-icon">&#x1F300;</span>
+          <span className="logo-text">AbstractFlow</span>
+        </div>
+        <Toolbar />
+        {gpu_enabled ? (
+          <monitor-gpu
+            ref={monitor_gpu_ref as any}
+            mode="icon"
+            history-size="5"
+            tick-ms="1500"
+            title="GPU usage (host)"
+            style={
+              {
+                ['--monitor-gpu-width' as any]: '34px',
+                ['--monitor-gpu-bars-height' as any]: '22px',
+                ['--monitor-gpu-padding' as any]: '2px 4px',
+                ['--monitor-gpu-radius' as any]: '999px',
+                ['--monitor-gpu-bg' as any]: 'rgba(0,0,0,0.18)',
+                ['--monitor-gpu-border' as any]: 'rgba(255,255,255,0.16)',
+                position: 'relative',
+                zIndex: 1100,
+                flexShrink: 0,
+              } as CSSProperties
+            }
+          />
+        ) : null}
+      </header>
 
-        {/* Main content */}
-        <main className="app-main">
-          {/* Left sidebar - Node palette */}
-          <aside className="sidebar left">
-            <NodePalette />
-          </aside>
+      {/* Main content */}
+      <main className="app-main">
+        {/* Left sidebar - Node palette */}
+        <aside className="sidebar left">
+          <NodePalette />
+        </aside>
 
-          {/* Center - Canvas */}
-          <div className="canvas-container">
-            <Canvas />
-          </div>
+        {/* Center - Canvas */}
+        <div className="canvas-container">
+          <Canvas />
+        </div>
 
-          {/* Right sidebar - Properties panel */}
-          <aside className="sidebar right">
-            <PropertiesPanel node={selectedNode} />
-          </aside>
-        </main>
+        {/* Right sidebar - Properties panel */}
+        <aside className="sidebar right">
+          <PropertiesPanel node={selectedNode} />
+        </aside>
+      </main>
 
-        {/* Footer */}
-        <footer className="app-footer">
-          <span>AbstractFlow Visual Editor v0.1.0</span>
-        </footer>
-      </div>
-    </ReactFlowProvider>
+      {/* Footer */}
+      <footer className="app-footer">
+        <span>AbstractFlow Visual Editor v0.1.0</span>
+      </footer>
+    </div>
   );
 }
 

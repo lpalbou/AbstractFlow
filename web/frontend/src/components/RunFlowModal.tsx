@@ -70,6 +70,85 @@ function stringifyJson(value: unknown): string {
   }
 }
 
+function MinimizeWindowIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg
+      aria-hidden="true"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d="M6 12h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function MaximizeWindowIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg
+      aria-hidden="true"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M7 7h10v10H7z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function RestoreWindowIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg
+      aria-hidden="true"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M9 9h10v10H9z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M5 15H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v1"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ChevronUpIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg
+      aria-hidden="true"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d="M6 14l6-6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function randomUuidHex(): string {
   try {
     if (typeof globalThis.crypto?.randomUUID === 'function') {
@@ -1513,7 +1592,7 @@ export function RunFlowModal({
           title="Expand"
           aria-label="Expand run modal"
         >
-          ⬆
+          <ChevronUpIcon />
         </button>
       </div>
     </div>
@@ -2137,7 +2216,7 @@ export function RunFlowModal({
               title="Minimize"
               aria-label="Minimize run modal"
             >
-              ▾
+              <MinimizeWindowIcon />
             </button>
             <button
               type="button"
@@ -2146,7 +2225,7 @@ export function RunFlowModal({
               title={isMaximized ? 'Restore' : 'Maximize'}
               aria-label={isMaximized ? 'Restore run modal size' : 'Maximize run modal'}
             >
-              {isMaximized ? '🗗' : '🗖'}
+              {isMaximized ? <RestoreWindowIcon /> : <MaximizeWindowIcon />}
             </button>
           </div>
         </div>

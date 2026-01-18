@@ -9,6 +9,7 @@ import ReactFlow, {
   MiniMap,
   Connection,
   ReactFlowInstance,
+  ReactFlowProvider,
   BackgroundVariant,
   Node,
   Edge,
@@ -283,57 +284,59 @@ export function Canvas() {
   }, [baseStyledEdges, recentEdgeIds]);
 
   return (
-    <div
-      ref={reactFlowWrapper}
-      className="canvas-wrapper"
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
-    >
-      <ReactFlow
-        nodes={nodes}
-        edges={decoratedEdges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={handleConnect}
-        isValidConnection={(connection) => validateConnection(nodes, edges, connection)}
-        connectionMode={ConnectionMode.Strict}
-        onNodeClick={handleNodeClick}
-        onEdgeClick={handleEdgeClick}
-        onPaneClick={handlePaneClick}
-        onInit={handleInit}
-        nodeTypes={nodeTypes}
-        minZoom={MIN_ZOOM}
-        maxZoom={MAX_ZOOM}
-        defaultViewport={{ x: 0, y: 0, zoom: DEFAULT_ZOOM }}
-        defaultEdgeOptions={{
-          type: 'smoothstep',
-          animated: false,
-        }}
-        connectionLineStyle={{ stroke: '#888', strokeWidth: 2 }}
-        fitView
-        fitViewOptions={{ maxZoom: DEFAULT_ZOOM }}
-        snapToGrid
-        snapGrid={[16, 16]}
-        deleteKeyCode={['Backspace', 'Delete']}
+    <ReactFlowProvider>
+      <div
+        ref={reactFlowWrapper}
+        className="canvas-wrapper"
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
       >
-        <Controls />
-        <Background
-          variant={BackgroundVariant.Dots}
-          gap={16}
-          size={1}
-          color="#444"
-        />
-        <MiniMap
-          nodeColor={(node) => {
-            const data = node.data as FlowNodeData;
-            return data?.headerColor || '#888';
+        <ReactFlow
+          nodes={nodes}
+          edges={decoratedEdges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={handleConnect}
+          isValidConnection={(connection) => validateConnection(nodes, edges, connection)}
+          connectionMode={ConnectionMode.Strict}
+          onNodeClick={handleNodeClick}
+          onEdgeClick={handleEdgeClick}
+          onPaneClick={handlePaneClick}
+          onInit={handleInit}
+          nodeTypes={nodeTypes}
+          minZoom={MIN_ZOOM}
+          maxZoom={MAX_ZOOM}
+          defaultViewport={{ x: 0, y: 0, zoom: DEFAULT_ZOOM }}
+          defaultEdgeOptions={{
+            type: 'smoothstep',
+            animated: false,
           }}
-          maskColor="rgba(0, 0, 0, 0.7)"
-        />
-      </ReactFlow>
-      <RunPreflightPanel onFocusNode={focusNode} />
-      <PinLegend />
-    </div>
+          connectionLineStyle={{ stroke: '#888', strokeWidth: 2 }}
+          fitView
+          fitViewOptions={{ maxZoom: DEFAULT_ZOOM }}
+          snapToGrid
+          snapGrid={[16, 16]}
+          deleteKeyCode={['Backspace', 'Delete']}
+        >
+          <Controls />
+          <Background
+            variant={BackgroundVariant.Dots}
+            gap={16}
+            size={1}
+            color="#444"
+          />
+          <MiniMap
+            nodeColor={(node) => {
+              const data = node.data as FlowNodeData;
+              return data?.headerColor || '#888';
+            }}
+            maskColor="rgba(0, 0, 0, 0.7)"
+          />
+        </ReactFlow>
+        <RunPreflightPanel onFocusNode={focusNode} />
+        <PinLegend />
+      </div>
+    </ReactFlowProvider>
   );
 }
 
