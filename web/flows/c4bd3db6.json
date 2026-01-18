@@ -1,0 +1,501 @@
+{
+  "id": "c4bd3db6",
+  "name": "basic-llm",
+  "description": "",
+  "interfaces": [
+    "abstractcode.agent.v1"
+  ],
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": {
+        "x": -528.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "RECEIVING PROMPT",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "use_context",
+            "label": "use_context",
+            "type": "boolean"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools"
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          },
+          {
+            "id": "max_in_tokens",
+            "label": "max_in_tokens",
+            "type": "number"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b",
+          "use_context": false,
+          "max_iterations": 20,
+          "temperature": 0.7,
+          "seed": -1,
+          "tools": [
+            "edit_file",
+            "analyze_code",
+            "execute_command",
+            "fetch_url",
+            "list_files",
+            "read_file",
+            "search_files",
+            "web_search",
+            "write_file"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 224.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "ANSWERING",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-6",
+      "type": "llm_call",
+      "position": {
+        "x": -208.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "LLM Call",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "use_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object",
+            "description": "Optional explicit context object for this call (e.g. {messages:[...]}). If provided, context.messages overrides inherited run context messages."
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider",
+            "description": "LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model",
+            "description": "LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string",
+            "description": "Optional system prompt for this single call."
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string",
+            "description": "User prompt/content for this single call."
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools",
+            "description": "Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node)."
+          },
+          {
+            "id": "max_in_tokens",
+            "label": "max_in_tokens",
+            "type": "number",
+            "description": "Optional per-call input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for this call."
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number",
+            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number",
+            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "object",
+            "description": "Optional JSON Schema object (type=object) the assistant content must conform to."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string",
+            "description": "Assistant text content (best-effort). For tool calls, content may be empty."
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean",
+            "description": "True if the LLM call completed successfully."
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object",
+            "description": "Host-facing meta envelope (schema=abstractflow.llm_call.v1.meta). Includes provider/model, usage, trace ids, and lightweight execution metadata."
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array",
+            "description": "Normalized tool call requests. This pin exists to make wiring into Tool Calls / Emit Event nodes simpler."
+          }
+        ],
+        "pinDefaults": {}
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-7",
+      "type": "tool_calls",
+      "position": {
+        "x": 32.0,
+        "y": 112.0
+      },
+      "data": {
+        "nodeType": "tool_calls",
+        "label": "Tool Calls",
+        "icon": "&#x1F528;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array",
+            "description": "List of tool call requests. Each entry shape: {name, arguments, call_id?}. Often comes from LLM Call.tool_calls."
+          },
+          {
+            "id": "allowed_tools",
+            "label": "allowed_tools",
+            "type": "array",
+            "description": "Optional allowlist of tool names enforced by the runtime effect handler (empty list => allow none). If not connected, the node config (if any) is used."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "results",
+            "label": "results",
+            "type": "array",
+            "description": "Per-call results in input order. Each entry shape: {call_id, name, success, output, error}. When success=true, output contains the tool output and error is null; when success=false, error contains the failure message and output is null (or best-effort structured output for some tools)."
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean",
+            "description": "Aggregate: true only if all per-call results have success=true (see results[].success/results[].error for per-call failures)."
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1768722017516",
+      "source": "node-1",
+      "sourceHandle": "use_context",
+      "target": "node-6",
+      "targetHandle": "use_context",
+      "animated": false
+    },
+    {
+      "id": "edge-1768722019485",
+      "source": "node-1",
+      "sourceHandle": "context",
+      "target": "node-6",
+      "targetHandle": "context",
+      "animated": false
+    },
+    {
+      "id": "edge-1768722023343",
+      "source": "node-1",
+      "sourceHandle": "provider",
+      "target": "node-6",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "edge-1768722025298",
+      "source": "node-1",
+      "sourceHandle": "model",
+      "target": "node-6",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-1768722026953",
+      "source": "node-1",
+      "sourceHandle": "system",
+      "target": "node-6",
+      "targetHandle": "system",
+      "animated": false
+    },
+    {
+      "id": "edge-1768722028819",
+      "source": "node-1",
+      "sourceHandle": "prompt",
+      "target": "node-6",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "edge-1768722030191",
+      "source": "node-1",
+      "sourceHandle": "tools",
+      "target": "node-6",
+      "targetHandle": "tools",
+      "animated": false
+    },
+    {
+      "id": "edge-1768722038533",
+      "source": "node-1",
+      "sourceHandle": "max_in_tokens",
+      "target": "node-6",
+      "targetHandle": "max_in_tokens",
+      "animated": false
+    },
+    {
+      "id": "edge-1768722040245",
+      "source": "node-1",
+      "sourceHandle": "temperature",
+      "target": "node-6",
+      "targetHandle": "temperature",
+      "animated": false
+    },
+    {
+      "id": "edge-1768722041582",
+      "source": "node-1",
+      "sourceHandle": "seed",
+      "target": "node-6",
+      "targetHandle": "seed",
+      "animated": false
+    },
+    {
+      "id": "edge-1768722043378",
+      "source": "node-1",
+      "sourceHandle": "resp_schema",
+      "target": "node-6",
+      "targetHandle": "resp_schema",
+      "animated": false
+    },
+    {
+      "id": "edge-1768722054171",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-6",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768722060659",
+      "source": "node-6",
+      "sourceHandle": "response",
+      "target": "end",
+      "targetHandle": "response",
+      "animated": false
+    },
+    {
+      "id": "edge-1768722062982",
+      "source": "node-6",
+      "sourceHandle": "success",
+      "target": "end",
+      "targetHandle": "success",
+      "animated": false
+    },
+    {
+      "id": "edge-1768722065751",
+      "source": "node-6",
+      "sourceHandle": "meta",
+      "target": "end",
+      "targetHandle": "meta",
+      "animated": false
+    },
+    {
+      "id": "edge-1768722075687",
+      "source": "node-6",
+      "sourceHandle": "exec-out",
+      "target": "node-7",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768722077851",
+      "source": "node-6",
+      "sourceHandle": "tool_calls",
+      "target": "node-7",
+      "targetHandle": "tool_calls",
+      "animated": false
+    },
+    {
+      "id": "edge-1768722080303",
+      "source": "node-7",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1768722089388",
+      "source": "node-1",
+      "sourceHandle": "tools",
+      "target": "node-7",
+      "targetHandle": "allowed_tools",
+      "animated": false
+    }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2026-01-18T07:39:41.830498",
+  "updated_at": "2026-01-18T07:41:37.607247"
+}

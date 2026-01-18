@@ -18,6 +18,10 @@ export default defineConfig({
     ],
   },
   server: {
+    host: '0.0.0.0',
+    allowedHosts: true,
+    strictPort: false,
+    cors: true,
     port: 3000,
     fs: {
       // Vite blocks serving files outside an allowlist. When we customize it to
@@ -30,6 +34,7 @@ export default defineConfig({
         target: 'http://localhost:8080',
         changeOrigin: true,
         ws: true,
+        secure: false,
       },
     },
   },

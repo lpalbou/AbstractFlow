@@ -1218,6 +1218,13 @@ button.primary:hover:not(:disabled) {
   flex-direction: column;
 }
 
+.run-modal.run-modal-maximized {
+  width: calc(100vw - 24px);
+  max-width: calc(100vw - 24px);
+  height: calc(100vh - 24px);
+  max-height: calc(100vh - 24px);
+}
+
 .run-modal-body {
   flex: 1;
   min-height: 0;
@@ -1254,7 +1261,8 @@ button.primary:hover:not(:disabled) {
   gap: 10px;
 }
 
-.run-minimize-btn {
+.run-minimize-btn,
+.run-maximize-btn {
   width: 30px;
   height: 30px;
   border-radius: 8px;
@@ -1265,13 +1273,15 @@ button.primary:hover:not(:disabled) {
   transition: background 0.15s, border-color 0.15s, transform 0.05s;
 }
 
-.run-minimize-btn:hover {
+.run-minimize-btn:hover,
+.run-maximize-btn:hover {
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.18);
   color: var(--text-primary);
 }
 
-.run-minimize-btn:active {
+.run-minimize-btn:active,
+.run-maximize-btn:active {
   transform: translateY(1px);
 }
 

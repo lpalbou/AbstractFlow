@@ -169,6 +169,72 @@ export function Toolbar() {
   const [inspectedEvents, setInspectedEvents] = useState<ExecutionEvent[]>([]);
   const [inspectedTraceEvents, setInspectedTraceEvents] = useState<ExecutionEvent[]>([]);
 
+  const formatValue = useCallback((value: unknown) => {
+    if (value == null) return '';
+    if (typeof value === 'string') return value;
+    if (value instanceof Error) {
+      const msg = value.stack || `${value.name}: ${value.message}`;
+      return msg || String(value);
+    }
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch {
+      return String(value);
+    }
+  }, []);
+
+  const copyTextToClipboard = useCallback(async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // Fallback: best-effort legacy copy
+      const el = document.createElement('textarea');
+      el.value = text;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+    }
+  }, []);
+
+  const showWorkflowFailedToast = useCallback(
+    (fullError: unknown) => {
+      const full = formatValue(fullError) || 'Unknown error';
+      const firstLine = full.split('\n').find((l) => l.trim()) || full;
+      const snippet = firstLine.length > 180 ? `${firstLine.slice(0, 179)}…` : firstLine;
+
+      toast.error(
+        <div
+          role="button"
+          tabIndex={0}
+          title="Click to copy full error"
+          style={{ cursor: 'pointer' }}
+          onClick={() => {
+            void (async () => {
+              await copyTextToClipboard(full);
+              toast.success('Copied error to clipboard');
+            })();
+          }}
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            e.preventDefault();
+            void (async () => {
+              await copyTextToClipboard(full);
+              toast.success('Copied error to clipboard');
+            })();
+          }}
+        >
+          <div style={{ fontWeight: 600 }}>Workflow failed</div>
+          <div style={{ marginTop: 6, fontSize: 12, opacity: 0.9, whiteSpace: 'pre-wrap' }}>{snippet}</div>
+          <div style={{ marginTop: 8, fontSize: 12, opacity: 0.9, textDecoration: 'underline' }}>
+            Click to copy full error
+          </div>
+        </div>
+      );
+    },
+    [copyTextToClipboard, formatValue]
+  );
+
   async function fetchRunHistory(runId: string): Promise<RunHistoryResponse> {
     const response = await fetch(`/api/runs/${runId}/history`);
     if (!response.ok) {
@@ -348,6 +414,12 @@ export function Toolbar() {
             : true;
 
         if (!reportedSuccess) {
+          const fullError = {
+            type: 'flow_complete',
+            success: false,
+            error: payloadObj && typeof payloadObj.error === 'string' ? payloadObj.error : null,
+            result: payloadObj?.result ?? payloadObj ?? payload,
+          };
           setRunResult({
             success: false,
             error:
@@ -355,7 +427,7 @@ export function Toolbar() {
               'Flow failed',
             result: payloadObj?.result ?? null,
           });
-          toast.error('Workflow failed');
+          showWorkflowFailedToast(fullError);
         } else {
           setRunResult({
             success: true,
@@ -364,11 +436,12 @@ export function Toolbar() {
           toast.success('Workflow executed successfully');
         }
       } else if (event.type === 'flow_error') {
+        const fullError = { ...event };
         setRunResult({
           success: false,
           error: event.error || 'Unknown error',
         });
-        toast.error('Workflow failed');
+        showWorkflowFailedToast(fullError);
       } else if (event.type === 'flow_cancelled') {
         setRunResult({
           success: false,

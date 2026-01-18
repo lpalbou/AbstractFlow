@@ -317,6 +317,7 @@ export function RunFlowModal({
   const [expandedSubflows, setExpandedSubflows] = useState<Record<string, boolean>>({});
   const [resumeDraft, setResumeDraft] = useState('');
   const [isMinimized, setIsMinimized] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
   const [rehydrateArtifactMarkdown, setRehydrateArtifactMarkdown] = useState<string | null>(null);
   const [rehydrateArtifactError, setRehydrateArtifactError] = useState<string | null>(null);
   const [rehydrateArtifactLoading, setRehydrateArtifactLoading] = useState(false);
@@ -2118,7 +2119,7 @@ export function RunFlowModal({
 
   return isMinimized ? minibar : (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal run-modal" onClick={(e) => e.stopPropagation()}>
+      <div className={`modal run-modal${isMaximized ? ' run-modal-maximized' : ''}`} onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="run-modal-header">
           <div className="run-modal-header-left">
@@ -2137,6 +2138,15 @@ export function RunFlowModal({
               aria-label="Minimize run modal"
             >
               ▾
+            </button>
+            <button
+              type="button"
+              className="run-maximize-btn"
+              onClick={() => setIsMaximized((v) => !v)}
+              title={isMaximized ? 'Restore' : 'Maximize'}
+              aria-label={isMaximized ? 'Restore run modal size' : 'Maximize run modal'}
+            >
+              {isMaximized ? '🗗' : '🗖'}
             </button>
           </div>
         </div>
@@ -2500,7 +2510,11 @@ export function RunFlowModal({
                         ) : null}
                       </div>
 
-                      {(outputPreview || memorizeContentPreview || recallIntoContextDisplay || (selectedStep?.nodeType === 'on_flow_start' && onFlowStartParams)) ? (
+                      {(outputPreview ||
+                        memorizeContentPreview ||
+                        recallIntoContextDisplay ||
+                        (selectedStep?.nodeType === 'on_flow_start' && onFlowStartParams) ||
+                        (selectedStep?.nodeType === 'memory_kg_query' && selectedStep.output != null)) ? (
                         <div className="run-output-preview">
                           {selectedStep?.nodeType === 'on_flow_start' && onFlowStartParams ? (
                             <div className="run-output-section">
