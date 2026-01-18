@@ -19,6 +19,7 @@ import { useTools } from '../hooks/useTools';
 import { useExecutionWorkspace } from '../hooks/useExecutionWorkspace';
 import { RunSwitcherDropdown } from './RunSwitcherDropdown';
 import { JsonViewer } from './JsonViewer';
+import { KgActiveMemoryPanel } from './KgActiveMemoryPanel';
 
 interface RunFlowModalProps {
   isOpen: boolean;
@@ -1525,6 +1526,7 @@ export function RunFlowModal({
         t === 'ask_user' ||
         t === 'answer_user' ||
         t === 'llm_call' ||
+        t === 'code' ||
         t === 'agent' ||
         t === 'on_flow_end' ||
         // Subflows often contain markdown-ish artifacts (e.g. raw LLM answers with code fences).
@@ -2786,6 +2788,17 @@ export function RunFlowModal({
                               ) : (
                                 <pre className="run-details-output">{outputPreview.previewText}</pre>
                               )}
+                            </div>
+                          ) : null}
+
+                          {selectedStep?.nodeType === 'memory_kg_query' && selectedStep.output != null ? (
+                            <div className="run-output-section">
+                              <div className="run-output-title">KG / Active Memory Explorer</div>
+                              <KgActiveMemoryPanel
+                                runId={rootRunId || null}
+                                title={selectedStep.nodeLabel || selectedStep.nodeId || 'KG'}
+                                output={selectedStep.output}
+                              />
                             </div>
                           ) : null}
 

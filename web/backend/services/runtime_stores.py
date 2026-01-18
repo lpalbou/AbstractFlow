@@ -17,6 +17,7 @@ from typing import Any, Tuple
 
 
 _IS_TEST = bool(os.getenv("PYTEST_CURRENT_TEST") or "pytest" in sys.modules)
+_TEST_BASE_DIRS: dict[str, Path] = {}
 
 _DEFAULT_PERSIST_DIR = Path(__file__).resolve().parents[2] / "runtime"
 _PERSIST_DIR = Path(os.getenv("ABSTRACTFLOW_RUNTIME_DIR", str(_DEFAULT_PERSIST_DIR)))
@@ -26,6 +27,18 @@ _PERSIST_DIR.mkdir(parents=True, exist_ok=True)
 def _base_dir_for_call() -> Path:
     # Isolate each test run to avoid cross-test interference (events scan the run store).
     if _IS_TEST:
+        # IMPORTANT:
+        # Multiple backend calls inside a single pytest test often need to see the same stores
+        # (e.g. create run -> query run). Keep isolation *per test* but stable within a test.
+        key = str(os.getenv("PYTEST_CURRENT_TEST") or "").strip()
+        if key:
+            base = _TEST_BASE_DIRS.get(key)
+            if base is None:
+                base = Path(tempfile.mkdtemp(prefix="abstractflow-runtime-"))
+                base.mkdir(parents=True, exist_ok=True)
+                _TEST_BASE_DIRS[key] = base
+            return base
+
         base = Path(tempfile.mkdtemp(prefix="abstractflow-runtime-"))
         base.mkdir(parents=True, exist_ok=True)
         return base

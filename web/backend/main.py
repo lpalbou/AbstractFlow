@@ -10,7 +10,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse
 
-from .routes import connection_router, flows_router, gateway_metrics_router, providers_router, runs_router, semantics_router, tools_router, ui_config_router, ws_router
+from .routes import (
+    connection_router,
+    flows_router,
+    gateway_metrics_router,
+    memory_kg_router,
+    providers_router,
+    runs_router,
+    semantics_router,
+    tools_router,
+    ui_config_router,
+    ws_router,
+)
 from .services.gateway_connection import bootstrap_gateway_connection_env
 
 # Best-effort bootstrap so the backend can call the gateway without requiring a restart after UI config.
@@ -39,6 +50,7 @@ app.include_router(connection_router, prefix="/api")
 app.include_router(providers_router, prefix="/api")
 app.include_router(runs_router, prefix="/api")
 app.include_router(semantics_router, prefix="/api")
+app.include_router(memory_kg_router, prefix="/api")
 app.include_router(tools_router, prefix="/api")
 app.include_router(ui_config_router, prefix="/api")
 app.include_router(ws_router, prefix="/api")
