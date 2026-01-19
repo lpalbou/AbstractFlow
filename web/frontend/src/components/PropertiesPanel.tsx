@@ -7,6 +7,7 @@ import type { Node } from 'reactflow';
 import toast from 'react-hot-toast';
 import type { FlowNodeData, ProviderInfo, VisualFlow, Pin } from '../types/flow';
 import { isEntryNodeType } from '../types/flow';
+import { RECALL_LEVEL_OPTIONS } from '../types/recall';
 import { useFlowStore } from '../hooks/useFlow';
 import { useSemanticsRegistry } from '../hooks/useSemantics';
 import { CodeEditorModal } from './CodeEditorModal';
@@ -1023,16 +1024,9 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 );
               }
 
-              if (
-                pin.id === 'recall_level' &&
-                (data.nodeType === 'memory_query' ||
-                  data.nodeType === 'memory_rehydrate' ||
-                  data.nodeType === 'memory_kg_query' ||
-                  (data.nodeType === 'subflow' &&
-                    data.inputs.some((p) => p.id === 'query_text' || p.id === 'query')))
-              ) {
+              if (pin.id === 'recall_level') {
                 const current = typeof raw === 'string' && raw.trim() ? raw.trim().toLowerCase() : 'standard';
-                const options = ['urgent', 'standard', 'deep'];
+                const options: string[] = [...RECALL_LEVEL_OPTIONS];
                 return (
                   <div key={pin.id} className="property-group">
                     <label className="property-sublabel">{rowLabel}</label>
@@ -2948,7 +2942,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               }
 
               if (pin.id === 'recall_level') {
-                const options = ['urgent', 'standard', 'deep'];
+                const options: string[] = [...RECALL_LEVEL_OPTIONS];
                 const current = typeof raw === 'string' && raw.trim() ? raw.trim().toLowerCase() : 'standard';
                 return (
                   <select

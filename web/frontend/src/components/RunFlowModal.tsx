@@ -9,6 +9,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useFlowStore } from '../hooks/useFlow';
 import type { ExecutionEvent, ExecutionMetrics, Pin, FlowRunResult, RunSummary } from '../types/flow';
 import { isEntryNodeType } from '../types/flow';
+import { RECALL_LEVEL_OPTIONS } from '../types/recall';
 import type { WaitingInfo } from '../hooks/useWebSocket';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { AgentSubrunTracePanel } from './AgentSubrunTracePanel';
@@ -3159,7 +3160,7 @@ export function RunFlowModal({
                       }
 
                       if (pin.id === 'recall_level') {
-                        const options = ['urgent', 'standard', 'deep'].map((v) => ({ value: v, label: v }));
+                        const options = RECALL_LEVEL_OPTIONS.map((v) => ({ value: v, label: v }));
                         return (
                           <div key={pin.id} className="run-form-field">
                             <label className="run-form-label">

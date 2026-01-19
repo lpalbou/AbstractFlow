@@ -1732,15 +1732,21 @@ export const BaseNode = memo(function BaseNode({
                 const isWriteFileContentPin = isWriteFileNode && pin.id === 'content';
                 const isCompareOpPin = isCompareNode && pin.id === 'op';
                 const isStringifyJsonModePin = isStringifyJsonNode && pin.id === 'mode';
-                const isMemoryScopePin =
-                  (isMemoryNoteNode || isMemoryQueryNode || isMemoryTagNode || isMemoryKgAssertNode || isMemoryKgQueryNode) &&
-                  pin.id === 'scope';
-                const isSubflowScopePin = isSubflowNode && pin.id === 'scope';
-                const isMemoryTagsModePin = isMemoryQueryNode && pin.id === 'tags_mode';
-                const isMemoryPlacementPin = isMemoryRehydrateNode && pin.id === 'placement';
-	                const hasSpecialControl =
-	                  (hasProviderDropdown && pin.id === 'provider') ||
-	                  (hasModelControls && pin.id === 'model') ||
+	                const isMemoryScopePin =
+	                  (isMemoryNoteNode || isMemoryQueryNode || isMemoryTagNode || isMemoryKgAssertNode || isMemoryKgQueryNode) &&
+	                  pin.id === 'scope';
+	                const isRecallLevelPin =
+	                  pin.id === 'recall_level' &&
+	                  (isMemoryQueryNode ||
+	                    isMemoryRehydrateNode ||
+	                    isMemoryKgQueryNode ||
+	                    (isSubflowNode && inputData.some((p) => p.id === 'query_text' || p.id === 'query')));
+	                const isSubflowScopePin = isSubflowNode && pin.id === 'scope';
+	                const isMemoryTagsModePin = isMemoryQueryNode && pin.id === 'tags_mode';
+	                const isMemoryPlacementPin = isMemoryRehydrateNode && pin.id === 'placement';
+		                const hasSpecialControl =
+		                  (hasProviderDropdown && pin.id === 'provider') ||
+		                  (hasModelControls && pin.id === 'model') ||
 	                  ((isAgentNode || isLlmNode || subflowHasToolsPin) && pin.id === 'tools') ||
 	                  (isVarNode && pin.id === 'name') ||
 	                  isCompareOpPin ||
@@ -1750,11 +1756,12 @@ export const BaseNode = memo(function BaseNode({
                   isOnEventScopePin ||
                   isOnScheduleTimestampPin ||
                   isOnScheduleRecurrentPin ||
-                  isWriteFileContentPin ||
-                  isMemoryScopePin ||
-                  isSubflowScopePin ||
-                  isMemoryTagsModePin ||
-                  isMemoryPlacementPin;
+	                  isWriteFileContentPin ||
+	                  isMemoryScopePin ||
+	                  isRecallLevelPin ||
+	                  isSubflowScopePin ||
+	                  isMemoryTagsModePin ||
+	                  isMemoryPlacementPin;
 
                 if (isEmitEventName) {
                   const pinned = pinDefaults.name;
@@ -1861,10 +1868,10 @@ export const BaseNode = memo(function BaseNode({
                   );
                 }
 
-                if (isMemoryPlacementPin && !connected) {
-                  const raw = pinDefaults.placement;
-                  const currentPlacement =
-                    typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : 'after_summary';
+	                if (isMemoryPlacementPin && !connected) {
+	                  const raw = pinDefaults.placement;
+	                  const currentPlacement =
+	                    typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : 'after_summary';
                   controls.push(
                     <AfSelect
                       key="memory-placement"
@@ -1880,13 +1887,36 @@ export const BaseNode = memo(function BaseNode({
                       minPopoverWidth={200}
                       onChange={(v) => setPinDefault('placement', (v || 'after_summary') as any)}
                     />
-                  );
-                }
+	                  );
+	                }
 
-                if (isCompareOpPin && !connected) {
-                  const raw = pinDefaults.op;
-                  const currentOp = typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : '==';
-                  controls.push(
+	                if (isRecallLevelPin && !connected) {
+	                  const raw = pinDefaults.recall_level;
+	                  const current =
+	                    typeof raw === 'string' && raw.trim().length > 0 ? raw.trim().toLowerCase() : 'standard';
+	                  const options = [
+	                    { value: 'urgent', label: 'urgent' },
+	                    { value: 'standard', label: 'standard' },
+	                    { value: 'deep', label: 'deep' },
+	                  ];
+	                  controls.push(
+	                    <AfSelect
+	                      key="recall-level"
+	                      variant="pin"
+	                      value={options.some((o) => o.value === current) ? current : 'standard'}
+	                      placeholder="standard"
+	                      options={options}
+	                      searchable={false}
+	                      minPopoverWidth={180}
+	                      onChange={(v) => setPinDefault('recall_level', (v || 'standard') as any)}
+	                    />
+	                  );
+	                }
+
+	                if (isCompareOpPin && !connected) {
+	                  const raw = pinDefaults.op;
+	                  const currentOp = typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : '==';
+	                  controls.push(
                     <AfSelect
                       key="compare-op"
                       variant="pin"
