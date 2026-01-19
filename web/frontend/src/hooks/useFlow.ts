@@ -964,6 +964,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
               ? [
                   wantInput({ id: 'exec-in', label: '', type: 'execution' }),
                   wantInput({ id: 'query', label: 'query', type: 'string' }),
+                  wantInput({ id: 'recall_level', label: 'recall_level', type: 'string' }),
                   wantInput({ id: 'limit', label: 'limit', type: 'number' }),
                   wantInput({ id: 'tags', label: 'tags', type: 'object' }),
                   wantInput({ id: 'tags_mode', label: 'tags_mode', type: 'string' }),
@@ -993,6 +994,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                         wantInput({ id: 'exec-in', label: '', type: 'execution' }),
                         wantInput({ id: 'span_ids', label: 'span_ids', type: 'array' }),
                         wantInput({ id: 'placement', label: 'placement', type: 'string' }),
+                        wantInput({ id: 'recall_level', label: 'recall_level', type: 'string' }),
                         wantInput({ id: 'max_messages', label: 'max_messages', type: 'number' }),
                       ]
 	                    : data.nodeType === 'memory_kg_assert'
@@ -1013,6 +1015,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 	                          wantInput({ id: 'until', label: 'until', type: 'string' }),
 	                          wantInput({ id: 'active_at', label: 'active_at', type: 'string' }),
 	                          wantInput({ id: 'scope', label: 'scope', type: 'string' }),
+	                          wantInput({ id: 'recall_level', label: 'recall_level', type: 'string' }),
 	                          wantInput({ id: 'owner_id', label: 'owner_id', type: 'string' }),
 	                          wantInput({ id: 'min_score', label: 'min_score', type: 'number' }),
 	                          wantInput({ id: 'max_input_tokens', label: 'max_input_tokens', type: 'number' }),

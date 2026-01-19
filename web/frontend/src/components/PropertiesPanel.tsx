@@ -1023,6 +1023,34 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 );
               }
 
+              if (
+                pin.id === 'recall_level' &&
+                (data.nodeType === 'memory_query' ||
+                  data.nodeType === 'memory_rehydrate' ||
+                  data.nodeType === 'memory_kg_query' ||
+                  (data.nodeType === 'subflow' &&
+                    data.inputs.some((p) => p.id === 'query_text' || p.id === 'query')))
+              ) {
+                const current = typeof raw === 'string' && raw.trim() ? raw.trim().toLowerCase() : 'standard';
+                const options = ['urgent', 'standard', 'deep'];
+                return (
+                  <div key={pin.id} className="property-group">
+                    <label className="property-sublabel">{rowLabel}</label>
+                    <select
+                      className="property-select"
+                      value={options.includes(current) ? current : 'standard'}
+                      onChange={(e) => setPinDefault(pin.id, e.target.value)}
+                    >
+                      {options.map((v) => (
+                        <option key={v} value={v}>
+                          {v}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              }
+
               if (pin.id === 'tags_mode' && data.nodeType === 'memory_query') {
                 const current = typeof raw === 'string' && raw.trim() ? raw.trim() : 'all';
                 return (
@@ -2908,6 +2936,24 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                   <select
                     className="property-select"
                     value={options.includes(current) ? current : 'run'}
+                    onChange={(e) => setPinDefault(pin.id, e.target.value)}
+                  >
+                    {options.map((v) => (
+                      <option key={v} value={v}>
+                        {v}
+                      </option>
+                    ))}
+                  </select>
+                );
+              }
+
+              if (pin.id === 'recall_level') {
+                const options = ['urgent', 'standard', 'deep'];
+                const current = typeof raw === 'string' && raw.trim() ? raw.trim().toLowerCase() : 'standard';
+                return (
+                  <select
+                    className="property-select"
+                    value={options.includes(current) ? current : 'standard'}
                     onChange={(e) => setPinDefault(pin.id, e.target.value)}
                   >
                     {options.map((v) => (

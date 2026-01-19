@@ -3158,6 +3158,26 @@ export function RunFlowModal({
                         );
                       }
 
+                      if (pin.id === 'recall_level') {
+                        const options = ['urgent', 'standard', 'deep'].map((v) => ({ value: v, label: v }));
+                        return (
+                          <div key={pin.id} className="run-form-field">
+                            <label className="run-form-label">
+                              {pin.label}
+                              <span className="run-form-type">({pin.type})</span>
+                            </label>
+                            <AfSelect
+                              value={value}
+                              placeholder="standard"
+                              options={options}
+                              searchable={false}
+                              disabled={isRunning}
+                              onChange={(v) => handleFieldChange(pin.id, v || 'standard')}
+                            />
+                          </div>
+                        );
+                      }
+
                       if (pin.type === 'array') {
                         return (
                           <div key={pin.id} className="run-form-field">

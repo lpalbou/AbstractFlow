@@ -26,6 +26,7 @@ class KgQueryRequest(BaseModel):
     run_id: Optional[str] = Field(default=None, description="Run id used to resolve scope owner ids (run/session/all).")
     scope: str = Field(default="session", description="run | session | global | all")
     owner_id: Optional[str] = Field(default=None, description="Explicit owner_id override (advanced).")
+    recall_level: Optional[str] = Field(default=None, description="urgent | standard | deep (optional recall effort policy)")
 
     query_text: Optional[str] = Field(default="", description="Semantic query (requires embeddings).")
     subject: Optional[str] = Field(default="", description="Exact-match subject filter (trim+lower).")
@@ -163,4 +164,3 @@ async def kg_query(request: KgQueryRequest) -> Dict[str, Any]:
 
     result = getattr(outcome, "result", None)
     return result if isinstance(result, dict) else {"ok": True, "result": result}
-

@@ -1101,6 +1101,7 @@ const MEMORY_NODES: NodeTemplate[] = [
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
       { id: 'query', label: 'query', type: 'string', description: 'Keyword query (substring match over span metadata and small previews). Combined with tags/authors/locations using AND semantics.' },
+      { id: 'recall_level', label: 'recall_level', type: 'string', description: 'Recall effort policy: urgent | standard | deep (optional; when set, applies bounded budgets and no-silent-downgrade semantics).' },
       { id: 'limit', label: 'limit', type: 'number', description: 'Maximum number of spans to return (limit_spans). Default: 5.' },
       { id: 'tags', label: 'tags', type: 'object', description: 'Tag filters as key→string or key→list[string]. Reserved key "kind" is ignored.' },
       { id: 'tags_mode', label: 'tags_mode', type: 'string', description: 'How to combine tag keys: all (AND) or any (OR). Within a single key, list values are OR.' },
@@ -1172,6 +1173,7 @@ const MEMORY_NODES: NodeTemplate[] = [
       { id: 'exec-in', label: '', type: 'execution' },
       { id: 'span_ids', label: 'span_ids', type: 'array', description: 'List of span_ids (artifact_ids) to insert into context.messages. Typically comes from Recall results.' },
       { id: 'placement', label: 'placement', type: 'string', description: 'Where to insert: after_summary | after_system | end.' },
+      { id: 'recall_level', label: 'recall_level', type: 'string', description: 'Recall effort policy: urgent | standard | deep (optional; when set, applies bounded budgets and no-silent-downgrade semantics).' },
       { id: 'max_messages', label: 'max_messages', type: 'number', description: 'Optional cap on inserted messages across all spans (None/empty = unlimited). Useful to avoid huge contexts.' },
     ],
     outputs: [
@@ -1197,6 +1199,7 @@ const MEMORY_NODES: NodeTemplate[] = [
       { id: 'until', label: 'until', type: 'string', description: 'Optional observed_at upper bound (ISO8601).' },
       { id: 'active_at', label: 'active_at', type: 'string', description: 'Optional validity window selector (ISO8601). Filters assertions active at that time.' },
       { id: 'scope', label: 'scope', type: 'string', description: 'run | session | global | all (fan-out over run+session+global).' },
+      { id: 'recall_level', label: 'recall_level', type: 'string', description: 'Recall effort policy: urgent | standard | deep (optional; when set, applies bounded budgets and no-silent-downgrade semantics).' },
       { id: 'owner_id', label: 'owner_id', type: 'string', description: 'Optional explicit owner id override (advanced; normally derived from scope).' },
       { id: 'min_score', label: 'min_score', type: 'number', description: 'Optional cosine similarity threshold (semantic query_text only). Range ~[-1..1]; start with 0.2–0.4.' },
       { id: 'max_input_tokens', label: 'max_input_tokens', type: 'number', description: 'Optional token budget for Active Memory packing (KG → prompt). If set, returns active_memory_text + packets.' },
