@@ -174,6 +174,7 @@ def create_visual_runner(
             "memory_rehydrate",
             "memory_kg_assert",
             "memory_kg_query",
+            "memact_compose",
         }
 
         node_types: Dict[str, str] = {n.id: _node_type(n) for n in vf.nodes}

@@ -143,6 +143,7 @@ class NodeType(str, Enum):
     MEMORY_REHYDRATE = "memory_rehydrate"
     MEMORY_KG_ASSERT = "memory_kg_assert"
     MEMORY_KG_QUERY = "memory_kg_query"
+    MEMACT_COMPOSE = "memact_compose"
     TOOL_CALLS = "tool_calls"
     CALL_TOOL = "call_tool"
     TOOLS_ALLOWLIST = "tools_allowlist"

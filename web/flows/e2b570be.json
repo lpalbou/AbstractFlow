@@ -732,7 +732,7 @@
                 "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/322-framework-workflow-dsl-documentation-visualflow-and-workflowartifact.md'. Extract the main goal, technical approach, and implications."
               },
               {
-                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/311-abstractruntime-run-history-bundle-and-workflow-snapshot.md'. Extract the main goal, technical approach, and implications."
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/completed/311-abstractruntime-run-history-bundle-and-workflow-snapshot.md'. Extract the main goal, technical approach, and implications."
               },
               {
                 "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/315-framework-workflow-registry-publish-install-and-interface-discovery.md'. Extract the main goal, technical approach, and implications."

@@ -1221,6 +1221,30 @@ const MEMORY_NODES: NodeTemplate[] = [
     category: 'memory',
   },
   {
+    type: 'memact_compose',
+    icon: '&#x1F9E9;', // Puzzle piece
+    label: 'MemAct Compose',
+    description: 'Map KG query results (packets/items) into MemAct CURRENT CONTEXT and render a MemAct system prompt for inspection.',
+    headerColor: '#16A085', // Teal - memory composition
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'kg_result', label: 'kg_result', type: 'object', description: 'Connect memory_kg_query.raw (or the full node output).' },
+      { id: 'stimulus', label: 'stimulus', type: 'string', description: 'Optional stimulus label for trace (defaults to query_text/task).' },
+      { id: 'marker', label: 'marker', type: 'string', description: 'Prefix marker used to replace previous KG-composed context entries. Default: KG:' },
+      { id: 'max_items', label: 'max_items', type: 'number', description: 'Optional cap on inserted packets (after packetization/packing).' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'ok', label: 'ok', type: 'boolean', description: 'True when composition succeeded.' },
+      { id: 'delta', label: 'delta', type: 'object', description: 'MemAct delta applied to Active Memory (current_context added/removed).' },
+      { id: 'trace', label: 'trace', type: 'object', description: 'JSON-safe composition trace (selected packets, budgets, warnings).' },
+      { id: 'active_memory', label: 'active_memory', type: 'object', description: 'Raw MemAct Active Memory object (run.vars._runtime.active_memory).' },
+      { id: 'memact_blocks', label: 'memact_blocks', type: 'array', description: 'Rendered MemAct block list (for UI/debug).' },
+      { id: 'memact_system_prompt', label: 'memact_system_prompt', type: 'string', description: 'Rendered MemAct system prompt (memory blueprints + blocks).' },
+    ],
+    category: 'memory',
+  },
+  {
     type: 'memory_kg_assert',
     icon: '&#x1F9E0;', // Brain
     label: 'KG Assert',

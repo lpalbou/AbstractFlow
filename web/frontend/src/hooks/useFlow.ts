@@ -935,7 +935,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         data.nodeType === 'memory_compact' ||
         data.nodeType === 'memory_rehydrate' ||
         data.nodeType === 'memory_kg_assert' ||
-        data.nodeType === 'memory_kg_query'
+        data.nodeType === 'memory_kg_query' ||
+        data.nodeType === 'memact_compose'
       ) {
         const existingInputs = Array.isArray(data.inputs) ? data.inputs : [];
         const byInputId = new Map(existingInputs.map((p) => [p.id, p] as const));
@@ -1005,7 +1006,15 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 	                          wantInput({ id: 'span_id', label: 'span_id', type: 'string' }),
 	                          wantInput({ id: 'owner_id', label: 'owner_id', type: 'string' }),
 	                        ]
-	                    : [
+	                    : data.nodeType === 'memact_compose'
+	                      ? [
+	                          wantInput({ id: 'exec-in', label: '', type: 'execution' }),
+	                          wantInput({ id: 'kg_result', label: 'kg_result', type: 'object' }),
+	                          wantInput({ id: 'stimulus', label: 'stimulus', type: 'string' }),
+	                          wantInput({ id: 'marker', label: 'marker', type: 'string' }),
+	                          wantInput({ id: 'max_items', label: 'max_items', type: 'number' }),
+	                        ]
+	                      : [
 	                          wantInput({ id: 'exec-in', label: '', type: 'execution' }),
 	                          wantInput({ id: 'query_text', label: 'query_text', type: 'string' }),
 	                          wantInput({ id: 'subject', label: 'subject', type: 'string' }),
@@ -1073,6 +1082,16 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 	                          wantOutput({ id: 'count', label: 'count', type: 'number' }),
 	                          wantOutput({ id: 'ok', label: 'ok', type: 'boolean' }),
 	                        ]
+	                      : data.nodeType === 'memact_compose'
+	                        ? [
+	                            wantOutput({ id: 'exec-out', label: '', type: 'execution' }),
+	                            wantOutput({ id: 'ok', label: 'ok', type: 'boolean' }),
+	                            wantOutput({ id: 'delta', label: 'delta', type: 'object' }),
+	                            wantOutput({ id: 'trace', label: 'trace', type: 'object' }),
+	                            wantOutput({ id: 'active_memory', label: 'active_memory', type: 'object' }),
+	                            wantOutput({ id: 'memact_blocks', label: 'memact_blocks', type: 'array' }),
+	                            wantOutput({ id: 'memact_system_prompt', label: 'memact_system_prompt', type: 'string' }),
+	                          ]
 	                      : [
 	                          wantOutput({ id: 'exec-out', label: '', type: 'execution' }),
 	                          wantOutput({ id: 'items', label: 'items', type: 'assertions' }),
@@ -1101,10 +1120,12 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                 ? new Set(['Tag Memory', 'Memory Tag'])
                 : data.nodeType === 'memory_compact'
                   ? new Set(['Compact', 'Compaction'])
-                  : data.nodeType === 'memory_rehydrate'
-                    ? new Set(['Memory Rehydrate'])
-                    : data.nodeType === 'memory_kg_assert'
-                      ? new Set(['Memory KG Assert', 'KG Assert'])
+                    : data.nodeType === 'memory_rehydrate'
+                      ? new Set(['Memory Rehydrate'])
+                      : data.nodeType === 'memory_kg_assert'
+                        ? new Set(['Memory KG Assert', 'KG Assert'])
+                      : data.nodeType === 'memact_compose'
+                        ? new Set(['MemAct Compose'])
                       : new Set(['Memory KG Query', 'KG Query']);
         if (template && typeof data.label === 'string') {
           const cur = data.label.trim();
