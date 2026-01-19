@@ -924,14 +924,125 @@ async def _execute_runner_loop(
     # - It captures *every* completed LLM call (including loops, agents, subflows).
     # - `_temp.effects` only stores the *latest* result per node id and would undercount loops.
     unsubscribe_ledger: Optional[Any] = None
+    ledger_trace_task: Optional[asyncio.Task] = None
     try:
         ledger_store = runtime.ledger_store if runtime is not None else None  # type: ignore[union-attr]
     except Exception:
         ledger_store = None
 
     if ledger_store is not None and hasattr(ledger_store, "subscribe"):
+        # Stream ledger records as trace_update events (STARTED/COMPLETED/FAILED/WAITING).
+        #
+        # Why ledger:
+        # - STARTED records are appended *before* long-running effects execute (LLM/tool),
+        #   so UIs can show truthful "something is happening" signals on slow hardware.
+        # - COMPLETED/FAILED/WAITING updates reuse the same `step_id` and are appended as
+        #   separate records, allowing the frontend to upsert (started -> completed).
+        ledger_q: "asyncio.Queue[dict]" = asyncio.Queue()
+        loop = asyncio.get_running_loop()
+
+        descendant_cache: set[str] = {root_run_id}
+
+        def _is_descendant_run_id(candidate: str) -> bool:
+            if candidate in descendant_cache:
+                return True
+            if runtime is None:
+                return False
+            cur = candidate
+            seen: set[str] = set()
+            for _ in range(50):
+                if cur in seen:
+                    return False
+                seen.add(cur)
+                try:
+                    st = runtime.get_state(cur)
+                except Exception:
+                    return False
+                parent = getattr(st, "parent_run_id", None)
+                if not isinstance(parent, str) or not parent.strip():
+                    return False
+                pid = parent.strip()
+                if pid == root_run_id:
+                    descendant_cache.add(candidate)
+                    return True
+                cur = pid
+            return False
+
+        def _trace_step_from_ledger(rec: dict) -> dict:
+            # Normalize StepRecord (ledger) -> TraceStep (UI).
+            status = rec.get("status")
+            eff = rec.get("effect")
+            step: dict = {
+                "ts": rec.get("ended_at") or rec.get("started_at") or _utc_now_iso(),
+                "status": status,
+                "step_id": rec.get("step_id"),
+                "attempt": rec.get("attempt"),
+                "idempotency_key": rec.get("idempotency_key"),
+                "effect": eff,
+            }
+            if status == "completed":
+                step["result"] = rec.get("result")
+            elif status == "failed":
+                step["error"] = rec.get("error")
+            elif status == "waiting":
+                # Legacy trace entries store wait details under `wait`.
+                res = rec.get("result")
+                if isinstance(res, dict):
+                    w = res.get("wait")
+                    if isinstance(w, dict):
+                        step["wait"] = w
+                    else:
+                        step["result"] = res
+                else:
+                    step["result"] = res
+            return step
+
+        async def _pump_ledger_traces() -> None:
+            while True:
+                rec = await ledger_q.get()
+                if rec is None:
+                    return
+                try:
+                    run_id = rec.get("run_id")
+                    node_id = rec.get("node_id")
+                    if not isinstance(run_id, str) or not run_id.strip():
+                        continue
+                    if not isinstance(node_id, str) or not node_id.strip():
+                        continue
+                    rid = run_id.strip()
+                    if rid == root_run_id:
+                        # Root run traces are ignored by the UI, so skip.
+                        continue
+                    if not _is_descendant_run_id(rid):
+                        continue
+                    await websocket.send_json(
+                        {
+                            "type": "trace_update",
+                            "ts": _utc_now_iso(),
+                            "runId": rid,
+                            "nodeId": node_id,
+                            "steps": _json_safe([_trace_step_from_ledger(rec)]),
+                        }
+                    )
+                except Exception:
+                    # Observability must not crash the WS loop.
+                    continue
+
+        ledger_trace_task = asyncio.create_task(_pump_ledger_traces())
+
         def _ledger_cb(payload: Any) -> None:
+            if not isinstance(payload, dict):
+                return
+            rid = payload.get("run_id")
+            if isinstance(rid, str) and rid.strip():
+                # Fast-path filter for unrelated runs.
+                if rid.strip() != root_run_id and not _is_descendant_run_id(rid.strip()):
+                    return
             _on_ledger_record(payload)
+            try:
+                loop.call_soon_threadsafe(ledger_q.put_nowait, payload)
+            except Exception:
+                return
 
         try:
             unsubscribe_ledger = ledger_store.subscribe(_ledger_cb)  # type: ignore[attr-defined]
@@ -1298,10 +1409,10 @@ async def _execute_runner_loop(
         duration_ms = (time.perf_counter() - t0) * 1000.0
 
         # Emit per-effect trace deltas for this run (including child agent runs).
-        # This provides live observability even when node_start/node_complete do not change
-        # (e.g. Agent subworkflow stays on a single runtime node while looping effects).
-        # Root runs are ignored by the UI (Agent trace panel is per sub-run), so don't waste work.
-        if not is_root:
+        #
+        # Primary source: ledger stream (STARTED/COMPLETED/FAILED) via subscription.
+        # Fallback: runtime node_traces (older runtimes / tests).
+        if not is_root and ledger_trace_task is None:
             await _emit_trace_deltas(run_id, state)
 
         if is_root:
@@ -1684,6 +1795,13 @@ async def _execute_runner_loop(
     if callable(unsubscribe_ledger):
         try:
             unsubscribe_ledger()
+        except Exception:
+            pass
+
+    if ledger_trace_task is not None:
+        ledger_trace_task.cancel()
+        try:
+            await ledger_trace_task
         except Exception:
             pass
 

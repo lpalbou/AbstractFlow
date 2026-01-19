@@ -70,7 +70,7 @@ function stringifyJson(value: unknown): string {
   }
 }
 
-function MinimizeWindowIcon({ size = 16 }: { size?: number }) {
+function MinimizeWindowIcon({ size = 18 }: { size?: number }) {
   return (
     <svg
       aria-hidden="true"
@@ -80,12 +80,13 @@ function MinimizeWindowIcon({ size = 16 }: { size?: number }) {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <path d="M6 12h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="M7 9l5 5 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5 17h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
     </svg>
   );
 }
 
-function MaximizeWindowIcon({ size = 16 }: { size?: number }) {
+function MaximizeWindowIcon({ size = 18 }: { size?: number }) {
   return (
     <svg
       aria-hidden="true"
@@ -95,18 +96,15 @@ function MaximizeWindowIcon({ size = 16 }: { size?: number }) {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <path
-        d="M7 7h10v10H7z"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <path d="M15 4h5v5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M9 20H4v-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M20 4l-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4 20l6-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
 
-function RestoreWindowIcon({ size = 16 }: { size?: number }) {
+function RestoreWindowIcon({ size = 18 }: { size?: number }) {
   return (
     <svg
       aria-hidden="true"
@@ -116,20 +114,10 @@ function RestoreWindowIcon({ size = 16 }: { size?: number }) {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <path
-        d="M9 9h10v10H9z"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M5 15H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v1"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <path d="M5 15h5v5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M19 9h-5V4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M14 10l6-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M10 14l-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

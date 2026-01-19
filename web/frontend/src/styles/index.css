@@ -1268,6 +1268,7 @@ button.primary:hover:not(:disabled) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  line-height: 0;
   padding: 0;
   border-radius: 8px;
   border: 1px solid var(--bg-tertiary);
@@ -1280,6 +1281,7 @@ button.primary:hover:not(:disabled) {
 .run-minimize-btn svg,
 .run-maximize-btn svg {
   display: block;
+  flex-shrink: 0;
 }
 
 .run-minimize-btn:hover,

@@ -24,6 +24,7 @@ export function AgentSubrunTracePanel({
   const items = useMemo<TraceItem[]>(() => {
     if (!rootRunId) return [];
     const out: TraceItem[] = [];
+    const upserts: Map<string, TraceItem> = new Map();
 
     for (let i = 0; i < events.length; i++) {
       const ev = events[i];
@@ -37,18 +38,36 @@ export function AgentSubrunTracePanel({
         const st = steps[j];
         if (!st || typeof st !== 'object') continue;
         const step = st as TraceStep;
+        const stepId = typeof (step as any).step_id === 'string' ? String((step as any).step_id) : '';
         const ts = typeof step.ts === 'string' ? step.ts : undefined;
         const status = typeof step.status === 'string' ? step.status : 'unknown';
-        out.push({
-          id: `trace:${ev.runId}:${nodeId}:${i}:${j}:${ts || ''}`,
-          runId: ev.runId,
-          nodeId,
-          ts,
-          status,
-          step,
-        });
+        if (stepId) {
+          const key = `ledger:${ev.runId}:${nodeId}:${stepId}`;
+          upserts.set(key, {
+            id: key,
+            runId: ev.runId,
+            nodeId,
+            ts,
+            status,
+            step,
+          });
+        } else {
+          // Legacy runtime node_traces are append-only and do not include step_id.
+          // Keep them as unique items.
+          out.push({
+            id: `trace:${ev.runId}:${nodeId}:${i}:${j}:${ts || ''}`,
+            runId: ev.runId,
+            nodeId,
+            ts,
+            status,
+            step,
+          });
+        }
       }
     }
+
+    // Add ledger upserts (STARTED/COMPLETED updates share step_id and should collapse).
+    out.push(...Array.from(upserts.values()));
 
     // Best-effort sort by trace timestamp (fallback to arrival order).
     out.sort((a, b) => {
@@ -73,4 +92,3 @@ export function AgentSubrunTracePanel({
     />
   );
 }
-

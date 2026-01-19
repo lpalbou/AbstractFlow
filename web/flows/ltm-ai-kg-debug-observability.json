@@ -34,6 +34,11 @@
             "type": "model"
           },
           {
+            "id": "extract_model",
+            "label": "extract_model",
+            "type": "model"
+          },
+          {
             "id": "ingest_enabled",
             "label": "ingest_enabled",
             "type": "boolean"
@@ -139,6 +144,7 @@
           "seed_demo": true,
           "provider": "lmstudio",
           "model": "qwen/qwen3-next-80b",
+          "extract_model": "qwen/qwen3-4b-2507",
           "domain_focus": "software / agents / memory systems",
           "text": "Data was found by Starfleet in 2338. He was the sole survivor on Omicron Theta in the rubble of a colony left after an attack from the Crystalline Entity. He is a synthetic lifeform with artificial intelligence, designed and built by Doctor Noonien Soong in his own likeness.\n\nHis positronic brain allows him impressive computational capabilities. He experienced ongoing difficulties during the early years of his life with understanding various aspects of human behavior and was unable to feel emotion, inspiring him to strive for his own humanity. This goal eventually led to the addition of an \"emotion chip\", created by Soong, to Data's positronic net.",
           "scope": "run",
@@ -1595,6 +1601,11 @@
             "type": "model"
           },
           {
+            "id": "extract_model",
+            "label": "extract_model",
+            "type": "model"
+          },
+          {
             "id": "domain_focus",
             "label": "domain_focus",
             "type": "string"
@@ -1758,7 +1769,7 @@
           }
         ],
         "codeBody": "# Available variables:\n# _input (dict)\n# input (any)\n\nreturn input",
-        "code": "def transform(_input):\n    d = _input if isinstance(_input, dict) else {}\n\n    def _sf(v):\n        return v.strip() if isinstance(v, str) else ''\n\n    def _n(v):\n        try:\n            if v is None or isinstance(v, bool):\n                return 0\n            return int(float(v))\n        except Exception:\n            return 0\n\n    ingest_enabled = bool(d.get('ingest_enabled'))\n    seed_demo = bool(d.get('seed_demo'))\n\n    provider = _sf(d.get('provider'))\n    model = _sf(d.get('model'))\n    domain_focus = _sf(d.get('domain_focus'))\n    scope = _sf(d.get('scope'))\n    owner_id = _sf(d.get('owner_id'))\n\n    extracted_count = _n(d.get('extracted_count'))\n    asserted_count = _n(d.get('assert_count'))\n    demo_count = _n(d.get('demo_assert_count'))\n\n    browse_count = _n(d.get('browse_count'))\n    browse_dropped = _n(d.get('browse_dropped'))\n    browse_tokens = _n(d.get('browse_estimated_tokens'))\n\n    loose_count = _n(d.get('loose_count'))\n    loose_dropped = _n(d.get('loose_dropped'))\n    loose_tokens = _n(d.get('loose_estimated_tokens'))\n\n    strict_count = _n(d.get('strict_count'))\n    strict_dropped = _n(d.get('strict_dropped'))\n    strict_tokens = _n(d.get('strict_estimated_tokens'))\n\n    browse_active = _sf(d.get('browse_active'))\n    loose_active = _sf(d.get('loose_active'))\n    strict_active = _sf(d.get('strict_active'))\n\n    def _active_block(title, text):\n        t = text if text else '(empty)'\n        return f\"### {title}\\n```\\n{t}\\n```\"\n\n    lines = []\n    lines.append('# KG Debug / Observability')\n    lines.append('')\n    lines.append('This flow validates: **seed/extract → assert → query → packets → Active Memory**.')\n    lines.append('')\n    lines.append('## How to test')\n    lines.append('- Default is fast: `ingest_enabled=false`, `seed_demo=true` (no LLM calls).')\n    lines.append('- For full LLM extraction: set `ingest_enabled=true` and set `seed_demo=false`.')\n    lines.append('- After running, click each `memory_kg_query` step to open the **KG / Active Memory Explorer** (graph, search, path, live store queries).')\n    lines.append('')\n\n    lines.append('## Inputs')\n    lines.append(f\"- ingest_enabled: `{str(ingest_enabled).lower()}`\")\n    lines.append(f\"- seed_demo: `{str(seed_demo).lower()}`\")\n    lines.append(f\"- provider/model: `{provider or '—'}` / `{model or '—'}`\")\n    lines.append(f\"- domain_focus: `{domain_focus or '—'}`\")\n    lines.append(f\"- scope: `{scope or '—'}`\" + (f\" (owner_id={owner_id})\" if owner_id else ''))\n    lines.append('')\n\n    lines.append('## Counters')\n    lines.append('| stage | count |')\n    lines.append('| --- | ---: |')\n    lines.append(f\"| demo seeded | {demo_count} |\")\n    lines.append(f\"| extracted (LLM) | {extracted_count} |\")\n    lines.append(f\"| asserted (LLM) | {asserted_count} |\")\n    lines.append(f\"| snapshot (pattern) | {browse_count} |\")\n    lines.append(f\"| semantic (loose) | {loose_count} |\")\n    lines.append(f\"| semantic (strict) | {strict_count} |\")\n    lines.append('')\n\n    lines.append('## Packing')\n    lines.append('| query | estimated_tokens | dropped |')\n    lines.append('| --- | ---: | ---: |')\n    lines.append(f\"| snapshot | {browse_tokens} | {browse_dropped} |\")\n    lines.append(f\"| loose | {loose_tokens} | {loose_dropped} |\")\n    lines.append(f\"| strict | {strict_tokens} | {strict_dropped} |\")\n    lines.append('')\n\n    lines.append(_active_block('Active Memory (snapshot)', browse_active))\n    lines.append('')\n    lines.append(_active_block('Active Memory (loose)', loose_active))\n    lines.append('')\n    lines.append(_active_block('Active Memory (strict)', strict_active))\n    lines.append('')\n\n    result = '\\n'.join(lines).strip() + '\\n'\n    summary = {\n        'seeded_count': demo_count,\n        'extracted_count': extracted_count,\n        'asserted_count': asserted_count,\n        'browse_count': browse_count,\n        'loose_count': loose_count,\n        'strict_count': strict_count,\n    }\n    return {'exec-out': True, 'result': result, 'summary': summary}\n",
+        "code": "def transform(_input):\n    d = _input if isinstance(_input, dict) else {}\n\n    def _sf(v):\n        return v.strip() if isinstance(v, str) else ''\n\n    def _n(v):\n        try:\n            if v is None or isinstance(v, bool):\n                return 0\n            return int(float(v))\n        except Exception:\n            return 0\n\n    ingest_enabled = bool(d.get('ingest_enabled'))\n    seed_demo = bool(d.get('seed_demo'))\n\n    provider = _sf(d.get('provider'))\n    model = _sf(d.get('model'))\n    extract_model = _sf(d.get('extract_model')) or model\n    domain_focus = _sf(d.get('domain_focus'))\n    scope = _sf(d.get('scope'))\n    owner_id = _sf(d.get('owner_id'))\n\n    extracted_count = _n(d.get('extracted_count'))\n    asserted_count = _n(d.get('assert_count'))\n    demo_count = _n(d.get('demo_assert_count'))\n\n    browse_count = _n(d.get('browse_count'))\n    browse_dropped = _n(d.get('browse_dropped'))\n    browse_tokens = _n(d.get('browse_estimated_tokens'))\n\n    loose_count = _n(d.get('loose_count'))\n    loose_dropped = _n(d.get('loose_dropped'))\n    loose_tokens = _n(d.get('loose_estimated_tokens'))\n\n    strict_count = _n(d.get('strict_count'))\n    strict_dropped = _n(d.get('strict_dropped'))\n    strict_tokens = _n(d.get('strict_estimated_tokens'))\n\n    browse_active = _sf(d.get('browse_active'))\n    loose_active = _sf(d.get('loose_active'))\n    strict_active = _sf(d.get('strict_active'))\n\n    def _active_block(title, text):\n        t = text if text else '(empty)'\n        return f\"### {title}\\n```\\n{t}\\n```\"\n\n    lines = []\n    lines.append('# KG Debug / Observability')\n    lines.append('')\n    lines.append('This flow validates: **seed/extract \\u2192 assert \\u2192 query \\u2192 packets \\u2192 Active Memory**.')\n    lines.append('')\n    lines.append('## How to test')\n    lines.append('- Default is fast: `ingest_enabled=false`, `seed_demo=true` (no LLM calls).')\n    lines.append('- For full LLM extraction: set `ingest_enabled=true` and set `seed_demo=false`.')\n    lines.append('- If your GPU is weak: set `extract_model` to a smaller model (e.g. `qwen/qwen3-4b-2507`) to avoid long stalls.')\n    lines.append('- After running, click each `memory_kg_query` step to open the **KG / Active Memory Explorer** (graph, search, path, live store queries).')\n    lines.append('')\n\n    lines.append('## Inputs')\n    lines.append(f\"- ingest_enabled: `{str(ingest_enabled).lower()}`\")\n    lines.append(f\"- seed_demo: `{str(seed_demo).lower()}`\")\n    lines.append(f\"- provider: `{provider or '\\u2014'}`\")\n    lines.append(f\"- model (packing): `{model or '\\u2014'}`\")\n    lines.append(f\"- extract_model (LLM extraction): `{extract_model or '\\u2014'}`\")\n    lines.append(f\"- domain_focus: `{domain_focus or '\\u2014'}`\")\n    lines.append(f\"- scope: `{scope or '\\u2014'}`\" + (f\" (owner_id={owner_id})\" if owner_id else ''))\n    lines.append('')\n\n    lines.append('## Counters')\n    lines.append('| stage | count |')\n    lines.append('| --- | ---: |')\n    lines.append(f\"| demo seeded | {demo_count} |\")\n    lines.append(f\"| extracted (LLM) | {extracted_count} |\")\n    lines.append(f\"| asserted (LLM) | {asserted_count} |\")\n    lines.append(f\"| snapshot (pattern) | {browse_count} |\")\n    lines.append(f\"| semantic (loose) | {loose_count} |\")\n    lines.append(f\"| semantic (strict) | {strict_count} |\")\n    lines.append('')\n\n    lines.append('## Packing')\n    lines.append('| query | estimated_tokens | dropped |')\n    lines.append('| --- | ---: | ---: |')\n    lines.append(f\"| snapshot | {browse_tokens} | {browse_dropped} |\")\n    lines.append(f\"| loose | {loose_tokens} | {loose_dropped} |\")\n    lines.append(f\"| strict | {strict_tokens} | {strict_dropped} |\")\n    lines.append('')\n\n    lines.append(_active_block('Active Memory (snapshot)', browse_active))\n    lines.append('')\n    lines.append(_active_block('Active Memory (loose)', loose_active))\n    lines.append('')\n    lines.append(_active_block('Active Memory (strict)', strict_active))\n    lines.append('')\n\n    result = '\\n'.join(lines).strip() + '\\n'\n    summary = {\n        'seeded_count': demo_count,\n        'extracted_count': extracted_count,\n        'asserted_count': asserted_count,\n        'browse_count': browse_count,\n        'loose_count': loose_count,\n        'strict_count': strict_count,\n    }\n    return {'exec-out': True, 'result': result, 'summary': summary}\n",
         "functionName": "transform"
       },
       "label": null,
@@ -1849,7 +1860,7 @@
     {
       "id": "edge-6",
       "source": "node-1",
-      "sourceHandle": "model",
+      "sourceHandle": "extract_model",
       "target": "node-5",
       "targetHandle": "value",
       "animated": false
@@ -2364,6 +2375,14 @@
       "sourceHandle": "model",
       "target": "node-18",
       "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "edge-92",
+      "source": "node-1",
+      "sourceHandle": "extract_model",
+      "target": "node-18",
+      "targetHandle": "extract_model",
       "animated": false
     },
     {

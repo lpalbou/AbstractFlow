@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 
-import { KgActiveMemoryExplorer, type KgAssertion, type KgQueryParams, type KgQueryResult } from '@abstractuic/monitor-active-memory';
+import { KgActiveMemoryExplorer, type JsonValue, type KgAssertion, type KgQueryParams, type KgQueryResult } from '@abstractuic/monitor-active-memory';
 
 interface KgActiveMemoryPanelProps {
   runId: string | null;
@@ -25,6 +25,11 @@ export function KgActiveMemoryPanel({ runId, title, output }: KgActiveMemoryPane
   const obj = asRecord(output);
   const items = useMemo(() => normalizeAssertions(obj?.items), [obj?.items]);
   const activeMemoryText = useMemo(() => (typeof obj?.active_memory_text === 'string' ? obj.active_memory_text : ''), [obj?.active_memory_text]);
+  const packets = useMemo(() => (Array.isArray(obj?.packets) ? (obj?.packets as JsonValue[]) : []), [obj?.packets]);
+  const packetsVersion = useMemo(() => (typeof obj?.packets_version === 'number' ? obj?.packets_version : undefined), [obj?.packets_version]);
+  const packedCount = useMemo(() => (typeof obj?.packed_count === 'number' ? obj?.packed_count : undefined), [obj?.packed_count]);
+  const dropped = useMemo(() => (typeof obj?.dropped === 'number' ? obj?.dropped : undefined), [obj?.dropped]);
+  const estimatedTokens = useMemo(() => (typeof obj?.estimated_tokens === 'number' ? obj?.estimated_tokens : undefined), [obj?.estimated_tokens]);
 
   const onQuery = useCallback(
     async (params: KgQueryParams): Promise<KgQueryResult> => {
@@ -43,12 +48,19 @@ export function KgActiveMemoryPanel({ runId, title, output }: KgActiveMemoryPane
     [runId]
   );
 
-  if (!items.length && !activeMemoryText) return null;
-
   return (
     <div style={{ marginBottom: 14 }}>
-      <KgActiveMemoryExplorer title={title} items={items} activeMemoryText={activeMemoryText} onQuery={onQuery} />
+      <KgActiveMemoryExplorer
+        title={title}
+        items={items}
+        activeMemoryText={activeMemoryText}
+        packets={packets}
+        packetsVersion={packetsVersion}
+        packedCount={packedCount}
+        dropped={dropped}
+        estimatedTokens={estimatedTokens}
+        onQuery={onQuery}
+      />
     </div>
   );
 }
-
