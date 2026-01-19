@@ -26,6 +26,8 @@ export function KgActiveMemoryPanel({ runId, title, output }: KgActiveMemoryPane
   const items = useMemo(() => normalizeAssertions(obj?.items), [obj?.items]);
   const activeMemoryText = useMemo(() => (typeof obj?.active_memory_text === 'string' ? obj.active_memory_text : ''), [obj?.active_memory_text]);
   const packets = useMemo(() => (Array.isArray(obj?.packets) ? (obj?.packets as JsonValue[]) : []), [obj?.packets]);
+  const effort = useMemo(() => (obj?.effort !== undefined ? (obj.effort as JsonValue) : undefined), [obj?.effort]);
+  const warnings = useMemo(() => (obj?.warnings !== undefined ? (obj.warnings as JsonValue) : undefined), [obj?.warnings]);
   const packetsVersion = useMemo(() => (typeof obj?.packets_version === 'number' ? obj?.packets_version : undefined), [obj?.packets_version]);
   const packedCount = useMemo(() => (typeof obj?.packed_count === 'number' ? obj?.packed_count : undefined), [obj?.packed_count]);
   const dropped = useMemo(() => (typeof obj?.dropped === 'number' ? obj?.dropped : undefined), [obj?.dropped]);
@@ -59,6 +61,8 @@ export function KgActiveMemoryPanel({ runId, title, output }: KgActiveMemoryPane
         packedCount={packedCount}
         dropped={dropped}
         estimatedTokens={estimatedTokens}
+        effort={effort}
+        warnings={warnings}
         onQuery={onQuery}
       />
     </div>

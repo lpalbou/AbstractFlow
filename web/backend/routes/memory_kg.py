@@ -39,11 +39,11 @@ class KgQueryRequest(BaseModel):
     order: Optional[str] = Field(default=None, description="asc | desc (non-semantic queries only).")
 
     min_score: Optional[float] = Field(default=None, description="Cosine similarity threshold for semantic query_text.")
-    limit: int = Field(default=80, ge=1, le=10_000, description="Max results.")
+    limit: Optional[int] = Field(default=None, ge=1, le=10_000, description="Max results (optional; recall_level default applies when omitted).")
 
     max_input_tokens: Optional[int] = Field(
         default=None,
-        ge=1,
+        ge=0,
         le=200_000,
         description="If set, also returns packets + active_memory_text (token-budgeted).",
     )
