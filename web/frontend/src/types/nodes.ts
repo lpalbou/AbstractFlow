@@ -254,6 +254,77 @@ const CORE_NODES: NodeTemplate[] = [
 	        description:
 	          'Optional explicit context object for the agent (e.g. {messages:[...]}). If provided, context.messages overrides the inherited run context messages.',
 	      },
+	      {
+	        id: 'use_session_attachments',
+	        label: 'use_session_attachments',
+	        type: 'boolean',
+	        description:
+	          'When true, include the session attachment index (enables open_attachment). If unset, runtime applies a safe default heuristic (agents with tools include it).',
+	      },
+	      {
+	        id: 'use_span_memory',
+	        label: 'use_span_memory',
+	        type: 'boolean',
+	        description:
+	          'When true, perform span-index recall + rehydration before running the agent (artifact-backed evidence).',
+	      },
+	      {
+	        id: 'use_semantic_search',
+	        label: 'use_semantic_search',
+	        type: 'boolean',
+	        description:
+	          'When true, allow embeddings-driven semantic search over text artifacts (not implemented in v0; reserved for planned memory ingestion).',
+	      },
+	      {
+	        id: 'use_kg_memory',
+	        label: 'use_kg_memory',
+	        type: 'boolean',
+	        description:
+	          'When true, query the temporal KG and inject a bounded “KG Active Memory” system block before running the agent.',
+	      },
+	      {
+	        id: 'memory_query',
+	        label: 'memory_query',
+	        type: 'string',
+	        description:
+	          "Query text used for span/KG recall. If unset, defaults to the agent's prompt/task (best-effort).",
+	      },
+	      {
+	        id: 'memory_scope',
+	        label: 'memory_scope',
+	        type: 'string',
+	        description: 'Memory scope for span/KG recall: run | session | global | all (default: run).',
+	      },
+	      {
+	        id: 'recall_level',
+	        label: 'recall_level',
+	        type: 'string',
+	        description: 'Recall effort policy: urgent | standard | deep (optional; applies bounded budgets with no silent downgrade).',
+	      },
+	      {
+	        id: 'max_span_messages',
+	        label: 'max_span_messages',
+	        type: 'number',
+	        description: 'Optional max messages inserted via span rehydration (bounded by recall_level when set).',
+	      },
+	      {
+	        id: 'kg_max_input_tokens',
+	        label: 'kg_max_input_tokens',
+	        type: 'number',
+	        description: 'Optional KG Active Memory token budget (bounded by recall_level when set; 0 disables packing).',
+	      },
+	      {
+	        id: 'kg_limit',
+	        label: 'kg_limit',
+	        type: 'number',
+	        description: 'Optional KG query limit (bounded by recall_level when set).',
+	      },
+	      {
+	        id: 'kg_min_score',
+	        label: 'kg_min_score',
+	        type: 'number',
+	        description: 'Optional KG similarity min_score (bounded by recall_level when set).',
+	      },
 	      { id: 'provider', label: 'provider', type: 'provider', description: 'LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider.' },
 	      { id: 'model', label: 'model', type: 'model', description: 'LLM model id/name. If unset, uses the node’s configured model.' },
 	      { id: 'system', label: 'system', type: 'string', description: 'Optional system prompt for this agent instance (high priority instructions).' },
@@ -324,6 +395,77 @@ const CORE_NODES: NodeTemplate[] = [
 	        type: 'object',
 	        description:
 	          'Optional explicit context object for this call (e.g. {messages:[...]}). If provided, context.messages overrides inherited run context messages.',
+	      },
+	      {
+	        id: 'use_session_attachments',
+	        label: 'use_session_attachments',
+	        type: 'boolean',
+	        description:
+	          'When true, include the session attachment index (enables open_attachment). If unset, runtime applies a safe default heuristic.',
+	      },
+	      {
+	        id: 'use_span_memory',
+	        label: 'use_span_memory',
+	        type: 'boolean',
+	        description:
+	          'When true, perform span-index recall + rehydration before this LLM call (artifact-backed evidence).',
+	      },
+	      {
+	        id: 'use_semantic_search',
+	        label: 'use_semantic_search',
+	        type: 'boolean',
+	        description:
+	          'When true, allow embeddings-driven semantic search over text artifacts (not implemented in v0; reserved for planned memory ingestion).',
+	      },
+	      {
+	        id: 'use_kg_memory',
+	        label: 'use_kg_memory',
+	        type: 'boolean',
+	        description:
+	          'When true, query the temporal KG and inject a bounded “KG Active Memory” system block into this call.',
+	      },
+	      {
+	        id: 'memory_query',
+	        label: 'memory_query',
+	        type: 'string',
+	        description:
+	          'Query text used for span/KG recall. If unset, defaults to this call’s prompt (best-effort).',
+	      },
+	      {
+	        id: 'memory_scope',
+	        label: 'memory_scope',
+	        type: 'string',
+	        description: 'Memory scope for span/KG recall: run | session | global | all (default: run).',
+	      },
+	      {
+	        id: 'recall_level',
+	        label: 'recall_level',
+	        type: 'string',
+	        description: 'Recall effort policy: urgent | standard | deep (optional; applies bounded budgets with no silent downgrade).',
+	      },
+	      {
+	        id: 'max_span_messages',
+	        label: 'max_span_messages',
+	        type: 'number',
+	        description: 'Optional max messages inserted via span rehydration (bounded by recall_level when set).',
+	      },
+	      {
+	        id: 'kg_max_input_tokens',
+	        label: 'kg_max_input_tokens',
+	        type: 'number',
+	        description: 'Optional KG Active Memory token budget (bounded by recall_level when set; 0 disables packing).',
+	      },
+	      {
+	        id: 'kg_limit',
+	        label: 'kg_limit',
+	        type: 'number',
+	        description: 'Optional KG query limit (bounded by recall_level when set).',
+	      },
+	      {
+	        id: 'kg_min_score',
+	        label: 'kg_min_score',
+	        type: 'number',
+	        description: 'Optional KG similarity min_score (bounded by recall_level when set).',
 	      },
 	      { id: 'provider', label: 'provider', type: 'provider', description: 'LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider.' },
 	      { id: 'model', label: 'model', type: 'model', description: 'LLM model id/name. If unset, uses the node’s configured model.' },
@@ -1216,6 +1358,32 @@ const MEMORY_NODES: NodeTemplate[] = [
       { id: 'packed_count', label: 'packed_count', type: 'number', description: 'Number of packets included in active_memory_text.' },
       { id: 'dropped', label: 'dropped', type: 'number', description: 'Packets dropped due to the Active Memory token budget.' },
       { id: 'estimated_tokens', label: 'estimated_tokens', type: 'number', description: 'Estimated token count of active_memory_text.' },
+      { id: 'raw', label: 'raw', type: 'object', description: 'Raw result object (debug).' },
+    ],
+    category: 'memory',
+  },
+  {
+    type: 'memory_kg_resolve',
+    icon: '&#x1F50D;', // Left-pointing magnifying glass
+    label: 'KG Resolve Entity',
+    description: 'Resolve candidate ex:* entity ids by label (+ optional rdf:type filter), using bounded exact-match rules and optional semantic fallback.',
+    headerColor: '#8E44AD', // Purple - semantic memory
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'label', label: 'label', type: 'string', description: 'Entity label text to resolve (case-insensitive; whitespace collapsed).' },
+      { id: 'expected_type', label: 'expected_type', type: 'string', description: 'Optional rdf:type filter (e.g. schema:person, skos:concept).' },
+      { id: 'scope', label: 'scope', type: 'string', description: 'run | session | global | all (fan-out over run+session+global).' },
+      { id: 'recall_level', label: 'recall_level', type: 'string', description: 'Recall effort policy: urgent | standard | deep (optional; no silent downgrade).' },
+      { id: 'max_candidates', label: 'max_candidates', type: 'number', description: 'Optional cap on returned candidates (default depends on recall_level; max 50).' },
+      { id: 'min_score', label: 'min_score', type: 'number', description: 'Optional cosine similarity threshold for semantic fallback (when enabled).' },
+      { id: 'include_semantic', label: 'include_semantic', type: 'boolean', description: 'Optional override to disable/enable semantic fallback (defaults depend on recall_level).' },
+      { id: 'owner_id', label: 'owner_id', type: 'string', description: 'Optional explicit owner id override (advanced; normally derived from scope).' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'candidates', label: 'candidates', type: 'array', description: 'Resolved candidates (bounded list): {id,label,types,scope,owner_id,score,evidence}.' },
+      { id: 'count', label: 'count', type: 'number', description: 'Number of returned candidates.' },
+      { id: 'ok', label: 'ok', type: 'boolean', description: 'True when the resolver executed successfully.' },
       { id: 'raw', label: 'raw', type: 'object', description: 'Raw result object (debug).' },
     ],
     category: 'memory',

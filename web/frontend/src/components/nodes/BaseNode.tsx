@@ -728,6 +728,7 @@ export const BaseNode = memo(function BaseNode({
   const isMemoryRehydrateNode = data.nodeType === 'memory_rehydrate';
   const isMemoryKgAssertNode = data.nodeType === 'memory_kg_assert';
   const isMemoryKgQueryNode = data.nodeType === 'memory_kg_query';
+  const isMemoryKgResolveNode = data.nodeType === 'memory_kg_resolve';
   // NOTE: Subflow control pins (inherit_context) are configured via pin defaults on the pin row.
   // We intentionally avoid a separate non-pin checkbox to keep the UI single-source-of-truth.
 
@@ -1733,13 +1734,19 @@ export const BaseNode = memo(function BaseNode({
                 const isCompareOpPin = isCompareNode && pin.id === 'op';
                 const isStringifyJsonModePin = isStringifyJsonNode && pin.id === 'mode';
 	                const isMemoryScopePin =
-	                  (isMemoryNoteNode || isMemoryQueryNode || isMemoryTagNode || isMemoryKgAssertNode || isMemoryKgQueryNode) &&
+	                  (isMemoryNoteNode ||
+	                    isMemoryQueryNode ||
+	                    isMemoryTagNode ||
+	                    isMemoryKgAssertNode ||
+	                    isMemoryKgQueryNode ||
+	                    isMemoryKgResolveNode) &&
 	                  pin.id === 'scope';
 	                const isRecallLevelPin =
 	                  pin.id === 'recall_level' &&
 	                  (isMemoryQueryNode ||
 	                    isMemoryRehydrateNode ||
 	                    isMemoryKgQueryNode ||
+	                    isMemoryKgResolveNode ||
 	                    (isSubflowNode && inputData.some((p) => p.id === 'query_text' || p.id === 'query')));
 	                const isSubflowScopePin = isSubflowNode && pin.id === 'scope';
 	                const isMemoryTagsModePin = isMemoryQueryNode && pin.id === 'tags_mode';

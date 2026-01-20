@@ -95,10 +95,10 @@
         ],
 	        "outputs": [{ "id": "result", "label": "result", "type": "string" }],
 	        "pinDefaults": {
-		          "template": "You are a semantic extractor for an AI long-term memory system.\\n\\nTask: output BETWEEN 6 and 12 high-signal, append-only assertions (subject-predicate-object) supported by TEXT (aim for ~8).\\nOnly output fewer than 6 if the text truly contains fewer distinct atomic facts.\\nDomain focus (only affects what you keep): {{domain_focus}}\\n\\nHard rules:\\n- Only assert what TEXT directly states (no external knowledge).\\n- Output MUST match the enforced structured-output schema: {\\\"assertions\\\":[...]}.\\n- Use ONLY predicates allowed by the schema enum (do not invent new predicates).\\n- If TEXT contains any factual statement, return >=1 assertion (never return empty just because TEXT is short).\\n- attributes.evidence_quote MUST be an exact verbatim substring of TEXT, <=160 chars, no ellipses.\\n- attributes.original_context (optional) MUST be an exact substring of TEXT, <=280 chars, and include evidence_quote.\\n- IDs: use lowercase stable CURIE-like ids. For new entities use ex:{kind}-{kebab-case}.\\n\\nEntity completeness (important):\\n- For every new ex:* entity you introduce, add:\\n  - rdf:type (to one of: skos:Concept, cito:Claim, schema:Event, schema:Person, schema:Organization, schema:Thing, dcterms:Text)\\n  - one primary label:\\n    - concepts → skos:prefLabel\\n    - claims → skos:definition\\n    - events/people/orgs/places → schema:name\\n    - documents → dcterms:title\\n\\nExtraction strategy (do this unless impossible):\\n- Capture 1–3 main statements as cito:Claim + skos:definition (use verbatim evidence_quote text).\\n- Create skos:Concept nodes for key terms, and link claims to them with schema:about / schema:mentions.\\n- Create schema:Event nodes only for explicit happenings.\\n\\nExample (for \\\"Mistakes are opportunities for growth.\\\"):\\n- ex:claim-mistakes-opportunities rdf:type cito:Claim\\n- ex:claim-mistakes-opportunities skos:definition \\\"mistakes are opportunities for growth\\\"\\n- ex:concept-mistake rdf:type skos:Concept\\n- ex:concept-mistake skos:prefLabel \\\"mistakes\\\"\\n- ex:claim-mistakes-opportunities schema:about ex:concept-mistake\\n\\nTEXT:\\n{{text}}"
-		        }
-		      }
-		    },
+		          "template": "You are a semantic extractor for an AI long-term memory system.\\n\\nTask: output BETWEEN 6 and 12 high-signal, append-only assertions (subject-predicate-object) supported by TEXT (aim for ~8).\\nOnly output fewer than 6 if the text truly contains fewer distinct atomic facts.\\nDomain focus (only affects what you keep): {{domain_focus}}\\n\\nHard rules:\\n- Only assert what TEXT directly states (no external knowledge).\\n- Output MUST match the enforced structured-output schema: {\\\"assertions\\\":[...]}.\\n- Use ONLY predicates allowed by the schema enum (do not invent new predicates).\\n- If TEXT contains any factual statement, return >=1 assertion (never return empty just because TEXT is short).\\n- attributes.evidence_quote MUST be an exact verbatim substring of TEXT, <=160 chars, no ellipses.\\n- attributes.original_context (optional) MUST be an exact substring of TEXT, <=280 chars, and include evidence_quote.\\n- IDs: use lowercase stable CURIE-like ids. For new entities use ex:{kind}-{kebab-case}.\\n- ID reuse: if the system prompt includes a \\\"## KG ACTIVE MEMORY\\\" block, reuse matching existing ex:* ids (match by rdf:type + primary label). Only mint a new id when no candidate fits.\\n\\nEntity completeness (important):\\n- For every new ex:* entity you introduce, add:\\n  - rdf:type (to one of: skos:Concept, cito:Claim, schema:Event, schema:Person, schema:Organization, schema:Thing, dcterms:Text)\\n  - one primary label:\\n    - concepts → skos:prefLabel\\n    - claims → skos:definition\\n    - events/people/orgs/places → schema:name\\n    - documents → dcterms:title\\n\\nExtraction strategy (do this unless impossible):\\n- Capture 1–3 main statements as cito:Claim + skos:definition (use verbatim evidence_quote text).\\n- Create skos:Concept nodes for key terms, and link claims to them with schema:about / schema:mentions.\\n- Create schema:Event nodes only for explicit happenings.\\n\\nExample (for \\\"Mistakes are opportunities for growth.\\\"):\\n- ex:claim-mistakes-opportunities rdf:type cito:Claim\\n- ex:claim-mistakes-opportunities skos:definition \\\"mistakes are opportunities for growth\\\"\\n- ex:concept-mistake rdf:type skos:Concept\\n- ex:concept-mistake skos:prefLabel \\\"mistakes\\\"\\n- ex:claim-mistakes-opportunities schema:about ex:concept-mistake\\n\\nTEXT:\\n{{text}}"
+	        }
+	      }
+	    },
     {
       "id": "node-6",
       "type": "json_schema",
@@ -150,6 +150,9 @@
 	        },
 	        "pinDefaults": {
 	          "include_context": false,
+	          "use_kg_memory": true,
+	          "memory_scope": "session",
+	          "recall_level": "standard",
 	          "system": "You are a semantic extractor for an AI long-term memory system. Always comply with the provided structured output schema."
 	        }
       }
@@ -255,6 +258,7 @@
     { "id": "edge-4", "source": "node-1", "sourceHandle": "domain_focus", "target": "node-4", "targetHandle": "value", "animated": false },
     { "id": "edge-5", "source": "node-4", "sourceHandle": "result", "target": "node-5", "targetHandle": "vars", "animated": false },
     { "id": "edge-6", "source": "node-5", "sourceHandle": "result", "target": "node-7", "targetHandle": "prompt", "animated": false },
+    { "id": "edge-6b", "source": "node-1", "sourceHandle": "text", "target": "node-7", "targetHandle": "memory_query", "animated": false },
 	    { "id": "edge-7", "source": "node-1", "sourceHandle": "provider", "target": "node-7", "targetHandle": "provider", "animated": false },
 	    { "id": "edge-8", "source": "node-1", "sourceHandle": "model", "target": "node-7", "targetHandle": "model", "animated": false },
 	    { "id": "edge-8b", "source": "node-1", "sourceHandle": "max_out_tokens", "target": "node-7", "targetHandle": "max_out_tokens", "animated": false },

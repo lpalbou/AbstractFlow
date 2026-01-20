@@ -956,7 +956,8 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               data.nodeType === 'memory_query' ||
               data.nodeType === 'memory_tag' ||
               data.nodeType === 'memory_kg_assert' ||
-              data.nodeType === 'memory_kg_query')
+              data.nodeType === 'memory_kg_query' ||
+              data.nodeType === 'memory_kg_resolve')
           )
             return true;
           if (p.id === 'tags_mode' && data.nodeType === 'memory_query') return true;
@@ -996,6 +997,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                   data.nodeType === 'memory_tag' ||
                   data.nodeType === 'memory_kg_assert' ||
                   data.nodeType === 'memory_kg_query' ||
+                  data.nodeType === 'memory_kg_resolve' ||
                   data.nodeType === 'subflow')
               ) {
                 const current = typeof raw === 'string' && raw.trim() ? raw.trim() : 'run';
@@ -1003,6 +1005,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                   data.nodeType === 'memory_query' ||
                   data.nodeType === 'memory_tag' ||
                   data.nodeType === 'memory_kg_query' ||
+                  data.nodeType === 'memory_kg_resolve' ||
                   (data.nodeType === 'subflow' &&
                     data.inputs.some((p) => p.id === 'query_text' || p.id === 'query'));
                 const options = allowAll ? ['run', 'session', 'global', 'all'] : ['run', 'session', 'global'];

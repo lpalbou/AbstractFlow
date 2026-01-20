@@ -1,0 +1,206 @@
+{
+  "id": "ltm-ai-kg-entity-resolver-debug",
+  "name": "ltm-ai-kg-entity-resolver-debug",
+  "description": "Debug harness for KG entity resolution. Optionally seeds a small demo KG, then resolves candidate ex:* ids by label + optional rdf:type filter.",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": { "x": 96, "y": 96 },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "label", "label": "label", "type": "string" },
+          { "id": "expected_type", "label": "expected_type", "type": "string" },
+          { "id": "scope", "label": "scope", "type": "string" },
+          { "id": "recall_level", "label": "recall_level", "type": "string" },
+          { "id": "max_candidates", "label": "max_candidates", "type": "number" },
+          { "id": "min_score", "label": "min_score", "type": "number" },
+          { "id": "seed_demo", "label": "seed_demo", "type": "boolean" }
+        ],
+        "pinDefaults": {
+          "label": "doctor noonien soong",
+          "expected_type": "schema:person",
+          "scope": "session",
+          "recall_level": "standard",
+          "max_candidates": 5,
+          "min_score": 0.35,
+          "seed_demo": true
+        }
+      }
+    },
+    {
+      "id": "node-7",
+      "type": "if",
+      "position": { "x": 320, "y": 96 },
+      "data": {
+        "nodeType": "if",
+        "label": "Seed demo?",
+        "icon": "&#x2753;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "condition", "label": "condition", "type": "boolean" }
+        ],
+        "outputs": [
+          { "id": "true", "label": "true", "type": "execution" },
+          { "id": "false", "label": "false", "type": "execution" }
+        ]
+      }
+    },
+    {
+      "id": "node-2",
+      "type": "literal_array",
+      "position": { "x": 96, "y": 296 },
+      "data": {
+        "nodeType": "literal_array",
+        "label": "Demo assertions",
+        "icon": "&#x1F4CB;",
+        "headerColor": "#7F8C8D",
+        "inputs": [],
+        "outputs": [{ "id": "value", "label": "assertions", "type": "assertions" }],
+        "literalValue": [
+          {
+            "subject": "ex:person-noonien-soong",
+            "predicate": "schema:name",
+            "object": "doctor noonien soong",
+            "observed_at": "2026-01-01T00:00:06Z",
+            "provenance": { "span_id": "demo-span" }
+          },
+          {
+            "subject": "ex:person-noonien-soong",
+            "predicate": "rdf:type",
+            "object": "schema:Person",
+            "observed_at": "2026-01-01T00:00:05Z",
+            "provenance": { "span_id": "demo-span" }
+          },
+          {
+            "subject": "ex:claim-data-emotion-chip",
+            "predicate": "schema:mentions",
+            "object": "ex:person-noonien-soong",
+            "observed_at": "2026-01-01T00:00:10Z",
+            "provenance": { "span_id": "demo-span" }
+          },
+          {
+            "subject": "ex:concept-emotion-chip",
+            "predicate": "skos:prefLabel",
+            "object": "emotion chip",
+            "observed_at": "2026-01-01T00:00:04Z",
+            "provenance": { "span_id": "demo-span" }
+          },
+          {
+            "subject": "ex:person-data",
+            "predicate": "schema:knowsabout",
+            "object": "human behavior",
+            "observed_at": "2026-01-01T00:00:11Z",
+            "provenance": { "span_id": "demo-span" }
+          }
+        ]
+      }
+    },
+    {
+      "id": "node-3",
+      "type": "memory_kg_assert",
+      "position": { "x": 416, "y": 296 },
+      "data": {
+        "nodeType": "memory_kg_assert",
+        "label": "KG Assert (demo)",
+        "icon": "&#x1F9E0;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "assertions", "label": "assertions", "type": "assertions" },
+          { "id": "scope", "label": "scope", "type": "string" },
+          { "id": "span_id", "label": "span_id", "type": "string" },
+          { "id": "owner_id", "label": "owner_id", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "count", "label": "count", "type": "number" },
+          { "id": "ok", "label": "ok", "type": "boolean" },
+          { "id": "assertion_ids", "label": "assertion_ids", "type": "array" }
+        ],
+        "pinDefaults": { "scope": "session" }
+      }
+    },
+    {
+      "id": "node-4",
+      "type": "memory_kg_resolve",
+      "position": { "x": 704, "y": 96 },
+      "data": {
+        "nodeType": "memory_kg_resolve",
+        "label": "KG Resolve Entity",
+        "icon": "&#x1F50D;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "label", "label": "label", "type": "string" },
+          { "id": "expected_type", "label": "expected_type", "type": "string" },
+          { "id": "scope", "label": "scope", "type": "string" },
+          { "id": "recall_level", "label": "recall_level", "type": "string" },
+          { "id": "max_candidates", "label": "max_candidates", "type": "number" },
+          { "id": "min_score", "label": "min_score", "type": "number" },
+          { "id": "include_semantic", "label": "include_semantic", "type": "boolean" },
+          { "id": "owner_id", "label": "owner_id", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "candidates", "label": "candidates", "type": "array" },
+          { "id": "count", "label": "count", "type": "number" },
+          { "id": "ok", "label": "ok", "type": "boolean" },
+          { "id": "raw", "label": "raw", "type": "object" }
+        ]
+      }
+    },
+    {
+      "id": "node-6",
+      "type": "on_flow_end",
+      "position": { "x": 992, "y": 96 },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "End",
+        "icon": "&#x1F6A9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "ok", "label": "ok", "type": "boolean" },
+          { "id": "count", "label": "count", "type": "number" },
+          { "id": "candidates", "label": "candidates", "type": "array" },
+          { "id": "raw", "label": "raw", "type": "object" }
+        ],
+        "outputs": []
+      }
+    }
+  ],
+  "edges": [
+    { "id": "e0", "source": "node-1", "sourceHandle": "exec-out", "target": "node-7", "targetHandle": "exec-in", "animated": true },
+    { "id": "e0b", "source": "node-1", "sourceHandle": "seed_demo", "target": "node-7", "targetHandle": "condition", "animated": false },
+
+    { "id": "e1", "source": "node-7", "sourceHandle": "true", "target": "node-3", "targetHandle": "exec-in", "animated": true },
+    { "id": "e1b", "source": "node-2", "sourceHandle": "value", "target": "node-3", "targetHandle": "assertions", "animated": false },
+
+    { "id": "e2", "source": "node-3", "sourceHandle": "exec-out", "target": "node-4", "targetHandle": "exec-in", "animated": true },
+    { "id": "e2b", "source": "node-7", "sourceHandle": "false", "target": "node-4", "targetHandle": "exec-in", "animated": true },
+
+    { "id": "e3", "source": "node-1", "sourceHandle": "label", "target": "node-4", "targetHandle": "label", "animated": false },
+    { "id": "e4", "source": "node-1", "sourceHandle": "expected_type", "target": "node-4", "targetHandle": "expected_type", "animated": false },
+    { "id": "e5", "source": "node-1", "sourceHandle": "scope", "target": "node-4", "targetHandle": "scope", "animated": false },
+    { "id": "e6", "source": "node-1", "sourceHandle": "recall_level", "target": "node-4", "targetHandle": "recall_level", "animated": false },
+    { "id": "e7", "source": "node-1", "sourceHandle": "max_candidates", "target": "node-4", "targetHandle": "max_candidates", "animated": false },
+    { "id": "e8", "source": "node-1", "sourceHandle": "min_score", "target": "node-4", "targetHandle": "min_score", "animated": false },
+
+    { "id": "e9", "source": "node-4", "sourceHandle": "exec-out", "target": "node-6", "targetHandle": "exec-in", "animated": true },
+    { "id": "e10", "source": "node-4", "sourceHandle": "ok", "target": "node-6", "targetHandle": "ok", "animated": false },
+    { "id": "e11", "source": "node-4", "sourceHandle": "count", "target": "node-6", "targetHandle": "count", "animated": false },
+    { "id": "e12", "source": "node-4", "sourceHandle": "candidates", "target": "node-6", "targetHandle": "candidates", "animated": false },
+    { "id": "e13", "source": "node-4", "sourceHandle": "raw", "target": "node-6", "targetHandle": "raw", "animated": false }
+  ],
+  "entryNode": "node-1"
+}
+

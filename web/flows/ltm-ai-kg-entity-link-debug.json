@@ -1,0 +1,168 @@
+{
+  "id": "ltm-ai-kg-entity-link-debug",
+  "name": "ltm-ai-kg-entity-link-debug",
+  "description": "Manual KG de-dup helper: write a non-destructive link edge (schema:sameAs / skos:closeMatch / skos:altLabel) with provenance.",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": { "x": 96, "y": 96 },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "subject", "label": "subject", "type": "string" },
+          { "id": "predicate", "label": "predicate", "type": "string" },
+          { "id": "object", "label": "object", "type": "string" },
+          { "id": "scope", "label": "scope", "type": "string" },
+          { "id": "span_id", "label": "span_id", "type": "string" }
+        ],
+        "pinDefaults": {
+          "subject": "ex:person-noonien-soong",
+          "predicate": "schema:sameAs",
+          "object": "ex:person-noonien-soong",
+          "scope": "session",
+          "span_id": "maintenance"
+        }
+      }
+    },
+    {
+      "id": "node-2",
+      "type": "literal_json",
+      "position": { "x": 96, "y": 248 },
+      "data": {
+        "nodeType": "literal_json",
+        "label": "Assertion",
+        "icon": "{}",
+        "headerColor": "#00FFFF",
+        "inputs": [],
+        "outputs": [{ "id": "value", "label": "value", "type": "object" }],
+        "literalValue": {}
+      }
+    },
+    {
+      "id": "node-3",
+      "type": "set",
+      "position": { "x": 320, "y": 248 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set subject",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "subject" }
+      }
+    },
+    {
+      "id": "node-4",
+      "type": "set",
+      "position": { "x": 544, "y": 248 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set predicate",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "predicate" }
+      }
+    },
+    {
+      "id": "node-5",
+      "type": "set",
+      "position": { "x": 768, "y": 248 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set object",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "object" }
+      }
+    },
+    {
+      "id": "node-6",
+      "type": "memory_kg_assert",
+      "position": { "x": 992, "y": 96 },
+      "data": {
+        "nodeType": "memory_kg_assert",
+        "label": "KG Assert link",
+        "icon": "&#x1F9E0;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "assertions", "label": "assertions", "type": "assertions" },
+          { "id": "scope", "label": "scope", "type": "string" },
+          { "id": "span_id", "label": "span_id", "type": "string" },
+          { "id": "owner_id", "label": "owner_id", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "count", "label": "count", "type": "number" },
+          { "id": "ok", "label": "ok", "type": "boolean" },
+          { "id": "assertion_ids", "label": "assertion_ids", "type": "array" }
+        ]
+      }
+    },
+    {
+      "id": "node-7",
+      "type": "on_flow_end",
+      "position": { "x": 1248, "y": 96 },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "End",
+        "icon": "&#x1F6A9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "ok", "label": "ok", "type": "boolean" },
+          { "id": "count", "label": "count", "type": "number" },
+          { "id": "assertion_ids", "label": "assertion_ids", "type": "array" }
+        ],
+        "outputs": []
+      }
+    }
+  ],
+  "edges": [
+    { "id": "e0", "source": "node-1", "sourceHandle": "exec-out", "target": "node-6", "targetHandle": "exec-in", "animated": true },
+
+    { "id": "e1", "source": "node-2", "sourceHandle": "value", "target": "node-3", "targetHandle": "object", "animated": false },
+    { "id": "e2", "source": "node-1", "sourceHandle": "subject", "target": "node-3", "targetHandle": "value", "animated": false },
+
+    { "id": "e3", "source": "node-3", "sourceHandle": "result", "target": "node-4", "targetHandle": "object", "animated": false },
+    { "id": "e4", "source": "node-1", "sourceHandle": "predicate", "target": "node-4", "targetHandle": "value", "animated": false },
+
+    { "id": "e5", "source": "node-4", "sourceHandle": "result", "target": "node-5", "targetHandle": "object", "animated": false },
+    { "id": "e6", "source": "node-1", "sourceHandle": "object", "target": "node-5", "targetHandle": "value", "animated": false },
+
+    { "id": "e7", "source": "node-5", "sourceHandle": "result", "target": "node-6", "targetHandle": "assertions", "animated": false },
+    { "id": "e8", "source": "node-1", "sourceHandle": "scope", "target": "node-6", "targetHandle": "scope", "animated": false },
+    { "id": "e9", "source": "node-1", "sourceHandle": "span_id", "target": "node-6", "targetHandle": "span_id", "animated": false },
+
+    { "id": "e10", "source": "node-6", "sourceHandle": "exec-out", "target": "node-7", "targetHandle": "exec-in", "animated": true },
+    { "id": "e11", "source": "node-6", "sourceHandle": "ok", "target": "node-7", "targetHandle": "ok", "animated": false },
+    { "id": "e12", "source": "node-6", "sourceHandle": "count", "target": "node-7", "targetHandle": "count", "animated": false },
+    { "id": "e13", "source": "node-6", "sourceHandle": "assertion_ids", "target": "node-7", "targetHandle": "assertion_ids", "animated": false }
+  ],
+  "entryNode": "node-1"
+}
+

@@ -1,0 +1,1239 @@
+{
+  "id": "ac-kg-memory-agent",
+  "name": "AbstractCode KG-Memory Agent (v0)",
+  "description": "RunnableFlow agent with KG recall + end-of-turn KG ingestion (extract → assert). Designed for per-turn memory reconstruction experiments.",
+  "interfaces": [
+    "abstractcode.agent.v1"
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": -960.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "use_context",
+            "label": "use_context",
+            "type": "boolean"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools"
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          },
+          {
+            "id": "max_in_tokens",
+            "label": "max_in_tokens",
+            "type": "number"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "object"
+          },
+          {
+            "id": "use_session_attachments",
+            "label": "use_session_attachments",
+            "type": "boolean"
+          },
+          {
+            "id": "use_span_memory",
+            "label": "use_span_memory",
+            "type": "boolean"
+          },
+          {
+            "id": "use_semantic_search",
+            "label": "use_semantic_search",
+            "type": "boolean"
+          },
+          {
+            "id": "use_kg_memory",
+            "label": "use_kg_memory",
+            "type": "boolean"
+          },
+          {
+            "id": "memory_query",
+            "label": "memory_query",
+            "type": "string"
+          },
+          {
+            "id": "memory_scope",
+            "label": "memory_scope",
+            "type": "string"
+          },
+          {
+            "id": "recall_level",
+            "label": "recall_level",
+            "type": "string"
+          },
+          {
+            "id": "max_span_messages",
+            "label": "max_span_messages",
+            "type": "number"
+          },
+          {
+            "id": "kg_max_input_tokens",
+            "label": "kg_max_input_tokens",
+            "type": "number"
+          },
+          {
+            "id": "kg_limit",
+            "label": "kg_limit",
+            "type": "number"
+          },
+          {
+            "id": "kg_min_score",
+            "label": "kg_min_score",
+            "type": "number"
+          },
+          {
+            "id": "kg_write_scope",
+            "label": "kg_write_scope",
+            "type": "string"
+          },
+          {
+            "id": "kg_domain_focus",
+            "label": "kg_domain_focus",
+            "type": "string"
+          },
+          {
+            "id": "kg_max_out_tokens",
+            "label": "kg_max_out_tokens",
+            "type": "number"
+          }
+        ],
+        "pinDefaults": {
+          "use_context": true,
+          "system": "You are a helpful assistant. Use the provided \"## KG ACTIVE MEMORY\" system block (when present) as retrieved memory from a temporal knowledge graph: it contains relevant facts and relationships. When uncertain, ask clarifying questions.\n\nAfter you respond, the workflow will extract durable facts from this turn and assert them into the KG for next-turn recall.",
+          "use_session_attachments": true,
+          "use_span_memory": false,
+          "use_semantic_search": false,
+          "use_kg_memory": true,
+          "memory_query": "",
+          "memory_scope": "session",
+          "recall_level": "standard",
+          "max_span_messages": 24,
+          "kg_max_input_tokens": 1200,
+          "kg_limit": 80,
+          "kg_min_score": 0.35,
+          "kg_write_scope": "session",
+          "kg_domain_focus": "software / agents / memory systems",
+          "kg_max_out_tokens": 700
+        }
+      }
+    },
+    {
+      "id": "agent",
+      "type": "agent",
+      "position": {
+        "x": -576.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "agent",
+        "label": "Agent (KG recall)",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "use_context",
+            "label": "use_context",
+            "type": "boolean"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools"
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          },
+          {
+            "id": "max_in_tokens",
+            "label": "max_in_tokens",
+            "type": "number"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "object"
+          },
+          {
+            "id": "use_session_attachments",
+            "label": "use_session_attachments",
+            "type": "boolean"
+          },
+          {
+            "id": "use_span_memory",
+            "label": "use_span_memory",
+            "type": "boolean"
+          },
+          {
+            "id": "use_semantic_search",
+            "label": "use_semantic_search",
+            "type": "boolean"
+          },
+          {
+            "id": "use_kg_memory",
+            "label": "use_kg_memory",
+            "type": "boolean"
+          },
+          {
+            "id": "memory_query",
+            "label": "memory_query",
+            "type": "string"
+          },
+          {
+            "id": "memory_scope",
+            "label": "memory_scope",
+            "type": "string"
+          },
+          {
+            "id": "recall_level",
+            "label": "recall_level",
+            "type": "string"
+          },
+          {
+            "id": "max_span_messages",
+            "label": "max_span_messages",
+            "type": "number"
+          },
+          {
+            "id": "kg_max_input_tokens",
+            "label": "kg_max_input_tokens",
+            "type": "number"
+          },
+          {
+            "id": "kg_limit",
+            "label": "kg_limit",
+            "type": "number"
+          },
+          {
+            "id": "kg_min_score",
+            "label": "kg_min_score",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          }
+        ],
+        "agentConfig": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b",
+          "tools": [],
+          "max_iterations": 25
+        }
+      }
+    },
+    {
+      "id": "turn_vars",
+      "type": "make_object",
+      "position": {
+        "x": -576.0,
+        "y": 240.0
+      },
+      "data": {
+        "nodeType": "make_object",
+        "label": "Turn vars",
+        "icon": "{}",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ]
+      }
+    },
+    {
+      "id": "turn_text",
+      "type": "string_template",
+      "position": {
+        "x": -352.0,
+        "y": 240.0
+      },
+      "data": {
+        "nodeType": "string_template",
+        "label": "Turn transcript",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "template",
+            "label": "template",
+            "type": "string"
+          },
+          {
+            "id": "vars",
+            "label": "vars",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "template": "USER: {{prompt}}\\n\\nASSISTANT: {{response}}"
+        }
+      }
+    },
+    {
+      "id": "ingest_input",
+      "type": "make_object",
+      "position": {
+        "x": -128.0,
+        "y": 240.0
+      },
+      "data": {
+        "nodeType": "make_object",
+        "label": "KG ingest input",
+        "icon": "{}",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "text",
+            "label": "text",
+            "type": "string"
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string"
+          },
+          {
+            "id": "domain_focus",
+            "label": "domain_focus",
+            "type": "string"
+          },
+          {
+            "id": "max_out_tokens",
+            "label": "max_out_tokens",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kg_ingest",
+      "type": "subflow",
+      "position": {
+        "x": 128.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "KG ingest (extract → assert)",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean",
+            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          }
+        ],
+        "subflowId": "ltm-ai-kg-ingest-turn",
+        "pinDefaults": {
+          "inherit_context": false
+        }
+      }
+    },
+    {
+      "id": "kg_ok",
+      "type": "get",
+      "position": {
+        "x": 352.0,
+        "y": 176.0
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "KG ok",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "ok",
+          "default": false
+        }
+      }
+    },
+    {
+      "id": "kg_count",
+      "type": "get",
+      "position": {
+        "x": 352.0,
+        "y": 256.0
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "KG count",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "count",
+          "default": 0
+        }
+      }
+    },
+    {
+      "id": "kg_ingest_summary",
+      "type": "make_object",
+      "position": {
+        "x": 576.0,
+        "y": 224.0
+      },
+      "data": {
+        "nodeType": "make_object",
+        "label": "KG ingest summary",
+        "icon": "{}",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "ok",
+            "label": "ok",
+            "type": "boolean"
+          },
+          {
+            "id": "count",
+            "label": "count",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kg_meta",
+      "type": "make_object",
+      "position": {
+        "x": 800.0,
+        "y": 224.0
+      },
+      "data": {
+        "nodeType": "make_object",
+        "label": "Meta additions",
+        "icon": "{}",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "kg_ingest",
+            "label": "kg_ingest",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ]
+      }
+    },
+    {
+      "id": "merge_meta",
+      "type": "merge",
+      "position": {
+        "x": 1024.0,
+        "y": 224.0
+      },
+      "data": {
+        "nodeType": "merge",
+        "label": "Merge meta",
+        "icon": "&#x1F517;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "object"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ]
+      }
+    },
+    {
+      "id": "success_true",
+      "type": "literal_boolean",
+      "position": {
+        "x": 352.0,
+        "y": 352.0
+      },
+      "data": {
+        "nodeType": "literal_boolean",
+        "label": "true",
+        "icon": "&#x1F7E2;",
+        "headerColor": "#00FF00",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "boolean"
+          }
+        ],
+        "literalValue": true
+      }
+    },
+    {
+      "id": "agent_success_coalesce",
+      "type": "coalesce",
+      "position": {
+        "x": 576.0,
+        "y": 352.0
+      },
+      "data": {
+        "nodeType": "coalesce",
+        "label": "Agent success (default true)",
+        "icon": "&#x1F517;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "agent_success",
+            "type": "any"
+          },
+          {
+            "id": "b",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "any"
+          }
+        ]
+      }
+    },
+    {
+      "id": "overall_success",
+      "type": "and",
+      "position": {
+        "x": 800.0,
+        "y": 352.0
+      },
+      "data": {
+        "nodeType": "and",
+        "label": "Overall success",
+        "icon": "&#x1F517;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "agent",
+            "type": "any"
+          },
+          {
+            "id": "b",
+            "label": "kg",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "boolean"
+          }
+        ]
+      }
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 1280.0,
+        "y": 0.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-agent-exec",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "agent",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-start-agent-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "agent",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-agent-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "agent",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-agent-prompt",
+      "source": "start",
+      "sourceHandle": "prompt",
+      "target": "agent",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-agent-system",
+      "source": "start",
+      "sourceHandle": "system",
+      "target": "agent",
+      "targetHandle": "system",
+      "animated": false
+    },
+    {
+      "id": "e-start-agent-tools",
+      "source": "start",
+      "sourceHandle": "tools",
+      "target": "agent",
+      "targetHandle": "tools",
+      "animated": false
+    },
+    {
+      "id": "e-start-agent-use-context",
+      "source": "start",
+      "sourceHandle": "use_context",
+      "target": "agent",
+      "targetHandle": "use_context",
+      "animated": false
+    },
+    {
+      "id": "e-start-agent-context",
+      "source": "start",
+      "sourceHandle": "context",
+      "target": "agent",
+      "targetHandle": "context",
+      "animated": false
+    },
+    {
+      "id": "e-start-agent-max-iterations",
+      "source": "start",
+      "sourceHandle": "max_iterations",
+      "target": "agent",
+      "targetHandle": "max_iterations",
+      "animated": false
+    },
+    {
+      "id": "e-start-agent-max-in-tokens",
+      "source": "start",
+      "sourceHandle": "max_in_tokens",
+      "target": "agent",
+      "targetHandle": "max_in_tokens",
+      "animated": false
+    },
+    {
+      "id": "e-start-agent-temperature",
+      "source": "start",
+      "sourceHandle": "temperature",
+      "target": "agent",
+      "targetHandle": "temperature",
+      "animated": false
+    },
+    {
+      "id": "e-start-agent-seed",
+      "source": "start",
+      "sourceHandle": "seed",
+      "target": "agent",
+      "targetHandle": "seed",
+      "animated": false
+    },
+    {
+      "id": "e-start-agent-resp-schema",
+      "source": "start",
+      "sourceHandle": "resp_schema",
+      "target": "agent",
+      "targetHandle": "resp_schema",
+      "animated": false
+    },
+    {
+      "id": "e-start-agent-use-session-attachments",
+      "source": "start",
+      "sourceHandle": "use_session_attachments",
+      "target": "agent",
+      "targetHandle": "use_session_attachments",
+      "animated": false
+    },
+    {
+      "id": "e-start-agent-use-span-memory",
+      "source": "start",
+      "sourceHandle": "use_span_memory",
+      "target": "agent",
+      "targetHandle": "use_span_memory",
+      "animated": false
+    },
+    {
+      "id": "e-start-agent-use-semantic-search",
+      "source": "start",
+      "sourceHandle": "use_semantic_search",
+      "target": "agent",
+      "targetHandle": "use_semantic_search",
+      "animated": false
+    },
+    {
+      "id": "e-start-agent-use-kg-memory",
+      "source": "start",
+      "sourceHandle": "use_kg_memory",
+      "target": "agent",
+      "targetHandle": "use_kg_memory",
+      "animated": false
+    },
+    {
+      "id": "e-start-agent-memory-query",
+      "source": "start",
+      "sourceHandle": "memory_query",
+      "target": "agent",
+      "targetHandle": "memory_query",
+      "animated": false
+    },
+    {
+      "id": "e-start-agent-memory-scope",
+      "source": "start",
+      "sourceHandle": "memory_scope",
+      "target": "agent",
+      "targetHandle": "memory_scope",
+      "animated": false
+    },
+    {
+      "id": "e-start-agent-recall-level",
+      "source": "start",
+      "sourceHandle": "recall_level",
+      "target": "agent",
+      "targetHandle": "recall_level",
+      "animated": false
+    },
+    {
+      "id": "e-start-agent-max-span-messages",
+      "source": "start",
+      "sourceHandle": "max_span_messages",
+      "target": "agent",
+      "targetHandle": "max_span_messages",
+      "animated": false
+    },
+    {
+      "id": "e-start-agent-kg-max-input-tokens",
+      "source": "start",
+      "sourceHandle": "kg_max_input_tokens",
+      "target": "agent",
+      "targetHandle": "kg_max_input_tokens",
+      "animated": false
+    },
+    {
+      "id": "e-start-agent-kg-limit",
+      "source": "start",
+      "sourceHandle": "kg_limit",
+      "target": "agent",
+      "targetHandle": "kg_limit",
+      "animated": false
+    },
+    {
+      "id": "e-start-agent-kg-min-score",
+      "source": "start",
+      "sourceHandle": "kg_min_score",
+      "target": "agent",
+      "targetHandle": "kg_min_score",
+      "animated": false
+    },
+    {
+      "id": "e-start-turn-vars-prompt",
+      "source": "start",
+      "sourceHandle": "prompt",
+      "target": "turn_vars",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-agent-turn-vars-response",
+      "source": "agent",
+      "sourceHandle": "response",
+      "target": "turn_vars",
+      "targetHandle": "response",
+      "animated": false
+    },
+    {
+      "id": "e-turn-vars-turn-text",
+      "source": "turn_vars",
+      "sourceHandle": "result",
+      "target": "turn_text",
+      "targetHandle": "vars",
+      "animated": false
+    },
+    {
+      "id": "e-turn-text-ingest-input-text",
+      "source": "turn_text",
+      "sourceHandle": "result",
+      "target": "ingest_input",
+      "targetHandle": "text",
+      "animated": false
+    },
+    {
+      "id": "e-start-ingest-input-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "ingest_input",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-ingest-input-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "ingest_input",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-ingest-input-scope",
+      "source": "start",
+      "sourceHandle": "kg_write_scope",
+      "target": "ingest_input",
+      "targetHandle": "scope",
+      "animated": false
+    },
+    {
+      "id": "e-start-ingest-input-domain-focus",
+      "source": "start",
+      "sourceHandle": "kg_domain_focus",
+      "target": "ingest_input",
+      "targetHandle": "domain_focus",
+      "animated": false
+    },
+    {
+      "id": "e-start-ingest-input-max-out-tokens",
+      "source": "start",
+      "sourceHandle": "kg_max_out_tokens",
+      "target": "ingest_input",
+      "targetHandle": "max_out_tokens",
+      "animated": false
+    },
+    {
+      "id": "e-agent-kg-ingest-exec",
+      "source": "agent",
+      "sourceHandle": "exec-out",
+      "target": "kg_ingest",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-ingest-input-kg-ingest-input",
+      "source": "ingest_input",
+      "sourceHandle": "result",
+      "target": "kg_ingest",
+      "targetHandle": "input",
+      "animated": false
+    },
+    {
+      "id": "e-kg-ingest-kg-ok-object",
+      "source": "kg_ingest",
+      "sourceHandle": "output",
+      "target": "kg_ok",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-kg-ingest-kg-count-object",
+      "source": "kg_ingest",
+      "sourceHandle": "output",
+      "target": "kg_count",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-kg-ok-summary-ok",
+      "source": "kg_ok",
+      "sourceHandle": "value",
+      "target": "kg_ingest_summary",
+      "targetHandle": "ok",
+      "animated": false
+    },
+    {
+      "id": "e-kg-count-summary-count",
+      "source": "kg_count",
+      "sourceHandle": "value",
+      "target": "kg_ingest_summary",
+      "targetHandle": "count",
+      "animated": false
+    },
+    {
+      "id": "e-kg-summary-kg-meta",
+      "source": "kg_ingest_summary",
+      "sourceHandle": "result",
+      "target": "kg_meta",
+      "targetHandle": "kg_ingest",
+      "animated": false
+    },
+    {
+      "id": "e-agent-meta-merge-a",
+      "source": "agent",
+      "sourceHandle": "meta",
+      "target": "merge_meta",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "e-kg-meta-merge-b",
+      "source": "kg_meta",
+      "sourceHandle": "result",
+      "target": "merge_meta",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "e-agent-success-coalesce-a",
+      "source": "agent",
+      "sourceHandle": "success",
+      "target": "agent_success_coalesce",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "e-success-true-coalesce-b",
+      "source": "success_true",
+      "sourceHandle": "value",
+      "target": "agent_success_coalesce",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "e-agent-success-overall-a",
+      "source": "agent_success_coalesce",
+      "sourceHandle": "result",
+      "target": "overall_success",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "e-kg-ok-overall-b",
+      "source": "kg_ok",
+      "sourceHandle": "value",
+      "target": "overall_success",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "e-kg-ingest-end-exec",
+      "source": "kg_ingest",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-agent-end-response",
+      "source": "agent",
+      "sourceHandle": "response",
+      "target": "end",
+      "targetHandle": "response",
+      "animated": false
+    },
+    {
+      "id": "e-overall-success-end-success",
+      "source": "overall_success",
+      "sourceHandle": "result",
+      "target": "end",
+      "targetHandle": "success",
+      "animated": false
+    },
+    {
+      "id": "e-merge-meta-end-meta",
+      "source": "merge_meta",
+      "sourceHandle": "result",
+      "target": "end",
+      "targetHandle": "meta",
+      "animated": false
+    },
+    {
+      "id": "e-agent-end-scratchpad",
+      "source": "agent",
+      "sourceHandle": "scratchpad",
+      "target": "end",
+      "targetHandle": "scratchpad",
+      "animated": false
+    }
+  ],
+  "entryNode": "start"
+}

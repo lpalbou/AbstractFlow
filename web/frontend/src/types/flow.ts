@@ -114,6 +114,7 @@ export type NodeType =
   | 'memory_rehydrate'
   | 'memory_kg_assert'
   | 'memory_kg_query'
+  | 'memory_kg_resolve'
   | 'memact_compose'
   | 'tool_calls'
   | 'call_tool'

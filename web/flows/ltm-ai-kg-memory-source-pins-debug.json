@@ -1,0 +1,758 @@
+{
+  "id": "ltm-ai-kg-memory-source-pins-debug",
+  "name": "ltm-ai-kg-memory-source-pins-debug",
+  "description": "Observability harness for 467: toggles memory-source pins on an LLM Call and asks the model to report whether it saw a “## KG ACTIVE MEMORY” system block. Optionally seeds a tiny demo KG first.",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": {
+        "x": 16.0,
+        "y": 96.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "seed_demo",
+            "label": "seed_demo",
+            "type": "boolean"
+          },
+          {
+            "id": "use_kg_memory",
+            "label": "use_kg_memory",
+            "type": "boolean"
+          },
+          {
+            "id": "memory_query",
+            "label": "memory_query",
+            "type": "string"
+          },
+          {
+            "id": "memory_scope",
+            "label": "memory_scope",
+            "type": "string"
+          },
+          {
+            "id": "recall_level",
+            "label": "recall_level",
+            "type": "string"
+          },
+          {
+            "id": "kg_max_input_tokens",
+            "label": "kg_max_input_tokens",
+            "type": "number"
+          },
+          {
+            "id": "kg_limit",
+            "label": "kg_limit",
+            "type": "number"
+          },
+          {
+            "id": "kg_min_score",
+            "label": "kg_min_score",
+            "type": "number"
+          }
+        ],
+        "pinDefaults": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b",
+          "prompt": "Return JSON matching the schema. Set has_kg_active_memory=true only if you can see a system message that starts with '## KG ACTIVE MEMORY'. If true, set kg_excerpt to the first bullet line from that block. If false, set kg_excerpt to ''.",
+          "seed_demo": true,
+          "use_kg_memory": true,
+          "memory_query": "noonien",
+          "memory_scope": "session",
+          "recall_level": "standard",
+          "kg_max_input_tokens": 800,
+          "kg_limit": 80,
+          "kg_min_score": 0.35
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-7",
+      "type": "if",
+      "position": {
+        "x": 320.0,
+        "y": 96.0
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "Seed demo?",
+        "icon": "&#x2753;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-2",
+      "type": "literal_array",
+      "position": {
+        "x": 128.0,
+        "y": 464.0
+      },
+      "data": {
+        "nodeType": "literal_array",
+        "label": "Demo assertions",
+        "icon": "&#x1F4CB;",
+        "headerColor": "#7F8C8D",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "assertions",
+            "type": "assertions"
+          }
+        ],
+        "literalValue": [
+          {
+            "subject": "ex:person-noonien-soong",
+            "predicate": "schema:name",
+            "object": "doctor noonien soong",
+            "observed_at": "2026-01-01T00:00:06Z",
+            "provenance": {
+              "span_id": "demo-span"
+            }
+          },
+          {
+            "subject": "ex:person-noonien-soong",
+            "predicate": "rdf:type",
+            "object": "schema:Person",
+            "observed_at": "2026-01-01T00:00:05Z",
+            "provenance": {
+              "span_id": "demo-span"
+            }
+          },
+          {
+            "subject": "ex:claim-data-emotion-chip",
+            "predicate": "schema:mentions",
+            "object": "ex:person-noonien-soong",
+            "observed_at": "2026-01-01T00:00:10Z",
+            "provenance": {
+              "span_id": "demo-span"
+            }
+          },
+          {
+            "subject": "ex:concept-emotion-chip",
+            "predicate": "skos:prefLabel",
+            "object": "emotion chip",
+            "observed_at": "2026-01-01T00:00:04Z",
+            "provenance": {
+              "span_id": "demo-span"
+            }
+          },
+          {
+            "subject": "ex:person-data",
+            "predicate": "schema:knowsabout",
+            "object": "human behavior",
+            "observed_at": "2026-01-01T00:00:11Z",
+            "provenance": {
+              "span_id": "demo-span"
+            }
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-3",
+      "type": "memory_kg_assert",
+      "position": {
+        "x": 416.0,
+        "y": 296.0
+      },
+      "data": {
+        "nodeType": "memory_kg_assert",
+        "label": "KG Assert (demo)",
+        "icon": "&#x1F9E0;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "assertions",
+            "label": "assertions",
+            "type": "assertions",
+            "description": "List of {subject,predicate,object,...} assertion objects."
+          },
+          {
+            "id": "scope",
+            "label": "scope",
+            "type": "string",
+            "description": "run | session | global. Determines the owner_id when not explicitly provided."
+          },
+          {
+            "id": "span_id",
+            "label": "span_id",
+            "type": "string",
+            "description": "Optional provenance pointer to a runtime span/artifact id."
+          },
+          {
+            "id": "owner_id",
+            "label": "owner_id",
+            "type": "string",
+            "description": "Optional explicit owner id override (advanced; normally derived from scope)."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "assertion_ids",
+            "label": "assertion_ids",
+            "type": "array",
+            "description": "IDs assigned by the store (implementation-specific)."
+          },
+          {
+            "id": "count",
+            "label": "count",
+            "type": "number",
+            "description": "Number of asserted triples."
+          },
+          {
+            "id": "ok",
+            "label": "ok",
+            "type": "boolean",
+            "description": "True when assertion succeeded."
+          }
+        ],
+        "pinDefaults": {
+          "scope": "session"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-6",
+      "type": "json_schema",
+      "position": {
+        "x": 512.0,
+        "y": 96.0
+      },
+      "data": {
+        "nodeType": "json_schema",
+        "label": "Response schema",
+        "icon": "&#x1F4C4;",
+        "headerColor": "#7F8C8D",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "schema",
+            "label": "schema",
+            "type": "object"
+          }
+        ],
+        "literalValue": {
+          "type": "object",
+          "properties": {
+            "has_kg_active_memory": {
+              "type": "boolean"
+            },
+            "kg_excerpt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "has_kg_active_memory",
+            "kg_excerpt"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-4",
+      "type": "llm_call",
+      "position": {
+        "x": 704.0,
+        "y": 96.0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "LLM Call (pins)",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "use_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object",
+            "description": "Optional explicit context object for this call (e.g. {messages:[...]}). If provided, context.messages overrides inherited run context messages."
+          },
+          {
+            "id": "use_session_attachments",
+            "label": "use_session_attachments",
+            "type": "boolean",
+            "description": "When true, include the session attachment index (enables open_attachment). If unset, runtime applies a safe default heuristic."
+          },
+          {
+            "id": "use_span_memory",
+            "label": "use_span_memory",
+            "type": "boolean",
+            "description": "When true, perform span-index recall + rehydration before this LLM call (artifact-backed evidence)."
+          },
+          {
+            "id": "use_semantic_search",
+            "label": "use_semantic_search",
+            "type": "boolean",
+            "description": "When true, allow embeddings-driven semantic search over text artifacts (not implemented in v0; reserved for planned memory ingestion)."
+          },
+          {
+            "id": "use_kg_memory",
+            "label": "use_kg_memory",
+            "type": "boolean",
+            "description": "When true, query the temporal KG and inject a bounded “KG Active Memory” system block into this call."
+          },
+          {
+            "id": "memory_query",
+            "label": "memory_query",
+            "type": "string",
+            "description": "Query text used for span/KG recall. If unset, defaults to this call’s prompt (best-effort)."
+          },
+          {
+            "id": "memory_scope",
+            "label": "memory_scope",
+            "type": "string",
+            "description": "Memory scope for span/KG recall: run | session | global | all (default: run)."
+          },
+          {
+            "id": "recall_level",
+            "label": "recall_level",
+            "type": "string",
+            "description": "Recall effort policy: urgent | standard | deep (optional; applies bounded budgets with no silent downgrade)."
+          },
+          {
+            "id": "max_span_messages",
+            "label": "max_span_messages",
+            "type": "number",
+            "description": "Optional max messages inserted via span rehydration (bounded by recall_level when set)."
+          },
+          {
+            "id": "kg_max_input_tokens",
+            "label": "kg_max_input_tokens",
+            "type": "number",
+            "description": "Optional KG Active Memory token budget (bounded by recall_level when set; 0 disables packing)."
+          },
+          {
+            "id": "kg_limit",
+            "label": "kg_limit",
+            "type": "number",
+            "description": "Optional KG query limit (bounded by recall_level when set)."
+          },
+          {
+            "id": "kg_min_score",
+            "label": "kg_min_score",
+            "type": "number",
+            "description": "Optional KG similarity min_score (bounded by recall_level when set)."
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider",
+            "description": "LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model",
+            "description": "LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string",
+            "description": "Optional system prompt for this single call."
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string",
+            "description": "User prompt/content for this single call."
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools",
+            "description": "Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node)."
+          },
+          {
+            "id": "max_in_tokens",
+            "label": "max_in_tokens",
+            "type": "number",
+            "description": "Optional per-call input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for this call."
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number",
+            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number",
+            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "object",
+            "description": "Optional JSON Schema object (type=object) the assistant content must conform to."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string",
+            "description": "Assistant text content (best-effort). For tool calls, content may be empty."
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean",
+            "description": "True if the LLM call completed successfully."
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object",
+            "description": "Host-facing meta envelope (schema=abstractflow.llm_call.v1.meta). Includes provider/model, usage, trace ids, and lightweight execution metadata."
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array",
+            "description": "Normalized tool call requests. This pin exists to make wiring into Tool Calls / Emit Event nodes simpler."
+          }
+        ],
+        "pinDefaults": {
+          "temperature": 0,
+          "seed": 0,
+          "system": "You are a debugging assistant. Respond with ONLY JSON matching the schema.",
+          "use_context": false
+        },
+        "effectConfig": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3-next-80b",
+          "temperature": 0,
+          "seed": 0,
+          "structured_output_fallback": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-5",
+      "type": "on_flow_end",
+      "position": {
+        "x": 992.0,
+        "y": 96.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "End",
+        "icon": "&#x1F6A9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-7",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e0b",
+      "source": "node-1",
+      "sourceHandle": "seed_demo",
+      "target": "node-7",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e1",
+      "source": "node-7",
+      "sourceHandle": "true",
+      "target": "node-3",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e1b",
+      "source": "node-2",
+      "sourceHandle": "value",
+      "target": "node-3",
+      "targetHandle": "assertions",
+      "animated": false
+    },
+    {
+      "id": "e2",
+      "source": "node-3",
+      "sourceHandle": "exec-out",
+      "target": "node-4",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e2b",
+      "source": "node-7",
+      "sourceHandle": "false",
+      "target": "node-4",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e3",
+      "source": "node-6",
+      "sourceHandle": "schema",
+      "target": "node-4",
+      "targetHandle": "resp_schema",
+      "animated": false
+    },
+    {
+      "id": "e4",
+      "source": "node-1",
+      "sourceHandle": "provider",
+      "target": "node-4",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e5",
+      "source": "node-1",
+      "sourceHandle": "model",
+      "target": "node-4",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e6",
+      "source": "node-1",
+      "sourceHandle": "prompt",
+      "target": "node-4",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e7",
+      "source": "node-1",
+      "sourceHandle": "use_kg_memory",
+      "target": "node-4",
+      "targetHandle": "use_kg_memory",
+      "animated": false
+    },
+    {
+      "id": "e8",
+      "source": "node-1",
+      "sourceHandle": "memory_query",
+      "target": "node-4",
+      "targetHandle": "memory_query",
+      "animated": false
+    },
+    {
+      "id": "e9",
+      "source": "node-1",
+      "sourceHandle": "memory_scope",
+      "target": "node-4",
+      "targetHandle": "memory_scope",
+      "animated": false
+    },
+    {
+      "id": "e10",
+      "source": "node-1",
+      "sourceHandle": "recall_level",
+      "target": "node-4",
+      "targetHandle": "recall_level",
+      "animated": false
+    },
+    {
+      "id": "e11",
+      "source": "node-1",
+      "sourceHandle": "kg_max_input_tokens",
+      "target": "node-4",
+      "targetHandle": "kg_max_input_tokens",
+      "animated": false
+    },
+    {
+      "id": "e12",
+      "source": "node-1",
+      "sourceHandle": "kg_limit",
+      "target": "node-4",
+      "targetHandle": "kg_limit",
+      "animated": false
+    },
+    {
+      "id": "e13",
+      "source": "node-1",
+      "sourceHandle": "kg_min_score",
+      "target": "node-4",
+      "targetHandle": "kg_min_score",
+      "animated": false
+    },
+    {
+      "id": "e14",
+      "source": "node-4",
+      "sourceHandle": "exec-out",
+      "target": "node-5",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e15",
+      "source": "node-4",
+      "sourceHandle": "success",
+      "target": "node-5",
+      "targetHandle": "success",
+      "animated": false
+    },
+    {
+      "id": "e16",
+      "source": "node-4",
+      "sourceHandle": "response",
+      "target": "node-5",
+      "targetHandle": "response",
+      "animated": false
+    },
+    {
+      "id": "e17",
+      "source": "node-4",
+      "sourceHandle": "meta",
+      "target": "node-5",
+      "targetHandle": "meta",
+      "animated": false
+    }
+  ],
+  "entryNode": "node-1",
+  "created_at": null,
+  "updated_at": "2026-01-20T02:24:07.600461"
+}
