@@ -44,39 +44,9 @@
             "type": "boolean"
           },
           {
-            "id": "use_kg_memory",
-            "label": "use_kg_memory",
-            "type": "boolean"
-          },
-          {
-            "id": "memory_query",
-            "label": "memory_query",
-            "type": "string"
-          },
-          {
-            "id": "memory_scope",
-            "label": "memory_scope",
-            "type": "string"
-          },
-          {
-            "id": "recall_level",
-            "label": "recall_level",
-            "type": "string"
-          },
-          {
-            "id": "kg_max_input_tokens",
-            "label": "kg_max_input_tokens",
-            "type": "number"
-          },
-          {
-            "id": "kg_limit",
-            "label": "kg_limit",
-            "type": "number"
-          },
-          {
-            "id": "kg_min_score",
-            "label": "kg_min_score",
-            "type": "number"
+            "id": "memory",
+            "label": "memory",
+            "type": "memory"
           }
         ],
         "pinDefaults": {
@@ -84,13 +54,15 @@
           "model": "qwen/qwen3-next-80b",
           "prompt": "Return JSON matching the schema. Set has_kg_active_memory=true only if you can see a system message that starts with '## KG ACTIVE MEMORY'. If true, set kg_excerpt to the first bullet line from that block. If false, set kg_excerpt to ''.",
           "seed_demo": true,
-          "use_kg_memory": true,
-          "memory_query": "noonien",
-          "memory_scope": "session",
-          "recall_level": "standard",
-          "kg_max_input_tokens": 800,
-          "kg_limit": 80,
-          "kg_min_score": 0.35
+          "memory": {
+            "use_kg_memory": true,
+            "memory_query": "noonien",
+            "memory_scope": "session",
+            "recall_level": "standard",
+            "kg_max_input_tokens": 800,
+            "kg_limit": 80,
+            "kg_min_score": 0.35
+          }
         }
       },
       "label": null,
@@ -368,70 +340,10 @@
             "description": "Optional explicit context object for this call (e.g. {messages:[...]}). If provided, context.messages overrides inherited run context messages."
           },
           {
-            "id": "use_session_attachments",
-            "label": "use_session_attachments",
-            "type": "boolean",
-            "description": "When true, include the session attachment index (enables open_attachment). If unset, runtime applies a safe default heuristic."
-          },
-          {
-            "id": "use_span_memory",
-            "label": "use_span_memory",
-            "type": "boolean",
-            "description": "When true, perform span-index recall + rehydration before this LLM call (artifact-backed evidence)."
-          },
-          {
-            "id": "use_semantic_search",
-            "label": "use_semantic_search",
-            "type": "boolean",
-            "description": "When true, allow embeddings-driven semantic search over text artifacts (not implemented in v0; reserved for planned memory ingestion)."
-          },
-          {
-            "id": "use_kg_memory",
-            "label": "use_kg_memory",
-            "type": "boolean",
-            "description": "When true, query the temporal KG and inject a bounded “KG Active Memory” system block into this call."
-          },
-          {
-            "id": "memory_query",
-            "label": "memory_query",
-            "type": "string",
-            "description": "Query text used for span/KG recall. If unset, defaults to this call’s prompt (best-effort)."
-          },
-          {
-            "id": "memory_scope",
-            "label": "memory_scope",
-            "type": "string",
-            "description": "Memory scope for span/KG recall: run | session | global | all (default: run)."
-          },
-          {
-            "id": "recall_level",
-            "label": "recall_level",
-            "type": "string",
-            "description": "Recall effort policy: urgent | standard | deep (optional; applies bounded budgets with no silent downgrade)."
-          },
-          {
-            "id": "max_span_messages",
-            "label": "max_span_messages",
-            "type": "number",
-            "description": "Optional max messages inserted via span rehydration (bounded by recall_level when set)."
-          },
-          {
-            "id": "kg_max_input_tokens",
-            "label": "kg_max_input_tokens",
-            "type": "number",
-            "description": "Optional KG Active Memory token budget (bounded by recall_level when set; 0 disables packing)."
-          },
-          {
-            "id": "kg_limit",
-            "label": "kg_limit",
-            "type": "number",
-            "description": "Optional KG query limit (bounded by recall_level when set)."
-          },
-          {
-            "id": "kg_min_score",
-            "label": "kg_min_score",
-            "type": "number",
-            "description": "Optional KG similarity min_score (bounded by recall_level when set)."
+            "id": "memory",
+            "label": "memory",
+            "type": "memory",
+            "description": "Memory configuration object (KG/span/session controls). If set, overrides this call’s recall behavior; if unset, runtime defaults apply."
           },
           {
             "id": "provider",
@@ -666,57 +578,9 @@
     {
       "id": "e7",
       "source": "node-1",
-      "sourceHandle": "use_kg_memory",
+      "sourceHandle": "memory",
       "target": "node-4",
-      "targetHandle": "use_kg_memory",
-      "animated": false
-    },
-    {
-      "id": "e8",
-      "source": "node-1",
-      "sourceHandle": "memory_query",
-      "target": "node-4",
-      "targetHandle": "memory_query",
-      "animated": false
-    },
-    {
-      "id": "e9",
-      "source": "node-1",
-      "sourceHandle": "memory_scope",
-      "target": "node-4",
-      "targetHandle": "memory_scope",
-      "animated": false
-    },
-    {
-      "id": "e10",
-      "source": "node-1",
-      "sourceHandle": "recall_level",
-      "target": "node-4",
-      "targetHandle": "recall_level",
-      "animated": false
-    },
-    {
-      "id": "e11",
-      "source": "node-1",
-      "sourceHandle": "kg_max_input_tokens",
-      "target": "node-4",
-      "targetHandle": "kg_max_input_tokens",
-      "animated": false
-    },
-    {
-      "id": "e12",
-      "source": "node-1",
-      "sourceHandle": "kg_limit",
-      "target": "node-4",
-      "targetHandle": "kg_limit",
-      "animated": false
-    },
-    {
-      "id": "e13",
-      "source": "node-1",
-      "sourceHandle": "kg_min_score",
-      "target": "node-4",
-      "targetHandle": "kg_min_score",
+      "targetHandle": "memory",
       "animated": false
     },
     {

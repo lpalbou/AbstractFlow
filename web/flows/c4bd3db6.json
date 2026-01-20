@@ -10,7 +10,7 @@
       "id": "node-1",
       "type": "on_flow_start",
       "position": {
-        "x": -528.0,
+        "x": -560.0,
         "y": 112.0
       },
       "data": {
@@ -29,6 +29,11 @@
             "id": "use_context",
             "label": "use_context",
             "type": "boolean"
+          },
+          {
+            "id": "memory",
+            "label": "memory",
+            "type": "memory"
           },
           {
             "id": "context",
@@ -116,7 +121,7 @@
       "id": "end",
       "type": "on_flow_end",
       "position": {
-        "x": 224.0,
+        "x": 384.0,
         "y": 112.0
       },
       "data": {
@@ -163,7 +168,7 @@
       "id": "node-6",
       "type": "llm_call",
       "position": {
-        "x": -208.0,
+        "x": -224.0,
         "y": 112.0
       },
       "data": {
@@ -188,6 +193,12 @@
             "label": "context",
             "type": "object",
             "description": "Optional explicit context object for this call (e.g. {messages:[...]}). If provided, context.messages overrides inherited run context messages."
+          },
+          {
+            "id": "memory",
+            "label": "memory",
+            "type": "memory",
+            "description": "Memory configuration object (KG/span/session controls). If set, overrides this call’s recall behavior; if unset, runtime defaults apply."
           },
           {
             "id": "provider",
@@ -287,7 +298,7 @@
       "id": "node-7",
       "type": "tool_calls",
       "position": {
-        "x": 32.0,
+        "x": 128.0,
         "y": 112.0
       },
       "data": {
@@ -356,6 +367,14 @@
       "sourceHandle": "context",
       "target": "node-6",
       "targetHandle": "context",
+      "animated": false
+    },
+    {
+      "id": "edge-start-memory",
+      "source": "node-1",
+      "sourceHandle": "memory",
+      "target": "node-6",
+      "targetHandle": "memory",
       "animated": false
     },
     {
@@ -497,5 +516,5 @@
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-18T07:39:41.830498",
-  "updated_at": "2026-01-18T07:41:37.607247"
+  "updated_at": "2026-01-20T10:56:50.163771"
 }

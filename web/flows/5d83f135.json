@@ -1,0 +1,148 @@
+{
+  "id": "5d83f135",
+  "name": "Untitled Flow",
+  "description": "",
+  "interfaces": [
+    "abstractcode.agent.v1"
+  ],
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": {
+        "x": -928.0,
+        "y": 80.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "use_context",
+            "label": "use_context",
+            "type": "boolean"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools"
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          },
+          {
+            "id": "max_in_tokens",
+            "label": "max_in_tokens",
+            "type": "number"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-2",
+      "type": "on_flow_end",
+      "position": {
+        "x": -608.0,
+        "y": 48.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [],
+  "entryNode": "node-1",
+  "created_at": "2026-01-20T12:28:46.459027",
+  "updated_at": "2026-01-20T12:28:55.977882"
+}

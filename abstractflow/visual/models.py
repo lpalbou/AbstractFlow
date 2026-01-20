@@ -23,6 +23,7 @@ class PinType(str, Enum):
     NUMBER = "number"  # Green #00FF00 - Integer/Float
     BOOLEAN = "boolean"  # Red #FF0000 - True/False
     OBJECT = "object"  # Cyan #00FFFF - JSON objects
+    MEMORY = "memory"  # Mint - Memory configuration object (KG/span/session controls)
     ASSERTION = "assertion"  # Teal - KG assertion object (subject/predicate/object + metadata)
     ASSERTIONS = "assertions"  # Teal - List of KG assertion objects (assertion[])
     ARRAY = "array"  # Orange #FF8800 - Collections

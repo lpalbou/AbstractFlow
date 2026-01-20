@@ -255,75 +255,11 @@ const CORE_NODES: NodeTemplate[] = [
 	          'Optional explicit context object for the agent (e.g. {messages:[...]}). If provided, context.messages overrides the inherited run context messages.',
 	      },
 	      {
-	        id: 'use_session_attachments',
-	        label: 'use_session_attachments',
-	        type: 'boolean',
+	        id: 'memory',
+	        label: 'memory',
+	        type: 'memory',
 	        description:
-	          'When true, include the session attachment index (enables open_attachment). If unset, runtime applies a safe default heuristic (agents with tools include it).',
-	      },
-	      {
-	        id: 'use_span_memory',
-	        label: 'use_span_memory',
-	        type: 'boolean',
-	        description:
-	          'When true, perform span-index recall + rehydration before running the agent (artifact-backed evidence).',
-	      },
-	      {
-	        id: 'use_semantic_search',
-	        label: 'use_semantic_search',
-	        type: 'boolean',
-	        description:
-	          'When true, allow embeddings-driven semantic search over text artifacts (not implemented in v0; reserved for planned memory ingestion).',
-	      },
-	      {
-	        id: 'use_kg_memory',
-	        label: 'use_kg_memory',
-	        type: 'boolean',
-	        description:
-	          'When true, query the temporal KG and inject a bounded “KG Active Memory” system block before running the agent.',
-	      },
-	      {
-	        id: 'memory_query',
-	        label: 'memory_query',
-	        type: 'string',
-	        description:
-	          "Query text used for span/KG recall. If unset, defaults to the agent's prompt/task (best-effort).",
-	      },
-	      {
-	        id: 'memory_scope',
-	        label: 'memory_scope',
-	        type: 'string',
-	        description: 'Memory scope for span/KG recall: run | session | global | all (default: run).',
-	      },
-	      {
-	        id: 'recall_level',
-	        label: 'recall_level',
-	        type: 'string',
-	        description: 'Recall effort policy: urgent | standard | deep (optional; applies bounded budgets with no silent downgrade).',
-	      },
-	      {
-	        id: 'max_span_messages',
-	        label: 'max_span_messages',
-	        type: 'number',
-	        description: 'Optional max messages inserted via span rehydration (bounded by recall_level when set).',
-	      },
-	      {
-	        id: 'kg_max_input_tokens',
-	        label: 'kg_max_input_tokens',
-	        type: 'number',
-	        description: 'Optional KG Active Memory token budget (bounded by recall_level when set; 0 disables packing).',
-	      },
-	      {
-	        id: 'kg_limit',
-	        label: 'kg_limit',
-	        type: 'number',
-	        description: 'Optional KG query limit (bounded by recall_level when set).',
-	      },
-	      {
-	        id: 'kg_min_score',
-	        label: 'kg_min_score',
-	        type: 'number',
-	        description: 'Optional KG similarity min_score (bounded by recall_level when set).',
+	          'Memory configuration object (KG/span/session controls). If set, overrides this node’s recall/ingest behavior; if unset, runtime defaults apply.',
 	      },
 	      { id: 'provider', label: 'provider', type: 'provider', description: 'LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider.' },
 	      { id: 'model', label: 'model', type: 'model', description: 'LLM model id/name. If unset, uses the node’s configured model.' },
@@ -397,75 +333,11 @@ const CORE_NODES: NodeTemplate[] = [
 	          'Optional explicit context object for this call (e.g. {messages:[...]}). If provided, context.messages overrides inherited run context messages.',
 	      },
 	      {
-	        id: 'use_session_attachments',
-	        label: 'use_session_attachments',
-	        type: 'boolean',
+	        id: 'memory',
+	        label: 'memory',
+	        type: 'memory',
 	        description:
-	          'When true, include the session attachment index (enables open_attachment). If unset, runtime applies a safe default heuristic.',
-	      },
-	      {
-	        id: 'use_span_memory',
-	        label: 'use_span_memory',
-	        type: 'boolean',
-	        description:
-	          'When true, perform span-index recall + rehydration before this LLM call (artifact-backed evidence).',
-	      },
-	      {
-	        id: 'use_semantic_search',
-	        label: 'use_semantic_search',
-	        type: 'boolean',
-	        description:
-	          'When true, allow embeddings-driven semantic search over text artifacts (not implemented in v0; reserved for planned memory ingestion).',
-	      },
-	      {
-	        id: 'use_kg_memory',
-	        label: 'use_kg_memory',
-	        type: 'boolean',
-	        description:
-	          'When true, query the temporal KG and inject a bounded “KG Active Memory” system block into this call.',
-	      },
-	      {
-	        id: 'memory_query',
-	        label: 'memory_query',
-	        type: 'string',
-	        description:
-	          'Query text used for span/KG recall. If unset, defaults to this call’s prompt (best-effort).',
-	      },
-	      {
-	        id: 'memory_scope',
-	        label: 'memory_scope',
-	        type: 'string',
-	        description: 'Memory scope for span/KG recall: run | session | global | all (default: run).',
-	      },
-	      {
-	        id: 'recall_level',
-	        label: 'recall_level',
-	        type: 'string',
-	        description: 'Recall effort policy: urgent | standard | deep (optional; applies bounded budgets with no silent downgrade).',
-	      },
-	      {
-	        id: 'max_span_messages',
-	        label: 'max_span_messages',
-	        type: 'number',
-	        description: 'Optional max messages inserted via span rehydration (bounded by recall_level when set).',
-	      },
-	      {
-	        id: 'kg_max_input_tokens',
-	        label: 'kg_max_input_tokens',
-	        type: 'number',
-	        description: 'Optional KG Active Memory token budget (bounded by recall_level when set; 0 disables packing).',
-	      },
-	      {
-	        id: 'kg_limit',
-	        label: 'kg_limit',
-	        type: 'number',
-	        description: 'Optional KG query limit (bounded by recall_level when set).',
-	      },
-	      {
-	        id: 'kg_min_score',
-	        label: 'kg_min_score',
-	        type: 'number',
-	        description: 'Optional KG similarity min_score (bounded by recall_level when set).',
+	          'Memory configuration object (KG/span/session controls). If set, overrides this call’s recall behavior; if unset, runtime defaults apply.',
 	      },
 	      { id: 'provider', label: 'provider', type: 'provider', description: 'LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider.' },
 	      { id: 'model', label: 'model', type: 'model', description: 'LLM model id/name. If unset, uses the node’s configured model.' },
@@ -1061,6 +933,16 @@ const LITERAL_NODES: NodeTemplate[] = [
   },
   {
     type: 'literal_json',
+    icon: '&#x1F4BE;', // Floppy disk (memory/config)
+    label: 'Memory',
+    description: 'Memory configuration object for Agent/LLM Call recall and KG settings.',
+    headerColor: '#00C49A', // Memory pin color
+    inputs: [],
+    outputs: [{ id: 'value', label: 'memory', type: 'memory' }],
+    category: 'literals',
+  },
+  {
+    type: 'literal_json',
     icon: '&#x1F9E0;', // Brain (semantic object)
     label: 'Assertion',
     description: 'KG assertion literal value (subject/predicate/object + optional metadata).',
@@ -1539,6 +1421,25 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
     ...(template.type === 'literal_number' && { literalValue: 0 }),
     ...(template.type === 'literal_boolean' && { literalValue: false }),
     ...(template.type === 'literal_json' && { literalValue: {} }),
+    ...(template.type === 'literal_json' &&
+      template.outputs.some((p) => p.type === 'memory') && {
+        literalValue: {
+          use_session_attachments: true,
+          use_span_memory: false,
+          use_semantic_search: false,
+          use_kg_memory: true,
+          memory_query: '',
+          memory_scope: 'session',
+          recall_level: 'standard',
+          max_span_messages: 24,
+          kg_max_input_tokens: 1200,
+          kg_limit: 80,
+          kg_min_score: 0.35,
+          kg_write_scope: 'session',
+          kg_domain_focus: '',
+          kg_max_out_tokens: 700,
+        },
+      }),
     ...(template.type === 'json_schema' && {
       literalValue: {
         type: 'object',

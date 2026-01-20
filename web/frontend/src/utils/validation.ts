@@ -101,6 +101,15 @@ export function areTypesCompatible(
     return true;
   }
 
+  // Memory is an object-like type; allow memory <-> object.
+  if (
+    (sourceType === 'memory' && targetType === 'object') ||
+    (sourceType === 'object' && targetType === 'memory') ||
+    (sourceType === 'memory' && targetType === 'memory')
+  ) {
+    return true;
+  }
+
   // Assertions is array-like; allow assertions -> object for the same reason as array -> object.
   if (sourceType === 'assertions' && targetType === 'object') {
     return true;

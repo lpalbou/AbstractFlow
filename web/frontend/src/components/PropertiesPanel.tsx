@@ -66,6 +66,7 @@ const DATA_PIN_TYPES: DataPinType[] = [
   'number',
   'boolean',
   'object',
+  'memory',
   'assertion',
   'assertions',
   'array',
@@ -3004,7 +3005,13 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 );
               }
 
-              if (pin.type === 'object' || pin.type === 'array' || pin.type === 'assertion' || pin.type === 'assertions') {
+              if (
+                pin.type === 'object' ||
+                pin.type === 'memory' ||
+                pin.type === 'array' ||
+                pin.type === 'assertion' ||
+                pin.type === 'assertions'
+              ) {
                 const fallback =
                   raw === undefined
                     ? ''
@@ -3036,7 +3043,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                       try {
                         const parsed = JSON.parse(v);
                         if (
-                          (pin.type === 'object' || pin.type === 'assertion') &&
+                          (pin.type === 'object' || pin.type === 'memory' || pin.type === 'assertion') &&
                           (parsed === null || Array.isArray(parsed) || typeof parsed !== 'object')
                         ) {
                           toast.error(`Default for ${pin.id} must be a JSON object`);
@@ -3320,7 +3327,13 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 );
               }
 
-              if (pin.type === 'object' || pin.type === 'array' || pin.type === 'assertion' || pin.type === 'assertions') {
+              if (
+                pin.type === 'object' ||
+                pin.type === 'memory' ||
+                pin.type === 'array' ||
+                pin.type === 'assertion' ||
+                pin.type === 'assertions'
+              ) {
                 const fallback =
                   raw === undefined
                     ? ''
@@ -3352,7 +3365,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                       try {
                         const parsed = JSON.parse(v);
                         if (
-                          (pin.type === 'object' || pin.type === 'assertion') &&
+                          (pin.type === 'object' || pin.type === 'memory' || pin.type === 'assertion') &&
                           (parsed === null || Array.isArray(parsed) || typeof parsed !== 'object')
                         ) {
                           toast.error(`Default for ${pin.id} must be a JSON object`);

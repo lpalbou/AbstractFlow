@@ -534,6 +534,26 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   // Load a flow from API
   loadFlow: (flow) => {
+    const rawEdges = Array.isArray(flow.edges) ? flow.edges : [];
+    const connectedInputHandlesByNodeId = new Map<string, Set<string>>();
+    const connectedOutputHandlesByNodeId = new Map<string, Set<string>>();
+    for (const e of rawEdges) {
+      const src = (e as any)?.source;
+      const tgt = (e as any)?.target;
+      const sh = (e as any)?.sourceHandle;
+      const th = (e as any)?.targetHandle;
+      if (typeof src === 'string' && typeof sh === 'string' && sh) {
+        const set = connectedOutputHandlesByNodeId.get(src) || new Set<string>();
+        set.add(sh);
+        connectedOutputHandlesByNodeId.set(src, set);
+      }
+      if (typeof tgt === 'string' && typeof th === 'string' && th) {
+        const set = connectedInputHandlesByNodeId.get(tgt) || new Set<string>();
+        set.add(th);
+        connectedInputHandlesByNodeId.set(tgt, set);
+      }
+    }
+
     const nodes: Node<FlowNodeData>[] = flow.nodes.map((vn) => {
       const template = getNodeTemplate(vn.type);
       let data: FlowNodeData = template
@@ -542,12 +562,74 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
       if (data.nodeType === 'on_flow_start') {
         // Prefer a stable, interface-aligned output order when pins are present.
-        const existingOutputs = Array.isArray(data.outputs) ? data.outputs : [];
+        const existingOutputs = Array.isArray(data.outputs) ? [...data.outputs] : [];
         if (existingOutputs.length) {
+          const connectedOut = connectedOutputHandlesByNodeId.get(vn.id) || new Set<string>();
+          const legacyMemoryPins = [
+            'use_session_attachments',
+            'use_span_memory',
+            'use_semantic_search',
+            'use_kg_memory',
+            'memory_query',
+            'memory_scope',
+            'recall_level',
+            'max_span_messages',
+            'kg_max_input_tokens',
+            'kg_limit',
+            'kg_min_score',
+            'kg_write_scope',
+            'kg_domain_focus',
+            'kg_max_out_tokens',
+          ];
+          const dropLegacy = new Set<string>(legacyMemoryPins.filter((id) => !connectedOut.has(id)));
+
+          // Migration: legacy start pinDefaults -> pinDefaults.memory (only for pins we drop).
+          const prevDefaults =
+            data.pinDefaults && typeof data.pinDefaults === 'object' ? data.pinDefaults : undefined;
+          if (prevDefaults) {
+            const nextDefaults: Record<string, JsonValue> = { ...prevDefaults };
+            const memoryRaw = nextDefaults.memory;
+            const memoryObj: Record<string, JsonValue> =
+              memoryRaw && typeof memoryRaw === 'object' && !Array.isArray(memoryRaw)
+                ? { ...(memoryRaw as Record<string, JsonValue>) }
+                : {};
+
+            let didFold = false;
+            for (const id of legacyMemoryPins) {
+              if (!dropLegacy.has(id)) continue;
+              if (!(id in nextDefaults)) continue;
+              if (!Object.prototype.hasOwnProperty.call(memoryObj, id)) {
+                memoryObj[id] = nextDefaults[id];
+              }
+              delete nextDefaults[id];
+              didFold = true;
+            }
+            if (didFold) {
+              nextDefaults.memory = memoryObj;
+              data = { ...data, pinDefaults: nextDefaults };
+            }
+          }
+
           const byId = new Map(existingOutputs.map((p) => [p.id, p] as const));
+          const hasDroppedLegacyPins = existingOutputs.some((p) => dropLegacy.has(p.id));
+          const hasMemoryDefault =
+            Boolean(
+              data.pinDefaults &&
+                typeof data.pinDefaults === 'object' &&
+                data.pinDefaults.memory &&
+                typeof data.pinDefaults.memory === 'object'
+            );
+          const shouldEnsureMemory = byId.has('memory') || hasMemoryDefault || hasDroppedLegacyPins;
+          if (shouldEnsureMemory && !byId.has('memory')) {
+            const memoryPin: Pin = { id: 'memory', label: 'memory', type: 'memory' };
+            byId.set('memory', memoryPin);
+            existingOutputs.push(memoryPin);
+          }
+
           const desiredIds = [
             'exec-out',
             'use_context',
+            'memory',
             'context',
             'provider',
             'model',
@@ -570,6 +652,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           }
           for (const p of existingOutputs) {
             if (seen.has(p.id)) continue;
+            if (dropLegacy.has(p.id)) continue;
             ordered.push(p);
           }
           data = { ...data, outputs: ordered };
@@ -629,23 +712,55 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
         const execIn = want({ id: 'exec-in', label: '', type: 'execution' });
 
+        const legacyMemoryPins = [
+          'use_session_attachments',
+          'use_span_memory',
+          'use_semantic_search',
+          'use_kg_memory',
+          'memory_query',
+          'memory_scope',
+          'recall_level',
+          'max_span_messages',
+          'kg_max_input_tokens',
+          'kg_limit',
+          'kg_min_score',
+        ];
+        const connectedInputs = connectedInputHandlesByNodeId.get(vn.id) || new Set<string>();
+        const dropLegacyMemoryPins = new Set<string>(legacyMemoryPins.filter((id) => !connectedInputs.has(id)));
+
+        // Migration: legacy memory pinDefaults -> pinDefaults.memory (only for pins we drop).
+        const prevDefaultsForMemoryCollapse =
+          data.pinDefaults && typeof data.pinDefaults === 'object' ? data.pinDefaults : undefined;
+        if (prevDefaultsForMemoryCollapse) {
+          const nextDefaults: Record<string, JsonValue> = { ...prevDefaultsForMemoryCollapse };
+          const memoryRaw = nextDefaults.memory;
+          const memoryObj: Record<string, JsonValue> =
+            memoryRaw && typeof memoryRaw === 'object' && !Array.isArray(memoryRaw)
+              ? { ...(memoryRaw as Record<string, JsonValue>) }
+              : {};
+          let didFold = false;
+          for (const id of legacyMemoryPins) {
+            if (!dropLegacyMemoryPins.has(id)) continue;
+            if (!(id in nextDefaults)) continue;
+            if (!Object.prototype.hasOwnProperty.call(memoryObj, id)) {
+              memoryObj[id] = nextDefaults[id];
+            }
+            delete nextDefaults[id];
+            didFold = true;
+          }
+          if (didFold) {
+            nextDefaults.memory = memoryObj;
+            data = { ...data, pinDefaults: nextDefaults };
+          }
+        }
+
         const canonicalInputs: Pin[] =
           data.nodeType === 'llm_call'
             ? [
                 execIn,
                 want({ id: 'use_context', label: 'use_context', type: 'boolean' }),
                 want({ id: 'context', label: 'context', type: 'object' }),
-                want({ id: 'use_session_attachments', label: 'use_session_attachments', type: 'boolean' }),
-                want({ id: 'use_span_memory', label: 'use_span_memory', type: 'boolean' }),
-                want({ id: 'use_semantic_search', label: 'use_semantic_search', type: 'boolean' }),
-                want({ id: 'use_kg_memory', label: 'use_kg_memory', type: 'boolean' }),
-                want({ id: 'memory_query', label: 'memory_query', type: 'string' }),
-                want({ id: 'memory_scope', label: 'memory_scope', type: 'string' }),
-                want({ id: 'recall_level', label: 'recall_level', type: 'string' }),
-                want({ id: 'max_span_messages', label: 'max_span_messages', type: 'number' }),
-                want({ id: 'kg_max_input_tokens', label: 'kg_max_input_tokens', type: 'number' }),
-                want({ id: 'kg_limit', label: 'kg_limit', type: 'number' }),
-                want({ id: 'kg_min_score', label: 'kg_min_score', type: 'number' }),
+                want({ id: 'memory', label: 'memory', type: 'memory' }),
                 want({ id: 'provider', label: 'provider', type: 'provider' }),
                 want({ id: 'model', label: 'model', type: 'model' }),
                 want({ id: 'system', label: 'system', type: 'string' }),
@@ -660,17 +775,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                 execIn,
                 want({ id: 'use_context', label: 'use_context', type: 'boolean' }),
                 want({ id: 'context', label: 'context', type: 'object' }),
-                want({ id: 'use_session_attachments', label: 'use_session_attachments', type: 'boolean' }),
-                want({ id: 'use_span_memory', label: 'use_span_memory', type: 'boolean' }),
-                want({ id: 'use_semantic_search', label: 'use_semantic_search', type: 'boolean' }),
-                want({ id: 'use_kg_memory', label: 'use_kg_memory', type: 'boolean' }),
-                want({ id: 'memory_query', label: 'memory_query', type: 'string' }),
-                want({ id: 'memory_scope', label: 'memory_scope', type: 'string' }),
-                want({ id: 'recall_level', label: 'recall_level', type: 'string' }),
-                want({ id: 'max_span_messages', label: 'max_span_messages', type: 'number' }),
-                want({ id: 'kg_max_input_tokens', label: 'kg_max_input_tokens', type: 'number' }),
-                want({ id: 'kg_limit', label: 'kg_limit', type: 'number' }),
-                want({ id: 'kg_min_score', label: 'kg_min_score', type: 'number' }),
+                want({ id: 'memory', label: 'memory', type: 'memory' }),
                 want({ id: 'provider', label: 'provider', type: 'provider' }),
                 want({ id: 'model', label: 'model', type: 'model' }),
                 want({ id: 'system', label: 'system', type: 'string' }),
@@ -685,7 +790,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
         // Drop truly deprecated pins (kept for backward compat in old flows).
         // - `write_context` was an experimental feature and is not part of the durable contract.
-        const dropIds = data.nodeType === 'llm_call' ? new Set(['write_context', 'writeContext']) : new Set<string>();
+        const dropIds = new Set<string>(data.nodeType === 'llm_call' ? ['write_context', 'writeContext'] : []);
+        for (const id of dropLegacyMemoryPins) dropIds.add(id);
         const extras = existingInputs.filter((p) => !used.has(p.id) && !dropIds.has(p.id));
         data = { ...data, inputs: [...canonicalInputs, ...extras] };
 

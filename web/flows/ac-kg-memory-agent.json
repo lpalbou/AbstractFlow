@@ -26,6 +26,21 @@
             "type": "execution"
           },
           {
+            "id": "use_context",
+            "label": "use_context",
+            "type": "boolean"
+          },
+          {
+            "id": "memory",
+            "label": "memory",
+            "type": "memory"
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object"
+          },
+          {
             "id": "provider",
             "label": "provider",
             "type": "provider"
@@ -36,23 +51,13 @@
             "type": "model"
           },
           {
-            "id": "prompt",
-            "label": "prompt",
+            "id": "system",
+            "label": "system",
             "type": "string"
           },
           {
-            "id": "use_context",
-            "label": "use_context",
-            "type": "boolean"
-          },
-          {
-            "id": "context",
-            "label": "context",
-            "type": "object"
-          },
-          {
-            "id": "system",
-            "label": "system",
+            "id": "prompt",
+            "label": "prompt",
             "type": "string"
           },
           {
@@ -84,81 +89,36 @@
             "id": "resp_schema",
             "label": "resp_schema",
             "type": "object"
-          },
-          {
-            "id": "use_session_attachments",
-            "label": "use_session_attachments",
-            "type": "boolean"
-          },
-          {
-            "id": "use_span_memory",
-            "label": "use_span_memory",
-            "type": "boolean"
-          },
-          {
-            "id": "use_semantic_search",
-            "label": "use_semantic_search",
-            "type": "boolean"
-          },
-          {
-            "id": "use_kg_memory",
-            "label": "use_kg_memory",
-            "type": "boolean"
-          },
-          {
-            "id": "memory_query",
-            "label": "memory_query",
-            "type": "string"
-          },
-          {
-            "id": "memory_scope",
-            "label": "memory_scope",
-            "type": "string"
-          },
-          {
-            "id": "recall_level",
-            "label": "recall_level",
-            "type": "string"
-          },
-          {
-            "id": "max_span_messages",
-            "label": "max_span_messages",
-            "type": "number"
-          },
-          {
-            "id": "kg_max_input_tokens",
-            "label": "kg_max_input_tokens",
-            "type": "number"
-          },
-          {
-            "id": "kg_limit",
-            "label": "kg_limit",
-            "type": "number"
-          },
-          {
-            "id": "kg_min_score",
-            "label": "kg_min_score",
-            "type": "number"
-          },
-          {
-            "id": "kg_write_scope",
-            "label": "kg_write_scope",
-            "type": "string"
-          },
-          {
-            "id": "kg_domain_focus",
-            "label": "kg_domain_focus",
-            "type": "string"
-          },
-          {
-            "id": "kg_max_out_tokens",
-            "label": "kg_max_out_tokens",
-            "type": "number"
           }
         ],
         "pinDefaults": {
           "use_context": true,
-          "system": "You are a helpful assistant. Use the provided \"## KG ACTIVE MEMORY\" system block (when present) as retrieved memory from a temporal knowledge graph: it contains relevant facts and relationships. When uncertain, ask clarifying questions.\n\nAfter you respond, the workflow will extract durable facts from this turn and assert them into the KG for next-turn recall.",
+          "memory": {},
+          "system": "You are a helpful assistant. Use the provided \"## KG ACTIVE MEMORY\" system block (when present) as retrieved memory from a temporal knowledge graph: it contains relevant facts and relationships. When uncertain, ask clarifying questions.\n\nAfter you respond, the workflow will extract durable facts from this turn and assert them into the KG for next-turn recall."
+        }
+      }
+    },
+    {
+      "id": "memory_default",
+      "type": "literal_json",
+      "position": {
+        "x": -960.0,
+        "y": 240.0
+      },
+      "data": {
+        "nodeType": "literal_json",
+        "label": "Memory (defaults)",
+        "icon": "&#x1F4BE;",
+        "headerColor": "#00C49A",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "memory",
+            "type": "memory"
+          }
+        ],
+        "literalValue": {
           "use_session_attachments": true,
           "use_span_memory": false,
           "use_semantic_search": false,
@@ -173,6 +133,165 @@
           "kg_write_scope": "session",
           "kg_domain_focus": "software / agents / memory systems",
           "kg_max_out_tokens": 700
+        }
+      }
+    },
+    {
+      "id": "memory_effective",
+      "type": "merge",
+      "position": {
+        "x": -736.0,
+        "y": 240.0
+      },
+      "data": {
+        "nodeType": "merge",
+        "label": "Memory",
+        "icon": "&#x1F517;",
+        "headerColor": "#00C49A",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "memory"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "memory"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "memory",
+            "type": "memory"
+          }
+        ]
+      }
+    },
+    {
+      "id": "mem_write_scope",
+      "type": "get",
+      "position": {
+        "x": -512.0,
+        "y": 176.0
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "kg_write_scope",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "kg_write_scope",
+          "default": "session"
+        }
+      }
+    },
+    {
+      "id": "mem_domain_focus",
+      "type": "get",
+      "position": {
+        "x": -512.0,
+        "y": 256.0
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "kg_domain_focus",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "kg_domain_focus",
+          "default": "software / agents / memory systems"
+        }
+      }
+    },
+    {
+      "id": "mem_max_out_tokens",
+      "type": "get",
+      "position": {
+        "x": -512.0,
+        "y": 336.0
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "kg_max_out_tokens",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "kg_max_out_tokens",
+          "default": 700
         }
       }
     },
@@ -205,6 +324,11 @@
             "type": "object"
           },
           {
+            "id": "memory",
+            "label": "memory",
+            "type": "memory"
+          },
+          {
             "id": "provider",
             "label": "provider",
             "type": "provider"
@@ -253,61 +377,6 @@
             "id": "resp_schema",
             "label": "resp_schema",
             "type": "object"
-          },
-          {
-            "id": "use_session_attachments",
-            "label": "use_session_attachments",
-            "type": "boolean"
-          },
-          {
-            "id": "use_span_memory",
-            "label": "use_span_memory",
-            "type": "boolean"
-          },
-          {
-            "id": "use_semantic_search",
-            "label": "use_semantic_search",
-            "type": "boolean"
-          },
-          {
-            "id": "use_kg_memory",
-            "label": "use_kg_memory",
-            "type": "boolean"
-          },
-          {
-            "id": "memory_query",
-            "label": "memory_query",
-            "type": "string"
-          },
-          {
-            "id": "memory_scope",
-            "label": "memory_scope",
-            "type": "string"
-          },
-          {
-            "id": "recall_level",
-            "label": "recall_level",
-            "type": "string"
-          },
-          {
-            "id": "max_span_messages",
-            "label": "max_span_messages",
-            "type": "number"
-          },
-          {
-            "id": "kg_max_input_tokens",
-            "label": "kg_max_input_tokens",
-            "type": "number"
-          },
-          {
-            "id": "kg_limit",
-            "label": "kg_limit",
-            "type": "number"
-          },
-          {
-            "id": "kg_min_score",
-            "label": "kg_min_score",
-            "type": "number"
           }
         ],
         "outputs": [
@@ -931,91 +1000,51 @@
       "animated": false
     },
     {
-      "id": "e-start-agent-use-session-attachments",
+      "id": "e-start-memory-effective-b",
       "source": "start",
-      "sourceHandle": "use_session_attachments",
-      "target": "agent",
-      "targetHandle": "use_session_attachments",
+      "sourceHandle": "memory",
+      "target": "memory_effective",
+      "targetHandle": "b",
       "animated": false
     },
     {
-      "id": "e-start-agent-use-span-memory",
-      "source": "start",
-      "sourceHandle": "use_span_memory",
-      "target": "agent",
-      "targetHandle": "use_span_memory",
+      "id": "e-memory-default-memory-effective-a",
+      "source": "memory_default",
+      "sourceHandle": "value",
+      "target": "memory_effective",
+      "targetHandle": "a",
       "animated": false
     },
     {
-      "id": "e-start-agent-use-semantic-search",
-      "source": "start",
-      "sourceHandle": "use_semantic_search",
+      "id": "e-memory-effective-agent-memory",
+      "source": "memory_effective",
+      "sourceHandle": "result",
       "target": "agent",
-      "targetHandle": "use_semantic_search",
+      "targetHandle": "memory",
       "animated": false
     },
     {
-      "id": "e-start-agent-use-kg-memory",
-      "source": "start",
-      "sourceHandle": "use_kg_memory",
-      "target": "agent",
-      "targetHandle": "use_kg_memory",
+      "id": "e-memory-effective-write-scope-object",
+      "source": "memory_effective",
+      "sourceHandle": "result",
+      "target": "mem_write_scope",
+      "targetHandle": "object",
       "animated": false
     },
     {
-      "id": "e-start-agent-memory-query",
-      "source": "start",
-      "sourceHandle": "memory_query",
-      "target": "agent",
-      "targetHandle": "memory_query",
+      "id": "e-memory-effective-domain-focus-object",
+      "source": "memory_effective",
+      "sourceHandle": "result",
+      "target": "mem_domain_focus",
+      "targetHandle": "object",
       "animated": false
     },
     {
-      "id": "e-start-agent-memory-scope",
-      "source": "start",
-      "sourceHandle": "memory_scope",
-      "target": "agent",
-      "targetHandle": "memory_scope",
-      "animated": false
-    },
-    {
-      "id": "e-start-agent-recall-level",
-      "source": "start",
-      "sourceHandle": "recall_level",
-      "target": "agent",
-      "targetHandle": "recall_level",
-      "animated": false
-    },
-    {
-      "id": "e-start-agent-max-span-messages",
-      "source": "start",
-      "sourceHandle": "max_span_messages",
-      "target": "agent",
-      "targetHandle": "max_span_messages",
-      "animated": false
-    },
-    {
-      "id": "e-start-agent-kg-max-input-tokens",
-      "source": "start",
-      "sourceHandle": "kg_max_input_tokens",
-      "target": "agent",
-      "targetHandle": "kg_max_input_tokens",
-      "animated": false
-    },
-    {
-      "id": "e-start-agent-kg-limit",
-      "source": "start",
-      "sourceHandle": "kg_limit",
-      "target": "agent",
-      "targetHandle": "kg_limit",
-      "animated": false
-    },
-    {
-      "id": "e-start-agent-kg-min-score",
-      "source": "start",
-      "sourceHandle": "kg_min_score",
-      "target": "agent",
-      "targetHandle": "kg_min_score",
+      "id": "e-memory-effective-max-out-tokens-object",
+      "source": "memory_effective",
+      "sourceHandle": "result",
+      "target": "mem_max_out_tokens",
+      "targetHandle": "object",
       "animated": false
     },
     {
@@ -1067,25 +1096,25 @@
       "animated": false
     },
     {
-      "id": "e-start-ingest-input-scope",
-      "source": "start",
-      "sourceHandle": "kg_write_scope",
+      "id": "e-mem-write-scope-ingest-scope",
+      "source": "mem_write_scope",
+      "sourceHandle": "value",
       "target": "ingest_input",
       "targetHandle": "scope",
       "animated": false
     },
     {
-      "id": "e-start-ingest-input-domain-focus",
-      "source": "start",
-      "sourceHandle": "kg_domain_focus",
+      "id": "e-mem-domain-focus-ingest-domain-focus",
+      "source": "mem_domain_focus",
+      "sourceHandle": "value",
       "target": "ingest_input",
       "targetHandle": "domain_focus",
       "animated": false
     },
     {
-      "id": "e-start-ingest-input-max-out-tokens",
-      "source": "start",
-      "sourceHandle": "kg_max_out_tokens",
+      "id": "e-mem-max-out-tokens-ingest-max-out-tokens",
+      "source": "mem_max_out_tokens",
+      "sourceHandle": "value",
       "target": "ingest_input",
       "targetHandle": "max_out_tokens",
       "animated": false

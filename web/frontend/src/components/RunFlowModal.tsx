@@ -281,6 +281,7 @@ function getInputTypeForPin(pinType: string): 'text' | 'number' | 'checkbox' | '
       return 'checkbox';
     case 'string':
     case 'object':
+    case 'memory':
     case 'array':
       return 'textarea';
     default:
@@ -296,6 +297,7 @@ function getPlaceholderForPin(pin: Pin): string {
     case 'number':
       return '0';
     case 'object':
+    case 'memory':
       return '{ }';
     case 'array':
       return '[ ]';
@@ -485,8 +487,14 @@ export function RunFlowModal({
           initialValues[pin.id] = raw;
           return;
         }
-        // Objects/arrays/assertions (render as JSON in textarea pins).
-        if (pin.type === 'object' || pin.type === 'array' || pin.type === 'assertion' || pin.type === 'assertions') {
+        // Objects/arrays/assertions/memory (render as JSON in textarea pins).
+        if (
+          pin.type === 'object' ||
+          pin.type === 'memory' ||
+          pin.type === 'array' ||
+          pin.type === 'assertion' ||
+          pin.type === 'assertions'
+        ) {
           try {
             initialValues[pin.id] = JSON.stringify(raw, null, 2);
             return;
@@ -556,6 +564,7 @@ export function RunFlowModal({
           inputData[pin.id] = value === 'true' || value === '1';
           break;
         case 'object':
+        case 'memory':
         case 'array':
         case 'assertion':
         case 'assertions':

@@ -78,6 +78,7 @@ def get_interface_specs() -> Dict[str, VisualFlowInterfaceSpec]:
             },
             recommended_start_outputs={
                 "use_context": "boolean",
+                "memory": "memory",
                 "context": "object",
                 "system": "string",
                 "tools": "tools",
@@ -355,6 +356,7 @@ def apply_visual_flow_interface_scaffold(
     desired_start_order = [
         "exec-out",
         "use_context",
+        "memory",
         "context",
         "provider",
         "model",

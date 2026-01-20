@@ -125,9 +125,10 @@ def test_visual_interface_abstractcode_agent_v1_scaffold_adds_success_meta_scrat
     start_pins = start.data.get("outputs") if isinstance(start.data, dict) else None
     assert isinstance(start_pins, list)
     start_ids = [p.get("id") for p in start_pins if isinstance(p, dict)]
-    assert start_ids[:13] == [
+    assert start_ids[:14] == [
         "exec-out",
         "use_context",
+        "memory",
         "context",
         "provider",
         "model",

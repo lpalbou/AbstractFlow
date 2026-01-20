@@ -9,6 +9,7 @@ export type PinType =
   | 'number'    // Green #00FF00 - Integer/Float
   | 'boolean'   // Red #FF0000 - True/False
   | 'object'    // Cyan #00FFFF - JSON objects
+  | 'memory'    // Mint - Memory configuration object (KG/span/session controls)
   | 'assertion' // Teal - KG assertion object (subject/predicate/object + metadata)
   | 'assertions' // Teal - List of KG assertion objects (assertion[])
   | 'array'     // Orange #FF8800 - Collections
@@ -25,6 +26,7 @@ export const PIN_COLORS: Record<PinType, string> = {
   number: '#00FF00',
   boolean: '#FF0000',
   object: '#00FFFF',
+  memory: '#00C49A',
   assertion: '#00B8D4',
   assertions: '#00B8D4',
   array: '#FF8800',
