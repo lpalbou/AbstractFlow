@@ -74,8 +74,8 @@ export function PublishFlowModal({
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h3>Publish WorkflowBundle</h3>
         <p>
-          Creates a new <code>.flow</code> bundle version (history preserved). By default, this publishes into the
-          gateway bundles directory and triggers a gateway reload.
+          Creates a new <code>.flow</code> bundle version (history preserved). If a gateway connection is configured,
+          AbstractFlow will also try to upload the bundle to the gateway and trigger a reload (remote-safe).
         </p>
 
         <div className="run-form-field">
@@ -169,4 +169,3 @@ export function PublishFlowModal({
     </div>
   );
 }
-

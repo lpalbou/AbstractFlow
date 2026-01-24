@@ -8,6 +8,7 @@ import os
 import re
 from urllib.error import HTTPError
 import urllib.request
+import urllib.parse
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -148,6 +149,21 @@ class PublishFlowResponse(BaseModel):
     gateway_reload_error: Optional[str] = None
 
 
+class DeprecateBundleRequest(BaseModel):
+    bundle_id: Optional[str] = Field(default=None, description="Bundle id (defaults to sanitized flow.name).")
+    flow_id: Optional[str] = Field(default=None, description="Optional entrypoint flow_id (default: all entrypoints for the bundle).")
+    reason: Optional[str] = Field(default=None, description="Optional reason to record.")
+
+
+class DeprecateBundleResponse(BaseModel):
+    ok: bool
+    bundle_id: str
+    flow_id: str
+    deprecated_at: Optional[str] = None
+    reason: Optional[str] = None
+    removed: Optional[bool] = None
+
+
 def _load_flows_from_disk() -> Dict[str, VisualFlow]:
     """Load all flows from disk on startup."""
     flows: Dict[str, VisualFlow] = {}
@@ -264,27 +280,35 @@ async def update_flow(flow_id: str, request: FlowUpdateRequest):
 
 
 def _gateway_reload_url() -> str:
-    raw = str(os.getenv("ABSTRACTFLOW_GATEWAY_URL") or os.getenv("ABSTRACTGATEWAY_URL") or "http://127.0.0.1:8081").strip()
-    raw = raw.rstrip("/")
-    if raw.endswith("/api"):
-        api = raw
-    elif raw.endswith("/api/"):
-        api = raw.rstrip("/")
-    else:
-        api = f"{raw}/api"
+    api = _gateway_api_base()
     return f"{api}/gateway/bundles/reload"
 
 
 def _gateway_upload_url() -> str:
+    api = _gateway_api_base()
+    return f"{api}/gateway/bundles/upload"
+
+
+def _gateway_api_base() -> str:
     raw = str(os.getenv("ABSTRACTFLOW_GATEWAY_URL") or os.getenv("ABSTRACTGATEWAY_URL") or "http://127.0.0.1:8081").strip()
     raw = raw.rstrip("/")
     if raw.endswith("/api"):
-        api = raw
-    elif raw.endswith("/api/"):
-        api = raw.rstrip("/")
-    else:
-        api = f"{raw}/api"
-    return f"{api}/gateway/bundles/upload"
+        return raw
+    if raw.endswith("/api/"):
+        return raw.rstrip("/")
+    return f"{raw}/api"
+
+
+def _gateway_deprecate_url(bundle_id: str) -> str:
+    api = _gateway_api_base()
+    bid = urllib.parse.quote(str(bundle_id or "").strip(), safe="")
+    return f"{api}/gateway/bundles/{bid}/deprecate"
+
+
+def _gateway_undeprecate_url(bundle_id: str) -> str:
+    api = _gateway_api_base()
+    bid = urllib.parse.quote(str(bundle_id or "").strip(), safe="")
+    return f"{api}/gateway/bundles/{bid}/undeprecate"
 
 
 def _gateway_auth_token() -> str:
@@ -357,6 +381,49 @@ def _try_upload_bundle_to_gateway(*, bundle_path: Path, overwrite: bool, reload:
 
     req = urllib.request.Request(url=url, data=body, method="POST")
     req.add_header("Content-Type", content_type)
+    req.add_header("Accept", "application/json")
+    if token:
+        req.add_header("Authorization", f"Bearer {token}")
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            raw = resp.read().decode("utf-8")
+        return (json.loads(raw) if raw else {}, None)
+    except HTTPError as e:
+        try:
+            detail = e.read().decode("utf-8").strip()
+        except Exception:
+            detail = ""
+        return None, detail or str(e)
+    except Exception as e:
+        return None, str(e)
+
+
+def _try_update_gateway_deprecation(
+    *,
+    bundle_id: str,
+    action: str,
+    flow_id: Optional[str],
+    reason: Optional[str],
+) -> tuple[Optional[dict[str, Any]], Optional[str]]:
+    bid = str(bundle_id or "").strip()
+    if not bid:
+        return None, "bundle_id is required"
+    act = str(action or "").strip().lower()
+    if act not in {"deprecate", "undeprecate"}:
+        return None, "action must be deprecate|undeprecate"
+    url = _gateway_deprecate_url(bid) if act == "deprecate" else _gateway_undeprecate_url(bid)
+    token = _gateway_auth_token()
+
+    payload: Dict[str, Any] = {}
+    fid = str(flow_id or "").strip()
+    if fid:
+        payload["flow_id"] = fid
+    rs = str(reason or "").strip()
+    if rs and act == "deprecate":
+        payload["reason"] = rs
+
+    req = urllib.request.Request(url=url, data=json.dumps(payload).encode("utf-8"), method="POST")
+    req.add_header("Content-Type", "application/json")
     req.add_header("Accept", "application/json")
     if token:
         req.add_header("Authorization", f"Bearer {token}")
@@ -468,6 +535,53 @@ async def publish_flow(flow_id: str, request: PublishFlowRequest) -> PublishFlow
         bundle_path=str(out_path),
         gateway_reloaded=bool(gateway_reloaded),
         gateway_reload_error=gateway_reload_error,
+    )
+
+
+@router.post("/{flow_id}/deprecate", response_model=DeprecateBundleResponse)
+async def deprecate_flow_bundle(flow_id: str, request: DeprecateBundleRequest) -> DeprecateBundleResponse:
+    if flow_id not in _flows:
+        raise HTTPException(status_code=404, detail=f"Flow '{flow_id}' not found")
+    flow = _flows[flow_id]
+    bundle_id = _sanitize_bundle_id(str(request.bundle_id or "").strip()) or _sanitize_bundle_id(str(flow.name or "").strip()) or str(flow.id)
+
+    resp, err = _try_update_gateway_deprecation(
+        bundle_id=bundle_id,
+        action="deprecate",
+        flow_id=request.flow_id,
+        reason=request.reason,
+    )
+    if err is not None:
+        raise HTTPException(status_code=400, detail=f"Failed to deprecate on gateway: {err}")
+    return DeprecateBundleResponse(
+        ok=True,
+        bundle_id=str(resp.get("bundle_id") or bundle_id),
+        flow_id=str(resp.get("flow_id") or request.flow_id or "*"),
+        deprecated_at=str(resp.get("deprecated_at") or "") or None,
+        reason=str(resp.get("reason") or request.reason or "") or None,
+    )
+
+
+@router.post("/{flow_id}/undeprecate", response_model=DeprecateBundleResponse)
+async def undeprecate_flow_bundle(flow_id: str, request: DeprecateBundleRequest) -> DeprecateBundleResponse:
+    if flow_id not in _flows:
+        raise HTTPException(status_code=404, detail=f"Flow '{flow_id}' not found")
+    flow = _flows[flow_id]
+    bundle_id = _sanitize_bundle_id(str(request.bundle_id or "").strip()) or _sanitize_bundle_id(str(flow.name or "").strip()) or str(flow.id)
+
+    resp, err = _try_update_gateway_deprecation(
+        bundle_id=bundle_id,
+        action="undeprecate",
+        flow_id=request.flow_id,
+        reason=None,
+    )
+    if err is not None:
+        raise HTTPException(status_code=400, detail=f"Failed to undeprecate on gateway: {err}")
+    return DeprecateBundleResponse(
+        ok=True,
+        bundle_id=str(resp.get("bundle_id") or bundle_id),
+        flow_id=str(resp.get("flow_id") or request.flow_id or "*"),
+        removed=bool(resp.get("removed") is True),
     )
 
 

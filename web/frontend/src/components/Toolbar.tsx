@@ -12,6 +12,7 @@ import { RunHistoryModal } from './RunHistoryModal';
 import { UserPromptModal } from './UserPromptModal';
 import { FlowLibraryModal } from './FlowLibraryModal';
 import { PublishFlowModal } from './PublishFlowModal';
+import { WorkflowLifecycleModal } from './WorkflowLifecycleModal';
 import { GatewayConnectionModal } from './GatewayConnectionModal';
 import type { ExecutionEvent, FlowRunResult, VisualFlow, RunHistoryResponse, RunSummary } from '../types/flow';
 import { computeRunPreflightIssues } from '../utils/preflight';
@@ -161,6 +162,7 @@ export function Toolbar() {
   const [showFlowLibrary, setShowFlowLibrary] = useState(false);
   const [showRunHistory, setShowRunHistory] = useState(false);
   const [showPublishModal, setShowPublishModal] = useState(false);
+  const [showLifecycleModal, setShowLifecycleModal] = useState(false);
   const [showConnectionModal, setShowConnectionModal] = useState(false);
   const [runResult, setRunResult] = useState<FlowRunResult | null>(null);
   const [executionEvents, setExecutionEvents] = useState<ExecutionEvent[]>([]);
@@ -611,6 +613,14 @@ export function Toolbar() {
     setShowPublishModal(true);
   }, [flowId]);
 
+  const handleLifecycle = useCallback(() => {
+    if (!flowId) {
+      toast.error('Please save the flow first');
+      return;
+    }
+    setShowLifecycleModal(true);
+  }, [flowId]);
+
   return (
     <>
       <div className="toolbar">
@@ -667,6 +677,10 @@ export function Toolbar() {
           title="Publish WorkflowBundle (.flow)"
         >
           📦 Publish
+        </button>
+
+        <button className="toolbar-button" onClick={handleLifecycle} disabled={isRunning || !flowId} title="Deprecate/undeprecate workflow on gateway">
+          🧬 Lifecycle
         </button>
 
         <button
@@ -797,6 +811,13 @@ export function Toolbar() {
         flowId={flowId}
         flowName={flowName}
         onClose={() => setShowPublishModal(false)}
+      />
+
+      <WorkflowLifecycleModal
+        isOpen={showLifecycleModal}
+        flowId={flowId}
+        flowName={flowName}
+        onClose={() => setShowLifecycleModal(false)}
       />
 
       {/* User Prompt Modal (fallback) */}
