@@ -48,6 +48,7 @@ def _default_publish_dir() -> Path:
     # default to the monorepo's shared `flows/bundles/` directory.
     raw = (
         os.getenv("ABSTRACTFLOW_PUBLISH_DIR")
+        or os.getenv("ABSTRACTFRAMEWORK_WORKFLOWS_DIR")
         or os.getenv("ABSTRACTGATEWAY_FLOWS_DIR")
         or os.getenv("ABSTRACTFLOW_FLOWS_DIR")
         or ""
