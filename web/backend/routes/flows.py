@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import re
+from urllib.error import HTTPError
 import urllib.request
 from datetime import datetime
 from pathlib import Path
@@ -44,15 +45,9 @@ def _repo_root() -> Path:
 
 
 def _default_publish_dir() -> Path:
-    # Prefer explicit publish dir; fall back to the gateway flows dir if set; otherwise
-    # default to the monorepo's shared `flows/bundles/` directory.
-    raw = (
-        os.getenv("ABSTRACTFLOW_PUBLISH_DIR")
-        or os.getenv("ABSTRACTFRAMEWORK_WORKFLOWS_DIR")
-        or os.getenv("ABSTRACTGATEWAY_FLOWS_DIR")
-        or os.getenv("ABSTRACTFLOW_FLOWS_DIR")
-        or ""
-    )
+    # Publish output is authored on the AbstractFlow machine. In gateway-first deployments,
+    # the bundle should then be uploaded to the remote gateway (no shared filesystem required).
+    raw = os.getenv("ABSTRACTFLOW_PUBLISH_DIR") or os.getenv("ABSTRACTFLOW_FLOWS_DIR") or ""
     if raw and str(raw).strip():
         return Path(raw).expanduser().resolve()
     return (_repo_root() / "flows" / "bundles").resolve()
@@ -280,6 +275,18 @@ def _gateway_reload_url() -> str:
     return f"{api}/gateway/bundles/reload"
 
 
+def _gateway_upload_url() -> str:
+    raw = str(os.getenv("ABSTRACTFLOW_GATEWAY_URL") or os.getenv("ABSTRACTGATEWAY_URL") or "http://127.0.0.1:8081").strip()
+    raw = raw.rstrip("/")
+    if raw.endswith("/api"):
+        api = raw
+    elif raw.endswith("/api/"):
+        api = raw.rstrip("/")
+    else:
+        api = f"{raw}/api"
+    return f"{api}/gateway/bundles/upload"
+
+
 def _gateway_auth_token() -> str:
     # Prefer canonical gateway env var names (with legacy fallbacks).
     raw = os.getenv("ABSTRACTGATEWAY_AUTH_TOKEN") or os.getenv("ABSTRACTFLOW_GATEWAY_AUTH_TOKEN") or ""
@@ -298,6 +305,73 @@ def _try_reload_gateway() -> Optional[str]:
         return None
     except Exception as e:
         return str(e)
+
+
+def _encode_multipart_formdata(
+    *,
+    fields: Dict[str, str],
+    file_field: str,
+    filename: str,
+    content: bytes,
+    content_type: str,
+) -> tuple[bytes, str]:
+    boundary = uuid.uuid4().hex
+    crlf = b"\r\n"
+    body = bytearray()
+
+    for k, v in (fields or {}).items():
+        body.extend(b"--" + boundary.encode("ascii") + crlf)
+        body.extend(f'Content-Disposition: form-data; name="{k}"'.encode("utf-8"))
+        body.extend(crlf + crlf)
+        body.extend(str(v).encode("utf-8"))
+        body.extend(crlf)
+
+    body.extend(b"--" + boundary.encode("ascii") + crlf)
+    body.extend(f'Content-Disposition: form-data; name="{file_field}"; filename="{filename}"'.encode("utf-8"))
+    body.extend(crlf)
+    body.extend(f"Content-Type: {content_type}".encode("utf-8"))
+    body.extend(crlf + crlf)
+    body.extend(bytes(content or b""))
+    body.extend(crlf)
+
+    body.extend(b"--" + boundary.encode("ascii") + b"--" + crlf)
+    return (bytes(body), f"multipart/form-data; boundary={boundary}")
+
+
+def _try_upload_bundle_to_gateway(*, bundle_path: Path, overwrite: bool, reload: bool) -> tuple[Optional[dict[str, Any]], Optional[str]]:
+    url = _gateway_upload_url()
+    token = _gateway_auth_token()
+
+    try:
+        content = bundle_path.read_bytes()
+    except Exception as e:
+        return None, f"Failed to read bundle: {e}"
+
+    body, content_type = _encode_multipart_formdata(
+        fields={"overwrite": "true" if overwrite else "false", "reload": "true" if reload else "false"},
+        file_field="file",
+        filename=bundle_path.name,
+        content=content,
+        content_type="application/octet-stream",
+    )
+
+    req = urllib.request.Request(url=url, data=body, method="POST")
+    req.add_header("Content-Type", content_type)
+    req.add_header("Accept", "application/json")
+    if token:
+        req.add_header("Authorization", f"Bearer {token}")
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            raw = resp.read().decode("utf-8")
+        return (json.loads(raw) if raw else {}, None)
+    except HTTPError as e:
+        try:
+            detail = e.read().decode("utf-8").strip()
+        except Exception:
+            detail = ""
+        return None, detail or str(e)
+    except Exception as e:
+        return None, str(e)
 
 
 @router.post("/{flow_id}/publish", response_model=PublishFlowResponse)
@@ -372,8 +446,19 @@ async def publish_flow(flow_id: str, request: PublishFlowRequest) -> PublishFlow
     gateway_reloaded = False
     gateway_reload_error = None
     if bool(request.reload_gateway):
-        gateway_reload_error = _try_reload_gateway()
-        gateway_reloaded = gateway_reload_error is None
+        # Prefer the gateway upload endpoint (works for remote hosts). Fallback to reload for local dev.
+        _resp, upload_err = _try_upload_bundle_to_gateway(bundle_path=out_path, overwrite=False, reload=True)
+        if upload_err is None:
+            gateway_reloaded = True
+            gateway_reload_error = None
+        else:
+            reload_err = _try_reload_gateway()
+            if reload_err is None:
+                gateway_reloaded = True
+                gateway_reload_error = None
+            else:
+                gateway_reloaded = False
+                gateway_reload_error = f"upload: {upload_err}; reload: {reload_err}"
 
     return PublishFlowResponse(
         ok=True,

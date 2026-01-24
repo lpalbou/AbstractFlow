@@ -1,13 +1,7 @@
-"""WorkflowBundle (.flow) tooling for AbstractFlow (authoring-side).
+"""WorkflowBundle (.flow) tooling (authoring-side).
 
-This module implements:
-- bundle pack: VisualFlow root + reachable subflows -> `.flow` zip
-- bundle inspect: read manifest summary
-- bundle unpack: extract to a directory
-
-Notes:
-- Packing requires `abstractflow` (VisualFlow models).
-- Reading bundles is handled in `abstractruntime.workflow_bundle` (stdlib-only).
+This module remains for backwards compatibility, but bundling logic lives in
+`abstractruntime.workflow_bundle` so hosts and clients share the same semantics.
 """
 
 from __future__ import annotations
@@ -285,3 +279,12 @@ def unpack_workflow_bundle(*, bundle_path: str | Path, out_dir: str | Path) -> P
     with zipfile.ZipFile(src, "r") as zf:
         zf.extractall(out)
     return out
+
+
+# Backwards-compat: prefer the shared stdlib-only implementation in AbstractRuntime.
+from abstractruntime.workflow_bundle import (  # noqa: E402
+    PackedWorkflowBundle as PackedWorkflowBundle,
+    inspect_workflow_bundle as inspect_workflow_bundle,
+    pack_workflow_bundle as pack_workflow_bundle,
+    unpack_workflow_bundle as unpack_workflow_bundle,
+)

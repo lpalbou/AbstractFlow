@@ -512,6 +512,151 @@
       "outputs": []
     },
     {
+      "id": "node-12",
+      "type": "length",
+      "position": { "x": 1344.0, "y": 256.0 },
+      "data": {
+        "nodeType": "length",
+        "label": "span_id len",
+        "icon": "#",
+        "headerColor": "#E74C3C",
+        "inputs": [{ "id": "text", "label": "text", "type": "string" }],
+        "outputs": [{ "id": "result", "label": "result", "type": "number" }]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-13",
+      "type": "compare",
+      "position": { "x": 1520.0, "y": 256.0 },
+      "data": {
+        "nodeType": "compare",
+        "label": "has span_id",
+        "icon": "=?",
+        "headerColor": "#F39C12",
+        "inputs": [
+          { "id": "a", "label": "a", "type": "any" },
+          { "id": "op", "label": "op", "type": "string" },
+          { "id": "b", "label": "b", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "boolean" }],
+        "pinDefaults": { "op": ">", "b": 0 }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-14",
+      "type": "if",
+      "position": { "x": 1696.0, "y": 256.0 },
+      "data": {
+        "nodeType": "if",
+        "label": "If span_id",
+        "icon": "&#x2753;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "condition", "label": "condition", "type": "boolean" }
+        ],
+        "outputs": [
+          { "id": "true", "label": "true", "type": "execution" },
+          { "id": "false", "label": "false", "type": "execution" }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-15",
+      "type": "string_template",
+      "position": { "x": 1520.0, "y": 384.0 },
+      "data": {
+        "nodeType": "string_template",
+        "label": "Build source note",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "template", "label": "template", "type": "string" },
+          { "id": "vars", "label": "vars", "type": "object" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "string" }],
+        "pinDefaults": {
+          "template": "# KG ingest-turn source\\n\\n(domain_focus={{domain_focus}})\\n\\n{{text}}"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-16",
+      "type": "memory_note",
+      "position": { "x": 1696.0, "y": 384.0 },
+      "data": {
+        "nodeType": "memory_note",
+        "label": "Store source span",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#2ECC71",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "keep_in_context", "label": "in_context", "type": "boolean" },
+          { "id": "scope", "label": "scope", "type": "string" },
+          { "id": "content", "label": "content", "type": "string" },
+          { "id": "location", "label": "location", "type": "string" },
+          { "id": "tags", "label": "tags", "type": "object" },
+          { "id": "sources", "label": "sources", "type": "object" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "note_id", "label": "note_id", "type": "string" }
+        ],
+        "pinDefaults": {
+          "keep_in_context": false,
+          "scope": "run",
+          "location": "kg_ingest_turn_source",
+          "tags": { "kind": "kg_ingest_turn_source" }
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-17",
+      "type": "coalesce",
+      "position": { "x": 1520.0, "y": 512.0 },
+      "data": {
+        "nodeType": "coalesce",
+        "label": "span_id (fallback note)",
+        "icon": "&#x1F517;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "a", "label": "span_id", "type": "any" },
+          { "id": "b", "label": "fallback", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "any" }]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
       "id": "node-10",
       "type": "on_flow_end",
       "position": {
@@ -684,17 +829,97 @@
       "id": "edge-14",
       "source": "node-1",
       "sourceHandle": "span_id",
-      "target": "node-9",
-      "targetHandle": "span_id",
+      "target": "node-17",
+      "targetHandle": "a",
       "animated": false
     },
     {
       "id": "edge-15",
       "source": "node-7",
       "sourceHandle": "exec-out",
+      "target": "node-14",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-21",
+      "source": "node-1",
+      "sourceHandle": "span_id",
+      "target": "node-12",
+      "targetHandle": "text",
+      "animated": false
+    },
+    {
+      "id": "edge-22",
+      "source": "node-12",
+      "sourceHandle": "result",
+      "target": "node-13",
+      "targetHandle": "a",
+      "animated": false
+    },
+    {
+      "id": "edge-23",
+      "source": "node-13",
+      "sourceHandle": "result",
+      "target": "node-14",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "edge-24",
+      "source": "node-14",
+      "sourceHandle": "true",
       "target": "node-9",
       "targetHandle": "exec-in",
       "animated": true
+    },
+    {
+      "id": "edge-25",
+      "source": "node-14",
+      "sourceHandle": "false",
+      "target": "node-16",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-26",
+      "source": "node-16",
+      "sourceHandle": "exec-out",
+      "target": "node-9",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-27",
+      "source": "node-11",
+      "sourceHandle": "result",
+      "target": "node-15",
+      "targetHandle": "vars",
+      "animated": false
+    },
+    {
+      "id": "edge-28",
+      "source": "node-15",
+      "sourceHandle": "result",
+      "target": "node-16",
+      "targetHandle": "content",
+      "animated": false
+    },
+    {
+      "id": "edge-29",
+      "source": "node-16",
+      "sourceHandle": "note_id",
+      "target": "node-17",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-30",
+      "source": "node-17",
+      "sourceHandle": "result",
+      "target": "node-9",
+      "targetHandle": "span_id",
+      "animated": false
     },
     {
       "id": "edge-16",
