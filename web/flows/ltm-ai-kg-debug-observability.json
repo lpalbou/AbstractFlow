@@ -150,7 +150,7 @@
           "scope": "run",
           "owner_id": "",
           "span_id": "demo-span",
-          "extract_max_out_tokens": 900,
+          "extract_max_out_tokens": 2000,
           "subject": "",
           "predicate": "",
           "object": "",

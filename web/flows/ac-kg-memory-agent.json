@@ -132,7 +132,7 @@
           "kg_min_score": 0.35,
           "kg_write_scope": "session",
           "kg_domain_focus": "software / agents / memory systems",
-          "kg_max_out_tokens": 700
+          "kg_max_out_tokens": 2000
         }
       }
     },
@@ -291,7 +291,7 @@
         ],
         "pinDefaults": {
           "key": "kg_max_out_tokens",
-          "default": 700
+          "default": 2000
         }
       }
     },
