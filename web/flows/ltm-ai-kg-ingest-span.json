@@ -23,7 +23,8 @@
 	          { "id": "domain_focus", "label": "domain_focus", "type": "string" },
 	          { "id": "max_messages", "label": "max_messages", "type": "number" },
 	          { "id": "max_input_tokens", "label": "max_input_tokens", "type": "number" },
-	          { "id": "max_out_tokens", "label": "max_out_tokens", "type": "number" }
+	          { "id": "max_out_tokens", "label": "max_out_tokens", "type": "number" },
+	          { "id": "extraction_profile", "label": "extraction_profile", "type": "object" }
 	        ],
 		        "pinDefaults": {
 		          "provider": "lmstudio",
@@ -32,7 +33,16 @@
 		          "domain_focus": "software / agents / memory systems",
 		          "max_messages": 80,
 		          "max_input_tokens": 12000,
-		          "max_out_tokens": 500
+		          "max_out_tokens": 500,
+		          "extraction_profile": {
+		            "persona_id": "default",
+		            "persona_version": "v1",
+		            "persona_summary": "Autonomous AI assistant aligned with AI–human partnership. Truthful, helpful, and efficient; preserves grounded commitments, preferences, definitions, and key concepts.",
+		            "values": ["truthfulness", "collaboration", "clarity", "efficiency"],
+		            "purposes": ["help humans accomplish tasks", "build clean, simple, efficient systems", "maintain continuity via grounded memory"],
+		            "memory_priorities": ["commitments", "preferences", "relationships", "definitions", "key concepts", "decisions"],
+		            "policy_version": "kg_extract_persona_v1"
+		          }
 		        }
 		      }
 		    },
@@ -192,10 +202,45 @@
         ],
 	        "outputs": [{ "id": "result", "label": "result", "type": "string" }],
 	        "pinDefaults": {
-		          "template": "You are a semantic extractor for an AI long-term memory system.\\n\\nTask: extract a small set of high-signal, append-only assertions (subject-predicate-object) supported by the recalled CONTEXT (context.messages).\\nDomain focus: {{domain_focus}}\\n\\nRules:\\n- Only assert what CONTEXT directly states (no external knowledge).\\n- Output MUST match the enforced structured-output schema.\\n- Use ONLY predicates from the schema enum (do not invent new ones).\\n- Prefer 6-10 assertions (max 12). If CONTEXT contains no concrete facts (only instructions/requests), it is OK to return an empty list."
+		          "template": "You are a semantic extractor for an AI long-term memory system.\\n\\nTask: extract a small set of high-signal, append-only assertions (subject-predicate-object) supported by the recalled CONTEXT (context.messages).\\nDomain focus: {{domain_focus}}\\nExtraction profile (identity + priorities; JSON):\\n{{extraction_profile_json}}\\n\\nRules:\\n- Only assert what CONTEXT directly states (no external knowledge).\\n- Output MUST match the enforced structured-output schema.\\n- Use ONLY predicates from the schema enum (do not invent new ones).\\n- Prefer 6-10 assertions (max 12). If CONTEXT contains no concrete facts (only instructions/requests), it is OK to return an empty list."
 		        }
 		      }
 		    },
+    {
+      "id": "node-19",
+      "type": "stringify_json",
+      "position": { "x": 1040.0, "y": 352.0 },
+      "data": {
+        "nodeType": "stringify_json",
+        "label": "Render extraction_profile",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "value", "label": "value", "type": "any", "description": "JSON value (or JSON-ish string) to stringify." },
+          { "id": "mode", "label": "mode", "type": "string", "description": "Rendering mode: none | beautify | minified. Default beautify." }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "string" }],
+        "pinDefaults": { "mode": "minified" }
+      }
+    },
+    {
+      "id": "node-20",
+      "type": "set",
+      "position": { "x": 1280.0, "y": 352.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set extraction_profile_json",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "extraction_profile_json" }
+      }
+    },
     {
       "id": "node-11",
       "type": "json_schema",
@@ -283,6 +328,146 @@
       }
     },
     {
+      "id": "node-21",
+      "type": "literal_json",
+      "position": { "x": 2000.0, "y": 256.0 },
+      "data": {
+        "nodeType": "literal_json",
+        "label": "KG attributes_defaults",
+        "icon": "{}",
+        "headerColor": "#00FFFF",
+        "inputs": [],
+        "outputs": [{ "id": "value", "label": "value", "type": "object" }],
+        "literalValue": {}
+      }
+    },
+    {
+      "id": "node-22",
+      "type": "get",
+      "position": { "x": 2000.0, "y": 320.0 },
+      "data": {
+        "nodeType": "get",
+        "label": "Get policy_version",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "policy_version", "default": "kg_extract_persona_v1" }
+      }
+    },
+    {
+      "id": "node-23",
+      "type": "get",
+      "position": { "x": 2000.0, "y": 384.0 },
+      "data": {
+        "nodeType": "get",
+        "label": "Get persona_id",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "persona_id", "default": "default" }
+      }
+    },
+    {
+      "id": "node-24",
+      "type": "get",
+      "position": { "x": 2000.0, "y": 448.0 },
+      "data": {
+        "nodeType": "get",
+        "label": "Get persona_version",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "persona_version", "default": "v1" }
+      }
+    },
+    {
+      "id": "node-25",
+      "type": "set",
+      "position": { "x": 2240.0, "y": 288.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set extractor_policy_version",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "extractor_policy_version" }
+      }
+    },
+    {
+      "id": "node-26",
+      "type": "set",
+      "position": { "x": 2240.0, "y": 352.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set persona_id",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "persona_id" }
+      }
+    },
+    {
+      "id": "node-27",
+      "type": "set",
+      "position": { "x": 2240.0, "y": 416.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set persona_version",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "persona_version" }
+      }
+    },
+    {
+      "id": "node-28",
+      "type": "set",
+      "position": { "x": 2240.0, "y": 480.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set extraction_input_kind",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "extraction_input_kind", "value": "span" }
+      }
+    },
+    {
       "id": "node-15",
       "type": "memory_kg_assert",
       "position": { "x": 2240.0, "y": 96.0 },
@@ -295,7 +480,8 @@
           { "id": "exec-in", "label": "", "type": "execution" },
 	          { "id": "assertions", "label": "assertions", "type": "assertions" },
           { "id": "scope", "label": "scope", "type": "string" },
-          { "id": "span_id", "label": "span_id", "type": "string" }
+          { "id": "span_id", "label": "span_id", "type": "string" },
+          { "id": "attributes_defaults", "label": "attributes_defaults", "type": "object" }
         ],
         "outputs": [
           { "id": "exec-out", "label": "", "type": "execution" },
@@ -372,7 +558,10 @@
     { "id": "edge-10", "source": "node-7", "sourceHandle": "exec-out", "target": "node-12", "targetHandle": "exec-in", "animated": true },
     { "id": "edge-11", "source": "node-8", "sourceHandle": "value", "target": "node-9", "targetHandle": "object", "animated": false },
     { "id": "edge-12", "source": "node-1", "sourceHandle": "domain_focus", "target": "node-9", "targetHandle": "value", "animated": false },
-    { "id": "edge-13", "source": "node-9", "sourceHandle": "result", "target": "node-10", "targetHandle": "vars", "animated": false },
+    { "id": "edge-13a", "source": "node-1", "sourceHandle": "extraction_profile", "target": "node-19", "targetHandle": "value", "animated": false },
+    { "id": "edge-13b", "source": "node-19", "sourceHandle": "result", "target": "node-20", "targetHandle": "value", "animated": false },
+    { "id": "edge-13c", "source": "node-9", "sourceHandle": "result", "target": "node-20", "targetHandle": "object", "animated": false },
+    { "id": "edge-13", "source": "node-20", "sourceHandle": "result", "target": "node-10", "targetHandle": "vars", "animated": false },
     { "id": "edge-14", "source": "node-10", "sourceHandle": "result", "target": "node-12", "targetHandle": "prompt", "animated": false },
     { "id": "edge-15", "source": "node-11", "sourceHandle": "value", "target": "node-12", "targetHandle": "response_schema", "animated": false },
 	    { "id": "edge-16", "source": "node-1", "sourceHandle": "provider", "target": "node-12", "targetHandle": "provider", "animated": false },
@@ -383,6 +572,17 @@
     { "id": "edge-20", "source": "node-13", "sourceHandle": "value", "target": "node-14", "targetHandle": "object", "animated": false },
     { "id": "edge-21", "source": "node-12", "sourceHandle": "exec-out", "target": "node-15", "targetHandle": "exec-in", "animated": true },
     { "id": "edge-22", "source": "node-14", "sourceHandle": "value", "target": "node-15", "targetHandle": "assertions", "animated": false },
+    { "id": "edge-22a", "source": "node-1", "sourceHandle": "extraction_profile", "target": "node-22", "targetHandle": "object", "animated": false },
+    { "id": "edge-22b", "source": "node-1", "sourceHandle": "extraction_profile", "target": "node-23", "targetHandle": "object", "animated": false },
+    { "id": "edge-22c", "source": "node-1", "sourceHandle": "extraction_profile", "target": "node-24", "targetHandle": "object", "animated": false },
+    { "id": "edge-22d", "source": "node-21", "sourceHandle": "value", "target": "node-25", "targetHandle": "object", "animated": false },
+    { "id": "edge-22e", "source": "node-22", "sourceHandle": "value", "target": "node-25", "targetHandle": "value", "animated": false },
+    { "id": "edge-22f", "source": "node-25", "sourceHandle": "result", "target": "node-26", "targetHandle": "object", "animated": false },
+    { "id": "edge-22g", "source": "node-23", "sourceHandle": "value", "target": "node-26", "targetHandle": "value", "animated": false },
+    { "id": "edge-22h", "source": "node-26", "sourceHandle": "result", "target": "node-27", "targetHandle": "object", "animated": false },
+    { "id": "edge-22i", "source": "node-24", "sourceHandle": "value", "target": "node-27", "targetHandle": "value", "animated": false },
+    { "id": "edge-22j", "source": "node-27", "sourceHandle": "result", "target": "node-28", "targetHandle": "object", "animated": false },
+    { "id": "edge-22k", "source": "node-28", "sourceHandle": "result", "target": "node-15", "targetHandle": "attributes_defaults", "animated": false },
     { "id": "edge-23", "source": "node-1", "sourceHandle": "scope", "target": "node-15", "targetHandle": "scope", "animated": false },
     { "id": "edge-24", "source": "node-1", "sourceHandle": "span_id", "target": "node-15", "targetHandle": "span_id", "animated": false },
     { "id": "edge-25", "source": "node-15", "sourceHandle": "exec-out", "target": "node-17", "targetHandle": "exec-in", "animated": true },

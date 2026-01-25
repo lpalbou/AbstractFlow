@@ -1,9 +1,9 @@
-"""AbstractFlow test bootstrap for monorepo layouts.
+"""AbstractFlow test bootstrap for a multi-repo workspace checkout.
 
 Why this exists:
-- In this repo, sibling projects live at the monorepo root (e.g. `abstractcore/`,
-  `abstractflow/`, ...).
-- When tests are invoked from the monorepo root, Python's default `sys.path`
+- In this workspace, sibling projects live under a shared parent directory
+  (e.g. `abstractcore/`, `abstractflow/`, ...).
+- When tests are invoked from the workspace root, Python's default `sys.path`
   includes the CWD (""), which makes directories like `abstractcore/` appear as
   namespace packages (PEP 420) and *shadow* the actual installable package
   located at `abstractcore/abstractcore/`.
@@ -12,7 +12,7 @@ This breaks imports for the AbstractRuntime↔AbstractCore integration, e.g.:
 `from abstractcore import create_llm`.
 
 The fix is to ensure the *project roots* for sibling packages are on `sys.path`
-ahead of the monorepo root CWD so imports resolve to the real packages.
+ahead of the workspace root CWD so imports resolve to the real packages.
 """
 
 from __future__ import annotations
@@ -41,8 +41,8 @@ _prepend_sys_path(MONOREPO_ROOT / "abstractcore")
 # them stable when running from monorepo root.
 _prepend_sys_path(MONOREPO_ROOT / "abstractruntime" / "src")
 _prepend_sys_path(MONOREPO_ROOT / "abstractagent" / "src")
-
-
+_prepend_sys_path(MONOREPO_ROOT / "abstractmemory" / "src")
+_prepend_sys_path(MONOREPO_ROOT / "abstractsemantics" / "src")
 
 
 

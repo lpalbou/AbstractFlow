@@ -20,13 +20,23 @@
 	          { "id": "model", "label": "model", "type": "model" },
 	          { "id": "text", "label": "text", "type": "string" },
 	          { "id": "domain_focus", "label": "domain_focus", "type": "string" },
-	          { "id": "max_out_tokens", "label": "max_out_tokens", "type": "number" }
+	          { "id": "max_out_tokens", "label": "max_out_tokens", "type": "number" },
+	          { "id": "extraction_profile", "label": "extraction_profile", "type": "object" }
 	        ],
 		        "pinDefaults": {
 		          "provider": "lmstudio",
 		          "model": "qwen/qwen3-next-80b",
 		          "domain_focus": "software / agents / memory systems",
-		          "max_out_tokens": 900
+		          "max_out_tokens": 900,
+		          "extraction_profile": {
+		            "persona_id": "default",
+		            "persona_version": "v1",
+		            "persona_summary": "Autonomous AI assistant aligned with AI–human partnership. Truthful, helpful, and efficient; preserves grounded commitments, preferences, definitions, and key concepts.",
+		            "values": ["truthfulness", "collaboration", "clarity", "efficiency"],
+		            "purposes": ["help humans accomplish tasks", "build clean, simple, efficient systems", "maintain continuity via grounded memory"],
+		            "memory_priorities": ["commitments", "preferences", "relationships", "definitions", "key concepts", "decisions"],
+		            "policy_version": "kg_extract_persona_v1"
+		          }
 		        }
 		      }
 		    },
@@ -95,10 +105,45 @@
         ],
 	        "outputs": [{ "id": "result", "label": "result", "type": "string" }],
 	        "pinDefaults": {
-		          "template": "You are a semantic extractor for an AI long-term memory system.\\n\\nTask: output BETWEEN 6 and 12 high-signal, append-only assertions (subject-predicate-object) supported by TEXT (aim for ~8).\\nOnly output fewer than 6 if the text truly contains fewer distinct atomic facts.\\nDomain focus (only affects what you keep): {{domain_focus}}\\n\\nHard rules:\\n- Only assert what TEXT directly states (no external knowledge).\\n- Output MUST match the enforced structured-output schema: {\\\"assertions\\\":[...]}.\\n- Use ONLY predicates allowed by the schema enum (do not invent new predicates).\\n- If TEXT contains any factual statement, return >=1 assertion (never return empty just because TEXT is short).\\n- attributes.evidence_quote MUST be an exact verbatim substring of TEXT, <=160 chars, no ellipses.\\n- attributes.original_context (optional) MUST be an exact substring of TEXT, <=280 chars, and include evidence_quote.\\n- IDs: use lowercase stable CURIE-like ids. For new entities use ex:{kind}-{kebab-case}.\\n- ID reuse: if the system prompt includes a \\\"## KG ACTIVE MEMORY\\\" block, reuse matching existing ex:* ids (match by rdf:type + primary label). Only mint a new id when no candidate fits.\\n\\nEntity completeness (important):\\n- For every new ex:* entity you introduce, add:\\n  - rdf:type (to one of: skos:Concept, cito:Claim, schema:Event, schema:Person, schema:Organization, schema:Thing, dcterms:Text)\\n  - one primary label:\\n    - concepts → skos:prefLabel\\n    - claims → skos:definition\\n    - events/people/orgs/places → schema:name\\n    - documents → dcterms:title\\n\\nExtraction strategy (do this unless impossible):\\n- Capture 1–3 main statements as cito:Claim + skos:definition (use verbatim evidence_quote text).\\n- Create skos:Concept nodes for key terms, and link claims to them with schema:about / schema:mentions.\\n- Create schema:Event nodes only for explicit happenings.\\n\\nExample (for \\\"Mistakes are opportunities for growth.\\\"):\\n- ex:claim-mistakes-opportunities rdf:type cito:Claim\\n- ex:claim-mistakes-opportunities skos:definition \\\"mistakes are opportunities for growth\\\"\\n- ex:concept-mistake rdf:type skos:Concept\\n- ex:concept-mistake skos:prefLabel \\\"mistakes\\\"\\n- ex:claim-mistakes-opportunities schema:about ex:concept-mistake\\n\\nTEXT:\\n{{text}}"
+		          "template": "You are a semantic extractor for an AI long-term memory system.\\n\\nTask: output BETWEEN 6 and 12 high-signal, append-only assertions (subject-predicate-object) supported by TEXT (aim for ~8).\\nOnly output fewer than 6 if the text truly contains fewer distinct atomic facts.\\nDomain focus (only affects what you keep): {{domain_focus}}\\nExtraction profile (identity + priorities; JSON):\\n{{extraction_profile_json}}\\n\\nHard rules:\\n- Only assert what TEXT directly states (no external knowledge).\\n- Output MUST match the enforced structured-output schema: {\\\"assertions\\\":[...]}.\\n- Use ONLY predicates allowed by the schema enum (do not invent new predicates).\\n- If TEXT contains any factual statement, return >=1 assertion (never return empty just because TEXT is short).\\n- attributes.evidence_quote MUST be an exact verbatim substring of TEXT, <=160 chars, no ellipses.\\n- attributes.original_context (optional) MUST be an exact substring of TEXT, <=280 chars, and include evidence_quote.\\n- IDs: use lowercase stable CURIE-like ids. For new entities use ex:{kind}-{kebab-case}.\\n- ID reuse: if the system prompt includes a \\\"## KG ACTIVE MEMORY\\\" block, reuse matching existing ex:* ids (match by rdf:type + primary label). Only mint a new id when no candidate fits.\\n\\nEntity completeness (important):\\n- For every new ex:* entity you introduce, add:\\n  - rdf:type (to one of: skos:Concept, cito:Claim, schema:Event, schema:Person, schema:Organization, schema:Thing, dcterms:Text)\\n  - one primary label:\\n    - concepts → skos:prefLabel\\n    - claims → skos:definition\\n    - events/people/orgs/places → schema:name\\n    - documents → dcterms:title\\n\\nExtraction strategy (do this unless impossible):\\n- Follow the extraction_profile priorities when choosing what to keep (this affects selection only; grounding rules still apply).\\n- Capture 1–3 main statements as cito:Claim + skos:definition (use verbatim evidence_quote text).\\n- Create skos:Concept nodes for key terms, and link claims to them with schema:about / schema:mentions.\\n- Create schema:Event nodes only for explicit happenings.\\n\\nExample (for \\\"Mistakes are opportunities for growth.\\\"):\\n- ex:claim-mistakes-opportunities rdf:type cito:Claim\\n- ex:claim-mistakes-opportunities skos:definition \\\"mistakes are opportunities for growth\\\"\\n- ex:concept-mistake rdf:type skos:Concept\\n- ex:concept-mistake skos:prefLabel \\\"mistakes\\\"\\n- ex:claim-mistakes-opportunities schema:about ex:concept-mistake\\n\\nTEXT:\\n{{text}}"
 	        }
 	      }
 	    },
+    {
+      "id": "node-13",
+      "type": "stringify_json",
+      "position": { "x": 560.0, "y": 352.0 },
+      "data": {
+        "nodeType": "stringify_json",
+        "label": "Render extraction_profile",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "value", "label": "value", "type": "any", "description": "JSON value (or JSON-ish string) to stringify." },
+          { "id": "mode", "label": "mode", "type": "string", "description": "Rendering mode: none | beautify | minified. Default beautify." }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "string" }],
+        "pinDefaults": { "mode": "minified" }
+      }
+    },
+    {
+      "id": "node-14",
+      "type": "set",
+      "position": { "x": 800.0, "y": 352.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set extraction_profile_json",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "extraction_profile_json" }
+      }
+    },
     {
       "id": "node-6",
       "type": "json_schema",
@@ -256,7 +301,10 @@
     { "id": "edge-2", "source": "node-2", "sourceHandle": "value", "target": "node-3", "targetHandle": "object", "animated": false },
     { "id": "edge-3", "source": "node-3", "sourceHandle": "result", "target": "node-4", "targetHandle": "object", "animated": false },
     { "id": "edge-4", "source": "node-1", "sourceHandle": "domain_focus", "target": "node-4", "targetHandle": "value", "animated": false },
-    { "id": "edge-5", "source": "node-4", "sourceHandle": "result", "target": "node-5", "targetHandle": "vars", "animated": false },
+    { "id": "edge-4b", "source": "node-1", "sourceHandle": "extraction_profile", "target": "node-13", "targetHandle": "value", "animated": false },
+    { "id": "edge-4c", "source": "node-13", "sourceHandle": "result", "target": "node-14", "targetHandle": "value", "animated": false },
+    { "id": "edge-4d", "source": "node-4", "sourceHandle": "result", "target": "node-14", "targetHandle": "object", "animated": false },
+    { "id": "edge-5", "source": "node-14", "sourceHandle": "result", "target": "node-5", "targetHandle": "vars", "animated": false },
     { "id": "edge-6", "source": "node-5", "sourceHandle": "result", "target": "node-7", "targetHandle": "prompt", "animated": false },
     { "id": "edge-6b", "source": "node-1", "sourceHandle": "text", "target": "node-7", "targetHandle": "memory_query", "animated": false },
 	    { "id": "edge-7", "source": "node-1", "sourceHandle": "provider", "target": "node-7", "targetHandle": "provider", "animated": false },

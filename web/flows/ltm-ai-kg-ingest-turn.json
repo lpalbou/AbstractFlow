@@ -57,6 +57,16 @@
             "id": "max_out_tokens",
             "label": "max_out_tokens",
             "type": "number"
+          },
+          {
+            "id": "extraction_profile",
+            "label": "extraction_profile",
+            "type": "object"
+          },
+          {
+            "id": "sources",
+            "label": "sources",
+            "type": "array"
           }
         ],
         "pinDefaults": {
@@ -64,7 +74,17 @@
           "model": "qwen/qwen3-next-80b",
           "scope": "session",
           "domain_focus": "software / agents / memory systems",
-          "max_out_tokens": 900
+          "max_out_tokens": 900,
+          "extraction_profile": {
+            "persona_id": "default",
+            "persona_version": "v1",
+            "persona_summary": "Autonomous AI assistant aligned with AI–human partnership. Truthful, helpful, and efficient; preserves grounded commitments, preferences, definitions, and key concepts.",
+            "values": ["truthfulness", "collaboration", "clarity", "efficiency"],
+            "purposes": ["help humans accomplish tasks", "build clean, simple, efficient systems", "maintain continuity via grounded memory"],
+            "memory_priorities": ["commitments", "preferences", "relationships", "definitions", "key concepts", "decisions"],
+            "policy_version": "kg_extract_persona_v1"
+          },
+          "sources": []
         }
       },
       "label": null,
@@ -332,6 +352,127 @@
       "outputs": []
     },
     {
+      "id": "node-18",
+      "type": "set",
+      "position": { "x": 1520.0, "y": 288.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set extraction_profile",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "extraction_profile" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-27",
+      "type": "set",
+      "position": { "x": 1520.0, "y": 352.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set sources",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "sources" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-28",
+      "type": "code",
+      "position": { "x": 1760.0, "y": 288.0 },
+      "data": {
+        "nodeType": "code",
+        "label": "Build evidence bundle",
+        "icon": "&#x1F40D;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "input", "label": "input", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "output", "label": "output", "type": "any" }
+        ],
+        "functionName": "transform",
+        "code": "def transform(_input):\n    payload = _input.get('input') if isinstance(_input, dict) else None\n    if not isinstance(payload, dict):\n        payload = {}\n\n    base_text = payload.get('text', '')\n    if not isinstance(base_text, str):\n        base_text = str(base_text or '')\n\n    domain_focus = payload.get('domain_focus', '')\n    if not isinstance(domain_focus, str):\n        domain_focus = str(domain_focus or '')\n\n    raw_sources = payload.get('sources', [])\n    if not isinstance(raw_sources, list):\n        raw_sources = []\n\n    def _s(v):\n        return v if isinstance(v, str) else str(v or '')\n\n    sources_norm = []\n    if base_text.strip():\n        sources_norm.append({'source_id': 'transcript', 'kind': 'transcript', 'text': base_text})\n\n    used = set([s.get('source_id') for s in sources_norm if isinstance(s, dict) and isinstance(s.get('source_id'), str)])\n\n    for idx, item in enumerate(raw_sources, start=1):\n        if not isinstance(item, dict):\n            continue\n\n        text = item.get('text')\n        if text is None:\n            text = item.get('content')\n        text = _s(text)\n        if not text.strip():\n            continue\n\n        kind = item.get('kind')\n        if kind is None:\n            kind = item.get('source_kind')\n        if kind is None:\n            kind = item.get('type')\n        kind = _s(kind).strip() or 'source'\n        kind2 = kind.lower()\n\n        source_id = item.get('source_id')\n        if source_id is None:\n            source_id = item.get('id')\n        if source_id is None:\n            source_id = item.get('name')\n        if source_id is None:\n            source_id = kind2\n        sid = _s(source_id).strip() or kind2\n        if sid in used:\n            sid = f\"{sid}-{idx}\"\n            while sid in used:\n                sid = f\"{sid}-{idx}\"\n        used.add(sid)\n\n        artifact_id = item.get('artifact_id')\n        if artifact_id is None:\n            artifact_id = item.get('span_id')\n        if artifact_id is None:\n            artifact_id = item.get('note_id')\n        artifact_id = _s(artifact_id).strip()\n\n        title = item.get('title')\n        if title is None:\n            title = item.get('label')\n        title = _s(title).strip()\n\n        src = {'source_id': sid, 'kind': kind2, 'text': text}\n        if artifact_id:\n            src['artifact_id'] = artifact_id\n        if title:\n            src['title'] = title\n        sources_norm.append(src)\n\n    # Build chat-friendly bundle text.\n    bundle = base_text.rstrip()\n\n    def _title_for(src):\n        t = src.get('title')\n        if isinstance(t, str) and t.strip():\n            return t.strip()\n        k = src.get('kind')\n        k2 = k if isinstance(k, str) else ''\n        k2 = k2.replace('_', ' ').strip()\n        return k2.title() if k2 else 'Source'\n\n    for src in sources_norm[1:]:\n        if not isinstance(src, dict):\n            continue\n        t = src.get('text')\n        if not isinstance(t, str) or not t.strip():\n            continue\n        hdr = [f\"source_id={src.get('source_id', '')}\", f\"kind={src.get('kind', '')}\"]\n        aid = src.get('artifact_id')\n        if isinstance(aid, str) and aid.strip():\n            hdr.append(f\"artifact_id={aid.strip()}\")\n        meta = ' · '.join([h for h in hdr if isinstance(h, str) and h.strip()])\n        block = [f\"SYSTEM: ## {_title_for(src)}\"]\n        if meta:\n            block.append(meta)\n        block.append('')\n        block.append(t.strip())\n        bundle = (bundle + \"\\n\\n\" + \"\\n\".join(block)).strip()\n\n    # Input object for the extractor: replace text, avoid duplicating raw_sources.\n    out_input = dict(payload)\n    out_input['text'] = bundle\n    if 'sources' in out_input:\n        del out_input['sources']\n\n    sources_meta = {\n        'kind': 'kg_evidence_bundle',\n        'domain_focus': domain_focus.strip(),\n        'sources': [\n            {\n                'source_id': s.get('source_id'),\n                'kind': s.get('kind'),\n                'artifact_id': s.get('artifact_id'),\n                'title': s.get('title'),\n                'text_len': len(s.get('text') or '') if isinstance(s.get('text'), str) else 0,\n            }\n            for s in sources_norm\n            if isinstance(s, dict)\n        ],\n    }\n\n    return {\n        'input': out_input,\n        'bundle_text': bundle,\n        'sources': sources_norm,\n        'sources_meta': sources_meta,\n    }\n"
+      }
+    },
+    {
+      "id": "node-29",
+      "type": "get",
+      "position": { "x": 1984.0, "y": 256.0 },
+      "data": {
+        "nodeType": "get",
+        "label": "Get bundle.input",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "input", "default": {} }
+      }
+    },
+    {
+      "id": "node-30",
+      "type": "get",
+      "position": { "x": 1984.0, "y": 320.0 },
+      "data": {
+        "nodeType": "get",
+        "label": "Get bundle.sources",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "sources", "default": [] }
+      }
+    },
+    {
+      "id": "node-31",
+      "type": "get",
+      "position": { "x": 1984.0, "y": 384.0 },
+      "data": {
+        "nodeType": "get",
+        "label": "Get bundle.sources_meta",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "sources_meta", "default": {} }
+      }
+    },
+    {
       "id": "node-7",
       "type": "subflow",
       "position": {
@@ -432,6 +573,223 @@
       "outputs": []
     },
     {
+      "id": "node-32",
+      "type": "make_object",
+      "position": { "x": 1728.0, "y": 256.0 },
+      "data": {
+        "nodeType": "make_object",
+        "label": "Source map input",
+        "icon": "{}",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "assertions", "label": "assertions", "type": "any" },
+          { "id": "sources", "label": "sources", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }]
+      }
+    },
+    {
+      "id": "node-33",
+      "type": "code",
+      "position": { "x": 1952.0, "y": 256.0 },
+      "data": {
+        "nodeType": "code",
+        "label": "Attach evidence source",
+        "icon": "&#x1F40D;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "input", "label": "input", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "output", "label": "output", "type": "any" }
+        ],
+        "functionName": "transform",
+        "code": "def transform(_input):\n    payload = _input.get('input') if isinstance(_input, dict) else None\n    if not isinstance(payload, dict):\n        payload = {}\n\n    assertions = payload.get('assertions', [])\n    sources = payload.get('sources', [])\n\n    if not isinstance(assertions, list):\n        return []\n    if not isinstance(sources, list):\n        sources = []\n\n    def _s(v):\n        return v if isinstance(v, str) else str(v or '')\n\n    norm_sources = []\n    for s in sources:\n        if not isinstance(s, dict):\n            continue\n        text = s.get('text')\n        text = _s(text)\n        if not text:\n            continue\n        norm_sources.append(\n            {\n                'source_id': _s(s.get('source_id')).strip(),\n                'kind': _s(s.get('kind')).strip(),\n                'artifact_id': _s(s.get('artifact_id')).strip(),\n                'title': _s(s.get('title')).strip(),\n                'text': text,\n            }\n        )\n\n    out = []\n    for a in assertions:\n        if not isinstance(a, dict):\n            continue\n        attrs = a.get('attributes') if isinstance(a.get('attributes'), dict) else {}\n        evidence = attrs.get('evidence_quote')\n        evidence = evidence if isinstance(evidence, str) else ''\n        context = attrs.get('original_context') if isinstance(attrs.get('original_context'), str) else ''\n\n        match = None\n        if evidence:\n            for s in norm_sources:\n                if evidence in s.get('text', ''):\n                    match = s\n                    break\n        if match is None and context:\n            for s in norm_sources:\n                if context in s.get('text', ''):\n                    match = s\n                    break\n\n        a2 = dict(a)\n        if match is not None:\n            prov = a2.get('provenance') if isinstance(a2.get('provenance'), dict) else {}\n            prov2 = dict(prov)\n            if match.get('source_id'):\n                prov2.setdefault('source_id', match.get('source_id'))\n            if match.get('kind'):\n                prov2.setdefault('source_kind', match.get('kind'))\n            if match.get('artifact_id'):\n                prov2.setdefault('source_artifact_id', match.get('artifact_id'))\n            a2['provenance'] = prov2\n\n            attrs2 = dict(attrs)\n            if match.get('source_id'):\n                attrs2.setdefault('source_id', match.get('source_id'))\n            if match.get('kind'):\n                attrs2.setdefault('source_kind', match.get('kind'))\n            if match.get('artifact_id'):\n                attrs2.setdefault('source_artifact_id', match.get('artifact_id'))\n            if match.get('title'):\n                attrs2.setdefault('source_title', match.get('title'))\n            a2['attributes'] = attrs2\n\n        out.append(a2)\n\n    return out\n"
+      }
+    },
+    {
+      "id": "node-19",
+      "type": "literal_json",
+      "position": { "x": 1504.0, "y": 256.0 },
+      "data": {
+        "nodeType": "literal_json",
+        "label": "KG attributes_defaults",
+        "icon": "{}",
+        "headerColor": "#00FFFF",
+        "inputs": [],
+        "outputs": [{ "id": "value", "label": "value", "type": "object" }],
+        "literalValue": {}
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-20",
+      "type": "get",
+      "position": { "x": 1504.0, "y": 320.0 },
+      "data": {
+        "nodeType": "get",
+        "label": "Get policy_version",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "policy_version", "default": "kg_extract_persona_v1" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-21",
+      "type": "get",
+      "position": { "x": 1504.0, "y": 384.0 },
+      "data": {
+        "nodeType": "get",
+        "label": "Get persona_id",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "persona_id", "default": "default" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-22",
+      "type": "get",
+      "position": { "x": 1504.0, "y": 448.0 },
+      "data": {
+        "nodeType": "get",
+        "label": "Get persona_version",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "default", "label": "default", "type": "any" }
+        ],
+        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+        "pinDefaults": { "key": "persona_version", "default": "v1" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-23",
+      "type": "set",
+      "position": { "x": 1728.0, "y": 288.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set extractor_policy_version",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "extractor_policy_version" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-24",
+      "type": "set",
+      "position": { "x": 1728.0, "y": 352.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set persona_id",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "persona_id" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-25",
+      "type": "set",
+      "position": { "x": 1728.0, "y": 416.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set persona_version",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "persona_version" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "node-26",
+      "type": "set",
+      "position": { "x": 1728.0, "y": 480.0 },
+      "data": {
+        "nodeType": "set",
+        "label": "Set extraction_input_kind",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "object", "label": "object", "type": "object" },
+          { "id": "key", "label": "key", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+        "pinDefaults": { "key": "extraction_input_kind", "value": "turn" }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
       "id": "node-9",
       "type": "memory_kg_assert",
       "position": {
@@ -472,6 +830,12 @@
             "label": "owner_id",
             "type": "string",
             "description": "Optional explicit owner id override (advanced; normally derived from scope)."
+          },
+          {
+            "id": "attributes_defaults",
+            "label": "attributes_defaults",
+            "type": "object",
+            "description": "Optional attributes merged into each assertion.attributes (defaults only; assertion keys win)."
           }
         ],
         "outputs": [
@@ -591,7 +955,7 @@
         ],
         "outputs": [{ "id": "result", "label": "result", "type": "string" }],
         "pinDefaults": {
-          "template": "# KG ingest-turn source\\n\\n(domain_focus={{domain_focus}})\\n\\n{{text}}"
+          "template": "# KG ingest-turn evidence bundle\\n\\n(domain_focus={{domain_focus}})\\n\\n{{text}}"
         }
       },
       "label": null,
@@ -786,16 +1150,88 @@
       "animated": false
     },
     {
-      "id": "edge-9c",
+      "id": "edge-9c1",
       "source": "node-11",
       "sourceHandle": "result",
+      "target": "node-18",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-9c2",
+      "source": "node-1",
+      "sourceHandle": "extraction_profile",
+      "target": "node-18",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-9c",
+      "source": "node-29",
+      "sourceHandle": "value",
       "target": "node-7",
       "targetHandle": "input",
       "animated": false
     },
     {
+      "id": "edge-9c3",
+      "source": "node-18",
+      "sourceHandle": "result",
+      "target": "node-27",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-9c4",
+      "source": "node-1",
+      "sourceHandle": "sources",
+      "target": "node-27",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-9c5",
+      "source": "node-27",
+      "sourceHandle": "result",
+      "target": "node-28",
+      "targetHandle": "input",
+      "animated": false
+    },
+    {
+      "id": "edge-9c6",
+      "source": "node-28",
+      "sourceHandle": "output",
+      "target": "node-29",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-9c7",
+      "source": "node-28",
+      "sourceHandle": "output",
+      "target": "node-30",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-9c8",
+      "source": "node-28",
+      "sourceHandle": "output",
+      "target": "node-31",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
       "id": "edge-10",
       "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-28",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-10b",
+      "source": "node-28",
       "sourceHandle": "exec-out",
       "target": "node-7",
       "targetHandle": "exec-in",
@@ -810,11 +1246,123 @@
       "animated": false
     },
     {
-      "id": "edge-12",
+      "id": "edge-11b",
       "source": "node-8",
       "sourceHandle": "value",
+      "target": "node-32",
+      "targetHandle": "assertions",
+      "animated": false
+    },
+    {
+      "id": "edge-11c",
+      "source": "node-30",
+      "sourceHandle": "value",
+      "target": "node-32",
+      "targetHandle": "sources",
+      "animated": false
+    },
+    {
+      "id": "edge-11d",
+      "source": "node-32",
+      "sourceHandle": "result",
+      "target": "node-33",
+      "targetHandle": "input",
+      "animated": false
+    },
+    {
+      "id": "edge-12",
+      "source": "node-33",
+      "sourceHandle": "output",
       "target": "node-9",
       "targetHandle": "assertions",
+      "animated": false
+    },
+    {
+      "id": "edge-12a",
+      "source": "node-1",
+      "sourceHandle": "extraction_profile",
+      "target": "node-20",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-12b",
+      "source": "node-1",
+      "sourceHandle": "extraction_profile",
+      "target": "node-21",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-12c",
+      "source": "node-1",
+      "sourceHandle": "extraction_profile",
+      "target": "node-22",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-12d",
+      "source": "node-19",
+      "sourceHandle": "value",
+      "target": "node-23",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-12e",
+      "source": "node-20",
+      "sourceHandle": "value",
+      "target": "node-23",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-12f",
+      "source": "node-23",
+      "sourceHandle": "result",
+      "target": "node-24",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-12g",
+      "source": "node-21",
+      "sourceHandle": "value",
+      "target": "node-24",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-12h",
+      "source": "node-24",
+      "sourceHandle": "result",
+      "target": "node-25",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-12i",
+      "source": "node-22",
+      "sourceHandle": "value",
+      "target": "node-25",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "edge-12j",
+      "source": "node-25",
+      "sourceHandle": "result",
+      "target": "node-26",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-12k",
+      "source": "node-26",
+      "sourceHandle": "result",
+      "target": "node-9",
+      "targetHandle": "attributes_defaults",
       "animated": false
     },
     {
@@ -835,9 +1383,17 @@
     },
     {
       "id": "edge-15",
-      "source": "node-7",
+      "source": "node-33",
       "sourceHandle": "exec-out",
       "target": "node-14",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-15b",
+      "source": "node-7",
+      "sourceHandle": "exec-out",
+      "target": "node-33",
       "targetHandle": "exec-in",
       "animated": true
     },
@@ -891,8 +1447,8 @@
     },
     {
       "id": "edge-27",
-      "source": "node-11",
-      "sourceHandle": "result",
+      "source": "node-29",
+      "sourceHandle": "value",
       "target": "node-15",
       "targetHandle": "vars",
       "animated": false
@@ -903,6 +1459,14 @@
       "sourceHandle": "result",
       "target": "node-16",
       "targetHandle": "content",
+      "animated": false
+    },
+    {
+      "id": "edge-28b",
+      "source": "node-31",
+      "sourceHandle": "value",
+      "target": "node-16",
+      "targetHandle": "sources",
       "animated": false
     },
     {

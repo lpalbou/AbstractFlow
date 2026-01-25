@@ -1306,6 +1306,12 @@ const MEMORY_NODES: NodeTemplate[] = [
       { id: 'scope', label: 'scope', type: 'string', description: 'run | session | global. Determines the owner_id when not explicitly provided.' },
       { id: 'span_id', label: 'span_id', type: 'string', description: 'Optional provenance pointer to a runtime span/artifact id.' },
       { id: 'owner_id', label: 'owner_id', type: 'string', description: 'Optional explicit owner id override (advanced; normally derived from scope).' },
+      {
+        id: 'attributes_defaults',
+        label: 'attributes_defaults',
+        type: 'object',
+        description: 'Optional attributes merged into each assertion.attributes (defaults only; assertion keys win).',
+      },
       { id: 'allow_custom_predicates', label: 'allow_custom_predicates', type: 'boolean', description: 'If true, allow custom predicates under the ex:* namespace (advanced; default false).' },
     ],
     outputs: [

@@ -484,6 +484,46 @@
       }
     },
     {
+      "id": "kg_sources",
+      "type": "code",
+      "position": {
+        "x": -352.0,
+        "y": 384.0
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "KG evidence sources",
+        "icon": "&#x1F40D;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "input",
+            "label": "scratchpad",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "sources",
+            "type": "any"
+          }
+        ],
+        "functionName": "transform",
+        "code": "def transform(_input):\n    sp = _input.get('input') if isinstance(_input, dict) else None\n    if not isinstance(sp, dict):\n        return []\n\n    node_traces = sp.get('node_traces')\n    if not isinstance(node_traces, dict):\n        return []\n\n    def _as_dict(v):\n        return v if isinstance(v, dict) else None\n\n    def _safe_str(v):\n        return v if isinstance(v, str) else str(v or '')\n\n    def _stringify(value, *, max_chars):\n        try:\n            import json\n\n            if isinstance(value, (dict, list)):\n                s = json.dumps(value, ensure_ascii=False, indent=2)\n            else:\n                s = _safe_str(value)\n        except Exception:\n            s = _safe_str(value)\n        if max_chars and isinstance(max_chars, int) and max_chars > 0 and len(s) > max_chars:\n            return s[: max_chars - 1] + '…'\n        return s\n\n    # Collect tool calls + results across all trace steps.\n    calls = []\n    for trace_any in node_traces.values():\n        trace = _as_dict(trace_any)\n        if not trace:\n            continue\n        steps = trace.get('steps')\n        if not isinstance(steps, list):\n            continue\n        for step_any in steps:\n            step = _as_dict(step_any)\n            if not step:\n                continue\n            effect = _as_dict(step.get('effect')) or {}\n            if _safe_str(effect.get('type')).strip() != 'tool_calls':\n                continue\n            payload = _as_dict(effect.get('payload')) or {}\n            tool_calls = payload.get('tool_calls')\n            if isinstance(tool_calls, dict):\n                tool_calls = [tool_calls]\n            if not isinstance(tool_calls, list):\n                tool_calls = []\n            result = _as_dict(step.get('result')) or {}\n            results = result.get('results')\n            if isinstance(results, dict):\n                results = [results]\n            if not isinstance(results, list):\n                results = []\n            results_by_id = {}\n            for r_any in results:\n                r = _as_dict(r_any)\n                if not r:\n                    continue\n                cid = _safe_str(r.get('call_id')).strip()\n                if cid:\n                    results_by_id[cid] = r\n            for c_any in tool_calls:\n                c = _as_dict(c_any)\n                if not c:\n                    continue\n                cid = _safe_str(c.get('call_id') or c.get('id')).strip()\n                r = results_by_id.get(cid) if cid else None\n                calls.append({'call': c, 'result': r})\n\n    if not calls:\n        return []\n\n    tools_used = []\n    attachment_ids = []\n\n    blocks = ['## Tool outputs']\n    total_chars = 0\n\n    for item in calls:\n        c = item.get('call') if isinstance(item, dict) else None\n        r = item.get('result') if isinstance(item, dict) else None\n        c = c if isinstance(c, dict) else {}\n        r = r if isinstance(r, dict) else {}\n\n        name = _safe_str(c.get('name')).strip() or 'tool'\n        tools_used.append(name)\n        cid = _safe_str(c.get('call_id') or c.get('id')).strip()\n        args = c.get('arguments') if isinstance(c.get('arguments'), dict) else {}\n\n        success = r.get('success') if isinstance(r.get('success'), bool) else None\n        error = r.get('error')\n        output = r.get('output')\n\n        # Best-effort: extract attachment artifact ids.\n        if name == 'open_attachment' and isinstance(output, dict):\n            aid = output.get('artifact_id')\n            aid = _safe_str(aid).strip()\n            if aid:\n                attachment_ids.append(aid)\n\n        entry = []\n        entry.append(f\"- `{name}`\" + (f\" (call_id={cid})\" if cid else ''))\n        entry.append('')\n        entry.append('**arguments**')\n        entry.append('```json')\n        entry.append(_stringify(args, max_chars=2000))\n        entry.append('```')\n        entry.append('')\n        entry.append('**result**')\n        if success is not None:\n            entry.append(f\"- success: {str(success).lower()}\")\n        if error is not None:\n            entry.append(f\"- error: {_safe_str(error)}\")\n        entry.append('```')\n        entry.append(_stringify(output, max_chars=4000))\n        entry.append('```')\n        entry.append('')\n\n        s = '\\n'.join(entry).strip() + '\\n'\n        total_chars += len(s)\n        if total_chars > 24000:\n            blocks.append('_(tool outputs truncated)_')\n            break\n        blocks.append(s)\n\n    tool_outputs_md = '\\n'.join(blocks).strip()\n\n    uniq_tools = []\n    seen = set()\n    for t in tools_used:\n        if t in seen:\n            continue\n        seen.add(t)\n        uniq_tools.append(t)\n\n    summary_lines = [\n        '## Work summary',\n        f\"- tool_calls: {len(calls)}\",\n        f\"- tools: {', '.join(uniq_tools) if uniq_tools else '(none)'}\",\n    ]\n    if attachment_ids:\n        uniq_a = []\n        seen2 = set()\n        for aid in attachment_ids:\n            if aid in seen2:\n                continue\n            seen2.add(aid)\n            uniq_a.append(aid)\n        summary_lines.append(f\"- attachments_used: {', '.join(uniq_a)}\")\n\n    work_summary_md = '\\n'.join(summary_lines).strip()\n\n    sources = [\n        {'source_id': 'tool_outputs', 'kind': 'tool_outputs', 'text': tool_outputs_md},\n        {'source_id': 'work_summary', 'kind': 'work_summary', 'text': work_summary_md},\n    ]\n    if attachment_ids:\n        sources.append({'source_id': 'attachments_used', 'kind': 'attachments_used', 'artifact_ids': attachment_ids, 'text': 'Attachments used:\\n' + '\\n'.join([f\"- {x}\" for x in attachment_ids])})\n\n    return sources\n"
+      }
+    },
+    {
       "id": "ingest_input",
       "type": "make_object",
       "position": {
@@ -510,6 +550,11 @@
             "id": "text",
             "label": "text",
             "type": "string"
+          },
+          {
+            "id": "sources",
+            "label": "sources",
+            "type": "array"
           },
           {
             "id": "scope",
@@ -1120,12 +1165,36 @@
       "animated": false
     },
     {
+      "id": "e-agent-kg-sources-scratchpad",
+      "source": "agent",
+      "sourceHandle": "scratchpad",
+      "target": "kg_sources",
+      "targetHandle": "input",
+      "animated": false
+    },
+    {
       "id": "e-agent-kg-ingest-exec",
       "source": "agent",
+      "sourceHandle": "exec-out",
+      "target": "kg_sources",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-kg-sources-kg-ingest-exec",
+      "source": "kg_sources",
       "sourceHandle": "exec-out",
       "target": "kg_ingest",
       "targetHandle": "exec-in",
       "animated": true
+    },
+    {
+      "id": "e-kg-sources-ingest-input-sources",
+      "source": "kg_sources",
+      "sourceHandle": "output",
+      "target": "ingest_input",
+      "targetHandle": "sources",
+      "animated": false
     },
     {
       "id": "e-ingest-input-kg-ingest-input",
