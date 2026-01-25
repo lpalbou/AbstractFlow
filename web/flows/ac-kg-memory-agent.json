@@ -124,7 +124,7 @@
           "use_semantic_search": false,
           "use_kg_memory": true,
           "memory_query": "",
-          "memory_scope": "session",
+          "memory_scope": "all",
           "recall_level": "standard",
           "max_span_messages": 24,
           "kg_max_input_tokens": 1200,
