@@ -14,25 +14,27 @@
         "icon": "&#x1F3C1;",
         "headerColor": "#C0392B",
         "inputs": [],
-	        "outputs": [
-	          { "id": "exec-out", "label": "", "type": "execution" },
-	          { "id": "provider", "label": "provider", "type": "provider" },
-	          { "id": "model", "label": "model", "type": "model" },
-	          { "id": "text", "label": "text", "type": "string" },
-	          { "id": "domain_focus", "label": "domain_focus", "type": "string" },
-	          { "id": "max_out_tokens", "label": "max_out_tokens", "type": "number" },
-	          { "id": "extraction_profile", "label": "extraction_profile", "type": "object" }
-	        ],
-		        "pinDefaults": {
-		          "provider": "lmstudio",
-		          "model": "qwen/qwen3-next-80b",
-		          "domain_focus": "software / agents / memory systems",
-		          "max_out_tokens": 0,
-		          "extraction_profile": {
-		            "persona_id": "default",
-		            "persona_version": "v1",
-		            "persona_summary": "Autonomous AI assistant aligned with AI–human partnership. Truthful, helpful, and efficient; preserves grounded commitments, preferences, definitions, and key concepts.",
-		            "values": ["truthfulness", "collaboration", "clarity", "efficiency"],
+		        "outputs": [
+		          { "id": "exec-out", "label": "", "type": "execution" },
+		          { "id": "provider", "label": "provider", "type": "provider" },
+		          { "id": "model", "label": "model", "type": "model" },
+		          { "id": "text", "label": "text", "type": "string" },
+		          { "id": "domain_focus", "label": "domain_focus", "type": "string" },
+		          { "id": "max_out_tokens", "label": "max_out_tokens", "type": "number" },
+		          { "id": "max_assertions", "label": "max_assertions", "type": "number" },
+		          { "id": "extraction_profile", "label": "extraction_profile", "type": "object" }
+		        ],
+			        "pinDefaults": {
+			          "provider": "lmstudio",
+			          "model": "qwen/qwen3-next-80b",
+			          "domain_focus": "software / agents / memory systems",
+			          "max_out_tokens": 0,
+			          "max_assertions": 24,
+			          "extraction_profile": {
+			            "persona_id": "default",
+			            "persona_version": "v1",
+			            "persona_summary": "Autonomous AI assistant aligned with AI–human partnership. Truthful, helpful, and efficient; preserves grounded commitments, preferences, definitions, and key concepts.",
+			            "values": ["truthfulness", "collaboration", "clarity", "efficiency"],
 		            "purposes": ["help humans accomplish tasks", "build clean, simple, efficient systems", "maintain continuity via grounded memory"],
 		            "memory_priorities": ["commitments", "preferences", "relationships", "definitions", "key concepts", "decisions"],
 		            "policy_version": "kg_extract_persona_v1"
@@ -72,28 +74,46 @@
         "pinDefaults": { "key": "text" }
       }
     },
-    {
-      "id": "node-4",
-      "type": "set",
-      "position": { "x": 560.0, "y": 224.0 },
-      "data": {
-        "nodeType": "set",
-        "label": "Set domain_focus",
-        "icon": "&#x1F4E4;",
-        "headerColor": "#3498DB",
-        "inputs": [
-          { "id": "object", "label": "object", "type": "object" },
-          { "id": "key", "label": "key", "type": "string" },
-          { "id": "value", "label": "value", "type": "any" }
-        ],
-        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
-        "pinDefaults": { "key": "domain_focus" }
-      }
-    },
-    {
-      "id": "node-5",
-      "type": "string_template",
-      "position": { "x": 800.0, "y": 224.0 },
+	    {
+	      "id": "node-4",
+	      "type": "set",
+	      "position": { "x": 560.0, "y": 224.0 },
+	      "data": {
+	        "nodeType": "set",
+	        "label": "Set domain_focus",
+	        "icon": "&#x1F4E4;",
+	        "headerColor": "#3498DB",
+	        "inputs": [
+	          { "id": "object", "label": "object", "type": "object" },
+	          { "id": "key", "label": "key", "type": "string" },
+	          { "id": "value", "label": "value", "type": "any" }
+	        ],
+	        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+	        "pinDefaults": { "key": "domain_focus" }
+	      }
+	    },
+	    {
+	      "id": "node-15",
+	      "type": "set",
+	      "position": { "x": 560.0, "y": 288.0 },
+	      "data": {
+	        "nodeType": "set",
+	        "label": "Set max_assertions",
+	        "icon": "&#x1F4E4;",
+	        "headerColor": "#3498DB",
+	        "inputs": [
+	          { "id": "object", "label": "object", "type": "object" },
+	          { "id": "key", "label": "key", "type": "string" },
+	          { "id": "value", "label": "value", "type": "any" }
+	        ],
+	        "outputs": [{ "id": "result", "label": "result", "type": "object" }],
+	        "pinDefaults": { "key": "max_assertions" }
+	      }
+	    },
+	    {
+	      "id": "node-5",
+	      "type": "string_template",
+	      "position": { "x": 800.0, "y": 224.0 },
       "data": {
         "nodeType": "string_template",
         "label": "Build prompt",
@@ -103,12 +123,12 @@
           { "id": "template", "label": "template", "type": "string" },
           { "id": "vars", "label": "vars", "type": "object" }
         ],
-	        "outputs": [{ "id": "result", "label": "result", "type": "string" }],
-	        "pinDefaults": {
-			          "template": "You are a semantic extractor for an AI long-term memory system.\\n\\nTask: output BETWEEN 6 and 12 high-signal, append-only assertions (subject-predicate-object) supported by TEXT (aim for ~8).\\nOnly output fewer than 6 if the text truly contains fewer distinct atomic facts.\\nDomain focus (only affects what you keep): {{domain_focus}}\\nExtraction profile (identity + priorities; JSON):\\n{{extraction_profile_json}}\\n\\nHard rules:\\n- Only assert what TEXT directly states (no external knowledge).\\n- Output MUST match the enforced structured-output schema: {\\\"assertions\\\":[...]}.\\n- Use ONLY predicates allowed by the schema enum (do not invent new predicates).\\n- If TEXT contains any factual statement, return >=1 assertion (never return empty just because TEXT is short).\\n- attributes.evidence_quote MUST be an exact verbatim substring of TEXT, <=160 chars, no ellipses.\\n- attributes.original_context (optional) MUST be an exact substring of TEXT, <=280 chars, and include evidence_quote.\\n- IDs: use lowercase stable CURIE-like ids. For new entities use ex:{kind}-{kebab-case}.\\n- ID reuse: if the system prompt includes a \\\"## KG ACTIVE MEMORY\\\" block, reuse matching existing ex:* ids (match by rdf:type + primary label). Only mint a new id when no candidate fits.\\n\\nEntity completeness (important):\\n- For every new ex:* entity you introduce, add:\\n  - rdf:type (pick a concrete type from the schema enum; common ones: skos:Concept, cito:Claim, schema:Event, schema:Person, schema:Organization, schema:SoftwareApplication, schema:SoftwareSourceCode, schema:Thing, dcterms:Text)\\n  - one primary label:\\n    - concepts → skos:prefLabel\\n    - claims → skos:definition\\n    - people/orgs/events/software → schema:name\\n    - documents/text → dcterms:title\\n\\nExtraction strategy (do this unless impossible):\\n- Follow the extraction_profile priorities when choosing what to keep (this affects selection only; grounding rules still apply).\\n- Capture 1–3 main statements as cito:Claim + skos:definition (use verbatim evidence_quote text).\\n- Create skos:Concept nodes for key terms, and link claims to them with schema:about / schema:mentions.\\n- When TEXT describes a system with components/modules, represent the composition explicitly:\\n  - ex:system dcterms:hasPart ex:component\\n  - ex:component dcterms:isPartOf ex:system\\n\\nExample (for \\\"Mistakes are opportunities for growth.\\\"):\\n- ex:claim-mistakes-opportunities rdf:type cito:Claim\\n- ex:claim-mistakes-opportunities skos:definition \\\"mistakes are opportunities for growth\\\"\\n- ex:concept-mistake rdf:type skos:Concept\\n- ex:concept-mistake skos:prefLabel \\\"mistakes\\\"\\n- ex:claim-mistakes-opportunities schema:about ex:concept-mistake\\n\\nTEXT:\\n{{text}}"
-	        }
-	      }
-	    },
+		        "outputs": [{ "id": "result", "label": "result", "type": "string" }],
+		        "pinDefaults": {
+				          "template": "You are a semantic extractor for an AI long-term memory system.\\n\\nTask: output BETWEEN 8 and {{max_assertions}} high-signal, append-only assertions (subject-predicate-object) supported by TEXT (aim for ~16).\\nOnly output fewer than 8 if the text truly contains fewer distinct atomic facts.\\nDomain focus (only affects what you keep): {{domain_focus}}\\nExtraction profile (identity + priorities; JSON):\\n{{extraction_profile_json}}\\n\\nHard rules:\\n- Only assert what TEXT directly states (no external knowledge).\\n- Output MUST match the enforced structured-output schema: {\\\"assertions\\\":[...]}.\\n- Use ONLY predicates allowed by the schema enum (do not invent new predicates).\\n- If TEXT contains any factual statement, return >=1 assertion (never return empty just because TEXT is short).\\n- attributes.evidence_quote MUST be an exact verbatim substring of TEXT, <=160 chars, no ellipses.\\n- attributes.original_context (optional) MUST be an exact substring of TEXT, <=280 chars, and include evidence_quote.\\n- IDs: use lowercase stable CURIE-like ids. For new entities use ex:{kind}-{kebab-case}.\\n- ID reuse: if the system prompt includes a \\\"## KG ACTIVE MEMORY\\\" block, reuse matching existing ex:* ids (match by rdf:type + primary label). Only mint a new id when no candidate fits.\\n\\nEntity completeness (important):\\n- For every new ex:* entity you introduce, add:\\n  - rdf:type (pick a concrete type from the schema enum; common ones: skos:Concept, cito:Claim, schema:Event, schema:Person, schema:Organization, schema:SoftwareApplication, schema:SoftwareSourceCode, schema:Thing, dcterms:Text)\\n  - one primary label:\\n    - concepts → skos:prefLabel\\n    - claims → skos:definition\\n    - people/orgs/events/software → schema:name\\n    - documents/text → dcterms:title\\n\\nExtraction strategy (do this unless impossible):\\n- Follow the extraction_profile priorities when choosing what to keep (this affects selection only; grounding rules still apply).\\n- Prefer actionable structure (claims + relations) over spending the whole budget on repeated rdf:type + labels.\\n  - If the budget is tight, introduce fewer entities rather than emitting mostly typing/label triples.\\n- Capture 1–3 main statements as cito:Claim + skos:definition (use verbatim evidence_quote text).\\n- Create skos:Concept nodes for key terms, and link claims to them with schema:about / schema:mentions.\\n- When TEXT describes a system with components/modules, represent the composition explicitly:\\n  - Prefer: ex:system dcterms:hasPart ex:component\\n  - Use: ex:component dcterms:isPartOf ex:system only when it adds clarity (avoid redundant inverses).\\n\\nExample (for \\\"Mistakes are opportunities for growth.\\\"):\\n- ex:claim-mistakes-opportunities rdf:type cito:Claim\\n- ex:claim-mistakes-opportunities skos:definition \\\"mistakes are opportunities for growth\\\"\\n- ex:concept-mistake rdf:type skos:Concept\\n- ex:concept-mistake skos:prefLabel \\\"mistakes\\\"\\n- ex:claim-mistakes-opportunities schema:about ex:concept-mistake\\n\\nTEXT:\\n{{text}}"
+		        }
+		      }
+		    },
     {
       "id": "node-13",
       "type": "stringify_json",
@@ -274,7 +294,7 @@
 	          { "id": "output", "label": "output", "type": "any" }
 	        ],
 	        "functionName": "transform",
-	        "code": "def transform(_input):\n    payload = _input.get('input') if isinstance(_input, dict) else None\n    if not isinstance(payload, dict):\n        payload = {}\n\n    text = payload.get('text', '')\n    if not isinstance(text, str):\n        text = str(text or '')\n\n    raw = payload.get('assertions', [])\n    if not isinstance(raw, list):\n        return []\n\n    def _norm_space(s):\n        return ' '.join(s.split()).strip().lower() if isinstance(s, str) else ''\n\n    MAX_EVIDENCE = 160\n    MAX_CONTEXT = 280\n\n    _pred_aliases = {\n        'schema:description': 'dcterms:description',\n        'schema:creator': 'dcterms:creator',\n        'schema:awareness': 'schema:knowsabout',\n        'schema:hasparent': 'dcterms:ispartof',\n        'schema:hasmember': 'dcterms:haspart',\n        'schema:recognizedas': 'skos:closematch',\n        'schema:hasmemorysource': 'dcterms:references',\n        'schema:haspart': 'dcterms:haspart',\n        'schema:ispartof': 'dcterms:ispartof',\n        'dcterms:has_part': 'dcterms:haspart',\n        'dcterms:is_part_of': 'dcterms:ispartof',\n    }\n\n    def _norm_predicate(p):\n        p2 = _norm_space(p)\n        return _pred_aliases.get(p2, p2)\n\n    def _repair_context(evidence, max_len=MAX_CONTEXT):\n        if not isinstance(evidence, str) or not evidence:\n            return ''\n        idx = text.find(evidence)\n        if idx < 0:\n            return ''\n        max_len2 = int(max_len) if isinstance(max_len, (int, float)) else MAX_CONTEXT\n        max_len2 = max(0, max_len2)\n        if max_len2 and max_len2 < len(evidence):\n            max_len2 = len(evidence)\n        window = (max_len2 - len(evidence)) // 2 if max_len2 else 0\n        start = idx - int(window)\n        if start < 0:\n            start = 0\n        end = idx + len(evidence) + int(window)\n        if end > len(text):\n            end = len(text)\n        if max_len2 and (end - start) > max_len2:\n            end = start + max_len2\n        return text[start:end]\n\n    def _normalize_with_map(s):\n        if not isinstance(s, str):\n            s = str(s or '')\n        out = []\n        mapping = []\n        prev_space = False\n        for i, ch in enumerate(s):\n            if ch in '*_`':\n                continue\n            if ch in '’‘':\n                ch2 = \"'\"\n            elif ch in '“”':\n                ch2 = '\"'\n            elif ch in '‑–—':\n                ch2 = '-'\n            else:\n                ch2 = ch\n\n            if ch2.isspace():\n                if prev_space:\n                    continue\n                prev_space = True\n                ch2 = ' '\n            else:\n                prev_space = False\n\n            out.append(ch2.lower())\n            mapping.append(i)\n\n        norm = ''.join(out)\n        if not norm:\n            return '', []\n\n        # Trim leading/trailing spaces while preserving mapping alignment.\n        start = 0\n        end = len(norm)\n        while start < end and norm[start] == ' ':\n            start += 1\n        while end > start and norm[end - 1] == ' ':\n            end -= 1\n        return norm[start:end], mapping[start:end]\n\n    def _find_verbatim_evidence(ev_raw):\n        if not isinstance(ev_raw, str):\n            return ''\n        ev0 = ev_raw.strip()\n        if not ev0:\n            return ''\n        if ev0 in text:\n            return ev0\n\n        # Best-effort repair: allow markdown emphasis markers + case/whitespace drift.\n        # If we can find a match deterministically, return the verbatim substring from TEXT.\n        norm_text, map_text = _normalize_with_map(text)\n        norm_ev, _ = _normalize_with_map(ev0)\n        if not norm_ev or not norm_text:\n            return ''\n\n        idx = norm_text.find(norm_ev)\n        if idx < 0:\n            return ''\n        end_idx = idx + len(norm_ev) - 1\n        if end_idx >= len(map_text):\n            return ''\n\n        start0 = map_text[idx]\n        end0 = map_text[end_idx] + 1\n        if not isinstance(start0, int) or not isinstance(end0, int):\n            return ''\n        if start0 < 0 or end0 <= start0 or end0 > len(text):\n            return ''\n\n        found = text[start0:end0]\n        return found if isinstance(found, str) and found and found in text else ''\n\n    seen = set()\n    out = []\n\n    for a in raw:\n        if not isinstance(a, dict):\n            continue\n\n        subj = _norm_space(a.get('subject'))\n        pred = _norm_predicate(a.get('predicate'))\n        obj = _norm_space(a.get('object'))\n\n        if not subj or not pred or not obj:\n            continue\n\n        attrs = a.get('attributes') if isinstance(a.get('attributes'), dict) else {}\n        ev = attrs.get('evidence_quote')\n        ctx = attrs.get('original_context')\n\n        if not isinstance(ev, str):\n            continue\n        ev2 = ev.strip()\n        if not ev2:\n            continue\n        if len(ev2) > MAX_EVIDENCE:\n            continue\n        if ev2 not in text:\n            ev2 = _find_verbatim_evidence(ev2)\n        if not ev2 or ev2 not in text:\n            continue\n        if len(ev2) > MAX_EVIDENCE:\n            continue\n\n        ctx2 = ctx.strip() if isinstance(ctx, str) else ''\n        if not ctx2 or ctx2 not in text or ev2 not in ctx2:\n            ctx2 = _repair_context(ev2)\n        if not ctx2:\n            # Evidence itself is always acceptable as context.\n            ctx2 = ev2\n        if ctx2 not in text or ev2 not in ctx2:\n            continue\n        if len(ctx2) > MAX_CONTEXT:\n            ctx2 = _repair_context(ev2) or ev2\n\n        key = (subj, pred, obj)\n        if key in seen:\n            continue\n        seen.add(key)\n\n        a2 = {'subject': subj, 'predicate': pred, 'object': obj}\n        for opt_key in ('confidence', 'valid_from', 'valid_until', 'provenance'):\n            if opt_key in a:\n                a2[opt_key] = a.get(opt_key)\n\n        # Preserve semantic typing + grounding fields.\n        a2['attributes'] = {\n            'subject_type': attrs.get('subject_type'),\n            'object_type': attrs.get('object_type'),\n            'evidence_quote': ev2,\n            'original_context': ctx2,\n        }\n\n        out.append(a2)\n        if len(out) >= 12:\n            break\n\n    return out\n"
+	        "code": "def transform(_input):\n    payload = _input.get('input') if isinstance(_input, dict) else None\n    if not isinstance(payload, dict):\n        payload = {}\n\n    text = payload.get('text', '')\n    if not isinstance(text, str):\n        text = str(text or '')\n\n    raw = payload.get('assertions', [])\n    if not isinstance(raw, list):\n        return []\n\n    def _norm_space(s):\n        return ' '.join(s.split()).strip().lower() if isinstance(s, str) else ''\n\n    MAX_EVIDENCE = 160\n    MAX_CONTEXT = 280\n\n    _pred_aliases = {\n        'schema:description': 'dcterms:description',\n        'schema:creator': 'dcterms:creator',\n        'schema:awareness': 'schema:knowsabout',\n        'schema:hasparent': 'dcterms:ispartof',\n        'schema:hasmember': 'dcterms:haspart',\n        'schema:recognizedas': 'skos:closematch',\n        'schema:hasmemorysource': 'dcterms:references',\n        'schema:haspart': 'dcterms:haspart',\n        'schema:ispartof': 'dcterms:ispartof',\n        'dcterms:has_part': 'dcterms:haspart',\n        'dcterms:is_part_of': 'dcterms:ispartof',\n    }\n\n    def _norm_predicate(p):\n        p2 = _norm_space(p)\n        return _pred_aliases.get(p2, p2)\n\n    def _repair_context(evidence, max_len=MAX_CONTEXT):\n        if not isinstance(evidence, str) or not evidence:\n            return ''\n        idx = text.find(evidence)\n        if idx < 0:\n            return ''\n        max_len2 = int(max_len) if isinstance(max_len, (int, float)) else MAX_CONTEXT\n        max_len2 = max(0, max_len2)\n        if max_len2 and max_len2 < len(evidence):\n            max_len2 = len(evidence)\n        window = (max_len2 - len(evidence)) // 2 if max_len2 else 0\n        start = idx - int(window)\n        if start < 0:\n            start = 0\n        end = idx + len(evidence) + int(window)\n        if end > len(text):\n            end = len(text)\n        if max_len2 and (end - start) > max_len2:\n            end = start + max_len2\n        return text[start:end]\n\n    def _normalize_with_map(s):\n        if not isinstance(s, str):\n            s = str(s or '')\n        out = []\n        mapping = []\n        prev_space = False\n        for i, ch in enumerate(s):\n            if ch in '*_`':\n                continue\n            if ch in '’‘':\n                ch2 = \"'\"\n            elif ch in '“”':\n                ch2 = '\"'\n            elif ch in '‑–—':\n                ch2 = '-'\n            else:\n                ch2 = ch\n\n            if ch2.isspace():\n                if prev_space:\n                    continue\n                prev_space = True\n                ch2 = ' '\n            else:\n                prev_space = False\n\n            out.append(ch2.lower())\n            mapping.append(i)\n\n        norm = ''.join(out)\n        if not norm:\n            return '', []\n\n        # Trim leading/trailing spaces while preserving mapping alignment.\n        start = 0\n        end = len(norm)\n        while start < end and norm[start] == ' ':\n            start += 1\n        while end > start and norm[end - 1] == ' ':\n            end -= 1\n        return norm[start:end], mapping[start:end]\n\n    def _find_verbatim_evidence(ev_raw):\n        if not isinstance(ev_raw, str):\n            return ''\n        ev0 = ev_raw.strip()\n        if not ev0:\n            return ''\n        if ev0 in text:\n            return ev0\n\n        # Best-effort repair: allow markdown emphasis markers + case/whitespace drift.\n        # If we can find a match deterministically, return the verbatim substring from TEXT.\n        norm_text, map_text = _normalize_with_map(text)\n        norm_ev, _ = _normalize_with_map(ev0)\n        if not norm_ev or not norm_text:\n            return ''\n\n        idx = norm_text.find(norm_ev)\n        if idx < 0:\n            return ''\n        end_idx = idx + len(norm_ev) - 1\n        if end_idx >= len(map_text):\n            return ''\n\n        start0 = map_text[idx]\n        end0 = map_text[end_idx] + 1\n        if not isinstance(start0, int) or not isinstance(end0, int):\n            return ''\n        if start0 < 0 or end0 <= start0 or end0 > len(text):\n            return ''\n\n        found = text[start0:end0]\n        return found if isinstance(found, str) and found and found in text else ''\n\n    max_keep = payload.get('max_assertions', 24)\n    try:\n        max_keep = int(max_keep)\n    except Exception:\n        max_keep = 24\n    max_keep = max(1, min(200, max_keep))\n\n    # Predicate buckets (lower-cased by _norm_predicate).\n    META = {\n        'rdf:type',\n        'skos:preflabel',\n        'skos:altlabel',\n        'schema:name',\n        'dcterms:title',\n        'dcterms:identifier',\n    }\n    CORE = {\n        'skos:definition',\n        'dcterms:description',\n        'dcterms:abstract',\n    }\n    STRUCT_PRIMARY = {\n        'dcterms:haspart',\n        'schema:about',\n        'schema:mentions',\n        'schema:knowsabout',\n        'dcterms:references',\n        'skos:broader',\n        'skos:narrower',\n        'skos:related',\n        'skos:exactmatch',\n        'skos:closematch',\n        'cito:supports',\n        'cito:disagreeswith',\n        'cito:usesdatafrom',\n        'cito:providesdatafor',\n        'cito:extends',\n        'cito:discusses',\n        'cito:confirms',\n    }\n    STRUCT_SECONDARY = {'dcterms:ispartof'}\n\n    def _is_entity(v):\n        return isinstance(v, str) and v.startswith('ex:')\n\n    def _k(a):\n        return (a.get('subject'), a.get('predicate'), a.get('object'))\n\n    seen = set()\n    out = []\n\n    for a in raw:\n        if not isinstance(a, dict):\n            continue\n\n        subj = _norm_space(a.get('subject'))\n        pred = _norm_predicate(a.get('predicate'))\n        obj = _norm_space(a.get('object'))\n\n        if not subj or not pred or not obj:\n            continue\n\n        attrs = a.get('attributes') if isinstance(a.get('attributes'), dict) else {}\n        ev = attrs.get('evidence_quote')\n        ctx = attrs.get('original_context')\n\n        if not isinstance(ev, str):\n            continue\n        ev2 = ev.strip()\n        if not ev2:\n            continue\n        if len(ev2) > MAX_EVIDENCE:\n            continue\n        if ev2 not in text:\n            ev2 = _find_verbatim_evidence(ev2)\n        if not ev2 or ev2 not in text:\n            continue\n        if len(ev2) > MAX_EVIDENCE:\n            continue\n\n        ctx2 = ctx.strip() if isinstance(ctx, str) else ''\n        if not ctx2 or ctx2 not in text or ev2 not in ctx2:\n            ctx2 = _repair_context(ev2)\n        if not ctx2:\n            # Evidence itself is always acceptable as context.\n            ctx2 = ev2\n        if ctx2 not in text or ev2 not in ctx2:\n            continue\n        if len(ctx2) > MAX_CONTEXT:\n            ctx2 = _repair_context(ev2) or ev2\n\n        key = (subj, pred, obj)\n        if key in seen:\n            continue\n        seen.add(key)\n\n        a2 = {'subject': subj, 'predicate': pred, 'object': obj}\n        for opt_key in ('confidence', 'valid_from', 'valid_until', 'provenance'):\n            if opt_key in a:\n                a2[opt_key] = a.get(opt_key)\n\n        # Preserve semantic typing + grounding fields.\n        a2['attributes'] = {\n            'subject_type': attrs.get('subject_type'),\n            'object_type': attrs.get('object_type'),\n            'evidence_quote': ev2,\n            'original_context': ctx2,\n        }\n\n        out.append(a2)\n\n    # Build an index for entity completeness.\n    by_subject = {}\n    for a in out:\n        by_subject.setdefault(a.get('subject'), []).append(a)\n\n    def _meta_for_entity(eid):\n        items = by_subject.get(eid, [])\n        meta = []\n        for it in items:\n            if it.get('predicate') == 'rdf:type':\n                meta.append(it)\n                break\n        for lab in (\n            'skos:preflabel',\n            'schema:name',\n            'dcterms:title',\n            'skos:definition',\n            'dcterms:identifier',\n            'skos:altlabel',\n        ):\n            for it in items:\n                if it.get('predicate') == lab:\n                    meta.append(it)\n                    return meta\n        return meta\n\n    selected = []\n    selected_keys = set()\n\n    def _add(a):\n        k = _k(a)\n        if k in selected_keys:\n            return False\n        selected_keys.add(k)\n        selected.append(a)\n        return True\n\n    def _todo(a):\n        todo = []\n        todo_keys = set()\n        k0 = _k(a)\n        if k0 not in selected_keys and k0 not in todo_keys:\n            todo.append(a)\n            todo_keys.add(k0)\n        for eid in (a.get('subject'), a.get('object')):\n            if _is_entity(eid):\n                for m in _meta_for_entity(eid):\n                    km = _k(m)\n                    if km not in selected_keys and km not in todo_keys:\n                        todo.append(m)\n                        todo_keys.add(km)\n        return todo\n\n    def _try_add(a):\n        todo = _todo(a)\n        if len(selected) + len(todo) > max_keep:\n            return False\n        for it in todo:\n            _add(it)\n        return True\n\n    # Pass 1: core content (claim definitions / descriptions).\n    for a in out:\n        if a.get('predicate') in CORE:\n            _try_add(a)\n            if len(selected) >= max_keep:\n                return selected\n\n    # Pass 2: structural relations (prefer hasPart/about/... over isPartOf).\n    for a in out:\n        if a.get('predicate') in STRUCT_PRIMARY:\n            _try_add(a)\n            if len(selected) >= max_keep:\n                return selected\n\n    for a in out:\n        if a.get('predicate') in STRUCT_SECONDARY:\n            _try_add(a)\n            if len(selected) >= max_keep:\n                return selected\n\n    # Pass 3: any remaining non-meta relations.\n    for a in out:\n        pred = a.get('predicate')\n        if pred in META or pred in CORE:\n            continue\n        _try_add(a)\n        if len(selected) >= max_keep:\n            return selected\n\n    # Fill remaining space deterministically.\n    for a in out:\n        _try_add(a)\n        if len(selected) >= max_keep:\n            break\n\n    return selected\n"
 	      }
 	    },
 	    {
@@ -301,9 +321,11 @@
     { "id": "edge-2", "source": "node-2", "sourceHandle": "value", "target": "node-3", "targetHandle": "object", "animated": false },
     { "id": "edge-3", "source": "node-3", "sourceHandle": "result", "target": "node-4", "targetHandle": "object", "animated": false },
     { "id": "edge-4", "source": "node-1", "sourceHandle": "domain_focus", "target": "node-4", "targetHandle": "value", "animated": false },
+    { "id": "edge-4e", "source": "node-4", "sourceHandle": "result", "target": "node-15", "targetHandle": "object", "animated": false },
+    { "id": "edge-4f", "source": "node-1", "sourceHandle": "max_assertions", "target": "node-15", "targetHandle": "value", "animated": false },
     { "id": "edge-4b", "source": "node-1", "sourceHandle": "extraction_profile", "target": "node-13", "targetHandle": "value", "animated": false },
     { "id": "edge-4c", "source": "node-13", "sourceHandle": "result", "target": "node-14", "targetHandle": "value", "animated": false },
-    { "id": "edge-4d", "source": "node-4", "sourceHandle": "result", "target": "node-14", "targetHandle": "object", "animated": false },
+    { "id": "edge-4d", "source": "node-15", "sourceHandle": "result", "target": "node-14", "targetHandle": "object", "animated": false },
     { "id": "edge-5", "source": "node-14", "sourceHandle": "result", "target": "node-5", "targetHandle": "vars", "animated": false },
     { "id": "edge-6", "source": "node-5", "sourceHandle": "result", "target": "node-7", "targetHandle": "prompt", "animated": false },
     { "id": "edge-6b", "source": "node-1", "sourceHandle": "text", "target": "node-7", "targetHandle": "memory_query", "animated": false },
@@ -318,7 +340,7 @@
 	    { "id": "edge-14", "source": "node-8", "sourceHandle": "value", "target": "node-10", "targetHandle": "extraction", "animated": false },
 	    { "id": "edge-15", "source": "node-7", "sourceHandle": "response", "target": "node-10", "targetHandle": "raw", "animated": false },
 	    { "id": "edge-16", "source": "node-12", "sourceHandle": "exec-out", "target": "node-10", "targetHandle": "exec-in", "animated": true },
-	    { "id": "edge-17", "source": "node-4", "sourceHandle": "result", "target": "node-11", "targetHandle": "object", "animated": false },
+	    { "id": "edge-17", "source": "node-15", "sourceHandle": "result", "target": "node-11", "targetHandle": "object", "animated": false },
 	    { "id": "edge-18", "source": "node-9", "sourceHandle": "value", "target": "node-11", "targetHandle": "value", "animated": false },
 	    { "id": "edge-19", "source": "node-11", "sourceHandle": "result", "target": "node-12", "targetHandle": "input", "animated": false },
 	    { "id": "edge-20", "source": "node-7", "sourceHandle": "exec-out", "target": "node-12", "targetHandle": "exec-in", "animated": true }
