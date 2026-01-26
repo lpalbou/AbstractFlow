@@ -483,9 +483,9 @@
         }
       }
     },
-    {
-      "id": "kg_sources",
-      "type": "code",
+	    {
+	      "id": "kg_sources",
+	      "type": "code",
       "position": {
         "x": -352.0,
         "y": 384.0
@@ -522,11 +522,182 @@
         "functionName": "transform",
         "code": "def transform(_input):\n    sp = _input.get('input') if isinstance(_input, dict) else None\n    if not isinstance(sp, dict):\n        return []\n\n    node_traces = sp.get('node_traces')\n    if not isinstance(node_traces, dict):\n        return []\n\n    def _as_dict(v):\n        return v if isinstance(v, dict) else None\n\n    def _safe_str(v):\n        return v if isinstance(v, str) else str(v or '')\n\n    def _stringify(value, *, max_chars):\n        # VisualFlow code nodes disallow imports; use a deterministic repr for structured values.\n        try:\n            if isinstance(value, (dict, list)):\n                s = repr(value)\n            else:\n                s = _safe_str(value)\n        except Exception:\n            s = _safe_str(value)\n        if max_chars and isinstance(max_chars, int) and max_chars > 0 and len(s) > max_chars:\n            return s[: max_chars - 1] + '…'\n        return s\n\n    # Collect tool calls + results across all trace steps.\n    calls = []\n    for trace_any in node_traces.values():\n        trace = _as_dict(trace_any)\n        if not trace:\n            continue\n        steps = trace.get('steps')\n        if not isinstance(steps, list):\n            continue\n        for step_any in steps:\n            step = _as_dict(step_any)\n            if not step:\n                continue\n            effect = _as_dict(step.get('effect')) or {}\n            if _safe_str(effect.get('type')).strip() != 'tool_calls':\n                continue\n            payload = _as_dict(effect.get('payload')) or {}\n            tool_calls = payload.get('tool_calls')\n            if isinstance(tool_calls, dict):\n                tool_calls = [tool_calls]\n            if not isinstance(tool_calls, list):\n                tool_calls = []\n            result = _as_dict(step.get('result')) or {}\n            results = result.get('results')\n            if isinstance(results, dict):\n                results = [results]\n            if not isinstance(results, list):\n                results = []\n            results_by_id = {}\n            for r_any in results:\n                r = _as_dict(r_any)\n                if not r:\n                    continue\n                cid = _safe_str(r.get('call_id')).strip()\n                if cid:\n                    results_by_id[cid] = r\n            for c_any in tool_calls:\n                c = _as_dict(c_any)\n                if not c:\n                    continue\n                cid = _safe_str(c.get('call_id') or c.get('id')).strip()\n                r = results_by_id.get(cid) if cid else None\n                calls.append({'call': c, 'result': r})\n\n    if not calls:\n        return []\n\n    tools_used = []\n    attachment_ids = []\n\n    blocks = ['## Tool outputs']\n    total_chars = 0\n\n    for item in calls:\n        c = item.get('call') if isinstance(item, dict) else None\n        r = item.get('result') if isinstance(item, dict) else None\n        c = c if isinstance(c, dict) else {}\n        r = r if isinstance(r, dict) else {}\n\n        name = _safe_str(c.get('name')).strip() or 'tool'\n        tools_used.append(name)\n        cid = _safe_str(c.get('call_id') or c.get('id')).strip()\n        args = c.get('arguments') if isinstance(c.get('arguments'), dict) else {}\n\n        success = r.get('success') if isinstance(r.get('success'), bool) else None\n        error = r.get('error')\n        output = r.get('output')\n\n        # Best-effort: extract attachment artifact ids.\n        if name == 'open_attachment' and isinstance(output, dict):\n            aid = output.get('artifact_id')\n            aid = _safe_str(aid).strip()\n            if aid:\n                attachment_ids.append(aid)\n\n        entry = []\n        entry.append(f\"- `{name}`\" + (f\" (call_id={cid})\" if cid else ''))\n        entry.append('')\n        entry.append('**arguments**')\n        entry.append('```json')\n        entry.append(_stringify(args, max_chars=2000))\n        entry.append('```')\n        entry.append('')\n        entry.append('**result**')\n        if success is not None:\n            entry.append(f\"- success: {str(success).lower()}\")\n        if error is not None:\n            entry.append(f\"- error: {_safe_str(error)}\")\n        entry.append('```')\n        entry.append(_stringify(output, max_chars=4000))\n        entry.append('```')\n        entry.append('')\n\n        s = '\\n'.join(entry).strip() + '\\n'\n        total_chars += len(s)\n        if total_chars > 24000:\n            blocks.append('_(tool outputs truncated)_')\n            break\n        blocks.append(s)\n\n    tool_outputs_md = '\\n'.join(blocks).strip()\n\n    uniq_tools = []\n    seen = set()\n    for t in tools_used:\n        if t in seen:\n            continue\n        seen.add(t)\n        uniq_tools.append(t)\n\n    summary_lines = [\n        '## Work summary',\n        f\"- tool_calls: {len(calls)}\",\n        f\"- tools: {', '.join(uniq_tools) if uniq_tools else '(none)'}\",\n    ]\n    if attachment_ids:\n        uniq_a = []\n        seen2 = set()\n        for aid in attachment_ids:\n            if aid in seen2:\n                continue\n            seen2.add(aid)\n            uniq_a.append(aid)\n        summary_lines.append(f\"- attachments_used: {', '.join(uniq_a)}\")\n\n    work_summary_md = '\\n'.join(summary_lines).strip()\n\n    sources = [\n        {'source_id': 'tool_outputs', 'kind': 'tool_outputs', 'text': tool_outputs_md},\n        {'source_id': 'work_summary', 'kind': 'work_summary', 'text': work_summary_md},\n    ]\n    if attachment_ids:\n        sources.append({'source_id': 'attachments_used', 'kind': 'attachments_used', 'artifact_ids': attachment_ids, 'text': 'Attachments used:\\n' + '\\n'.join([f\"- {x}\" for x in attachment_ids])})\n\n    return sources\n"
       }
-    },
-    {
-      "id": "ingest_input",
-      "type": "make_object",
-      "position": {
+	    },
+	    {
+	      "id": "ctx_attachments",
+	      "type": "get",
+	      "position": {
+	        "x": -352.0,
+	        "y": 528.0
+	      },
+	      "data": {
+	        "nodeType": "get",
+	        "label": "context.attachments",
+	        "icon": "&#x1F4E5;",
+	        "headerColor": "#3498DB",
+	        "inputs": [
+	          { "id": "object", "label": "object", "type": "object" },
+	          { "id": "key", "label": "key", "type": "string" },
+	          { "id": "default", "label": "default", "type": "any" }
+	        ],
+	        "outputs": [{ "id": "value", "label": "value", "type": "any" }],
+	        "pinDefaults": { "key": "attachments", "default": [] }
+	      }
+	    },
+	    {
+	      "id": "ctx_min",
+	      "type": "make_object",
+	      "position": {
+	        "x": -128.0,
+	        "y": 528.0
+	      },
+	      "data": {
+	        "nodeType": "make_object",
+	        "label": "Context (attachments only)",
+	        "icon": "{}",
+	        "headerColor": "#3498DB",
+	        "inputs": [
+	          { "id": "attachments", "label": "attachments", "type": "array" }
+	        ],
+	        "outputs": [{ "id": "result", "label": "result", "type": "object" }]
+	      }
+	    },
+      {
+        "id": "kg_attachment_calls",
+        "type": "code",
+        "position": {
+          "x": -352.0,
+          "y": 672.0
+        },
+        "data": {
+          "nodeType": "code",
+          "label": "KG open active attachments",
+          "icon": "&#x1F4CE;",
+          "headerColor": "#9B59B6",
+          "inputs": [
+            { "id": "exec-in", "label": "", "type": "execution" },
+            { "id": "input", "label": "attachments", "type": "any" }
+          ],
+          "outputs": [
+            { "id": "exec-out", "label": "", "type": "execution" },
+            { "id": "output", "label": "tool_calls", "type": "any" }
+          ],
+          "functionName": "transform",
+          "code": "def transform(_input):\n    items = _input.get('input') if isinstance(_input, dict) else None\n    if not isinstance(items, list) or not items:\n        return []\n\n    out = []\n    for it in items:\n        if not isinstance(it, dict):\n            continue\n        aid = it.get('$artifact') or it.get('artifact_id') or it.get('id')\n        if not isinstance(aid, str) or not aid.strip():\n            continue\n        out.append({'name': 'open_attachment', 'arguments': {'artifact_id': aid.strip(), 'start_line': 1, 'end_line': None, 'max_chars': 200000}})\n\n    return out\n"
+        }
+      },
+      {
+        "id": "kg_open_attachments_allow",
+        "type": "literal_array",
+        "position": {
+          "x": -352.0,
+          "y": 784.0
+        },
+        "data": {
+          "nodeType": "literal_array",
+          "label": "KG open_attachments allowlist",
+          "icon": "[]",
+          "headerColor": "#00FFFF",
+          "inputs": [],
+          "outputs": [{ "id": "value", "label": "value", "type": "array" }],
+          "literalValue": ["open_attachment"]
+        }
+      },
+      {
+        "id": "kg_open_attachments",
+        "type": "tool_calls",
+        "position": {
+          "x": -128.0,
+          "y": 672.0
+        },
+        "data": {
+          "nodeType": "tool_calls",
+          "label": "KG open attachments",
+          "icon": "&#x1F528;",
+          "headerColor": "#16A085",
+          "inputs": [
+            { "id": "exec-in", "label": "", "type": "execution" },
+            { "id": "tool_calls", "label": "tool_calls", "type": "array" },
+            { "id": "allowed_tools", "label": "allowed_tools", "type": "array" }
+          ],
+          "outputs": [
+            { "id": "exec-out", "label": "", "type": "execution" },
+            { "id": "results", "label": "results", "type": "array" },
+            { "id": "success", "label": "success", "type": "boolean" }
+          ]
+        }
+      },
+      {
+        "id": "kg_attachment_sources",
+        "type": "code",
+        "position": {
+          "x": 96.0,
+          "y": 672.0
+        },
+        "data": {
+          "nodeType": "code",
+          "label": "KG attachment sources",
+          "icon": "&#x1F4C4;",
+          "headerColor": "#9B59B6",
+          "inputs": [
+            { "id": "exec-in", "label": "", "type": "execution" },
+            { "id": "input", "label": "open results", "type": "any" }
+          ],
+          "outputs": [
+            { "id": "exec-out", "label": "", "type": "execution" },
+            { "id": "output", "label": "sources", "type": "any" }
+          ],
+          "functionName": "transform",
+          "code": "def transform(_input):\n    results = _input.get('input') if isinstance(_input, dict) else None\n    if not isinstance(results, list) or not results:\n        return []\n\n    out = []\n    seen = set()\n\n    def _safe_str(v):\n        return v if isinstance(v, str) else str(v or '')\n\n    for idx, r in enumerate(results, start=1):\n        if not isinstance(r, dict):\n            continue\n        if _safe_str(r.get('name')).strip() != 'open_attachment':\n            continue\n        if r.get('success') is not True:\n            continue\n        o = r.get('output')\n        if not isinstance(o, dict):\n            continue\n        text = o.get('content_text')\n        if not isinstance(text, str) or not text.strip():\n            continue\n        aid = o.get('artifact_id')\n        if not isinstance(aid, str) or not aid.strip():\n            continue\n\n        title = _safe_str(o.get('handle')).strip()\n        base_id = title or aid.strip() or f'attachment-{idx}'\n        base_id = base_id.replace('\\\\', '/').strip().strip('/')\n        base_id = base_id.rsplit('/', 1)[-1] if base_id else f'attachment-{idx}'\n        source_id = f'attachment:{base_id}'\n        if source_id in seen:\n            source_id = f\"{source_id}-{idx}\"\n        seen.add(source_id)\n\n        src = {\n            'source_id': source_id,\n            'kind': 'attachment',\n            'artifact_id': aid.strip(),\n            'title': title if title else None,\n            'text': text,\n        }\n        if o.get('truncated'):\n            src['truncated'] = True\n        ct = o.get('derived_text_content_type') or o.get('content_type')\n        ct = _safe_str(ct).strip()\n        if ct:\n            src['content_type'] = ct\n\n        out.append(src)\n\n    return out\n"
+        }
+      },
+      {
+        "id": "kg_sources_merge_input",
+        "type": "make_object",
+        "position": {
+          "x": 352.0,
+          "y": 672.0
+        },
+        "data": {
+          "nodeType": "make_object",
+          "label": "KG sources merge input",
+          "icon": "{}",
+          "headerColor": "#3498DB",
+          "inputs": [
+            { "id": "tool_sources", "label": "tool_sources", "type": "array" },
+            { "id": "attachment_sources", "label": "attachment_sources", "type": "array" }
+          ],
+          "outputs": [{ "id": "result", "label": "result", "type": "object" }]
+        }
+      },
+      {
+        "id": "kg_sources_all",
+        "type": "code",
+        "position": {
+          "x": 576.0,
+          "y": 672.0
+        },
+        "data": {
+          "nodeType": "code",
+          "label": "KG sources (combined)",
+          "icon": "&#x1F4DA;",
+          "headerColor": "#9B59B6",
+          "inputs": [
+            { "id": "exec-in", "label": "", "type": "execution" },
+            { "id": "input", "label": "sources", "type": "any" }
+          ],
+          "outputs": [
+            { "id": "exec-out", "label": "", "type": "execution" },
+            { "id": "output", "label": "sources", "type": "any" }
+          ],
+          "functionName": "transform",
+          "code": "def transform(_input):\n    payload = _input.get('input') if isinstance(_input, dict) else None\n    if not isinstance(payload, dict):\n        payload = {}\n\n    tool_sources = payload.get('tool_sources')\n    attachment_sources = payload.get('attachment_sources')\n\n    out = []\n    seen = set()\n\n    for arr in (tool_sources, attachment_sources):\n        if not isinstance(arr, list):\n            continue\n        for it in arr:\n            if not isinstance(it, dict):\n                continue\n            sid = it.get('source_id')\n            sid2 = sid.strip() if isinstance(sid, str) else ''\n            if sid2 and sid2 in seen:\n                continue\n            if sid2:\n                seen.add(sid2)\n            out.append(dict(it))\n\n    return out\n"
+        }
+      },
+	    {
+	      "id": "ingest_input",
+	      "type": "make_object",
+	      "position": {
         "x": -128.0,
         "y": 240.0
       },
@@ -535,9 +706,9 @@
         "label": "KG ingest input",
         "icon": "{}",
         "headerColor": "#3498DB",
-        "inputs": [
-          {
-            "id": "provider",
+	        "inputs": [
+	          {
+	            "id": "provider",
             "label": "provider",
             "type": "provider"
           },
@@ -566,14 +737,19 @@
             "label": "domain_focus",
             "type": "string"
           },
-          {
-            "id": "max_out_tokens",
-            "label": "max_out_tokens",
-            "type": "number"
-          }
-        ],
-        "outputs": [
-          {
+	          {
+	            "id": "max_out_tokens",
+	            "label": "max_out_tokens",
+	            "type": "number"
+	          },
+	          {
+	            "id": "context",
+	            "label": "context",
+	            "type": "object"
+	          }
+	        ],
+	        "outputs": [
+	          {
             "id": "result",
             "label": "result",
             "type": "object"
@@ -1005,6 +1181,30 @@
       "animated": false
     },
     {
+      "id": "e-start-ctx-attachments-object",
+      "source": "start",
+      "sourceHandle": "context",
+      "target": "ctx_attachments",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-ctx-attachments-ctx-min-attachments",
+      "source": "ctx_attachments",
+      "sourceHandle": "value",
+      "target": "ctx_min",
+      "targetHandle": "attachments",
+      "animated": false
+    },
+    {
+      "id": "e-ctx-min-ingest-input-context",
+      "source": "ctx_min",
+      "sourceHandle": "result",
+      "target": "ingest_input",
+      "targetHandle": "context",
+      "animated": false
+    },
+    {
       "id": "e-start-agent-max-iterations",
       "source": "start",
       "sourceHandle": "max_iterations",
@@ -1181,20 +1381,108 @@
       "animated": true
     },
     {
-      "id": "e-kg-sources-kg-ingest-exec",
+      "id": "e-ctx-attachments-kg-attachment-calls",
+      "source": "ctx_attachments",
+      "sourceHandle": "value",
+      "target": "kg_attachment_calls",
+      "targetHandle": "input",
+      "animated": false
+    },
+    {
+      "id": "e-kg-sources-kg-attachment-calls-exec",
       "source": "kg_sources",
       "sourceHandle": "exec-out",
-      "target": "kg_ingest",
+      "target": "kg_attachment_calls",
       "targetHandle": "exec-in",
       "animated": true
     },
     {
-      "id": "e-kg-sources-ingest-input-sources",
+      "id": "e-kg-attachment-calls-open-attachments-toolcalls",
+      "source": "kg_attachment_calls",
+      "sourceHandle": "output",
+      "target": "kg_open_attachments",
+      "targetHandle": "tool_calls",
+      "animated": false
+    },
+    {
+      "id": "e-kg-attachment-calls-open-attachments-exec",
+      "source": "kg_attachment_calls",
+      "sourceHandle": "exec-out",
+      "target": "kg_open_attachments",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-kg-open-attachments-allow-tools",
+      "source": "kg_open_attachments_allow",
+      "sourceHandle": "value",
+      "target": "kg_open_attachments",
+      "targetHandle": "allowed_tools",
+      "animated": false
+    },
+    {
+      "id": "e-kg-open-attachments-kg-attachment-sources-input",
+      "source": "kg_open_attachments",
+      "sourceHandle": "results",
+      "target": "kg_attachment_sources",
+      "targetHandle": "input",
+      "animated": false
+    },
+    {
+      "id": "e-kg-open-attachments-kg-attachment-sources-exec",
+      "source": "kg_open_attachments",
+      "sourceHandle": "exec-out",
+      "target": "kg_attachment_sources",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-kg-sources-merge-tool-sources",
       "source": "kg_sources",
+      "sourceHandle": "output",
+      "target": "kg_sources_merge_input",
+      "targetHandle": "tool_sources",
+      "animated": false
+    },
+    {
+      "id": "e-kg-attachment-sources-merge-attachment-sources",
+      "source": "kg_attachment_sources",
+      "sourceHandle": "output",
+      "target": "kg_sources_merge_input",
+      "targetHandle": "attachment_sources",
+      "animated": false
+    },
+    {
+      "id": "e-kg-sources-merge-input-kg-sources-all-input",
+      "source": "kg_sources_merge_input",
+      "sourceHandle": "result",
+      "target": "kg_sources_all",
+      "targetHandle": "input",
+      "animated": false
+    },
+    {
+      "id": "e-kg-attachment-sources-kg-sources-all-exec",
+      "source": "kg_attachment_sources",
+      "sourceHandle": "exec-out",
+      "target": "kg_sources_all",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-kg-sources-all-ingest-input-sources",
+      "source": "kg_sources_all",
       "sourceHandle": "output",
       "target": "ingest_input",
       "targetHandle": "sources",
       "animated": false
+    },
+    {
+      "id": "e-kg-sources-all-kg-ingest-exec",
+      "source": "kg_sources_all",
+      "sourceHandle": "exec-out",
+      "target": "kg_ingest",
+      "targetHandle": "exec-in",
+      "animated": true
     },
     {
       "id": "e-ingest-input-kg-ingest-input",
