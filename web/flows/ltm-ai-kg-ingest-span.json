@@ -33,7 +33,7 @@
 		          "domain_focus": "software / agents / memory systems",
 		          "max_messages": 80,
 		          "max_input_tokens": 12000,
-			          "max_out_tokens": 2000,
+			          "max_out_tokens": 0,
 		          "extraction_profile": {
 		            "persona_id": "default",
 		            "persona_version": "v1",

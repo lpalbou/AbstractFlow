@@ -11,7 +11,7 @@ def test_ltm_ai_kg_extract_triples_has_safe_default_output_budget() -> None:
     start = next(n for n in nodes if isinstance(n, dict) and n.get("id") == "node-1")
     pin_defaults = start.get("data", {}).get("pinDefaults", {})
     max_out = pin_defaults.get("max_out_tokens")
-    assert isinstance(max_out, (int, float)) and int(max_out) >= 1500
+    assert isinstance(max_out, (int, float)) and int(max_out) <= 0
 
 
 def test_ltm_ai_kg_extract_triples_prompt_mentions_composition_edges() -> None:
@@ -23,4 +23,3 @@ def test_ltm_ai_kg_extract_triples_prompt_mentions_composition_edges() -> None:
     prompt_node = next(n for n in nodes if isinstance(n, dict) and n.get("id") == "node-5")
     template = prompt_node.get("data", {}).get("pinDefaults", {}).get("template", "")
     assert isinstance(template, str) and "dcterms:hasPart" in template and "dcterms:isPartOf" in template
-

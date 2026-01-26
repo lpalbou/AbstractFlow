@@ -671,20 +671,21 @@ def create_visual_runner(
                 else:
                     llm_kwargs["timeout"] = timeout_s
 
-        # Default output token cap for web-hosted runs.
+        # Output token budget for web-hosted runs.
         #
-        # Without an explicit max_output_tokens, agent-style loops can produce very long
-        # responses that are both slow (local inference) and unhelpful for a visual UI
-        # (tools should write files; the model should not dump huge blobs into chat).
+        # Contract: do not impose an arbitrary default cap here. When unset, the runtime/provider
+        # uses the model's declared capabilities (`model_capabilities.json`) for its defaults.
+        #
+        # Operators can still override via env (including disabling by setting <=0 / "unlimited").
         max_out_raw = os.getenv("ABSTRACTFLOW_LLM_MAX_OUTPUT_TOKENS") or os.getenv("ABSTRACTFLOW_MAX_OUTPUT_TOKENS")
         max_out: Optional[int] = None
         if max_out_raw is None or not str(max_out_raw).strip():
-            max_out = 4096
+            max_out = None
         else:
             try:
                 max_out = int(str(max_out_raw).strip())
             except Exception:
-                max_out = 4096
+                max_out = None
         if isinstance(max_out, int) and max_out <= 0:
             max_out = None
 
