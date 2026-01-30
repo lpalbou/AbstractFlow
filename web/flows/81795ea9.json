@@ -31,6 +31,11 @@
             "type": "boolean"
           },
           {
+            "id": "memory",
+            "label": "memory",
+            "type": "memory"
+          },
+          {
             "id": "context",
             "label": "context",
             "type": "object"
@@ -90,7 +95,6 @@
           "provider": "lmstudio",
           "model": "qwen/qwen3-next-80b",
           "use_context": false,
-          "max_iterations": 20,
           "temperature": 0.7,
           "seed": -1,
           "tools": [
@@ -103,7 +107,8 @@
             "search_files",
             "web_search",
             "write_file"
-          ]
+          ],
+          "max_iterations": 5
         }
       },
       "label": null,
@@ -188,6 +193,12 @@
             "label": "context",
             "type": "object",
             "description": "Optional explicit context object for the agent (e.g. {messages:[...]}). If provided, it can override inherited run context."
+          },
+          {
+            "id": "memory",
+            "label": "memory",
+            "type": "memory",
+            "description": "Memory configuration object (KG/span/session controls). If set, overrides this node’s recall/ingest behavior; if unset, runtime defaults apply."
           },
           {
             "id": "provider",
@@ -571,5 +582,5 @@
   ],
   "entryNode": "node-1",
   "created_at": "2026-01-10T03:16:28.522693",
-  "updated_at": "2026-01-16T13:41:16.354013"
+  "updated_at": "2026-01-26T15:25:10.144125"
 }

@@ -1443,7 +1443,7 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
           kg_min_score: 0.35,
           kg_write_scope: 'session',
           kg_domain_focus: '',
-          kg_max_out_tokens: 700,
+          kg_max_out_tokens: 0,
         },
       }),
     ...(template.type === 'json_schema' && {
