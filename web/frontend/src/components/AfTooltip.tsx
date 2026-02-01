@@ -191,7 +191,6 @@ export function AfTooltip({
       left: pos?.left ?? 0,
       top: pos?.top ?? 0,
       maxWidth: Math.max(120, maxWidthPx),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ['--af-tooltip-arrow-left' as any]: `${pos?.arrowLeftPct ?? 50}%`,
     };
 
@@ -259,5 +258,4 @@ export function AfTooltip({
 }
 
 export default AfTooltip;
-
 

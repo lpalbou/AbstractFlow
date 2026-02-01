@@ -100,7 +100,6 @@ const DEFAULT_CLONE_OFFSET: Point = { x: 40, y: 40 };
 function deepClone<T>(value: T): T {
   // Flow node data is expected to be JSON-serializable. Prefer structuredClone if available.
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sc = (globalThis as any).structuredClone as ((v: unknown) => unknown) | undefined;
     if (typeof sc === 'function') return sc(value) as T;
   } catch {
