@@ -22,10 +22,14 @@
       "@abstractuic/monitor-flow/*": ["../../../abstractuic/monitor-flow/src/*"],
       "@abstractuic/monitor-active-memory": ["../../../abstractuic/monitor-active-memory/src/index.ts"],
       "@abstractuic/monitor-active-memory/*": ["../../../abstractuic/monitor-active-memory/src/*"],
+      "@abstractuic/ui-kit": ["../../../abstractuic/ui-kit/src/index.ts"],
+      "@abstractuic/ui-kit/*": ["../../../abstractuic/ui-kit/src/*"],
       "@abstractutils/monitor-gpu": ["../../../abstractuic/monitor-gpu/src/index.d.ts"],
       "reactflow": ["./node_modules/reactflow/dist/esm/index.d.ts"],
       "reactflow/*": ["./node_modules/reactflow/*"],
       "react": ["./node_modules/@types/react/index.d.ts"],
+      "react-dom": ["./node_modules/@types/react-dom/index.d.ts"],
+      "react-dom/client": ["./node_modules/@types/react-dom/client.d.ts"],
       "react/jsx-runtime": ["./node_modules/@types/react/jsx-runtime.d.ts"],
       "react/jsx-dev-runtime": ["./node_modules/@types/react/jsx-dev-runtime.d.ts"]
     }

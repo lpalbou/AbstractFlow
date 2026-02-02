@@ -140,7 +140,7 @@ async function saveFlow(
   return response.json();
 }
 
-export function Toolbar() {
+export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void }) {
   const queryClient = useQueryClient();
   const {
     flowId,
@@ -718,6 +718,15 @@ export function Toolbar() {
           aria-label="Open connection settings"
         >
           🔌 Connect
+        </button>
+
+        <button
+          className="toolbar-button"
+          onClick={() => onOpenAppearance?.()}
+          title="Appearance (theme + typography)"
+          aria-label="Open appearance settings"
+        >
+          🎨
         </button>
 
         {/* Status indicator */}

@@ -13,18 +13,6 @@
 
 /* Variables */
 :root {
-  /* Colors */
-  --bg-primary: #1a1a2e;
-  --bg-secondary: #16213e;
-  --bg-tertiary: #0f3460;
-  --text-primary: #eee;
-  --text-secondary: #aaa;
-  --text-muted: #666;
-  --accent: #e94560;
-  --success: #27ae60;
-  --warning: #f39c12;
-  --error: #e74c3c;
-
   /* Blueprint colors */
   --pin-execution: #ffffff;
   --pin-string: #ff00ff;
@@ -35,14 +23,8 @@
   --pin-agent: #4488ff;
   --pin-any: #888888;
 
-  /* Sizes */
-  --header-height: 48px;
-  --footer-height: 32px;
+  /* Layout */
   --sidebar-width: 240px;
-
-  /* Fonts */
-  --font-mono: 'Fira Code', 'Consolas', monospace;
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 /* Body */
@@ -52,7 +34,8 @@ body,
   height: 100%;
   width: 100%;
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
   color: var(--text-primary);
   background-color: var(--bg-primary);
   overflow: hidden;

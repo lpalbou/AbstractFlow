@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import App from './App';
+import '@abstractuic/ui-kit/theme.css';
 import './styles/index.css';
 import './styles/nodes.css';
 import './styles/palette.css';
