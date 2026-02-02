@@ -88,7 +88,7 @@
   padding: 8px 12px;
   border-radius: 4px 4px 0 0;
   font-weight: 600;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: #fff;
@@ -107,7 +107,7 @@
   top: 6px;
   right: 34px; /* leave space for exec-out pin on the far right */
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--font-size-xxs);
   padding: 2px 7px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -173,7 +173,7 @@
 }
 
 .exec-branch .pin-label {
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   color: var(--text-secondary);
   text-transform: capitalize;
 }
@@ -202,7 +202,7 @@
 
 .exec-add-pin .pin-label {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   text-transform: none;
 }
 
@@ -232,7 +232,7 @@
 }
 
 .node-icon {
-  font-size: 14px;
+  font-size: var(--font-size-base);
 }
 
 .node-title {
@@ -266,7 +266,7 @@
 
 .node-code-edit-button {
   padding: 6px 10px;
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.14);
 }
@@ -283,7 +283,7 @@
 }
 
 .node-config-label {
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   color: var(--text-secondary);
   flex: 0 0 auto;
   min-width: 5ch;
@@ -339,7 +339,7 @@
   max-width: 120px;
   height: 20px;
   padding: 0 6px;
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(0, 0, 0, 0.22);
@@ -355,7 +355,7 @@
 }
 
 .pin-label {
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   color: var(--text-secondary);
 }
 
@@ -406,7 +406,7 @@
 .code-preview {
   padding: 8px;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--font-size-xxs);
   color: var(--text-secondary);
   background: #1e1e1e;
   margin: 0;

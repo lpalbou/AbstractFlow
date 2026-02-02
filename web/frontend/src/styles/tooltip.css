@@ -30,7 +30,7 @@
   border: 1px solid rgba(255, 255, 255, 0.14);
   color: rgba(255, 255, 255, 0.94);
 
-  font-size: 13px;
+  font-size: var(--font-size-md);
   line-height: 1.45;
   white-space: pre-wrap;
 
