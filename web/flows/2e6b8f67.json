@@ -215,16 +215,9 @@
         "literalValue": {
           "name": "list_emails",
           "arguments": {
-            "name": "list_emails",
-            "arguments": {
-              "imap_host": "imap.mail.ovh.net",
-              "imap_port": 993,
-              "username": "alpha@abstractcore.ai",
-              "password_env_var": "ABSTRACT_GMAIL_PASSWD",
-              "since": "1d",
-              "status": "unread",
-              "limit": 20
-            }
+            "since": "1d",
+            "status": "unread",
+            "limit": 20
           }
         }
       },

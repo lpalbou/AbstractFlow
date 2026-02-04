@@ -215,17 +215,9 @@
         "literalValue": {
           "name": "send_email",
           "arguments": {
-            "name": "send_email",
-            "arguments": {
-              "smtp_host": "smtp.mail.ovh.net",
-              "smtp_port": 465,
-              "use_starttls": false,
-              "username": "alpha@abstractcore.ai",
-              "password_env_var": "ABSTRACT_GMAIL_PASSWD",
-              "to": "lpalbou@gmail.com",
-              "subject": "[MNEMOSYNE] : <short_subject>",
-              "body_text": "<message>"
-            }
+            "to": "lpalbou@gmail.com",
+            "subject": "[MNEMOSYNE] : <short_subject>",
+            "body_text": "<message>"
           }
         }
       },
