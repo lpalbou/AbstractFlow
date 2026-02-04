@@ -39,9 +39,9 @@ For agent-based flows:
     >>> result = runner.run({"context": {"task": "Build a REST API"}})
 """
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 __author__ = "Laurent-Philippe Albou"
-__email__ = "contact@abstractcore.ai"
+__email__ = "contact@abstractflow.ai"
 __license__ = "MIT"
 
 # Core classes

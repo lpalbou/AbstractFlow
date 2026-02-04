@@ -4,7 +4,7 @@ This guide covers the two primary ways to use AbstractFlow:
 - **Programmatic flows** (`Flow` + `FlowRunner`)
 - **Visual flows** (portable `VisualFlow` JSON authored by the editor in `web/`)
 
-See also: `docs/visualflow.md`, `docs/web-editor.md`, `docs/cli.md`, `docs/architecture.md`.
+See also: `docs/README.md`, `docs/api.md`, `docs/faq.md`, `docs/visualflow.md`, `docs/web-editor.md`, `docs/cli.md`, `docs/architecture.md`.
 
 ## Requirements
 
@@ -90,6 +90,8 @@ Evidence:
 ## Run the visual editor (from source)
 
 The editor is a reference/dev app in `web/` (FastAPI backend + React frontend). Follow: `docs/web-editor.md`.
+
+Tip: install the backend deps from the repo root with `pip install -e ".[server,agent]"`.
 
 ## Workflow bundles (`.flow`)
 

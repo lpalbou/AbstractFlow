@@ -6,7 +6,7 @@ Entry point:
 - `abstractflow` (declared in `pyproject.toml` → `project.scripts`)
 - implementation: `abstractflow/cli.py`
 
-See also: `docs/visualflow.md`, `docs/getting-started.md`, `docs/architecture.md`.
+See also: `docs/getting-started.md`, `docs/faq.md`, `docs/visualflow.md`, `docs/architecture.md`.
 
 ## WorkflowBundle (.flow)
 

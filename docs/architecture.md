@@ -9,7 +9,7 @@ AbstractFlow is a workflow authoring + orchestration layer built on:
 - **AbstractAgent** (optional): Agent node subworkflows (ReAct)
 - **AbstractMemory** (optional): memory/KG nodes
 
-See also: `docs/getting-started.md`, `docs/visualflow.md`, `docs/web-editor.md`, `docs/cli.md`.
+See also: `docs/getting-started.md`, `docs/api.md`, `docs/faq.md`, `docs/visualflow.md`, `docs/web-editor.md`, `docs/cli.md`.
 
 ## Repository layout (what ships where)
 

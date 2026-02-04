@@ -6,7 +6,7 @@ The schema lives in `abstractflow/visual/models.py` (Pydantic models). Any host 
 - load/validate the JSON into `VisualFlow`
 - execute it using `abstractflow.visual` helpers
 
-See also: `docs/getting-started.md`, `docs/web-editor.md`, `docs/architecture.md`.
+See also: `docs/getting-started.md`, `docs/faq.md`, `docs/web-editor.md`, `docs/architecture.md`.
 
 ## Minimal schema (what to expect)
 

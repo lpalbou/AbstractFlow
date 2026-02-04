@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **AbstractCode UI event demo flows** (`abstractflow/web/flows/*.json`):
+- **AbstractCode UI event demo flows** (`web/flows/*.json`):
   - `acagent_message_demo.json`: `abstractcode.message`
   - `acagent_ask_demo.json`: durable ask+wait via `wait_event.prompt`
   - `acagent_tool_events_demo.json`: `abstractcode.tool_execution` + `abstractcode.tool_result`
@@ -24,6 +24,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **FlowRunner SUBWORKFLOW auto-drive**: `FlowRunner.run()` no longer hangs if the runtime registry contains only subworkflow specs (common in unit tests). It now falls back to the runner’s own root `WorkflowSpec` when resuming/bubbling parents.
+
+## [0.3.1] - 2026-02-04
+
+### Added
+- **User-facing documentation set** for public release:
+  - Core docs: `README.md`, `docs/getting-started.md`, `docs/architecture.md`, `docs/api.md`, `docs/faq.md`
+  - Repo policies: `CONTRIBUTING.md`, `SECURITY.md`, `ACKNOWLEDMENTS.md`
+  - Agentic index: `llms.txt`, `llms-full.txt`
+
+### Changed
+- **Documentation accuracy + structure**: refreshed docs to match the implemented code (VisualFlow portability, runtime wiring, CLI bundle tooling, web editor layout) and improved cross-references for first-time users.
 
 ## [0.3.0] - 2025-01-06
 
@@ -136,7 +147,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Run history replay synthesizes missing `node_complete` events for steps left open in durable ledger
 - **Canvas Highlighting**: Robust to fast child-run emissions (race with `node_start` before `runId` state update fixed)
 - **WebSocket Subworkflow Waits**: Correctly close waiting node when run resumes past `WAITING(reason=SUBWORKFLOW)`
-- **Web Run History**: Reliably shows persisted runs regardless of server working directory (backend defaults to `abstractflow/web/runtime` unless `ABSTRACTFLOW_RUNTIME_DIR` set)
+- **Web Run History**: Reliably shows persisted runs regardless of server working directory (backend defaults to `web/runtime` unless `ABSTRACTFLOW_RUNTIME_DIR` set)
 - **Cancel Run**: No longer surfaces as `flow_error` from `asyncio.CancelledError` (treated as expected control-plane operation)
 - **Markdown Code Blocks**: "Copy" now copies original raw code (preserves newlines/indentation) after syntax highlighting
 
@@ -150,15 +161,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 12 new example workflow JSON files in `web/flows/`
 
 ### Notes
-- In this monorepo, `abstractflow` contains a working Flow compiler/runner and VisualFlow execution utilities. Packaging/docs alignment is tracked in `docs/backlog/planned/093-framework-packaging-alignment-flow-runtime.md`.
-
-### Planned
-- Visual workflow editor with drag-and-drop interface
-- Real-time workflow execution and monitoring
-- Integration with AbstractCore for multi-provider LLM support
-- Custom node development SDK
-- Cloud deployment capabilities
-- Collaborative workflow development features
+- This repository includes the published Python package (`abstractflow/`) and a reference visual editor app (`web/`).
 
 ## [0.1.0] - 2025-01-15
 
@@ -173,4 +176,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - This is a placeholder release to secure the `abstractflow` name on PyPI
 - No functional code is included in this version
 - Follow the GitHub repository for development updates and release timeline
-

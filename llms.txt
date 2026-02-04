@@ -11,6 +11,8 @@ Use this file as a curated index for LLM/agentic tooling:
 
 - [README](README.md): What AbstractFlow is + install + quickstarts
 - [Getting started](docs/getting-started.md): Programmatic + VisualFlow execution
+- [FAQ](docs/faq.md): Common questions (external users)
+- [API reference](docs/api.md): Public Python API overview
 - [Docs index](docs/README.md): Documentation map
 
 ## Formats
@@ -46,7 +48,14 @@ Use this file as a curated index for LLM/agentic tooling:
 - [Bundle tests](tests/test_workflow_bundle_pack.py): `.flow` packing semantics + compilation checks
 - [WebSocket execution tests](tests/test_visual_ws_subflow.py): WS run/resume + subflow waits
 
+## Support
+
+- [Security policy](SECURITY.md): How to report vulnerabilities responsibly
+- [Contributing](CONTRIBUTING.md): Dev setup, tests, and contribution guidelines
+
 ## Optional
 
+- [Full context pack](llms-full.txt): Concatenated docs for offline use (generated)
+- [Pack generator](scripts/generate_llms_full.py): Regenerate `llms-full.txt`
 - [Changelog](CHANGELOG.md)
 - [Sample flows](web/flows): Example VisualFlow JSON documents used by the web editor

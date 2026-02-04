@@ -6,7 +6,7 @@ This repository includes a reference visual editor:
 
 It is intended for development and as a reference host for executing VisualFlows. It is not packaged as an installable Python module on PyPI.
 
-See also: `docs/getting-started.md`, `docs/visualflow.md`, `docs/architecture.md`.
+See also: `docs/getting-started.md`, `docs/faq.md`, `docs/visualflow.md`, `docs/architecture.md`.
 
 ## Run (dev mode)
 

@@ -22,9 +22,11 @@ Evidence (code): `abstractflow/runner.py`, `abstractflow/visual/executor.py`, `a
 ## Docs
 
 - Start here: `docs/getting-started.md`
+- API reference: `docs/api.md`
 - VisualFlow format: `docs/visualflow.md`
 - Visual editor: `docs/web-editor.md`
 - CLI: `docs/cli.md`
+- FAQ: `docs/faq.md`
 - Architecture: `docs/architecture.md`
 - Docs index: `docs/README.md`
 
@@ -109,6 +111,22 @@ See `docs/cli.md` and `abstractflow/cli.py`.
 - AbstractRuntime (durable execution kernel): https://github.com/lpalbou/AbstractRuntime
 - AbstractCore (providers/models/tools): https://github.com/lpalbou/AbstractCore
 - AbstractAgent (ReAct/CodeAct): https://github.com/lpalbou/AbstractAgent
+
+## Changelog
+
+See `CHANGELOG.md`.
+
+## Contributing
+
+See `CONTRIBUTING.md`.
+
+## Security
+
+See `SECURITY.md`.
+
+## Acknowledgments
+
+See `ACKNOWLEDMENTS.md`.
 
 ## License
 
