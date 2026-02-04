@@ -726,16 +726,16 @@
             ],
             "tasks": [
               {
-                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/338-abstractcode-thin-client-ux-and-subworkflow-wait-fix.md'. Extract the main goal, technical approach, and implications."
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/completed/338-abstractcode-thin-client-ux-and-subworkflow-wait-fix.md'. Extract the main goal, technical approach, and implications."
               },
               {
-                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/322-framework-workflow-dsl-documentation-visualflow-and-workflowartifact.md'. Extract the main goal, technical approach, and implications."
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/322-framework-workflow-dsl-documentation-visualflow-and-effect-contracts.md'. Extract the main goal, technical approach, and implications."
               },
               {
                 "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/completed/311-abstractruntime-run-history-bundle-and-workflow-snapshot.md'. Extract the main goal, technical approach, and implications."
               },
               {
-                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/315-framework-workflow-registry-publish-install-and-interface-discovery.md'. Extract the main goal, technical approach, and implications."
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/completed/315-framework-workflow-registry-publish-install-and-interface-discovery.md'. Extract the main goal, technical approach, and implications."
               },
               {
                 "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/301-framework-empty-llm-response-recovery-and-reviewer-validation.md'. Extract the main goal, technical approach, and implications."
@@ -759,7 +759,7 @@
                 "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/266-abstractmemory-typed-memory-blocks-and-multimodal.md'. Extract the main goal, technical approach, and implications."
               },
               {
-                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/207-abstractcore-qwen3-thinking-mode-control.md'. Extract the main goal, technical approach, and implications."
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/completed/207-abstractcore-qwen3-thinking-mode-control.md'. Extract the main goal, technical approach, and implications."
               },
               {
                 "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/042-abstractagent-remember-notes-tool.md'. Extract the main goal, technical approach, and implications."
@@ -792,7 +792,7 @@
                 "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/177-framework-agent-host-pool.md'. Extract the main goal, technical approach, and implications."
               },
               {
-                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/316-framework-pypi-install-matrix-and-deps-audit.md'. Extract the main goal, technical approach, and implications."
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/completed/316-framework-pypi-install-matrix-and-deps-audit.md'. Extract the main goal, technical approach, and implications."
               },
               {
                 "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/310-framework-backlog-hygiene-renumber-and-metadata.md'. Extract the main goal, technical approach, and implications."
@@ -855,7 +855,7 @@
                 "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/115-abstractflow-evidence-ux-and-evidence-nodes.md'. Extract the main goal, technical approach, and implications."
               },
               {
-                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/158-framework-workflow-declared-dependencies-and-multi-language-code-nodes.md'. Extract the main goal, technical approach, and implications."
+                "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/184-framework-workflow-declared-dependencies-and-multi-language-code-nodes.md'. Extract the main goal, technical approach, and implications."
               },
               {
                 "user_prompt": "Read and summarize the file '/Users/albou/abstractframework/docs/backlog/planned/156-framework-react-delegation-minimal-context-subcalls.md'. Extract the main goal, technical approach, and implications."
