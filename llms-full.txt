@@ -1,0 +1,623 @@
+# AbstractFlow (Full Context)
+
+> A single-file documentation pack for offline/agentic consumption. Prefer `llms.txt` to jump to authoritative sources when you can follow files directly.
+
+---
+file: README.md
+---
+
+# AbstractFlow
+
+Diagram-based, **durable** AI workflows for Python.
+
+AbstractFlow provides:
+- A portable workflow format (`VisualFlow` JSON) and helpers to execute it from any host (`abstractflow.visual`).
+- A simple programmatic API (`Flow`, `FlowRunner`) backed by **AbstractRuntime**.
+- A reference visual editor app in `web/` (FastAPI backend + React frontend).
+
+Project status: **Pre-alpha** (`pyproject.toml`: `Development Status :: 2 - Pre-Alpha`). Expect breaking changes.
+
+## Capabilities (implemented)
+
+- Execute programmatic flows (`Flow` → `FlowRunner`) with a default in-memory runtime.
+- Execute portable `VisualFlow` JSON from any host process (`abstractflow.visual`).
+- Durable waits and resumption via AbstractRuntime (e.g. user/event/schedule waits).
+- Package a flow tree as a WorkflowBundle (`.flow`) via the CLI.
+- Author/run VisualFlows in the reference web editor (`web/`).
+
+Evidence (code): `abstractflow/runner.py`, `abstractflow/visual/executor.py`, `abstractflow/cli.py`, `web/backend/routes/ws.py`.
+
+## Docs
+
+- Start here: `docs/getting-started.md`
+- VisualFlow format: `docs/visualflow.md`
+- Visual editor: `docs/web-editor.md`
+- CLI: `docs/cli.md`
+- Architecture: `docs/architecture.md`
+- Docs index: `docs/README.md`
+
+## Installation
+
+```bash
+pip install abstractflow
+```
+
+Requirements: Python **3.10+** (`pyproject.toml`: `requires-python`).
+
+Optional extras:
+- Agent nodes (ReAct workflows): `pip install "abstractflow[agent]"`
+- Dev tools (tests/formatting): `pip install "abstractflow[dev]"`
+
+Notes:
+- `abstractflow` depends on `AbstractRuntime` and `abstractcore[tools]` (see `pyproject.toml`).
+- Some VisualFlow node types require additional packages (e.g. `memory_kg_*` nodes need `abstractmemory`).
+
+## Quickstart (programmatic)
+
+```python
+from abstractflow import Flow, FlowRunner
+
+flow = Flow("linear")
+flow.add_node("double", lambda x: x * 2, input_key="value", output_key="doubled")
+flow.add_node("add_ten", lambda x: x + 10, input_key="doubled", output_key="final")
+flow.add_edge("double", "add_ten")
+flow.set_entry("double")
+
+result = FlowRunner(flow).run({"value": 5})
+print(result)  # {"success": True, "result": 20}
+```
+
+## Quickstart (execute a VisualFlow JSON)
+
+```python
+import json
+from abstractflow.visual import VisualFlow, execute_visual_flow
+
+with open("my-flow.json", "r", encoding="utf-8") as f:
+    vf = VisualFlow.model_validate(json.load(f))
+result = execute_visual_flow(vf, {"prompt": "Hello"}, flows={vf.id: vf})
+print(result)  # {"success": True, "waiting": False, "result": ...}
+```
+
+If your flow uses subflows, load all referenced `*.json` into the `flows={...}` mapping (see `docs/getting-started.md`).
+
+## Visual editor (from source)
+
+The visual editor is a dev/reference app in `web/` (not shipped as a Python package on PyPI).
+
+```bash
+git clone https://github.com/lpalbou/AbstractFlow.git
+cd AbstractFlow
+
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[server,agent]"
+
+# Terminal 1: Backend (FastAPI)
+cd web && python -m backend --reload --port 8080
+
+# Terminal 2: Frontend (Vite)
+cd web/frontend && npm install && npm run dev
+```
+
+Open the frontend at http://localhost:3003 (default Vite port). See `docs/web-editor.md`.
+
+## CLI (WorkflowBundle `.flow`)
+
+```bash
+abstractflow bundle pack web/flows/ac-echo.json --out /tmp/ac-echo.flow
+abstractflow bundle inspect /tmp/ac-echo.flow
+abstractflow bundle unpack /tmp/ac-echo.flow --dir /tmp/ac-echo
+```
+
+See `docs/cli.md` and `abstractflow/cli.py`.
+
+## Related projects
+
+- AbstractRuntime (durable execution kernel): https://github.com/lpalbou/AbstractRuntime
+- AbstractCore (providers/models/tools): https://github.com/lpalbou/AbstractCore
+- AbstractAgent (ReAct/CodeAct): https://github.com/lpalbou/AbstractAgent
+
+## License
+
+MIT. See `LICENSE`.
+
+---
+file: docs/README.md
+---
+
+# AbstractFlow documentation
+
+AbstractFlow is a Python library + reference UI for authoring and executing **durable** AI workflows.
+
+## Read this first
+
+- Project overview + install: `README.md`
+- Getting started (install + quickstarts): `docs/getting-started.md`
+- VisualFlow JSON format (portable workflow document): `docs/visualflow.md`
+- Visual editor (FastAPI + React dev app): `docs/web-editor.md`
+- CLI (`abstractflow bundle …`): `docs/cli.md`
+- Architecture (how the pieces fit): `docs/architecture.md`
+
+## Code map (evidence)
+
+- Public Python API: `abstractflow/__init__.py`
+- Programmatic flows: `abstractflow/core/flow.py` (re-export from AbstractRuntime)
+- Flow execution: `abstractflow/runner.py` (`FlowRunner`)
+- VisualFlow schema: `abstractflow/visual/models.py` (`VisualFlow`, `VisualNode`, `NodeType`, …)
+- VisualFlow execution wiring: `abstractflow/visual/executor.py` (`create_visual_runner`, `execute_visual_flow`)
+- VisualFlow interfaces/contracts: `abstractflow/visual/interfaces.py`
+- CLI entrypoint: `abstractflow/cli.py`
+- WorkflowBundle utilities: `abstractflow/workflow_bundle.py` (delegates to `abstractruntime.workflow_bundle`)
+- Web backend: `web/backend/main.py`, `web/backend/routes/*`
+- Web frontend: `web/frontend/src/*`
+
+---
+file: docs/getting-started.md
+---
+
+# Getting started
+
+This guide covers the two primary ways to use AbstractFlow:
+- **Programmatic flows** (`Flow` + `FlowRunner`)
+- **Visual flows** (portable `VisualFlow` JSON authored by the editor in `web/`)
+
+See also: `docs/visualflow.md`, `docs/web-editor.md`, `docs/cli.md`, `docs/architecture.md`.
+
+## Requirements
+
+- Python **3.10+** (`pyproject.toml`: `requires-python`)
+
+## Install
+
+```bash
+# From PyPI
+pip install abstractflow
+```
+
+Optional extras:
+- Agent nodes (ReAct workflows): `pip install "abstractflow[agent]"`
+- Dev tools: `pip install "abstractflow[dev]"`
+
+From source (repo root):
+
+```bash
+pip install -e .
+```
+
+Evidence: dependencies and extras are declared in `pyproject.toml`.
+
+## Programmatic flow (FlowRunner)
+
+```python
+from abstractflow import Flow, FlowRunner
+
+flow = Flow("linear")
+flow.add_node("double", lambda x: x * 2, input_key="value", output_key="doubled")
+flow.add_node("add_ten", lambda x: x + 10, input_key="doubled", output_key="final")
+flow.add_edge("double", "add_ten")
+flow.set_entry("double")
+
+print(FlowRunner(flow).run({"value": 5}))
+# {"success": True, "result": 20}
+```
+
+Evidence:
+- `Flow` / `FlowNode` / `FlowEdge` are re-exported from AbstractRuntime: `abstractflow/core/flow.py`
+- `FlowRunner` output normalization is implemented in `abstractflow/runner.py`
+- Baseline behavior is covered in `tests/test_runner.py`
+
+## Execute a VisualFlow JSON
+
+Visual flows are JSON documents matching the Pydantic models in `abstractflow/visual/models.py`.
+
+Minimal example (single flow, no subflows):
+
+```python
+import json
+from abstractflow.visual import VisualFlow, execute_visual_flow
+
+with open("my-flow.json", "r", encoding="utf-8") as f:
+    vf = VisualFlow.model_validate(json.load(f))
+print(execute_visual_flow(vf, {"prompt": "Hello"}, flows={vf.id: vf}))
+```
+
+If your flow uses subflows:
+- load **all referenced** `*.json` flows into the `flows={flow_id: VisualFlow}` mapping, or
+- package them as a WorkflowBundle (`.flow`) and load via AbstractRuntime (see `docs/cli.md`).
+
+Convenient loader:
+
+```python
+from pathlib import Path
+import json
+from abstractflow.visual import VisualFlow
+
+def load_flows(dir_path: str) -> dict[str, VisualFlow]:
+    flows: dict[str, VisualFlow] = {}
+    for p in Path(dir_path).glob("*.json"):
+        vf = VisualFlow.model_validate(json.loads(p.read_text(encoding="utf-8")))
+        flows[vf.id] = vf
+    return flows
+```
+
+Evidence:
+- VisualFlow execution wiring lives in `abstractflow/visual/executor.py` (`create_visual_runner`, `execute_visual_flow`)
+- Subflow reachability / registry behavior is exercised in `tests/test_visual_subflow_*.py`
+
+## Run the visual editor (from source)
+
+The editor is a reference/dev app in `web/` (FastAPI backend + React frontend). Follow: `docs/web-editor.md`.
+
+## Workflow bundles (`.flow`)
+
+To package a VisualFlow + subflows into a single file, use the CLI:
+- `docs/cli.md`
+
+## Waiting runs (durable asks/events/schedules)
+
+Some flows intentionally block waiting for external input (e.g. `ask_user`, `wait_event`, `wait_until`).
+
+- `FlowRunner.run()` returns `{"waiting": True, "state": <RunState>, ...}` when blocked (`abstractflow/runner.py`).
+- `execute_visual_flow()` returns a friendly shape including `waiting`, `wait_key`, and optional UX fields (`prompt`, `choices`, `allow_free_text`) (`abstractflow/visual/executor.py`).
+  - Note: waiting results are reported as `success: False` with an `error` message (the run is not “failed”; it is blocked on input).
+
+To resume a run you need a host that can call `Runtime.resume(...)` (the web editor does this via WebSocket; see `docs/web-editor.md`).
+
+---
+file: docs/visualflow.md
+---
+
+# VisualFlow (portable JSON workflow format)
+
+`VisualFlow` is the portable workflow document produced by the visual editor in `web/frontend/` and persisted by the backend in `web/backend/`.
+
+The schema lives in `abstractflow/visual/models.py` (Pydantic models). Any host can:
+- load/validate the JSON into `VisualFlow`
+- execute it using `abstractflow.visual` helpers
+
+See also: `docs/getting-started.md`, `docs/web-editor.md`, `docs/architecture.md`.
+
+## Minimal schema (what to expect)
+
+- `VisualFlow`
+  - `id: str`
+  - `name: str`, `description: str`
+  - `interfaces: list[str]` (optional host contracts)
+  - `nodes: list[VisualNode]`, `edges: list[VisualEdge]`
+  - `entryNode: str | null` (optional, Blueprint-style execution root)
+- `VisualNode`
+  - `id: str`, `type: NodeType`, `position: {x,y}`
+  - `data: dict` (node config + pin metadata)
+- `VisualEdge`
+  - `source`, `sourceHandle`, `target`, `targetHandle`
+
+Evidence: `abstractflow/visual/models.py`.
+
+## Node types and pins
+
+- The full list of node types is `NodeType` in `abstractflow/visual/models.py`.
+- Pin types are `PinType` in `abstractflow/visual/models.py` (and mirrored for UI concerns in `web/frontend/src/types/flow.ts`).
+
+Two edge “kinds” are used by convention:
+- **Execution edges**: connect to the target handle `exec-in` (Blueprint-style control flow).
+- **Data edges**: connect non-exec handles and carry values between pins.
+
+Evidence:
+- VisualFlow runner wiring uses execution-graph reachability (`targetHandle == "exec-in"`) in `abstractflow/visual/executor.py`.
+- UI colors data edges by pin type in `web/frontend/src/components/Canvas.tsx`.
+
+Note on pins in saved JSON:
+- The editor persists pin definitions under `node.data.inputs` / `node.data.outputs`.
+- The top-level `node.inputs` / `node.outputs` fields may be present but empty.
+
+Evidence: `abstractflow/visual/interfaces.py` (`_pin_types` reads `node.data.*`) and sample flows in `web/flows/*.json`.
+
+## Subflows
+
+Subflows are regular VisualFlows referenced by id from a node of type `subflow`.
+
+Convention:
+- `node.type == "subflow"`
+- `node.data["subflowId"]` holds the referenced flow id (legacy key `flowId` is tolerated).
+
+Evidence:
+- Runner wiring resolves subflows in `abstractflow/visual/executor.py` (`subflowId` / legacy `flowId`)
+- Bundle packing is delegated to AbstractRuntime via `abstractflow/workflow_bundle.py` (see `tests/test_workflow_bundle_pack.py`).
+- Tests: `tests/test_visual_subflow_*.py`, `tests/test_workflow_bundle_pack.py`
+
+## Interfaces (optional host contracts)
+
+`VisualFlow.interfaces` is a list of interface markers a host can interpret as “this workflow supports a known IO contract”.
+
+AbstractFlow ships:
+- `abstractcode.agent.v1` (`ABSTRACTCODE_AGENT_V1`) with validators and scaffolding helpers
+
+Evidence: `abstractflow/visual/interfaces.py`.
+
+---
+file: docs/web-editor.md
+---
+
+# Visual editor (reference app in `web/`)
+
+This repository includes a reference visual editor:
+- FastAPI backend: `web/backend/`
+- React frontend: `web/frontend/`
+
+It is intended for development and as a reference host for executing VisualFlows. It is not packaged as an installable Python module on PyPI.
+
+See also: `docs/getting-started.md`, `docs/visualflow.md`, `docs/architecture.md`.
+
+## Run (dev mode)
+
+Terminal 1 (backend):
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[server,agent]"
+
+cd web
+python -m backend --reload --port 8080
+```
+
+Terminal 2 (frontend):
+
+```bash
+cd web/frontend
+npm install
+npm run dev
+```
+
+Open:
+- Frontend: http://localhost:3003 (Vite dev server; see `web/frontend/package.json`)
+- Backend: http://localhost:8080/api/health (FastAPI; see `web/backend/main.py`)
+
+## Run (single-process “production” mode)
+
+Build the frontend and let the backend serve it:
+
+```bash
+cd web/frontend
+npm install
+npm run build
+
+cd ../
+python -m backend --port 8080
+```
+
+Evidence: `web/backend/main.py` serves `web/frontend/dist` when it exists.
+
+## Where data is stored
+
+- Flows: `./flows/*.json` relative to the backend working directory.
+  - If you run the backend from `web/`, that becomes `web/flows/`.
+  - Evidence: `FLOWS_DIR = Path("./flows")` in `web/backend/routes/flows.py`.
+- Runtime persistence (runs/ledger/artifacts): defaults to `web/runtime/`.
+  - Override with `ABSTRACTFLOW_RUNTIME_DIR`.
+  - Evidence: `web/backend/services/runtime_stores.py`.
+
+## Gateway connectivity (optional)
+
+The backend can talk to an AbstractGateway for provider/model catalogs and remote execution.
+
+Common env vars / flags:
+- `ABSTRACTFLOW_GATEWAY_URL` (or `ABSTRACTGATEWAY_URL`)
+- `ABSTRACTGATEWAY_AUTH_TOKEN` (legacy: `ABSTRACTFLOW_GATEWAY_AUTH_TOKEN`)
+- CLI flags: `python -m backend --gateway-url ... --gateway-token ...` (see `web/backend/cli.py`)
+
+Evidence: `web/backend/services/gateway_connection.py`, `abstractflow/visual/executor.py`.
+
+## WebSocket execution
+
+The Run UI uses WebSocket messages:
+- `{ "type": "run", "input_data": {…} }`
+- `{ "type": "resume", "response": "…" }`
+- `{ "type": "control", "action": "pause|resume|cancel", "run_id": "…" }`
+
+Evidence: `web/backend/routes/ws.py`.
+
+---
+file: docs/cli.md
+---
+
+# CLI (`abstractflow`)
+
+AbstractFlow ships a small CLI focused on **WorkflowBundle** (`.flow`) utilities.
+
+Entry point:
+- `abstractflow` (declared in `pyproject.toml` → `project.scripts`)
+- implementation: `abstractflow/cli.py`
+
+See also: `docs/visualflow.md`, `docs/getting-started.md`, `docs/architecture.md`.
+
+## WorkflowBundle (.flow)
+
+A `.flow` file is a zip bundle containing:
+- `manifest.json`
+- `flows/<flow_id>.json` (one or more VisualFlow JSON documents)
+
+Bundling semantics are shared with AbstractRuntime:
+- AbstractFlow CLI uses `abstractruntime.workflow_bundle` under the hood.
+- Evidence: `abstractflow/workflow_bundle.py`, `abstractflow/cli.py`.
+
+## Commands
+
+Pack a bundle from a root VisualFlow JSON (includes referenced subflows as determined by the AbstractRuntime packer):
+
+```bash
+abstractflow bundle pack web/flows/ac-echo.json --out /tmp/ac-echo.flow
+```
+
+Common options (see `abstractflow bundle pack --help`):
+- `--flows-dir <dir>`: where to find `<flow_id>.json` files (defaults to the root file’s directory)
+- `--bundle-id <id>`, `--bundle-version <x.y.z>`
+- `--entrypoint <flow_id>` (repeatable)
+
+Inspect a bundle manifest:
+
+```bash
+abstractflow bundle inspect /tmp/ac-echo.flow
+```
+
+Unpack to a directory:
+
+```bash
+abstractflow bundle unpack /tmp/ac-echo.flow --dir /tmp/ac-echo
+```
+
+Evidence:
+- Delegation to AbstractRuntime: `abstractflow/workflow_bundle.py`
+- CLI implementation: `abstractflow/cli.py`
+- Tests: `tests/test_workflow_bundle_pack.py`
+
+---
+file: docs/architecture.md
+---
+
+# AbstractFlow — Architecture (Current)
+
+> Updated: 2026-02-04  
+> Scope: describes **implemented behavior** in this repository (no roadmap claims).
+
+AbstractFlow is a workflow authoring + orchestration layer built on:
+- **AbstractRuntime**: durable runs, waits, subworkflows, stores (`RunStore`/`LedgerStore`/`ArtifactStore`)
+- **AbstractCore** (via runtime integration): LLM + tool effects
+- **AbstractAgent** (optional): Agent node subworkflows (ReAct)
+- **AbstractMemory** (optional): memory/KG nodes
+
+See also: `docs/getting-started.md`, `docs/visualflow.md`, `docs/web-editor.md`, `docs/cli.md`.
+
+## Repository layout (what ships where)
+
+```
+abstractflow/                  # Published Python package
+  __init__.py                  # Public API exports
+  core/flow.py                 # Flow IR re-export (from AbstractRuntime)
+  runner.py                    # FlowRunner (runtime-backed)
+  compiler.py                  # Compiler shim (delegates to AbstractRuntime)
+  visual/                      # VisualFlow models + portable execution wiring
+  adapters/                    # Adapter re-exports (delegates to AbstractRuntime)
+  cli.py                       # `abstractflow` CLI
+  workflow_bundle.py           # Bundle helpers (delegates to AbstractRuntime)
+docs/                          # Human docs (this folder)
+web/                           # Reference visual editor app (not packaged on PyPI)
+  backend/                     # FastAPI backend (CRUD + websocket execution)
+  frontend/                    # React editor + run UI
+  flows/                       # Default flow storage when running backend from `web/`
+  runtime/                     # Default runtime persistence when running backend from `web/`
+tests/                         # Test suite
+```
+
+## High-level data and execution flow
+
+```mermaid
+flowchart LR
+  subgraph Authoring
+    FE[web/frontend<br/>React editor] -->|save/load VisualFlow JSON| BE[web/backend<br/>FastAPI]
+    BE -->|persists| FLOWS[(web/flows/*.json)]
+  end
+
+  subgraph Execution
+    HOST[Host process<br/>(web backend / CLI / 3rd party)] -->|validate| VF[VisualFlow models<br/>abstractflow/visual/models.py]
+    HOST -->|create_visual_runner| WIRE[Runtime wiring<br/>abstractflow/visual/executor.py]
+    WIRE --> RT[AbstractRuntime Runtime<br/>tick/resume]
+    RT --> STORES[(RunStore / LedgerStore / ArtifactStore)]
+    RT -->|LLM_CALL, TOOL_CALLS| AC[AbstractCore integration]
+    RT -->|START_SUBWORKFLOW| REG[WorkflowRegistry]
+  end
+
+  BE -->|WS: run/resume/control| HOST
+```
+
+## Portable data model: VisualFlow JSON
+
+The portable authoring format is `VisualFlow` (Pydantic models):
+- `VisualFlow`, `VisualNode`, `VisualEdge`, `NodeType`, `PinType`, …
+
+Evidence: `abstractflow/visual/models.py`.
+
+Key portability rule (enforced by design): the JSON must contain enough configuration to execute outside the web backend. Hosts may add storage, auth, and UI around it, but execution should remain host-independent.
+
+## Compilation and execution (portable)
+
+### VisualFlow → Flow IR
+
+AbstractFlow delegates “VisualFlow → Flow IR” semantics to AbstractRuntime:
+- `abstractflow.visual.executor.visual_to_flow()` calls `abstractruntime.visualflow_compiler.visual_to_flow(...)`.
+
+Evidence: `abstractflow/visual/executor.py`.
+
+### Flow IR → WorkflowSpec
+
+AbstractFlow delegates compilation to AbstractRuntime:
+- `abstractflow.compiler.compile_flow` is re-exported from `abstractruntime.visualflow_compiler.compiler`.
+
+Evidence: `abstractflow/compiler.py`.
+
+### Running (FlowRunner)
+
+`FlowRunner` owns host-friendly execution convenience:
+- creates a default in-memory runtime when you don’t provide one
+- normalizes outputs to `{"success": bool, "result": ...}` for callers
+- can auto-drive nested `SUBWORKFLOW` waits in non-interactive contexts
+
+Evidence: `abstractflow/runner.py`, tests in `tests/test_runner.py`.
+
+## VisualFlow execution wiring (host responsibilities)
+
+The key host entrypoint is:
+- `abstractflow.visual.executor.create_visual_runner(...)`
+
+It wires the runtime based on **what is present in the flow tree**:
+- registers subflows/agent workflows when needed (workflow registry)
+- enables artifact storage when memory nodes are present
+- wires AbstractCore effect handlers when LLM/tool nodes are present
+- optionally installs AbstractMemory KG effect handlers when `memory_kg_*` nodes are present
+
+Evidence: `abstractflow/visual/executor.py`.
+
+## Session-scoped events (VisualSessionRunner)
+
+VisualFlows that include custom events (`on_event` / `emit_event`) are executed with a session-aware runner:
+- `VisualSessionRunner` starts derived event-listener workflows as **child runs** in the same session.
+- During `run()`, it also ticks those child runs so `EMIT_EVENT` branches make progress without a separate host loop.
+
+Evidence: `abstractflow/visual/session_runner.py`, wiring in `abstractflow/visual/executor.py`, tests in `tests/test_visual_custom_events.py`.
+
+## Web editor host (FastAPI + WebSockets)
+
+The reference host in `web/` provides:
+- Flow CRUD (`web/backend/routes/flows.py`) storing `./flows/*.json` relative to its working dir
+- Durable stores for runs/ledger/artifacts (`web/backend/services/runtime_stores.py`)
+- WebSocket execution (`web/backend/routes/ws.py`) with message types:
+  - `{ "type": "run", "input_data": {…} }`
+  - `{ "type": "resume", "response": "…" }`
+  - `{ "type": "control", "action": "pause|resume|cancel", "run_id": "…" }`
+
+See `docs/web-editor.md` for run instructions.
+
+## Workflow bundles (`.flow`)
+
+WorkflowBundles package a root VisualFlow JSON plus any referenced subflows into a single `.flow` (zip) file (manifest + flow JSON files).
+
+- CLI: `abstractflow bundle pack|inspect|unpack` (`abstractflow/cli.py`)
+- Implementation delegates to AbstractRuntime: `abstractflow/workflow_bundle.py`
+- Format/packing semantics are owned by AbstractRuntime; AbstractFlow is a thin wrapper.
+
+Evidence: `tests/test_workflow_bundle_pack.py`, `abstractflow/workflow_bundle.py`.
+
+## What AbstractFlow owns vs delegates
+
+**Owns in this repo**
+- VisualFlow schema (`abstractflow/visual/models.py`)
+- Host wiring helpers (`abstractflow/visual/executor.py`, `abstractflow/visual/session_runner.py`)
+- Public runner conveniences (`abstractflow/runner.py`)
+- Reference web editor app (`web/`)
+- CLI wrapper (`abstractflow/cli.py`)
+
+**Delegates to AbstractRuntime**
+- Compilation semantics and builtins (`abstractflow/compiler.py`, `abstractflow/visual/builtins.py`)
+- Adapter implementations (`abstractflow/adapters/*`)
+- WorkflowBundle format and IO (`abstractflow/workflow_bundle.py`)

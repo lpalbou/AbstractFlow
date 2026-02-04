@@ -1,168 +1,145 @@
 # AbstractFlow — Architecture (Current)
 
-> Updated: 2026-01-07  
-> Scope: this describes **what is implemented today** in this monorepo (no “future” design claims).
+> Updated: 2026-02-04  
+> Scope: describes **implemented behavior** in this repository (no roadmap claims).
 
-AbstractFlow is the **workflow authoring + orchestration** layer of the AbstractFramework:
-- **Authoring**: a visual editor produces a portable `VisualFlow` JSON document.
-- **Execution**: hosts compile/execute that JSON using `abstractflow.visual` and **AbstractRuntime**.
-- **Orchestration**: nodes can run LLM calls, tools, agents, subflows, and durable waits (user/events/schedule).
+AbstractFlow is a workflow authoring + orchestration layer built on:
+- **AbstractRuntime**: durable runs, waits, subworkflows, stores (`RunStore`/`LedgerStore`/`ArtifactStore`)
+- **AbstractCore** (via runtime integration): LLM + tool effects
+- **AbstractAgent** (optional): Agent node subworkflows (ReAct)
+- **AbstractMemory** (optional): memory/KG nodes
 
-This document focuses on AbstractFlow’s architecture and how it leverages:
-- `abstractruntime` for durability + effects + run control
-- `abstractcore` for provider/model/tool abstractions (via runtime integrations)
-- `abstractagent` for agent workflows (ReAct/CodeAct) used by the visual Agent node
+See also: `docs/getting-started.md`, `docs/visualflow.md`, `docs/web-editor.md`, `docs/cli.md`.
 
-## High-level component/data flow
+## Repository layout (what ships where)
 
 ```
-             (authoring)                                  (execution)
-┌─────────────────────────────┐                 ┌─────────────────────────────┐
-│ AbstractFlow Web Frontend    │                 │ Host (AbstractFlow backend, │
-│ (React visual editor)        │                 │ AbstractCode, 3rd-party)    │
-│ - edits VisualFlow JSON      │                 │ - loads VisualFlow JSON     │
-└──────────────┬──────────────┘                 │ - compiles to WorkflowSpec  │
-               │ save/load                        │ - ticks Runtime            │
-               ▼                                  └──────────────┬────────────┘
-┌─────────────────────────────┐                               uses│
-│ AbstractFlow Web Backend     │                                   ▼
-│ (FastAPI)                    │                 ┌─────────────────────────────┐
-│ - persists VisualFlow JSON   │                 │ AbstractRuntime               │
-│ - runs flows (WS)            │                 │ - RunStore/Ledger/Artifacts   │
-│ - run history APIs           │                 │ - effects + waits + resume    │
-└─────────────────────────────┘                 └─────────────────────────────┘
+abstractflow/                  # Published Python package
+  __init__.py                  # Public API exports
+  core/flow.py                 # Flow IR re-export (from AbstractRuntime)
+  runner.py                    # FlowRunner (runtime-backed)
+  compiler.py                  # Compiler shim (delegates to AbstractRuntime)
+  visual/                      # VisualFlow models + portable execution wiring
+  adapters/                    # Adapter re-exports (delegates to AbstractRuntime)
+  cli.py                       # `abstractflow` CLI
+  workflow_bundle.py           # Bundle helpers (delegates to AbstractRuntime)
+docs/                          # Human docs (this folder)
+web/                           # Reference visual editor app (not packaged on PyPI)
+  backend/                     # FastAPI backend (CRUD + websocket execution)
+  frontend/                    # React editor + run UI
+  flows/                       # Default flow storage when running backend from `web/`
+  runtime/                     # Default runtime persistence when running backend from `web/`
+tests/                         # Test suite
 ```
 
-## Repository Layout
+## High-level data and execution flow
 
+```mermaid
+flowchart LR
+  subgraph Authoring
+    FE[web/frontend<br/>React editor] -->|save/load VisualFlow JSON| BE[web/backend<br/>FastAPI]
+    BE -->|persists| FLOWS[(web/flows/*.json)]
+  end
+
+  subgraph Execution
+    HOST[Host process<br/>(web backend / CLI / 3rd party)] -->|validate| VF[VisualFlow models<br/>abstractflow/visual/models.py]
+    HOST -->|create_visual_runner| WIRE[Runtime wiring<br/>abstractflow/visual/executor.py]
+    WIRE --> RT[AbstractRuntime Runtime<br/>tick/resume]
+    RT --> STORES[(RunStore / LedgerStore / ArtifactStore)]
+    RT -->|LLM_CALL, TOOL_CALLS| AC[AbstractCore integration]
+    RT -->|START_SUBWORKFLOW| REG[WorkflowRegistry]
+  end
+
+  BE -->|WS: run/resume/control| HOST
 ```
-abstractflow/
-  abstractflow/                 # Python library (portable)
-    core/                       # Flow graph model
-    visual/                     # VisualFlow schema + portable executor
-    adapters/                   # Compiler adapters (control/effects/agents/events/subflows)
-    compiler.py                 # Flow -> WorkflowSpec (AbstractRuntime)
-    runner.py                   # FlowRunner (runtime-backed)
-  web/
-    backend/                    # FastAPI host app (flow CRUD + websocket execution)
-    frontend/                   # React visual editor + Run Flow UI
-    flows/                      # Saved VisualFlow JSON (web host default)
-    runtime/                    # RunStore/LedgerStore/ArtifactStore base dir (web host default)
-```
 
-## Core Data Model (Portable)
+## Portable data model: VisualFlow JSON
 
-### VisualFlow JSON
-The visual editor saves workflows as `VisualFlow` JSON (Pydantic models in `abstractflow/abstractflow/visual/models.py`):
-- `VisualFlow`: `id`, `name`, `description`, `nodes`, `edges`, optional `entryNode`.
-- `VisualNode`: `id`, `type` (`NodeType`), `position`, `data` (pins + node config).
-- `VisualEdge`: `source`, `sourceHandle`, `target`, `targetHandle`.
+The portable authoring format is `VisualFlow` (Pydantic models):
+- `VisualFlow`, `VisualNode`, `VisualEdge`, `NodeType`, `PinType`, …
 
-Recent additions (portable node types):
-- `memory_rehydrate`: runtime-owned mutation that rehydrates archived `conversation_span` messages into `context.messages`.
+Evidence: `abstractflow/visual/models.py`.
 
-**Important constraint:** the workflow must remain **portable** across hosts:
-- the JSON includes node configuration (`data`) needed to execute outside the web backend
-- execution semantics are expressed via AbstractRuntime effects + pure functions
+Key portability rule (enforced by design): the JSON must contain enough configuration to execute outside the web backend. Hosts may add storage, auth, and UI around it, but execution should remain host-independent.
 
-### Programmatic Flow
-AbstractFlow also exposes a programmatic graph model (`abstractflow/abstractflow/core/flow.py`):
-- `Flow`, `FlowNode`, `FlowEdge`
+## Compilation and execution (portable)
 
-Programmatic flows compile to AbstractRuntime the same way as visual flows (via `abstractflow/abstractflow/compiler.py`).
+### VisualFlow → Flow IR
 
-## Compilation + Execution Pipeline
+AbstractFlow delegates “VisualFlow → Flow IR” semantics to AbstractRuntime:
+- `abstractflow.visual.executor.visual_to_flow()` calls `abstractruntime.visualflow_compiler.visual_to_flow(...)`.
 
-### VisualFlow → Flow
-`abstractflow.visual.executor.visual_to_flow()` builds a `Flow` from a `VisualFlow`:
-- builds a **data-edge map** (`source node/pin → target node/pin`)
-- pre-evaluates “pure” nodes (e.g., literals) into `flow._node_outputs`
-- wraps node handlers so execution pins drive control flow and data pins resolve inputs
+Evidence: `abstractflow/visual/executor.py`.
 
-### Flow → WorkflowSpec (AbstractRuntime)
-`abstractflow.compiler.compile_flow()` converts a `Flow` to `abstractruntime.WorkflowSpec`:
-- function nodes → `create_function_node_handler(...)` (sync compute)
-- effect nodes (ask_user/llm_call/wait_event/…) → `Effect` requests (durable waits/side effects)
-  - memory effect nodes (`memory_note`, `memory_query`, `memory_rehydrate`) → runtime memory effects (require `ArtifactStore`)
-- control nodes (sequence/parallel/while/loop) → scheduler handlers in `abstractflow.adapters.control_adapter`
-- agent nodes (programmatic agents) → `abstractflow.adapters.agent_adapter`
-- visual agent nodes (`type: "agent"`) → a **START_SUBWORKFLOW** wrapper that delegates to `abstractagent` ReAct workflows (implemented in `abstractflow.compiler._create_visual_agent_effect_handler`)
+### Flow IR → WorkflowSpec
 
-### Runtime Execution
-Execution is owned by AbstractRuntime:
-- `FlowRunner` (`abstractflow/abstractflow/runner.py`) runs a `WorkflowSpec` via `Runtime.start(...)` + `Runtime.tick(...)`.
-- For visual flows, `abstractflow.visual.executor.create_visual_runner(...)` wires the runtime with needed integrations and returns a runner.
+AbstractFlow delegates compilation to AbstractRuntime:
+- `abstractflow.compiler.compile_flow` is re-exported from `abstractruntime.visualflow_compiler.compiler`.
 
-## AbstractRuntime Integration (Durability + Effects)
+Evidence: `abstractflow/compiler.py`.
 
-### Store Backends (Web Host)
-The AbstractFlow web backend chooses file-based runtime stores (`abstractflow/web/backend/services/runtime_stores.py`):
-- `JsonFileRunStore` → `run_<run_id>.json` checkpoints
-- `JsonlLedgerStore` → `ledger_<run_id>.jsonl` append-only step journal
-- `FileArtifactStore` → large payloads referenced from run vars
+### Running (FlowRunner)
 
-The base directory is `ABSTRACTFLOW_RUNTIME_DIR` (default `./runtime`). When the backend runs from `abstractflow/web`, this becomes `abstractflow/web/runtime/`.
+`FlowRunner` owns host-friendly execution convenience:
+- creates a default in-memory runtime when you don’t provide one
+- normalizes outputs to `{"success": bool, "result": ...}` for callers
+- can auto-drive nested `SUBWORKFLOW` waits in non-interactive contexts
 
-### LLM + Tool Effects (via AbstractCore Integration)
-When a visual flow contains LLM nodes (`llm_call` / `agent`), `abstractflow.visual.executor.create_visual_runner(...)` constructs a runtime via:
-- `abstractruntime.integrations.abstractcore.factory.create_local_runtime(...)`
+Evidence: `abstractflow/runner.py`, tests in `tests/test_runner.py`.
 
-This wires:
-- `EffectType.LLM_CALL` via an AbstractCore-backed LLM client
-- `EffectType.TOOL_CALLS` via a host-configured `ToolExecutor` (typically `MappingToolExecutor.from_tools(...)`)
+## VisualFlow execution wiring (host responsibilities)
 
-Visual node outputs are designed to be easy to wire:
-- **LLM Call** exposes `response`, `success`, `meta`, and a convenience `tool_calls` output (so you can connect directly into **Tool Calls** or event nodes).
-  - In structured-output mode, `response` is a JSON string of the structured object (matching the schema).
-  - Older saved flows may still have legacy pins (e.g. `result`); new nodes do not generate them.
-- **Agent** exposes `response`, `success`, `meta`, and `scratchpad`.
-  - In structured-output mode, `response` is a JSON string of the structured object (matching the schema).
-  - `scratchpad` is runtime-owned observability data and includes:
-    - `messages`: the agent’s internal message transcript/history for this run
-    - `node_traces`: the structured per-node trace produced by the ReAct subworkflow
-    - `steps`: a flattened list derived from `node_traces` (easier for UI rendering)
-    - best-effort `tool_calls` / `tool_results` extracted post-run from `steps`
+The key host entrypoint is:
+- `abstractflow.visual.executor.create_visual_runner(...)`
 
-When a visual flow contains memory nodes, the host must also configure:
-- an `ArtifactStore` (for archived spans, notes, and rehydration source artifacts)
+It wires the runtime based on **what is present in the flow tree**:
+- registers subflows/agent workflows when needed (workflow registry)
+- enables artifact storage when memory nodes are present
+- wires AbstractCore effect handlers when LLM/tool nodes are present
+- optionally installs AbstractMemory KG effect handlers when `memory_kg_*` nodes are present
 
-## Events and Schedules (Durable)
+Evidence: `abstractflow/visual/executor.py`.
 
-AbstractFlow expresses event-driven behavior using AbstractRuntime’s durable waits:
-- `On Event` nodes compile to `WAIT_EVENT` waits (listener runs)
-- `Emit Event` nodes compile to `EMIT_EVENT` (delivers to matching waiters)
-- `On Schedule` nodes compile to `WAIT_UNTIL` (time-based waits)
+## Session-scoped events (VisualSessionRunner)
 
-For visual flows, `VisualSessionRunner` (`abstractflow/abstractflow/visual/session_runner.py`) starts `On Event` listeners as child runs in the same session and actively ticks them when events are emitted.
+VisualFlows that include custom events (`on_event` / `emit_event`) are executed with a session-aware runner:
+- `VisualSessionRunner` starts derived event-listener workflows as **child runs** in the same session.
+- During `run()`, it also ticks those child runs so `EMIT_EVENT` branches make progress without a separate host loop.
 
-Note:
-- `Wait Event` nodes support optional UX metadata pins (`prompt`, `choices`, `allow_free_text`) so hosts can render durable “ask + wait” interactions (ADR-0017).
+Evidence: `abstractflow/visual/session_runner.py`, wiring in `abstractflow/visual/executor.py`, tests in `tests/test_visual_custom_events.py`.
 
-## Web Backend Execution (Run Flow UI)
+## Web editor host (FastAPI + WebSockets)
 
-The real-time Run Flow UI is powered by WebSockets (`abstractflow/web/backend/routes/ws.py`):
-- client sends `{type:"run"}` to start
-- backend creates a runner with durable stores (`create_visual_runner(...)`)
-- backend drives execution by calling `runner.step()` (which calls `Runtime.tick(...)`) and streams `ExecutionEvent` updates
-- if the runtime enters a wait state (ASK_USER / WAIT_EVENT / WAIT_UNTIL / SUBWORKFLOW), the UI shows the waiting step and can send `{type:"resume"}` to continue
-- run controls (pause/resume/cancel) are exposed as `{type:"control"}` messages and map to AbstractRuntime run control APIs
+The reference host in `web/` provides:
+- Flow CRUD (`web/backend/routes/flows.py`) storing `./flows/*.json` relative to its working dir
+- Durable stores for runs/ledger/artifacts (`web/backend/services/runtime_stores.py`)
+- WebSocket execution (`web/backend/routes/ws.py`) with message types:
+  - `{ "type": "run", "input_data": {…} }`
+  - `{ "type": "resume", "response": "…" }`
+  - `{ "type": "control", "action": "pause|resume|cancel", "run_id": "…" }`
 
-### Run history (web host)
-The web backend also exposes run-history endpoints (list runs + replay) to support browsing historical runs in the UI:
-- see `abstractflow/web/backend/routes/runs.py`
+See `docs/web-editor.md` for run instructions.
 
-## What AbstractFlow Owns vs Uses
+## Workflow bundles (`.flow`)
 
-**AbstractFlow owns**
-- Visual authoring schema (`VisualFlow`)
-- Compilation from graphs to AbstractRuntime `WorkflowSpec`
-- Orchestration primitives (control nodes, subflows, event listener wiring)
-- Web host UX (editor + execution UI)
+WorkflowBundles package a root VisualFlow JSON plus any referenced subflows into a single `.flow` (zip) file (manifest + flow JSON files).
 
-**AbstractFlow uses**
-- **AbstractRuntime**: durable run state, waits, ledger, artifacts, run control
-- **AbstractCore**: providers/models/tools (via runtime’s `integrations.abstractcore`)
-- **AbstractAgent**: agent workflows used by the visual Agent node (ReAct today; CodeAct exists in AbstractAgent)
+- CLI: `abstractflow bundle pack|inspect|unpack` (`abstractflow/cli.py`)
+- Implementation delegates to AbstractRuntime: `abstractflow/workflow_bundle.py`
+- Format/packing semantics are owned by AbstractRuntime; AbstractFlow is a thin wrapper.
 
-## Acknowledgements (inspiration)
-- The visual editor UX is inspired by **Unreal Engine (UE4/UE5) Blueprints**: execution pins, typed pins with color coding, and “graph-as-program” ergonomics.
+Evidence: `tests/test_workflow_bundle_pack.py`, `abstractflow/workflow_bundle.py`.
+
+## What AbstractFlow owns vs delegates
+
+**Owns in this repo**
+- VisualFlow schema (`abstractflow/visual/models.py`)
+- Host wiring helpers (`abstractflow/visual/executor.py`, `abstractflow/visual/session_runner.py`)
+- Public runner conveniences (`abstractflow/runner.py`)
+- Reference web editor app (`web/`)
+- CLI wrapper (`abstractflow/cli.py`)
+
+**Delegates to AbstractRuntime**
+- Compilation semantics and builtins (`abstractflow/compiler.py`, `abstractflow/visual/builtins.py`)
+- Adapter implementations (`abstractflow/adapters/*`)
+- WorkflowBundle format and IO (`abstractflow/workflow_bundle.py`)
