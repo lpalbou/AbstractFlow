@@ -76,7 +76,7 @@ class _FakeRunner:
             self._state.vars["_temp"]["agent"]["agent"]["phase"] = "subworkflow"
             self.flow._node_outputs["agent"] = {
                 "status": "running",
-                "task": "list the files in /Users/albou/r-type/ , read some key files and tell me what this is about",
+                "task": "list the files in r-type/ , read some key files and tell me what this is about",
                 "context": {},
                 "result": None,
             }
@@ -89,7 +89,7 @@ class _FakeRunner:
         self._state.status = "completed"
         result_obj = {
             "result": "This is a Python-based R-Type II clone project (arcade shooter) with modular weapons and power-ups.",
-            "task": "list the files in /Users/albou/r-type/ , read some key files and tell me what this is about",
+            "task": "list the files in r-type/ , read some key files and tell me what this is about",
             "context": {},
             "success": True,
             "provider": "lmstudio",
@@ -111,14 +111,14 @@ class _FakeRunner:
                             "type": "tool_calls",
                             "payload": {
                                 "tool_calls": [
-                                    {"name": "list_files", "arguments": {"directory_path": "/Users/albou/r-type/", "pattern": "*"}},
-                                    {"name": "read_file", "arguments": {"file_path": "/Users/albou/r-type/designs.md"}},
+                                    {"name": "list_files", "arguments": {"directory_path": "r-type/", "pattern": "*"}},
+                                    {"name": "read_file", "arguments": {"file_path": "r-type/designs.md"}},
                                 ]
                             },
                         },
                         "result": {
                             "results": [
-                                {"name": "list_files", "success": True, "output": "Files in '/Users/albou/r-type/'..."},
+                                {"name": "list_files", "success": True, "output": "Files in 'r-type/'..."},
                                 {"name": "read_file", "success": True, "output": "File: ..."},
                             ]
                         },
@@ -198,5 +198,5 @@ def test_ws_agent_node_emits_single_complete_and_trace_is_not_truncated() -> Non
     tool_calls = payload_obj.get("tool_calls")
     assert isinstance(tool_calls, list) and tool_calls
     assert tool_calls[0]["name"] == "list_files"
-    assert tool_calls[0]["arguments"]["directory_path"] == "/Users/albou/r-type/"
+    assert tool_calls[0]["arguments"]["directory_path"] == "r-type/"
 
