@@ -1,13 +1,41 @@
 {
-  "name": "abstractflow-visual-editor",
+  "name": "@abstractframework/flow",
   "version": "0.1.0",
-  "private": true,
+  "description": "Visual workflow editor for AbstractFramework - drag-and-drop workflow authoring with real-time testing",
   "type": "module",
+  "author": "Laurent-Philippe Albou",
+  "license": "MIT",
+  "keywords": [
+    "abstractframework",
+    "workflow",
+    "visual-editor",
+    "drag-and-drop",
+    "react"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lpalbou/abstractflow.git",
+    "directory": "web/frontend"
+  },
+  "homepage": "https://github.com/lpalbou/abstractflow#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "bin": {
+    "abstractflow-editor": "./bin/cli.js"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "README.md"
+  ],
   "scripts": {
     "dev": "vite --host --port 3003",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
+    "start": "node ./bin/cli.js",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "react": "^18.2.0",
