@@ -121,7 +121,7 @@ if __name__ == "__main__":
         os.environ["ABSTRACTFLOW_MONITOR_GPU"] = "1"
 
     uvicorn.run(
-        "abstractflow.web.backend.main:app",
+        "backend.main:app",
         host="0.0.0.0",
         port=8080,
         reload=True,

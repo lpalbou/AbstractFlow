@@ -12,6 +12,9 @@ recursive-include abstractflow *.json
 recursive-include abstractflow *.yaml
 recursive-include abstractflow *.yml
 
+# Include web backend (FastAPI) code in sdists
+recursive-include web/backend *.py
+
 # Exclude development and build files
 exclude .gitignore
 exclude .pre-commit-config.yaml
@@ -24,5 +27,4 @@ exclude .pytest_cache
 exclude build
 exclude dist
 exclude *.egg-info
-
 

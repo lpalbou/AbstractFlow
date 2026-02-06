@@ -40,6 +40,7 @@ Requirements: Python **3.10+** (`pyproject.toml`: `requires-python`).
 
 Optional extras:
 - Agent nodes (ReAct workflows): `pip install "abstractflow[agent]"`
+- Visual editor backend (FastAPI): `pip install "abstractflow[server]"`
 - Dev tools (tests/formatting): `pip install "abstractflow[dev]"`
 
 Notes:
@@ -75,26 +76,26 @@ print(result)  # {"success": True, "waiting": False, "result": ...}
 
 If your flow uses subflows, load all referenced `*.json` into the `flows={...}` mapping (see `docs/getting-started.md`).
 
-## Visual editor (from source)
+## Visual editor (local)
 
-The visual editor is a dev/reference app in `web/` (not shipped as a Python package on PyPI).
+The visual editor is split into:
+- a **Python backend** (FastAPI) shipped with `abstractflow[server]`
+- a **JS frontend** shipped as `@abstractframework/flow` (runs via `npx`)
 
 ```bash
-git clone https://github.com/lpalbou/AbstractFlow.git
-cd AbstractFlow
+# Terminal 1: Editor backend (FastAPI)
+pip install "abstractflow[server,agent]"
+abstractflow serve --reload --port 8080
 
-python -m venv .venv
-source .venv/bin/activate
-pip install -e ".[server,agent]"
-
-# Terminal 1: Backend (FastAPI)
-cd web && python -m backend --reload --port 8080
-
-# Terminal 2: Frontend (Vite)
-cd web/frontend && npm install && npm run dev
+# Terminal 2: Editor UI (static server + /api proxy)
+npx @abstractframework/flow
 ```
 
-Open the frontend at http://localhost:3003 (default Vite port). See `docs/web-editor.md`.
+Open:
+- UI: http://localhost:3003
+- Backend health: http://localhost:8080/api/health
+
+Optional: run an AbstractGateway at http://127.0.0.1:8081 and configure it in the UI “Connect” modal (used for embeddings-backed KG and bundle publishing). See `docs/web-editor.md` and `docs/architecture.md`.
 
 ## CLI (WorkflowBundle `.flow`)
 

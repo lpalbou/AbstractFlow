@@ -65,6 +65,7 @@ Requirements: Python **3.10+** (`pyproject.toml`: `requires-python`).
 
 Optional extras:
 - Agent nodes (ReAct workflows): `pip install "abstractflow[agent]"`
+- Visual editor backend (FastAPI): `pip install "abstractflow[server]"`
 - Dev tools (tests/formatting): `pip install "abstractflow[dev]"`
 
 Notes:
@@ -100,26 +101,26 @@ print(result)  # {"success": True, "waiting": False, "result": ...}
 
 If your flow uses subflows, load all referenced `*.json` into the `flows={...}` mapping (see `docs/getting-started.md`).
 
-## Visual editor (from source)
+## Visual editor (local)
 
-The visual editor is a dev/reference app in `web/` (not shipped as a Python package on PyPI).
+The visual editor is split into:
+- a **Python backend** (FastAPI) shipped with `abstractflow[server]`
+- a **JS frontend** shipped as `@abstractframework/flow` (runs via `npx`)
 
 ```bash
-git clone https://github.com/lpalbou/AbstractFlow.git
-cd AbstractFlow
+# Terminal 1: Editor backend (FastAPI)
+pip install "abstractflow[server,agent]"
+abstractflow serve --reload --port 8080
 
-python -m venv .venv
-source .venv/bin/activate
-pip install -e ".[server,agent]"
-
-# Terminal 1: Backend (FastAPI)
-cd web && python -m backend --reload --port 8080
-
-# Terminal 2: Frontend (Vite)
-cd web/frontend && npm install && npm run dev
+# Terminal 2: Editor UI (static server + /api proxy)
+npx @abstractframework/flow
 ```
 
-Open the frontend at http://localhost:3003 (default Vite port). See `docs/web-editor.md`.
+Open:
+- UI: http://localhost:3003
+- Backend health: http://localhost:8080/api/health
+
+Optional: run an AbstractGateway at http://127.0.0.1:8081 and configure it in the UI “Connect” modal (used for embeddings-backed KG and bundle publishing). See `docs/web-editor.md` and `docs/architecture.md`.
 
 ## CLI (WorkflowBundle `.flow`)
 
@@ -175,7 +176,7 @@ All file paths in this doc set are relative to the repository root.
 - API reference (high-level): `docs/api.md`
 - VisualFlow JSON format (portable workflow document): `docs/visualflow.md`
 - Visual editor (FastAPI + React dev app): `docs/web-editor.md`
-- CLI (`abstractflow bundle …`): `docs/cli.md`
+- CLI (`abstractflow bundle …`, `abstractflow serve`): `docs/cli.md`
 - Architecture (how the pieces fit): `docs/architecture.md`
 
 ## Repo policies
@@ -223,6 +224,7 @@ pip install abstractflow
 
 Optional extras:
 - Agent nodes (ReAct workflows): `pip install "abstractflow[agent]"`
+- Visual editor backend (FastAPI): `pip install "abstractflow[server]"`
 - Dev tools: `pip install "abstractflow[dev]"`
 
 From source (repo root):
@@ -291,11 +293,19 @@ Evidence:
 - VisualFlow execution wiring lives in `abstractflow/visual/executor.py` (`create_visual_runner`, `execute_visual_flow`)
 - Subflow reachability / registry behavior is exercised in `tests/test_visual_subflow_*.py`
 
-## Run the visual editor (from source)
+## Run the visual editor (local)
 
-The editor is a reference/dev app in `web/` (FastAPI backend + React frontend). Follow: `docs/web-editor.md`.
+The editor is a reference app (FastAPI backend + React frontend). Follow: `docs/web-editor.md`.
 
-Tip: install the backend deps from the repo root with `pip install -e ".[server,agent]"`.
+Quick start (no repo clone needed):
+
+```bash
+pip install "abstractflow[server,agent]"
+abstractflow serve --reload --port 8080
+npx @abstractframework/flow
+```
+
+Tip (from source): install the backend deps from the repo root with `pip install -e ".[server,agent]"`.
 
 ## Workflow bundles (`.flow`)
 
@@ -426,6 +436,10 @@ Evidence: `abstractflow/workflow_bundle.py`, `docs/cli.md`.
 The `abstractflow` CLI entry point is declared in `pyproject.toml` (`project.scripts`) and implemented in:
 - `abstractflow/cli.py`
 
+The CLI includes:
+- WorkflowBundle tools: `abstractflow bundle ...`
+- Visual editor backend runner (optional): `abstractflow serve ...` (requires `abstractflow[server]`)
+
 Evidence: `pyproject.toml`, `abstractflow/cli.py`.
 
 ---
@@ -488,17 +502,22 @@ Evidence: `abstractflow/visual/session_runner.py`, wiring in `abstractflow/visua
 
 ## Does `pip install abstractflow` include the web editor UI?
 
-No. The published Python package is under `abstractflow/`. The visual editor is a reference/dev app under `web/` and is run from source.
+Not the UI. The visual editor has two parts:
+- Backend (FastAPI): included when you install `abstractflow[server]` and runnable via `abstractflow serve`.
+- UI (React): published as the npm package `@abstractframework/flow` (run via `npx`).
 
-Evidence: repo layout in `docs/architecture.md`, packaging config in `pyproject.toml` (`tool.setuptools.packages.find`).
+Evidence: `pyproject.toml` (`server` extra + `project.scripts`), `abstractflow/cli.py`, `web/frontend/bin/cli.js`.
 
 ## Where does the web editor store flows and run data?
 
-When you run the backend from `web/`:
-- Flows are stored in `web/flows/*.json` (relative path `./flows`).
-- Runtime persistence defaults to `web/runtime/` (override with `ABSTRACTFLOW_RUNTIME_DIR`).
+Defaults:
+- Flows: `./flows/*.json` relative to the backend working directory (override with `ABSTRACTFLOW_FLOWS_DIR`).
+- Runtime persistence (runs/ledger/artifacts):
+  - source checkout: `web/runtime/`
+  - installed package: `~/.abstractflow/runtime`
+  - override with `ABSTRACTFLOW_RUNTIME_DIR`.
 
-Evidence: `web/backend/routes/flows.py` (`FLOWS_DIR = Path("./flows")`), `web/backend/services/runtime_stores.py`.
+Evidence: `web/backend/routes/flows.py` (`FLOWS_DIR`, `ABSTRACTFLOW_FLOWS_DIR`), `web/backend/services/paths.py`.
 
 ## How does tool / file access work (security)?
 
@@ -617,11 +636,43 @@ This repository includes a reference visual editor:
 - FastAPI backend: `web/backend/`
 - React frontend: `web/frontend/`
 
-It is intended for development and as a reference host for executing VisualFlows. It is not packaged as an installable Python module on PyPI.
+It is intended for development and as a reference host for executing VisualFlows. For convenience, the backend is also shipped as an **optional** part of the Python package (`abstractflow[server]`).
 
 See also: `docs/getting-started.md`, `docs/faq.md`, `docs/visualflow.md`, `docs/architecture.md`.
 
-## Run (dev mode)
+## Run (recommended: PyPI + npx)
+
+Terminal 1 (backend):
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install "abstractflow[server,agent]"
+
+abstractflow serve --reload --port 8080
+```
+
+Alternative entrypoint (equivalent):
+
+```bash
+abstractflow-backend --reload --port 8080
+```
+
+Terminal 2 (UI):
+
+```bash
+npx @abstractframework/flow
+```
+
+Notes:
+- The UI expects `/api/*` on the same origin; the `npx` server proxies `/api/*` (HTTP + WebSocket) to the backend (default: `http://127.0.0.1:8080`).
+- Override the backend target with `--backend-url ...` (or env `ABSTRACTFLOW_BACKEND_URL`).
+
+Open:
+- UI: http://localhost:3003
+- Backend health: http://localhost:8080/api/health
+
+## Run (from source / dev mode)
 
 Terminal 1 (backend):
 
@@ -664,22 +715,28 @@ Evidence: `web/backend/main.py` serves `web/frontend/dist` when it exists.
 ## Where data is stored
 
 - Flows: `./flows/*.json` relative to the backend working directory.
-  - If you run the backend from `web/`, that becomes `web/flows/`.
-  - Evidence: `FLOWS_DIR = Path("./flows")` in `web/backend/routes/flows.py`.
-- Runtime persistence (runs/ledger/artifacts): defaults to `web/runtime/`.
+  - Override with `ABSTRACTFLOW_FLOWS_DIR` (recommended when using the packaged backend).
+  - Evidence: `FLOWS_DIR` in `web/backend/routes/flows.py`.
+- Runtime persistence (runs/ledger/artifacts): defaults to:
+  - source checkout: `web/runtime/`
+  - installed package: `~/.abstractflow/runtime`
   - Override with `ABSTRACTFLOW_RUNTIME_DIR`.
-  - Evidence: `web/backend/services/runtime_stores.py`.
+  - Evidence: `web/backend/services/paths.py`, `web/backend/services/runtime_stores.py`.
 
 ## Gateway connectivity (optional)
 
-The backend can talk to an AbstractGateway for provider/model catalogs and remote execution.
+The backend can talk to an AbstractGateway for embeddings-backed memory KG operations and bundle publishing/reload.
 
 Common env vars / flags:
 - `ABSTRACTFLOW_GATEWAY_URL` (or `ABSTRACTGATEWAY_URL`)
 - `ABSTRACTGATEWAY_AUTH_TOKEN` (legacy: `ABSTRACTFLOW_GATEWAY_AUTH_TOKEN`)
-- CLI flags: `python -m backend --gateway-url ... --gateway-token ...` (see `web/backend/cli.py`)
+- CLI flags: `abstractflow serve --gateway-url ... --gateway-token ...` (or `python -m backend ...`) (see `web/backend/cli.py`)
 
-Evidence: `web/backend/services/gateway_connection.py`, `abstractflow/visual/executor.py`.
+Evidence:
+- UI modal: `web/frontend/src/components/GatewayConnectionModal.tsx`
+- Backend persistence + env bootstrap: `web/backend/services/gateway_connection.py`
+- Embeddings config check + KG embedder wiring: `web/backend/routes/connection.py`, `web/backend/routes/memory_kg.py`
+- Bundle upload/reload on publish: `web/backend/routes/flows.py`
 
 ## WebSocket execution
 
@@ -696,7 +753,9 @@ file: docs/cli.md
 
 # CLI (`abstractflow`)
 
-AbstractFlow ships a small CLI focused on **WorkflowBundle** (`.flow`) utilities.
+AbstractFlow ships a small CLI focused on:
+- **WorkflowBundle** (`.flow`) utilities
+- running the **Visual Editor backend** (optional; requires `abstractflow[server]`)
 
 Entry point:
 - `abstractflow` (declared in `pyproject.toml` → `project.scripts`)
@@ -744,13 +803,32 @@ Evidence:
 - CLI implementation: `abstractflow/cli.py`
 - Tests: `tests/test_workflow_bundle_pack.py`
 
+## Serve (Visual Editor backend)
+
+Run the FastAPI backend used by the visual editor UI:
+
+```bash
+pip install "abstractflow[server]"
+abstractflow serve --reload --port 8080
+```
+
+Notes:
+- This starts the backend API on `/api/*` (health: `/api/health`).
+- The UI can be served via `npx @abstractframework/flow` (see `docs/web-editor.md`).
+
+Gateway-related flags (optional):
+- `--gateway-url http://127.0.0.1:8081`
+- `--gateway-token <token>`
+
+Evidence: `abstractflow/cli.py`, `web/backend/cli.py`, `web/backend/main.py`.
+
 ---
 file: docs/architecture.md
 ---
 
 # AbstractFlow — Architecture (Current)
 
-> Updated: 2026-02-04  
+> Updated: 2026-02-06  
 > Scope: describes **implemented behavior** in this repository (no roadmap claims).
 
 AbstractFlow is a workflow authoring + orchestration layer built on:
@@ -774,11 +852,11 @@ abstractflow/                  # Published Python package
   cli.py                       # `abstractflow` CLI
   workflow_bundle.py           # Bundle helpers (delegates to AbstractRuntime)
 docs/                          # Human docs (this folder)
-web/                           # Reference visual editor app (not packaged on PyPI)
+web/                           # Reference visual editor app (backend shipped via `abstractflow[server]`)
   backend/                     # FastAPI backend (CRUD + websocket execution)
   frontend/                    # React editor + run UI
   flows/                       # Default flow storage when running backend from `web/`
-  runtime/                     # Default runtime persistence when running backend from `web/`
+  runtime/                     # Default runtime persistence in a source checkout (installed: ~/.abstractflow/runtime)
 tests/                         # Test suite
 ```
 
@@ -924,6 +1002,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **FlowRunner SUBWORKFLOW auto-drive**: `FlowRunner.run()` no longer hangs if the runtime registry contains only subworkflow specs (common in unit tests). It now falls back to the runner’s own root `WorkflowSpec` when resuming/bubbling parents.
+
+## [0.3.2] - 2026-02-06
+
+### Added
+- **Packaged visual editor backend** (FastAPI) as part of `abstractflow[server]`:
+  - `abstractflow serve ...` CLI subcommand
+  - `abstractflow-backend ...` console script (alias of `python -m backend`)
+
+### Changed
+- **Backend runtime directory defaults**:
+  - source checkout: `web/runtime/`
+  - installed package: `~/.abstractflow/runtime`
+  - override: `ABSTRACTFLOW_RUNTIME_DIR`
+- **Backend flow storage can be overridden** via `ABSTRACTFLOW_FLOWS_DIR` (default remains `./flows`).
+- **Default publish directory** is now `./flows/bundles/` (override via `ABSTRACTFLOW_PUBLISH_DIR`).
+
+### Fixed
+- **`npx @abstractframework/flow` UI server now proxies `/api/*`** (HTTP + WebSocket) to the backend, preventing “Save failed: JSON.parse …” when the backend is running.
 
 ## [0.3.1] - 2026-02-04
 

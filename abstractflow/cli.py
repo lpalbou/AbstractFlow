@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from typing import List, Optional
 
@@ -43,6 +44,24 @@ def _build_parser() -> argparse.ArgumentParser:
     unpack = bundle_sub.add_parser("unpack", help="Extract a .flow bundle to a directory")
     unpack.add_argument("bundle", help="Path to .flow (zip) or extracted directory")
     unpack.add_argument("--dir", required=True, help="Output directory")
+
+    serve = sub.add_parser("serve", help="Run the Visual Editor backend (FastAPI)")
+    serve.add_argument("--host", default=os.getenv("HOST", "0.0.0.0"))
+    serve.add_argument("--port", type=int, default=int(os.getenv("PORT", "8080")))
+    serve.add_argument("--reload", action="store_true", help="Enable auto-reload (dev)")
+    serve.add_argument("--log-level", default=os.getenv("LOG_LEVEL", "info"))
+    serve.add_argument("--monitor-gpu", action="store_true", help="Show the small GPU widget in the UI")
+    serve.add_argument(
+        "--gateway-url",
+        default=os.getenv("ABSTRACTFLOW_GATEWAY_URL") or os.getenv("ABSTRACTGATEWAY_URL") or "",
+    )
+    serve.add_argument(
+        "--gateway-token",
+        default=os.getenv("ABSTRACTFLOW_GATEWAY_AUTH_TOKEN")
+        or os.getenv("ABSTRACTGATEWAY_AUTH_TOKEN")
+        or os.getenv("ABSTRACTCODE_GATEWAY_TOKEN")
+        or "",
+    )
 
     return p
 
@@ -79,11 +98,52 @@ def main(args: Optional[List[str]] = None) -> int:
 
         parser.error("Missing bundle subcommand (pack|inspect|unpack)")
 
+    if ns.command == "serve":
+        try:
+            import uvicorn  # type: ignore
+        except Exception:
+            sys.stderr.write(
+                "Server dependencies are not installed.\n"
+                "Install with: pip install \"abstractflow[server]\"\n"
+            )
+            return 2
+
+        # Validate backend import early so we can give a clear error message.
+        try:
+            import backend.main  # noqa: F401
+        except Exception as e:
+            sys.stderr.write(
+                "Failed to import the Visual Editor backend.\n"
+                f"Error: {e}\n"
+                "Install with: pip install \"abstractflow[server]\"\n"
+            )
+            return 2
+
+        if bool(getattr(ns, "monitor_gpu", False)):
+            os.environ["ABSTRACTFLOW_MONITOR_GPU"] = "1"
+
+        gateway_url = str(getattr(ns, "gateway_url", "") or "").strip()
+        gateway_token = str(getattr(ns, "gateway_token", "") or "").strip()
+        if gateway_url:
+            os.environ.setdefault("ABSTRACTFLOW_GATEWAY_URL", gateway_url)
+            os.environ.setdefault("ABSTRACTGATEWAY_URL", gateway_url)
+        if gateway_token:
+            os.environ.setdefault("ABSTRACTGATEWAY_AUTH_TOKEN", gateway_token)
+            os.environ.setdefault("ABSTRACTFLOW_GATEWAY_AUTH_TOKEN", gateway_token)
+
+        uvicorn.run(
+            "backend.main:app",
+            host=str(getattr(ns, "host", "0.0.0.0")),
+            port=int(getattr(ns, "port", 8080)),
+            reload=bool(getattr(ns, "reload", False)),
+            log_level=str(getattr(ns, "log_level", "info")),
+        )
+        return 0
+
     parser.print_help()
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
 

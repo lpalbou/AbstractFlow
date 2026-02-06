@@ -1,6 +1,8 @@
 # CLI (`abstractflow`)
 
-AbstractFlow ships a small CLI focused on **WorkflowBundle** (`.flow`) utilities.
+AbstractFlow ships a small CLI focused on:
+- **WorkflowBundle** (`.flow`) utilities
+- running the **Visual Editor backend** (optional; requires `abstractflow[server]`)
 
 Entry point:
 - `abstractflow` (declared in `pyproject.toml` → `project.scripts`)
@@ -47,3 +49,22 @@ Evidence:
 - Delegation to AbstractRuntime: `abstractflow/workflow_bundle.py`
 - CLI implementation: `abstractflow/cli.py`
 - Tests: `tests/test_workflow_bundle_pack.py`
+
+## Serve (Visual Editor backend)
+
+Run the FastAPI backend used by the visual editor UI:
+
+```bash
+pip install "abstractflow[server]"
+abstractflow serve --reload --port 8080
+```
+
+Notes:
+- This starts the backend API on `/api/*` (health: `/api/health`).
+- The UI can be served via `npx @abstractframework/flow` (see `docs/web-editor.md`).
+
+Gateway-related flags (optional):
+- `--gateway-url http://127.0.0.1:8081`
+- `--gateway-token <token>`
+
+Evidence: `abstractflow/cli.py`, `web/backend/cli.py`, `web/backend/main.py`.

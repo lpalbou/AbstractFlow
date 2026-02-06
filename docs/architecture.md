@@ -1,6 +1,6 @@
 # AbstractFlow — Architecture (Current)
 
-> Updated: 2026-02-04  
+> Updated: 2026-02-06  
 > Scope: describes **implemented behavior** in this repository (no roadmap claims).
 
 AbstractFlow is a workflow authoring + orchestration layer built on:
@@ -24,11 +24,11 @@ abstractflow/                  # Published Python package
   cli.py                       # `abstractflow` CLI
   workflow_bundle.py           # Bundle helpers (delegates to AbstractRuntime)
 docs/                          # Human docs (this folder)
-web/                           # Reference visual editor app (not packaged on PyPI)
+web/                           # Reference visual editor app (backend shipped via `abstractflow[server]`)
   backend/                     # FastAPI backend (CRUD + websocket execution)
   frontend/                    # React editor + run UI
   flows/                       # Default flow storage when running backend from `web/`
-  runtime/                     # Default runtime persistence when running backend from `web/`
+  runtime/                     # Default runtime persistence in a source checkout (installed: ~/.abstractflow/runtime)
 tests/                         # Test suite
 ```
 

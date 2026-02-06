@@ -36,14 +36,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/flows", tags=["flows"])
 
 # File-based persistence
-FLOWS_DIR = Path("./flows")
-FLOWS_DIR.mkdir(exist_ok=True)
-
-
-def _repo_root() -> Path:
-    # flows.py -> routes/ (0) -> backend/ (1) -> web/ (2) -> abstractflow/ (3) -> repo root/ (4)
-    return Path(__file__).resolve().parents[4]
-
+_FLOWS_DIR_ENV = os.getenv("ABSTRACTFLOW_FLOWS_DIR") or ""
+FLOWS_DIR = (
+    Path(_FLOWS_DIR_ENV).expanduser().resolve()
+    if isinstance(_FLOWS_DIR_ENV, str) and _FLOWS_DIR_ENV.strip()
+    else Path("./flows")
+)
+FLOWS_DIR.mkdir(parents=True, exist_ok=True)
 
 def _default_publish_dir() -> Path:
     # Publish output is authored on the AbstractFlow machine. In gateway-first deployments,
@@ -51,7 +50,8 @@ def _default_publish_dir() -> Path:
     raw = os.getenv("ABSTRACTFLOW_PUBLISH_DIR") or os.getenv("ABSTRACTFLOW_FLOWS_DIR") or ""
     if raw and str(raw).strip():
         return Path(raw).expanduser().resolve()
-    return (_repo_root() / "flows" / "bundles").resolve()
+    # Default next to the local flow files so `save` + `publish` stay in one place.
+    return (FLOWS_DIR / "bundles").resolve()
 
 
 _BUNDLE_ID_SAFE_RE = re.compile(r"[^a-zA-Z0-9_-]+")
@@ -446,7 +446,7 @@ async def publish_flow(flow_id: str, request: PublishFlowRequest) -> PublishFlow
     """Pack and publish a `.flow` bundle for the specified VisualFlow.
 
     This mirrors `abstractflow bundle pack ...` but:
-    - writes to a shared bundles directory (default: repo `flows/bundles/`)
+    - writes to a shared bundles directory (default: `./flows/bundles/`)
     - auto-bumps bundle_version to preserve older published bundles
     - adds lineage metadata into the bundle manifest
     """

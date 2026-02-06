@@ -5,7 +5,7 @@
 Use this file as a curated index for LLM/agentic tooling:
 - Prefer the Markdown docs in `docs/` for user-facing behavior and stable concepts.
 - Use the linked code files as the source of truth for implementation details.
-- The `web/` visual editor is a reference/dev app; the published Python package is under `abstractflow/`.
+- The `web/` visual editor is a reference app; the backend is shipped via `abstractflow[server]` and the published Python package is under `abstractflow/`.
 
 ## Start Here
 
@@ -38,8 +38,8 @@ Use this file as a curated index for LLM/agentic tooling:
 
 ## CLI
 
-- [CLI guide](docs/cli.md): WorkflowBundle commands
-- [CLI implementation](abstractflow/cli.py): `abstractflow bundle pack|inspect|unpack`
+- [CLI guide](docs/cli.md): WorkflowBundle commands + `abstractflow serve`
+- [CLI implementation](abstractflow/cli.py): `abstractflow bundle …` and `abstractflow serve`
 - [WorkflowBundle helpers](abstractflow/workflow_bundle.py): Delegates to AbstractRuntime bundle format
 
 ## Tests

@@ -54,17 +54,22 @@ Evidence: `abstractflow/visual/session_runner.py`, wiring in `abstractflow/visua
 
 ## Does `pip install abstractflow` include the web editor UI?
 
-No. The published Python package is under `abstractflow/`. The visual editor is a reference/dev app under `web/` and is run from source.
+Not the UI. The visual editor has two parts:
+- Backend (FastAPI): included when you install `abstractflow[server]` and runnable via `abstractflow serve`.
+- UI (React): published as the npm package `@abstractframework/flow` (run via `npx`).
 
-Evidence: repo layout in `docs/architecture.md`, packaging config in `pyproject.toml` (`tool.setuptools.packages.find`).
+Evidence: `pyproject.toml` (`server` extra + `project.scripts`), `abstractflow/cli.py`, `web/frontend/bin/cli.js`.
 
 ## Where does the web editor store flows and run data?
 
-When you run the backend from `web/`:
-- Flows are stored in `web/flows/*.json` (relative path `./flows`).
-- Runtime persistence defaults to `web/runtime/` (override with `ABSTRACTFLOW_RUNTIME_DIR`).
+Defaults:
+- Flows: `./flows/*.json` relative to the backend working directory (override with `ABSTRACTFLOW_FLOWS_DIR`).
+- Runtime persistence (runs/ledger/artifacts):
+  - source checkout: `web/runtime/`
+  - installed package: `~/.abstractflow/runtime`
+  - override with `ABSTRACTFLOW_RUNTIME_DIR`.
 
-Evidence: `web/backend/routes/flows.py` (`FLOWS_DIR = Path("./flows")`), `web/backend/services/runtime_stores.py`.
+Evidence: `web/backend/routes/flows.py` (`FLOWS_DIR`, `ABSTRACTFLOW_FLOWS_DIR`), `web/backend/services/paths.py`.
 
 ## How does tool / file access work (security)?
 

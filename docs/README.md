@@ -12,7 +12,7 @@ All file paths in this doc set are relative to the repository root.
 - API reference (high-level): `docs/api.md`
 - VisualFlow JSON format (portable workflow document): `docs/visualflow.md`
 - Visual editor (FastAPI + React dev app): `docs/web-editor.md`
-- CLI (`abstractflow bundle …`): `docs/cli.md`
+- CLI (`abstractflow bundle …`, `abstractflow serve`): `docs/cli.md`
 - Architecture (how the pieces fit): `docs/architecture.md`
 
 ## Repo policies

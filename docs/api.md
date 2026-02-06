@@ -108,4 +108,8 @@ Evidence: `abstractflow/workflow_bundle.py`, `docs/cli.md`.
 The `abstractflow` CLI entry point is declared in `pyproject.toml` (`project.scripts`) and implemented in:
 - `abstractflow/cli.py`
 
+The CLI includes:
+- WorkflowBundle tools: `abstractflow bundle ...`
+- Visual editor backend runner (optional): `abstractflow serve ...` (requires `abstractflow[server]`)
+
 Evidence: `pyproject.toml`, `abstractflow/cli.py`.

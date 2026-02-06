@@ -25,6 +25,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **FlowRunner SUBWORKFLOW auto-drive**: `FlowRunner.run()` no longer hangs if the runtime registry contains only subworkflow specs (common in unit tests). It now falls back to the runner’s own root `WorkflowSpec` when resuming/bubbling parents.
 
+## [0.3.2] - 2026-02-06
+
+### Added
+- **Packaged visual editor backend** (FastAPI) as part of `abstractflow[server]`:
+  - `abstractflow serve ...` CLI subcommand
+  - `abstractflow-backend ...` console script (alias of `python -m backend`)
+
+### Changed
+- **Backend runtime directory defaults**:
+  - source checkout: `web/runtime/`
+  - installed package: `~/.abstractflow/runtime`
+  - override: `ABSTRACTFLOW_RUNTIME_DIR`
+- **Backend flow storage can be overridden** via `ABSTRACTFLOW_FLOWS_DIR` (default remains `./flows`).
+- **Default publish directory** is now `./flows/bundles/` (override via `ABSTRACTFLOW_PUBLISH_DIR`).
+
+### Fixed
+- **`npx @abstractframework/flow` UI server now proxies `/api/*`** (HTTP + WebSocket) to the backend, preventing “Save failed: JSON.parse …” when the backend is running.
+
 ## [0.3.1] - 2026-02-04
 
 ### Added

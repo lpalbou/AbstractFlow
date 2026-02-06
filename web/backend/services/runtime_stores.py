@@ -15,13 +15,11 @@ import tempfile
 from pathlib import Path
 from typing import Any, Tuple
 
+from .paths import resolve_runtime_dir
+
 
 _IS_TEST = bool(os.getenv("PYTEST_CURRENT_TEST") or "pytest" in sys.modules)
 _TEST_BASE_DIRS: dict[str, Path] = {}
-
-_DEFAULT_PERSIST_DIR = Path(__file__).resolve().parents[2] / "runtime"
-_PERSIST_DIR = Path(os.getenv("ABSTRACTFLOW_RUNTIME_DIR", str(_DEFAULT_PERSIST_DIR)))
-_PERSIST_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _base_dir_for_call() -> Path:
@@ -42,7 +40,7 @@ def _base_dir_for_call() -> Path:
         base = Path(tempfile.mkdtemp(prefix="abstractflow-runtime-"))
         base.mkdir(parents=True, exist_ok=True)
         return base
-    return _PERSIST_DIR
+    return resolve_runtime_dir()
 
 
 def get_runtime_stores() -> Tuple[Any, Any, Any]:

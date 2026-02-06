@@ -19,6 +19,7 @@ pip install abstractflow
 
 Optional extras:
 - Agent nodes (ReAct workflows): `pip install "abstractflow[agent]"`
+- Visual editor backend (FastAPI): `pip install "abstractflow[server]"`
 - Dev tools: `pip install "abstractflow[dev]"`
 
 From source (repo root):
@@ -87,11 +88,19 @@ Evidence:
 - VisualFlow execution wiring lives in `abstractflow/visual/executor.py` (`create_visual_runner`, `execute_visual_flow`)
 - Subflow reachability / registry behavior is exercised in `tests/test_visual_subflow_*.py`
 
-## Run the visual editor (from source)
+## Run the visual editor (local)
 
-The editor is a reference/dev app in `web/` (FastAPI backend + React frontend). Follow: `docs/web-editor.md`.
+The editor is a reference app (FastAPI backend + React frontend). Follow: `docs/web-editor.md`.
 
-Tip: install the backend deps from the repo root with `pip install -e ".[server,agent]"`.
+Quick start (no repo clone needed):
+
+```bash
+pip install "abstractflow[server,agent]"
+abstractflow serve --reload --port 8080
+npx @abstractframework/flow
+```
+
+Tip (from source): install the backend deps from the repo root with `pip install -e ".[server,agent]"`.
 
 ## Workflow bundles (`.flow`)
 

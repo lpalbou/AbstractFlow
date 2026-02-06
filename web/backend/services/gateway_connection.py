@@ -19,22 +19,14 @@ from typing import Any, Dict, Optional, Tuple
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from .paths import resolve_runtime_dir
+
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
-
-def _default_runtime_dir() -> Path:
-    # Keep consistent with backend/services/runtime_stores.py.
-    return Path(__file__).resolve().parents[2] / "runtime"
-
-
 def _runtime_dir() -> Path:
-    base = os.getenv("ABSTRACTFLOW_RUNTIME_DIR") or ""
-    p = Path(str(base)).expanduser() if str(base).strip() else _default_runtime_dir()
-    p = p.resolve()
-    p.mkdir(parents=True, exist_ok=True)
-    return p
+    return resolve_runtime_dir()
 
 
 def _config_path() -> Path:
@@ -180,4 +172,3 @@ def fetch_gateway_embeddings_config(*, gateway_url: str, token: Optional[str], t
         return {"ok": False, "error": f"Request failed: {e}"}
     except Exception as e:
         return {"ok": False, "error": str(e)}
-
