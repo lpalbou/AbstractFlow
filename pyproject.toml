@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "abstractflow"
-version = "0.3.6"
+version = "0.3.7"
 description = "Diagram-based AI workflow generation built on AbstractCore"
 readme = "README.md"
 license = "MIT"
@@ -39,7 +39,7 @@ dependencies = [
     "AbstractRuntime>=0.4.0",
     # Keep this aligned with the latest known published AbstractCore versions
     # (monorepo may carry a newer dev version).
-    "abstractcore[tools]>=2.6.8",
+    "abstractcore[tools]>=2.11.8",
     "pydantic>=2.0.0",
     "typing-extensions>=4.0.0",
 ]
@@ -51,7 +51,7 @@ agent = [
 ]
 editor = [
     # Main end-user install for the Visual Editor (backend + Agent node support).
-    "abstractagent>=0.2.0",
+    "abstractagent>=0.3.1",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.23.0",
     "websockets>=11.0.0",
