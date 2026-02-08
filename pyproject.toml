@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "abstractflow"
-version = "0.3.4"
+version = "0.3.5"
 description = "Diagram-based AI workflow generation built on AbstractCore"
 readme = "README.md"
 license = "MIT"
