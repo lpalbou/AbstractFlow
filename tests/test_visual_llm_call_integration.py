@@ -36,6 +36,24 @@ def _lmstudio_models(base_url: str) -> list[str]:
     return out
 
 
+def _is_lmstudio_model_not_servable_error(e: BaseException) -> bool:
+    s = str(e).lower()
+    # LMStudio often lists installed models in `/v1/models` even when they are not
+    # currently loaded/servable. Some setups also fail to auto-load models on demand.
+    # Treat these as "environment not ready" and skip (integration tests should not
+    # fail in such environments).
+    return any(
+        needle in s
+        for needle in [
+            "model unloaded",
+            "failed to load model",
+            "model not loaded",
+            "operation canceled",
+            "operation cancelled",
+        ]
+    )
+
+
 @pytest.mark.integration
 def test_visual_llm_call_executes_and_is_ledgered() -> None:
     provider = (os.getenv("ABSTRACTFLOW_TEST_LLM_PROVIDER") or "lmstudio").strip().lower()
@@ -99,9 +117,7 @@ def test_visual_llm_call_executes_and_is_ledgered() -> None:
     try:
         result = runner.run({})
     except RuntimeError as e:
-        # LMStudio often lists installed models in `/v1/models` even when they are not
-        # currently loaded/servable. Treat that as a "not ready" environment and skip.
-        if "model unloaded" in str(e).lower():
+        if _is_lmstudio_model_not_servable_error(e):
             pytest.skip(f"LMStudio model '{model}' is installed but not loaded/servable ({e})")
         raise
     assert result.get("success") is True
@@ -172,7 +188,7 @@ def test_visual_llm_call_can_be_terminal_node() -> None:
     try:
         result = runner.run({})
     except RuntimeError as e:
-        if "model unloaded" in str(e).lower():
+        if _is_lmstudio_model_not_servable_error(e):
             pytest.skip(f"LMStudio model '{model}' is installed but not loaded/servable ({e})")
         raise
     assert result.get("success") is True
@@ -274,9 +290,7 @@ def test_visual_llm_call_can_use_multiple_models_in_one_flow() -> None:
     try:
         result = runner.run({})
     except RuntimeError as e:
-        # Some LMStudio setups serve only the currently loaded model; other installed models
-        # return "Model unloaded" when selected. Skip rather than fail the test suite.
-        if "model unloaded" in str(e).lower():
+        if _is_lmstudio_model_not_servable_error(e):
             pytest.skip(f"LMStudio multi-model run not supported without loading models ({e})")
         raise
     assert result.get("success") is True

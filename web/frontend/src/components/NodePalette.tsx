@@ -37,9 +37,10 @@ export function NodePalette() {
   // Filter nodes by search term
   const filterNodes = useCallback(
     (nodes: NodeTemplate[]) => {
-      if (!searchTerm) return nodes;
+      const visibleNodes = nodes.filter((n) => !n.hiddenInPalette);
+      if (!searchTerm) return visibleNodes;
       const term = searchTerm.toLowerCase();
-      return nodes.filter(
+      return visibleNodes.filter(
         (n) =>
           n.label.toLowerCase().includes(term) ||
           n.type.toLowerCase().includes(term)

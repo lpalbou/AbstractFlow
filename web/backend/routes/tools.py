@@ -14,6 +14,15 @@ from fastapi import APIRouter, HTTPException
 router = APIRouter(tags=["tools"])
 
 
+def _tool_spec_from_callable(func: Any) -> Dict[str, Any]:
+    tool_def = getattr(func, "_tool_definition", None)
+    if tool_def is not None and hasattr(tool_def, "to_dict"):
+        return dict(tool_def.to_dict())
+    from abstractcore.tools.core import ToolDefinition
+
+    return dict(ToolDefinition.from_function(func).to_dict())
+
+
 @router.get("/tools")
 async def list_tools() -> List[Dict[str, Any]]:
     """List available tools (ToolSpec dicts)."""
@@ -29,6 +38,25 @@ async def list_tools() -> List[Dict[str, Any]]:
         specs = list_default_tool_specs()
         if not isinstance(specs, list):
             specs = []
+
+        # AbstractCore common tools that are safe but not yet included in AbstractRuntime defaults.
+        # Keep discovery aligned with the host executor (`abstractflow.visual.workspace_scoped_tools`).
+        try:
+            from abstractcore.tools.common_tools import skim_url, skim_websearch
+
+            seen = {str(s.get("name") or "") for s in specs if isinstance(s, dict)}
+            for tool_fn in [skim_url, skim_websearch]:
+                if not callable(tool_fn):
+                    continue
+                d = _tool_spec_from_callable(tool_fn)
+                name = str(d.get("name") or "").strip()
+                if not name or name in seen:
+                    continue
+                seen.add(name)
+                d.setdefault("toolset", "web")
+                specs.append(d)
+        except Exception:
+            pass
 
         # Add schema-only runtime tools used by agents (no external callable).
         # These are executed as runtime effects by AbstractAgent adapters.

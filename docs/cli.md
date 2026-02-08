@@ -55,7 +55,7 @@ Evidence:
 Run the FastAPI backend used by the visual editor UI:
 
 ```bash
-pip install "abstractflow[server]"
+pip install "abstractflow[editor]"  # or: abstractflow[server]
 abstractflow serve --reload --port 8080
 ```
 

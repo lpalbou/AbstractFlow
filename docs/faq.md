@@ -55,7 +55,7 @@ Evidence: `abstractflow/visual/session_runner.py`, wiring in `abstractflow/visua
 ## Does `pip install abstractflow` include the web editor UI?
 
 Not the UI. The visual editor has two parts:
-- Backend (FastAPI): included when you install `abstractflow[server]` and runnable via `abstractflow serve`.
+- Backend (FastAPI): included when you install `abstractflow[editor]` (or `abstractflow[server]`) and runnable via `abstractflow serve`.
 - UI (React): published as the npm package `@abstractframework/flow` (run via `npx`).
 
 Evidence: `pyproject.toml` (`server` extra + `project.scripts`), `abstractflow/cli.py`, `web/frontend/bin/cli.js`.
@@ -78,6 +78,24 @@ The web backend creates a per-run workspace directory and wraps tool execution w
 - Workspace root is injected into `input_data` (`workspace_root`) and used to scope tools
 
 Evidence: `web/backend/services/execution_workspace.py`, `abstractflow/visual/workspace_scoped_tools.py`, `web/backend/routes/ws.py`, `web/backend/routes/flows.py`.
+
+## Why don’t I see comms tools (email/WhatsApp/Telegram) in the tool list?
+
+Comms tools are **disabled by default** for safety. Enable them on the editor backend and restart it:
+
+```bash
+ABSTRACT_ENABLE_COMMS_TOOLS=1 abstractflow serve --port 8080
+```
+
+Or enable subsets:
+- `ABSTRACT_ENABLE_EMAIL_TOOLS=1`
+- `ABSTRACT_ENABLE_WHATSAPP_TOOLS=1`
+- `ABSTRACT_ENABLE_TELEGRAM_TOOLS=1`
+
+Evidence:
+- Tool discovery endpoint: `web/backend/routes/tools.py` (`GET /api/tools`)
+- Host tool execution: `abstractflow/visual/workspace_scoped_tools.py`
+- Run guide: `docs/web-editor.md`
 
 ## How do I package and share workflows?
 

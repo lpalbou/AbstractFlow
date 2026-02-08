@@ -12,7 +12,7 @@ It is designed to run alongside the **editor backend** (FastAPI), which provides
 Terminal 1 (backend):
 
 ```bash
-pip install "abstractflow[server,agent]"
+pip install "abstractflow[editor]"
 abstractflow serve --reload --port 8080
 ```
 

@@ -41,6 +41,7 @@ Requirements: Python **3.10+** (`pyproject.toml`: `requires-python`).
 Optional extras:
 - Agent nodes (ReAct workflows): `pip install "abstractflow[agent]"`
 - Visual editor backend (FastAPI): `pip install "abstractflow[server]"`
+- Visual editor backend + Agent nodes (recommended): `pip install "abstractflow[editor]"`
 - Dev tools (tests/formatting): `pip install "abstractflow[dev]"`
 
 Notes:
@@ -79,12 +80,12 @@ If your flow uses subflows, load all referenced `*.json` into the `flows={...}` 
 ## Visual editor (local)
 
 The visual editor is split into:
-- a **Python backend** (FastAPI) shipped with `abstractflow[server]`
+- a **Python backend** (FastAPI) shipped with `abstractflow[editor]` (or `abstractflow[server]`)
 - a **JS frontend** shipped as `@abstractframework/flow` (runs via `npx`)
 
 ```bash
 # Terminal 1: Editor backend (FastAPI)
-pip install "abstractflow[server,agent]"
+pip install "abstractflow[editor]"
 abstractflow serve --reload --port 8080
 
 # Terminal 2: Editor UI (static server + /api proxy)

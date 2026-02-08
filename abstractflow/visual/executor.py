@@ -632,7 +632,34 @@ def create_visual_runner(
         effective_tool_executor = tool_executor
         if effective_tool_executor is None and MappingToolExecutor is not None and callable(get_default_tools):
             try:
-                effective_tool_executor = MappingToolExecutor.from_tools(get_default_tools())  # type: ignore[attr-defined]
+                tools = list(get_default_tools())  # type: ignore[misc]
+                # Include a couple of safe web helpers that ship with `abstractcore[tools]` but
+                # are not part of AbstractRuntime's default tool list yet.
+                try:
+                    from abstractcore.tools.common_tools import skim_url, skim_websearch
+
+                    def _tool_name(func: Any) -> str:
+                        tool_def = getattr(func, "_tool_definition", None)
+                        if tool_def is not None:
+                            name = getattr(tool_def, "name", None)
+                            if isinstance(name, str) and name.strip():
+                                return name.strip()
+                        name = getattr(func, "__name__", "")
+                        return str(name or "").strip()
+
+                    seen = {_tool_name(t) for t in tools if callable(t)}
+                    for t in [skim_url, skim_websearch]:
+                        if not callable(t):
+                            continue
+                        name = _tool_name(t)
+                        if not name or name in seen:
+                            continue
+                        seen.add(name)
+                        tools.append(t)
+                except Exception:
+                    pass
+
+                effective_tool_executor = MappingToolExecutor.from_tools(tools)  # type: ignore[attr-defined]
             except Exception:
                 effective_tool_executor = None
 

@@ -25,6 +25,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **FlowRunner SUBWORKFLOW auto-drive**: `FlowRunner.run()` no longer hangs if the runtime registry contains only subworkflow specs (common in unit tests). It now falls back to the runner’s own root `WorkflowSpec` when resuming/bubbling parents.
 
+## [0.3.4] - 2026-02-06
+
+### Added
+- **More AbstractCore “common tools” in the editor**: `skim_url` and `skim_websearch` are now included in `/api/tools` and are executable by the default host tool executor.
+- **Comms tools documentation**: clarified how to opt into email/WhatsApp/Telegram tools via env flags.
+
+## [0.3.3] - 2026-02-06
+
+### Added
+- **`abstractflow[editor]` extra** as the recommended install for the Visual Editor backend (equivalent to `abstractflow[server]` + `abstractflow[agent]`).
+
 ## [0.3.2] - 2026-02-06
 
 ### Added

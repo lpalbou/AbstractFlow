@@ -66,6 +66,7 @@ Requirements: Python **3.10+** (`pyproject.toml`: `requires-python`).
 Optional extras:
 - Agent nodes (ReAct workflows): `pip install "abstractflow[agent]"`
 - Visual editor backend (FastAPI): `pip install "abstractflow[server]"`
+- Visual editor backend + Agent nodes (recommended): `pip install "abstractflow[editor]"`
 - Dev tools (tests/formatting): `pip install "abstractflow[dev]"`
 
 Notes:
@@ -104,12 +105,12 @@ If your flow uses subflows, load all referenced `*.json` into the `flows={...}` 
 ## Visual editor (local)
 
 The visual editor is split into:
-- a **Python backend** (FastAPI) shipped with `abstractflow[server]`
+- a **Python backend** (FastAPI) shipped with `abstractflow[editor]` (or `abstractflow[server]`)
 - a **JS frontend** shipped as `@abstractframework/flow` (runs via `npx`)
 
 ```bash
 # Terminal 1: Editor backend (FastAPI)
-pip install "abstractflow[server,agent]"
+pip install "abstractflow[editor]"
 abstractflow serve --reload --port 8080
 
 # Terminal 2: Editor UI (static server + /api proxy)
@@ -225,6 +226,7 @@ pip install abstractflow
 Optional extras:
 - Agent nodes (ReAct workflows): `pip install "abstractflow[agent]"`
 - Visual editor backend (FastAPI): `pip install "abstractflow[server]"`
+- Visual editor backend + Agent nodes (recommended): `pip install "abstractflow[editor]"`
 - Dev tools: `pip install "abstractflow[dev]"`
 
 From source (repo root):
@@ -300,7 +302,7 @@ The editor is a reference app (FastAPI backend + React frontend). Follow: `docs/
 Quick start (no repo clone needed):
 
 ```bash
-pip install "abstractflow[server,agent]"
+pip install "abstractflow[editor]"
 abstractflow serve --reload --port 8080
 npx @abstractframework/flow
 ```
@@ -503,7 +505,7 @@ Evidence: `abstractflow/visual/session_runner.py`, wiring in `abstractflow/visua
 ## Does `pip install abstractflow` include the web editor UI?
 
 Not the UI. The visual editor has two parts:
-- Backend (FastAPI): included when you install `abstractflow[server]` and runnable via `abstractflow serve`.
+- Backend (FastAPI): included when you install `abstractflow[editor]` (or `abstractflow[server]`) and runnable via `abstractflow serve`.
 - UI (React): published as the npm package `@abstractframework/flow` (run via `npx`).
 
 Evidence: `pyproject.toml` (`server` extra + `project.scripts`), `abstractflow/cli.py`, `web/frontend/bin/cli.js`.
@@ -526,6 +528,24 @@ The web backend creates a per-run workspace directory and wraps tool execution w
 - Workspace root is injected into `input_data` (`workspace_root`) and used to scope tools
 
 Evidence: `web/backend/services/execution_workspace.py`, `abstractflow/visual/workspace_scoped_tools.py`, `web/backend/routes/ws.py`, `web/backend/routes/flows.py`.
+
+## Why don’t I see comms tools (email/WhatsApp/Telegram) in the tool list?
+
+Comms tools are **disabled by default** for safety. Enable them on the editor backend and restart it:
+
+```bash
+ABSTRACT_ENABLE_COMMS_TOOLS=1 abstractflow serve --port 8080
+```
+
+Or enable subsets:
+- `ABSTRACT_ENABLE_EMAIL_TOOLS=1`
+- `ABSTRACT_ENABLE_WHATSAPP_TOOLS=1`
+- `ABSTRACT_ENABLE_TELEGRAM_TOOLS=1`
+
+Evidence:
+- Tool discovery endpoint: `web/backend/routes/tools.py` (`GET /api/tools`)
+- Host tool execution: `abstractflow/visual/workspace_scoped_tools.py`
+- Run guide: `docs/web-editor.md`
 
 ## How do I package and share workflows?
 
@@ -636,7 +656,7 @@ This repository includes a reference visual editor:
 - FastAPI backend: `web/backend/`
 - React frontend: `web/frontend/`
 
-It is intended for development and as a reference host for executing VisualFlows. For convenience, the backend is also shipped as an **optional** part of the Python package (`abstractflow[server]`).
+It is intended for development and as a reference host for executing VisualFlows. For convenience, the backend is also shipped as an **optional** part of the Python package (`abstractflow[editor]` / `abstractflow[server]`).
 
 See also: `docs/getting-started.md`, `docs/faq.md`, `docs/visualflow.md`, `docs/architecture.md`.
 
@@ -647,7 +667,7 @@ Terminal 1 (backend):
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install "abstractflow[server,agent]"
+pip install "abstractflow[editor]"
 
 abstractflow serve --reload --port 8080
 ```
@@ -667,6 +687,7 @@ npx @abstractframework/flow
 Notes:
 - The UI expects `/api/*` on the same origin; the `npx` server proxies `/api/*` (HTTP + WebSocket) to the backend (default: `http://127.0.0.1:8080`).
 - Override the backend target with `--backend-url ...` (or env `ABSTRACTFLOW_BACKEND_URL`).
+- `abstractflow[editor]` is equivalent to installing `abstractflow[server]` + `abstractflow[agent]` together.
 
 Open:
 - UI: http://localhost:3003
@@ -738,6 +759,31 @@ Evidence:
 - Embeddings config check + KG embedder wiring: `web/backend/routes/connection.py`, `web/backend/routes/memory_kg.py`
 - Bundle upload/reload on publish: `web/backend/routes/flows.py`
 
+## Tools (AbstractCore)
+
+Tool lists shown in the editor come from the backend:
+- HTTP endpoint: `GET /api/tools` (`web/backend/routes/tools.py`)
+- Execution: tool calls are run by the host tool executor (`abstractflow/visual/workspace_scoped_tools.py`)
+
+By default, the backend exposes a safe set of “common tools” (files/web/system) from `abstractcore[tools]`.
+
+### Comms tools (opt-in)
+
+Email/WhatsApp/Telegram tools are **disabled by default**. Enable explicitly on the backend:
+
+```bash
+ABSTRACT_ENABLE_COMMS_TOOLS=1 abstractflow serve --port 8080
+```
+
+Or enable specific subsets:
+- `ABSTRACT_ENABLE_EMAIL_TOOLS=1`
+- `ABSTRACT_ENABLE_WHATSAPP_TOOLS=1`
+- `ABSTRACT_ENABLE_TELEGRAM_TOOLS=1`
+
+Notes:
+- These tools require additional AbstractCore configuration (credentials, accounts). See `abstractcore/tools/comms_tools.py` and `abstractcore/tools/telegram_tools.py` in the AbstractCore repo.
+- You must restart the backend after changing env vars so `/api/tools` reflects the new toolsets.
+
 ## WebSocket execution
 
 The Run UI uses WebSocket messages:
@@ -808,7 +854,7 @@ Evidence:
 Run the FastAPI backend used by the visual editor UI:
 
 ```bash
-pip install "abstractflow[server]"
+pip install "abstractflow[editor]"  # or: abstractflow[server]
 abstractflow serve --reload --port 8080
 ```
 
@@ -1002,6 +1048,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **FlowRunner SUBWORKFLOW auto-drive**: `FlowRunner.run()` no longer hangs if the runtime registry contains only subworkflow specs (common in unit tests). It now falls back to the runner’s own root `WorkflowSpec` when resuming/bubbling parents.
+
+## [0.3.4] - 2026-02-06
+
+### Added
+- **More AbstractCore “common tools” in the editor**: `skim_url` and `skim_websearch` are now included in `/api/tools` and are executable by the default host tool executor.
+- **Comms tools documentation**: clarified how to opt into email/WhatsApp/Telegram tools via env flags.
+
+## [0.3.3] - 2026-02-06
+
+### Added
+- **`abstractflow[editor]` extra** as the recommended install for the Visual Editor backend (equivalent to `abstractflow[server]` + `abstractflow[agent]`).
 
 ## [0.3.2] - 2026-02-06
 

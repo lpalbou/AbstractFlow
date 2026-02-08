@@ -15,6 +15,14 @@ export interface NodeTemplate {
   inputs: Pin[];
   outputs: Pin[];
   category: string;
+  /**
+   * Hide this template from the Node Palette (kept for backward compatibility).
+   */
+  hiddenInPalette?: boolean;
+  /**
+   * Mark as deprecated; existing flows can still load/run it.
+   */
+  deprecated?: boolean;
 }
 
 // Node categories
@@ -190,49 +198,6 @@ const EVENT_NODES: NodeTemplate[] = [
 // Core nodes
 const CORE_NODES: NodeTemplate[] = [
   {
-    type: 'subflow',
-    icon: '&#x1F4E6;', // Package
-    label: 'Subflow',
-    description: 'Run another saved workflow (subflow) and return its output object.',
-    headerColor: '#00CCCC',
-    inputs: [
-      { id: 'exec-in', label: '', type: 'execution' },
-      {
-        id: 'inherit_context',
-        label: 'inherit_context',
-        type: 'boolean',
-        description:
-          "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false.",
-      },
-      { id: 'input', label: 'input', type: 'object' },
-    ],
-    outputs: [
-      { id: 'exec-out', label: '', type: 'execution' },
-      { id: 'output', label: 'output', type: 'object' },
-    ],
-    category: 'core',
-  },
-  {
-    type: 'add_message',
-    icon: '&#x1F4AC;', // Speech bubble
-    label: 'Add Message',
-    description: 'Append a canonical message to the run active context (context.messages).',
-    headerColor: '#3498DB',
-    inputs: [
-      { id: 'exec-in', label: '', type: 'execution' },
-      { id: 'role', label: 'role', type: 'string', description: 'Message role (e.g. user, assistant, system, tool).' },
-      { id: 'content', label: 'content', type: 'string', description: 'Message content.' },
-    ],
-    outputs: [
-      { id: 'exec-out', label: '', type: 'execution' },
-      { id: 'message', label: 'message', type: 'object', description: 'Message object {role, content, timestamp, metadata.message_id}.' },
-      { id: 'context', label: 'context', type: 'object', description: 'Updated active context object (run.vars.context).' },
-      { id: 'task', label: 'task', type: 'string', description: 'Convenience output for context.task.' },
-      { id: 'messages', label: 'messages', type: 'array', description: 'Updated context.messages list.' },
-    ],
-    category: 'core',
-  },
-  {
     type: 'agent',
     icon: '&#x1F916;', // Robot
     label: 'Agent',
@@ -307,6 +272,29 @@ const CORE_NODES: NodeTemplate[] = [
         description:
           'Runtime-owned execution trace/scratchpad for observability (LLM/tool steps, timings). Includes best-effort tool_calls/tool_results extracted post-run.',
       },
+    ],
+    category: 'core',
+  },
+  {
+    type: 'subflow',
+    icon: '&#x1F4E6;', // Package
+    label: 'Subflow',
+    description: 'Run another saved workflow (subflow) and return its output object.',
+    headerColor: '#00CCCC',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      {
+        id: 'inherit_context',
+        label: 'inherit_context',
+        type: 'boolean',
+        description:
+          "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false.",
+      },
+      { id: 'input', label: 'input', type: 'object' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'output', label: 'output', type: 'object' },
     ],
     category: 'core',
   },
@@ -418,35 +406,6 @@ const CORE_NODES: NodeTemplate[] = [
     category: 'core',
   },
   {
-    type: 'call_tool',
-    icon: '&#x1F527;', // Wrench
-    label: 'Call Tool',
-    description: 'Execute a single tool call via the runtime. Outputs tool result (or error) and a success boolean.',
-    headerColor: '#16A085', // Teal - IO/tools
-    inputs: [
-      { id: 'exec-in', label: '', type: 'execution' },
-      {
-        id: 'tool_call',
-        label: 'tool_call',
-        type: 'object',
-        description: 'Single tool call request shape: {name, arguments, call_id?}.',
-      },
-      {
-        id: 'allowed_tools',
-        label: 'allowed_tools',
-        type: 'array',
-        description:
-          'Optional allowlist of tool names enforced by the runtime effect handler (empty list => allow none). If not connected, the node config (if any) is used.',
-      },
-    ],
-    outputs: [
-      { id: 'exec-out', label: '', type: 'execution' },
-      { id: 'result', label: 'result', type: 'any', description: 'Tool output when success=true; otherwise the error string.' },
-      { id: 'success', label: 'success', type: 'boolean', description: 'True if the tool executed successfully.' },
-    ],
-    category: 'core',
-  },
-  {
     type: 'ask_user',
     icon: '&#x2753;', // Question mark
     label: 'Ask User',
@@ -500,6 +459,57 @@ const CORE_NODES: NodeTemplate[] = [
       { id: 'output', label: 'output', type: 'any' },
     ],
     category: 'core',
+  },
+  {
+    type: 'add_message',
+    icon: '&#x1F4AC;', // Speech bubble
+    label: 'Add Message',
+    description: 'Append a canonical message to the run active context (context.messages).',
+    headerColor: '#3498DB',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'role', label: 'role', type: 'string', description: 'Message role (e.g. user, assistant, system, tool).' },
+      { id: 'content', label: 'content', type: 'string', description: 'Message content.' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'message', label: 'message', type: 'object', description: 'Message object {role, content, timestamp, metadata.message_id}.' },
+      { id: 'context', label: 'context', type: 'object', description: 'Updated active context object (run.vars.context).' },
+      { id: 'task', label: 'task', type: 'string', description: 'Convenience output for context.task.' },
+      { id: 'messages', label: 'messages', type: 'array', description: 'Updated context.messages list.' },
+    ],
+    category: 'core',
+  },
+  {
+    type: 'call_tool',
+    icon: '&#x1F527;', // Wrench
+    label: 'Call Tool',
+    description: 'Deprecated (use Tool Calls). Execute a single tool call via the runtime.',
+    headerColor: '#16A085', // Teal - IO/tools
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      {
+        id: 'tool_call',
+        label: 'tool_call',
+        type: 'object',
+        description: 'Single tool call request shape: {name, arguments, call_id?}.',
+      },
+      {
+        id: 'allowed_tools',
+        label: 'allowed_tools',
+        type: 'array',
+        description:
+          'Optional allowlist of tool names enforced by the runtime effect handler (empty list => allow none). If not connected, the node config (if any) is used.',
+      },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'result', label: 'result', type: 'any', description: 'Tool output when success=true; otherwise the error string.' },
+      { id: 'success', label: 'success', type: 'boolean', description: 'True if the tool executed successfully.' },
+    ],
+    category: 'core',
+    deprecated: true,
+    hiddenInPalette: true,
   },
 ];
 

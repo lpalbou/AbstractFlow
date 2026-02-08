@@ -20,6 +20,7 @@ pip install abstractflow
 Optional extras:
 - Agent nodes (ReAct workflows): `pip install "abstractflow[agent]"`
 - Visual editor backend (FastAPI): `pip install "abstractflow[server]"`
+- Visual editor backend + Agent nodes (recommended): `pip install "abstractflow[editor]"`
 - Dev tools: `pip install "abstractflow[dev]"`
 
 From source (repo root):
@@ -95,7 +96,7 @@ The editor is a reference app (FastAPI backend + React frontend). Follow: `docs/
 Quick start (no repo clone needed):
 
 ```bash
-pip install "abstractflow[server,agent]"
+pip install "abstractflow[editor]"
 abstractflow serve --reload --port 8080
 npx @abstractframework/flow
 ```

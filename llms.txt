@@ -6,6 +6,7 @@ Use this file as a curated index for LLM/agentic tooling:
 - Prefer the Markdown docs in `docs/` for user-facing behavior and stable concepts.
 - Use the linked code files as the source of truth for implementation details.
 - The `web/` visual editor is a reference app; the backend is shipped via `abstractflow[server]` and the published Python package is under `abstractflow/`.
+  - Recommended install for the editor backend is `abstractflow[editor]` (server + agent).
 
 ## Start Here
 
