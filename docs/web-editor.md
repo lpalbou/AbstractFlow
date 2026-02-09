@@ -6,7 +6,7 @@ This repository includes a reference visual editor:
 
 It is intended for development and as a reference host for executing VisualFlows. For convenience, the backend is also shipped as an **optional** part of the Python package (`abstractflow[editor]` / `abstractflow[server]`).
 
-See also: `docs/getting-started.md`, `docs/faq.md`, `docs/visualflow.md`, `docs/architecture.md`.
+See also: [../README.md](../README.md), [getting-started.md](getting-started.md), [faq.md](faq.md), [visualflow.md](visualflow.md), [architecture.md](architecture.md).
 
 ## Run (recommended: PyPI + npx)
 
@@ -79,18 +79,18 @@ cd ../
 python -m backend --port 8080
 ```
 
-Evidence: `web/backend/main.py` serves `web/frontend/dist` when it exists.
+Evidence: [../web/backend/main.py](../web/backend/main.py) serves `web/frontend/dist` when it exists.
 
 ## Where data is stored
 
 - Flows: `./flows/*.json` relative to the backend working directory.
   - Override with `ABSTRACTFLOW_FLOWS_DIR` (recommended when using the packaged backend).
-  - Evidence: `FLOWS_DIR` in `web/backend/routes/flows.py`.
+  - Evidence: `FLOWS_DIR` in [../web/backend/routes/flows.py](../web/backend/routes/flows.py).
 - Runtime persistence (runs/ledger/artifacts): defaults to:
   - source checkout: `web/runtime/`
   - installed package: `~/.abstractflow/runtime`
   - Override with `ABSTRACTFLOW_RUNTIME_DIR`.
-  - Evidence: `web/backend/services/paths.py`, `web/backend/services/runtime_stores.py`.
+  - Evidence: [../web/backend/services/paths.py](../web/backend/services/paths.py), [../web/backend/services/runtime_stores.py](../web/backend/services/runtime_stores.py).
 
 ## Gateway connectivity (optional)
 
@@ -102,10 +102,10 @@ Common env vars / flags:
 - CLI flags: `abstractflow serve --gateway-url ... --gateway-token ...` (or `python -m backend ...`) (see `web/backend/cli.py`)
 
 Evidence:
-- UI modal: `web/frontend/src/components/GatewayConnectionModal.tsx`
-- Backend persistence + env bootstrap: `web/backend/services/gateway_connection.py`
-- Embeddings config check + KG embedder wiring: `web/backend/routes/connection.py`, `web/backend/routes/memory_kg.py`
-- Bundle upload/reload on publish: `web/backend/routes/flows.py`
+- UI modal: [../web/frontend/src/components/GatewayConnectionModal.tsx](../web/frontend/src/components/GatewayConnectionModal.tsx)
+- Backend persistence + env bootstrap: [../web/backend/services/gateway_connection.py](../web/backend/services/gateway_connection.py)
+- Embeddings config check + KG embedder wiring: [../web/backend/routes/connection.py](../web/backend/routes/connection.py), [../web/backend/routes/memory_kg.py](../web/backend/routes/memory_kg.py)
+- Bundle upload/reload on publish: [../web/backend/routes/flows.py](../web/backend/routes/flows.py)
 
 ## Tools (AbstractCore)
 
@@ -113,24 +113,13 @@ Tool lists shown in the editor come from the backend:
 - HTTP endpoint: `GET /api/tools` (`web/backend/routes/tools.py`)
 - Execution: tool calls are run by the host tool executor (`abstractflow/visual/workspace_scoped_tools.py`)
 
-By default, the backend exposes a safe set of “common tools” (files/web/system) from `abstractcore[tools]`.
+By default, the backend exposes a conservative tool set derived from AbstractRuntime’s “default tools” list, plus a small number of extra safe web helpers.
 
-### Comms tools (opt-in)
+To add or customize tools, update the host:
+- Tool discovery (`GET /api/tools`): `web/backend/routes/tools.py`
+- Tool execution (workspace scoping + mapping executor): `abstractflow/visual/workspace_scoped_tools.py`
 
-Email/WhatsApp/Telegram tools are **disabled by default**. Enable explicitly on the backend:
-
-```bash
-ABSTRACT_ENABLE_COMMS_TOOLS=1 abstractflow serve --port 8080
-```
-
-Or enable specific subsets:
-- `ABSTRACT_ENABLE_EMAIL_TOOLS=1`
-- `ABSTRACT_ENABLE_WHATSAPP_TOOLS=1`
-- `ABSTRACT_ENABLE_TELEGRAM_TOOLS=1`
-
-Notes:
-- These tools require additional AbstractCore configuration (credentials, accounts). See `abstractcore/tools/comms_tools.py` and `abstractcore/tools/telegram_tools.py` in the AbstractCore repo.
-- You must restart the backend after changing env vars so `/api/tools` reflects the new toolsets.
+Evidence: [../web/backend/routes/tools.py](../web/backend/routes/tools.py), [../abstractflow/visual/workspace_scoped_tools.py](../abstractflow/visual/workspace_scoped_tools.py).
 
 ## WebSocket execution
 
@@ -139,4 +128,4 @@ The Run UI uses WebSocket messages:
 - `{ "type": "resume", "response": "…" }`
 - `{ "type": "control", "action": "pause|resume|cancel", "run_id": "…" }`
 
-Evidence: `web/backend/routes/ws.py`.
+Evidence: [../web/backend/routes/ws.py](../web/backend/routes/ws.py).

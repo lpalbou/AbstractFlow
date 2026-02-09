@@ -2,13 +2,14 @@
 
 This page documents the public Python API surface of the `abstractflow` package.
 
-See also: `README.md`, `docs/getting-started.md`, `docs/architecture.md`, `docs/faq.md`.
+See also: [../README.md](../README.md), [getting-started.md](getting-started.md), [architecture.md](architecture.md), [faq.md](faq.md).
 
 ## Version
 
 - `abstractflow.__version__` (string)
+- `abstractflow.get_version()` (helper)
 
-Evidence: `abstractflow/__init__.py`.
+Evidence: [../abstractflow/__init__.py](../abstractflow/__init__.py), [../pyproject.toml](../pyproject.toml).
 
 ## Programmatic flows
 
@@ -20,7 +21,7 @@ Evidence: `abstractflow/__init__.py`.
 from abstractflow import Flow, FlowNode, FlowEdge
 ```
 
-Evidence: `abstractflow/core/flow.py`, `abstractflow/__init__.py`.
+Evidence: [../abstractflow/core/flow.py](../abstractflow/core/flow.py), [../abstractflow/__init__.py](../abstractflow/__init__.py).
 
 ### FlowRunner
 
@@ -34,8 +35,9 @@ Key behaviors:
 - Creates a default in-memory runtime when you don’t provide one.
 - Normalizes completion output into `{"success": bool, "result": ...}`.
 - Returns `{"waiting": True, ...}` if the flow blocks on durable input.
+- Provides `start(...)`, `step(...)`, and `resume(...)` for host-driven execution loops.
 
-Evidence: `abstractflow/runner.py`.
+Evidence: [../abstractflow/runner.py](../abstractflow/runner.py).
 
 ### Compilation
 
@@ -45,7 +47,13 @@ Compilation functions are delegated to AbstractRuntime’s VisualFlow compiler a
 from abstractflow import compile_flow
 ```
 
-Evidence: `abstractflow/compiler.py`, `abstractflow/__init__.py`.
+Advanced compilation helpers are also re-exported (typically used by hosts/tools, not most end users):
+
+```python
+from abstractflow.compiler import compile_visualflow, compile_visualflow_tree
+```
+
+Evidence: [../abstractflow/compiler.py](../abstractflow/compiler.py), [../abstractflow/__init__.py](../abstractflow/__init__.py).
 
 ## Visual flows (VisualFlow JSON)
 
@@ -57,7 +65,7 @@ Pydantic models for the portable JSON format:
 from abstractflow.visual import VisualFlow, VisualNode, VisualEdge, NodeType, PinType
 ```
 
-Evidence: `abstractflow/visual/models.py`, `abstractflow/visual/__init__.py`.
+Evidence: [../abstractflow/visual/models.py](../abstractflow/visual/models.py), [../abstractflow/visual/__init__.py](../abstractflow/visual/__init__.py).
 
 ### Execute a VisualFlow
 
@@ -73,7 +81,13 @@ For advanced use cases (custom stores/tool execution, or access to run state/led
 from abstractflow.visual import create_visual_runner
 ```
 
-Evidence: `abstractflow/visual/executor.py`, `docs/getting-started.md`.
+Utilities:
+
+```python
+from abstractflow.visual import visual_to_flow
+```
+
+Evidence: [../abstractflow/visual/executor.py](../abstractflow/visual/executor.py), [getting-started.md](getting-started.md).
 
 ### Interfaces/contracts (optional)
 
@@ -87,7 +101,7 @@ from abstractflow.visual.interfaces import (
 )
 ```
 
-Evidence: `abstractflow/visual/interfaces.py`.
+Evidence: [../abstractflow/visual/interfaces.py](../abstractflow/visual/interfaces.py).
 
 ## Workflow bundles (`.flow`)
 
@@ -101,15 +115,29 @@ from abstractflow.workflow_bundle import (
 )
 ```
 
-Evidence: `abstractflow/workflow_bundle.py`, `docs/cli.md`.
+Evidence: [../abstractflow/workflow_bundle.py](../abstractflow/workflow_bundle.py), [cli.md](cli.md).
+
+## Adapters (advanced)
+
+If you build custom hosts or want direct control over node handler construction, adapters are re-exported:
+
+```python
+from abstractflow.adapters import (
+    create_function_node_handler,
+    create_agent_node_handler,
+    create_subflow_node_handler,
+)
+```
+
+Evidence: [../abstractflow/adapters/](../abstractflow/adapters/).
 
 ## CLI
 
 The `abstractflow` CLI entry point is declared in `pyproject.toml` (`project.scripts`) and implemented in:
-- `abstractflow/cli.py`
+- [../abstractflow/cli.py](../abstractflow/cli.py)
 
 The CLI includes:
 - WorkflowBundle tools: `abstractflow bundle ...`
 - Visual editor backend runner (optional): `abstractflow serve ...` (requires `abstractflow[server]`)
 
-Evidence: `pyproject.toml`, `abstractflow/cli.py`.
+Evidence: [../pyproject.toml](../pyproject.toml), [../abstractflow/cli.py](../abstractflow/cli.py), [../web/backend/cli.py](../web/backend/cli.py).

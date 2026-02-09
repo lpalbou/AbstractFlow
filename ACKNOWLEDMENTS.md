@@ -6,17 +6,18 @@ AbstractFlow is built on the shoulders of many projects and ideas. Thank you to 
 
 - The visual workflow UX is inspired by Unreal Engine (UE4/UE5) Blueprints: execution pins, typed pins, and “graph as program”.
 
-Evidence: `docs/architecture.md`.
+Evidence: [docs/architecture.md](docs/architecture.md).
 
 ## Core building blocks
 
+- AbstractFramework (ecosystem): https://github.com/lpalbou/AbstractFramework
 - AbstractRuntime (durable execution kernel: runs, waits, ledgers, artifacts)
 - AbstractCore (providers/models/tools integration used by runtime effects)
 - AbstractAgent (optional ReAct/CodeAct agent workflows used by the Visual Agent node)
 
 See `README.md` for links to the upstream repositories.
 
-Evidence: `pyproject.toml` (dependencies and extras), `abstractflow/visual/executor.py` (Agent + memory wiring).
+Evidence: [pyproject.toml](pyproject.toml) (dependencies and extras), [abstractflow/visual/executor.py](abstractflow/visual/executor.py) (Agent + memory wiring).
 
 ## Open-source libraries used in this repo
 

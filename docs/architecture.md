@@ -1,15 +1,15 @@
 # AbstractFlow — Architecture (Current)
 
-> Updated: 2026-02-06  
+> Updated: 2026-02-09  
 > Scope: describes **implemented behavior** in this repository (no roadmap claims).
 
-AbstractFlow is a workflow authoring + orchestration layer built on:
+AbstractFlow is a workflow authoring + orchestration layer in the [AbstractFramework ecosystem](https://github.com/lpalbou/AbstractFramework), built on:
 - **AbstractRuntime**: durable runs, waits, subworkflows, stores (`RunStore`/`LedgerStore`/`ArtifactStore`)
 - **AbstractCore** (via runtime integration): LLM + tool effects
 - **AbstractAgent** (optional): Agent node subworkflows (ReAct)
 - **AbstractMemory** (optional): memory/KG nodes
 
-See also: `docs/getting-started.md`, `docs/api.md`, `docs/faq.md`, `docs/visualflow.md`, `docs/web-editor.md`, `docs/cli.md`.
+See also: [../README.md](../README.md), [getting-started.md](getting-started.md), [api.md](api.md), [faq.md](faq.md), [visualflow.md](visualflow.md), [web-editor.md](web-editor.md), [cli.md](cli.md).
 
 ## Repository layout (what ships where)
 
@@ -58,7 +58,7 @@ flowchart LR
 The portable authoring format is `VisualFlow` (Pydantic models):
 - `VisualFlow`, `VisualNode`, `VisualEdge`, `NodeType`, `PinType`, …
 
-Evidence: `abstractflow/visual/models.py`.
+Evidence: [../abstractflow/visual/models.py](../abstractflow/visual/models.py).
 
 Key portability rule (enforced by design): the JSON must contain enough configuration to execute outside the web backend. Hosts may add storage, auth, and UI around it, but execution should remain host-independent.
 
@@ -69,14 +69,14 @@ Key portability rule (enforced by design): the JSON must contain enough configur
 AbstractFlow delegates “VisualFlow → Flow IR” semantics to AbstractRuntime:
 - `abstractflow.visual.executor.visual_to_flow()` calls `abstractruntime.visualflow_compiler.visual_to_flow(...)`.
 
-Evidence: `abstractflow/visual/executor.py`.
+Evidence: [../abstractflow/visual/executor.py](../abstractflow/visual/executor.py).
 
 ### Flow IR → WorkflowSpec
 
 AbstractFlow delegates compilation to AbstractRuntime:
 - `abstractflow.compiler.compile_flow` is re-exported from `abstractruntime.visualflow_compiler.compiler`.
 
-Evidence: `abstractflow/compiler.py`.
+Evidence: [../abstractflow/compiler.py](../abstractflow/compiler.py).
 
 ### Running (FlowRunner)
 
@@ -85,7 +85,7 @@ Evidence: `abstractflow/compiler.py`.
 - normalizes outputs to `{"success": bool, "result": ...}` for callers
 - can auto-drive nested `SUBWORKFLOW` waits in non-interactive contexts
 
-Evidence: `abstractflow/runner.py`, tests in `tests/test_runner.py`.
+Evidence: [../abstractflow/runner.py](../abstractflow/runner.py), tests in [../tests/test_runner.py](../tests/test_runner.py).
 
 ## VisualFlow execution wiring (host responsibilities)
 
@@ -98,7 +98,7 @@ It wires the runtime based on **what is present in the flow tree**:
 - wires AbstractCore effect handlers when LLM/tool nodes are present
 - optionally installs AbstractMemory KG effect handlers when `memory_kg_*` nodes are present
 
-Evidence: `abstractflow/visual/executor.py`.
+Evidence: [../abstractflow/visual/executor.py](../abstractflow/visual/executor.py).
 
 ## Session-scoped events (VisualSessionRunner)
 
@@ -106,7 +106,7 @@ VisualFlows that include custom events (`on_event` / `emit_event`) are executed 
 - `VisualSessionRunner` starts derived event-listener workflows as **child runs** in the same session.
 - During `run()`, it also ticks those child runs so `EMIT_EVENT` branches make progress without a separate host loop.
 
-Evidence: `abstractflow/visual/session_runner.py`, wiring in `abstractflow/visual/executor.py`, tests in `tests/test_visual_custom_events.py`.
+Evidence: [../abstractflow/visual/session_runner.py](../abstractflow/visual/session_runner.py), wiring in [../abstractflow/visual/executor.py](../abstractflow/visual/executor.py), tests in [../tests/test_visual_custom_events.py](../tests/test_visual_custom_events.py).
 
 ## Web editor host (FastAPI + WebSockets)
 
@@ -118,7 +118,7 @@ The reference host in `web/` provides:
   - `{ "type": "resume", "response": "…" }`
   - `{ "type": "control", "action": "pause|resume|cancel", "run_id": "…" }`
 
-See `docs/web-editor.md` for run instructions.
+See [web-editor.md](web-editor.md) for run instructions.
 
 ## Workflow bundles (`.flow`)
 
@@ -128,7 +128,7 @@ WorkflowBundles package a root VisualFlow JSON plus any referenced subflows into
 - Implementation delegates to AbstractRuntime: `abstractflow/workflow_bundle.py`
 - Format/packing semantics are owned by AbstractRuntime; AbstractFlow is a thin wrapper.
 
-Evidence: `tests/test_workflow_bundle_pack.py`, `abstractflow/workflow_bundle.py`.
+Evidence: [../tests/test_workflow_bundle_pack.py](../tests/test_workflow_bundle_pack.py), [../abstractflow/workflow_bundle.py](../abstractflow/workflow_bundle.py).
 
 ## What AbstractFlow owns vs delegates
 

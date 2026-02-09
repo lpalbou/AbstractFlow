@@ -4,7 +4,7 @@ This guide covers the two primary ways to use AbstractFlow:
 - **Programmatic flows** (`Flow` + `FlowRunner`)
 - **Visual flows** (portable `VisualFlow` JSON authored by the editor in `web/`)
 
-See also: `docs/README.md`, `docs/api.md`, `docs/faq.md`, `docs/visualflow.md`, `docs/web-editor.md`, `docs/cli.md`, `docs/architecture.md`.
+See also: [README](../README.md), [docs index](README.md), [api.md](api.md), [faq.md](faq.md), [visualflow.md](visualflow.md), [web-editor.md](web-editor.md), [cli.md](cli.md), [architecture.md](architecture.md).
 
 ## Requirements
 
@@ -29,7 +29,7 @@ From source (repo root):
 pip install -e .
 ```
 
-Evidence: dependencies and extras are declared in `pyproject.toml`.
+Evidence: dependencies and extras are declared in [../pyproject.toml](../pyproject.toml).
 
 ## Programmatic flow (FlowRunner)
 
@@ -47,9 +47,9 @@ print(FlowRunner(flow).run({"value": 5}))
 ```
 
 Evidence:
-- `Flow` / `FlowNode` / `FlowEdge` are re-exported from AbstractRuntime: `abstractflow/core/flow.py`
-- `FlowRunner` output normalization is implemented in `abstractflow/runner.py`
-- Baseline behavior is covered in `tests/test_runner.py`
+- `Flow` / `FlowNode` / `FlowEdge` are re-exported from AbstractRuntime: [../abstractflow/core/flow.py](../abstractflow/core/flow.py)
+- `FlowRunner` output normalization and “waiting” shape: [../abstractflow/runner.py](../abstractflow/runner.py)
+- Baseline behavior: [../tests/test_runner.py](../tests/test_runner.py)
 
 ## Execute a VisualFlow JSON
 
@@ -68,7 +68,7 @@ print(execute_visual_flow(vf, {"prompt": "Hello"}, flows={vf.id: vf}))
 
 If your flow uses subflows:
 - load **all referenced** `*.json` flows into the `flows={flow_id: VisualFlow}` mapping, or
-- package them as a WorkflowBundle (`.flow`) and load via AbstractRuntime (see `docs/cli.md`).
+- package them as a WorkflowBundle (`.flow`) and load via AbstractRuntime (see [cli.md](cli.md)).
 
 Convenient loader:
 
@@ -86,12 +86,12 @@ def load_flows(dir_path: str) -> dict[str, VisualFlow]:
 ```
 
 Evidence:
-- VisualFlow execution wiring lives in `abstractflow/visual/executor.py` (`create_visual_runner`, `execute_visual_flow`)
-- Subflow reachability / registry behavior is exercised in `tests/test_visual_subflow_*.py`
+- VisualFlow execution wiring: [../abstractflow/visual/executor.py](../abstractflow/visual/executor.py)
+- Subflow reachability / registry behavior: [../tests/test_visual_subflow_registry_reachability.py](../tests/test_visual_subflow_registry_reachability.py), [../tests/test_visual_subflow_recursion.py](../tests/test_visual_subflow_recursion.py)
 
 ## Run the visual editor (local)
 
-The editor is a reference app (FastAPI backend + React frontend). Follow: `docs/web-editor.md`.
+The editor is a reference app (FastAPI backend + React frontend). Follow: [web-editor.md](web-editor.md).
 
 Quick start (no repo clone needed):
 
@@ -106,7 +106,7 @@ Tip (from source): install the backend deps from the repo root with `pip install
 ## Workflow bundles (`.flow`)
 
 To package a VisualFlow + subflows into a single file, use the CLI:
-- `docs/cli.md`
+- [cli.md](cli.md)
 
 ## Waiting runs (durable asks/events/schedules)
 
@@ -116,4 +116,4 @@ Some flows intentionally block waiting for external input (e.g. `ask_user`, `wai
 - `execute_visual_flow()` returns a friendly shape including `waiting`, `wait_key`, and optional UX fields (`prompt`, `choices`, `allow_free_text`) (`abstractflow/visual/executor.py`).
   - Note: waiting results are reported as `success: False` with an `error` message (the run is not “failed”; it is blocked on input).
 
-To resume a run you need a host that can call `Runtime.resume(...)` (the web editor does this via WebSocket; see `docs/web-editor.md`).
+To resume a run you need a host that can call `Runtime.resume(...)` (the web editor does this via WebSocket; see [web-editor.md](web-editor.md)).

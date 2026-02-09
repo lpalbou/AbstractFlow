@@ -8,7 +8,7 @@ Entry point:
 - `abstractflow` (declared in `pyproject.toml` → `project.scripts`)
 - implementation: `abstractflow/cli.py`
 
-See also: `docs/getting-started.md`, `docs/faq.md`, `docs/visualflow.md`, `docs/architecture.md`.
+See also: [../README.md](../README.md), [getting-started.md](getting-started.md), [faq.md](faq.md), [visualflow.md](visualflow.md), [architecture.md](architecture.md).
 
 ## WorkflowBundle (.flow)
 
@@ -18,7 +18,7 @@ A `.flow` file is a zip bundle containing:
 
 Bundling semantics are shared with AbstractRuntime:
 - AbstractFlow CLI uses `abstractruntime.workflow_bundle` under the hood.
-- Evidence: `abstractflow/workflow_bundle.py`, `abstractflow/cli.py`.
+- Evidence: [../abstractflow/workflow_bundle.py](../abstractflow/workflow_bundle.py), [../abstractflow/cli.py](../abstractflow/cli.py).
 
 ## Commands
 
@@ -46,9 +46,9 @@ abstractflow bundle unpack /tmp/ac-echo.flow --dir /tmp/ac-echo
 ```
 
 Evidence:
-- Delegation to AbstractRuntime: `abstractflow/workflow_bundle.py`
-- CLI implementation: `abstractflow/cli.py`
-- Tests: `tests/test_workflow_bundle_pack.py`
+- Delegation to AbstractRuntime: [../abstractflow/workflow_bundle.py](../abstractflow/workflow_bundle.py)
+- CLI implementation: [../abstractflow/cli.py](../abstractflow/cli.py)
+- Tests: [../tests/test_workflow_bundle_pack.py](../tests/test_workflow_bundle_pack.py)
 
 ## Serve (Visual Editor backend)
 
@@ -61,10 +61,10 @@ abstractflow serve --reload --port 8080
 
 Notes:
 - This starts the backend API on `/api/*` (health: `/api/health`).
-- The UI can be served via `npx @abstractframework/flow` (see `docs/web-editor.md`).
+- The UI can be served via `npx @abstractframework/flow` (see [web-editor.md](web-editor.md)).
 
 Gateway-related flags (optional):
 - `--gateway-url http://127.0.0.1:8081`
 - `--gateway-token <token>`
 
-Evidence: `abstractflow/cli.py`, `web/backend/cli.py`, `web/backend/main.py`.
+Evidence: [../abstractflow/cli.py](../abstractflow/cli.py), [../web/backend/cli.py](../web/backend/cli.py), [../web/backend/main.py](../web/backend/main.py).

@@ -1,62 +1,85 @@
 # AbstractFlow
 
-> Diagram-based, durable AI workflows for Python (portable VisualFlow JSON + AbstractRuntime execution).
+> Diagram-based, durable AI workflows for Python (portable VisualFlow JSON, AbstractRuntime-backed execution, reference web editor).
 
-Use this file as a curated index for LLM/agentic tooling:
-- Prefer the Markdown docs in `docs/` for user-facing behavior and stable concepts.
-- Use the linked code files as the source of truth for implementation details.
-- The `web/` visual editor is a reference app; the backend is shipped via `abstractflow[server]` and the published Python package is under `abstractflow/`.
-  - Recommended install for the editor backend is `abstractflow[editor]` (server + agent).
+This repository ships:
+- the Python package `abstractflow/` (PyPI: `abstractflow`)
+- a reference visual editor app in `web/` (FastAPI backend + React UI)
+
+AbstractFlow is part of the AbstractFramework ecosystem:
+- https://github.com/lpalbou/AbstractFramework
+- built on AbstractRuntime: https://github.com/lpalbou/abstractruntime
+- and AbstractCore: https://github.com/lpalbou/abstractcore
+
+Agent usage tips:
+- All linked paths are repo-root relative.
+- If you need the smallest useful context, read **Start Here** and skip **Optional**.
+- Prefer `docs/` for stable, user-facing behavior; treat the linked code files as source of truth.
+- This project is **Pre-alpha** (APIs may change); use tests as executable behavior specs.
+- To validate changes locally, run: `pytest -q`.
+- `llms-full.txt` is generated from this file and intended for offline/RAG use. It may exceed a single context window; chunk it if needed.
+- After updating docs or linked files, regenerate: `python scripts/generate_llms_full.py`.
 
 ## Start Here
 
 - [README](README.md): What AbstractFlow is + install + quickstarts
-- [Getting started](docs/getting-started.md): Programmatic + VisualFlow execution
-- [FAQ](docs/faq.md): Common questions (external users)
-- [API reference](docs/api.md): Public Python API overview
 - [Docs index](docs/README.md): Documentation map
+- [Getting started](docs/getting-started.md): Programmatic + VisualFlow execution
+- [API reference](docs/api.md): Public Python API overview
+- [Architecture](docs/architecture.md): How authoring/execution fit together (diagram)
+- [FAQ](docs/faq.md): Common questions + operational details
 
 ## Formats
 
 - [VisualFlow format](docs/visualflow.md): Portable JSON workflow document
 - [VisualFlow schema](abstractflow/visual/models.py): Pydantic models (`VisualFlow`, `NodeType`, `PinType`, …)
-- [Interfaces/contracts](abstractflow/visual/interfaces.py): `VisualFlow.interfaces` markers + validation/scaffolding
+- [Interfaces/contracts](abstractflow/visual/interfaces.py): `VisualFlow.interfaces` markers + validation/scaffolding (e.g. `abstractcode.agent.v1`)
 
-## Architecture
+## Key Source (Python)
 
-- [Architecture](docs/architecture.md): How authoring/execution fit together (includes diagram)
-- [VisualFlow runtime wiring](abstractflow/visual/executor.py): `create_visual_runner`, integrations, subflows
-- [VisualSessionRunner](abstractflow/visual/session_runner.py): session-scoped event listeners (`on_event` / `emit_event`)
-- [FlowRunner](abstractflow/runner.py): Execution + output normalization + subworkflow convenience
-- [Compiler shim](abstractflow/compiler.py): Delegation to `abstractruntime.visualflow_compiler`
+- [Public API exports](abstractflow/__init__.py): what `from abstractflow import ...` provides
+- [FlowRunner](abstractflow/runner.py): execution + output normalization + durable “waiting” shape
+- [VisualFlow runtime wiring](abstractflow/visual/executor.py): `create_visual_runner`, registry + integrations, `execute_visual_flow`
+- [VisualSessionRunner](abstractflow/visual/session_runner.py): session-scoped custom events (`on_event` / `emit_event`)
+- [Workspace-scoped tools](abstractflow/visual/workspace_scoped_tools.py): default tool executor wiring (host-side)
+- [Compiler shim](abstractflow/compiler.py): re-exports from `abstractruntime.visualflow_compiler`
+- [WorkflowBundle helpers](abstractflow/workflow_bundle.py): `.flow` pack/inspect/unpack thin wrapper
 
-## Web Editor
+## Web Editor Host (FastAPI)
 
 - [Web editor guide](docs/web-editor.md): Run backend/frontend, storage locations, gateway env vars
-- [Backend app](web/backend/main.py): FastAPI app + static serving rules
 - [WebSocket execution](web/backend/routes/ws.py): `{type:"run"|"resume"|"control"}` protocol and event stream
-- [Frontend scripts](web/frontend/package.json): Vite dev/build commands (ports)
+- [Flow CRUD + publish](web/backend/routes/flows.py): flow persistence (`ABSTRACTFLOW_FLOWS_DIR`) + bundle publishing
+- [Tool discovery](web/backend/routes/tools.py): `GET /api/tools` used by the UI allowlist picker
+- [Runtime persistence paths](web/backend/services/paths.py): `ABSTRACTFLOW_RUNTIME_DIR` defaulting rules
+- [Execution workspaces](web/backend/services/execution_workspace.py): `ABSTRACTFLOW_BASE_EXECUTION` and workspace aliasing
+- [Backend app](web/backend/main.py): FastAPI app + static serving rules
 
 ## CLI
 
 - [CLI guide](docs/cli.md): WorkflowBundle commands + `abstractflow serve`
 - [CLI implementation](abstractflow/cli.py): `abstractflow bundle …` and `abstractflow serve`
-- [WorkflowBundle helpers](abstractflow/workflow_bundle.py): Delegates to AbstractRuntime bundle format
 
-## Tests
+## Manifests
 
-- [Runner tests](tests/test_runner.py): Programmatic FlowRunner behavior
-- [Bundle tests](tests/test_workflow_bundle_pack.py): `.flow` packing semantics + compilation checks
-- [WebSocket execution tests](tests/test_visual_ws_subflow.py): WS run/resume + subflow waits
+- [Python package manifest](pyproject.toml): version, dependencies/extras, CLI scripts
+- [Frontend manifest](web/frontend/package.json): npm package name and dev/build scripts
 
-## Support
+## Tests (executable specs)
 
-- [Security policy](SECURITY.md): How to report vulnerabilities responsibly
+- [Runner tests](tests/test_runner.py): FlowRunner behavior and output normalization
+- [Bundle tests](tests/test_workflow_bundle_pack.py): `.flow` packing semantics
+- [WS execution tests](tests/test_visual_ws_subflow.py): WebSocket run/resume + subflow behavior
+
+## Repo Policies
+
 - [Contributing](CONTRIBUTING.md): Dev setup, tests, and contribution guidelines
+- [Security policy](SECURITY.md): How to report vulnerabilities responsibly
+- [Acknowledgments](ACKNOWLEDMENTS.md): dependency overview + upstream credits
+- [Changelog](CHANGELOG.md): user-visible changes
 
 ## Optional
 
 - [Full context pack](llms-full.txt): Concatenated docs for offline use (generated)
 - [Pack generator](scripts/generate_llms_full.py): Regenerate `llms-full.txt`
-- [Changelog](CHANGELOG.md)
-- [Sample flows](web/flows): Example VisualFlow JSON documents used by the web editor
+- [Sample flow: ac-echo](web/flows/ac-echo.json): small VisualFlow JSON used in CLI examples
