@@ -273,7 +273,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     setLoadingProviders(true);
     fetch('/api/providers')
       .then((res) => res.json())
-      .then((data) => setProviders(data))
+      .then((data) => setProviders(Array.isArray(data) ? data : []))
       .catch((err) => console.error('Failed to fetch providers:', err))
       .finally(() => setLoadingProviders(false));
   }, []);
@@ -338,7 +338,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       setModels([]);
       fetch(`/api/providers/${selectedProvider}/models`)
         .then((res) => res.json())
-        .then((data) => setModels(data))
+        .then((data) => setModels(Array.isArray(data) ? data : []))
         .catch((err) => console.error('Failed to fetch models:', err))
         .finally(() => setLoadingModels(false));
     } else {
