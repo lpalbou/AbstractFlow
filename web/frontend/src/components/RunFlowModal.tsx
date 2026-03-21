@@ -5,7 +5,7 @@
  * Shows execution progress and results.
  */
 
-import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef, type DragEvent } from 'react';
 import { useFlowStore } from '../hooks/useFlow';
 import type { ExecutionEvent, ExecutionMetrics, Pin, FlowRunResult, RunSummary } from '../types/flow';
 import { isEntryNodeType } from '../types/flow';
@@ -26,7 +26,16 @@ interface RunFlowModalProps {
   isOpen: boolean;
   onClose: () => void;
   onRun: (inputData: Record<string, unknown>) => void;
-  onRunAgain: () => void;
+  onFollowUpSubmit?: (payload: {
+    message: string;
+    attachments: File[];
+    contextMessages?: FollowUpMessage[];
+    sessionId?: string;
+    threadRootRunId?: string;
+    inputDataDefaults?: Record<string, unknown> | null;
+  }) => Promise<void> | void;
+  onNewRun?: () => void;
+  onApproveAll?: (ctx?: { rootRunId?: string; sessionId?: string }) => void;
   isRunning: boolean;
   isPaused?: boolean;
   result: FlowRunResult | null;
@@ -34,17 +43,22 @@ interface RunFlowModalProps {
   traceEvents?: ExecutionEvent[];
   isWaiting?: boolean;
   waitingInfo?: WaitingInfo | null;
-  onResume?: (response: string) => void;
+  onResume?: (response: string | { response?: string; approved?: boolean; reason?: string; runId?: string; waitKey?: string }) => void;
   onPause?: () => void;
   onResumeRun?: () => void;
   onCancelRun?: () => void;
   onSelectRunId?: (runId: string) => void;
   runSummary?: RunSummary | null;
+  stableSessionId?: string;
+  threadRootRunId?: string;
 }
 
 type JsonParseResult<T> =
   | { ok: true; value: T }
   | { ok: false; error: string };
+
+type FollowUpMessage = { role: 'user' | 'assistant'; content: string };
+type FollowUpContext = { messages: FollowUpMessage[] };
 
 function parseJson<T>(raw: string): JsonParseResult<T> {
   const text = typeof raw === 'string' ? raw.trim() : '';
@@ -136,43 +150,6 @@ function ChevronUpIcon({ size = 16 }: { size?: number }) {
       <path d="M6 14l6-6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
-}
-
-function randomUuidHex(): string {
-  try {
-    if (typeof globalThis.crypto?.randomUUID === 'function') {
-      return globalThis.crypto.randomUUID().replace(/-/g, '');
-    }
-  } catch {
-    // ignore
-  }
-  try {
-    if (typeof globalThis.crypto?.getRandomValues === 'function') {
-      const bytes = new Uint8Array(16);
-      globalThis.crypto.getRandomValues(bytes);
-      return Array.from(bytes)
-        .map((b) => b.toString(16).padStart(2, '0'))
-        .join('');
-    }
-  } catch {
-    // ignore
-  }
-  // Non-crypto fallback (best-effort; still unique enough for UI defaults).
-  return (
-    Math.random().toString(16).slice(2).padEnd(16, '0') +
-    Math.random().toString(16).slice(2).padEnd(16, '0')
-  ).slice(0, 32);
-}
-
-function joinPath(base: string, child: string): string {
-  const b = String(base || '');
-  const c = String(child || '');
-  if (!b) return c;
-  if (!c) return b;
-  const sep = b.includes('\\') ? '\\' : '/';
-  const b2 = b.endsWith('/') || b.endsWith('\\') ? b.slice(0, -1) : b;
-  const c2 = c.replace(/^[/\\]+/, '');
-  return `${b2}${sep}${c2}`;
 }
 
 function ArrayParamEditor({
@@ -314,7 +291,9 @@ export function RunFlowModal({
   isOpen,
   onClose,
   onRun,
-  onRunAgain,
+  onFollowUpSubmit,
+  onNewRun,
+  onApproveAll,
   isRunning,
   isPaused = false,
   result,
@@ -328,6 +307,8 @@ export function RunFlowModal({
   onCancelRun,
   onSelectRunId,
   runSummary = null,
+  stableSessionId,
+  threadRootRunId,
 }: RunFlowModalProps) {
   const { nodes, edges, flowName, flowId, lastLoopProgress, loopProgressByNodeId } = useFlowStore();
 
@@ -378,8 +359,11 @@ export function RunFlowModal({
   const [workspaceRandom, setWorkspaceRandom] = useState(true);
   const [workspaceRoot, setWorkspaceRoot] = useState('');
   const [manualWorkspaceRoot, setManualWorkspaceRoot] = useState('');
-  const [workspaceAccessMode, setWorkspaceAccessMode] = useState<'workspace_only' | 'all_except_ignored'>('workspace_only');
+  type WorkspaceAccessMode = 'workspace_only' | 'workspace_or_allowed' | 'all_except_ignored';
+  const [workspaceAccessMode, setWorkspaceAccessMode] = useState<WorkspaceAccessMode>('workspace_only');
   const [workspaceIgnoredPathsText, setWorkspaceIgnoredPathsText] = useState('');
+  const [showIgnoredPaths, setShowIgnoredPaths] = useState(false);
+  const [sessionIdOverride, setSessionIdOverride] = useState('');
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [rawJsonOpen, setRawJsonOpen] = useState(true);
   // Nested subflow observability: folded by default; per-step expansion keyed by the
@@ -391,6 +375,34 @@ export function RunFlowModal({
   const [rehydrateArtifactMarkdown, setRehydrateArtifactMarkdown] = useState<string | null>(null);
   const [rehydrateArtifactError, setRehydrateArtifactError] = useState<string | null>(null);
   const [rehydrateArtifactLoading, setRehydrateArtifactLoading] = useState(false);
+  const [startInputData, setStartInputData] = useState<Record<string, unknown> | null>(null);
+  const [startInputDefaults, setStartInputDefaults] = useState<Record<string, unknown> | null>(null);
+  const [followUpContext, setFollowUpContext] = useState<FollowUpContext | null>(null);
+  const [lastRunSeed, setLastRunSeed] = useState<FollowUpContext | null>(null);
+  // Follow-up modal state.
+  const [showFollowUpModal, setShowFollowUpModal] = useState(false);
+  const [followUpDraft, setFollowUpDraft] = useState('');
+  const [followUpAttachments, setFollowUpAttachments] = useState<File[]>([]);
+  const [followUpError, setFollowUpError] = useState<string | null>(null);
+  const [followUpSubmitting, setFollowUpSubmitting] = useState(false);
+  const [followUpDragActive, setFollowUpDragActive] = useState(false);
+
+  const sessionPinId = useMemo(() => {
+    const pin = formInputPins.find((p) => p.id === 'session_id' || p.id === 'sessionId');
+    return pin?.id || null;
+  }, [formInputPins]);
+
+
+  const derivedSessionId = useMemo(() => {
+    const fromInput =
+      typeof startInputData?.sessionId === 'string' && startInputData.sessionId.trim()
+        ? startInputData.sessionId.trim()
+        : typeof startInputData?.session_id === 'string' && startInputData.session_id.trim()
+          ? startInputData.session_id.trim()
+          : '';
+    if (fromInput) return fromInput;
+    return typeof stableSessionId === 'string' && stableSessionId.trim() ? stableSessionId.trim() : '';
+  }, [stableSessionId, startInputData]);
 
   const providerPinId = useMemo(() => {
     const pin = formInputPins.find((p) => p.type === 'provider' || p.id === 'provider');
@@ -420,28 +432,81 @@ export function RunFlowModal({
   }, [toolSpecs]);
 
   const executionWorkspaceQuery = useExecutionWorkspace(isOpen);
-  const defaultRandomRoot =
-    executionWorkspaceQuery.data && typeof executionWorkspaceQuery.data.default_random_root === 'string'
-      ? executionWorkspaceQuery.data.default_random_root
-      : '';
-  const createRandomWorkspaceRoot = useCallback(() => {
-    const base = String(defaultRandomRoot || '').trim();
-    if (!base) return '';
-    return joinPath(base, randomUuidHex());
-  }, [defaultRandomRoot]);
+  const workspacePolicy = useMemo(() => {
+    const policy = executionWorkspaceQuery.data?.policy;
+    return policy && typeof policy === 'object' ? (policy as Record<string, unknown>) : null;
+  }, [executionWorkspaceQuery.data]);
+  const workspacePolicyTarget =
+    typeof workspacePolicy?.target === 'string' && workspacePolicy?.target.trim()
+      ? workspacePolicy.target.trim()
+      : 'server';
+  const workspaceOverridesAllowed = workspacePolicy?.client_workspace_scope_overrides === true;
+  const workspacePolicyLoading = executionWorkspaceQuery.isLoading;
+  const workspaceInputEnabled = workspacePolicyLoading
+    ? true
+    : workspacePolicyTarget !== 'server' || workspaceOverridesAllowed;
+  const workspaceRootRequired = workspacePolicyLoading ? false : workspacePolicyTarget !== 'server';
+  const ignoredPathsCount = useMemo(() => {
+    return String(workspaceIgnoredPathsText || '')
+      .split('\n')
+      .filter((line) => line.trim()).length;
+  }, [workspaceIgnoredPathsText]);
+  const allowedAccessModes = useMemo(() => {
+    const raw = workspacePolicy?.allowed_access_modes;
+    let modes: string[] | null = null;
+    if (Array.isArray(raw)) {
+      const cleaned = raw.filter((v) => typeof v === 'string' && v.trim()).map((v) => v.trim());
+      if (cleaned.length > 0) {
+        modes = cleaned;
+      } else {
+        console.warn('#FALLBACK: workspace policy allowed_access_modes is empty; using defaults');
+      }
+    } else if (raw !== undefined) {
+      console.warn('#FALLBACK: workspace policy allowed_access_modes is invalid; using defaults');
+    }
+    if (!modes) {
+      modes = workspaceOverridesAllowed
+        ? ['workspace_only', 'workspace_or_allowed', 'all_except_ignored']
+        : ['workspace_only', 'workspace_or_allowed'];
+    }
+    return modes;
+  }, [workspaceOverridesAllowed, workspacePolicy]);
+  const workspaceAccessModeOptions = useMemo(() => {
+    const labels: Record<string, string> = {
+      workspace_only: 'workspace_only (restrict to workspace_root)',
+      workspace_or_allowed: 'workspace_or_allowed (allow server-approved mounts)',
+      all_except_ignored: 'all_except_ignored (allow absolute paths outside workspace_root)',
+    };
+    return allowedAccessModes.map((mode) => ({
+      value: mode,
+      label: labels[mode] || mode,
+    }));
+  }, [allowedAccessModes]);
+
+  useEffect(() => {
+    if (allowedAccessModes.includes(workspaceAccessMode)) return;
+    const next = (allowedAccessModes[0] || 'workspace_only') as WorkspaceAccessMode;
+    console.warn(`#FALLBACK: workspace_access_mode not allowed; resetting to '${next}'`);
+    setWorkspaceAccessMode(next);
+  }, [allowedAccessModes, workspaceAccessMode]);
+
+  useEffect(() => {
+    if (workspaceInputEnabled) return;
+    // Even when client overrides are disabled, the gateway uses a per-run workspace by default.
+    // Keep the UI in "Random" mode so it matches the actual behavior (and avoids confusion).
+    if (!workspaceRandom) setWorkspaceRandom(true);
+    if (workspaceRoot.trim()) {
+      console.warn('#FALLBACK: workspace_root ignored because gateway policy disallows client overrides');
+      setWorkspaceRoot('');
+    }
+  }, [workspaceInputEnabled, workspaceRandom, workspaceRoot]);
 
   // When the modal is opened, start expanded (predictable UX).
   useEffect(() => {
     if (isOpen) setIsMinimized(false);
   }, [isOpen]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    if (!workspaceRandom) return;
-    if (workspaceRoot.trim()) return;
-    const next = createRandomWorkspaceRoot();
-    if (next) setWorkspaceRoot(next);
-  }, [createRandomWorkspaceRoot, isOpen, workspaceRandom, workspaceRoot]);
+  // When "Random" is enabled, the gateway will generate a workspace on run start.
 
   // Initialize form values when modal opens
   useEffect(() => {
@@ -511,6 +576,20 @@ export function RunFlowModal({
     }
   }, [isOpen, formInputPins, entryNode]);
 
+  useEffect(() => {
+    if (!isOpen || !derivedSessionId) return;
+    if (sessionPinId) {
+      const current = formValues[sessionPinId];
+      if (!current || !String(current).trim()) {
+        setFormValues((prev) => ({ ...prev, [sessionPinId]: derivedSessionId }));
+      }
+      return;
+    }
+    if (!sessionIdOverride.trim()) {
+      setSessionIdOverride(derivedSessionId);
+    }
+  }, [derivedSessionId, formValues, isOpen, sessionIdOverride, sessionPinId]);
+
   // Clear resume draft when leaving waiting state
   useEffect(() => {
     if (!isWaiting) setResumeDraft('');
@@ -533,14 +612,14 @@ export function RunFlowModal({
     (checked: boolean) => {
       if (checked) {
         setWorkspaceRandom(true);
-        const next = createRandomWorkspaceRoot();
-        if (next) setWorkspaceRoot(next);
+        // Default behavior: server allocates a per-run workspace when workspace_root is unset.
+        setWorkspaceRoot('');
         return;
       }
       setWorkspaceRandom(false);
       if (manualWorkspaceRoot.trim()) setWorkspaceRoot(manualWorkspaceRoot);
     },
-    [createRandomWorkspaceRoot, manualWorkspaceRoot]
+    [manualWorkspaceRoot]
   );
 
   // Submit the form
@@ -585,7 +664,11 @@ export function RunFlowModal({
 
     const workspaceValue = String(workspaceRoot || '').trim();
     if (workspaceValue) {
-      inputData.workspace_root = workspaceValue;
+      if (workspaceInputEnabled) {
+        inputData.workspace_root = workspaceValue;
+      } else {
+        console.warn('#FALLBACK: workspace_root ignored because gateway policy disallows client overrides');
+      }
     }
     inputData.workspace_access_mode = workspaceAccessMode;
     const ignored = String(workspaceIgnoredPathsText || '')
@@ -596,14 +679,47 @@ export function RunFlowModal({
       inputData.workspace_ignored_paths = ignored;
     }
 
+    const sessionValue = sessionPinId ? formValues[sessionPinId] : sessionIdOverride;
+    const sessionIdRaw = typeof sessionValue === 'string' ? sessionValue.trim() : '';
+    const sessionId = sessionIdRaw || derivedSessionId;
+    if (sessionId) {
+      inputData.sessionId = sessionId;
+    }
+
+    if (followUpContext?.messages?.length) {
+      const existingContextRaw = inputData.context;
+      const existingContext =
+        existingContextRaw && typeof existingContextRaw === 'object' && !Array.isArray(existingContextRaw)
+          ? { ...(existingContextRaw as Record<string, unknown>) }
+          : {};
+      const existingMessages = Array.isArray(existingContext.messages) ? existingContext.messages : [];
+      existingContext.messages = [...followUpContext.messages, ...existingMessages];
+      inputData.context = existingContext;
+    }
+
     onRun(inputData);
-  }, [formInputPins, formValues, onRun, toolsValues, workspaceAccessMode, workspaceIgnoredPathsText, workspaceRoot]);
+    if (followUpContext) setFollowUpContext(null);
+  }, [
+    formInputPins,
+    formValues,
+    onRun,
+    toolsValues,
+    workspaceAccessMode,
+    workspaceIgnoredPathsText,
+    workspaceInputEnabled,
+    workspaceRoot,
+    followUpContext,
+    sessionIdOverride,
+    sessionPinId,
+    derivedSessionId,
+  ]);
 
   type StepStatus = 'running' | 'completed' | 'waiting' | 'failed';
   type Step = {
     id: string;
     status: StepStatus;
     runId?: string;
+    runtimeStepId?: string;
     nodeId?: string;
     nodeLabel?: string;
     nodeType?: string;
@@ -623,6 +739,8 @@ export function RunFlowModal({
       allowFreeText: boolean;
       waitKey?: string;
       reason?: string;
+      runId?: string;
+      details?: Record<string, unknown>;
     };
   };
 
@@ -699,17 +817,47 @@ export function RunFlowModal({
     return badges;
   };
 
+  const getActualRunId = (ev: ExecutionEvent): string => (typeof ev.runId === 'string' ? ev.runId.trim() : '');
+  const getThreadRunId = (ev: ExecutionEvent): string =>
+    typeof ev.threadRunId === 'string' ? ev.threadRunId.trim() : '';
+
   const runSteps = useMemo(() => {
     const openByNode = new Map<string, number>();
+    const terminalIndexByNode = new Map<string, number>();
     const all: Step[] = [];
 
-    const rootRunId = (() => {
+    const forcedThreadId = typeof threadRootRunId === 'string' ? threadRootRunId.trim() : '';
+    let threadId: string | null = forcedThreadId || null;
+    const rootRunIds: string[] = [];
+    const seenRootRunIds = new Set<string>();
+
+    for (const ev of events) {
+      if (ev.type !== 'flow_start') continue;
+      const rid = getActualRunId(ev);
+      if (rid && !seenRootRunIds.has(rid)) {
+        seenRootRunIds.add(rid);
+        rootRunIds.push(rid);
+      }
+      if (!threadId) {
+        const tid = getThreadRunId(ev);
+        threadId = tid || rid || null;
+      }
+    }
+
+    if (!threadId) {
       for (let i = events.length - 1; i >= 0; i--) {
         const ev = events[i];
-        if (ev.type === 'flow_start' && ev.runId) return ev.runId;
+        const tid = getThreadRunId(ev);
+        const rid = getActualRunId(ev);
+        if (tid || rid) {
+          threadId = tid || rid;
+          break;
+        }
       }
-      return null;
-    })();
+    }
+
+    const rootRunId = rootRunIds.length ? rootRunIds[rootRunIds.length - 1] : threadId;
+    const displayRootRunIds = rootRunIds.length ? rootRunIds : rootRunId ? [rootRunId] : [];
 
     const safeString = (value: unknown) => (typeof value === 'string' ? value : value == null ? '' : String(value));
 
@@ -869,6 +1017,15 @@ export function RunFlowModal({
         if (typeof nestedObj.response === 'string' && nestedObj.response) return nestedObj.response;
       }
 
+      const nestedOutput = obj.output;
+      if (nestedOutput && typeof nestedOutput === 'object') {
+        const outObj = nestedOutput as Record<string, unknown>;
+        if (typeof outObj.output === 'string' && outObj.output) return outObj.output;
+        if (typeof outObj.result === 'string' && outObj.result) return outObj.result;
+        if (typeof outObj.message === 'string' && outObj.message) return outObj.message;
+        if (typeof outObj.response === 'string' && outObj.response) return outObj.response;
+      }
+
       try {
         return JSON.stringify(value);
       } catch {
@@ -884,7 +1041,17 @@ export function RunFlowModal({
     const nodeMeta = (nodeId: string | undefined) => {
       if (!nodeId) return null;
       const n = nodeById.get(nodeId);
-      if (!n) return null;
+      if (!n) {
+        if (nodeId === '__follow_up__') {
+          return {
+            label: 'Follow Up',
+            type: 'ask_user',
+            icon: '...',
+            color: '#3a4a5a',
+          };
+        }
+        return null;
+      }
       return {
         label: n.data.label || nodeId,
         type: n.data.nodeType,
@@ -895,16 +1062,19 @@ export function RunFlowModal({
 
     for (let i = 0; i < events.length; i++) {
       const ev = events[i];
+      const evRunId = getActualRunId(ev);
+      const evStepId = typeof ev.stepId === 'string' && ev.stepId.trim() ? ev.stepId.trim() : undefined;
       // We show only node steps in the left timeline; flow-level status is surfaced in the header / final result.
       if (ev.type === 'flow_start' || ev.type === 'flow_complete') continue;
 
       if (ev.type === 'node_start') {
-        const key = `${ev.runId || ''}:${ev.nodeId || ''}`;
+        const key = `${evRunId || ''}:${ev.nodeId || ''}`;
         const meta = nodeMeta(ev.nodeId);
         const step: Step = {
           id: `node_start:${ev.nodeId || 'unknown'}:${i}`,
           status: 'running',
-          runId: ev.runId,
+          runId: evRunId || ev.runId,
+          runtimeStepId: evStepId,
           nodeId: ev.nodeId,
           nodeLabel: meta?.label,
           nodeType: meta?.type,
@@ -919,32 +1089,56 @@ export function RunFlowModal({
 
       if (ev.type === 'node_complete') {
         const nodeId = ev.nodeId;
-        const key = `${ev.runId || ''}:${nodeId || ''}`;
+        const key = `${evRunId || ''}:${nodeId || ''}`;
         const idx = nodeId ? openByNode.get(key) : undefined;
         const mi = extractModelInfo(ev.result);
+        const meta = nodeMeta(nodeId);
+        const terminalKey = meta?.type === 'on_flow_end' && nodeId ? `${evRunId || ''}:${nodeId}` : '';
+        const existingTerminalIdx = terminalKey ? terminalIndexByNode.get(terminalKey) : undefined;
+        if (typeof existingTerminalIdx === 'number' && typeof idx !== 'number') {
+          const prior = all[existingTerminalIdx];
+          const incomingSummary = summarize(ev.result);
+          const preferIncoming =
+            Boolean(incomingSummary) && (!prior?.summary || incomingSummary.length > (prior.summary || '').length);
+          if (preferIncoming) {
+            all[existingTerminalIdx] = {
+              ...prior,
+              output: ev.result ?? prior.output,
+              summary: incomingSummary || prior.summary,
+              metrics: mergeMetricsPreferLonger(prior.metrics ?? null, ev.meta ?? null),
+              provider: mi.provider ?? prior.provider,
+              model: mi.model ?? prior.model,
+              runtimeStepId: prior.runtimeStepId ?? evStepId,
+              endedAt: typeof ev.ts === 'string' ? ev.ts : prior.endedAt,
+            };
+          }
+          continue;
+        }
         if (typeof idx === 'number') {
           all[idx] = {
             ...all[idx],
             status: 'completed',
+            waiting: undefined,
             output: ev.result,
             summary: summarize(ev.result),
             metrics: ev.meta,
             provider: mi.provider,
             model: mi.model,
+            runtimeStepId: all[idx].runtimeStepId ?? evStepId,
             endedAt: typeof ev.ts === 'string' ? ev.ts : all[idx].endedAt,
           };
           openByNode.delete(key);
+          if (terminalKey) terminalIndexByNode.set(terminalKey, idx);
           continue;
         }
 
         // Dedupe: some runs can emit a duplicate `node_complete` for an Agent node
         // (same node + same sub_run_id) due to start_subworkflow/wait/resume edge cases.
         // Prefer to merge into the most recent completed step rather than rendering two.
-        const meta = nodeMeta(nodeId);
-        if (meta?.type === 'agent' && nodeId && typeof ev.runId === 'string' && ev.runId.trim()) {
+        if (meta?.type === 'agent' && nodeId && evRunId) {
           const subRunId = extractSubRunId(ev.result);
           if (subRunId) {
-            const rid = ev.runId.trim();
+            const rid = evRunId;
             let deduped = false;
             for (let j = all.length - 1; j >= 0; j--) {
               const prior = all[j];
@@ -974,7 +1168,8 @@ export function RunFlowModal({
         all.push({
           id: `node_complete:${nodeId || 'unknown'}:${i}`,
           status: 'completed',
-          runId: ev.runId,
+          runId: evRunId || ev.runId,
+          runtimeStepId: evStepId,
           nodeId,
           nodeLabel: meta?.label,
           nodeType: meta?.type,
@@ -988,32 +1183,40 @@ export function RunFlowModal({
           startedAt: typeof ev.ts === 'string' ? ev.ts : undefined,
           endedAt: typeof ev.ts === 'string' ? ev.ts : undefined,
         });
+        if (terminalKey) terminalIndexByNode.set(terminalKey, all.length - 1);
         continue;
       }
 
       if (ev.type === 'flow_waiting') {
         const nodeId = ev.nodeId;
-        const key = `${ev.runId || ''}:${nodeId || ''}`;
+        const key = `${evRunId || ''}:${nodeId || ''}`;
         const idx = nodeId ? openByNode.get(key) : undefined;
 
+        const reason = typeof ev.reason === 'string' ? ev.reason : undefined;
+        const isSubworkflowWait = reason?.toLowerCase() === 'subworkflow';
+        const status: StepStatus = isSubworkflowWait ? 'running' : 'waiting';
+        // Subworkflow waits do not include user prompts; avoid default prompt text.
         const waiting = {
-          prompt: ev.prompt || 'Please respond:',
+          prompt: isSubworkflowWait ? '' : ev.prompt || 'Please respond:',
           choices: Array.isArray(ev.choices) ? ev.choices : [],
-          allowFreeText: ev.allow_free_text !== false,
+          allowFreeText: isSubworkflowWait ? false : ev.allow_free_text !== false,
           waitKey: ev.wait_key,
-          reason: ev.reason,
+          reason,
+          runId: evRunId || ev.runId,
+          details: ev.details && typeof ev.details === 'object' ? (ev.details as Record<string, unknown>) : undefined,
         };
 
         if (typeof idx === 'number') {
-          all[idx] = { ...all[idx], status: 'waiting', waiting };
+          all[idx] = { ...all[idx], status, waiting, runtimeStepId: all[idx].runtimeStepId ?? evStepId };
           continue;
         }
 
         const meta = nodeMeta(nodeId);
         all.push({
           id: `flow_waiting:${nodeId || 'unknown'}:${i}`,
-          status: 'waiting',
-          runId: ev.runId,
+          status,
+          runId: evRunId || ev.runId,
+          runtimeStepId: evStepId,
           nodeId,
           nodeLabel: meta?.label,
           nodeType: meta?.type,
@@ -1027,19 +1230,56 @@ export function RunFlowModal({
 
       if (ev.type === 'flow_error') {
         const nodeId = ev.nodeId;
-        const key = `${ev.runId || ''}:${nodeId || ''}`;
+        const key = `${evRunId || ''}:${nodeId || ''}`;
         const idx = nodeId ? openByNode.get(key) : undefined;
         if (typeof idx === 'number') {
-          all[idx] = { ...all[idx], status: 'failed', error: ev.error || 'Unknown error' };
+          all[idx] = {
+            ...all[idx],
+            status: 'failed',
+            error: ev.error || 'Unknown error',
+            runtimeStepId: all[idx].runtimeStepId ?? evStepId,
+          };
           openByNode.delete(key);
           continue;
         }
         // Best-effort: attach to the most recent step if we can't map to a node.
         if (all.length > 0) {
           const lastIdx = all.length - 1;
-          all[lastIdx] = { ...all[lastIdx], status: 'failed', error: ev.error || 'Unknown error' };
+          all[lastIdx] = {
+            ...all[lastIdx],
+            status: 'failed',
+            error: ev.error || 'Unknown error',
+            runtimeStepId: all[lastIdx].runtimeStepId ?? evStepId,
+          };
         }
       }
+    }
+
+    if (
+      startInputData &&
+      entryNode &&
+      entryNode.data?.nodeType === 'on_flow_start' &&
+      !all.some((s) => s.nodeId === entryNode.id || s.nodeType === 'on_flow_start')
+    ) {
+      const meta = nodeMeta(entryNode.id);
+      const createdAt =
+        typeof runSummary?.created_at === 'string' && (!runSummary.run_id || runSummary.run_id === rootRunId)
+          ? runSummary.created_at
+          : undefined;
+      all.unshift({
+        id: `flow_start:${entryNode.id}:synthetic`,
+        status: 'completed',
+        runId: rootRunId || undefined,
+        nodeId: entryNode.id,
+        nodeLabel: meta?.label,
+        nodeType: meta?.type,
+        nodeIcon: meta?.icon,
+        nodeColor: meta?.color,
+        output: startInputData,
+        summary: summarize(startInputData),
+        startedAt: createdAt,
+        endedAt: createdAt,
+      });
     }
 
     const stepById = new Map<string, Step>();
@@ -1053,27 +1293,119 @@ export function RunFlowModal({
       else stepsByRunId.set(rid, [s]);
     }
 
-    const rootSteps =
-      rootRunId && stepsByRunId.get(rootRunId) ? (stepsByRunId.get(rootRunId) as Step[]) : [];
+    const rootSteps: Step[] = [];
+    for (const rid of displayRootRunIds) {
+      const bucket = stepsByRunId.get(rid);
+      if (bucket && bucket.length > 0) rootSteps.push(...bucket);
+    }
 
-    return { rootRunId, rootSteps, stepById, stepsByRunId };
-  }, [events, nodeById]);
+    return { threadId, rootRunId, rootRunIds: displayRootRunIds, rootSteps, stepById, stepsByRunId };
+  }, [entryNode, events, nodeById, runSummary?.created_at, runSummary?.run_id, startInputData, threadRootRunId]);
+  const threadId = runSteps.threadId;
+  const rootRunIds = runSteps.rootRunIds;
   const rootRunId = runSteps.rootRunId;
   const steps = runSteps.rootSteps;
   const stepById = runSteps.stepById;
   const stepsByRunId = runSteps.stepsByRunId;
 
-  // Map (parentRunId:nodeId) -> sub_run_id for subworkflow waits, so the UI can show
+  const failureSummary = useMemo(() => {
+    const out: Array<{ step: Step; snippet: string; shortRunId: string }> = [];
+    stepById.forEach((s) => {
+      if (s.status !== 'failed') return;
+      const err = typeof s.error === 'string' ? s.error.trim() : '';
+      const firstLine = err.split('\n').find((l) => l.trim()) || err || 'Unknown error';
+      const snippet = firstLine.length > 180 ? `${firstLine.slice(0, 179)}…` : firstLine;
+      const shortRunId = typeof s.runId === 'string' ? s.runId.slice(0, 8) : '';
+      out.push({ step: s, snippet, shortRunId });
+    });
+    out.sort((a, b) => {
+      const ta = a.step.endedAt || a.step.startedAt || '';
+      const tb = b.step.endedAt || b.step.startedAt || '';
+      return ta.localeCompare(tb);
+    });
+    return out;
+  }, [stepById]);
+
+  const flowWarnings = useMemo(() => {
+    const raw = runSummary?.flow_warnings;
+    if (!Array.isArray(raw)) return [];
+    const out: string[] = [];
+    for (const w of raw) {
+      if (typeof w !== 'string') continue;
+      const s = w.trim();
+      if (!s) continue;
+      out.push(s);
+    }
+    return out;
+  }, [runSummary?.flow_warnings]);
+
+  const approvalSessionId = useMemo(() => {
+    if (derivedSessionId && derivedSessionId.trim()) return derivedSessionId.trim();
+    const fallback = (runSummary as any)?.session_id;
+    return typeof fallback === 'string' ? fallback.trim() : '';
+  }, [derivedSessionId, runSummary]);
+
+  useEffect(() => {
+    if (!isOpen || !rootRunId) {
+      setStartInputData(null);
+      setStartInputDefaults(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/gateway/runs/${encodeURIComponent(rootRunId)}/input_data`);
+        if (!res.ok) throw new Error(await res.text());
+        const payload = (await res.json()) as Record<string, unknown>;
+        let inputData: Record<string, unknown> | null = null;
+        let workspace: Record<string, unknown> | null = null;
+        if (payload && typeof payload === 'object') {
+          const raw = payload.input_data;
+          if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+            inputData = raw as Record<string, unknown>;
+          } else {
+            inputData = payload as Record<string, unknown>;
+          }
+          const wsRaw = (payload as any).workspace;
+          if (wsRaw && typeof wsRaw === 'object' && !Array.isArray(wsRaw)) {
+            workspace = wsRaw as Record<string, unknown>;
+          }
+        }
+        if (cancelled) return;
+        setStartInputData(inputData);
+        if (workspace && Object.keys(workspace).length > 0) {
+          setStartInputDefaults({ ...(inputData || {}), ...workspace });
+        } else {
+          setStartInputDefaults(inputData);
+        }
+      } catch {
+        if (!cancelled) {
+          setStartInputData(null);
+          setStartInputDefaults(null);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, rootRunId]);
+
+  // Map (parentRunId:nodeId[:stepId]) -> sub_run_id for subworkflow waits, so the UI can show
   // child run steps even before the parent subflow node completes.
   const subworkflowLinks = useMemo(() => {
     const out = new Map<string, string>();
+    const keyFor = (runId: string, nodeId: string, stepId?: string) =>
+      stepId ? `${runId}:${nodeId}:${stepId}` : `${runId}:${nodeId}`;
     for (const ev of events) {
       if (ev.type !== 'subworkflow_update') continue;
-      const parentRunId = typeof ev.runId === 'string' ? ev.runId.trim() : '';
+      const parentRunId = getActualRunId(ev);
       const parentNodeId = typeof ev.nodeId === 'string' ? ev.nodeId.trim() : '';
       const childRunId = typeof ev.sub_run_id === 'string' ? ev.sub_run_id.trim() : '';
+      const parentStepId = typeof ev.stepId === 'string' ? ev.stepId.trim() : '';
       if (!parentRunId || !parentNodeId || !childRunId) continue;
-      out.set(`${parentRunId}:${parentNodeId}`, childRunId);
+      if (parentStepId) out.set(keyFor(parentRunId, parentNodeId, parentStepId), childRunId);
+      // Back-compat fallback: older events may not carry a stepId.
+      out.set(keyFor(parentRunId, parentNodeId), childRunId);
     }
     return out;
   }, [events]);
@@ -1163,7 +1495,8 @@ export function RunFlowModal({
       for (let i = events.length - 1; i >= 0; i--) {
         const ev = events[i];
         if (ev.type !== 'node_complete') continue;
-        if (ev.runId && ev.runId !== rootRunId) continue;
+        const evRunId = getActualRunId(ev);
+        if (evRunId && evRunId !== rootRunId) continue;
 
         const r = ev.result as unknown;
         const obj = asRecord(r);
@@ -1192,7 +1525,8 @@ export function RunFlowModal({
     if (rootRunId && (reactSubflowId || codeactSubflowId)) {
       for (const ev of events) {
         if (ev.type !== 'node_complete') continue;
-        if (ev.runId && ev.runId !== rootRunId) continue;
+        const evRunId = getActualRunId(ev);
+        if (evRunId && evRunId !== rootRunId) continue;
         if (!ev.nodeId) continue;
         if (ev.nodeId !== reactSubflowId && ev.nodeId !== codeactSubflowId) continue;
         const ms = ev.meta && typeof ev.meta.duration_ms === 'number' ? ev.meta.duration_ms : null;
@@ -1226,10 +1560,14 @@ export function RunFlowModal({
   const MAX_STEP_TREE_DEPTH = 3;
 
   const stepTree = useMemo<StepTreeNode[]>(() => {
+    const roots = (Array.isArray(rootRunIds) ? rootRunIds : []).map((r) => String(r || '').trim()).filter(Boolean);
     const rid0 = typeof rootRunId === 'string' ? rootRunId.trim() : '';
-    if (!rid0) return [];
+    const rootIds = roots.length > 0 ? roots : rid0 ? [rid0] : [];
+    if (rootIds.length === 0) return [];
 
     const pick = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+    const keyFor = (runId: string, nodeId: string, stepId?: string | null) =>
+      stepId ? `${runId}:${nodeId}:${stepId}` : `${runId}:${nodeId}`;
 
     const childRunIdFromOutput = (out: unknown): string | null => {
       if (!out || typeof out !== 'object') return null;
@@ -1242,17 +1580,22 @@ export function RunFlowModal({
       return sr;
     };
 
-	    const childRunIdFromStep = (s: Step): string | null => {
-	      // Agent nodes have their own dedicated live trace panel; expanding the internal
-	      // ReAct sub-run nodes (init/reason/act/...) in the execution list is noisy and
-	      // not actionable (they are not VisualFlow nodes and typically have no details).
-	      if (s.nodeType === 'agent') return null;
-	      const fromOutput = childRunIdFromOutput(s.output);
-	      if (fromOutput) return fromOutput;
-	      const parentRunId = pick(s.runId);
-	      const parentNodeId = pick(s.nodeId);
+    const childRunIdFromStep = (s: Step): string | null => {
+      // Agent nodes have their own dedicated live trace panel; expanding the internal
+      // ReAct sub-run nodes (init/reason/act/...) in the execution list is noisy and
+      // not actionable (they are not VisualFlow nodes and typically have no details).
+      if (s.nodeType === 'agent') return null;
+      const fromOutput = childRunIdFromOutput(s.output);
+      if (fromOutput) return fromOutput;
+      const parentRunId = pick(s.runId);
+      const parentNodeId = pick(s.nodeId);
+      const parentStepId = pick(s.runtimeStepId);
       if (!parentRunId || !parentNodeId) return null;
-      return subworkflowLinks.get(`${parentRunId}:${parentNodeId}`) || null;
+      if (parentStepId) {
+        const scoped = subworkflowLinks.get(keyFor(parentRunId, parentNodeId, parentStepId));
+        if (scoped) return scoped;
+      }
+      return subworkflowLinks.get(keyFor(parentRunId, parentNodeId)) || null;
     };
 
     const seen = new Set<string>();
@@ -1280,8 +1623,12 @@ export function RunFlowModal({
       return nodes;
     };
 
-    return buildForRun(rid0, 0);
-  }, [rootRunId, stepsByRunId, subworkflowLinks]);
+    const out: StepTreeNode[] = [];
+    for (const rid of rootIds) {
+      out.push(...buildForRun(rid, 0));
+    }
+    return out;
+  }, [rootRunId, rootRunIds, stepsByRunId, subworkflowLinks]);
 
   // Auto-expand running subflows so long-running nested runs are observable by default.
   // If the user explicitly collapses (sets false), do not override.
@@ -1339,6 +1686,68 @@ export function RunFlowModal({
     if (!selectedStepId) return null;
     return stepById.get(selectedStepId) || null;
   }, [selectedStepId, stepById]);
+  const waitingInfoDetails =
+    waitingInfo?.details && typeof waitingInfo.details === 'object'
+      ? (waitingInfo.details as Record<string, unknown>)
+      : null;
+  const isApprovalDetails = useCallback((details: Record<string, unknown> | null): boolean => {
+    if (!details) return false;
+    const modeRaw = details.mode;
+    const kindRaw = details.kind;
+    const mode = typeof modeRaw === 'string' ? modeRaw.toLowerCase() : '';
+    const kind = typeof kindRaw === 'string' ? kindRaw.toLowerCase() : '';
+    return mode === 'approval_required' || kind === 'tool_approval';
+  }, []);
+  const approvalWait = useMemo(() => {
+    if (isApprovalDetails(waitingInfoDetails)) {
+      return { details: waitingInfoDetails, waitKey: waitingInfo?.waitKey, runId: waitingInfo?.runId };
+    }
+    const allSteps = Array.from(stepById.values());
+    for (let i = allSteps.length - 1; i >= 0; i--) {
+      const step = allSteps[i];
+      const waiting = step.waiting;
+      const details =
+        waiting?.details && typeof waiting.details === 'object' ? (waiting.details as Record<string, unknown>) : null;
+      if (!isApprovalDetails(details)) continue;
+      return { details, waitKey: waiting?.waitKey, runId: waiting?.runId || step.runId };
+    }
+    return null;
+  }, [isApprovalDetails, stepById, waitingInfo?.runId, waitingInfo?.waitKey, waitingInfoDetails]);
+  const approvalDetails = approvalWait ? approvalWait.details : null;
+  const approvalToolCalls = approvalDetails && Array.isArray(approvalDetails.tool_calls) ? approvalDetails.tool_calls : [];
+  const approvalRunId = approvalWait?.runId || waitingInfo?.runId;
+
+  const waitingPayload = selectedStep?.waiting || null;
+  const waitingReasonRaw = typeof waitingPayload?.reason === 'string' ? waitingPayload.reason : '';
+  const waitingDetails =
+    waitingPayload?.details && typeof waitingPayload.details === 'object'
+      ? (waitingPayload.details as Record<string, unknown>)
+      : null;
+  const approvalModeRaw = waitingDetails ? waitingDetails.mode : undefined;
+  const approvalMode = typeof approvalModeRaw === 'string' ? approvalModeRaw.toLowerCase() : '';
+  const approvalKindRaw = waitingDetails ? waitingDetails.kind : undefined;
+  const approvalKind = typeof approvalKindRaw === 'string' ? approvalKindRaw.toLowerCase() : '';
+  const isToolApprovalWait = approvalMode === 'approval_required' || approvalKind === 'tool_approval';
+  const showWaitingPanel = Boolean(waitingPayload) && selectedStep?.status === 'waiting';
+  const isSubworkflowWait = waitingReasonRaw.trim().toLowerCase() === 'subworkflow';
+  const selectedDurationLabel =
+    selectedStep?.metrics && selectedStep.metrics.duration_ms != null
+      ? formatDuration(selectedStep.metrics.duration_ms)
+      : '';
+  const detailsBodyClass =
+    selectedStep?.nodeType === 'agent' ? 'run-details-body run-details-body--agent' : 'run-details-body';
+  const tokenBadge = selectedStep?.metrics ? formatTokenBadge(selectedStep.metrics) : '';
+  const tpsBadge = selectedStep?.metrics ? formatTpsBadge(selectedStep.metrics) : '';
+  const showMetricsBlock =
+    Boolean(selectedStep?.metrics) && selectedStep?.nodeType !== 'agent' && Boolean(tokenBadge || tpsBadge);
+  const runningTitle = isSubworkflowWait
+    ? selectedStep?.nodeType === 'agent'
+      ? 'Agent running (subworkflow)'
+      : 'Subflow running'
+    : 'Working…';
+  const runningNote = isSubworkflowWait
+    ? 'This node executes as a durable sub-run so its internal steps can stream in real time.'
+    : 'This node is still processing. The output will appear when it completes.';
 
   // Keep the per-step Raw JSON section predictably unfolded when switching steps.
   useEffect(() => {
@@ -1374,6 +1783,22 @@ export function RunFlowModal({
         if (sr) return sr;
       }
     }
+    // Running agents may not have output yet. Prefer the explicit subworkflow link (per invocation)
+    // before falling back to heuristics.
+    {
+      const pick = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+      const parentRunId = pick(selectedStep.runId);
+      const parentNodeId = pick(selectedStep.nodeId);
+      const parentStepId = pick(selectedStep.runtimeStepId);
+      if (parentRunId && parentNodeId) {
+        if (parentStepId) {
+          const scoped = subworkflowLinks.get(`${parentRunId}:${parentNodeId}:${parentStepId}`);
+          if (scoped) return scoped;
+        }
+        const fallback = subworkflowLinks.get(`${parentRunId}:${parentNodeId}`);
+        if (fallback) return fallback;
+      }
+    }
     // Running agents don't have final output yet. Best-effort: use the latest sub-run trace_update runId.
     for (let i = traceEvents.length - 1; i >= 0; i--) {
       const ev = traceEvents[i];
@@ -1381,7 +1806,7 @@ export function RunFlowModal({
       if (typeof ev.runId === 'string' && ev.runId.trim() && ev.runId !== rootRunId) return ev.runId.trim();
     }
     return null;
-  }, [selectedStep, traceEvents, rootRunId]);
+  }, [rootRunId, selectedStep, subworkflowLinks, traceEvents]);
 
   const selectedSubflowRunId = useMemo(() => {
     if (!selectedStep || selectedStep.nodeType !== 'subflow') return null;
@@ -1402,25 +1827,104 @@ export function RunFlowModal({
 
     const parentRunId = pick(selectedStep.runId);
     const parentNodeId = pick(selectedStep.nodeId);
+    const parentStepId = pick(selectedStep.runtimeStepId);
     if (!parentRunId || !parentNodeId) return null;
+    if (parentStepId) {
+      const scoped = subworkflowLinks.get(`${parentRunId}:${parentNodeId}:${parentStepId}`);
+      if (scoped) return scoped;
+    }
     return subworkflowLinks.get(`${parentRunId}:${parentNodeId}`) || null;
   }, [selectedStep, subworkflowLinks]);
 
-  const hasRunData = isRunning || result != null || events.length > 0;
+  const agentTracePanel = useMemo(() => {
+    if (!selectedStep || selectedStep.nodeType !== 'agent') return null;
+    return <AgentSubrunTracePanel rootRunId={rootRunId} events={traceEvents} subRunId={selectedAgentSubRunId} />;
+  }, [rootRunId, selectedAgentSubRunId, selectedStep, traceEvents]);
+
+  const subflowTracePanel = useMemo(() => {
+    if (!selectedStep || selectedStep.nodeType !== 'subflow') return null;
+    if (selectedSubflowRunId) {
+      return (
+        <AgentSubrunTracePanel
+          rootRunId={rootRunId}
+          events={traceEvents}
+          subRunId={selectedSubflowRunId}
+          title="Subflow calls"
+          subtitle="Live per-effect trace (LLM/tool calls)."
+          onOpenSubRun={onSelectRunId ? () => onSelectRunId(selectedSubflowRunId) : undefined}
+        />
+      );
+    }
+    return (
+      <div className="agent-trace-panel">
+        <div className="agent-trace-header">
+          <div className="agent-trace-title">Subflow calls</div>
+          <div className="agent-trace-subtitle">Waiting for sub_run_id…</div>
+        </div>
+        <div className="agent-trace-empty">No trace entries yet.</div>
+      </div>
+    );
+  }, [onSelectRunId, rootRunId, selectedStep, selectedSubflowRunId, traceEvents]);
+
+  const derivedAgentOutput = useMemo(() => {
+    if (!selectedStep || selectedStep.nodeType !== 'agent') return null;
+    if (!selectedAgentSubRunId) return null;
+    for (let i = traceEvents.length - 1; i >= 0; i--) {
+      const ev = traceEvents[i];
+      if (ev.type !== 'trace_update') continue;
+      if (ev.runId !== selectedAgentSubRunId) continue;
+      const steps = Array.isArray(ev.steps) ? ev.steps : [];
+      for (let j = steps.length - 1; j >= 0; j--) {
+        const step = steps[j] as Record<string, unknown>;
+        const res = step?.result;
+        if (!res || typeof res !== 'object') continue;
+        const resObj = res as Record<string, unknown>;
+        if ('output' in resObj && resObj.output != null) return resObj.output as unknown;
+        if ('result' in resObj && resObj.result != null) return resObj.result as unknown;
+      }
+    }
+    return null;
+  }, [selectedAgentSubRunId, selectedStep, traceEvents]);
+
+  const resolvedStepOutput = useMemo(() => {
+    if (!selectedStep) return null;
+    if (selectedStep.output != null) return selectedStep.output;
+    if (selectedStep.nodeType === 'agent') return derivedAgentOutput;
+    return null;
+  }, [derivedAgentOutput, selectedStep]);
+
+  const computedFinalResult = useMemo(() => {
+    if (steps.length === 0) return null;
+    const lastTerminal = [...steps].reverse().find((s) => s.nodeType === 'on_flow_end' && s.output != null);
+    const fallback = [...steps].reverse().find((s) => s.status === 'completed' && s.output != null);
+    const picked = lastTerminal || fallback;
+    if (!picked || picked.output == null) return null;
+    return { success: true, result: picked.output } as FlowRunResult;
+  }, [steps]);
+
+  const effectiveResult = useMemo(() => {
+    if (!result) return computedFinalResult;
+    if (result.error) return result;
+    if (result.result === undefined && computedFinalResult) return computedFinalResult;
+    return result;
+  }, [computedFinalResult, result]);
+
+  const hasRunData = isRunning || effectiveResult != null || events.length > 0;
 
   const showFinalResult = useMemo(() => {
-    if (!result || isRunning) return false;
+    if (!effectiveResult || isRunning) return false;
     if (steps.length === 0) return true;
     const last = steps[steps.length - 1];
     return Boolean(last && selectedStepId === last.id);
-  }, [isRunning, result, selectedStepId, steps]);
+  }, [effectiveResult, isRunning, selectedStepId, steps]);
 
   const runStatusLabel = useMemo(() => {
+    if (isPaused) return 'PAUSED';
+    if (approvalDetails || isWaiting) return 'WAITING';
     if (isRunning) return 'RUNNING';
-    if (isWaiting) return 'WAITING';
-    if (result) return result.success ? 'SUCCESS' : 'FAILED';
+    if (effectiveResult) return effectiveResult.success ? 'SUCCESS' : 'FAILED';
     return '';
-  }, [isRunning, isWaiting, result]);
+  }, [approvalDetails, effectiveResult, isPaused, isRunning, isWaiting]);
 
   // Minimized view (run minibar): show current step + status and keep the canvas visible.
   // This uses only local state (isMinimized) so it never affects run execution itself.
@@ -1634,6 +2138,183 @@ export function RunFlowModal({
     }
   }, []);
 
+  const beautifyJsonText = useCallback((raw: string): { text: string; isJson: boolean } => {
+    const text = typeof raw === 'string' ? raw : String(raw ?? '');
+    const trimmed = text.trim();
+    if (!trimmed) return { text, isJson: false };
+    const looksJson =
+      (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+      (trimmed.startsWith('[') && trimmed.endsWith(']'));
+    if (!looksJson) return { text, isJson: false };
+    try {
+      const parsed = JSON.parse(trimmed) as unknown;
+      return { text: JSON.stringify(parsed, null, 2), isJson: true };
+    } catch {
+      return { text, isJson: false };
+    }
+  }, []);
+
+  const extractFollowUpPrompt = useCallback((input: Record<string, unknown> | null): string => {
+    if (!input) return '';
+    const candidates = ['prompt', 'message', 'task', 'query', 'question'];
+    for (const key of candidates) {
+      const v = input[key];
+      if (typeof v === 'string' && v.trim()) return v.trim();
+    }
+    return '';
+  }, []);
+
+  const extractFollowUpAnswer = useCallback((value: unknown): string => {
+    if (value == null) return '';
+    if (typeof value === 'string' && value.trim()) return value.trim();
+    if (typeof value !== 'object') return String(value);
+    if (Array.isArray(value)) {
+      try {
+        return JSON.stringify(value, null, 2);
+      } catch {
+        return String(value);
+      }
+    }
+    const obj = value as Record<string, unknown>;
+    const keys = ['output', 'result', 'response', 'message', 'text', 'answer'];
+    for (const key of keys) {
+      const v = obj[key];
+      if (typeof v === 'string' && v.trim()) return v.trim();
+      if (v && typeof v === 'object' && !Array.isArray(v)) {
+        const nested = v as Record<string, unknown>;
+        for (const nk of keys) {
+          const nv = nested[nk];
+          if (typeof nv === 'string' && nv.trim()) return nv.trim();
+        }
+      }
+    }
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch {
+      return String(value);
+    }
+  }, []);
+
+  const followUpSeed = useMemo(() => {
+    const baseMessages: FollowUpMessage[] = [];
+    const ctxRaw = startInputData?.context;
+    if (ctxRaw && typeof ctxRaw === 'object' && !Array.isArray(ctxRaw)) {
+      const ctx = ctxRaw as Record<string, unknown>;
+      const msgs = ctx.messages;
+      if (Array.isArray(msgs)) {
+        for (const m of msgs) {
+          if (!m || typeof m !== 'object' || Array.isArray(m)) continue;
+          const rec = m as Record<string, unknown>;
+          const role = rec.role === 'assistant' ? 'assistant' : rec.role === 'user' ? 'user' : null;
+          const content = typeof rec.content === 'string' ? rec.content.trim() : '';
+          if (role && content) baseMessages.push({ role, content });
+        }
+      }
+    }
+
+    const prompt = extractFollowUpPrompt(startInputData);
+    if (prompt) {
+      const last = baseMessages[baseMessages.length - 1];
+      if (!last || last.role !== 'user' || last.content !== prompt) {
+        baseMessages.push({ role: 'user', content: prompt });
+      }
+    }
+
+    const answerSource = effectiveResult?.result ?? effectiveResult;
+    const answer = extractFollowUpAnswer(answerSource);
+    if (answer) {
+      const last = baseMessages[baseMessages.length - 1];
+      if (!last || last.role !== 'assistant' || last.content !== answer) {
+        baseMessages.push({ role: 'assistant', content: answer });
+      }
+    }
+
+    return baseMessages.length > 0 ? { messages: baseMessages } : null;
+  }, [effectiveResult, extractFollowUpAnswer, extractFollowUpPrompt, startInputData]);
+
+  useEffect(() => {
+    if (!followUpSeed) return;
+    if (isRunning || isPaused || isWaiting) return;
+    setLastRunSeed(followUpSeed);
+  }, [followUpSeed, isPaused, isRunning, isWaiting]);
+
+  const addFollowUpFiles = useCallback((incoming: FileList | File[]) => {
+    const files = Array.from(incoming || []);
+    if (!files.length) return;
+    setFollowUpAttachments((prev) => {
+      const seen = new Set(prev.map((f) => `${f.name}:${f.size}:${f.lastModified}`));
+      const next = [...prev];
+      for (const f of files) {
+        const key = `${f.name}:${f.size}:${f.lastModified}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        next.push(f);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleFollowUpDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setFollowUpDragActive(true);
+  }, []);
+
+  const handleFollowUpDragLeave = useCallback((e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setFollowUpDragActive(false);
+  }, []);
+
+  const handleFollowUpDrop = useCallback(
+    (e: DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setFollowUpDragActive(false);
+      if (e.dataTransfer?.files?.length) addFollowUpFiles(e.dataTransfer.files);
+    },
+    [addFollowUpFiles]
+  );
+
+  const handleFollowUpSubmit = useCallback(async () => {
+    if (!onFollowUpSubmit) return;
+    const message = followUpDraft.trim();
+    if (!message) {
+      setFollowUpError('Please enter a follow up message.');
+      return;
+    }
+    const seed = lastRunSeed || followUpSeed;
+    setFollowUpSubmitting(true);
+    setFollowUpError(null);
+    try {
+      await onFollowUpSubmit({
+        message,
+        attachments: followUpAttachments,
+        contextMessages: seed?.messages,
+        sessionId: derivedSessionId || undefined,
+        threadRootRunId: threadId || rootRunId || undefined,
+        inputDataDefaults: startInputDefaults,
+      });
+      setShowFollowUpModal(false);
+      setFollowUpDraft('');
+      setFollowUpAttachments([]);
+    } catch (e) {
+      setFollowUpError(e instanceof Error ? e.message : 'Failed to submit follow up.');
+    } finally {
+      setFollowUpSubmitting(false);
+    }
+  }, [
+    derivedSessionId,
+    followUpAttachments,
+    followUpDraft,
+    followUpSeed,
+    lastRunSeed,
+    onFollowUpSubmit,
+    rootRunId,
+    threadId,
+    startInputDefaults,
+  ]);
+
   const copyToClipboard = async (value: unknown) => {
     const text = formatValue(value);
     try {
@@ -1649,37 +2330,42 @@ export function RunFlowModal({
     }
   };
 
-  const openWorkspaceFolder = async () => {
-    if (!rootRunId) return;
-    try {
-      const res = await fetch(`/api/runs/${encodeURIComponent(rootRunId)}/open-workspace`, { method: 'POST' });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || `Failed to open workspace (HTTP ${res.status})`);
-      }
-    } catch (e) {
-      console.error(e);
-      window.alert(e instanceof Error ? e.message : 'Failed to open workspace');
-    }
-  };
-
   const outputPreview = useMemo(() => {
-    if (!selectedStep?.output) return null;
-    const value = selectedStep.output;
+    if (resolvedStepOutput == null) return null;
+    const value = resolvedStepOutput;
 
     if (typeof value === 'string') {
-      const text = value.trim();
-      return text ? { previewText: text, task: null, scratchpad: null, raw: value, cleaned: value } : null;
+      const beautified = beautifyJsonText(value);
+      const text = beautified.text.trim();
+      return text
+        ? {
+            previewText: beautified.text,
+            previewIsJson: beautified.isJson,
+            task: null,
+            scratchpad: null,
+            raw: value,
+            cleaned: value,
+          }
+        : null;
     }
 
     if (!value || typeof value !== 'object') {
-      return { previewText: String(value), task: null, scratchpad: null, raw: value, cleaned: value };
+      const beautified = beautifyJsonText(String(value));
+      return {
+        previewText: beautified.text,
+        previewIsJson: beautified.isJson,
+        task: null,
+        scratchpad: null,
+        raw: value,
+        cleaned: value,
+      };
     }
 
     const obj = value as Record<string, unknown>;
 
 	    let task: string | null = null;
 	    let previewText: string | null = null;
+	    let previewIsJson = false;
 	    let scratchpad: unknown = null;
 	    let provider: string | null = null;
 	    let model: string | null = null;
@@ -1727,6 +2413,14 @@ export function RunFlowModal({
     if (!previewText && typeof obj.message === 'string' && obj.message.trim()) previewText = obj.message.trim();
     if (!previewText && typeof obj.response === 'string' && obj.response.trim()) previewText = obj.response.trim();
 	    if (!previewText && typeof obj.result === 'string' && obj.result.trim()) previewText = obj.result.trim();
+    if (!previewText && typeof obj.output === 'string' && obj.output.trim()) previewText = obj.output.trim();
+    if (!previewText && obj.output && typeof obj.output === 'object') {
+      const outObj = obj.output as Record<string, unknown>;
+      if (typeof outObj.output === 'string' && outObj.output.trim()) previewText = outObj.output.trim();
+      if (!previewText && typeof outObj.result === 'string' && outObj.result.trim()) previewText = outObj.result.trim();
+      if (!previewText && typeof outObj.message === 'string' && outObj.message.trim()) previewText = outObj.message.trim();
+      if (!previewText && typeof outObj.response === 'string' && outObj.response.trim()) previewText = outObj.response.trim();
+    }
 	    if (!provider && typeof obj.provider === 'string' && obj.provider.trim()) provider = obj.provider.trim();
 	    if (!model && typeof obj.model === 'string' && obj.model.trim()) model = obj.model.trim();
 	    if (!usage && 'usage' in obj) usage = obj.usage;
@@ -1788,9 +2482,24 @@ export function RunFlowModal({
       cleaned = copy;
     }
 
+	    if (previewText) {
+	      const beautified = beautifyJsonText(previewText);
+	      previewText = beautified.text;
+	      previewIsJson = beautified.isJson;
+	    } else {
+	      // Ensure we always show the received output in a pretty form.
+	      try {
+	        previewText = JSON.stringify(cleaned, null, 2);
+	        previewIsJson = true;
+	      } catch {
+	        previewText = String(cleaned ?? '');
+	        previewIsJson = false;
+	      }
+	    }
+
 	    if (!task && !previewText && scratchpad == null && !provider && !model && !usage && !benchmark && !subRunId) return null;
-	    return { task, previewText, scratchpad, provider, model, usage, benchmark, subRunId, raw: value, cleaned };
-	  }, [selectedStep?.output]);
+	    return { task, previewText, previewIsJson, scratchpad, provider, model, usage, benchmark, subRunId, raw: value, cleaned };
+	  }, [beautifyJsonText, resolvedStepOutput, selectedStep]);
 
   const selectedEventIndex = useMemo(() => {
     if (!selectedStep?.id) return null;
@@ -1839,7 +2548,8 @@ export function RunFlowModal({
     for (let i = startAt; i >= 0; i--) {
       const ev = events[i];
       if (ev.type !== 'node_complete') continue;
-      if (rootRunId && ev.runId && ev.runId !== rootRunId) continue;
+      const evRunId = getActualRunId(ev);
+      if (rootRunId && evRunId && evRunId !== rootRunId) continue;
       if (ev.nodeId !== sourceNodeId) continue;
 
       const r = ev.result as unknown;
@@ -1887,7 +2597,7 @@ export function RunFlowModal({
       entries.push({ artifact_id, inserted, skipped, preview, error });
     }
     return entries;
-  }, [selectedStep]);
+  }, [beautifyJsonText, resolvedStepOutput, selectedStep]);
 
   const recallIntoContextPreview = useMemo(() => {
     if (!selectedStep || selectedStep.nodeType !== 'memory_rehydrate') return null;
@@ -1929,7 +2639,9 @@ export function RunFlowModal({
     (async () => {
       const fetched = await Promise.all(
         artifactIds.map(async (aid) => {
-          const res = await fetch(`/api/runs/${encodeURIComponent(rootRunId)}/artifacts/${encodeURIComponent(aid)}`);
+          const res = await fetch(
+            `/api/gateway/runs/${encodeURIComponent(rootRunId)}/artifacts/${encodeURIComponent(aid)}`
+          );
           if (!res.ok) throw new Error(`Failed to fetch artifact ${aid} (HTTP ${res.status})`);
           return res.json() as Promise<{ artifact_id: string; payload: unknown }>;
         })
@@ -2023,7 +2735,7 @@ export function RunFlowModal({
   }, [selectedStep]);
 
   const shouldDefaultRawJsonOpen = useMemo(() => {
-    if (!selectedStep || selectedStep.output == null) return false;
+    if (!selectedStep || resolvedStepOutput == null) return false;
     const hasPreviewBlocks =
       Boolean(memorizeContentPreview) ||
       Boolean(recallIntoContextDisplay) ||
@@ -2036,7 +2748,7 @@ export function RunFlowModal({
       Boolean(outputPreview?.model) ||
       outputPreview?.scratchpad != null;
     return !hasPreviewBlocks;
-  }, [memorizeContentPreview, onFlowStartParams, outputPreview, recallIntoContextDisplay, selectedStep]);
+  }, [memorizeContentPreview, onFlowStartParams, outputPreview, recallIntoContextDisplay, resolvedStepOutput, selectedStep]);
 
   const lastRawJsonStepIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -2290,6 +3002,46 @@ export function RunFlowModal({
                 </div>
               </div>
 
+              {flowWarnings.length > 0 ? (
+                <div className="run-warnings-panel">
+                  <div className="run-warnings-title">Warnings</div>
+                  <div className="run-warnings-list">
+                    {flowWarnings.slice(0, 5).map((w, idx) => (
+                      <div key={w || idx} className="run-warnings-item" title={w}>
+                        {w}
+                      </div>
+                    ))}
+                    {flowWarnings.length > 5 ? (
+                      <div className="run-warnings-more">+{flowWarnings.length - 5} more warnings</div>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+
+              {failureSummary.length > 0 ? (
+                <div className="run-failures-panel">
+                  <div className="run-failures-title">Failures detected</div>
+                  <div className="run-failures-list">
+                    {failureSummary.slice(0, 5).map(({ step, snippet, shortRunId }) => (
+                      <button
+                        key={step.id}
+                        type="button"
+                        className="run-failures-item"
+                        onClick={() => setSelectedStepId(step.id)}
+                        title={step.error || snippet}
+                      >
+                        <span className="run-failures-node">{step.nodeLabel || step.nodeId || 'node'}</span>
+                        {shortRunId ? <span className="run-failures-run">run:{shortRunId}</span> : null}
+                        <span className="run-failures-error">{snippet}</span>
+                      </button>
+                    ))}
+                    {failureSummary.length > 5 ? (
+                      <div className="run-failures-more">+{failureSummary.length - 5} more failures</div>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+
               <div className="run-steps-list">
                 {stepTree.length === 0 ? (
                   <div className="run-steps-empty">No execution events yet.</div>
@@ -2303,13 +3055,17 @@ export function RunFlowModal({
                         const selected = s.id === selectedStepId;
                         const color = s.nodeColor || '#888888';
                         const bg = hexToRgba(color, 0.12);
+                        const waitReason = typeof s.waiting?.reason === 'string' ? s.waiting.reason.toLowerCase() : '';
+                        const isSubworkflowWait = waitReason === 'subworkflow';
                         const statusLabel =
                           s.status === 'running'
                             ? 'RUNNING'
                             : s.status === 'completed'
                               ? 'OK'
                               : s.status === 'waiting'
-                                ? 'WAITING'
+                                ? isSubworkflowWait
+                                  ? 'RUNNING'
+                                  : 'WAITING'
                                 : 'FAILED';
                         const startedAtLabel = formatStepTime(s.startedAt);
                         const durationLabel =
@@ -2392,6 +3148,10 @@ export function RunFlowModal({
                                 </div>
                                 {s.status === 'failed' && s.error ? (
                                   <div className="run-step-error">{s.error}</div>
+                                ) : s.waiting && isSubworkflowWait ? (
+                                  <div className="run-step-waiting">
+                                    {s.nodeType === 'agent' ? 'agent running · subworkflow' : 'subflow running'}
+                                  </div>
                                 ) : s.status === 'waiting' && s.waiting ? (
                                   <div className="run-step-waiting">
                                     {s.waiting.reason ? `waiting · ${s.waiting.reason}` : 'waiting'}
@@ -2426,6 +3186,11 @@ export function RunFlowModal({
                   <div className="run-details-header-badges">
                     {selectedStep.provider ? <span className="run-metric-badge metric-provider">{selectedStep.provider}</span> : null}
                     {selectedStep.model ? <span className="run-metric-badge metric-model">{selectedStep.model}</span> : null}
+                    {selectedDurationLabel ? (
+                      <span className="run-metric-badge metric-duration" title="Duration">
+                        {selectedDurationLabel}
+                      </span>
+                    ) : null}
                     {parentRunId && onSelectRunId ? (
                       <button
                         type="button"
@@ -2450,114 +3215,102 @@ export function RunFlowModal({
               </div>
 
 	              {selectedStep ? (
-	                <div className="run-details-body">
+	                <div className={detailsBodyClass}>
 	                  {selectedStep.status === 'running' ? (
 	                    <>
 	                      <div className="run-working">
 	                        <span className="run-spinner" aria-label="working" />
 	                        <div>
-	                          <div className="run-working-title">Working…</div>
-	                          <div className="run-working-note">This node is still processing. The output will appear when it completes.</div>
+	                          <div className="run-working-title">{runningTitle}</div>
+	                          <div className="run-working-note">{runningNote}</div>
 	                        </div>
 	                      </div>
-	                      {selectedStep.nodeType === 'subflow' ? (
-	                        selectedSubflowRunId ? (
-	                          <AgentSubrunTracePanel
-	                            rootRunId={rootRunId}
-	                            events={traceEvents}
-	                            subRunId={selectedSubflowRunId}
-	                            title="Subflow calls"
-	                            subtitle="Live per-effect trace (LLM/tool calls)."
-	                            onOpenSubRun={onSelectRunId ? () => onSelectRunId(selectedSubflowRunId) : undefined}
-	                          />
-	                        ) : (
-	                          <div className="agent-trace-panel">
-	                            <div className="agent-trace-header">
-	                              <div className="agent-trace-title">Subflow calls</div>
-	                              <div className="agent-trace-subtitle">Waiting for sub_run_id…</div>
-	                            </div>
-	                            <div className="agent-trace-empty">No trace entries yet.</div>
-	                          </div>
-	                        )
-	                      ) : null}
-	                      {selectedStep.nodeType === 'agent' ? (
-	                        <AgentSubrunTracePanel rootRunId={rootRunId} events={traceEvents} subRunId={selectedAgentSubRunId} />
-	                      ) : null}
+	                      {subflowTracePanel}
+	                      {agentTracePanel}
 	                    </>
-	                  ) : selectedStep.status === 'waiting' && (waitingInfo || selectedStep.waiting) ? (
-                    <div className="run-waiting">
-                      <div className="run-waiting-prompt">
-                        <MarkdownRenderer
-                          markdown={(selectedStep.waiting?.prompt || waitingInfo?.prompt || 'Please respond:').trim()}
-                        />
+                  ) : showWaitingPanel ? (
+                    isSubworkflowWait ? (
+                      <div className="run-waiting">
+                        <div className="run-waiting-prompt">
+                          Waiting on subworkflow... No input required.
+                        </div>
                       </div>
-
-                      {(selectedStep.waiting?.choices?.length || waitingInfo?.choices?.length) ? (
-                        <div className="run-waiting-choices">
-                          {(selectedStep.waiting?.choices || waitingInfo?.choices || []).map((c) => (
-                            <button
-                              key={c}
-                              type="button"
-                              className="run-waiting-choice"
-                              onClick={() => onResume?.(c)}
-                            >
-                              {c}
-                            </button>
-                          ))}
+                    ) : isToolApprovalWait ? (
+                      <div className="run-waiting">
+                        <div className="run-waiting-prompt">
+                          Tool approval pending. Review details in the footer.
                         </div>
-                      ) : null}
-
-                      {(selectedStep.waiting?.allowFreeText ?? waitingInfo?.allowFreeText ?? true) && (
-                        <div className="run-waiting-input">
-                          <textarea
-                            className="run-waiting-textarea"
-                            value={resumeDraft}
-                            onChange={(e) => setResumeDraft(e.target.value)}
-                            placeholder="Type your response…"
-                            rows={3}
+                      </div>
+                    ) : (
+                      <div className="run-waiting">
+                        <div className="run-waiting-prompt">
+                          <MarkdownRenderer
+                            markdown={(waitingPayload?.prompt || 'Please respond:').trim()}
                           />
-                          <div className="run-waiting-actions">
-                            <button
-                              type="button"
-                              className="modal-button primary"
-                              onClick={submitResume}
-                              disabled={!resumeDraft.trim()}
-                            >
-                              Continue
-                            </button>
-                          </div>
                         </div>
-                      )}
-                    </div>
+
+                        {waitingPayload?.choices?.length ? (
+                          <div className="run-waiting-choices">
+                            {(waitingPayload?.choices || []).map((c) => (
+                              <button
+                                key={c}
+                                type="button"
+                                className="run-waiting-choice"
+                                onClick={() => onResume?.(c)}
+                              >
+                                {c}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+
+                        {(waitingPayload?.allowFreeText ?? true) && (
+                          <div className="run-waiting-input">
+                            <textarea
+                              className="run-waiting-textarea"
+                              value={resumeDraft}
+                              onChange={(e) => setResumeDraft(e.target.value)}
+                              placeholder="Type your response…"
+                              rows={3}
+                            />
+                            <div className="run-waiting-actions">
+                              <button
+                                type="button"
+                                className="modal-button primary"
+                                onClick={submitResume}
+                                disabled={!resumeDraft.trim()}
+                              >
+                                Continue
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
                   ) : selectedStep.status === 'failed' && selectedStep.error ? (
                     <div className="run-details-error">{selectedStep.error}</div>
-                  ) : selectedStep.output != null ? (
+                  ) : resolvedStepOutput != null ? (
                     <>
-                      {selectedStep.nodeType === 'agent' ? (
-                        <AgentSubrunTracePanel rootRunId={rootRunId} events={traceEvents} subRunId={selectedAgentSubRunId} />
-                      ) : null}
-                      {selectedStep.metrics ? (
+                      {subflowTracePanel}
+                      {agentTracePanel}
+                      {showMetricsBlock ? (
                         <div className="run-details-metrics">
-                          <div className="run-details-metrics-row">
-                            <span className="run-details-metrics-label">Duration</span>
-                            <span className="run-details-metrics-value">{formatDuration(selectedStep.metrics.duration_ms)}</span>
-                          </div>
-                          {(typeof selectedStep.metrics.input_tokens === 'number' || typeof selectedStep.metrics.output_tokens === 'number') ? (
+                          {tokenBadge ? (
                             <div className="run-details-metrics-row">
                               <span className="run-details-metrics-label">Tokens</span>
-                              <span className="run-details-metrics-value">{formatTokenBadge(selectedStep.metrics)}</span>
+                              <span className="run-details-metrics-value">{tokenBadge}</span>
                             </div>
                           ) : null}
-                          {formatTpsBadge(selectedStep.metrics) ? (
+                          {tpsBadge ? (
                             <div className="run-details-metrics-row">
                               <span className="run-details-metrics-label">Throughput</span>
-                              <span className="run-details-metrics-value">{formatTpsBadge(selectedStep.metrics)}</span>
+                              <span className="run-details-metrics-value">{tpsBadge}</span>
                             </div>
                           ) : null}
                         </div>
                       ) : null}
 	                      <div className="run-details-actions">
-	                        <button type="button" className="modal-button" onClick={() => copyToClipboard(selectedStep.output)}>
+	                        <button type="button" className="modal-button" onClick={() => copyToClipboard(resolvedStepOutput)}>
 	                          Copy raw
 	                        </button>
 	                        {outputPreview?.subRunId && onSelectRunId ? (
@@ -2635,10 +3388,10 @@ export function RunFlowModal({
                                               className="run-param-link"
                                               onClick={(e) => {
                                                 e.stopPropagation();
-                                                void openWorkspaceFolder();
+                                                void copyToClipboard(v);
                                               }}
-                                              title="Open workspace folder"
-                                              aria-label="Open workspace folder"
+                                              title="Copy workspace path (server-side)"
+                                              aria-label="Copy workspace path"
                                             >
                                               {String(v)}
                                             </button>
@@ -2872,7 +3625,9 @@ export function RunFlowModal({
                           {outputPreview?.previewText ? (
                             <div className="run-output-section">
                               <div className="run-output-title">Preview</div>
-                              {shouldRenderMarkdown(selectedStep?.nodeType) ? (
+                              {outputPreview.previewIsJson ? (
+                                <JsonViewer value={outputPreview.previewText} collapseAfterDepth={6} />
+                              ) : shouldRenderMarkdown(selectedStep?.nodeType) ? (
                                 <div className="run-details-markdown">
                                   <MarkdownRenderer markdown={outputPreview.previewText} />
                                 </div>
@@ -2937,27 +3692,39 @@ export function RunFlowModal({
                         onToggle={(e) => setRawJsonOpen((e.currentTarget as HTMLDetailsElement).open)}
                       >
                         <summary>Raw JSON</summary>
-                        {rawJsonOpen ? <JsonViewer key={selectedStep.id} value={selectedStep.output} /> : null}
+                        {rawJsonOpen ? (
+                          <JsonViewer key={selectedStep.id} value={resolvedStepOutput} collapseAfterDepth={99} />
+                        ) : null}
                       </details>
                     </>
                   ) : (
-                    <div className="run-details-empty">No output for this step.</div>
+                    <>
+                      {subflowTracePanel}
+                      {agentTracePanel}
+                      <div className="run-details-empty">No output for this step.</div>
+                    </>
                   )}
 
-                  {showFinalResult && result ? (
+                  {showFinalResult && effectiveResult ? (
                     <div className="run-final">
-                      <div className={`run-final-header ${result.success ? 'success' : 'error'}`}>
-                        <span className="run-final-title">{result.success ? 'Final Result (SUCCESS)' : 'Final Result (FAILED)'}</span>
+                      <div className={`run-final-header ${effectiveResult.success ? 'success' : 'error'}`}>
+                        <span className="run-final-title">
+                          {effectiveResult.success ? 'Final Result (SUCCESS)' : 'Final Result (FAILED)'}
+                        </span>
                         <div className="run-details-actions">
-                          <button type="button" className="modal-button" onClick={() => copyToClipboard(result.error ?? result.result)}>
+                          <button
+                            type="button"
+                            className="modal-button"
+                            onClick={() => copyToClipboard(effectiveResult.error ?? effectiveResult.result)}
+                          >
                             Copy
                           </button>
                         </div>
                       </div>
-                      {result.error ? (
-                        <div className="run-details-error">{result.error}</div>
+                      {effectiveResult.error ? (
+                        <div className="run-details-error">{effectiveResult.error}</div>
                       ) : (
-                        <JsonViewer value={result.result} />
+                        <JsonViewer value={effectiveResult.result} />
                       )}
                     </div>
                   ) : null}
@@ -2976,273 +3743,343 @@ export function RunFlowModal({
             <>
               {entryNode ? (
                 <div className="run-form">
-                  <p className="run-form-intro">
-                    Entry point: <strong>{entryNode.data.label}</strong>
-                  </p>
-
                   <div className="run-form-fields">
-                    <div className="run-form-field">
-                      <label className="run-form-label">
-                        Execution folder
-                        <span className="run-form-type">(workspace_root)</span>
-                        <span className="run-form-required">required</span>
-                      </label>
 
-                      <div className="run-form-inline">
-                        <input
-                          type="text"
-                          className="run-form-input"
-                          value={workspaceRoot}
-                          onChange={(e) => handleWorkspaceRootChange(e.target.value)}
-                          placeholder={
-                            workspaceRandom && !workspaceRoot.trim()
-                              ? executionWorkspaceQuery.isLoading
-                                ? 'Generating…'
-                                : 'Will be generated on Run'
-                              : 'Folder path…'
-                          }
-                          readOnly={workspaceRandom}
-                          disabled={isRunning}
-                        />
-
-                        <label className="run-form-checkbox run-form-inline-checkbox">
-                          <input
-                            type="checkbox"
-                            checked={workspaceRandom}
-                            onChange={(e) => handleWorkspaceRandomChange(e.target.checked)}
+                    {/* Card 1: File System Access (collapsible) */}
+                    <details className="run-form-section run-form-filesystem">
+                      <summary className="run-form-section-summary">
+                        <span className="run-form-section-title">File System Access</span>
+                        <span className="run-form-section-meta">
+                          {workspaceAccessMode}
+                          {ignoredPathsCount > 0 ? ` · ${ignoredPathsCount} ignored` : ''}
+                        </span>
+                      </summary>
+                      <div className="run-form-section-body">
+                        <div className="run-form-field">
+                          <label className="run-form-label">
+                            Access mode
+                            <span className="run-form-type">(workspace_access_mode)</span>
+                          </label>
+                          <AfSelect
+                            value={workspaceAccessMode}
+                            placeholder="workspace_only"
+                            options={workspaceAccessModeOptions}
+                            searchable={false}
                             disabled={isRunning}
+                            onChange={(v) => {
+                              const next = typeof v === 'string' ? v.trim() : '';
+                              if (allowedAccessModes.includes(next)) {
+                                setWorkspaceAccessMode(next as WorkspaceAccessMode);
+                              } else if (allowedAccessModes.length > 0) {
+                                const fallback = allowedAccessModes[0] as WorkspaceAccessMode;
+                                console.warn(`#FALLBACK: workspace_access_mode not allowed; resetting to '${fallback}'`);
+                                setWorkspaceAccessMode(fallback);
+                              }
+                            }}
                           />
-                          <span>Random</span>
-                          <span
-                            className="run-form-tooltip"
-                            title="When enabled, a new folder is generated for the next execution to keep runs isolated. Uncheck to run in a specific folder."
-                            aria-label="Execution folder randomization help"
-                          >
-                            i
-                          </span>
-                        </label>
-                      </div>
+                          <p className="run-form-note run-form-note-compact">
+                            Relative paths resolve under workspace root. This only affects absolute paths.
+                          </p>
+                        </div>
 
-                      {executionWorkspaceQuery.isError ? (
-                        <p className="run-form-note">Could not fetch defaults; the server will generate a folder on Run.</p>
-                      ) : null}
-                    </div>
+                        <div className="run-form-field">
+                          <label className="run-form-label">
+                            Workspace folder
+                            <span className="run-form-type">(workspace_root)</span>
+                            {workspaceRootRequired ? (
+                              <span className="run-form-required">required</span>
+                            ) : (
+                              <span className="run-form-note">optional</span>
+                            )}
+                          </label>
 
-                    <div className="run-form-field">
-                      <label className="run-form-label">
-                        Filesystem access
-                        <span className="run-form-type">(workspace_access_mode)</span>
-                      </label>
-                      <AfSelect
-                        value={workspaceAccessMode}
-                        placeholder="workspace_only"
-                        options={[
-                          { value: 'workspace_only', label: 'workspace_only (restrict to workspace_root)' },
-                          { value: 'all_except_ignored', label: 'all_except_ignored (allow absolute paths outside workspace_root)' },
-                        ]}
-                        searchable={false}
-                        disabled={isRunning}
-                        onChange={(v) =>
-                          setWorkspaceAccessMode(v === 'all_except_ignored' ? 'all_except_ignored' : 'workspace_only')
-                        }
-                      />
-                      <p className="run-form-note">
-                        Relative paths still resolve under <code>workspace_root</code>. This only affects absolute paths.
-                      </p>
-                    </div>
-
-                    <div className="run-form-field">
-                      <label className="run-form-label">
-                        Ignored folders (denylist)
-                        <span className="run-form-type">(workspace_ignored_paths)</span>
-                      </label>
-                      <textarea
-                        className="run-form-input run-form-textarea"
-                        value={workspaceIgnoredPathsText}
-                        onChange={(e) => setWorkspaceIgnoredPathsText(e.target.value)}
-                        placeholder={'.git\nnode_modules\n.venv\n~/Library\n/Users/albou/.ssh'}
-                        rows={5}
-                        disabled={isRunning}
-                      />
-                      <p className="run-form-note">
-                        One path per line. Relative entries are resolved under <code>workspace_root</code>.
-                      </p>
-                    </div>
-
-                    {formInputPins.length === 0 ? (
-                      <p className="run-form-note">
-                        This flow has no input parameters. Click Run to execute.
-                      </p>
-                    ) : null}
-
-                    {formInputPins.map(pin => {
-                      const inputType = getInputTypeForPin(pin.type);
-                      const value = formValues[pin.id] || '';
-
-                      if (pin.type === 'provider' || pin.id === 'provider') {
-                        return (
-                          <div key={pin.id} className="run-form-field">
-                            <label className="run-form-label">
-                              {pin.label}
-                              <span className="run-form-type">({pin.type})</span>
-                            </label>
-                            <AfSelect
-                              value={value}
-                              placeholder={providersQuery.isLoading ? 'Loading…' : 'Select…'}
-                              options={providers.map((p) => ({ value: p.name, label: p.display_name || p.name }))}
-                              disabled={providersQuery.isLoading}
-                              loading={providersQuery.isLoading}
-                              searchable
-                              searchPlaceholder="Search providers…"
-                              onChange={(v) => handleFieldChange(pin.id, v)}
+                          <div className="run-form-inline">
+                            <input
+                              type="text"
+                              className="run-form-input"
+                              value={workspaceRoot}
+                              onChange={(e) => handleWorkspaceRootChange(e.target.value)}
+                              placeholder={
+                                !workspaceInputEnabled
+                                  ? 'Server-managed (client overrides disabled)'
+                                  : workspaceRandom && !workspaceRoot.trim()
+                                    ? executionWorkspaceQuery.isLoading
+                                      ? 'Generating…'
+                                      : 'Will be generated on Run'
+                                    : 'Folder path…'
+                              }
+                              readOnly={!workspaceInputEnabled || workspaceRandom}
+                              disabled={isRunning || !workspaceInputEnabled}
                             />
-                          </div>
-                        );
-                      }
 
-	                      if (pin.type === 'model' || pin.id === 'model') {
-	                        return (
-	                          <div key={pin.id} className="run-form-field">
-	                            <label className="run-form-label">
-	                              {pin.label}
-	                              <span className="run-form-type">({pin.type})</span>
-	                            </label>
-	                            <AfSelect
-	                              value={value}
-	                              placeholder={
-	                                !selectedProvider ? 'Pick provider…' : modelsQuery.isLoading ? 'Loading…' : 'Select…'
-	                              }
-	                              options={models.map((m) => ({ value: m, label: m }))}
-	                              disabled={!selectedProvider}
-	                              loading={modelsQuery.isLoading}
-	                              allowCustom
-	                              searchable
-	                              searchPlaceholder="Search models…"
-	                              onChange={(v) => handleFieldChange(pin.id, v)}
-	                            />
-	                          </div>
-                        );
-                      }
-
-                      if (pin.type === 'tools') {
-                        const values = Array.isArray(toolsValues[pin.id]) ? toolsValues[pin.id] : [];
-                        return (
-                          <div key={pin.id} className="run-form-field">
-                            <label className="run-form-label">
-                              {pin.label}
-                              <span className="run-form-type">({pin.type})</span>
+                            <label className="run-form-checkbox run-form-inline-checkbox">
+                              <input
+                                type="checkbox"
+                                checked={workspaceRandom}
+                                onChange={(e) => handleWorkspaceRandomChange(e.target.checked)}
+                                disabled={isRunning || !workspaceInputEnabled}
+                              />
+                              <span>Random (default)</span>
+                              <span
+                                className="run-form-tooltip"
+                                title="When enabled, workspace_root is left unset and the gateway allocates a fresh per-run folder. Uncheck to run in a specific folder."
+                                aria-label="Workspace folder randomization help"
+                              >
+                                i
+                              </span>
                             </label>
-                            <AfMultiSelect
-                              values={values}
-                              placeholder={toolsQuery.isLoading ? 'Loading…' : 'Select…'}
-                              options={toolOptions}
-                              disabled={isRunning || toolsQuery.isLoading}
-                              loading={toolsQuery.isLoading}
-                              searchable
-                              searchPlaceholder="Search tools…"
-                              clearable
-                              minPopoverWidth={340}
-                              onChange={(next) => setToolsValues((prev) => ({ ...prev, [pin.id]: next }))}
-                            />
                           </div>
-                        );
-                      }
 
-                      if (pin.id === 'scope') {
-                        const options = memoryScopeOptions.map((v) => ({ value: v, label: v }));
-                        return (
-                          <div key={pin.id} className="run-form-field">
+                          {!workspaceInputEnabled ? (
+                            <p className="run-form-note">
+                              Workspace is managed by the gateway (a new per-run folder is created by default). Client overrides are disabled by policy.
+                            </p>
+                          ) : executionWorkspaceQuery.isError ? (
+                            <p className="run-form-note">
+                              Could not fetch defaults; the server will generate a folder on Run.
+                            </p>
+                          ) : null}
+                        </div>
+
+                        <div className="run-form-field">
+                          <div className="run-form-label-row">
                             <label className="run-form-label">
-                              {pin.label}
-                              <span className="run-form-type">({pin.type})</span>
+                              Ignored folders
+                              <span className="run-form-type">(workspace_ignored_paths)</span>
                             </label>
-                            <AfSelect
-                              value={value}
-                              placeholder="run"
-                              options={options}
-                              searchable={false}
+                            <button
+                              type="button"
+                              className="run-form-action"
+                              onClick={() => setShowIgnoredPaths((prev) => !prev)}
                               disabled={isRunning}
-                              onChange={(v) => handleFieldChange(pin.id, v || 'run')}
-                            />
+                              aria-expanded={showIgnoredPaths}
+                            >
+                              {showIgnoredPaths ? 'Hide' : `Edit${ignoredPathsCount > 0 ? ` (${ignoredPathsCount})` : ''}`}
+                            </button>
                           </div>
-                        );
-                      }
 
-                      if (pin.id === 'recall_level') {
-                        const options = RECALL_LEVEL_OPTIONS.map((v) => ({ value: v, label: v }));
-                        return (
-                          <div key={pin.id} className="run-form-field">
-                            <label className="run-form-label">
-                              {pin.label}
-                              <span className="run-form-type">({pin.type})</span>
-                            </label>
-                            <AfSelect
-                              value={value}
-                              placeholder="standard"
-                              options={options}
-                              searchable={false}
-                              disabled={isRunning}
-                              onChange={(v) => handleFieldChange(pin.id, v || 'standard')}
-                            />
-                          </div>
-                        );
-                      }
-
-                      if (pin.type === 'array') {
-                        return (
-                          <div key={pin.id} className="run-form-field">
-                            <label className="run-form-label">
-                              {pin.label}
-                              <span className="run-form-type">({pin.type})</span>
-                            </label>
-                            <ArrayParamEditor
-                              value={value}
-                              disabled={isRunning}
-                              onChange={(next) => handleFieldChange(pin.id, next)}
-                            />
-                          </div>
-                        );
-                      }
-
-                      return (
-                          <div key={pin.id} className="run-form-field">
-                            <label className="run-form-label">
-                              {pin.label}
-                              <span className="run-form-type">({pin.type})</span>
-                            </label>
-
-                            {inputType === 'textarea' ? (
+                          {showIgnoredPaths ? (
+                            <>
                               <textarea
-                                className="run-form-input"
-                                value={value}
-                                onChange={(e) => handleFieldChange(pin.id, e.target.value)}
-                                placeholder={getPlaceholderForPin(pin)}
-                                rows={pin.type === 'string' ? 3 : 5}
+                                className="run-form-input run-form-textarea"
+                                value={workspaceIgnoredPathsText}
+                                onChange={(e) => setWorkspaceIgnoredPathsText(e.target.value)}
+                                placeholder={'.git\nnode_modules\n.venv\n~/Library\n/Users/albou/.ssh'}
+                                rows={4}
                                 disabled={isRunning}
                               />
-                            ) : inputType === 'checkbox' ? (
-                              <label className="run-form-checkbox">
-                                <input
-                                  type="checkbox"
-                                  checked={value === 'true'}
-                                  onChange={(e) => handleFieldChange(pin.id, e.target.checked ? 'true' : 'false')}
+                              <p className="run-form-note">
+                                One path per line. Relative entries are resolved under workspace root.
+                              </p>
+                            </>
+                          ) : null}
+                        </div>
+                      </div>
+                    </details>
+
+                    {/* Card 2: Workflow Parameters */}
+                    <div className="run-form-section">
+                      <div className="run-form-section-header">
+                        <div className="run-form-section-title">Workflow Parameters</div>
+                      </div>
+                      <div className="run-form-section-body">
+                        {!sessionPinId ? (
+                          <div className="run-form-field">
+                            <label className="run-form-label">
+                              Session ID
+                              <span className="run-form-type">(session_id)</span>
+                              <span className="run-form-note">optional</span>
+                            </label>
+                            <input
+                              type="text"
+                              className="run-form-input"
+                              value={sessionIdOverride}
+                              onChange={(e) => setSessionIdOverride(e.target.value)}
+                              placeholder={derivedSessionId || 'Reuse a session id for follow-ups'}
+                              disabled={isRunning}
+                            />
+                            <p className="run-form-note">
+                              Reuse the same session id to continue context on Follow Up. Leave blank to use the default tab session.
+                            </p>
+                          </div>
+                        ) : null}
+                        {formInputPins.length === 0 ? (
+                          <p className="run-form-note">
+                            This flow has no input parameters. Click Run to execute.
+                          </p>
+                        ) : null}
+
+                        {formInputPins.map(pin => {
+                          const inputType = getInputTypeForPin(pin.type);
+                          const value = formValues[pin.id] || '';
+
+                          if (pin.type === 'provider' || pin.id === 'provider') {
+                            return (
+                              <div key={pin.id} className="run-form-field">
+                                <label className="run-form-label">
+                                  {pin.label}
+                                  <span className="run-form-type">({pin.type})</span>
+                                </label>
+                                <AfSelect
+                                  value={value}
+                                  placeholder={providersQuery.isLoading ? 'Loading…' : 'Select…'}
+                                  options={providers.map((p) => ({ value: p.name, label: p.display_name || p.name }))}
+                                  disabled={providersQuery.isLoading}
+                                  loading={providersQuery.isLoading}
+                                  searchable
+                                  searchPlaceholder="Search providers…"
+                                  onChange={(v) => handleFieldChange(pin.id, v)}
+                                />
+                              </div>
+                            );
+                          }
+
+                          if (pin.type === 'model' || pin.id === 'model') {
+                            return (
+                              <div key={pin.id} className="run-form-field">
+                                <label className="run-form-label">
+                                  {pin.label}
+                                  <span className="run-form-type">({pin.type})</span>
+                                </label>
+                                <AfSelect
+                                  value={value}
+                                  placeholder={
+                                    !selectedProvider ? 'Pick provider…' : modelsQuery.isLoading ? 'Loading…' : 'Select…'
+                                  }
+                                  options={models.map((m) => ({ value: m, label: m }))}
+                                  disabled={!selectedProvider}
+                                  loading={modelsQuery.isLoading}
+                                  allowCustom
+                                  searchable
+                                  searchPlaceholder="Search models…"
+                                  onChange={(v) => handleFieldChange(pin.id, v)}
+                                />
+                              </div>
+                            );
+                          }
+
+                          if (pin.type === 'tools') {
+                            const values = Array.isArray(toolsValues[pin.id]) ? toolsValues[pin.id] : [];
+                            return (
+                              <div key={pin.id} className="run-form-field">
+                                <label className="run-form-label">
+                                  {pin.label}
+                                  <span className="run-form-type">({pin.type})</span>
+                                </label>
+                                <AfMultiSelect
+                                  values={values}
+                                  placeholder={toolsQuery.isLoading ? 'Loading…' : 'Select…'}
+                                  options={toolOptions}
+                                  disabled={isRunning || toolsQuery.isLoading}
+                                  loading={toolsQuery.isLoading}
+                                  searchable
+                                  searchPlaceholder="Search tools…"
+                                  clearable
+                                  minPopoverWidth={340}
+                                  onChange={(next) => setToolsValues((prev) => ({ ...prev, [pin.id]: next }))}
+                                />
+                              </div>
+                            );
+                          }
+
+                          if (pin.id === 'scope') {
+                            const options = memoryScopeOptions.map((v) => ({ value: v, label: v }));
+                            return (
+                              <div key={pin.id} className="run-form-field">
+                                <label className="run-form-label">
+                                  {pin.label}
+                                  <span className="run-form-type">({pin.type})</span>
+                                </label>
+                                <AfSelect
+                                  value={value}
+                                  placeholder="run"
+                                  options={options}
+                                  searchable={false}
+                                  disabled={isRunning}
+                                  onChange={(v) => handleFieldChange(pin.id, v || 'run')}
+                                />
+                              </div>
+                            );
+                          }
+
+                          if (pin.id === 'recall_level') {
+                            const options = RECALL_LEVEL_OPTIONS.map((v) => ({ value: v, label: v }));
+                            return (
+                              <div key={pin.id} className="run-form-field">
+                                <label className="run-form-label">
+                                  {pin.label}
+                                  <span className="run-form-type">({pin.type})</span>
+                                </label>
+                                <AfSelect
+                                  value={value}
+                                  placeholder="standard"
+                                  options={options}
+                                  searchable={false}
+                                  disabled={isRunning}
+                                  onChange={(v) => handleFieldChange(pin.id, v || 'standard')}
+                                />
+                              </div>
+                            );
+                          }
+
+                          if (pin.type === 'array') {
+                            return (
+                              <div key={pin.id} className="run-form-field">
+                                <label className="run-form-label">
+                                  {pin.label}
+                                  <span className="run-form-type">({pin.type})</span>
+                                </label>
+                                <ArrayParamEditor
+                                  value={value}
+                                  disabled={isRunning}
+                                  onChange={(next) => handleFieldChange(pin.id, next)}
+                                />
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div key={pin.id} className="run-form-field">
+                              <label className="run-form-label">
+                                {pin.label}
+                                <span className="run-form-type">({pin.type})</span>
+                              </label>
+
+                              {inputType === 'textarea' ? (
+                                <textarea
+                                  className="run-form-input"
+                                  value={value}
+                                  onChange={(e) => handleFieldChange(pin.id, e.target.value)}
+                                  placeholder={getPlaceholderForPin(pin)}
+                                  rows={pin.type === 'string' ? 3 : 5}
                                   disabled={isRunning}
                                 />
-                                <span>{pin.label}</span>
-                              </label>
-                            ) : (
-                              <input
-                                type={inputType}
-                                className="run-form-input"
-                                value={value}
-                                onChange={(e) => handleFieldChange(pin.id, e.target.value)}
-                                placeholder={getPlaceholderForPin(pin)}
-                                disabled={isRunning}
-                              />
-                            )}
-                          </div>
-                        );
-                      })}
+                              ) : inputType === 'checkbox' ? (
+                                <label className="run-form-checkbox">
+                                  <input
+                                    type="checkbox"
+                                    checked={value === 'true'}
+                                    onChange={(e) => handleFieldChange(pin.id, e.target.checked ? 'true' : 'false')}
+                                    disabled={isRunning}
+                                  />
+                                  <span>{pin.label}</span>
+                                </label>
+                              ) : (
+                                <input
+                                  type={inputType}
+                                  className="run-form-input"
+                                  value={value}
+                                  onChange={(e) => handleFieldChange(pin.id, e.target.value)}
+                                  placeholder={getPlaceholderForPin(pin)}
+                                  disabled={isRunning}
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
                   </div>
                 </div>
               ) : (
@@ -3255,63 +4092,261 @@ export function RunFlowModal({
         </div>
 
         {/* Footer */}
-        <div className="modal-actions run-modal-footer">
-          {onCancelRun && (
-            <button
-              className="modal-button cancel"
-              onClick={onCancelRun}
-              disabled={!(isRunning || isPaused || isWaiting)}
-            >
-              Cancel Run
-            </button>
-          )}
+        <div className="run-modal-footer">
+          {approvalDetails ? (
+            <div className="run-approval-panel">
+              <div className="run-approval-header">
+                <div className="run-approval-title">Pending tool approval</div>
+                {approvalRunId ? (
+                  <div className="run-approval-meta">Run {approvalRunId}</div>
+                ) : null}
+              </div>
+              {approvalToolCalls.length > 0 ? (
+                <div className="run-approval-tools">
+                  {approvalToolCalls.map((call, idx) => {
+                    const callObj = call && typeof call === 'object' ? (call as Record<string, unknown>) : {};
+                    const name = typeof callObj.name === 'string' ? callObj.name : `tool_${idx + 1}`;
+                    const args =
+                      callObj.arguments && typeof callObj.arguments === 'object'
+                        ? callObj.arguments
+                        : callObj.args && typeof callObj.args === 'object'
+                          ? callObj.args
+                          : callObj;
+                    const callId = typeof callObj.call_id === 'string' ? callObj.call_id : '';
+                    return (
+                      <div key={`${name}-${idx}`} className="run-approval-tool">
+                        <div className="run-approval-tool-title">
+                          {name}
+                          {callId ? <span className="run-approval-tool-id">{callId}</span> : null}
+                        </div>
+                        <JsonViewer value={args} collapseAfterDepth={6} />
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="run-approval-empty">No tool call details were provided.</div>
+              )}
+            </div>
+          ) : null}
 
-          {(onPause || onResumeRun) && (
-            <button
-              className={isPaused ? 'modal-button primary' : 'modal-button cancel'}
-              onClick={() => {
-                if (isPaused) onResumeRun?.();
-                else onPause?.();
-              }}
-              disabled={isPaused ? !isPaused : !(isRunning && !isWaiting)}
-            >
-              {isPaused ? 'Resume' : 'Pause'}
-            </button>
-          )}
+          <div className="run-modal-footer-actions">
+            <div className="run-modal-footer-left">
+              {approvalDetails ? (
+                <>
+                  <button
+                    type="button"
+                    className="modal-button primary"
+                    onClick={() => {
+                      onApproveAll?.({
+                        rootRunId: rootRunId || undefined,
+                        sessionId: approvalSessionId || undefined,
+                      });
+                      onResume?.({
+                        approved: true,
+                        runId: approvalWait?.runId,
+                        waitKey: approvalWait?.waitKey,
+                      });
+                    }}
+                  >
+                    Approve All
+                  </button>
+                  <button
+                    type="button"
+                    className="modal-button"
+                    onClick={() =>
+                      onResume?.({
+                        approved: true,
+                        runId: approvalWait?.runId,
+                        waitKey: approvalWait?.waitKey,
+                      })
+                    }
+                  >
+                    Approve
+                  </button>
+                  <button
+                    type="button"
+                    className="modal-button cancel"
+                    onClick={() =>
+                      onResume?.({
+                        approved: false,
+                        runId: approvalWait?.runId,
+                        waitKey: approvalWait?.waitKey,
+                      })
+                    }
+                  >
+                    Deny
+                  </button>
+                </>
+              ) : null}
+            </div>
 
-          <button
-            className="modal-button cancel"
-            onClick={onClose}
-          >
-            {(isRunning || isPaused || isWaiting) ? 'Hide' : (hasRunData || result ? 'Close' : 'Cancel')}
-          </button>
+            <div className="run-modal-footer-right">
+              {onCancelRun && (
+                <button
+                  className="modal-button cancel"
+                  onClick={onCancelRun}
+                  disabled={!(isRunning || isPaused || isWaiting)}
+                >
+                  Cancel Run
+                </button>
+              )}
 
-          {!hasRunData && !result && (
-            <button
-              className="modal-button primary"
-              onClick={handleSubmit}
-              disabled={
-                isRunning || !entryNode || (!workspaceRoot.trim() && !(workspaceRandom && executionWorkspaceQuery.isError))
-              }
-            >
-              {isRunning ? 'Running...' : 'Run'}
-            </button>
-          )}
+              {(onPause || onResumeRun) && (
+                <button
+                  className={isPaused ? 'modal-button primary' : 'modal-button cancel'}
+                  onClick={() => {
+                    if (isPaused) onResumeRun?.();
+                    else onPause?.();
+                  }}
+                  disabled={isPaused ? !isPaused : !(isRunning && !isWaiting)}
+                >
+                  {isPaused ? 'Resume' : 'Pause'}
+                </button>
+              )}
 
-          {(hasRunData || result) && (
-            <button
-              className="modal-button primary"
-              onClick={() => {
-                if (workspaceRandom) {
-                  const next = createRandomWorkspaceRoot();
-                  if (next) setWorkspaceRoot(next);
-                }
-                onRunAgain();
-              }}
-              disabled={isRunning}
-            >
-              Run Again
-            </button>
+              <button
+                className="modal-button cancel"
+                onClick={onClose}
+              >
+                {(isRunning || isPaused || isWaiting) ? 'Hide' : (hasRunData || result ? 'Close' : 'Cancel')}
+              </button>
+
+              {!hasRunData && !result && (
+                <button
+                  className="modal-button primary"
+                  onClick={handleSubmit}
+                  disabled={
+                    isRunning ||
+                    !entryNode ||
+                    (workspaceRootRequired && !workspaceRoot.trim() && !(workspaceRandom && executionWorkspaceQuery.isError))
+                  }
+                >
+                  {isRunning ? 'Running...' : 'Run'}
+                </button>
+              )}
+
+              {(hasRunData || result) && !isRunning && !isPaused && !isWaiting && onFollowUpSubmit && (
+                <button
+                  className="modal-button cancel"
+                  onClick={() => {
+                    setFollowUpError(null);
+                    setShowFollowUpModal(true);
+                  }}
+                >
+                  Follow Up
+                </button>
+              )}
+
+              {(hasRunData || result) && onNewRun && (
+                <button
+                  className="modal-button primary"
+                  onClick={() => {
+                    if (workspaceRandom) {
+                      setWorkspaceRoot('');
+                    }
+                    setFollowUpContext(null);
+                    setLastRunSeed(null);
+                    if (sessionPinId) {
+                      setFormValues((prev) => ({ ...prev, [sessionPinId]: '' }));
+                    } else {
+                      setSessionIdOverride('');
+                    }
+                    onNewRun();
+                  }}
+                  disabled={isRunning || Boolean(isPaused) || Boolean(isWaiting)}
+                >
+                  New Run
+                </button>
+              )}
+            </div>
+          </div>
+          {showFollowUpModal && (
+            <div className="run-followup-overlay">
+              <div className="run-followup-modal">
+                <div className="run-followup-header">Follow Up</div>
+                <div className="run-followup-body">
+                  <label className="run-followup-label" htmlFor="run-followup-textarea">
+                    Message
+                  </label>
+                  <textarea
+                    id="run-followup-textarea"
+                    className="run-followup-textarea"
+                    rows={4}
+                    value={followUpDraft}
+                    onChange={(e) => setFollowUpDraft(e.target.value)}
+                    placeholder="Add your follow up request…"
+                    disabled={followUpSubmitting}
+                  />
+                  <div
+                    className={`run-followup-drop ${followUpDragActive ? 'is-active' : ''}`}
+                    onDragEnter={handleFollowUpDragOver}
+                    onDragOver={handleFollowUpDragOver}
+                    onDragLeave={handleFollowUpDragLeave}
+                    onDrop={handleFollowUpDrop}
+                  >
+                    <div className="run-followup-drop-title">Drag & drop attachments here</div>
+                    <div className="run-followup-drop-subtitle">or</div>
+                    <label className="run-followup-attach">
+                      <input
+                        type="file"
+                        multiple
+                        onChange={(e) => {
+                          if (e.target.files) addFollowUpFiles(e.target.files);
+                          e.currentTarget.value = '';
+                        }}
+                        disabled={followUpSubmitting}
+                      />
+                      Choose files
+                    </label>
+                  </div>
+                  {followUpAttachments.length > 0 ? (
+                    <div className="run-followup-files">
+                      {followUpAttachments.map((f, idx) => (
+                        <div className="run-followup-file" key={`${f.name}-${f.size}-${f.lastModified}-${idx}`}>
+                          <div className="run-followup-file-name">{f.name}</div>
+                          <div className="run-followup-file-meta">{Math.max(1, Math.ceil(f.size / 1024))} KB</div>
+                          <button
+                            type="button"
+                            className="run-followup-file-remove"
+                            onClick={() =>
+                              setFollowUpAttachments((prev) => prev.filter((_, pIdx) => pIdx !== idx))
+                            }
+                            disabled={followUpSubmitting}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                  {followUpError ? <div className="run-followup-error">{followUpError}</div> : null}
+                </div>
+                <div className="run-followup-footer">
+                  <button
+                    type="button"
+                    className="modal-button cancel"
+                    onClick={() => {
+                      if (followUpSubmitting) return;
+                      setFollowUpDraft('');
+                      setFollowUpAttachments([]);
+                      setFollowUpError(null);
+                      setShowFollowUpModal(false);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="modal-button primary"
+                    onClick={handleFollowUpSubmit}
+                    disabled={followUpSubmitting}
+                  >
+                    {followUpSubmitting ? 'Sending...' : 'Follow Up'}
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>

@@ -20,6 +20,9 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import logging
+
+logger = logging.getLogger(__name__)
 
 def _prepend_sys_path(path: Path) -> None:
     p = str(path)
@@ -43,6 +46,24 @@ _prepend_sys_path(MONOREPO_ROOT / "abstractruntime" / "src")
 _prepend_sys_path(MONOREPO_ROOT / "abstractagent" / "src")
 _prepend_sys_path(MONOREPO_ROOT / "abstractmemory" / "src")
 _prepend_sys_path(MONOREPO_ROOT / "abstractsemantics" / "src")
+
+
+def pytest_configure() -> None:
+    _disable_openai_compatible_model_validation()
+
+
+def _disable_openai_compatible_model_validation() -> None:
+    """Skip provider model validation for local tests (avoids environment coupling)."""
+    try:
+        from abstractcore.providers.openai_compatible_provider import OpenAICompatibleProvider
+    except Exception:
+        return
+
+    def _no_validate(self) -> None:
+        return None
+
+    OpenAICompatibleProvider._validate_model = _no_validate  # type: ignore[assignment]
+    logger.warning("#FALLBACK: disabled OpenAI-compatible model validation for tests")
 
 
 

@@ -4,8 +4,8 @@
  * CLI entry point for @abstractframework/flow
  * Serves the visual workflow editor on a configurable port.
  *
- * NOTE: The editor UI expects a backend API at `/api/*`.
- * This CLI proxies `/api/*` (HTTP + WebSocket upgrades) to a configurable backend URL.
+ * NOTE: The editor UI expects a gateway API at `/api/*`.
+ * This CLI proxies `/api/*` (HTTP + SSE) to a configurable gateway URL.
  */
 
 import * as http from 'http';
@@ -21,11 +21,22 @@ function parseArgs(argv) {
   const out = {
     host: process.env.HOST || '0.0.0.0',
     port: Number.parseInt(String(process.env.PORT || '3003'), 10),
-    backendUrl:
-      process.env.ABSTRACTFLOW_BACKEND_URL ||
-      process.env.BACKEND_URL ||
+    gatewayUrl:
+      process.env.ABSTRACTGATEWAY_URL ||
+      process.env.ABSTRACTFLOW_GATEWAY_URL ||
+      process.env.ABSTRACTFLOW_BACKEND_URL || // #FALLBACK: legacy env var
+      process.env.BACKEND_URL || // #FALLBACK: legacy env var
       'http://127.0.0.1:8080',
+    gatewayToken:
+      process.env.ABSTRACTGATEWAY_AUTH_TOKEN ||
+      process.env.ABSTRACTFLOW_GATEWAY_AUTH_TOKEN || // #FALLBACK: legacy env var
+      process.env.ABSTRACTCODE_GATEWAY_TOKEN || // #FALLBACK: legacy env var
+      '',
   };
+  let gatewayUrlFromCli = false;
+  let legacyCliFlag = false;
+  let gatewayTokenFromCli = false;
+  let legacyTokenFlag = false;
 
   const args = Array.isArray(argv) ? argv.slice() : [];
   for (let i = 0; i < args.length; i += 1) {
@@ -48,14 +59,39 @@ function parseArgs(argv) {
       i += 1;
       continue;
     }
-    if ((a === '--backend-url' || a === '--backend') && typeof next === 'string') {
-      out.backendUrl = next;
+    if ((a === '--gateway-url' || a === '--backend-url' || a === '--backend') && typeof next === 'string') {
+      if (a !== '--gateway-url') legacyCliFlag = true;
+      out.gatewayUrl = next;
+      gatewayUrlFromCli = true;
+      i += 1;
+      continue;
+    }
+    if ((a === '--gateway-token' || a === '--backend-token') && typeof next === 'string') {
+      if (a !== '--gateway-token') legacyTokenFlag = true;
+      out.gatewayToken = next;
+      gatewayTokenFromCli = true;
       i += 1;
       continue;
     }
   }
 
   if (!Number.isFinite(out.port) || out.port <= 0) out.port = 3003;
+  if (legacyCliFlag) {
+    console.warn('#FALLBACK: --backend-url/--backend is deprecated; use --gateway-url');
+  }
+  if (!gatewayUrlFromCli && !process.env.ABSTRACTGATEWAY_URL && !process.env.ABSTRACTFLOW_GATEWAY_URL) {
+    if (process.env.ABSTRACTFLOW_BACKEND_URL || process.env.BACKEND_URL) {
+      console.warn('#FALLBACK: using legacy ABSTRACTFLOW_BACKEND_URL/BACKEND_URL for gateway URL');
+    }
+  }
+  if (legacyTokenFlag) {
+    console.warn('#FALLBACK: --backend-token is deprecated; use --gateway-token');
+  }
+  if (!gatewayTokenFromCli && !process.env.ABSTRACTGATEWAY_AUTH_TOKEN) {
+    if (process.env.ABSTRACTFLOW_GATEWAY_AUTH_TOKEN || process.env.ABSTRACTCODE_GATEWAY_TOKEN) {
+      console.warn('#FALLBACK: using legacy auth token env var for gateway auth');
+    }
+  }
   return out;
 }
 
@@ -67,24 +103,33 @@ if (OPTS.help) {
   console.log(`AbstractFlow Editor (static) — @abstractframework/flow
 
 Usage:
-  npx @abstractframework/flow [--port 3003] [--host 0.0.0.0] [--backend-url http://127.0.0.1:8080]
+  npx @abstractframework/flow [--port 3003] [--host 0.0.0.0] [--gateway-url http://127.0.0.1:8080] [--gateway-token <token>]
 
 Env vars:
   PORT, HOST
-  ABSTRACTFLOW_BACKEND_URL (or BACKEND_URL)
+  ABSTRACTGATEWAY_URL (or ABSTRACTFLOW_GATEWAY_URL / ABSTRACTFLOW_BACKEND_URL / BACKEND_URL)
+  ABSTRACTGATEWAY_AUTH_TOKEN (or ABSTRACTFLOW_GATEWAY_AUTH_TOKEN / ABSTRACTCODE_GATEWAY_TOKEN)
 
 Notes:
-  - Proxies /api/* to the backend URL (HTTP + WebSocket).
-  - Start the backend with: abstractflow serve --port 8080
+  - Proxies /api/* to the gateway URL (HTTP + SSE).
+  - Start the gateway with: abstractgateway --port 8080
 `);
   process.exit(0);
 }
 
+if (!String(OPTS.gatewayToken || '').trim()) {
+  console.error(
+    'AbstractFlow requires gateway authentication. ' +
+    'Export ABSTRACTGATEWAY_AUTH_TOKEN or pass --gateway-token <token>.'
+  );
+  process.exit(1);
+}
+
 let BACKEND;
 try {
-  BACKEND = new URL(String(OPTS.backendUrl || '').trim());
+  BACKEND = new URL(String(OPTS.gatewayUrl || '').trim());
 } catch {
-  console.error(`Invalid backend URL: ${String(OPTS.backendUrl || '')}`);
+  console.error(`Invalid gateway URL: ${String(OPTS.gatewayUrl || '')}`);
   process.exit(2);
 }
 if (!BACKEND.port) {
@@ -133,6 +178,10 @@ function serveFile(res, filePath) {
 function proxyApiRequest(req, res) {
   const client = BACKEND.protocol === 'https:' ? https : http;
   const headers = { ...req.headers, host: BACKEND.host };
+  const authHeader = headers.authorization || headers.Authorization;
+  if (OPTS.gatewayToken && !authHeader) {
+    headers.authorization = `Bearer ${String(OPTS.gatewayToken).trim()}`;
+  }
 
   const proxyReq = client.request(
     {
@@ -169,6 +218,10 @@ function proxyApiRequest(req, res) {
 function proxyApiWebSocket(req, socket, head) {
   const client = BACKEND.protocol === 'https:' ? https : http;
   const headers = { ...req.headers, host: BACKEND.host };
+  const authHeader = headers.authorization || headers.Authorization;
+  if (OPTS.gatewayToken && !authHeader) {
+    headers.authorization = `Bearer ${String(OPTS.gatewayToken).trim()}`;
+  }
 
   const proxyReq = client.request({
     protocol: BACKEND.protocol,
@@ -320,10 +373,9 @@ server.listen(PORT, HOST, () => {
 
   🌐 Local:   http://localhost:${PORT}
   🌐 Network: http://${HOST}:${PORT}
-  🔌 Backend: ${BACKEND_ORIGIN}
+  🔌 Gateway: ${BACKEND_ORIGIN}
 
   📐 Drag-and-drop workflow authoring
-  🔗 Configure AbstractGateway in the Connect modal
   💾 Export .flow bundles for deployment
 
   Press Ctrl+C to stop

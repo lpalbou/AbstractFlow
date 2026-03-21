@@ -177,6 +177,6 @@ flows.db
 web/runtime/
 
 # Local editor backend defaults (when run from repo root)
-runtime/
-flows/
-untracked/
+/runtime/
+/flows/
+/untracked/

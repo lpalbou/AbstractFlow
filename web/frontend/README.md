@@ -36,6 +36,6 @@ Environment variables:
 
 ## AbstractGateway (optional)
 
-If you run an AbstractGateway (default: http://127.0.0.1:8081), configure it from the UI “Connect” modal.
+If you run an AbstractGateway (default: http://127.0.0.1:8080), configure it from the UI “Connect” modal.
 
 Gateway is required for embeddings-backed memory/KG features and “publish to gateway” flows.

@@ -5,12 +5,19 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RunSummary } from '../types/flow';
+import { filterRunSummariesByFlowId, mapGatewayRunSummary } from '../utils/gatewayRuns';
 
 async function fetchRuns(workflowId: string): Promise<RunSummary[]> {
-  const qs = new URLSearchParams({ workflow_id: workflowId, limit: '50' });
-  const res = await fetch(`/api/runs?${qs.toString()}`);
+  const qs = new URLSearchParams({ limit: '50' });
+  const res = await fetch(`/api/gateway/runs?${qs.toString()}`);
   if (!res.ok) throw new Error(`Failed to list runs (HTTP ${res.status})`);
-  return res.json();
+  const payload = (await res.json()) as { items?: Record<string, unknown>[] };
+  if (!Array.isArray(payload.items)) {
+    console.warn('#FALLBACK: runs response missing items; treating as empty list');
+  }
+  const items = Array.isArray(payload.items) ? payload.items : [];
+  const mapped = items.map(mapGatewayRunSummary);
+  return filterRunSummariesByFlowId(mapped, workflowId);
 }
 
 function shortRunId(runId: string): string {

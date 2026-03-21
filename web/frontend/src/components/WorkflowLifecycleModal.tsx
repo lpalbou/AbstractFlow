@@ -23,8 +23,8 @@ type DeprecateBundleResponse = {
   removed?: boolean | null;
 };
 
-async function deprecateBundle(flowId: string, payload: DeprecateBundleRequest): Promise<DeprecateBundleResponse> {
-  const response = await fetch(`/api/flows/${flowId}/deprecate`, {
+async function deprecateBundle(bundleId: string, payload: DeprecateBundleRequest): Promise<DeprecateBundleResponse> {
+  const response = await fetch(`/api/gateway/bundles/${encodeURIComponent(bundleId)}/deprecate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -37,8 +37,8 @@ async function deprecateBundle(flowId: string, payload: DeprecateBundleRequest):
   return response.json();
 }
 
-async function undeprecateBundle(flowId: string, payload: DeprecateBundleRequest): Promise<DeprecateBundleResponse> {
-  const response = await fetch(`/api/flows/${flowId}/undeprecate`, {
+async function undeprecateBundle(bundleId: string, payload: DeprecateBundleRequest): Promise<DeprecateBundleResponse> {
+  const response = await fetch(`/api/gateway/bundles/${encodeURIComponent(bundleId)}/undeprecate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -53,12 +53,10 @@ async function undeprecateBundle(flowId: string, payload: DeprecateBundleRequest
 
 export function WorkflowLifecycleModal({
   isOpen,
-  flowId,
   flowName,
   onClose,
 }: {
   isOpen: boolean;
-  flowId: string | null;
   flowName: string;
   onClose: () => void;
 }) {
@@ -80,7 +78,7 @@ export function WorkflowLifecycleModal({
 
   if (!isOpen) return null;
 
-  const canSubmit = Boolean(flowId) && !isSubmitting;
+  const canSubmit = Boolean(bundleId.trim()) && !isSubmitting;
 
   return (
     <div className="modal-overlay" onClick={onClose} role="presentation">
@@ -160,7 +158,7 @@ export function WorkflowLifecycleModal({
             className="modal-button danger"
             disabled={!canSubmit}
             onClick={async () => {
-              if (!flowId) return;
+              if (!bundleId.trim()) return;
               setIsSubmitting(true);
               try {
                 const payload: DeprecateBundleRequest = {};
@@ -170,7 +168,7 @@ export function WorkflowLifecycleModal({
                 if (fid) payload.flow_id = fid;
                 const r = (reason || '').trim();
                 if (r) payload.reason = r;
-                const res = await deprecateBundle(flowId, payload);
+                const res = await deprecateBundle(bid || bundleId, payload);
                 setResult(res);
                 toast.success(`Deprecated ${res.bundle_id}:${res.flow_id}`);
               } catch (e) {
@@ -186,7 +184,7 @@ export function WorkflowLifecycleModal({
             className="modal-button"
             disabled={!canSubmit}
             onClick={async () => {
-              if (!flowId) return;
+              if (!bundleId.trim()) return;
               setIsSubmitting(true);
               try {
                 const payload: DeprecateBundleRequest = {};
@@ -194,7 +192,7 @@ export function WorkflowLifecycleModal({
                 if (bid) payload.bundle_id = bid;
                 const fid = (entryFlowId || '').trim();
                 if (fid) payload.flow_id = fid;
-                const res = await undeprecateBundle(flowId, payload);
+                const res = await undeprecateBundle(bid || bundleId, payload);
                 setResult(res);
                 toast.success(`Undeprecated ${res.bundle_id}:${res.flow_id}`);
               } catch (e) {

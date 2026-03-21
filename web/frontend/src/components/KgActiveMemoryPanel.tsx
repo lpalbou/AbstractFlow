@@ -36,7 +36,7 @@ export function KgActiveMemoryPanel({ runId, title, output }: KgActiveMemoryPane
   const onQuery = useCallback(
     async (params: KgQueryParams): Promise<KgQueryResult> => {
       if (!runId) throw new Error('run_id is missing');
-      const res = await fetch('/api/memory/kg/query', {
+      const res = await fetch('/api/gateway/kg/query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...params, run_id: runId }),

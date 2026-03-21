@@ -160,6 +160,7 @@ export interface FlowNodeData {
     model?: string;
     temperature?: number;  // Sampling temperature (0 = deterministic)
     seed?: number;         // Seed for deterministic outputs (-1 = random/unset)
+    max_iterations?: number; // Safety cap for agent loop iterations
     tools?: string[];      // Allowlisted tool names (0..N)
     include_context?: boolean; // When true, include run context/messages as history (Recall into context)
     outputSchema?: {       // Optional structured output schema
@@ -285,6 +286,9 @@ export interface ExecutionEvent {
   // ISO 8601 UTC timestamp for event emission (host-side observability).
   ts?: string;
   runId?: string;
+  threadRunId?: string;
+  // Durable ledger step id (when sourced from the gateway ledger stream).
+  stepId?: string;
   nodeId?: string;
   result?: unknown;
   // subworkflow_update payload
@@ -299,6 +303,7 @@ export interface ExecutionEvent {
   allow_free_text?: boolean;
   wait_key?: string;
   reason?: string;
+  details?: Record<string, unknown>;
 }
 
 export interface ExecutionMetrics {
@@ -326,6 +331,7 @@ export interface RunSummary {
   updated_at?: string | null;
   parent_run_id?: string | null;
   error?: string | null;
+  flow_warnings?: string[] | null;
   wait_reason?: string | null;
   wait_key?: string | null;
   paused?: boolean;

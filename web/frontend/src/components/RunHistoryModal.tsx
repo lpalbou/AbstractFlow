@@ -7,19 +7,75 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { RunSummary } from '../types/flow';
+import { extractFlowIdFromWorkflowId, mapGatewayRunSummary } from '../utils/gatewayRuns';
 
 interface RunHistoryModalProps {
   isOpen: boolean;
   workflowId: string;
+  workflowName?: string;
   onClose: () => void;
   onSelectRun: (runId: string) => void;
 }
 
-async function fetchRuns(workflowId: string): Promise<RunSummary[]> {
-  const qs = new URLSearchParams({ workflow_id: workflowId, limit: '50' });
-  const res = await fetch(`/api/runs?${qs.toString()}`);
-  if (!res.ok) throw new Error(`Failed to list runs (HTTP ${res.status})`);
-  return res.json();
+function sanitizeBundleId(raw: string): string {
+  let s = String(raw || '').trim();
+  if (!s) return '';
+  s = s.replace(/[^a-zA-Z0-9_-]+/g, '-');
+  s = s.replace(/-{2,}/g, '-').replace(/^-+|-+$/g, '');
+  return s;
+}
+
+async function fetchRuns(workflowId: string, workflowName?: string): Promise<RunSummary[]> {
+  const fid = String(workflowId || '').trim();
+  if (!fid) return [];
+
+  const candidates = new Set<string>();
+  candidates.add(fid);
+  if (fid.includes(':')) candidates.add(fid);
+
+  const bundleId = sanitizeBundleId(workflowName || '') || sanitizeBundleId(fid);
+  if (bundleId) {
+    candidates.add(`${bundleId}@dev:${fid}`);
+    candidates.add(`${bundleId}:${fid}`);
+  }
+
+  const all: RunSummary[] = [];
+  for (const wid of candidates) {
+    const qs = new URLSearchParams({ limit: '500', root_only: 'true', workflow_id: wid });
+    const res = await fetch(`/api/gateway/runs?${qs.toString()}`);
+    if (!res.ok) continue;
+    const payload = (await res.json()) as { items?: Record<string, unknown>[] };
+    const items = Array.isArray(payload.items) ? payload.items : [];
+    const mapped = items.map(mapGatewayRunSummary);
+    all.push(...mapped);
+  }
+
+  // Fallback: fetch recent root runs and filter by flow id suffix.
+  try {
+    const qs = new URLSearchParams({ limit: '500', root_only: 'true' });
+    const res = await fetch(`/api/gateway/runs?${qs.toString()}`);
+    if (res.ok) {
+      const payload = (await res.json()) as { items?: Record<string, unknown>[] };
+      const items = Array.isArray(payload.items) ? payload.items : [];
+      const mapped = items.map(mapGatewayRunSummary);
+      for (const r of mapped) {
+        if (extractFlowIdFromWorkflowId(r.workflow_id) === fid) {
+          all.push(r);
+        }
+      }
+    }
+  } catch {
+    // ignore fallback errors
+  }
+
+  // Deduplicate by run id.
+  const byId = new Map<string, RunSummary>();
+  for (const r of all) {
+    const rid = r.run_id || '';
+    if (!rid) continue;
+    if (!byId.has(rid)) byId.set(rid, r);
+  }
+  return Array.from(byId.values());
 }
 
 function formatRunTime(iso?: string | null): string {
@@ -29,7 +85,7 @@ function formatRunTime(iso?: string | null): string {
   return d.toLocaleString();
 }
 
-export function RunHistoryModal({ isOpen, workflowId, onClose, onSelectRun }: RunHistoryModalProps) {
+export function RunHistoryModal({ isOpen, workflowId, workflowName, onClose, onSelectRun }: RunHistoryModalProps) {
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +96,7 @@ export function RunHistoryModal({ isOpen, workflowId, onClose, onSelectRun }: Ru
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchRuns(workflowId);
+      const data = await fetchRuns(workflowId, workflowName);
       setRuns(Array.isArray(data) ? data : []);
     } catch (e) {
       setRuns([]);

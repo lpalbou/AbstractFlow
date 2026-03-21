@@ -21,6 +21,8 @@ from urllib.request import Request, urlopen
 
 from .paths import resolve_runtime_dir
 
+DEFAULT_GATEWAY_URL = "http://127.0.0.1:8080"
+
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -54,7 +56,7 @@ def _write_json(path: Path, payload: Dict[str, Any]) -> None:
 
 
 def resolve_gateway_url_from_env() -> Optional[str]:
-    raw = os.getenv("ABSTRACTFLOW_GATEWAY_URL") or os.getenv("ABSTRACTGATEWAY_URL") or ""
+    raw = os.getenv("ABSTRACTGATEWAY_URL") or os.getenv("ABSTRACTFLOW_GATEWAY_URL") or ""
     url = str(raw or "").strip().rstrip("/")
     return url if url else None
 
@@ -139,10 +141,10 @@ def resolve_effective_gateway_connection() -> Tuple[str, Optional[str], str]:
     url = resolve_gateway_url_from_env()
     token = resolve_gateway_token_from_env()
     if token is not None:
-        return (url or "http://127.0.0.1:8081", token, "env")
+        return (url or DEFAULT_GATEWAY_URL, token, "env")
 
     data = load_persisted_gateway_connection()
-    url2 = url or (data.get("gateway_url") if isinstance(data.get("gateway_url"), str) else None) or "http://127.0.0.1:8081"
+    url2 = url or (data.get("gateway_url") if isinstance(data.get("gateway_url"), str) else None) or DEFAULT_GATEWAY_URL
     token2 = data.get("gateway_token") if isinstance(data.get("gateway_token"), str) else None
     return (str(url2).strip().rstrip("/"), token2.strip() if isinstance(token2, str) and token2.strip() else None, "config" if token2 else "none")
 

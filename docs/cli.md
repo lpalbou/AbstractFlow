@@ -64,7 +64,12 @@ Notes:
 - The UI can be served via `npx @abstractframework/flow` (see [web-editor.md](web-editor.md)).
 
 Gateway-related flags (optional):
-- `--gateway-url http://127.0.0.1:8081`
+- `--gateway-url http://127.0.0.1:8080`
 - `--gateway-token <token>`
+
+Gateway resolution:
+- `--gateway-url` falls back to `ABSTRACTGATEWAY_URL` and defaults to `http://127.0.0.1:8080`
+- `--gateway-token` falls back to `ABSTRACTGATEWAY_AUTH_TOKEN`
+- startup fails with a clear error if no gateway token is available
 
 Evidence: [../abstractflow/cli.py](../abstractflow/cli.py), [../web/backend/cli.py](../web/backend/cli.py), [../web/backend/main.py](../web/backend/main.py).

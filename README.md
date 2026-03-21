@@ -106,7 +106,7 @@ Open:
 - UI: http://localhost:3003
 - Backend health: http://localhost:8080/api/health
 
-Optional: run an AbstractGateway at http://127.0.0.1:8081 and configure it in the UI “Connect” modal (used for embeddings-backed memory KG and bundle publishing). See [docs/web-editor.md](docs/web-editor.md) and [docs/architecture.md](docs/architecture.md).
+Optional: run an AbstractGateway at http://127.0.0.1:8080 and configure it in the UI “Connect” modal (used for embeddings-backed memory KG and bundle publishing). Export `ABSTRACTGATEWAY_AUTH_TOKEN` or pass `--gateway-token` when starting the backend. See [docs/web-editor.md](docs/web-editor.md) and [docs/architecture.md](docs/architecture.md).
 
 ## CLI (WorkflowBundle `.flow`)
 

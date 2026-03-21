@@ -66,6 +66,8 @@ def _resolve_gateway_auth_token() -> str | None:
     return None
 
 
+
+
 def create_visual_runner(
     visual_flow: VisualFlow,
     *,
@@ -542,9 +544,9 @@ def create_visual_runner(
                 "Install `abstractmemory` (src layout) and ensure it is importable."
             ) from e
 
-        gateway_url = str(os.getenv("ABSTRACTFLOW_GATEWAY_URL") or os.getenv("ABSTRACTGATEWAY_URL") or "").strip()
+        gateway_url = str(os.getenv("ABSTRACTGATEWAY_URL") or os.getenv("ABSTRACTFLOW_GATEWAY_URL") or "").strip()
         if not gateway_url:
-            gateway_url = "http://127.0.0.1:8081"
+            gateway_url = "http://127.0.0.1:8080"
         auth_token = _resolve_gateway_auth_token()
         # Deterministic/offline mode:
         # - When embeddings are explicitly disabled, allow LanceDB to operate in pattern-only mode.
@@ -932,7 +934,12 @@ def create_visual_runner(
                 provider = None
                 model = None
 
+                # Tool allowlist semantics:
+                # - If tools are explicitly configured (even empty), honor that list.
+                # - If tools are unspecified, allow the default tool set.
+                tools_specified = isinstance(cfg, dict) and "tools" in cfg
                 tools_selected = _normalize_tool_names(cfg.get("tools"))
+                allowed_tools = tools_selected if tools_specified else None
                 logic = ReActLogic(tools=all_tool_defs)
                 registry.register(
                     create_react_workflow(
@@ -940,7 +947,7 @@ def create_visual_runner(
                         workflow_id=workflow_id,
                         provider=provider,
                         model=model,
-                        allowed_tools=tools_selected,
+                        allowed_tools=allowed_tools,
                     )
                 )
 

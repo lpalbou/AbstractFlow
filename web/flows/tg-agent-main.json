@@ -1,0 +1,213 @@
+{
+  "id": "tg-agent-main",
+  "name": "telegram-agent",
+  "description": "Event-driven agent that listens for Telegram messages and replies via send_telegram_message. Designed for the AbstractGateway Telegram bridge.",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "node-start",
+      "type": "on_flow_start",
+      "position": {
+        "x": -400.0,
+        "y": -200.0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Binding Created",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          }
+        ],
+        "pinDefaults": {}
+      }
+    },
+    {
+      "id": "node-end",
+      "type": "on_flow_end",
+      "position": {
+        "x": -100.0,
+        "y": -200.0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Root Done",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          }
+        ],
+        "outputs": []
+      }
+    },
+    {
+      "id": "node-event",
+      "type": "on_event",
+      "position": {
+        "x": -400.0,
+        "y": 100.0
+      },
+      "data": {
+        "nodeType": "on_event",
+        "label": "On Telegram Message",
+        "icon": "&#x1F4E8;",
+        "headerColor": "#2980B9",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "payload",
+            "label": "payload",
+            "type": "any"
+          },
+          {
+            "id": "event_id",
+            "label": "event_id",
+            "type": "string"
+          }
+        ],
+        "eventConfig": {
+          "name": "telegram.message",
+          "scope": "session"
+        }
+      }
+    },
+    {
+      "id": "node-agent",
+      "type": "agent",
+      "position": {
+        "x": 100.0,
+        "y": 100.0
+      },
+      "data": {
+        "nodeType": "agent",
+        "label": "Telegram Agent",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools"
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          }
+        ],
+        "agentConfig": {
+          "provider": "lmstudio",
+          "model": "zai-org/glm-4.6v-flash"
+        },
+        "pinDefaults": {
+          "max_iterations": 10,
+          "temperature": 0.7,
+          "system": "You are a helpful AI assistant communicating via Telegram.\n\nYou receive inbound messages as a JSON payload. The user's text is in `telegram.text` and their chat identifier is in `telegram.chat_id`.\n\nIMPORTANT RULES:\n1. Extract the user's message text from the payload.\n2. Think about the user's request, then compose a clear, helpful reply.\n3. ALWAYS send your reply by calling the `send_telegram_message` tool with `chat_id` (from the payload) and `text` (your reply).\n4. You may call `send_telegram_message` multiple times if the reply is long or has multiple parts.\n5. You may use `web_search` or `fetch_url` if the user asks about current events or needs web information.\n6. You may use `send_telegram_artifact` to send files or images if relevant.\n7. Keep replies concise and conversational — Telegram is a chat medium.\n8. If the payload contains media attachments, acknowledge them.",
+          "tools": [
+            "send_telegram_message",
+            "send_telegram_artifact",
+            "web_search",
+            "fetch_url"
+          ],
+          "provider": "lmstudio",
+          "model": "zai-org/glm-4.6v-flash"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-root-exec",
+      "source": "node-start",
+      "sourceHandle": "exec-out",
+      "target": "node-end",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-event-exec",
+      "source": "node-event",
+      "sourceHandle": "exec-out",
+      "target": "node-agent",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-event-payload-to-prompt",
+      "source": "node-event",
+      "sourceHandle": "payload",
+      "target": "node-agent",
+      "targetHandle": "prompt",
+      "animated": false
+    }
+  ],
+  "entryNode": "node-start",
+  "created_at": "2026-02-14T00:00:00.000000",
+  "updated_at": "2026-02-14T00:00:00.000000"
+}

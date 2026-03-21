@@ -1426,6 +1426,8 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
     headerColor: template.headerColor,
     inputs: [...template.inputs],
     outputs: [...template.outputs],
+    // Default pin values for input-driven nodes
+    ...(template.type === 'agent' && { pinDefaults: { max_iterations: 50 } }),
     // Default code for code nodes
     ...(template.type === 'code' && {
       codeBody: defaultCodeBody,

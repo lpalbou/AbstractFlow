@@ -1,9 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 
 export interface ExecutionWorkspaceInfo {
-  base_execution_dir: string;
-  default_random_root: string;
-  alias_pattern?: string;
+  default_random_root?: string;
+  policy?: Record<string, unknown>;
 }
 
 async function fetchJson<T>(url: string): Promise<T> {
@@ -22,7 +21,14 @@ async function fetchJson<T>(url: string): Promise<T> {
 export function useExecutionWorkspace(enabled: boolean) {
   return useQuery({
     queryKey: ['runs', 'execution-workspace'],
-    queryFn: () => fetchJson<ExecutionWorkspaceInfo>('/api/runs/execution-workspace'),
+    queryFn: async () => {
+      const res = await fetchJson<{ policy?: Record<string, unknown> }>('/api/gateway/workspace/policy');
+      const policy = res && typeof res === 'object' ? res.policy : undefined;
+      if (!policy || typeof policy !== 'object') {
+        console.warn('#FALLBACK: workspace policy missing; UI defaults may be incomplete');
+      }
+      return { default_random_root: '', policy };
+    },
     enabled,
     staleTime: 30_000,
   });

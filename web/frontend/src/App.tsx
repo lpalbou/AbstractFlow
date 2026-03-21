@@ -53,23 +53,10 @@ function save_appearance_settings(value: AppearanceSettings): void {
 
 function App() {
   const { selectedNode } = useFlowStore();
-  const [remote_monitor_gpu, set_remote_monitor_gpu] = useState<boolean | null>(null);
-  const gpu_enabled = remote_monitor_gpu === true || monitor_gpu_enabled();
+  const gpu_enabled = monitor_gpu_enabled();
   const monitor_gpu_ref = useRef<HTMLElement | null>(null);
   const [appearance, set_appearance] = useState<AppearanceSettings>(() => load_appearance_settings());
   const [show_appearance, set_show_appearance] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    fetch('/api/ui/config')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((body) => {
-        const v = body && typeof body === 'object' ? (body as any).monitor_gpu : null;
-        if (typeof v === 'boolean') set_remote_monitor_gpu(v);
-        else set_remote_monitor_gpu(null);
-      })
-      .catch(() => set_remote_monitor_gpu(null));
-  }, []);
 
   useEffect(() => {
     if (!gpu_enabled) return;

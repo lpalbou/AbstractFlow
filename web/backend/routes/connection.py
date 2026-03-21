@@ -26,7 +26,7 @@ router = APIRouter(prefix="/connection", tags=["connection"])
 
 
 class GatewayConnectionUpdate(BaseModel):
-    gateway_url: str | None = Field(default=None, description="Base URL of AbstractGateway (e.g. http://127.0.0.1:8081).")
+    gateway_url: str | None = Field(default=None, description="Base URL of AbstractGateway (e.g. http://127.0.0.1:8080).")
     gateway_token: str | None = Field(default=None, description="Bearer token for gateway (stored server-side).")
     persist: bool = Field(default=True, description="Persist the connection config to the runtime dir.")
 
@@ -81,4 +81,3 @@ async def clear_gateway_connection() -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=f"Failed to clear config: {e}") from e
     # Do not mutate env on delete (explicit env vars should win).
     return {"ok": True}
-

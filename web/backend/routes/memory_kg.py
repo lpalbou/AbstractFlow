@@ -92,9 +92,9 @@ def _get_kg_store(*, artifact_store: Any) -> Any:
     base_dir = _resolve_memory_dir(artifact_store=artifact_store)
     base_dir.mkdir(parents=True, exist_ok=True)
 
-    gateway_url = str(os.getenv("ABSTRACTFLOW_GATEWAY_URL") or os.getenv("ABSTRACTGATEWAY_URL") or "").strip()
+    gateway_url = str(os.getenv("ABSTRACTGATEWAY_URL") or os.getenv("ABSTRACTFLOW_GATEWAY_URL") or "").strip()
     if not gateway_url:
-        gateway_url = "http://127.0.0.1:8081"
+        gateway_url = "http://127.0.0.1:8080"
 
     auth_token = _resolve_gateway_auth_token()
 

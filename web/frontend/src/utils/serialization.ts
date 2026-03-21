@@ -63,7 +63,7 @@ export function fromVisualFlow(flow: VisualFlow): {
     const dataBase: FlowNodeData = template
       ? { ...createNodeData(template), ...vn.data }
       : vn.data;
-    const data: FlowNodeData =
+    let data: FlowNodeData =
       template ? mergePinDocsFromTemplate(createNodeData(template), dataBase) : dataBase;
 
     // Best-effort migrations for legacy nodes (keep flows usable across versions).
@@ -113,6 +113,14 @@ export function fromVisualFlow(flow: VisualFlow): {
           nextInputs.push(maxPin);
         }
         (data as any).inputs = nextInputs;
+      }
+      const defaultsRaw = data.pinDefaults && typeof data.pinDefaults === 'object' ? data.pinDefaults : null;
+      const hasDefault = Boolean(defaultsRaw && Object.prototype.hasOwnProperty.call(defaultsRaw, 'max_iterations'));
+      const hasConfig = typeof data.agentConfig?.max_iterations === 'number';
+      if (!hasDefault && !hasConfig) {
+        const nextDefaults: Record<string, any> = { ...(defaultsRaw || {}) };
+        nextDefaults.max_iterations = 50;
+        data = { ...data, pinDefaults: nextDefaults };
       }
     }
 

@@ -38,7 +38,7 @@ async function fetchJson<T>(url: string): Promise<T> {
 export function useSemanticsRegistry(enabled: boolean) {
   return useQuery({
     queryKey: ['semantics-registry'],
-    queryFn: () => fetchJson<SemanticsRegistry>('/api/semantics'),
+    queryFn: () => fetchJson<SemanticsRegistry>('/api/gateway/semantics'),
     enabled,
     staleTime: 60_000,
   });

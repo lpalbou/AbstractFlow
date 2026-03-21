@@ -290,7 +290,7 @@ def _gateway_upload_url() -> str:
 
 
 def _gateway_api_base() -> str:
-    raw = str(os.getenv("ABSTRACTFLOW_GATEWAY_URL") or os.getenv("ABSTRACTGATEWAY_URL") or "http://127.0.0.1:8081").strip()
+    raw = str(os.getenv("ABSTRACTGATEWAY_URL") or os.getenv("ABSTRACTFLOW_GATEWAY_URL") or "http://127.0.0.1:8080").strip()
     raw = raw.rstrip("/")
     if raw.endswith("/api"):
         return raw

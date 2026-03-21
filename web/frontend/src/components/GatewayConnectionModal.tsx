@@ -66,7 +66,7 @@ export function GatewayConnectionModal({ isOpen, onClose }: { isOpen: boolean; o
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<GatewayConnectionStatus | null>(null);
-  const [gatewayUrl, setGatewayUrl] = useState('http://127.0.0.1:8081');
+  const [gatewayUrl, setGatewayUrl] = useState('http://127.0.0.1:8080');
   const [gatewayToken, setGatewayToken] = useState('');
   const [showToken, setShowToken] = useState(false);
   const [persist, setPersist] = useState(true);
@@ -169,7 +169,7 @@ export function GatewayConnectionModal({ isOpen, onClose }: { isOpen: boolean; o
 
         <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 10, alignItems: 'center' }}>
           <label className="property-label">Gateway URL</label>
-          <input value={gatewayUrl} onChange={(e) => setGatewayUrl(e.target.value)} placeholder="http://127.0.0.1:8081" />
+          <input value={gatewayUrl} onChange={(e) => setGatewayUrl(e.target.value)} placeholder="http://127.0.0.1:8080" />
 
           <label className="property-label">Gateway token</label>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -210,4 +210,3 @@ export function GatewayConnectionModal({ isOpen, onClose }: { isOpen: boolean; o
     </div>
   );
 }
-

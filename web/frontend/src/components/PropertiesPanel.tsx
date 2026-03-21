@@ -271,9 +271,14 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   // Fetch available providers on mount
   useEffect(() => {
     setLoadingProviders(true);
-    fetch('/api/providers')
+    fetch('/api/gateway/discovery/providers')
       .then((res) => res.json())
-      .then((data) => setProviders(Array.isArray(data) ? data : []))
+      .then((data) => {
+        if (!Array.isArray(data?.items)) {
+          console.warn('#FALLBACK: providers response missing items; using empty list');
+        }
+        setProviders(Array.isArray(data?.items) ? data.items : []);
+      })
       .catch((err) => console.error('Failed to fetch providers:', err))
       .finally(() => setLoadingProviders(false));
   }, []);
@@ -282,12 +287,16 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   useEffect(() => {
     setLoadingTools(true);
     setToolsError(null);
-    fetch('/api/tools')
+    fetch('/api/gateway/discovery/tools')
       .then((res) => res.json())
       .then((data) => {
-        if (Array.isArray(data)) {
-          const normalized: ToolSpec[] = data
-            .filter((t) => t && typeof t.name === 'string' && t.name.trim())
+        if (!Array.isArray(data?.items)) {
+          console.warn('#FALLBACK: tools response missing items; using empty list');
+        }
+        const items = Array.isArray(data?.items) ? (data.items as ToolSpec[]) : [];
+        if (items.length > 0) {
+          const normalized: ToolSpec[] = items
+            .filter((t): t is ToolSpec => Boolean(t && typeof t.name === 'string' && t.name.trim()))
             .map((t) => ({
               name: String(t.name),
               description: typeof t.description === 'string' ? t.description : undefined,
@@ -336,9 +345,19 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       lastFetchedProvider.current = selectedProvider;
       setLoadingModels(true);
       setModels([]);
-      fetch(`/api/providers/${selectedProvider}/models`)
+      fetch(`/api/gateway/discovery/providers/${encodeURIComponent(selectedProvider)}/models`)
         .then((res) => res.json())
-        .then((data) => setModels(Array.isArray(data) ? data : []))
+        .then((data) => {
+          const models = Array.isArray(data?.models)
+            ? data.models
+            : Array.isArray(data?.items)
+              ? data.items
+              : [];
+          if (models.length === 0 && !Array.isArray(data?.models) && !Array.isArray(data?.items)) {
+            console.warn('#FALLBACK: provider models response missing models/items; using empty list');
+          }
+          setModels(models);
+        })
         .catch((err) => console.error('Failed to fetch models:', err))
         .finally(() => setLoadingModels(false));
     } else {
@@ -351,7 +370,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   useEffect(() => {
     if (!node || node.data.nodeType !== 'subflow') return;
     setLoadingFlows(true);
-    fetch('/api/flows')
+    fetch('/api/gateway/visualflows')
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {
@@ -406,7 +425,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
     const findFlowEndNode = (flow: VisualFlow) => flow.nodes.find((n) => n.type === 'on_flow_end');
 
-    fetch(`/api/flows/${subflowId}`)
+    fetch(`/api/gateway/visualflows/${encodeURIComponent(subflowId)}`)
       .then((res) => res.json())
       .then((flow: VisualFlow) => {
         const start = findFlowStartNode(flow);
@@ -706,6 +725,14 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const toolsPinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'tools');
   const temperaturePinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'temperature');
   const seedPinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'seed');
+  const maxIterationsPinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'max_iterations');
+  const maxIterationsDefault = (() => {
+    const pinVal = data.pinDefaults && typeof data.pinDefaults === 'object' ? (data.pinDefaults as any).max_iterations : undefined;
+    if (typeof pinVal === 'number' && Number.isFinite(pinVal)) return pinVal;
+    const cfgVal = data.agentConfig?.max_iterations;
+    if (typeof cfgVal === 'number' && Number.isFinite(cfgVal)) return cfgVal;
+    return 50;
+  })();
   const emitEventNamePinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'name');
   const scopePinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'scope');
   const emitEventScopePinConnected = scopePinConnected && data.nodeType === 'emit_event';
@@ -775,6 +802,20 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       agentConfig: {
         ...(data.agentConfig || {}),
         ...patch,
+      },
+    });
+  };
+
+  const setAgentMaxIterations = (value: number | null) => {
+    const prevDefaults = data.pinDefaults && typeof data.pinDefaults === 'object' ? data.pinDefaults : {};
+    const nextDefaults: Record<string, unknown> = { ...prevDefaults };
+    if (value == null) delete nextDefaults.max_iterations;
+    else nextDefaults.max_iterations = value;
+    updateNodeData(node.id, {
+      pinDefaults: nextDefaults as any,
+      agentConfig: {
+        ...(data.agentConfig || {}),
+        max_iterations: value == null ? undefined : value,
       },
     });
   };
@@ -2041,6 +2082,35 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               />
             )}
             <span className="property-hint">-1 = random/unset; {'>=0'} = deterministic (provider permitting)</span>
+          </div>
+
+          <div className="property-group">
+            <label className="property-sublabel">Max iterations</label>
+            {maxIterationsPinConnected ? (
+              <span className="property-hint">Provided by connected pin.</span>
+            ) : (
+              <input
+                type="number"
+                className="property-input"
+                value={maxIterationsDefault}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (!raw) {
+                    setAgentMaxIterations(null);
+                    return;
+                  }
+                  const parsed = parseInt(raw, 10);
+                  if (!Number.isFinite(parsed) || parsed < 1) {
+                    setAgentMaxIterations(50);
+                    return;
+                  }
+                  setAgentMaxIterations(parsed);
+                }}
+                min={1}
+                step={1}
+              />
+            )}
+            <span className="property-hint">Safety cap for the agent loop (default 50)</span>
           </div>
 
           <div className="property-group">

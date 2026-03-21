@@ -25,7 +25,7 @@ type PublishFlowResponse = {
 };
 
 async function publishFlow(flowId: string, payload: PublishFlowRequest): Promise<PublishFlowResponse> {
-  const response = await fetch(`/api/flows/${flowId}/publish`, {
+  const response = await fetch(`/api/gateway/visualflows/${encodeURIComponent(flowId)}/publish`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -74,8 +74,8 @@ export function PublishFlowModal({
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h3>Publish WorkflowBundle</h3>
         <p>
-          Creates a new <code>.flow</code> bundle version (history preserved). If a gateway connection is configured,
-          AbstractFlow will also try to upload the bundle to the gateway and trigger a reload (remote-safe).
+          Creates a new <code>.flow</code> bundle version (history preserved) and installs it directly into the gateway
+          bundle registry. Leave the version empty to auto-bump.
         </p>
 
         <div className="run-form-field">

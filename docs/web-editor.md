@@ -97,9 +97,11 @@ Evidence: [../web/backend/main.py](../web/backend/main.py) serves `web/frontend/
 The backend can talk to an AbstractGateway for embeddings-backed memory KG operations and bundle publishing/reload.
 
 Common env vars / flags:
-- `ABSTRACTFLOW_GATEWAY_URL` (or `ABSTRACTGATEWAY_URL`)
-- `ABSTRACTGATEWAY_AUTH_TOKEN` (legacy: `ABSTRACTFLOW_GATEWAY_AUTH_TOKEN`)
+- `ABSTRACTGATEWAY_URL` (default `http://127.0.0.1:8080`)
+- `ABSTRACTGATEWAY_AUTH_TOKEN`
 - CLI flags: `abstractflow serve --gateway-url ... --gateway-token ...` (or `python -m backend ...`) (see `web/backend/cli.py`)
+
+If no gateway token is available, backend startup fails with a clear error telling you to export `ABSTRACTGATEWAY_AUTH_TOKEN` or pass `--gateway-token`.
 
 Evidence:
 - UI modal: [../web/frontend/src/components/GatewayConnectionModal.tsx](../web/frontend/src/components/GatewayConnectionModal.tsx)

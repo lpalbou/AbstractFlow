@@ -31,7 +31,14 @@ async function fetchJson<T>(url: string): Promise<T> {
 export function useTools(enabled: boolean) {
   return useQuery({
     queryKey: ['tools'],
-    queryFn: () => fetchJson<ToolSpec[]>('/api/tools'),
+    queryFn: async () => {
+      const res = await fetchJson<{ items?: ToolSpec[] }>('/api/gateway/discovery/tools');
+      if (!Array.isArray(res.items)) {
+        console.warn('#FALLBACK: tools response missing items; returning empty list');
+        return [];
+      }
+      return res.items;
+    },
     enabled,
     staleTime: 30_000,
   });
