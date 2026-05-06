@@ -21,6 +21,7 @@ Optional extras:
 - Agent nodes (ReAct workflows): `pip install "abstractflow[agent]"`
 - Visual editor backend (FastAPI): `pip install "abstractflow[server]"`
 - Visual editor backend + Agent nodes (recommended): `pip install "abstractflow[editor]"`
+- Documentation site tools: `pip install "abstractflow[docs]"`
 - Dev tools: `pip install "abstractflow[dev]"`
 
 From source (repo root):

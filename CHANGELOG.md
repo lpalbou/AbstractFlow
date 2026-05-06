@@ -7,7 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.7] - 2026-05-06
+
 ### Added
+- **Release and documentation automation**:
+  - GitHub Actions now builds the MkDocs documentation site in CI and on releases.
+  - Tagged releases deploy the docs site to the `gh-pages` branch after PyPI and GitHub Release publication.
+  - Added a MkDocs Material documentation site configuration.
+- **Centralized package version source**: `abstractflow/_version.py` is now the single source of truth for release version metadata.
 - **AbstractCode UI event demo flows** (`web/flows/*.json`):
   - `acagent_message_demo.json`: `abstractcode.message`
   - `acagent_ask_demo.json`: durable ask+wait via `wait_event.prompt`

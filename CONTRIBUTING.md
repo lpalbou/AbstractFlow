@@ -62,6 +62,19 @@ python -m mypy abstractflow
 pre-commit run -a
 ```
 
+## Docs and releases
+
+Build the documentation site locally:
+
+```bash
+pip install -e ".[docs]"
+mkdocs build -q
+```
+
+Release version source of truth: `abstractflow/_version.py`.
+
+For a release, update `abstractflow/_version.py`, add the matching `CHANGELOG.md` entry (`## [X.Y.Z] - YYYY-MM-DD`), then push tag `vX.Y.Z`. The release workflow validates tests, frontend build, docs build, package metadata, and changelog before publishing to PyPI and deploying the MkDocs site to the `gh-pages` branch.
+
 ## Pull request checklist
 
 - Tests pass (`pytest -q`)

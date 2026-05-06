@@ -32,13 +32,15 @@ Included local files (repo-root relative, in order):
 - docs/cli.md
 - abstractflow/cli.py
 - pyproject.toml
+- abstractflow/_version.py
+- mkdocs.yml
 - web/frontend/package.json
 - tests/test_runner.py
 - tests/test_workflow_bundle_pack.py
 - tests/test_visual_ws_subflow.py
 - CONTRIBUTING.md
 - SECURITY.md
-- ACKNOWLEDMENTS.md
+- ACKNOWLEDGMENTS.md
 - CHANGELOG.md
 - scripts/generate_llms_full.py
 - web/flows/ac-echo.json
@@ -111,7 +113,9 @@ Agent usage tips:
 
 ## Manifests
 
-- [Python package manifest](pyproject.toml): version, dependencies/extras, CLI scripts
+- [Python package manifest](pyproject.toml): dependencies/extras, CLI scripts, dynamic version wiring
+- [Version source](abstractflow/_version.py): release version single source of truth
+- [Docs site config](mkdocs.yml): MkDocs Material site and GitHub Pages nav
 - [Frontend manifest](web/frontend/package.json): npm package name and dev/build scripts
 
 ## Tests (executable specs)
@@ -124,7 +128,7 @@ Agent usage tips:
 
 - [Contributing](CONTRIBUTING.md): Dev setup, tests, and contribution guidelines
 - [Security policy](SECURITY.md): How to report vulnerabilities responsibly
-- [Acknowledgments](ACKNOWLEDMENTS.md): dependency overview + upstream credits
+- [Acknowledgments](ACKNOWLEDGMENTS.md): dependency overview + upstream credits
 - [Changelog](CHANGELOG.md): user-visible changes
 
 ## Optional
@@ -170,6 +174,8 @@ flowchart LR
 
 ## Docs
 
+Published documentation: https://www.lpalbou.info/AbstractFlow/
+
 - Getting started: [docs/getting-started.md](docs/getting-started.md)
 - API (high-level): [docs/api.md](docs/api.md)
 - Architecture: [docs/architecture.md](docs/architecture.md)
@@ -191,6 +197,7 @@ Optional extras (declared in `pyproject.toml`):
 - Agent nodes (Visual Agent node support): `pip install "abstractflow[agent]"`
 - Visual editor backend (FastAPI): `pip install "abstractflow[server]"`
 - Visual editor backend + Agent nodes: `pip install "abstractflow[editor]"`
+- Documentation site tools: `pip install "abstractflow[docs]"`
 - Dev tools: `pip install "abstractflow[dev]"`
 
 Notes:
@@ -245,7 +252,7 @@ Open:
 - UI: http://localhost:3003
 - Backend health: http://localhost:8080/api/health
 
-Optional: run an AbstractGateway at http://127.0.0.1:8081 and configure it in the UI “Connect” modal (used for embeddings-backed memory KG and bundle publishing). See [docs/web-editor.md](docs/web-editor.md) and [docs/architecture.md](docs/architecture.md).
+Optional: run an AbstractGateway at http://127.0.0.1:8080 and configure it in the UI “Connect” modal (used for embeddings-backed memory KG and bundle publishing). Export `ABSTRACTGATEWAY_AUTH_TOKEN` or pass `--gateway-token` when starting the backend. See [docs/web-editor.md](docs/web-editor.md) and [docs/architecture.md](docs/architecture.md).
 
 ## CLI (WorkflowBundle `.flow`)
 
@@ -269,7 +276,7 @@ See [docs/cli.md](docs/cli.md) and `abstractflow/cli.py`.
 - Changelog: [CHANGELOG.md](CHANGELOG.md)
 - Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
 - Security: [SECURITY.md](SECURITY.md)
-- Acknowledgments: [ACKNOWLEDMENTS.md](ACKNOWLEDMENTS.md)
+- Acknowledgments: [ACKNOWLEDGMENTS.md](ACKNOWLEDGMENTS.md)
 - License: [LICENSE](LICENSE)
 
 ---
@@ -286,6 +293,7 @@ This doc set is intentionally:
 
 ## Start here
 
+- Published documentation site: https://www.lpalbou.info/AbstractFlow/
 - Project overview + install: [../README.md](../README.md)
 - Getting started (quickstarts + “waiting” runs): [getting-started.md](getting-started.md)
 
@@ -303,7 +311,7 @@ This doc set is intentionally:
 - Changelog: [../CHANGELOG.md](../CHANGELOG.md)
 - Contributing: [../CONTRIBUTING.md](../CONTRIBUTING.md)
 - Security reporting: [../SECURITY.md](../SECURITY.md)
-- Acknowledgments: [../ACKNOWLEDMENTS.md](../ACKNOWLEDMENTS.md)
+- Acknowledgments: [../ACKNOWLEDGMENTS.md](../ACKNOWLEDGMENTS.md)
 
 ## Code map (evidence)
 
@@ -345,6 +353,7 @@ Optional extras:
 - Agent nodes (ReAct workflows): `pip install "abstractflow[agent]"`
 - Visual editor backend (FastAPI): `pip install "abstractflow[server]"`
 - Visual editor backend + Agent nodes (recommended): `pip install "abstractflow[editor]"`
+- Documentation site tools: `pip install "abstractflow[docs]"`
 - Dev tools: `pip install "abstractflow[dev]"`
 
 From source (repo root):
@@ -457,7 +466,7 @@ See also: [../README.md](../README.md), [getting-started.md](getting-started.md)
 - `abstractflow.__version__` (string)
 - `abstractflow.get_version()` (helper)
 
-Evidence: [../abstractflow/__init__.py](../abstractflow/__init__.py), [../pyproject.toml](../pyproject.toml).
+Evidence: [../abstractflow/_version.py](../abstractflow/_version.py), [../abstractflow/__init__.py](../abstractflow/__init__.py), [../pyproject.toml](../pyproject.toml).
 
 ## Programmatic flows
 
@@ -1712,10 +1721,11 @@ For agent-based flows:
     >>> result = runner.run({"context": {"task": "Build a REST API"}})
 """
 
-__version__ = "0.3.7"
 __author__ = "Laurent-Philippe Albou"
 __email__ = "contact@abstractflow.ai"
 __license__ = "MIT"
+
+from ._version import __version__
 
 # Core classes
 from .core.flow import Flow, FlowNode, FlowEdge
@@ -2242,6 +2252,8 @@ def _resolve_gateway_auth_token() -> str | None:
     return None
 
 
+
+
 def create_visual_runner(
     visual_flow: VisualFlow,
     *,
@@ -2718,9 +2730,9 @@ def create_visual_runner(
                 "Install `abstractmemory` (src layout) and ensure it is importable."
             ) from e
 
-        gateway_url = str(os.getenv("ABSTRACTFLOW_GATEWAY_URL") or os.getenv("ABSTRACTGATEWAY_URL") or "").strip()
+        gateway_url = str(os.getenv("ABSTRACTGATEWAY_URL") or os.getenv("ABSTRACTFLOW_GATEWAY_URL") or "").strip()
         if not gateway_url:
-            gateway_url = "http://127.0.0.1:8081"
+            gateway_url = "http://127.0.0.1:8080"
         auth_token = _resolve_gateway_auth_token()
         # Deterministic/offline mode:
         # - When embeddings are explicitly disabled, allow LanceDB to operate in pattern-only mode.
@@ -3108,7 +3120,12 @@ def create_visual_runner(
                 provider = None
                 model = None
 
+                # Tool allowlist semantics:
+                # - If tools are explicitly configured (even empty), honor that list.
+                # - If tools are unspecified, allow the default tool set.
+                tools_specified = isinstance(cfg, dict) and "tools" in cfg
                 tools_selected = _normalize_tool_names(cfg.get("tools"))
+                allowed_tools = tools_selected if tools_specified else None
                 logic = ReActLogic(tools=all_tool_defs)
                 registry.register(
                     create_react_workflow(
@@ -3116,7 +3133,7 @@ def create_visual_runner(
                         workflow_id=workflow_id,
                         provider=provider,
                         model=model,
-                        allowed_tools=tools_selected,
+                        allowed_tools=allowed_tools,
                     )
                 )
 
@@ -3854,9 +3871,11 @@ Evidence: [../web/backend/main.py](../web/backend/main.py) serves `web/frontend/
 The backend can talk to an AbstractGateway for embeddings-backed memory KG operations and bundle publishing/reload.
 
 Common env vars / flags:
-- `ABSTRACTFLOW_GATEWAY_URL` (or `ABSTRACTGATEWAY_URL`)
-- `ABSTRACTGATEWAY_AUTH_TOKEN` (legacy: `ABSTRACTFLOW_GATEWAY_AUTH_TOKEN`)
+- `ABSTRACTGATEWAY_URL` (default `http://127.0.0.1:8080`)
+- `ABSTRACTGATEWAY_AUTH_TOKEN`
 - CLI flags: `abstractflow serve --gateway-url ... --gateway-token ...` (or `python -m backend ...`) (see `web/backend/cli.py`)
+
+If no gateway token is available, backend startup fails with a clear error telling you to export `ABSTRACTGATEWAY_AUTH_TOKEN` or pass `--gateway-token`.
 
 Evidence:
 - UI modal: [../web/frontend/src/components/GatewayConnectionModal.tsx](../web/frontend/src/components/GatewayConnectionModal.tsx)
@@ -6255,7 +6274,7 @@ def _gateway_upload_url() -> str:
 
 
 def _gateway_api_base() -> str:
-    raw = str(os.getenv("ABSTRACTFLOW_GATEWAY_URL") or os.getenv("ABSTRACTGATEWAY_URL") or "http://127.0.0.1:8081").strip()
+    raw = str(os.getenv("ABSTRACTGATEWAY_URL") or os.getenv("ABSTRACTFLOW_GATEWAY_URL") or "http://127.0.0.1:8080").strip()
     raw = raw.rstrip("/")
     if raw.endswith("/api"):
         return raw
@@ -7105,8 +7124,13 @@ Notes:
 - The UI can be served via `npx @abstractframework/flow` (see [web-editor.md](web-editor.md)).
 
 Gateway-related flags (optional):
-- `--gateway-url http://127.0.0.1:8081`
+- `--gateway-url http://127.0.0.1:8080`
 - `--gateway-token <token>`
+
+Gateway resolution:
+- `--gateway-url` falls back to `ABSTRACTGATEWAY_URL` and defaults to `http://127.0.0.1:8080`
+- `--gateway-token` falls back to `ABSTRACTGATEWAY_AUTH_TOKEN`
+- startup fails with a clear error if no gateway token is available
 
 Evidence: [../abstractflow/cli.py](../abstractflow/cli.py), [../web/backend/cli.py](../web/backend/cli.py), [../web/backend/main.py](../web/backend/main.py).
 
@@ -7130,6 +7154,7 @@ import os
 import sys
 from typing import List, Optional
 
+from .gateway_options import require_gateway_connection, resolve_gateway_token, resolve_gateway_url
 from .workflow_bundle import inspect_workflow_bundle, pack_workflow_bundle, unpack_workflow_bundle
 from abstractruntime.workflow_bundle import workflow_bundle_manifest_to_dict
 
@@ -7169,95 +7194,96 @@ def _build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--monitor-gpu", action="store_true", help="Show the small GPU widget in the UI")
     serve.add_argument(
         "--gateway-url",
-        default=os.getenv("ABSTRACTFLOW_GATEWAY_URL") or os.getenv("ABSTRACTGATEWAY_URL") or "",
+        default=None,
     )
     serve.add_argument(
         "--gateway-token",
-        default=os.getenv("ABSTRACTFLOW_GATEWAY_AUTH_TOKEN")
-        or os.getenv("ABSTRACTGATEWAY_AUTH_TOKEN")
-        or os.getenv("ABSTRACTCODE_GATEWAY_TOKEN")
-        or "",
+        default=None,
     )
 
     return p
 
 
 def main(args: Optional[List[str]] = None) -> int:
-    if args is None:
-        args = sys.argv[1:]
+    try:
+        if args is None:
+            args = sys.argv[1:]
 
-    parser = _build_parser()
-    ns = parser.parse_args(args)
+        parser = _build_parser()
+        ns = parser.parse_args(args)
 
-    if ns.command == "bundle":
-        if ns.bundle_cmd == "pack":
-            packed = pack_workflow_bundle(
-                root_flow_json=ns.root,
-                out_path=ns.out,
-                bundle_id=ns.bundle_id,
-                bundle_version=ns.bundle_version,
-                flows_dir=ns.flows_dir,
-                entrypoints=list(ns.entrypoint) if isinstance(ns.entrypoint, list) and ns.entrypoint else None,
+        if ns.command == "bundle":
+            if ns.bundle_cmd == "pack":
+                packed = pack_workflow_bundle(
+                    root_flow_json=ns.root,
+                    out_path=ns.out,
+                    bundle_id=ns.bundle_id,
+                    bundle_version=ns.bundle_version,
+                    flows_dir=ns.flows_dir,
+                    entrypoints=list(ns.entrypoint) if isinstance(ns.entrypoint, list) and ns.entrypoint else None,
+                )
+                sys.stdout.write(str(packed.path) + "\n")
+                return 0
+
+            if ns.bundle_cmd == "inspect":
+                man = inspect_workflow_bundle(bundle_path=ns.bundle)
+                sys.stdout.write(json.dumps(workflow_bundle_manifest_to_dict(man), indent=2, ensure_ascii=False) + "\n")
+                return 0
+
+            if ns.bundle_cmd == "unpack":
+                out = unpack_workflow_bundle(bundle_path=ns.bundle, out_dir=ns.dir)
+                sys.stdout.write(str(out) + "\n")
+                return 0
+
+            parser.error("Missing bundle subcommand (pack|inspect|unpack)")
+
+        if ns.command == "serve":
+            try:
+                import uvicorn  # type: ignore
+            except Exception:
+                sys.stderr.write(
+                    "Server dependencies are not installed.\n"
+                    "Install with: pip install \"abstractflow[server]\"\n"
+                )
+                return 2
+
+            # Validate backend import early so we can give a clear error message.
+            try:
+                import backend.main  # noqa: F401
+            except Exception as e:
+                sys.stderr.write(
+                    "Failed to import the Visual Editor backend.\n"
+                    f"Error: {e}\n"
+                    "Install with: pip install \"abstractflow[server]\"\n"
+                )
+                return 2
+
+            if bool(getattr(ns, "monitor_gpu", False)):
+                os.environ["ABSTRACTFLOW_MONITOR_GPU"] = "1"
+
+            gateway_url, gateway_token = require_gateway_connection(
+                gateway_url=getattr(ns, "gateway_url", None),
+                gateway_token=getattr(ns, "gateway_token", None),
             )
-            sys.stdout.write(str(packed.path) + "\n")
+            os.environ["ABSTRACTGATEWAY_URL"] = resolve_gateway_url(gateway_url)
+            os.environ["ABSTRACTFLOW_GATEWAY_URL"] = resolve_gateway_url(gateway_url)
+            os.environ["ABSTRACTGATEWAY_AUTH_TOKEN"] = resolve_gateway_token(gateway_token)
+            os.environ["ABSTRACTFLOW_GATEWAY_AUTH_TOKEN"] = resolve_gateway_token(gateway_token)
+
+            uvicorn.run(
+                "backend.main:app",
+                host=str(getattr(ns, "host", "0.0.0.0")),
+                port=int(getattr(ns, "port", 8080)),
+                reload=bool(getattr(ns, "reload", False)),
+                log_level=str(getattr(ns, "log_level", "info")),
+            )
             return 0
 
-        if ns.bundle_cmd == "inspect":
-            man = inspect_workflow_bundle(bundle_path=ns.bundle)
-            sys.stdout.write(json.dumps(workflow_bundle_manifest_to_dict(man), indent=2, ensure_ascii=False) + "\n")
-            return 0
-
-        if ns.bundle_cmd == "unpack":
-            out = unpack_workflow_bundle(bundle_path=ns.bundle, out_dir=ns.dir)
-            sys.stdout.write(str(out) + "\n")
-            return 0
-
-        parser.error("Missing bundle subcommand (pack|inspect|unpack)")
-
-    if ns.command == "serve":
-        try:
-            import uvicorn  # type: ignore
-        except Exception:
-            sys.stderr.write(
-                "Server dependencies are not installed.\n"
-                "Install with: pip install \"abstractflow[server]\"\n"
-            )
-            return 2
-
-        # Validate backend import early so we can give a clear error message.
-        try:
-            import backend.main  # noqa: F401
-        except Exception as e:
-            sys.stderr.write(
-                "Failed to import the Visual Editor backend.\n"
-                f"Error: {e}\n"
-                "Install with: pip install \"abstractflow[server]\"\n"
-            )
-            return 2
-
-        if bool(getattr(ns, "monitor_gpu", False)):
-            os.environ["ABSTRACTFLOW_MONITOR_GPU"] = "1"
-
-        gateway_url = str(getattr(ns, "gateway_url", "") or "").strip()
-        gateway_token = str(getattr(ns, "gateway_token", "") or "").strip()
-        if gateway_url:
-            os.environ.setdefault("ABSTRACTFLOW_GATEWAY_URL", gateway_url)
-            os.environ.setdefault("ABSTRACTGATEWAY_URL", gateway_url)
-        if gateway_token:
-            os.environ.setdefault("ABSTRACTGATEWAY_AUTH_TOKEN", gateway_token)
-            os.environ.setdefault("ABSTRACTFLOW_GATEWAY_AUTH_TOKEN", gateway_token)
-
-        uvicorn.run(
-            "backend.main:app",
-            host=str(getattr(ns, "host", "0.0.0.0")),
-            port=int(getattr(ns, "port", 8080)),
-            reload=bool(getattr(ns, "reload", False)),
-            log_level=str(getattr(ns, "log_level", "info")),
-        )
+        parser.print_help()
         return 0
-
-    parser.print_help()
-    return 0
+    except ValueError as e:
+        sys.stderr.write(str(e) + "\n")
+        return 2
 
 
 if __name__ == "__main__":
@@ -7273,7 +7299,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "abstractflow"
-version = "0.3.7"
+dynamic = ["version"]
 description = "Diagram-based AI workflow generation built on AbstractCore"
 readme = "README.md"
 license = "MIT"
@@ -7333,6 +7359,12 @@ dev = [
     "flake8>=6.0.0",
     "mypy>=1.0.0",
     "pre-commit>=3.0.0",
+    "mkdocs>=1.6.0",
+    "mkdocs-material>=9.0.0",
+]
+docs = [
+    "mkdocs>=1.6.0",
+    "mkdocs-material>=9.0.0",
 ]
 server = [
     "fastapi>=0.100.0",
@@ -7350,7 +7382,7 @@ all = [
 
 [project.urls]
 Homepage = "https://github.com/lpalbou/AbstractFlow"
-Documentation = "https://abstractflow.readthedocs.io"
+Documentation = "https://www.lpalbou.info/AbstractFlow/"
 Repository = "https://github.com/lpalbou/AbstractFlow"
 "Bug Tracker" = "https://github.com/lpalbou/AbstractFlow/issues"
 Changelog = "https://github.com/lpalbou/AbstractFlow/blob/main/CHANGELOG.md"
@@ -7358,6 +7390,9 @@ Changelog = "https://github.com/lpalbou/AbstractFlow/blob/main/CHANGELOG.md"
 [project.scripts]
 abstractflow = "abstractflow.cli:main"
 abstractflow-backend = "backend.cli:main"
+
+[tool.setuptools.dynamic]
+version = {attr = "abstractflow._version.__version__"}
 
 [tool.setuptools.packages.find]
 where = [".", "web"]
@@ -7425,6 +7460,65 @@ markers = [
     "integration: marks tests as integration tests",
     "unit: marks tests as unit tests",
 ]
+
+---
+file: abstractflow/_version.py
+---
+
+"""Package version.
+
+This file is the single source of truth for AbstractFlow releases.
+"""
+
+__version__ = "0.3.7"
+
+---
+file: mkdocs.yml
+---
+
+site_name: AbstractFlow
+site_description: Diagram-based, durable AI workflows for Python with portable VisualFlow JSON and a reference visual editor.
+site_url: https://www.lpalbou.info/AbstractFlow/
+repo_url: https://github.com/lpalbou/AbstractFlow
+repo_name: lpalbou/AbstractFlow
+
+docs_dir: docs
+
+theme:
+  name: material
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.top
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - footnotes
+  - toc:
+      permalink: true
+  - pymdownx.superfences
+  - pymdownx.highlight
+
+plugins:
+  - search
+
+validation:
+  nav:
+    omitted_files: ignore
+  links:
+    not_found: ignore
+    unrecognized_links: ignore
+
+nav:
+  - Home: README.md
+  - Getting Started: getting-started.md
+  - API Reference: api.md
+  - Architecture: architecture.md
+  - VisualFlow JSON: visualflow.md
+  - Web Editor: web-editor.md
+  - CLI: cli.md
+  - FAQ: faq.md
 
 ---
 file: web/frontend/package.json
@@ -8219,6 +8313,19 @@ python -m mypy abstractflow
 pre-commit run -a
 ```
 
+## Docs and releases
+
+Build the documentation site locally:
+
+```bash
+pip install -e ".[docs]"
+mkdocs build -q
+```
+
+Release version source of truth: `abstractflow/_version.py`.
+
+For a release, update `abstractflow/_version.py`, add the matching `CHANGELOG.md` entry (`## [X.Y.Z] - YYYY-MM-DD`), then push tag `vX.Y.Z`. The release workflow validates tests, frontend build, docs build, package metadata, and changelog before publishing to PyPI and deploying the MkDocs site to the `gh-pages` branch.
+
 ## Pull request checklist
 
 - Tests pass (`pytest -q`)
@@ -8270,7 +8377,7 @@ AbstractFlow is currently **Pre-alpha**. We recommend staying on the latest patc
 Evidence: `pyproject.toml` (`Development Status :: 2 - Pre-Alpha`).
 
 ---
-file: ACKNOWLEDMENTS.md
+file: ACKNOWLEDGMENTS.md
 ---
 
 # Acknowledgments
@@ -8364,7 +8471,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.7] - 2026-05-06
+
 ### Added
+- **Release and documentation automation**:
+  - GitHub Actions now builds the MkDocs documentation site in CI and on releases.
+  - Tagged releases deploy the docs site to the `gh-pages` branch after PyPI and GitHub Release publication.
+  - Added a MkDocs Material documentation site configuration.
+- **Centralized package version source**: `abstractflow/_version.py` is now the single source of truth for release version metadata.
 - **AbstractCode UI event demo flows** (`web/flows/*.json`):
   - `acagent_message_demo.json`: `abstractcode.message`
   - `acagent_ask_demo.json`: durable ask+wait via `wait_event.prompt`

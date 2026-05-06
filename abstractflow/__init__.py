@@ -39,10 +39,11 @@ For agent-based flows:
     >>> result = runner.run({"context": {"task": "Build a REST API"}})
 """
 
-__version__ = "0.3.7"
 __author__ = "Laurent-Philippe Albou"
 __email__ = "contact@abstractflow.ai"
 __license__ = "MIT"
+
+from ._version import __version__
 
 # Core classes
 from .core.flow import Flow, FlowNode, FlowEdge

@@ -9,7 +9,7 @@ See also: [../README.md](../README.md), [getting-started.md](getting-started.md)
 - `abstractflow.__version__` (string)
 - `abstractflow.get_version()` (helper)
 
-Evidence: [../abstractflow/__init__.py](../abstractflow/__init__.py), [../pyproject.toml](../pyproject.toml).
+Evidence: [../abstractflow/_version.py](../abstractflow/_version.py), [../abstractflow/__init__.py](../abstractflow/__init__.py), [../pyproject.toml](../pyproject.toml).
 
 ## Programmatic flows
 

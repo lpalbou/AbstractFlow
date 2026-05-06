@@ -8,6 +8,7 @@ This doc set is intentionally:
 
 ## Start here
 
+- Published documentation site: https://www.lpalbou.info/AbstractFlow/
 - Project overview + install: [../README.md](../README.md)
 - Getting started (quickstarts + “waiting” runs): [getting-started.md](getting-started.md)
 
@@ -25,7 +26,7 @@ This doc set is intentionally:
 - Changelog: [../CHANGELOG.md](../CHANGELOG.md)
 - Contributing: [../CONTRIBUTING.md](../CONTRIBUTING.md)
 - Security reporting: [../SECURITY.md](../SECURITY.md)
-- Acknowledgments: [../ACKNOWLEDMENTS.md](../ACKNOWLEDMENTS.md)
+- Acknowledgments: [../ACKNOWLEDGMENTS.md](../ACKNOWLEDGMENTS.md)
 
 ## Code map (evidence)
 

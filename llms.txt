@@ -62,7 +62,9 @@ Agent usage tips:
 
 ## Manifests
 
-- [Python package manifest](pyproject.toml): version, dependencies/extras, CLI scripts
+- [Python package manifest](pyproject.toml): dependencies/extras, CLI scripts, dynamic version wiring
+- [Version source](abstractflow/_version.py): release version single source of truth
+- [Docs site config](mkdocs.yml): MkDocs Material site and GitHub Pages nav
 - [Frontend manifest](web/frontend/package.json): npm package name and dev/build scripts
 
 ## Tests (executable specs)
@@ -75,7 +77,7 @@ Agent usage tips:
 
 - [Contributing](CONTRIBUTING.md): Dev setup, tests, and contribution guidelines
 - [Security policy](SECURITY.md): How to report vulnerabilities responsibly
-- [Acknowledgments](ACKNOWLEDMENTS.md): dependency overview + upstream credits
+- [Acknowledgments](ACKNOWLEDGMENTS.md): dependency overview + upstream credits
 - [Changelog](CHANGELOG.md): user-visible changes
 
 ## Optional

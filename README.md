@@ -31,6 +31,8 @@ flowchart LR
 
 ## Docs
 
+Published documentation: https://www.lpalbou.info/AbstractFlow/
+
 - Getting started: [docs/getting-started.md](docs/getting-started.md)
 - API (high-level): [docs/api.md](docs/api.md)
 - Architecture: [docs/architecture.md](docs/architecture.md)
@@ -52,6 +54,7 @@ Optional extras (declared in `pyproject.toml`):
 - Agent nodes (Visual Agent node support): `pip install "abstractflow[agent]"`
 - Visual editor backend (FastAPI): `pip install "abstractflow[server]"`
 - Visual editor backend + Agent nodes: `pip install "abstractflow[editor]"`
+- Documentation site tools: `pip install "abstractflow[docs]"`
 - Dev tools: `pip install "abstractflow[dev]"`
 
 Notes:
@@ -130,5 +133,5 @@ See [docs/cli.md](docs/cli.md) and `abstractflow/cli.py`.
 - Changelog: [CHANGELOG.md](CHANGELOG.md)
 - Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
 - Security: [SECURITY.md](SECURITY.md)
-- Acknowledgments: [ACKNOWLEDMENTS.md](ACKNOWLEDMENTS.md)
+- Acknowledgments: [ACKNOWLEDGMENTS.md](ACKNOWLEDGMENTS.md)
 - License: [LICENSE](LICENSE)

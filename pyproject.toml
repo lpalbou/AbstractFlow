@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "abstractflow"
-version = "0.3.7"
+dynamic = ["version"]
 description = "Diagram-based AI workflow generation built on AbstractCore"
 readme = "README.md"
 license = "MIT"
@@ -64,6 +64,12 @@ dev = [
     "flake8>=6.0.0",
     "mypy>=1.0.0",
     "pre-commit>=3.0.0",
+    "mkdocs>=1.6.0",
+    "mkdocs-material>=9.0.0",
+]
+docs = [
+    "mkdocs>=1.6.0",
+    "mkdocs-material>=9.0.0",
 ]
 server = [
     "fastapi>=0.100.0",
@@ -81,7 +87,7 @@ all = [
 
 [project.urls]
 Homepage = "https://github.com/lpalbou/AbstractFlow"
-Documentation = "https://abstractflow.readthedocs.io"
+Documentation = "https://www.lpalbou.info/AbstractFlow/"
 Repository = "https://github.com/lpalbou/AbstractFlow"
 "Bug Tracker" = "https://github.com/lpalbou/AbstractFlow/issues"
 Changelog = "https://github.com/lpalbou/AbstractFlow/blob/main/CHANGELOG.md"
@@ -89,6 +95,9 @@ Changelog = "https://github.com/lpalbou/AbstractFlow/blob/main/CHANGELOG.md"
 [project.scripts]
 abstractflow = "abstractflow.cli:main"
 abstractflow-backend = "backend.cli:main"
+
+[tool.setuptools.dynamic]
+version = {attr = "abstractflow._version.__version__"}
 
 [tool.setuptools.packages.find]
 where = [".", "web"]
