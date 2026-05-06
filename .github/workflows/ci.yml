@@ -72,6 +72,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Checkout AbstractUIC shared packages
+        run: git clone --depth 1 https://github.com/lpalbou/AbstractUIC.git ../abstractuic
       - uses: actions/setup-node@v4
         with:
           node-version: "20"

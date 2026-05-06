@@ -6,6 +6,8 @@ import subprocess
 import sys
 import tempfile
 
+import pytest
+
 
 def test_web_backend_dev_import_paths_prioritize_runtime_src() -> None:
     """Ensure `cd abstractflow/web && PYTHONPATH=. uvicorn backend.main:app` is stable.
@@ -15,8 +17,13 @@ def test_web_backend_dev_import_paths_prioritize_runtime_src() -> None:
     like `abstractruntime.scheduler`.
     """
 
-    repo_root = Path(__file__).resolve().parents[2]
-    web_dir = repo_root / "abstractflow" / "web"
+    repo_root = Path(__file__).resolve().parents[1]
+    workspace_root = repo_root.parent
+    web_dir = repo_root / "web"
+    runtime_src = workspace_root / "abstractruntime" / "src"
+
+    if not runtime_src.is_dir():
+        pytest.skip("monorepo sibling abstractruntime checkout is not available")
 
     with tempfile.TemporaryDirectory() as tmp:
         shadow = Path(tmp) / "abstractruntime"
@@ -42,6 +49,5 @@ def test_web_backend_dev_import_paths_prioritize_runtime_src() -> None:
         )
 
         assert proc.returncode == 0, proc.stderr
-        expected = repo_root / "abstractruntime" / "src" / "abstractruntime" / "__init__.py"
+        expected = runtime_src / "abstractruntime" / "__init__.py"
         assert str(expected) in proc.stdout
-

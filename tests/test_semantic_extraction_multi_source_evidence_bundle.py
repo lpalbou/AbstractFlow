@@ -5,8 +5,8 @@ from pathlib import Path
 
 
 def _repo_root() -> Path:
-    # .../abstractflow/tests/<file>.py -> repo root is 2 levels up.
-    return Path(__file__).resolve().parents[2]
+    # .../abstractflow/tests/<file>.py -> repo root is 1 level up.
+    return Path(__file__).resolve().parents[1]
 
 
 def _load_flow(path: Path) -> dict:
@@ -32,7 +32,7 @@ def _exec_transform(code: str):
 
 
 def test_ingest_turn_builds_chat_friendly_evidence_bundle() -> None:
-    flow = _load_flow(_repo_root() / "abstractflow" / "web" / "flows" / "ltm-ai-kg-ingest-turn.json")
+    flow = _load_flow(_repo_root() / "web" / "flows" / "ltm-ai-kg-ingest-turn.json")
     transform = _exec_transform(_node_code(flow, node_id="node-28"))
 
     out = transform(
@@ -74,7 +74,7 @@ def test_ingest_turn_builds_chat_friendly_evidence_bundle() -> None:
 
 
 def test_ingest_turn_attaches_source_provenance_when_evidence_matches() -> None:
-    flow = _load_flow(_repo_root() / "abstractflow" / "web" / "flows" / "ltm-ai-kg-ingest-turn.json")
+    flow = _load_flow(_repo_root() / "web" / "flows" / "ltm-ai-kg-ingest-turn.json")
     transform = _exec_transform(_node_code(flow, node_id="node-33"))
 
     out = transform(
@@ -123,7 +123,7 @@ def test_ingest_turn_attaches_source_provenance_when_evidence_matches() -> None:
 
 
 def test_ac_kg_memory_agent_emits_tool_sources_from_scratchpad_traces() -> None:
-    flow = _load_flow(_repo_root() / "abstractflow" / "web" / "flows" / "ac-kg-memory-agent.json")
+    flow = _load_flow(_repo_root() / "web" / "flows" / "ac-kg-memory-agent.json")
     transform = _exec_transform(_node_code(flow, node_id="kg_sources"))
 
     sources = transform(
@@ -154,4 +154,3 @@ def test_ac_kg_memory_agent_emits_tool_sources_from_scratchpad_traces() -> None:
     assert len(sources) >= 2
     assert any(s.get("kind") == "tool_outputs" for s in sources if isinstance(s, dict))
     assert any(s.get("kind") == "work_summary" for s in sources if isinstance(s, dict))
-
