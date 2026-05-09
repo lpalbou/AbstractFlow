@@ -117,6 +117,18 @@ from abstractflow.workflow_bundle import (
 
 Evidence: [../abstractflow/workflow_bundle.py](../abstractflow/workflow_bundle.py), [cli.md](cli.md).
 
+## Gateway editor contract
+
+The React editor is a thin client for AbstractGateway's versioned discovery contract:
+
+```text
+GET /api/gateway/discovery/capabilities
+```
+
+It reads `capabilities.contracts.flow_editor` for VisualFlow CRUD/publish, run input schema, run start, ledger stream, artifact, and prompt-cache endpoints. The browser calls same-origin `/api/gateway/*`; the Flow static server/Vite/Python host proxy those requests to Gateway and inject the configured bearer token.
+
+Evidence: [../web/frontend/src/hooks/useGatewayCapabilities.ts](../web/frontend/src/hooks/useGatewayCapabilities.ts), [../web/frontend/src/utils/gatewayClient.ts](../web/frontend/src/utils/gatewayClient.ts), [../web/backend/main.py](../web/backend/main.py).
+
 ## Adapters (advanced)
 
 If you build custom hosts or want direct control over node handler construction, adapters are re-exported:

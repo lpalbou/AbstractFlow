@@ -2082,6 +2082,18 @@ button.primary:hover:not(:disabled) {
   font-size: var(--font-size-sm);
 }
 
+.run-prompt-cache-actions {
+  align-items: stretch;
+}
+
+.run-prompt-cache-actions .modal-button {
+  min-width: 86px;
+}
+
+.run-prompt-cache-meta {
+  padding-top: 4px;
+}
+
 /* Run Result */
 .run-result {
   margin-bottom: 16px;
@@ -3453,6 +3465,21 @@ button.primary:hover:not(:disabled) {
 
 .run-output-meta-json {
   max-height: 240px;
+}
+
+.run-generated-image {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.run-generated-image-img {
+  width: min(100%, 640px);
+  max-height: 420px;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid var(--bg-tertiary);
+  background: rgba(0, 0, 0, 0.18);
 }
 
 .run-trace {

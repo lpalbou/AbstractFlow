@@ -1,4 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
+import { useGatewayCapabilities, gatewayContractsFromCapabilities } from './useGatewayCapabilities';
+import { gatewayJson, gatewayPath } from '../utils/gatewayClient';
 
 export type SemanticsPredicate = {
   id: string;
@@ -22,25 +24,15 @@ export type SemanticsRegistry = {
   entity_types: SemanticsEntityType[];
 };
 
-async function fetchJson<T>(url: string): Promise<T> {
-  const res = await fetch(url);
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    const msg =
-      err && typeof err === 'object' && 'detail' in err && typeof (err as any).detail === 'string'
-        ? (err as any).detail
-        : `HTTP ${res.status}`;
-    throw new Error(msg);
-  }
-  return res.json();
-}
-
 export function useSemanticsRegistry(enabled: boolean) {
+  const capabilitiesQuery = useGatewayCapabilities(enabled);
+  const contracts = gatewayContractsFromCapabilities(capabilitiesQuery.data);
+  const endpoint = contracts?.common?.discovery?.semantics || '/api/gateway/semantics';
+
   return useQuery({
-    queryKey: ['semantics-registry'],
-    queryFn: () => fetchJson<SemanticsRegistry>('/api/gateway/semantics'),
-    enabled,
+    queryKey: ['semantics-registry', endpoint],
+    queryFn: () => gatewayJson<SemanticsRegistry>(gatewayPath(endpoint)),
+    enabled: enabled && !capabilitiesQuery.isLoading,
     staleTime: 60_000,
   });
 }
-

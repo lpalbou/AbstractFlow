@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
+import {
+  capabilityUnavailable,
+  endpointFromDescriptor,
+  gatewayJson,
+  jsonRequest,
+  type GatewayContracts,
+} from '../utils/gatewayClient';
 
 function sanitizeBundleId(raw: string): string {
   const trimmed = (raw || '').trim();
@@ -24,29 +31,31 @@ type PublishFlowResponse = {
   gateway_reload_error?: string | null;
 };
 
-async function publishFlow(flowId: string, payload: PublishFlowRequest): Promise<PublishFlowResponse> {
-  const response = await fetch(`/api/gateway/visualflows/${encodeURIComponent(flowId)}/publish`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    const message = error.detail ? String(error.detail) : `HTTP ${response.status}`;
-    throw new Error(message);
+async function publishFlow(
+  flowId: string,
+  payload: PublishFlowRequest,
+  contracts: GatewayContracts | null | undefined
+): Promise<PublishFlowResponse> {
+  const publish = contracts?.flow_editor?.visualflows?.publish;
+  if (capabilityUnavailable(publish)) {
+    const hint = typeof publish?.install_hint === 'string' ? publish.install_hint : '';
+    throw new Error(hint || 'Gateway cannot publish VisualFlows');
   }
-  return response.json();
+  const url = endpointFromDescriptor(publish, '/api/gateway/visualflows/{flow_id}/publish', { flow_id: flowId });
+  return gatewayJson<PublishFlowResponse>(url, jsonRequest(payload, { method: 'POST' }));
 }
 
 export function PublishFlowModal({
   isOpen,
   flowId,
   flowName,
+  gatewayContracts,
   onClose,
 }: {
   isOpen: boolean;
   flowId: string | null;
   flowName: string;
+  gatewayContracts?: GatewayContracts | null;
   onClose: () => void;
 }) {
   const defaultBundleId = useMemo(() => sanitizeBundleId(flowName), [flowName]);
@@ -149,7 +158,7 @@ export function PublishFlowModal({
                 if (bver) payload.bundle_version = bver;
                 payload.reload_gateway = Boolean(reloadGateway);
 
-                const res = await publishFlow(flowId, payload);
+                const res = await publishFlow(flowId, payload, gatewayContracts);
                 setResult(res);
                 toast.success(`Published ${res.bundle_ref}`);
                 if (payload.reload_gateway && !res.gateway_reloaded) {

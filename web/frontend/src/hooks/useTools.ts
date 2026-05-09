@@ -1,4 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
+import { useGatewayCapabilities, gatewayContractsFromCapabilities } from './useGatewayCapabilities';
+import { gatewayJson, gatewayPath } from '../utils/gatewayClient';
 
 export interface ToolSpec {
   name: string;
@@ -15,31 +17,22 @@ export interface ToolSpec {
   examples?: unknown[];
 }
 
-async function fetchJson<T>(url: string): Promise<T> {
-  const res = await fetch(url);
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    const msg =
-      err && typeof err === 'object' && 'detail' in err && typeof (err as any).detail === 'string'
-        ? (err as any).detail
-        : `HTTP ${res.status}`;
-    throw new Error(msg);
-  }
-  return res.json();
-}
-
 export function useTools(enabled: boolean) {
+  const capabilitiesQuery = useGatewayCapabilities(enabled);
+  const contracts = gatewayContractsFromCapabilities(capabilitiesQuery.data);
+  const endpoint = contracts?.common?.discovery?.tools || '/api/gateway/discovery/tools';
+
   return useQuery({
-    queryKey: ['tools'],
+    queryKey: ['tools', endpoint],
     queryFn: async () => {
-      const res = await fetchJson<{ items?: ToolSpec[] }>('/api/gateway/discovery/tools');
+      const res = await gatewayJson<{ items?: ToolSpec[] }>(gatewayPath(endpoint));
       if (!Array.isArray(res.items)) {
         console.warn('#FALLBACK: tools response missing items; returning empty list');
         return [];
       }
       return res.items;
     },
-    enabled,
+    enabled: enabled && !capabilitiesQuery.isLoading,
     staleTime: 30_000,
   });
 }

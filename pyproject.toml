@@ -36,10 +36,10 @@ dependencies = [
     # AbstractFlow is built on AbstractRuntime (durable execution kernel).
     # `abstractflow/__init__.py` imports runtime-backed components (FlowRunner/compile_flow),
     # so this dependency is required (not optional).
-    "AbstractRuntime>=0.4.0",
+    "AbstractRuntime>=0.4.6",
     # Keep this aligned with the latest known published AbstractCore versions
     # (monorepo may carry a newer dev version).
-    "abstractcore[tools]>=2.11.8",
+    "abstractcore[tools]>=2.13.10",
     "pydantic>=2.0.0",
     "typing-extensions>=4.0.0",
 ]
@@ -51,6 +51,7 @@ agent = [
 ]
 editor = [
     # Main end-user install for the Visual Editor (backend + Agent node support).
+    "abstractgateway[http]>=0.2.3",
     "abstractagent>=0.3.1",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.23.0",
@@ -72,6 +73,7 @@ docs = [
     "mkdocs-material>=9.0.0",
 ]
 server = [
+    "abstractgateway[http]>=0.2.3",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.23.0",
     "websockets>=11.0.0",

@@ -24,6 +24,7 @@ import {
   upsertPythonAvailableVariablesComments,
 } from '../utils/codegen';
 import { collectCustomEventNames } from '../utils/events';
+import { gatewayJson, gatewayPath } from '../utils/gatewayClient';
 import {
   AGENT_META_SCHEMA,
   AGENT_RESULT_SCHEMA,
@@ -271,8 +272,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   // Fetch available providers on mount
   useEffect(() => {
     setLoadingProviders(true);
-    fetch('/api/gateway/discovery/providers')
-      .then((res) => res.json())
+    gatewayJson<{ items?: ProviderInfo[] }>(gatewayPath('/api/gateway/discovery/providers'))
       .then((data) => {
         if (!Array.isArray(data?.items)) {
           console.warn('#FALLBACK: providers response missing items; using empty list');
@@ -287,8 +287,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   useEffect(() => {
     setLoadingTools(true);
     setToolsError(null);
-    fetch('/api/gateway/discovery/tools')
-      .then((res) => res.json())
+    gatewayJson<{ items?: ToolSpec[] }>(gatewayPath('/api/gateway/discovery/tools'))
       .then((data) => {
         if (!Array.isArray(data?.items)) {
           console.warn('#FALLBACK: tools response missing items; using empty list');
@@ -345,8 +344,9 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       lastFetchedProvider.current = selectedProvider;
       setLoadingModels(true);
       setModels([]);
-      fetch(`/api/gateway/discovery/providers/${encodeURIComponent(selectedProvider)}/models`)
-        .then((res) => res.json())
+      gatewayJson<{ models?: string[]; items?: string[] }>(
+        gatewayPath('/api/gateway/discovery/providers/{provider_name}/models', { provider_name: selectedProvider })
+      )
         .then((data) => {
           const models = Array.isArray(data?.models)
             ? data.models
@@ -370,8 +370,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   useEffect(() => {
     if (!node || node.data.nodeType !== 'subflow') return;
     setLoadingFlows(true);
-    fetch('/api/gateway/visualflows')
-      .then((res) => res.json())
+    gatewayJson<VisualFlow[]>(gatewayPath('/api/gateway/visualflows'))
       .then((data) => {
         if (Array.isArray(data)) {
           setSavedFlows(
@@ -425,8 +424,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
     const findFlowEndNode = (flow: VisualFlow) => flow.nodes.find((n) => n.type === 'on_flow_end');
 
-    fetch(`/api/gateway/visualflows/${encodeURIComponent(subflowId)}`)
-      .then((res) => res.json())
+    gatewayJson<VisualFlow>(gatewayPath('/api/gateway/visualflows/{flow_id}', { flow_id: subflowId }))
       .then((flow: VisualFlow) => {
         const start = findFlowStartNode(flow);
         const end = findFlowEndNode(flow);

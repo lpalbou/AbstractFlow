@@ -19,8 +19,8 @@ pip install abstractflow
 
 Optional extras:
 - Agent nodes (ReAct workflows): `pip install "abstractflow[agent]"`
-- Visual editor backend (FastAPI): `pip install "abstractflow[server]"`
-- Visual editor backend + Agent nodes (recommended): `pip install "abstractflow[editor]"`
+- Visual editor legacy/dev FastAPI host: `pip install "abstractflow[server]"`
+- Visual editor host + Gateway HTTP deps (recommended for Python-hosted UI): `pip install "abstractflow[editor]"`
 - Documentation site tools: `pip install "abstractflow[docs]"`
 - Dev tools: `pip install "abstractflow[dev]"`
 
@@ -92,17 +92,20 @@ Evidence:
 
 ## Run the visual editor (local)
 
-The editor is a reference app (FastAPI backend + React frontend). Follow: [web-editor.md](web-editor.md).
+The modern editor talks to AbstractGateway. Follow: [web-editor.md](web-editor.md).
 
 Quick start (no repo clone needed):
 
 ```bash
-pip install "abstractflow[editor]"
-abstractflow serve --reload --port 8080
-npx @abstractframework/flow
+pip install "abstractgateway[http]" abstractflow
+export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
+abstractgateway --port 8080
+
+export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
+npx @abstractframework/flow --gateway-url http://127.0.0.1:8080
 ```
 
-Tip (from source): install the backend deps from the repo root with `pip install -e ".[server,agent]"`.
+Tip (from source): install Flow and Gateway editably, then run `npm run dev` from `web/frontend` with `ABSTRACTGATEWAY_AUTH_TOKEN` set so Vite can inject Gateway auth in its proxy.
 
 ## Workflow bundles (`.flow`)
 

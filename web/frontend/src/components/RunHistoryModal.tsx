@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { RunSummary } from '../types/flow';
 import { extractFlowIdFromWorkflowId, mapGatewayRunSummary } from '../utils/gatewayRuns';
+import { gatewayJson, gatewayPath } from '../utils/gatewayClient';
 
 interface RunHistoryModalProps {
   isOpen: boolean;
@@ -41,10 +42,10 @@ async function fetchRuns(workflowId: string, workflowName?: string): Promise<Run
 
   const all: RunSummary[] = [];
   for (const wid of candidates) {
-    const qs = new URLSearchParams({ limit: '500', root_only: 'true', workflow_id: wid });
-    const res = await fetch(`/api/gateway/runs?${qs.toString()}`);
-    if (!res.ok) continue;
-    const payload = (await res.json()) as { items?: Record<string, unknown>[] };
+    const payload = await gatewayJson<{ items?: Record<string, unknown>[] }>(
+      gatewayPath('/api/gateway/runs', {}, { limit: 500, root_only: true, workflow_id: wid })
+    ).catch(() => null);
+    if (!payload) continue;
     const items = Array.isArray(payload.items) ? payload.items : [];
     const mapped = items.map(mapGatewayRunSummary);
     all.push(...mapped);
@@ -52,16 +53,14 @@ async function fetchRuns(workflowId: string, workflowName?: string): Promise<Run
 
   // Fallback: fetch recent root runs and filter by flow id suffix.
   try {
-    const qs = new URLSearchParams({ limit: '500', root_only: 'true' });
-    const res = await fetch(`/api/gateway/runs?${qs.toString()}`);
-    if (res.ok) {
-      const payload = (await res.json()) as { items?: Record<string, unknown>[] };
-      const items = Array.isArray(payload.items) ? payload.items : [];
-      const mapped = items.map(mapGatewayRunSummary);
-      for (const r of mapped) {
-        if (extractFlowIdFromWorkflowId(r.workflow_id) === fid) {
-          all.push(r);
-        }
+    const payload = await gatewayJson<{ items?: Record<string, unknown>[] }>(
+      gatewayPath('/api/gateway/runs', {}, { limit: 500, root_only: true })
+    );
+    const items = Array.isArray(payload.items) ? payload.items : [];
+    const mapped = items.map(mapGatewayRunSummary);
+    for (const r of mapped) {
+      if (extractFlowIdFromWorkflowId(r.workflow_id) === fid) {
+        all.push(r);
       }
     }
   } catch {
@@ -204,7 +203,6 @@ export function RunHistoryModal({ isOpen, workflowId, workflowName, onClose, onS
 }
 
 export default RunHistoryModal;
-
 
 
 

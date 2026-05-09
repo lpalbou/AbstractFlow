@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
+import { endpointFromDescriptor, gatewayJson, jsonRequest, type GatewayContracts } from '../utils/gatewayClient';
 
 function sanitizeBundleId(raw: string): string {
   const trimmed = (raw || '').trim();
@@ -23,41 +24,37 @@ type DeprecateBundleResponse = {
   removed?: boolean | null;
 };
 
-async function deprecateBundle(bundleId: string, payload: DeprecateBundleRequest): Promise<DeprecateBundleResponse> {
-  const response = await fetch(`/api/gateway/bundles/${encodeURIComponent(bundleId)}/deprecate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+async function deprecateBundle(
+  bundleId: string,
+  payload: DeprecateBundleRequest,
+  contracts: GatewayContracts | null | undefined
+): Promise<DeprecateBundleResponse> {
+  const url = endpointFromDescriptor(contracts?.flow_editor?.bundles?.deprecate, '/api/gateway/bundles/{bundle_id}/deprecate', {
+    bundle_id: bundleId,
   });
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    const message = error.detail ? String(error.detail) : `HTTP ${response.status}`;
-    throw new Error(message);
-  }
-  return response.json();
+  return gatewayJson<DeprecateBundleResponse>(url, jsonRequest(payload, { method: 'POST' }));
 }
 
-async function undeprecateBundle(bundleId: string, payload: DeprecateBundleRequest): Promise<DeprecateBundleResponse> {
-  const response = await fetch(`/api/gateway/bundles/${encodeURIComponent(bundleId)}/undeprecate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+async function undeprecateBundle(
+  bundleId: string,
+  payload: DeprecateBundleRequest,
+  contracts: GatewayContracts | null | undefined
+): Promise<DeprecateBundleResponse> {
+  const url = endpointFromDescriptor(contracts?.flow_editor?.bundles?.undeprecate, '/api/gateway/bundles/{bundle_id}/undeprecate', {
+    bundle_id: bundleId,
   });
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    const message = error.detail ? String(error.detail) : `HTTP ${response.status}`;
-    throw new Error(message);
-  }
-  return response.json();
+  return gatewayJson<DeprecateBundleResponse>(url, jsonRequest(payload, { method: 'POST' }));
 }
 
 export function WorkflowLifecycleModal({
   isOpen,
   flowName,
+  gatewayContracts,
   onClose,
 }: {
   isOpen: boolean;
   flowName: string;
+  gatewayContracts?: GatewayContracts | null;
   onClose: () => void;
 }) {
   const defaultBundleId = useMemo(() => sanitizeBundleId(flowName), [flowName]);
@@ -168,7 +165,7 @@ export function WorkflowLifecycleModal({
                 if (fid) payload.flow_id = fid;
                 const r = (reason || '').trim();
                 if (r) payload.reason = r;
-                const res = await deprecateBundle(bid || bundleId, payload);
+                const res = await deprecateBundle(bid || bundleId, payload, gatewayContracts);
                 setResult(res);
                 toast.success(`Deprecated ${res.bundle_id}:${res.flow_id}`);
               } catch (e) {
@@ -192,7 +189,7 @@ export function WorkflowLifecycleModal({
                 if (bid) payload.bundle_id = bid;
                 const fid = (entryFlowId || '').trim();
                 if (fid) payload.flow_id = fid;
-                const res = await undeprecateBundle(bid || bundleId, payload);
+                const res = await undeprecateBundle(bid || bundleId, payload, gatewayContracts);
                 setResult(res);
                 toast.success(`Undeprecated ${res.bundle_id}:${res.flow_id}`);
               } catch (e) {
@@ -209,4 +206,3 @@ export function WorkflowLifecycleModal({
     </div>
   );
 }
-

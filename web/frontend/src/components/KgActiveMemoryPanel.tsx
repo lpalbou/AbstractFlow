@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react';
 
 import { KgActiveMemoryExplorer, type JsonValue, type KgAssertion, type KgQueryParams, type KgQueryResult } from '@abstractuic/monitor-active-memory';
+import { gatewayJson, gatewayPath, jsonRequest } from '../utils/gatewayClient';
 
 interface KgActiveMemoryPanelProps {
   runId: string | null;
@@ -36,16 +37,10 @@ export function KgActiveMemoryPanel({ runId, title, output }: KgActiveMemoryPane
   const onQuery = useCallback(
     async (params: KgQueryParams): Promise<KgQueryResult> => {
       if (!runId) throw new Error('run_id is missing');
-      const res = await fetch('/api/gateway/kg/query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...params, run_id: runId }),
-      });
-      if (!res.ok) {
-        const txt = await res.text();
-        throw new Error(txt || `KG query failed (HTTP ${res.status})`);
-      }
-      return (await res.json()) as KgQueryResult;
+      return gatewayJson<KgQueryResult>(
+        gatewayPath('/api/gateway/kg/query'),
+        jsonRequest({ ...params, run_id: runId }, { method: 'POST' })
+      );
     },
     [runId]
   );

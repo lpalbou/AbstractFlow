@@ -9,7 +9,7 @@ AbstractFlow is part of the [AbstractFramework ecosystem](https://github.com/lpa
 It provides:
 - A small programmatic API (`Flow`, `FlowRunner`) for building and running flows in Python.
 - A portable workflow format (`VisualFlow` JSON) + helpers to execute it from any host (`abstractflow.visual`).
-- A reference visual editor app in `web/` (FastAPI backend + React frontend).
+- A Gateway-first visual editor app in `web/` (React frontend + `/api/gateway/*` proxy).
 
 Project status: **Pre-alpha** (`pyproject.toml`: `Development Status :: 2 - Pre-Alpha`). Expect breaking changes.
 
@@ -19,8 +19,7 @@ Evidence (code): [abstractflow/runner.py](abstractflow/runner.py), [abstractflow
 
 ```mermaid
 flowchart LR
-  UI[Visual editor UI<br/>npx @abstractframework/flow] <-->|/api/*| BE[Editor backend<br/>FastAPI (optional)]
-  BE -->|save/load| FLOWS[(flows/*.json)]
+  UI[Visual editor UI<br/>npx @abstractframework/flow] <-->|/api/gateway/*| GW[AbstractGateway<br/>runs/ledger/artifacts/bundles]
 
   HOST[Any host process<br/>CLI / server / notebook] --> VF[VisualFlow models<br/>abstractflow/visual/models.py]
   HOST --> RUN[create_visual_runner / execute_visual_flow<br/>abstractflow/visual/executor.py]
@@ -52,8 +51,8 @@ Requirements: Python **3.10+** (`pyproject.toml`: `requires-python`).
 
 Optional extras (declared in `pyproject.toml`):
 - Agent nodes (Visual Agent node support): `pip install "abstractflow[agent]"`
-- Visual editor backend (FastAPI): `pip install "abstractflow[server]"`
-- Visual editor backend + Agent nodes: `pip install "abstractflow[editor]"`
+- Visual editor legacy/dev FastAPI host: `pip install "abstractflow[server]"`
+- Visual editor host + Gateway HTTP client deps: `pip install "abstractflow[editor]"`
 - Documentation site tools: `pip install "abstractflow[docs]"`
 - Dev tools: `pip install "abstractflow[dev]"`
 
@@ -92,24 +91,24 @@ If your flow uses subflows, load all referenced `*.json` into the `flows={...}` 
 
 ## Visual editor (local)
 
-The visual editor is split into:
-- a **Python backend** (FastAPI) shipped with `abstractflow[editor]` (or `abstractflow[server]`)
-- a **JS frontend** published as `@abstractframework/flow` (run via `npx`)
+The visual editor talks to AbstractGateway. The Flow server keeps the Gateway bearer token server-side while proxying browser requests.
 
 ```bash
-# Terminal 1: editor backend (FastAPI)
-pip install "abstractflow[editor]"
-abstractflow serve --reload --port 8080
+# Terminal 1: Gateway
+pip install "abstractgateway[http]" abstractflow
+export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
+abstractgateway --port 8080
 
-# Terminal 2: editor UI (static server + /api proxy)
-npx @abstractframework/flow
+# Terminal 2: editor UI (static server + /api/gateway proxy)
+export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
+npx @abstractframework/flow --gateway-url http://127.0.0.1:8080
 ```
 
 Open:
 - UI: http://localhost:3003
-- Backend health: http://localhost:8080/api/health
+- Gateway capabilities: http://localhost:8080/api/gateway/discovery/capabilities
 
-Optional: run an AbstractGateway at http://127.0.0.1:8080 and configure it in the UI “Connect” modal (used for embeddings-backed memory KG and bundle publishing). Export `ABSTRACTGATEWAY_AUTH_TOKEN` or pass `--gateway-token` when starting the backend. See [docs/web-editor.md](docs/web-editor.md) and [docs/architecture.md](docs/architecture.md).
+The legacy `abstractflow serve` FastAPI host remains available for local development and also proxies `/api/gateway/*` with the configured token. See [docs/web-editor.md](docs/web-editor.md) and [docs/architecture.md](docs/architecture.md).
 
 ## CLI (WorkflowBundle `.flow`)
 

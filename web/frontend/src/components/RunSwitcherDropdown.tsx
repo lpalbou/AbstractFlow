@@ -6,12 +6,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RunSummary } from '../types/flow';
 import { filterRunSummariesByFlowId, mapGatewayRunSummary } from '../utils/gatewayRuns';
+import { gatewayJson, gatewayPath } from '../utils/gatewayClient';
 
 async function fetchRuns(workflowId: string): Promise<RunSummary[]> {
-  const qs = new URLSearchParams({ limit: '50' });
-  const res = await fetch(`/api/gateway/runs?${qs.toString()}`);
-  if (!res.ok) throw new Error(`Failed to list runs (HTTP ${res.status})`);
-  const payload = (await res.json()) as { items?: Record<string, unknown>[] };
+  const payload = await gatewayJson<{ items?: Record<string, unknown>[] }>(
+    gatewayPath('/api/gateway/runs', {}, { limit: 50 })
+  );
   if (!Array.isArray(payload.items)) {
     console.warn('#FALLBACK: runs response missing items; treating as empty list');
   }
@@ -220,6 +220,5 @@ export function RunSwitcherDropdown({
 }
 
 export default RunSwitcherDropdown;
-
 
 

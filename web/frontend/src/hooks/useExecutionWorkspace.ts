@@ -1,36 +1,28 @@
 import { useQuery } from '@tanstack/react-query';
+import { useGatewayCapabilities, gatewayContractsFromCapabilities } from './useGatewayCapabilities';
+import { gatewayJson, gatewayPath } from '../utils/gatewayClient';
 
 export interface ExecutionWorkspaceInfo {
   default_random_root?: string;
   policy?: Record<string, unknown>;
 }
 
-async function fetchJson<T>(url: string): Promise<T> {
-  const res = await fetch(url);
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    const msg =
-      err && typeof err === 'object' && 'detail' in err && typeof (err as any).detail === 'string'
-        ? (err as any).detail
-        : `HTTP ${res.status}`;
-    throw new Error(msg);
-  }
-  return res.json();
-}
-
 export function useExecutionWorkspace(enabled: boolean) {
+  const capabilitiesQuery = useGatewayCapabilities(enabled);
+  const contracts = gatewayContractsFromCapabilities(capabilitiesQuery.data);
+  const endpoint = contracts?.common?.workspace?.policy_endpoint || '/api/gateway/workspace/policy';
+
   return useQuery({
-    queryKey: ['runs', 'execution-workspace'],
+    queryKey: ['runs', 'execution-workspace', endpoint],
     queryFn: async () => {
-      const res = await fetchJson<{ policy?: Record<string, unknown> }>('/api/gateway/workspace/policy');
+      const res = await gatewayJson<{ policy?: Record<string, unknown> }>(gatewayPath(endpoint));
       const policy = res && typeof res === 'object' ? res.policy : undefined;
       if (!policy || typeof policy !== 'object') {
         console.warn('#FALLBACK: workspace policy missing; UI defaults may be incomplete');
       }
       return { default_random_root: '', policy };
     },
-    enabled,
+    enabled: enabled && !capabilitiesQuery.isLoading,
     staleTime: 30_000,
   });
 }
-

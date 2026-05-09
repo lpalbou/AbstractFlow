@@ -24,9 +24,9 @@ abstractflow/                  # Published Python package
   cli.py                       # `abstractflow` CLI
   workflow_bundle.py           # Bundle helpers (delegates to AbstractRuntime)
 docs/                          # Human docs (this folder)
-web/                           # Reference visual editor app (backend shipped via `abstractflow[server]`)
-  backend/                     # FastAPI backend (CRUD + websocket execution)
-  frontend/                    # React editor + run UI
+web/                           # Reference visual editor app
+  backend/                     # Legacy/dev FastAPI host + Gateway proxy
+  frontend/                    # React editor + Gateway-first run UI
   flows/                       # Default flow storage when running backend from `web/`
   runtime/                     # Default runtime persistence in a source checkout (installed: ~/.abstractflow/runtime)
 tests/                         # Test suite
@@ -37,12 +37,12 @@ tests/                         # Test suite
 ```mermaid
 flowchart LR
   subgraph Authoring
-    FE[web/frontend<br/>React editor] -->|save/load VisualFlow JSON| BE[web/backend<br/>FastAPI]
-    BE -->|persists| FLOWS[(web/flows/*.json)]
+    FE[web/frontend<br/>React editor] -->|/api/gateway/*| GW[AbstractGateway<br/>VisualFlows + bundles]
+    GW -->|persists| GWDATA[(Gateway data dirs)]
   end
 
   subgraph Execution
-    HOST[Host process<br/>(web backend / CLI / 3rd party)] -->|validate| VF[VisualFlow models<br/>abstractflow/visual/models.py]
+    HOST[Host process<br/>(Gateway / CLI / 3rd party)] -->|validate| VF[VisualFlow models<br/>abstractflow/visual/models.py]
     HOST -->|create_visual_runner| WIRE[Runtime wiring<br/>abstractflow/visual/executor.py]
     WIRE --> RT[AbstractRuntime Runtime<br/>tick/resume]
     RT --> STORES[(RunStore / LedgerStore / ArtifactStore)]
@@ -50,7 +50,7 @@ flowchart LR
     RT -->|START_SUBWORKFLOW| REG[WorkflowRegistry]
   end
 
-  BE -->|WS: run/resume/control| HOST
+  FE -->|HTTP/SSE: start/commands/ledger| GW
 ```
 
 ## Portable data model: VisualFlow JSON
@@ -108,7 +108,19 @@ VisualFlows that include custom events (`on_event` / `emit_event`) are executed 
 
 Evidence: [../abstractflow/visual/session_runner.py](../abstractflow/visual/session_runner.py), wiring in [../abstractflow/visual/executor.py](../abstractflow/visual/executor.py), tests in [../tests/test_visual_custom_events.py](../tests/test_visual_custom_events.py).
 
-## Web editor host (FastAPI + WebSockets)
+## Web editor host (Gateway-first)
+
+The modern editor is a thin Gateway client:
+- VisualFlow CRUD: `GET/POST/PUT/DELETE /api/gateway/visualflows`
+- Publish: `POST /api/gateway/visualflows/{flow_id}/publish`
+- Run input schema: `GET /api/gateway/bundles/{bundle_id}/flows/{flow_id}/input_schema`
+- Runs/commands: `POST /api/gateway/runs/start`, `POST /api/gateway/commands`
+- Replay/stream: `GET /api/gateway/runs/{run_id}/ledger`, `GET /api/gateway/runs/{run_id}/ledger/stream`
+- Artifacts: `GET /api/gateway/runs/{run_id}/artifacts/...`
+
+The static `@abstractframework/flow` server, Vite dev proxy, and Python FastAPI host all proxy `/api/gateway/*` and inject the configured Gateway bearer token server-side. This is required because browser `EventSource` cannot send custom auth headers.
+
+## Legacy/dev FastAPI host
 
 The reference host in `web/` provides:
 - Flow CRUD (`web/backend/routes/flows.py`) storing `./flows/*.json` relative to its working dir
@@ -118,7 +130,7 @@ The reference host in `web/` provides:
   - `{ "type": "resume", "response": "…" }`
   - `{ "type": "control", "action": "pause|resume|cancel", "run_id": "…" }`
 
-See [web-editor.md](web-editor.md) for run instructions.
+These local routes remain for development/reference compatibility. See [web-editor.md](web-editor.md) for current run instructions.
 
 ## Workflow bundles (`.flow`)
 
