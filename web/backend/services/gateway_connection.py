@@ -62,21 +62,10 @@ def resolve_gateway_url_from_env() -> Optional[str]:
 
 
 def resolve_gateway_token_from_env() -> Optional[str]:
-    raw = (
-        os.getenv("ABSTRACTGATEWAY_AUTH_TOKEN")
-        or os.getenv("ABSTRACTFLOW_GATEWAY_AUTH_TOKEN")
-        or os.getenv("ABSTRACTCODE_GATEWAY_TOKEN")
-        or ""
-    )
+    raw = os.getenv("ABSTRACTGATEWAY_AUTH_TOKEN") or ""
     token = str(raw or "").strip()
     if token:
         return token
-
-    raw_list = os.getenv("ABSTRACTGATEWAY_AUTH_TOKENS") or os.getenv("ABSTRACTFLOW_GATEWAY_AUTH_TOKENS") or ""
-    if isinstance(raw_list, str) and raw_list.strip():
-        first = raw_list.split(",", 1)[0].strip()
-        if first:
-            return first
     return None
 
 
@@ -122,7 +111,6 @@ def apply_gateway_connection_to_env(*, gateway_url: Optional[str], gateway_token
         os.environ.setdefault("ABSTRACTGATEWAY_URL", url)
     if token:
         os.environ["ABSTRACTGATEWAY_AUTH_TOKEN"] = token
-        os.environ["ABSTRACTFLOW_GATEWAY_AUTH_TOKEN"] = token
 
 
 def bootstrap_gateway_connection_env() -> None:

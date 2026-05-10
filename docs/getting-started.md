@@ -18,9 +18,10 @@ pip install abstractflow
 ```
 
 Optional extras:
+- Runtime APIs (`Flow`, `FlowRunner`, `abstractflow.visual` local execution, workflow bundles): `pip install "abstractflow[runtime]"`
+- Host profile for local Python proxy stack + compatibility routes: `pip install "abstractflow[all-apple]"` or `pip install "abstractflow[all-gpu]"`
+- `abstractflow[all-apple]` and `abstractflow[all-gpu]` both include `abstractflow[runtime]` so local execution helpers are available in compat mode.
 - Agent nodes (ReAct workflows): `pip install "abstractflow[agent]"`
-- Visual editor backend (FastAPI): `pip install "abstractflow[server]"`
-- Visual editor backend + Agent nodes (recommended): `pip install "abstractflow[editor]"`
 - Documentation site tools: `pip install "abstractflow[docs]"`
 - Dev tools: `pip install "abstractflow[dev]"`
 
@@ -31,6 +32,17 @@ pip install -e .
 ```
 
 Evidence: dependencies and extras are declared in [../pyproject.toml](../pyproject.toml).
+
+For thin-client gateway-first mode, `abstractflow` (without extras) is sufficient. Install `abstractgateway[http]` separately for the backend.
+Enable local runtime compatibility only when needed with `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1`.
+
+If you install a host profile (`all-apple`, `all-gpu`), the local execution stack is already included for compatibility.
+
+Programmatic and local VisualFlow execution examples below require the runtime extra:
+
+```bash
+pip install "abstractflow[runtime]"
+```
 
 ## Programmatic flow (FlowRunner)
 
@@ -92,17 +104,20 @@ Evidence:
 
 ## Run the visual editor (local)
 
-The editor is a reference app (FastAPI backend + React frontend). Follow: [web-editor.md](web-editor.md).
+The modern editor talks to AbstractGateway. Follow: [web-editor.md](web-editor.md).
 
 Quick start (no repo clone needed):
 
 ```bash
-pip install "abstractflow[editor]"
-abstractflow serve --reload --port 8080
-npx @abstractframework/flow
+pip install "abstractgateway[http]" abstractflow
+export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
+abstractgateway --port 8080
+
+export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
+npx @abstractframework/flow --gateway-url http://127.0.0.1:8080
 ```
 
-Tip (from source): install the backend deps from the repo root with `pip install -e ".[server,agent]"`.
+Tip (from source): install Flow and Gateway editably, then run `npm run dev` from `web/frontend` with `ABSTRACTGATEWAY_AUTH_TOKEN` set so Vite can inject Gateway auth in its proxy.
 
 ## Workflow bundles (`.flow`)
 

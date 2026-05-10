@@ -18,10 +18,6 @@ def test_gateway_connection_persistence_and_bootstrap(monkeypatch, tmp_path) -> 
         "ABSTRACTFLOW_GATEWAY_URL",
         "ABSTRACTGATEWAY_URL",
         "ABSTRACTGATEWAY_AUTH_TOKEN",
-        "ABSTRACTFLOW_GATEWAY_AUTH_TOKEN",
-        "ABSTRACTCODE_GATEWAY_TOKEN",
-        "ABSTRACTGATEWAY_AUTH_TOKENS",
-        "ABSTRACTFLOW_GATEWAY_AUTH_TOKENS",
     ]:
         monkeypatch.delenv(k, raising=False)
 

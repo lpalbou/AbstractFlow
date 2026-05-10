@@ -16,6 +16,7 @@ Evidence: [../abstractflow/_version.py](../abstractflow/_version.py), [../abstra
 ### Flow IR
 
 `Flow`, `FlowNode`, and `FlowEdge` are re-exported from AbstractRuntime so there is a single source of truth for semantics.
+These APIs are available with `abstractflow[runtime]` (or any host profile: `abstractflow[all-apple]`, `abstractflow[all-gpu]`).
 
 ```python
 from abstractflow import Flow, FlowNode, FlowEdge
@@ -26,6 +27,7 @@ Evidence: [../abstractflow/core/flow.py](../abstractflow/core/flow.py), [../abst
 ### FlowRunner
 
 `FlowRunner` compiles a `Flow` to a runtime `WorkflowSpec` and executes it using an AbstractRuntime `Runtime`.
+Available with `abstractflow[runtime]` (or any host profile: `abstractflow[all-apple]`, `abstractflow[all-gpu]`).
 
 ```python
 from abstractflow import FlowRunner
@@ -42,6 +44,7 @@ Evidence: [../abstractflow/runner.py](../abstractflow/runner.py).
 ### Compilation
 
 Compilation functions are delegated to AbstractRuntime’s VisualFlow compiler and re-exported:
+Requires `abstractflow[runtime]` (or any host profile: `abstractflow[all-apple]`, `abstractflow[all-gpu]`).
 
 ```python
 from abstractflow import compile_flow
@@ -71,17 +74,23 @@ Evidence: [../abstractflow/visual/models.py](../abstractflow/visual/models.py), 
 
 Use `execute_visual_flow(...)` for a simple “run and return a result” call:
 
+Requires `abstractflow[runtime]`.
+
 ```python
 from abstractflow.visual import execute_visual_flow
 ```
 
 For advanced use cases (custom stores/tool execution, or access to run state/ledger), build a runner:
 
+Requires `abstractflow[runtime]`.
+
 ```python
 from abstractflow.visual import create_visual_runner
 ```
 
 Utilities:
+
+Requires `abstractflow[runtime]` for runtime flow-spec conversion.
 
 ```python
 from abstractflow.visual import visual_to_flow
@@ -106,6 +115,7 @@ Evidence: [../abstractflow/visual/interfaces.py](../abstractflow/visual/interfac
 ## Workflow bundles (`.flow`)
 
 WorkflowBundle helpers are available as a thin wrapper around AbstractRuntime’s bundle implementation:
+Requires `abstractflow[runtime]`.
 
 ```python
 from abstractflow.workflow_bundle import (
@@ -116,6 +126,18 @@ from abstractflow.workflow_bundle import (
 ```
 
 Evidence: [../abstractflow/workflow_bundle.py](../abstractflow/workflow_bundle.py), [cli.md](cli.md).
+
+## Gateway editor contract
+
+The React editor is a thin client for AbstractGateway's versioned discovery contract:
+
+```text
+GET /api/gateway/discovery/capabilities
+```
+
+It reads `capabilities.contracts.flow_editor` for VisualFlow CRUD/publish, run input schema, run start, ledger stream, artifact, and prompt-cache endpoints. The browser calls same-origin `/api/gateway/*`; the Flow static server/Vite/Python host proxy those requests to Gateway and inject the configured bearer token.
+
+Evidence: [../web/frontend/src/hooks/useGatewayCapabilities.ts](../web/frontend/src/hooks/useGatewayCapabilities.ts), [../web/frontend/src/utils/gatewayClient.ts](../web/frontend/src/utils/gatewayClient.ts), [../web/backend/main.py](../web/backend/main.py).
 
 ## Adapters (advanced)
 
@@ -138,6 +160,6 @@ The `abstractflow` CLI entry point is declared in `pyproject.toml` (`project.scr
 
 The CLI includes:
 - WorkflowBundle tools: `abstractflow bundle ...`
-- Visual editor backend runner (optional): `abstractflow serve ...` (requires `abstractflow[server]`)
+- Visual editor backend runner (optional): `abstractflow serve ...` (requires `abstractflow[all-apple]` or `abstractflow[all-gpu]`)
 
 Evidence: [../pyproject.toml](../pyproject.toml), [../abstractflow/cli.py](../abstractflow/cli.py), [../web/backend/cli.py](../web/backend/cli.py).

@@ -2,24 +2,23 @@
 
 This package ships the **browser UI** for the AbstractFlow visual editor (React + ReactFlow).
 
-It is designed to run alongside the **editor backend** (FastAPI), which provides `/api/*` endpoints for:
-- saving/loading flows
-- running flows (WebSocket streaming)
-- configuring the optional AbstractGateway connection
+It is designed to run alongside **AbstractGateway**. The package server proxies same-origin `/api/*` requests to Gateway and injects the configured bearer token, including for SSE ledger streams.
 
 ## Quick start
 
-Terminal 1 (backend):
+Terminal 1 (Gateway):
 
 ```bash
-pip install "abstractflow[editor]"
-abstractflow serve --reload --port 8080
+pip install "abstractgateway[http]" abstractflow
+export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
+abstractgateway --port 8080
 ```
 
 Terminal 2 (UI):
 
 ```bash
-npx @abstractframework/flow
+export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
+npx @abstractframework/flow --gateway-url http://127.0.0.1:8080
 ```
 
 Open: http://localhost:3003
@@ -27,15 +26,10 @@ Open: http://localhost:3003
 ## CLI options
 
 ```bash
-npx @abstractframework/flow --port 3003 --host 0.0.0.0 --backend-url http://127.0.0.1:8080
+npx @abstractframework/flow --port 3003 --host 0.0.0.0 --gateway-url http://127.0.0.1:8080 --gateway-token dev-token
 ```
 
 Environment variables:
 - `PORT`, `HOST`
-- `ABSTRACTFLOW_BACKEND_URL` (or `BACKEND_URL`)
-
-## AbstractGateway (optional)
-
-If you run an AbstractGateway (default: http://127.0.0.1:8080), configure it from the UI “Connect” modal.
-
-Gateway is required for embeddings-backed memory/KG features and “publish to gateway” flows.
+- `ABSTRACTGATEWAY_URL` (or `ABSTRACTFLOW_GATEWAY_URL`)
+- `ABSTRACTGATEWAY_AUTH_TOKEN`

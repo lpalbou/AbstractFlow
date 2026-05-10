@@ -2,7 +2,9 @@
 
 AbstractFlow ships a small CLI focused on:
 - **WorkflowBundle** (`.flow`) utilities
-- running the **Visual Editor backend** (optional; requires `abstractflow[server]`)
+- running the **Visual Editor backend** (optional; requires `abstractflow[all-apple]` or `abstractflow[all-gpu]`)
+- Note: WorkflowBundle commands require `abstractflow[runtime]` (or any full host profile:
+  `abstractflow[all-apple]`, `abstractflow[all-gpu]`).
 
 Entry point:
 - `abstractflow` (declared in `pyproject.toml` → `project.scripts`)
@@ -55,7 +57,7 @@ Evidence:
 Run the FastAPI backend used by the visual editor UI:
 
 ```bash
-pip install "abstractflow[editor]"  # or: abstractflow[server]
+pip install "abstractflow[all-apple]"  # or abstractflow[all-gpu]
 abstractflow serve --reload --port 8080
 ```
 
@@ -70,6 +72,7 @@ Gateway-related flags (optional):
 Gateway resolution:
 - `--gateway-url` falls back to `ABSTRACTGATEWAY_URL` and defaults to `http://127.0.0.1:8080`
 - `--gateway-token` falls back to `ABSTRACTGATEWAY_AUTH_TOKEN`
-- startup fails with a clear error if no gateway token is available
+- by default, startup now validates that AbstractGateway is reachable before binding the server
+- set `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1` to opt into compatibility-only local-host mode and skip the gateway reachability guard
 
 Evidence: [../abstractflow/cli.py](../abstractflow/cli.py), [../web/backend/cli.py](../web/backend/cli.py), [../web/backend/main.py](../web/backend/main.py).

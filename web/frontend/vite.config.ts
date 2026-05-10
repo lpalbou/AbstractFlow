@@ -5,21 +5,10 @@ import { resolve } from 'path';
 const GATEWAY_URL =
   process.env.ABSTRACTGATEWAY_URL ||
   process.env.ABSTRACTFLOW_GATEWAY_URL ||
-  process.env.ABSTRACTFLOW_BACKEND_URL || // #FALLBACK: legacy env var
-  process.env.BACKEND_URL || // #FALLBACK: legacy env var
   'http://localhost:8080';
 const GATEWAY_AUTH_TOKEN =
   process.env.ABSTRACTGATEWAY_AUTH_TOKEN ||
-  process.env.ABSTRACTFLOW_GATEWAY_AUTH_TOKEN || // #FALLBACK: legacy env var
-  process.env.ABSTRACTCODE_GATEWAY_TOKEN || // #FALLBACK: legacy env var
   '';
-
-if (!process.env.ABSTRACTGATEWAY_URL && !process.env.ABSTRACTFLOW_GATEWAY_URL && (process.env.ABSTRACTFLOW_BACKEND_URL || process.env.BACKEND_URL)) {
-  console.warn('#FALLBACK: using legacy ABSTRACTFLOW_BACKEND_URL/BACKEND_URL for gateway URL');
-}
-if (!process.env.ABSTRACTGATEWAY_AUTH_TOKEN && (process.env.ABSTRACTFLOW_GATEWAY_AUTH_TOKEN || process.env.ABSTRACTCODE_GATEWAY_TOKEN)) {
-  console.warn('#FALLBACK: using legacy auth token env var for gateway auth');
-}
 
 const PROXY_HEADERS = GATEWAY_AUTH_TOKEN
   ? { Authorization: `Bearer ${GATEWAY_AUTH_TOKEN}` }

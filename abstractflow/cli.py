@@ -14,9 +14,29 @@ import os
 import sys
 from typing import List, Optional
 
-from .gateway_options import require_gateway_connection, resolve_gateway_token, resolve_gateway_url
-from .workflow_bundle import inspect_workflow_bundle, pack_workflow_bundle, unpack_workflow_bundle
-from abstractruntime.workflow_bundle import workflow_bundle_manifest_to_dict
+from .gateway_options import (
+    local_runtime_enabled,
+    require_gateway_connection,
+    require_gateway_connectivity,
+    resolve_gateway_token,
+    resolve_gateway_url,
+)
+
+
+def _load_workflow_bundle_tools():
+    """Import workflow bundle helpers only when the optional runtime stack is needed."""
+    try:
+        from abstractruntime.workflow_bundle import workflow_bundle_manifest_to_dict
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "Workflow bundle commands require the runtime stack. "
+            'Install with: pip install "abstractflow[runtime]" '
+            '(or one host profile: "abstractflow[all-apple]", "abstractflow[all-gpu]").'
+        ) from exc
+
+    from .workflow_bundle import inspect_workflow_bundle, pack_workflow_bundle, unpack_workflow_bundle
+
+    return inspect_workflow_bundle, pack_workflow_bundle, unpack_workflow_bundle, workflow_bundle_manifest_to_dict
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -73,6 +93,14 @@ def main(args: Optional[List[str]] = None) -> int:
         ns = parser.parse_args(args)
 
         if ns.command == "bundle":
+            try:
+                inspect_workflow_bundle, pack_workflow_bundle, unpack_workflow_bundle, workflow_bundle_manifest_to_dict = (
+                    _load_workflow_bundle_tools()
+                )
+            except RuntimeError as e:
+                sys.stderr.write(str(e) + "\n")
+                return 2
+
             if ns.bundle_cmd == "pack":
                 packed = pack_workflow_bundle(
                     root_flow_json=ns.root,
@@ -103,7 +131,7 @@ def main(args: Optional[List[str]] = None) -> int:
             except Exception:
                 sys.stderr.write(
                     "Server dependencies are not installed.\n"
-                    "Install with: pip install \"abstractflow[server]\"\n"
+                    "Install with: pip install \"abstractflow[all-apple]\" or \"abstractflow[all-gpu]\".\n"
                 )
                 return 2
 
@@ -114,21 +142,34 @@ def main(args: Optional[List[str]] = None) -> int:
                 sys.stderr.write(
                     "Failed to import the Visual Editor backend.\n"
                     f"Error: {e}\n"
-                    "Install with: pip install \"abstractflow[server]\"\n"
+                    "Install with: pip install \"abstractflow[all-apple]\" or \"abstractflow[all-gpu]\".\n"
                 )
                 return 2
 
             if bool(getattr(ns, "monitor_gpu", False)):
                 os.environ["ABSTRACTFLOW_MONITOR_GPU"] = "1"
 
-            gateway_url, gateway_token = require_gateway_connection(
-                gateway_url=getattr(ns, "gateway_url", None),
-                gateway_token=getattr(ns, "gateway_token", None),
-            )
-            os.environ["ABSTRACTGATEWAY_URL"] = resolve_gateway_url(gateway_url)
-            os.environ["ABSTRACTFLOW_GATEWAY_URL"] = resolve_gateway_url(gateway_url)
-            os.environ["ABSTRACTGATEWAY_AUTH_TOKEN"] = resolve_gateway_token(gateway_token)
-            os.environ["ABSTRACTFLOW_GATEWAY_AUTH_TOKEN"] = resolve_gateway_token(gateway_token)
+            local_mode = local_runtime_enabled()
+            if local_mode:
+                print("Running in local runtime compatibility mode (ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1).")
+            else:
+                gateway_url, gateway_token = require_gateway_connection(
+                    gateway_url=getattr(ns, "gateway_url", None),
+                    gateway_token=getattr(ns, "gateway_token", None),
+                )
+                require_gateway_connectivity(
+                    gateway_url=gateway_url,
+                    gateway_token=gateway_token,
+                )
+                os.environ["ABSTRACTGATEWAY_URL"] = resolve_gateway_url(gateway_url)
+                os.environ["ABSTRACTFLOW_GATEWAY_URL"] = resolve_gateway_url(gateway_url)
+                os.environ["ABSTRACTGATEWAY_AUTH_TOKEN"] = resolve_gateway_token(gateway_token)
+
+            if getattr(ns, "gateway_url", None):
+                os.environ["ABSTRACTGATEWAY_URL"] = resolve_gateway_url(getattr(ns, "gateway_url", None))
+                os.environ["ABSTRACTFLOW_GATEWAY_URL"] = resolve_gateway_url(getattr(ns, "gateway_url", None))
+            if getattr(ns, "gateway_token", None):
+                os.environ["ABSTRACTGATEWAY_AUTH_TOKEN"] = resolve_gateway_token(getattr(ns, "gateway_token", None))
 
             uvicorn.run(
                 "backend.main:app",

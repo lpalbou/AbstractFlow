@@ -8,11 +8,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { RunSummary } from '../types/flow';
 import { extractFlowIdFromWorkflowId, mapGatewayRunSummary } from '../utils/gatewayRuns';
+import { endpointFromDescriptor, gatewayJson, type GatewayContracts } from '../utils/gatewayClient';
 
 interface RunHistoryModalProps {
   isOpen: boolean;
   workflowId: string;
   workflowName?: string;
+  gatewayContracts?: GatewayContracts | null;
   onClose: () => void;
   onSelectRun: (runId: string) => void;
 }
@@ -25,7 +27,11 @@ function sanitizeBundleId(raw: string): string {
   return s;
 }
 
-async function fetchRuns(workflowId: string, workflowName?: string): Promise<RunSummary[]> {
+async function fetchRuns(
+  workflowId: string,
+  workflowName?: string,
+  gatewayContracts?: GatewayContracts | null
+): Promise<RunSummary[]> {
   const fid = String(workflowId || '').trim();
   if (!fid) return [];
 
@@ -39,12 +45,14 @@ async function fetchRuns(workflowId: string, workflowName?: string): Promise<Run
     candidates.add(`${bundleId}:${fid}`);
   }
 
+  const runsListDescriptor = gatewayContracts?.common?.runs?.list || gatewayContracts?.flow_editor?.runs?.list;
+
   const all: RunSummary[] = [];
   for (const wid of candidates) {
-    const qs = new URLSearchParams({ limit: '500', root_only: 'true', workflow_id: wid });
-    const res = await fetch(`/api/gateway/runs?${qs.toString()}`);
-    if (!res.ok) continue;
-    const payload = (await res.json()) as { items?: Record<string, unknown>[] };
+    const payload = await gatewayJson<{ items?: Record<string, unknown>[] }>(
+      endpointFromDescriptor(runsListDescriptor, '/api/gateway/runs', {}, { limit: 500, root_only: true, workflow_id: wid })
+    ).catch(() => null);
+    if (!payload) continue;
     const items = Array.isArray(payload.items) ? payload.items : [];
     const mapped = items.map(mapGatewayRunSummary);
     all.push(...mapped);
@@ -52,16 +60,14 @@ async function fetchRuns(workflowId: string, workflowName?: string): Promise<Run
 
   // Fallback: fetch recent root runs and filter by flow id suffix.
   try {
-    const qs = new URLSearchParams({ limit: '500', root_only: 'true' });
-    const res = await fetch(`/api/gateway/runs?${qs.toString()}`);
-    if (res.ok) {
-      const payload = (await res.json()) as { items?: Record<string, unknown>[] };
-      const items = Array.isArray(payload.items) ? payload.items : [];
-      const mapped = items.map(mapGatewayRunSummary);
-      for (const r of mapped) {
-        if (extractFlowIdFromWorkflowId(r.workflow_id) === fid) {
-          all.push(r);
-        }
+    const payload = await gatewayJson<{ items?: Record<string, unknown>[] }>(
+      endpointFromDescriptor(runsListDescriptor, '/api/gateway/runs', {}, { limit: 500, root_only: true })
+    );
+    const items = Array.isArray(payload.items) ? payload.items : [];
+    const mapped = items.map(mapGatewayRunSummary);
+    for (const r of mapped) {
+      if (extractFlowIdFromWorkflowId(r.workflow_id) === fid) {
+        all.push(r);
       }
     }
   } catch {
@@ -85,7 +91,7 @@ function formatRunTime(iso?: string | null): string {
   return d.toLocaleString();
 }
 
-export function RunHistoryModal({ isOpen, workflowId, workflowName, onClose, onSelectRun }: RunHistoryModalProps) {
+export function RunHistoryModal({ isOpen, workflowId, workflowName, gatewayContracts, onClose, onSelectRun }: RunHistoryModalProps) {
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -96,7 +102,7 @@ export function RunHistoryModal({ isOpen, workflowId, workflowName, onClose, onS
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchRuns(workflowId, workflowName);
+      const data = await fetchRuns(workflowId, workflowName, gatewayContracts);
       setRuns(Array.isArray(data) ? data : []);
     } catch (e) {
       setRuns([]);
@@ -104,7 +110,7 @@ export function RunHistoryModal({ isOpen, workflowId, workflowName, onClose, onS
     } finally {
       setLoading(false);
     }
-  }, [workflowId]);
+  }, [gatewayContracts, workflowId, workflowName]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -204,7 +210,4 @@ export function RunHistoryModal({ isOpen, workflowId, workflowName, onClose, onS
 }
 
 export default RunHistoryModal;
-
-
-
 

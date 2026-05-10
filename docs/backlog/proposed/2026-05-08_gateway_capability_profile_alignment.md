@@ -13,7 +13,7 @@ ledger/history/artifact streams.
 
 Gateway now has clear Python install profiles:
 
-- `abstractgateway[server]`: lightweight remote/server deployment.
+- `abstractgateway[http]`: lightweight remote/server deployment.
 - `abstractgateway[apple]` / `abstractgateway[all-apple]`: full native Apple deployment.
 - `abstractgateway[gpu]` / `abstractgateway[all-gpu]`: full native GPU deployment.
 - Docker remains limited to the lightweight server image and the explicit NVIDIA server image.
@@ -32,7 +32,7 @@ Make Gateway discovery the source of truth for Flow authoring UX:
   memory/KG readiness, prompt-cache support, tool inventory, and workspace policy from
   `/api/gateway/discovery/capabilities` and related Gateway catalog routes;
 - show node controls only when the connected Gateway advertises the corresponding contract;
-- keep `abstractflow[editor]` as a UI/proxy install profile, not a local execution aggregate;
+- keep `abstractflow[all-apple]` / `abstractflow[all-gpu]` as UI/proxy install profiles, not a local execution aggregate;
 - document that local hardware setup belongs to `abstractgateway[apple]` or `abstractgateway[gpu]`,
   not to Flow.
 
@@ -92,7 +92,7 @@ memory, or prompt-cache controls in the editor.
 
 - UI contract tests with Gateway capability fixtures for lightweight, Apple, and GPU profiles.
 - Regression test that missing Gateway capability fields hide or disable the relevant node controls.
-- Manual smoke: connect Flow to `abstractgateway[server]` and verify no local-only controls are
+- Manual smoke: connect Flow to `abstractgateway[http]` and verify no local-only controls are
   advertised as runnable.
 
 ## Guidance For Implementing Agents

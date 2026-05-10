@@ -21,6 +21,51 @@ import { useExecutionWorkspace } from '../hooks/useExecutionWorkspace';
 import { RunSwitcherDropdown } from './RunSwitcherDropdown';
 import { JsonViewer } from './JsonViewer';
 import { KgActiveMemoryPanel } from './KgActiveMemoryPanel';
+import {
+  endpointFromDescriptor,
+  descriptorEndpointAvailable,
+  gatewayJson,
+  gatewayPath,
+  jsonRequest,
+  type GatewayContracts,
+  type GatewayEndpointDescriptor,
+} from '../utils/gatewayClient';
+
+type FlowGraphNode = {
+  id: string;
+  data?: Record<string, unknown> & {
+    nodeType?: string;
+    label?: string;
+    effectConfig?: Record<string, unknown>;
+    agentConfig?: Record<string, unknown>;
+    pinDefaults?: Record<string, unknown>;
+    literalValue?: unknown;
+  };
+};
+
+type FlowGraphEdge = {
+  source?: string | null;
+  target?: string | null;
+  sourceHandle?: string | null;
+  targetHandle?: string | null;
+};
+
+type PromptCacheGraphTarget =
+  | {
+      provider: string;
+      model: string;
+      source: 'graph';
+      label?: string;
+      count: number;
+      multiple: false;
+    }
+  | {
+      provider: '';
+      model: '';
+      source: 'graph';
+      count: number;
+      multiple: true;
+    };
 
 interface RunFlowModalProps {
   isOpen: boolean;
@@ -51,6 +96,7 @@ interface RunFlowModalProps {
   runSummary?: RunSummary | null;
   stableSessionId?: string;
   threadRootRunId?: string;
+  gatewayContracts?: GatewayContracts | null;
 }
 
 type JsonParseResult<T> =
@@ -77,12 +123,187 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((v) => typeof v === 'string');
 }
 
+function pickNonEmptyString(value: unknown): string {
+  return typeof value === 'string' && value.trim() ? value.trim() : '';
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
 function stringifyJson(value: unknown): string {
   try {
     return JSON.stringify(value, null, 2);
   } catch {
     return '';
   }
+}
+
+function isExecutionHandle(value: unknown): boolean {
+  const handle = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  return handle.includes('exec');
+}
+
+function reachableExecutionNodeIds(nodes: FlowGraphNode[], edges: FlowGraphEdge[]): Set<string> {
+  const starts = nodes
+    .filter((n) => {
+      const nodeType = pickNonEmptyString(n.data?.nodeType);
+      return nodeType ? isEntryNodeType(nodeType as Parameters<typeof isEntryNodeType>[0]) : false;
+    })
+    .map((n) => n.id);
+  if (starts.length === 0 && nodes[0]?.id) starts.push(nodes[0].id);
+
+  const bySource = new Map<string, FlowGraphEdge[]>();
+  for (const edge of edges) {
+    const source = pickNonEmptyString(edge.source);
+    const target = pickNonEmptyString(edge.target);
+    if (!source || !target) continue;
+    if (!isExecutionHandle(edge.sourceHandle) && !isExecutionHandle(edge.targetHandle)) continue;
+    const list = bySource.get(source) || [];
+    list.push(edge);
+    bySource.set(source, list);
+  }
+
+  const seen = new Set<string>();
+  const queue = [...starts];
+  while (queue.length > 0) {
+    const id = queue.shift();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    for (const edge of bySource.get(id) || []) {
+      const target = pickNonEmptyString(edge.target);
+      if (target && !seen.has(target)) queue.push(target);
+    }
+  }
+  return seen;
+}
+
+function inferConnectedPinDefault(
+  nodeId: string,
+  pinId: 'provider' | 'model',
+  nodesById: Map<string, FlowGraphNode>,
+  edges: FlowGraphEdge[]
+): string {
+  for (const edge of edges) {
+    if (edge.target !== nodeId || edge.targetHandle !== pinId) continue;
+    const sourceId = pickNonEmptyString(edge.source);
+    if (!sourceId) continue;
+    const source = nodesById.get(sourceId);
+    const data = source?.data;
+    if (!data) continue;
+    const sourceHandle = pickNonEmptyString(edge.sourceHandle) || pinId;
+
+    const pinDefaults = isRecord(data.pinDefaults) ? data.pinDefaults : null;
+    const fromDefault = pinDefaults ? pickNonEmptyString(pinDefaults[sourceHandle]) : '';
+    if (fromDefault) return fromDefault;
+
+    const literalValue = data.literalValue;
+    const literalString = pickNonEmptyString(literalValue);
+    if (literalString) return literalString;
+    if (isRecord(literalValue)) {
+      const fromDefaultKey = pickNonEmptyString(literalValue.default);
+      if (fromDefaultKey) return fromDefaultKey;
+      const fromHandle = pickNonEmptyString(literalValue[sourceHandle]);
+      if (fromHandle) return fromHandle;
+    }
+  }
+  return '';
+}
+
+function inferPromptCacheGraphTarget(nodes: FlowGraphNode[], edges: FlowGraphEdge[]): PromptCacheGraphTarget | null {
+  const nodesById = new Map(nodes.map((n) => [n.id, n] as const));
+  const reachable = reachableExecutionNodeIds(nodes, edges);
+  const useReachable = reachable.size > 0;
+  const pairs = new Map<string, { provider: string; model: string; label?: string; count: number }>();
+
+  for (const node of nodes) {
+    if (useReachable && !reachable.has(node.id)) continue;
+    const data = node.data;
+    const nodeType = pickNonEmptyString(data?.nodeType);
+    const cfg =
+      nodeType === 'agent'
+        ? data?.agentConfig
+        : nodeType === 'llm_call' || nodeType === 'memory_compact'
+          ? data?.effectConfig
+          : null;
+    if (!cfg) continue;
+
+    const provider = pickNonEmptyString(cfg.provider) || inferConnectedPinDefault(node.id, 'provider', nodesById, edges);
+    const model = pickNonEmptyString(cfg.model) || inferConnectedPinDefault(node.id, 'model', nodesById, edges);
+    if (!provider || !model) continue;
+
+    const normalizedProvider = provider.toLowerCase();
+    const key = `${normalizedProvider}\x1f${model}`;
+    const existing = pairs.get(key);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      pairs.set(key, {
+        provider: normalizedProvider,
+        model,
+        label: pickNonEmptyString(data?.label) || node.id,
+        count: 1,
+      });
+    }
+  }
+
+  if (pairs.size === 0) return null;
+  if (pairs.size > 1) return { provider: '', model: '', source: 'graph', count: pairs.size, multiple: true };
+  const only = Array.from(pairs.values())[0];
+  return { ...only, source: 'graph', multiple: false };
+}
+
+type GeneratedImagePreview = {
+  artifactId: string;
+  src: string;
+  contentType?: string;
+  prompt?: string;
+  provider?: string;
+  model?: string;
+  width?: number;
+  height?: number;
+  format?: string;
+};
+
+function extractGeneratedImagePreview(
+  value: unknown,
+  runId: string | null,
+  artifactContentDescriptor?: GatewayEndpointDescriptor | string | null
+): GeneratedImagePreview | null {
+  if (!runId || !value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const obj = value as Record<string, unknown>;
+  const name = typeof obj.name === 'string' ? obj.name : '';
+  const payloadRaw = obj.payload && typeof obj.payload === 'object' && !Array.isArray(obj.payload)
+    ? (obj.payload as Record<string, unknown>)
+    : obj;
+  const imageRaw = payloadRaw.image_artifact && typeof payloadRaw.image_artifact === 'object' && !Array.isArray(payloadRaw.image_artifact)
+    ? (payloadRaw.image_artifact as Record<string, unknown>)
+    : null;
+  if (name && name !== 'abstract.media.image.generated' && !imageRaw) return null;
+  if (!imageRaw) return null;
+  const artifactId =
+    (typeof imageRaw.artifact_id === 'string' && imageRaw.artifact_id.trim()) ||
+    (typeof imageRaw.$artifact === 'string' && imageRaw.$artifact.trim()) ||
+    '';
+  if (!artifactId) return null;
+  return {
+    artifactId,
+    src: endpointFromDescriptor(
+      artifactContentDescriptor,
+      '/api/gateway/runs/{run_id}/artifacts/{artifact_id}/content',
+      {
+        run_id: runId,
+        artifact_id: artifactId,
+      }
+    ),
+    contentType: typeof imageRaw.content_type === 'string' ? imageRaw.content_type : undefined,
+    prompt: typeof payloadRaw.prompt === 'string' ? payloadRaw.prompt : undefined,
+    provider: typeof payloadRaw.provider === 'string' ? payloadRaw.provider : undefined,
+    model: typeof payloadRaw.model === 'string' ? payloadRaw.model : undefined,
+    width: typeof payloadRaw.width === 'number' ? payloadRaw.width : undefined,
+    height: typeof payloadRaw.height === 'number' ? payloadRaw.height : undefined,
+    format: typeof payloadRaw.format === 'string' ? payloadRaw.format : undefined,
+  };
 }
 
 function MinimizeWindowIcon({ size = 18 }: { size?: number }) {
@@ -309,6 +530,7 @@ export function RunFlowModal({
   runSummary = null,
   stableSessionId,
   threadRootRunId,
+  gatewayContracts = null,
 }: RunFlowModalProps) {
   const { nodes, edges, flowName, flowId, lastLoopProgress, loopProgressByNodeId } = useFlowStore();
 
@@ -386,6 +608,10 @@ export function RunFlowModal({
   const [followUpError, setFollowUpError] = useState<string | null>(null);
   const [followUpSubmitting, setFollowUpSubmitting] = useState(false);
   const [followUpDragActive, setFollowUpDragActive] = useState(false);
+  const [promptCacheBusy, setPromptCacheBusy] = useState(false);
+  const [promptCacheResult, setPromptCacheResult] = useState<Record<string, unknown> | null>(null);
+  const [promptCacheError, setPromptCacheError] = useState<string | null>(null);
+  const [promptCacheRuntimeHint, setPromptCacheRuntimeHint] = useState<Record<string, unknown> | null>(null);
 
   const sessionPinId = useMemo(() => {
     const pin = formInputPins.find((p) => p.id === 'session_id' || p.id === 'sessionId');
@@ -412,6 +638,68 @@ export function RunFlowModal({
   const selectedProvider = useMemo(() => {
     return providerPinId ? (formValues[providerPinId] || '') : '';
   }, [formValues, providerPinId]);
+
+  const modelPinId = useMemo(() => {
+    const pin = formInputPins.find((p) => p.type === 'model' || p.id === 'model');
+    return pin?.id || null;
+  }, [formInputPins]);
+
+  const selectedModel = useMemo(() => {
+    return modelPinId ? (formValues[modelPinId] || '') : '';
+  }, [formValues, modelPinId]);
+
+  const promptCacheGraphTarget = useMemo(
+    () => inferPromptCacheGraphTarget(nodes as unknown as FlowGraphNode[], edges as unknown as FlowGraphEdge[]),
+    [edges, nodes]
+  );
+
+  const promptCacheSessionLifecycle = gatewayContracts?.common?.prompt_cache?.session_lifecycle === true;
+  const promptCacheSessionEndpoints = gatewayContracts?.common?.prompt_cache?.session_endpoints || {};
+  const runInputDataDescriptor = gatewayContracts?.common?.runs?.input_data || gatewayContracts?.flow_editor?.runs?.input_data;
+  const strictGatewayContract = Boolean(
+    gatewayContracts && typeof gatewayContracts.version === 'number' && gatewayContracts.version >= 1
+  );
+  const artifactMetadataDescriptor =
+    gatewayContracts?.common?.artifacts?.metadata || gatewayContracts?.flow_editor?.artifacts?.metadata;
+  const artifactContentDescriptor =
+    gatewayContracts?.common?.artifacts?.content || gatewayContracts?.flow_editor?.artifacts?.content;
+  const kgMemoryDescriptor = gatewayContracts?.common?.memory;
+  const kgMemoryAvailable = descriptorEndpointAvailable(kgMemoryDescriptor);
+  const promptCacheProvider = (
+    selectedProvider.trim() ||
+    (promptCacheGraphTarget && !promptCacheGraphTarget.multiple ? promptCacheGraphTarget.provider : '')
+  ).toLowerCase();
+  const promptCacheModel =
+    selectedModel.trim() ||
+    (promptCacheGraphTarget && !promptCacheGraphTarget.multiple ? promptCacheGraphTarget.model : '');
+  const promptCacheGraphAmbiguous = Boolean(promptCacheGraphTarget?.multiple);
+  const promptCacheSessionIdRaw = sessionPinId ? formValues[sessionPinId] : sessionIdOverride;
+  const promptCacheSessionId = String(promptCacheSessionIdRaw || '').trim() || derivedSessionId;
+  const promptCacheEnabled = Boolean(promptCacheSessionLifecycle && promptCacheProvider && promptCacheModel && promptCacheSessionId);
+  const promptCacheResultUnavailable = Boolean(
+    promptCacheResult && (promptCacheResult.ok === false || promptCacheResult.supported === false)
+  );
+  const promptCacheHeaderStatus = (() => {
+    if (promptCacheResultUnavailable) return String(promptCacheResult?.mode || promptCacheResult?.code || 'unavailable');
+    if (promptCacheRuntimeHint) return 'ready';
+    if (promptCacheResult) return String(promptCacheResult.mode || promptCacheResult.code || 'checked');
+    if (promptCacheGraphTarget && !promptCacheGraphTarget.multiple) return 'configured';
+    return 'session';
+  })();
+  const promptCacheSelectionNote =
+    !promptCacheProvider || !promptCacheModel
+      ? promptCacheGraphAmbiguous
+        ? 'Multiple LLM provider/model pairs are configured; select provider and model to manage a session cache.'
+        : 'Select provider and model to manage a session cache.'
+      : !promptCacheSessionId
+        ? 'Set a session id to manage a session cache.'
+        : '';
+  const promptCacheResultMessage =
+    promptCacheResult && typeof promptCacheResult.error === 'string' && promptCacheResult.error.trim()
+      ? promptCacheResult.error.trim()
+      : promptCacheResult && typeof promptCacheResult.hint === 'string' && promptCacheResult.hint.trim()
+        ? promptCacheResult.hint.trim()
+        : '';
 
   const wantProviderDropdown = Boolean(isOpen && formInputPins.some((p) => p.type === 'provider' || p.id === 'provider'));
   const wantModelDropdown = Boolean(isOpen && formInputPins.some((p) => p.type === 'model' || p.id === 'model'));
@@ -505,6 +793,12 @@ export function RunFlowModal({
   useEffect(() => {
     if (isOpen) setIsMinimized(false);
   }, [isOpen]);
+
+  useEffect(() => {
+    setPromptCacheResult(null);
+    setPromptCacheError(null);
+    setPromptCacheRuntimeHint(null);
+  }, [flowId, promptCacheModel, promptCacheProvider, promptCacheSessionId]);
 
   // When "Random" is enabled, the gateway will generate a workspace on run start.
 
@@ -622,6 +916,66 @@ export function RunFlowModal({
     [manualWorkspaceRoot]
   );
 
+  const buildPromptCachePayload = useCallback(() => {
+    return {
+      provider: promptCacheProvider,
+      model: promptCacheModel,
+      flow_id: flowId || undefined,
+      template_id: flowName || flowId || undefined,
+      make_default: false,
+      version: 1,
+    };
+  }, [flowId, flowName, promptCacheModel, promptCacheProvider]);
+
+  const runPromptCacheOperation = useCallback(
+    async (operation: 'status' | 'prepare' | 'clear' | 'rebuild') => {
+      if (!promptCacheEnabled) return;
+      const sessionId = promptCacheSessionId.trim();
+      const endpoint =
+        operation === 'status'
+          ? promptCacheSessionEndpoints.status || '/api/gateway/sessions/{session_id}/prompt_cache/status'
+          : operation === 'prepare'
+            ? promptCacheSessionEndpoints.prepare || '/api/gateway/sessions/{session_id}/prompt_cache/prepare'
+            : operation === 'clear'
+              ? promptCacheSessionEndpoints.clear || '/api/gateway/sessions/{session_id}/prompt_cache/clear'
+              : promptCacheSessionEndpoints.rebuild || '/api/gateway/sessions/{session_id}/prompt_cache/rebuild';
+      const payload = buildPromptCachePayload();
+      setPromptCacheBusy(true);
+      setPromptCacheError(null);
+      try {
+        const data =
+          operation === 'status'
+            ? await gatewayJson<Record<string, unknown>>(
+                gatewayPath(endpoint, { session_id: sessionId }, {
+                  provider: payload.provider,
+                  model: payload.model,
+                  flow_id: payload.flow_id,
+                  template_id: payload.template_id,
+                  version: payload.version,
+                })
+              )
+            : await gatewayJson<Record<string, unknown>>(
+                gatewayPath(endpoint, { session_id: sessionId }),
+                jsonRequest(payload, { method: 'POST' })
+              );
+        setPromptCacheResult(data);
+        const hint = data.runtime_hint && typeof data.runtime_hint === 'object' && !Array.isArray(data.runtime_hint)
+          ? (data.runtime_hint as Record<string, unknown>)
+          : null;
+        if (operation === 'clear') {
+          setPromptCacheRuntimeHint(null);
+        } else if (hint) {
+          setPromptCacheRuntimeHint(hint);
+        }
+      } catch (e) {
+        setPromptCacheError(e instanceof Error ? e.message : 'Prompt cache request failed');
+      } finally {
+        setPromptCacheBusy(false);
+      }
+    },
+    [buildPromptCachePayload, promptCacheEnabled, promptCacheSessionEndpoints, promptCacheSessionId]
+  );
+
   // Submit the form
   const handleSubmit = useCallback(() => {
     // Build input data from form values
@@ -686,6 +1040,10 @@ export function RunFlowModal({
       inputData.sessionId = sessionId;
     }
 
+    if (promptCacheRuntimeHint) {
+      Object.assign(inputData, promptCacheRuntimeHint);
+    }
+
     if (followUpContext?.messages?.length) {
       const existingContextRaw = inputData.context;
       const existingContext =
@@ -712,6 +1070,7 @@ export function RunFlowModal({
     sessionIdOverride,
     sessionPinId,
     derivedSessionId,
+    promptCacheRuntimeHint,
   ]);
 
   type StepStatus = 'running' | 'completed' | 'waiting' | 'failed';
@@ -1352,11 +1711,30 @@ export function RunFlowModal({
       return;
     }
     let cancelled = false;
+    const hasInputDataDescriptor = descriptorEndpointAvailable(runInputDataDescriptor);
+    const inputDataEndpoint = (() => {
+      if (hasInputDataDescriptor) {
+        return endpointFromDescriptor(runInputDataDescriptor, '/api/gateway/runs/{run_id}/input_data', { run_id: rootRunId });
+      }
+      if (strictGatewayContract) {
+        console.warn('Gateway contract requires runs.input_data for run rehydration; endpoint is not advertised.');
+        return '';
+      }
+      console.warn(
+        '#FALLBACK: runs.input_data descriptor missing in discovery; using legacy canonical route for run detail rehydration compatibility.'
+      );
+      return gatewayPath('/api/gateway/runs/{run_id}/input_data', { run_id: rootRunId });
+    })();
     (async () => {
+      if (!inputDataEndpoint) {
+        if (!cancelled) {
+          setStartInputData(null);
+          setStartInputDefaults(null);
+        }
+        return;
+      }
       try {
-        const res = await fetch(`/api/gateway/runs/${encodeURIComponent(rootRunId)}/input_data`);
-        if (!res.ok) throw new Error(await res.text());
-        const payload = (await res.json()) as Record<string, unknown>;
+        const payload = await gatewayJson<Record<string, unknown>>(inputDataEndpoint);
         let inputData: Record<string, unknown> | null = null;
         let workspace: Record<string, unknown> | null = null;
         if (payload && typeof payload === 'object') {
@@ -1388,7 +1766,7 @@ export function RunFlowModal({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, rootRunId]);
+  }, [isOpen, rootRunId, runInputDataDescriptor, strictGatewayContract]);
 
   // Map (parentRunId:nodeId[:stepId]) -> sub_run_id for subworkflow waits, so the UI can show
   // child run steps even before the parent subflow node completes.
@@ -1892,6 +2270,11 @@ export function RunFlowModal({
     if (selectedStep.nodeType === 'agent') return derivedAgentOutput;
     return null;
   }, [derivedAgentOutput, selectedStep]);
+
+  const generatedImagePreview = useMemo(
+    () => extractGeneratedImagePreview(resolvedStepOutput, selectedStep?.runId || rootRunId || null, artifactContentDescriptor),
+    [artifactContentDescriptor, resolvedStepOutput, rootRunId, selectedStep?.runId]
+  );
 
   const computedFinalResult = useMemo(() => {
     if (steps.length === 0) return null;
@@ -2639,11 +3022,13 @@ export function RunFlowModal({
     (async () => {
       const fetched = await Promise.all(
         artifactIds.map(async (aid) => {
-          const res = await fetch(
-            `/api/gateway/runs/${encodeURIComponent(rootRunId)}/artifacts/${encodeURIComponent(aid)}`
+          return gatewayJson<{ artifact_id: string; payload: unknown }>(
+            endpointFromDescriptor(
+              artifactMetadataDescriptor,
+              '/api/gateway/runs/{run_id}/artifacts/{artifact_id}',
+              { run_id: rootRunId, artifact_id: aid }
+            )
           );
-          if (!res.ok) throw new Error(`Failed to fetch artifact ${aid} (HTTP ${res.status})`);
-          return res.json() as Promise<{ artifact_id: string; payload: unknown }>;
         })
       );
 
@@ -2703,7 +3088,7 @@ export function RunFlowModal({
     return () => {
       cancelled = true;
     };
-  }, [formatValue, isOpen, recallIntoContextArtifacts, rootRunId, selectedStep]);
+  }, [artifactMetadataDescriptor, formatValue, isOpen, recallIntoContextArtifacts, rootRunId, selectedStep]);
 
   const recallIntoContextDisplay = rehydrateArtifactMarkdown || recallIntoContextPreview;
 
@@ -2739,6 +3124,7 @@ export function RunFlowModal({
     const hasPreviewBlocks =
       Boolean(memorizeContentPreview) ||
       Boolean(recallIntoContextDisplay) ||
+      Boolean(generatedImagePreview) ||
       (selectedStep.nodeType === 'on_flow_start' && Boolean(onFlowStartParams)) ||
       Boolean(outputPreview?.task) ||
       Boolean(outputPreview?.benchmark) ||
@@ -2748,7 +3134,7 @@ export function RunFlowModal({
       Boolean(outputPreview?.model) ||
       outputPreview?.scratchpad != null;
     return !hasPreviewBlocks;
-  }, [memorizeContentPreview, onFlowStartParams, outputPreview, recallIntoContextDisplay, resolvedStepOutput, selectedStep]);
+  }, [generatedImagePreview, memorizeContentPreview, onFlowStartParams, outputPreview, recallIntoContextDisplay, resolvedStepOutput, selectedStep]);
 
   const lastRawJsonStepIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -2917,7 +3303,12 @@ export function RunFlowModal({
           </div>
           <div className="run-modal-header-right">
             {flowId && onSelectRunId ? (
-              <RunSwitcherDropdown workflowId={flowId} currentRunId={rootRunId} onSelectRun={onSelectRunId} />
+              <RunSwitcherDropdown
+                workflowId={flowId}
+                currentRunId={rootRunId}
+                gatewayContracts={gatewayContracts}
+                onSelectRun={onSelectRunId}
+              />
             ) : null}
             <button
               type="button"
@@ -3343,6 +3734,7 @@ export function RunFlowModal({
                       {(outputPreview ||
                         memorizeContentPreview ||
                         recallIntoContextDisplay ||
+                        generatedImagePreview ||
                         (selectedStep?.nodeType === 'on_flow_start' && onFlowStartParams) ||
                         (selectedStep?.nodeType === 'memory_kg_query' && selectedStep.output != null)) ? (
                         <div className="run-output-preview">
@@ -3456,6 +3848,44 @@ export function RunFlowModal({
                               ) : (
                                 <div className="run-details-empty">No preview available.</div>
                               )}
+                            </div>
+                          ) : null}
+
+                          {generatedImagePreview ? (
+                            <div className="run-output-section">
+                              <div className="run-output-title">Generated image</div>
+                              <div className="run-generated-image">
+                                <img
+                                  src={generatedImagePreview.src}
+                                  alt={generatedImagePreview.prompt || generatedImagePreview.artifactId}
+                                  className="run-generated-image-img"
+                                />
+                                <div className="run-output-meta">
+                                  {generatedImagePreview.prompt ? (
+                                    <div>
+                                      <span className="run-output-meta-key">Prompt</span>
+                                      <span className="run-output-meta-val">{generatedImagePreview.prompt}</span>
+                                    </div>
+                                  ) : null}
+                                  {(generatedImagePreview.provider || generatedImagePreview.model) ? (
+                                    <div>
+                                      <span className="run-output-meta-key">Model</span>
+                                      <span className="run-output-meta-val">
+                                        {generatedImagePreview.provider ? (
+                                          <span className="run-metric-badge metric-provider">{generatedImagePreview.provider}</span>
+                                        ) : null}
+                                        {generatedImagePreview.model ? (
+                                          <span className="run-metric-badge metric-model">{generatedImagePreview.model}</span>
+                                        ) : null}
+                                      </span>
+                                    </div>
+                                  ) : null}
+                                  <div>
+                                    <span className="run-output-meta-key">Artifact</span>
+                                    <span className="run-output-meta-val">{generatedImagePreview.artifactId}</span>
+                                  </div>
+                                </div>
+                              </div>
                             </div>
                           ) : null}
 
@@ -3637,13 +4067,14 @@ export function RunFlowModal({
                             </div>
                           ) : null}
 
-                          {selectedStep?.nodeType === 'memory_kg_query' && selectedStep.output != null ? (
+                          {selectedStep?.nodeType === 'memory_kg_query' && selectedStep.output != null && kgMemoryAvailable ? (
                             <div className="run-output-section">
                               <div className="run-output-title">KG / Active Memory Explorer</div>
                               <KgActiveMemoryPanel
                                 runId={rootRunId || null}
                                 title={selectedStep.nodeLabel || selectedStep.nodeId || 'KG'}
                                 output={selectedStep.output}
+                                queryEndpoint={kgMemoryDescriptor}
                               />
                             </div>
                           ) : null}
@@ -4079,6 +4510,81 @@ export function RunFlowModal({
                         })}
                       </div>
                     </div>
+
+                    {promptCacheSessionLifecycle ? (
+                      <details className="run-form-section">
+                        <summary className="run-form-section-summary">
+                          <span className="run-form-section-title">Prompt Cache</span>
+                          <span className="run-form-section-meta">
+                            {promptCacheHeaderStatus}
+                          </span>
+                        </summary>
+                        <div className="run-form-section-body">
+                          <div className="run-form-inline run-prompt-cache-actions">
+                            <button
+                              type="button"
+                              className="modal-button"
+                              onClick={() => void runPromptCacheOperation('status')}
+                              disabled={!promptCacheEnabled || promptCacheBusy}
+                            >
+                              Status
+                            </button>
+                            <button
+                              type="button"
+                              className="modal-button"
+                              onClick={() => void runPromptCacheOperation('prepare')}
+                              disabled={!promptCacheEnabled || promptCacheBusy}
+                            >
+                              Prepare
+                            </button>
+                            <button
+                              type="button"
+                              className="modal-button cancel"
+                              onClick={() => void runPromptCacheOperation('clear')}
+                              disabled={!promptCacheEnabled || promptCacheBusy}
+                            >
+                              Clear
+                            </button>
+                            <button
+                              type="button"
+                              className="modal-button"
+                              onClick={() => void runPromptCacheOperation('rebuild')}
+                              disabled={!promptCacheEnabled || promptCacheBusy}
+                            >
+                              Rebuild
+                            </button>
+                          </div>
+                          {promptCacheSelectionNote ? <p className="run-form-note">{promptCacheSelectionNote}</p> : null}
+                          {promptCacheError ? <div className="run-details-error">{promptCacheError}</div> : null}
+                          {promptCacheResult ? (
+                            <div className="run-output-meta run-prompt-cache-meta">
+                              <div>
+                                <span className="run-output-meta-key">Mode</span>
+                                <span className="run-output-meta-val">{String(promptCacheResult.mode || 'unknown')}</span>
+                              </div>
+                              {typeof promptCacheResult.prompt_cache_key === 'string' ? (
+                                <div>
+                                  <span className="run-output-meta-key">Key</span>
+                                  <span className="run-output-meta-val">{promptCacheResult.prompt_cache_key}</span>
+                                </div>
+                              ) : null}
+                              {typeof promptCacheResult.code === 'string' ? (
+                                <div>
+                                  <span className="run-output-meta-key">Code</span>
+                                  <span className="run-output-meta-val">{promptCacheResult.code}</span>
+                                </div>
+                              ) : null}
+                              {promptCacheResultMessage ? (
+                                <div>
+                                  <span className="run-output-meta-key">Info</span>
+                                  <span className="run-output-meta-val">{promptCacheResultMessage}</span>
+                                </div>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </div>
+                      </details>
+                    ) : null}
 
                   </div>
                 </div>

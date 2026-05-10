@@ -9,6 +9,7 @@ import type { FlowNodeData, ProviderInfo, VisualFlow, Pin } from '../types/flow'
 import { isEntryNodeType } from '../types/flow';
 import { RECALL_LEVEL_OPTIONS } from '../types/recall';
 import { useFlowStore } from '../hooks/useFlow';
+import { useGatewayCapabilities, gatewayContractsFromCapabilities } from '../hooks/useGatewayCapabilities';
 import { useSemanticsRegistry } from '../hooks/useSemantics';
 import { CodeEditorModal } from './CodeEditorModal';
 import ProviderModelsPanel from './ProviderModelsPanel';
@@ -24,6 +25,7 @@ import {
   upsertPythonAvailableVariablesComments,
 } from '../utils/codegen';
 import { collectCustomEventNames } from '../utils/events';
+import { gatewayJson, gatewayPath, getGatewayFlowEditorReadiness } from '../utils/gatewayClient';
 import {
   AGENT_META_SCHEMA,
   AGENT_RESULT_SCHEMA,
@@ -190,6 +192,14 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     duplicateSelection,
   } = useFlowStore();
   const [showCodeEditor, setShowCodeEditor] = useState(false);
+  const gatewayCapabilitiesQuery = useGatewayCapabilities(true);
+  const gatewayContracts = gatewayContractsFromCapabilities(gatewayCapabilitiesQuery.data);
+  const gatewayReadiness = getGatewayFlowEditorReadiness(gatewayContracts);
+  const providerDiscoveryEndpoint = gatewayContracts?.common?.discovery?.providers || '';
+  const providerModelsEndpoint = gatewayContracts?.common?.discovery?.provider_models || '';
+  const toolsDiscoveryEndpoint = gatewayContracts?.common?.discovery?.tools || '';
+  const visualflowCollectionEndpoint = gatewayContracts?.flow_editor?.visualflows?.crud?.collection_endpoint || '';
+  const visualflowItemEndpoint = gatewayContracts?.flow_editor?.visualflows?.crud?.item_endpoint || '';
 
   // Provider/model state for agent nodes
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
@@ -268,11 +278,16 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     setAgentSchemaJsonError(null);
   }, [node?.id]);
 
-  // Fetch available providers on mount
+  // Fetch provider catalogs only after Gateway advertises the discovery route.
   useEffect(() => {
+    if (gatewayCapabilitiesQuery.isLoading) return;
+    if (!providerDiscoveryEndpoint || gatewayCapabilitiesQuery.isError) {
+      setProviders([]);
+      setLoadingProviders(false);
+      return;
+    }
     setLoadingProviders(true);
-    fetch('/api/gateway/discovery/providers')
-      .then((res) => res.json())
+    gatewayJson<{ items?: ProviderInfo[] }>(gatewayPath(providerDiscoveryEndpoint))
       .then((data) => {
         if (!Array.isArray(data?.items)) {
           console.warn('#FALLBACK: providers response missing items; using empty list');
@@ -281,14 +296,20 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       })
       .catch((err) => console.error('Failed to fetch providers:', err))
       .finally(() => setLoadingProviders(false));
-  }, []);
+  }, [gatewayCapabilitiesQuery.isError, gatewayCapabilitiesQuery.isLoading, providerDiscoveryEndpoint]);
 
-  // Fetch available tools for Agent nodes
+  // Fetch available tools only after Gateway advertises the discovery route.
   useEffect(() => {
+    if (gatewayCapabilitiesQuery.isLoading) return;
+    if (!toolsDiscoveryEndpoint || gatewayCapabilitiesQuery.isError) {
+      setToolSpecs([]);
+      setToolsError(null);
+      setLoadingTools(false);
+      return;
+    }
     setLoadingTools(true);
     setToolsError(null);
-    fetch('/api/gateway/discovery/tools')
-      .then((res) => res.json())
+    gatewayJson<{ items?: ToolSpec[] }>(gatewayPath(toolsDiscoveryEndpoint))
       .then((data) => {
         if (!Array.isArray(data?.items)) {
           console.warn('#FALLBACK: tools response missing items; using empty list');
@@ -317,7 +338,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         setToolSpecs([]);
       })
       .finally(() => setLoadingTools(false));
-  }, []);
+  }, [gatewayCapabilitiesQuery.isError, gatewayCapabilitiesQuery.isLoading, toolsDiscoveryEndpoint]);
 
   // Fetch models when provider changes (agent/llm_call nodes + IO defaults on start/end nodes).
   const selectedProvider = (() => {
@@ -341,12 +362,13 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       return;
     }
 
-    if (selectedProvider) {
+    if (selectedProvider && providerModelsEndpoint && !gatewayCapabilitiesQuery.isError) {
       lastFetchedProvider.current = selectedProvider;
       setLoadingModels(true);
       setModels([]);
-      fetch(`/api/gateway/discovery/providers/${encodeURIComponent(selectedProvider)}/models`)
-        .then((res) => res.json())
+      gatewayJson<{ models?: string[]; items?: string[] }>(
+        gatewayPath(providerModelsEndpoint, { provider_name: selectedProvider })
+      )
         .then((data) => {
           const models = Array.isArray(data?.models)
             ? data.models
@@ -364,14 +386,17 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       lastFetchedProvider.current = null;
       setModels([]);
     }
-  }, [selectedProvider]);
+  }, [gatewayCapabilitiesQuery.isError, providerModelsEndpoint, selectedProvider]);
 
   // Fetch saved flows when editing a subflow node
   useEffect(() => {
     if (!node || node.data.nodeType !== 'subflow') return;
+    if (!gatewayReadiness.operations.save.ready || !visualflowCollectionEndpoint) {
+      setSavedFlows([]);
+      return;
+    }
     setLoadingFlows(true);
-    fetch('/api/gateway/visualflows')
-      .then((res) => res.json())
+    gatewayJson<VisualFlow[]>(gatewayPath(visualflowCollectionEndpoint))
       .then((data) => {
         if (Array.isArray(data)) {
           setSavedFlows(
@@ -388,13 +413,14 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         setSavedFlows([]);
       })
       .finally(() => setLoadingFlows(false));
-  }, [node]);
+  }, [gatewayReadiness.operations.save.ready, node, visualflowCollectionEndpoint]);
 
   // Sync Subflow pins to match the selected child workflow IO
   useEffect(() => {
     if (!node || node.data.nodeType !== 'subflow') return;
     const subflowId = node.data.subflowId;
     if (!subflowId) return;
+    if (!gatewayReadiness.operations.save.ready || !visualflowItemEndpoint) return;
 
     const syncKey = `${node.id}:${subflowId}`;
     if (lastSyncedSubflowPins.current === syncKey) return;
@@ -425,8 +451,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
     const findFlowEndNode = (flow: VisualFlow) => flow.nodes.find((n) => n.type === 'on_flow_end');
 
-    fetch(`/api/gateway/visualflows/${encodeURIComponent(subflowId)}`)
-      .then((res) => res.json())
+    gatewayJson<VisualFlow>(gatewayPath(visualflowItemEndpoint, { flow_id: subflowId }))
       .then((flow: VisualFlow) => {
         const start = findFlowStartNode(flow);
         const end = findFlowEndNode(flow);
@@ -461,7 +486,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       .catch((err) => {
         console.error('Failed to sync subflow pins:', err);
       });
-  }, [node?.id, node?.data.subflowId, flowId, updateNodeData]);
+  }, [gatewayReadiness.operations.save.ready, node?.id, node?.data.subflowId, flowId, updateNodeData, visualflowItemEndpoint]);
 
   const handleProviderChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {

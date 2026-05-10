@@ -6,12 +6,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RunSummary } from '../types/flow';
 import { filterRunSummariesByFlowId, mapGatewayRunSummary } from '../utils/gatewayRuns';
+import { endpointFromDescriptor, gatewayJson, type GatewayContracts } from '../utils/gatewayClient';
 
-async function fetchRuns(workflowId: string): Promise<RunSummary[]> {
-  const qs = new URLSearchParams({ limit: '50' });
-  const res = await fetch(`/api/gateway/runs?${qs.toString()}`);
-  if (!res.ok) throw new Error(`Failed to list runs (HTTP ${res.status})`);
-  const payload = (await res.json()) as { items?: Record<string, unknown>[] };
+async function fetchRuns(workflowId: string, gatewayContracts?: GatewayContracts | null): Promise<RunSummary[]> {
+  const runsListDescriptor = gatewayContracts?.common?.runs?.list || gatewayContracts?.flow_editor?.runs?.list;
+  const payload = await gatewayJson<{ items?: Record<string, unknown>[] }>(
+    endpointFromDescriptor(runsListDescriptor, '/api/gateway/runs', {}, { limit: 50 })
+  );
   if (!Array.isArray(payload.items)) {
     console.warn('#FALLBACK: runs response missing items; treating as empty list');
   }
@@ -52,10 +53,12 @@ async function copyText(text: string): Promise<void> {
 export function RunSwitcherDropdown({
   workflowId,
   currentRunId,
+  gatewayContracts,
   onSelectRun,
 }: {
   workflowId: string;
   currentRunId: string | null;
+  gatewayContracts?: GatewayContracts | null;
   onSelectRun: (runId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -70,7 +73,7 @@ export function RunSwitcherDropdown({
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchRuns(workflowId);
+      const data = await fetchRuns(workflowId, gatewayContracts);
       setRuns(Array.isArray(data) ? data : []);
     } catch (e) {
       setRuns([]);
@@ -78,7 +81,7 @@ export function RunSwitcherDropdown({
     } finally {
       setLoading(false);
     }
-  }, [workflowId]);
+  }, [gatewayContracts, workflowId]);
 
   useEffect(() => {
     if (!workflowId) return;
@@ -220,6 +223,4 @@ export function RunSwitcherDropdown({
 }
 
 export default RunSwitcherDropdown;
-
-
 

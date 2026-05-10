@@ -17,132 +17,120 @@ import { closeOpenNodes, createLedgerMappingState, mapLedgerRecordToEvents, type
 import { mapGatewayRunSummary } from '../utils/gatewayRuns';
 import type { ExecutionEvent, FlowRunResult, VisualFlow, RunHistoryResponse, RunSummary } from '../types/flow';
 import { computeRunPreflightIssues } from '../utils/preflight';
+import { useGatewayCapabilities, gatewayContractsFromCapabilities } from '../hooks/useGatewayCapabilities';
+import {
+  endpointFromDescriptor,
+  gatewayFetch,
+  gatewayJson,
+  gatewayPath,
+  descriptorEndpointAvailable,
+  getGatewayFlowEditorReadiness,
+  jsonRequest,
+  type GatewayContracts,
+} from '../utils/gatewayClient';
 
 // Fetch list of saved flows
-async function listFlows(): Promise<VisualFlow[]> {
-  const response = await fetch('/api/gateway/visualflows');
-  if (!response.ok) {
-    throw new Error('Failed to fetch flows');
-  }
-  return response.json();
+async function listFlows(contracts: GatewayContracts | null): Promise<VisualFlow[]> {
+  const endpoint = contracts?.flow_editor?.visualflows?.crud?.collection_endpoint || '/api/gateway/visualflows';
+  return gatewayJson<VisualFlow[]>(gatewayPath(endpoint));
 }
 
 // Load a specific flow
-async function fetchFlow(flowId: string): Promise<VisualFlow> {
-  const response = await fetch(`/api/gateway/visualflows/${flowId}`);
-  if (!response.ok) {
-    throw new Error('Failed to load flow');
-  }
-  return response.json();
+async function fetchFlow(flowId: string, contracts: GatewayContracts | null): Promise<VisualFlow> {
+  const endpoint = contracts?.flow_editor?.visualflows?.crud?.item_endpoint || '/api/gateway/visualflows/{flow_id}';
+  return gatewayJson<VisualFlow>(gatewayPath(endpoint, { flow_id: flowId }));
 }
 
-async function deleteFlow(flowId: string): Promise<void> {
-  const response = await fetch(`/api/gateway/visualflows/${flowId}`, { method: 'DELETE' });
-  if (!response.ok) throw new Error('Failed to delete flow');
+async function deleteFlow(flowId: string, contracts: GatewayContracts | null): Promise<void> {
+  const endpoint = contracts?.flow_editor?.visualflows?.crud?.item_endpoint || '/api/gateway/visualflows/{flow_id}';
+  await gatewayFetch(gatewayPath(endpoint, { flow_id: flowId }), { method: 'DELETE' });
 }
 
-async function renameFlow(flowId: string, name: string): Promise<VisualFlow> {
-  const response = await fetch(`/api/gateway/visualflows/${flowId}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name }),
-  });
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    const message = error.detail ? String(error.detail) : `HTTP ${response.status}`;
-    throw new Error(message);
-  }
-  return response.json();
+async function renameFlow(flowId: string, name: string, contracts: GatewayContracts | null): Promise<VisualFlow> {
+  const endpoint = contracts?.flow_editor?.visualflows?.crud?.item_endpoint || '/api/gateway/visualflows/{flow_id}';
+  return gatewayJson<VisualFlow>(gatewayPath(endpoint, { flow_id: flowId }), jsonRequest({ name }, { method: 'PUT' }));
 }
 
-async function updateFlowDescription(flowId: string, description: string): Promise<VisualFlow> {
-  const response = await fetch(`/api/gateway/visualflows/${flowId}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ description }),
-  });
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    const message = error.detail ? String(error.detail) : `HTTP ${response.status}`;
-    throw new Error(message);
-  }
-  return response.json();
+async function updateFlowDescription(flowId: string, description: string, contracts: GatewayContracts | null): Promise<VisualFlow> {
+  const endpoint = contracts?.flow_editor?.visualflows?.crud?.item_endpoint || '/api/gateway/visualflows/{flow_id}';
+  return gatewayJson<VisualFlow>(gatewayPath(endpoint, { flow_id: flowId }), jsonRequest({ description }, { method: 'PUT' }));
 }
 
-async function updateFlowInterfaces(flowId: string, interfaces: string[]): Promise<VisualFlow> {
-  const response = await fetch(`/api/gateway/visualflows/${flowId}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ interfaces }),
-  });
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    const message = error.detail ? String(error.detail) : `HTTP ${response.status}`;
-    throw new Error(message);
-  }
-  return response.json();
+async function updateFlowInterfaces(flowId: string, interfaces: string[], contracts: GatewayContracts | null): Promise<VisualFlow> {
+  const endpoint = contracts?.flow_editor?.visualflows?.crud?.item_endpoint || '/api/gateway/visualflows/{flow_id}';
+  return gatewayJson<VisualFlow>(gatewayPath(endpoint, { flow_id: flowId }), jsonRequest({ interfaces }, { method: 'PUT' }));
 }
 
-async function duplicateFlow(source: VisualFlow, newName: string): Promise<VisualFlow> {
-  const response = await fetch('/api/gateway/visualflows', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+async function duplicateFlow(source: VisualFlow, newName: string, contracts: GatewayContracts | null): Promise<VisualFlow> {
+  const endpoint = contracts?.flow_editor?.visualflows?.crud?.collection_endpoint || '/api/gateway/visualflows';
+  return gatewayJson<VisualFlow>(gatewayPath(endpoint), jsonRequest({
       name: newName,
       description: source.description || '',
       interfaces: Array.isArray(source.interfaces) ? source.interfaces : [],
       nodes: source.nodes,
       edges: source.edges,
       entryNode: source.entryNode,
-    }),
-  });
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    const message = error.detail ? String(error.detail) : `HTTP ${response.status}`;
-    throw new Error(message);
-  }
-  return response.json();
+    }, { method: 'POST' }));
 }
 
 // API functions
 async function saveFlow(
   flow: VisualFlow,
-  existingFlowId: string | null
+  existingFlowId: string | null,
+  contracts: GatewayContracts | null
 ): Promise<VisualFlow> {
   // Use existingFlowId to determine if this is an update or create
   // flow.id may have a generated value even for new flows
   const method = existingFlowId ? 'PUT' : 'POST';
-  const url = existingFlowId ? `/api/gateway/visualflows/${existingFlowId}` : '/api/gateway/visualflows';
+  const crud = contracts?.flow_editor?.visualflows?.crud;
+  const url = existingFlowId
+    ? gatewayPath(crud?.item_endpoint || '/api/gateway/visualflows/{flow_id}', { flow_id: existingFlowId })
+    : gatewayPath(crud?.collection_endpoint || '/api/gateway/visualflows');
 
-  const response = await fetch(url, {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  return gatewayJson<VisualFlow>(url, jsonRequest({
       name: flow.name,
       description: flow.description,
       interfaces: Array.isArray(flow.interfaces) ? flow.interfaces : [],
       nodes: flow.nodes,
       edges: flow.edges,
       entryNode: flow.entryNode,
-    }),
-  });
-
-  if (!response.ok) {
-    // Get detailed error from backend
-    const error = await response.json().catch(() => ({}));
-    const message = error.detail
-      ? (Array.isArray(error.detail)
-        ? error.detail.map((e: { msg: string }) => e.msg).join(', ')
-        : error.detail)
-      : `HTTP ${response.status}`;
-    throw new Error(message);
-  }
-
-  return response.json();
+    }, { method }));
 }
 
 export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void }) {
   const queryClient = useQueryClient();
+  const gatewayCapabilitiesQuery = useGatewayCapabilities(true);
+  const gatewayContracts = gatewayContractsFromCapabilities(gatewayCapabilitiesQuery.data);
+  const flowEditorContract = gatewayContracts?.flow_editor;
+  const gatewayReadiness = getGatewayFlowEditorReadiness(gatewayContracts);
+  const strictGatewayContract = Boolean(
+    gatewayContracts && typeof gatewayContracts.version === 'number' && gatewayContracts.version >= 1
+  );
+  const gatewayDiscoveryError =
+    gatewayCapabilitiesQuery.error instanceof Error
+      ? gatewayCapabilitiesQuery.error.message
+      : gatewayCapabilitiesQuery.isError
+        ? 'Gateway capability discovery failed'
+        : '';
+  const gatewayCheckPending = gatewayCapabilitiesQuery.isLoading;
+  const gatewayBlockReason = gatewayCheckPending
+    ? 'Checking Gateway capabilities'
+    : gatewayDiscoveryError
+      ? `Gateway capability discovery failed: ${gatewayDiscoveryError}`
+      : '';
+  const visualflowCrudUnavailable = Boolean(gatewayBlockReason || !gatewayReadiness.operations.save.ready);
+  const visualflowPublishUnavailable = Boolean(gatewayBlockReason || !gatewayReadiness.operations.publish.ready);
+  const visualflowRunUnavailable = Boolean(gatewayBlockReason || !gatewayReadiness.operations.run.ready);
+  const runHistoryUnavailable = Boolean(gatewayBlockReason || !gatewayReadiness.operations.history.ready);
+  const saveUnavailableReason = gatewayBlockReason || gatewayReadiness.operations.save.reason || 'Gateway VisualFlow storage is unavailable';
+  const visualflowPublishHint =
+    gatewayBlockReason ||
+    gatewayReadiness.operations.publish.reason ||
+    (flowEditorContract?.visualflows?.publish && typeof flowEditorContract.visualflows.publish.install_hint === 'string'
+      ? flowEditorContract.visualflows.publish.install_hint
+      : '');
+  const visualflowRunHint = gatewayBlockReason || gatewayReadiness.operations.run.reason || visualflowPublishHint;
+  const runHistoryHint = gatewayBlockReason || gatewayReadiness.operations.history.reason || 'Gateway run history is unavailable';
   const {
     flowId,
     flowName,
@@ -243,18 +231,42 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
   );
 
   async function fetchRunHistory(runId: string): Promise<RunHistoryResponse> {
-    const response = await fetch(
-      `/api/gateway/runs/${encodeURIComponent(runId)}/history_bundle?include_subruns=true&ledger_mode=full`
-    );
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      const message = error.detail ? String(error.detail) : `HTTP ${response.status}`;
-      throw new Error(message);
-    }
-    const bundle = (await response.json()) as {
+    const historyBundleDescriptor =
+      gatewayContracts?.common?.runs?.history_bundle || gatewayContracts?.flow_editor?.runs?.history_bundle;
+    const hasHistoryBundleDescriptor = descriptorEndpointAvailable(historyBundleDescriptor);
+    const historyBundlePath = (() => {
+      if (hasHistoryBundleDescriptor) {
+        return endpointFromDescriptor(
+          historyBundleDescriptor,
+          '/api/gateway/runs/{run_id}/history_bundle',
+          { run_id: runId },
+          {
+            include_subruns: true,
+            ledger_mode: 'full',
+          }
+        );
+      }
+      if (strictGatewayContract) {
+        throw new Error('Gateway contract is missing runs.history_bundle; run history replay is unavailable.');
+      }
+      console.warn(
+        '#FALLBACK: runs.history_bundle descriptor missing in discovery; using legacy canonical route for history replay compatibility.'
+      );
+      return gatewayPath(
+        '/api/gateway/runs/{run_id}/history_bundle',
+        { run_id: runId },
+        {
+          include_subruns: true,
+          ledger_mode: 'full',
+        }
+      );
+    })();
+    const bundle = await gatewayJson<{
       run?: Record<string, unknown>;
       ledgers?: Record<string, { items?: Array<{ record?: LedgerRecord }> }>;
-    };
+    }>(
+      historyBundlePath
+    );
 
   if (!bundle || typeof bundle.run !== 'object') {
     console.warn('#FALLBACK: run history bundle missing run summary; using empty summary');
@@ -366,16 +378,16 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
 
   // Query for listing saved flows
   const flowsQuery = useQuery({
-    queryKey: ['flows'],
-    queryFn: listFlows,
-    enabled: showFlowLibrary, // Only fetch when modal is open
+    queryKey: ['flows', flowEditorContract?.visualflows?.crud?.collection_endpoint || '/api/gateway/visualflows'],
+    queryFn: () => listFlows(gatewayContracts),
+    enabled: showFlowLibrary && !visualflowCrudUnavailable && !gatewayCapabilitiesQuery.isLoading,
   });
 
   // Handle loading a flow
   const handleLoadFlow = useCallback(
     async (selectedFlowId: string) => {
       try {
-        const flow = await fetchFlow(selectedFlowId);
+        const flow = await fetchFlow(selectedFlowId, gatewayContracts);
         loadFlow(flow);
         setShowFlowLibrary(false);
         toast.success(`Loaded "${flow.name}"`);
@@ -383,24 +395,24 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
         toast.error('Failed to load flow');
       }
     },
-    [loadFlow]
+    [gatewayContracts, loadFlow]
   );
 
   const handleRenameFlow = useCallback(
     async (id: string, nextName: string) => {
       const name = nextName.trim();
       if (!name) return;
-      const updated = await renameFlow(id, name);
+      const updated = await renameFlow(id, name, gatewayContracts);
       if (flowId && id === flowId) setFlowName(updated.name);
       queryClient.invalidateQueries({ queryKey: ['flows'] });
       toast.success('Renamed');
     },
-    [flowId, queryClient, setFlowName]
+    [flowId, gatewayContracts, queryClient, setFlowName]
   );
 
   const handleUpdateDescription = useCallback(
     async (id: string, nextDescription: string) => {
-      const updated = await updateFlowDescription(id, nextDescription);
+      const updated = await updateFlowDescription(id, nextDescription, gatewayContracts);
       // If we are currently editing that flow, keep the in-editor description in sync by reloading.
       if (flowId && id === flowId) {
         // We only have the flow name in store; description lives in the saved flow object.
@@ -410,24 +422,24 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
       queryClient.invalidateQueries({ queryKey: ['flows'] });
       toast.success('Description updated');
     },
-    [flowId, loadFlow, queryClient]
+    [flowId, gatewayContracts, loadFlow, queryClient]
   );
 
   const handleUpdateInterfaces = useCallback(
     async (id: string, nextInterfaces: string[]) => {
-      const updated = await updateFlowInterfaces(id, nextInterfaces);
+      const updated = await updateFlowInterfaces(id, nextInterfaces, gatewayContracts);
       if (flowId && id === flowId) {
         loadFlow(updated);
       }
       queryClient.invalidateQueries({ queryKey: ['flows'] });
       toast.success('Interfaces updated');
     },
-    [flowId, loadFlow, queryClient]
+    [flowId, gatewayContracts, loadFlow, queryClient]
   );
 
   const handleDeleteFlow = useCallback(
     async (id: string) => {
-      await deleteFlow(id);
+      await deleteFlow(id, gatewayContracts);
       if (flowId && id === flowId) {
         // Keep the current graph but mark it as unsaved.
         setFlowId(null);
@@ -437,7 +449,7 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
       }
       queryClient.invalidateQueries({ queryKey: ['flows'] });
     },
-    [flowId, queryClient, setFlowId]
+    [flowId, gatewayContracts, queryClient, setFlowId]
   );
 
   const handleDuplicateFlow = useCallback(
@@ -446,19 +458,19 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
       const src = all.find((f) => f.id === id);
       if (!src) return;
       const base = (src.name || 'Untitled').trim() || 'Untitled';
-      const created = await duplicateFlow(src, `${base} (copy)`);
+      const created = await duplicateFlow(src, `${base} (copy)`, gatewayContracts);
       queryClient.invalidateQueries({ queryKey: ['flows'] });
       loadFlow(created);
       setShowFlowLibrary(false);
       toast.success(`Duplicated as "${created.name}"`);
     },
-    [flowsQuery.data, loadFlow, queryClient]
+    [flowsQuery.data, gatewayContracts, loadFlow, queryClient]
   );
 
   // Save mutation
   const saveMutation = useMutation({
     mutationFn: ({ flow, existingFlowId }: { flow: VisualFlow; existingFlowId: string | null }) =>
-      saveFlow(flow, existingFlowId),
+      saveFlow(flow, existingFlowId, gatewayContracts),
     onSuccess: (savedFlow) => {
       loadFlow(savedFlow);
       toast.success('Flow saved!');
@@ -584,18 +596,26 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
 
   // Handle save
   const handleSave = useCallback(() => {
+    if (visualflowCrudUnavailable) {
+      toast.error(saveUnavailableReason);
+      return;
+    }
     const flow = getFlow();
     if (!flow.name.trim()) {
       toast.error('Please enter a flow name');
       return;
     }
     saveMutation.mutate({ flow, existingFlowId: flowId });
-  }, [getFlow, saveMutation, flowId]);
+  }, [getFlow, saveMutation, flowId, saveUnavailableReason, visualflowCrudUnavailable]);
 
   // Handle run - open modal
   const handleRun = useCallback(() => {
     if (!flowId) {
       toast.error('Please save the flow first');
+      return;
+    }
+    if (visualflowRunUnavailable) {
+      toast.error(visualflowRunHint || 'Gateway cannot run VisualFlows');
       return;
     }
     // If we already have an active/previous run in memory, opening the modal should
@@ -613,7 +633,20 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
     }
     clearPreflightIssues();
     setShowRunModal(true);
-  }, [clearPreflightIssues, edges, executionEvents.length, flowId, inspectedRun, isRunning, nodes, runResult, setPreflightIssues, traceEvents.length]);
+  }, [
+    clearPreflightIssues,
+    edges,
+    executionEvents.length,
+    flowId,
+    inspectedRun,
+    isRunning,
+    nodes,
+    runResult,
+    setPreflightIssues,
+    traceEvents.length,
+    visualflowRunHint,
+    visualflowRunUnavailable,
+  ]);
 
   const resetThreadState = useCallback(() => {
     threadRootRunIdRef.current = null;
@@ -722,10 +755,11 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
           const form = new FormData();
           form.append('session_id', sessionId);
           form.append('file', file, file.name);
-          const res = await fetch('/api/gateway/attachments/upload', { method: 'POST', body: form });
-          if (!res.ok) {
-            throw new Error(await res.text());
-          }
+          const uploadUrl = endpointFromDescriptor(
+            gatewayContracts?.common?.attachments?.upload,
+            '/api/gateway/attachments/upload'
+          );
+          const res = await gatewayFetch(uploadUrl, { method: 'POST', body: form });
           const data = (await res.json()) as Record<string, unknown>;
           const attachment = data && typeof data.attachment === 'object' ? (data.attachment as Record<string, unknown>) : null;
           if (attachment) attachmentRefs.push(attachment);
@@ -788,7 +822,7 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
       setRunResult(null);
       runFlow(nextInputData);
     },
-    [executionEvents, flowId, resolveThreadRootId, runFlow, setIsRunning, stableSessionId]
+    [executionEvents, flowId, gatewayContracts?.common?.attachments?.upload, resolveThreadRootId, runFlow, setIsRunning, stableSessionId]
   );
 
   const inspectRunById = useCallback(
@@ -864,10 +898,14 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
 
   // Duplicate the current flow in-place (keeps current editor state as the source).
   const handleDuplicateCurrent = useCallback(async () => {
+    if (visualflowCrudUnavailable) {
+      toast.error(saveUnavailableReason);
+      return;
+    }
     const flow = getFlow();
     const base = (flow.name || 'Untitled').trim() || 'Untitled';
     try {
-      const created = await duplicateFlow(flow, `${base} (copy)`);
+      const created = await duplicateFlow(flow, `${base} (copy)`, gatewayContracts);
       queryClient.invalidateQueries({ queryKey: ['flows'] });
       loadFlow(created);
       toast.success(`Duplicated as "${created.name}"`);
@@ -875,15 +913,19 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
       const msg = e instanceof Error ? e.message : 'Duplicate failed';
       toast.error(msg);
     }
-  }, [getFlow, loadFlow, queryClient]);
+  }, [gatewayContracts, getFlow, loadFlow, queryClient, saveUnavailableReason, visualflowCrudUnavailable]);
 
   const handlePublish = useCallback(() => {
     if (!flowId) {
       toast.error('Please save the flow first');
       return;
     }
+    if (visualflowPublishUnavailable) {
+      toast.error(visualflowPublishHint || 'Gateway cannot publish VisualFlows');
+      return;
+    }
     setShowPublishModal(true);
-  }, [flowId]);
+  }, [flowId, visualflowPublishHint, visualflowPublishUnavailable]);
 
   const handleLifecycle = useCallback(() => {
     if (!flowId) {
@@ -934,7 +976,8 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
         <button
           className="toolbar-button"
           onClick={handleDuplicateCurrent}
-          title="Duplicate Flow"
+          disabled={visualflowCrudUnavailable}
+          title={visualflowCrudUnavailable ? saveUnavailableReason : 'Duplicate Flow'}
         >
           📑 Duplicate
         </button>
@@ -950,7 +993,8 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
         <button
           className="toolbar-button"
           onClick={() => setShowFlowLibrary(true)}
-          title="Load Flow"
+          disabled={visualflowCrudUnavailable}
+          title={visualflowCrudUnavailable ? saveUnavailableReason : 'Load Flow'}
         >
           📂 Load
         </button>
@@ -958,8 +1002,8 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
         <button
           className="toolbar-button"
           onClick={handleSave}
-          disabled={saveMutation.isPending}
-          title="Save Flow"
+          disabled={saveMutation.isPending || visualflowCrudUnavailable}
+          title={visualflowCrudUnavailable ? saveUnavailableReason : 'Save Flow'}
         >
           💾 Save
         </button>
@@ -967,8 +1011,8 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
         <button
           className="toolbar-button primary"
           onClick={handleRun}
-          disabled={!flowId}
-          title={isRunning ? 'Open current run' : 'Run Flow'}
+          disabled={!flowId || visualflowRunUnavailable}
+          title={visualflowRunUnavailable ? (visualflowRunHint || 'Gateway cannot run VisualFlows') : isRunning ? 'Open current run' : 'Run Flow'}
         >
           {isRunning ? '⏳ Running...' : '▶ Run'}
         </button>
@@ -976,8 +1020,8 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
         <button
           className="toolbar-button"
           onClick={handlePublish}
-          disabled={isRunning || !flowId}
-          title="Publish WorkflowBundle (.flow)"
+          disabled={isRunning || !flowId || visualflowPublishUnavailable}
+          title={visualflowPublishUnavailable ? (visualflowPublishHint || 'Gateway cannot publish VisualFlows') : 'Publish WorkflowBundle (.flow)'}
         >
           📦 Publish
         </button>
@@ -989,8 +1033,8 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
         <button
           className="toolbar-button"
           onClick={() => setShowRunHistory(true)}
-          disabled={!flowId}
-          title="Run history"
+          disabled={!flowId || runHistoryUnavailable}
+          title={runHistoryUnavailable ? runHistoryHint : 'Run history'}
           aria-label="Open run history"
         >
           🕘
@@ -1108,6 +1152,7 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
         waitingInfo={viewing ? waitingInfo2 : waitingInfo}
         stableSessionId={stableSessionId}
         threadRootRunId={viewing ? undefined : threadRootRunId || undefined}
+        gatewayContracts={gatewayContracts}
         onResume={resumeFlow}
         onPause={() => pauseRun(inspectedRun?.run_id)}
         onResumeRun={() => resumeRun(inspectedRun?.run_id)}
@@ -1122,6 +1167,7 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
         isOpen={showRunHistory}
         workflowId={flowId || ''}
         workflowName={flowName}
+        gatewayContracts={gatewayContracts}
         onClose={() => setShowRunHistory(false)}
         onSelectRun={handleSelectHistoryRun}
       />
@@ -1146,12 +1192,14 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
         isOpen={showPublishModal}
         flowId={flowId}
         flowName={flowName}
+        gatewayContracts={gatewayContracts}
         onClose={() => setShowPublishModal(false)}
       />
 
       <WorkflowLifecycleModal
         isOpen={showLifecycleModal}
         flowName={flowName}
+        gatewayContracts={gatewayContracts}
         onClose={() => setShowLifecycleModal(false)}
       />
 

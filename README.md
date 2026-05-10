@@ -9,7 +9,7 @@ AbstractFlow is part of the [AbstractFramework ecosystem](https://github.com/lpa
 It provides:
 - A small programmatic API (`Flow`, `FlowRunner`) for building and running flows in Python.
 - A portable workflow format (`VisualFlow` JSON) + helpers to execute it from any host (`abstractflow.visual`).
-- A reference visual editor app in `web/` (FastAPI backend + React frontend).
+- A Gateway-first visual editor app in `web/` (React frontend + `/api/gateway/*` proxy).
 
 Project status: **Pre-alpha** (`pyproject.toml`: `Development Status :: 2 - Pre-Alpha`). Expect breaking changes.
 
@@ -19,8 +19,7 @@ Evidence (code): [abstractflow/runner.py](abstractflow/runner.py), [abstractflow
 
 ```mermaid
 flowchart LR
-  UI[Visual editor UI<br/>npx @abstractframework/flow] <-->|/api/*| BE[Editor backend<br/>FastAPI (optional)]
-  BE -->|save/load| FLOWS[(flows/*.json)]
+  UI[Visual editor UI<br/>npx @abstractframework/flow] <-->|/api/gateway/*| GW[AbstractGateway<br/>runs/ledger/artifacts/bundles]
 
   HOST[Any host process<br/>CLI / server / notebook] --> VF[VisualFlow models<br/>abstractflow/visual/models.py]
   HOST --> RUN[create_visual_runner / execute_visual_flow<br/>abstractflow/visual/executor.py]
@@ -51,19 +50,19 @@ pip install abstractflow
 Requirements: Python **3.10+** (`pyproject.toml`: `requires-python`).
 
 Optional extras (declared in `pyproject.toml`):
+- Runtime stack for local programmatic/VisualFlow execution APIs (`Flow`, `FlowRunner`, `execute_visual_flow`, workflow bundles): `pip install "abstractflow[runtime]"`
+- Full host profiles:
+  - Apple-capable: `pip install "abstractflow[all-apple]"`
+  - GPU-capable: `pip install "abstractflow[all-gpu]"`
+- `abstractflow[all-apple]` and `abstractflow[all-gpu]` both include gateway proxy + local compatibility stack.
 - Agent nodes (Visual Agent node support): `pip install "abstractflow[agent]"`
-- Visual editor backend (FastAPI): `pip install "abstractflow[server]"`
-- Visual editor backend + Agent nodes: `pip install "abstractflow[editor]"`
 - Documentation site tools: `pip install "abstractflow[docs]"`
 - Dev tools: `pip install "abstractflow[dev]"`
-
-Notes:
-- Runtime deps include `AbstractRuntime` + `abstractcore[tools]` (see `pyproject.toml`).
-- Some VisualFlow nodes require extra packages at runtime (e.g. `memory_kg_*` nodes require `abstractmemory`).
 
 ## Quickstart (programmatic)
 
 ```python
+# Requires: `abstractflow[runtime]`
 from abstractflow import Flow, FlowRunner
 
 flow = Flow("linear")
@@ -82,6 +81,7 @@ print(FlowRunner(flow).run({"value": 5}))
 import json
 from abstractflow.visual import VisualFlow, execute_visual_flow
 
+# Requires: `abstractflow[runtime]`
 with open("my-flow.json", "r", encoding="utf-8") as f:
     vf = VisualFlow.model_validate(json.load(f))
 
@@ -90,26 +90,26 @@ print(execute_visual_flow(vf, {"prompt": "Hello"}, flows={vf.id: vf}))
 
 If your flow uses subflows, load all referenced `*.json` into the `flows={...}` mapping (see [docs/getting-started.md](docs/getting-started.md)).
 
-## Visual editor (local)
+## Visual editor (Gateway-first)
 
-The visual editor is split into:
-- a **Python backend** (FastAPI) shipped with `abstractflow[editor]` (or `abstractflow[server]`)
-- a **JS frontend** published as `@abstractframework/flow` (run via `npx`)
+The visual editor talks to AbstractGateway. The Flow server keeps the Gateway bearer token server-side while proxying browser requests.
 
 ```bash
-# Terminal 1: editor backend (FastAPI)
-pip install "abstractflow[editor]"
-abstractflow serve --reload --port 8080
+# Terminal 1: Gateway
+pip install "abstractgateway[http]" abstractflow
+export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
+abstractgateway --port 8080
 
-# Terminal 2: editor UI (static server + /api proxy)
-npx @abstractframework/flow
+# Terminal 2: editor UI (static server + /api/gateway proxy)
+export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
+npx @abstractframework/flow --gateway-url http://127.0.0.1:8080
 ```
 
 Open:
 - UI: http://localhost:3003
-- Backend health: http://localhost:8080/api/health
+- Gateway capabilities: http://localhost:8080/api/gateway/discovery/capabilities
 
-Optional: run an AbstractGateway at http://127.0.0.1:8080 and configure it in the UI “Connect” modal (used for embeddings-backed memory KG and bundle publishing). Export `ABSTRACTGATEWAY_AUTH_TOKEN` or pass `--gateway-token` when starting the backend. See [docs/web-editor.md](docs/web-editor.md) and [docs/architecture.md](docs/architecture.md).
+The `abstractflow serve`/FastAPI host is a Gateway proxy by default. Its old local `/api/flows`, `/api/ws`, and `/api/runs` compatibility routes are available only when `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1` is set. See [docs/web-editor.md](docs/web-editor.md) and [docs/architecture.md](docs/architecture.md).
 
 ## CLI (WorkflowBundle `.flow`)
 
