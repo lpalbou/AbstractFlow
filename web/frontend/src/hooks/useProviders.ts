@@ -6,7 +6,7 @@ import { gatewayJson, gatewayPath } from '../utils/gatewayClient';
 export function useProviders(enabled: boolean) {
   const capabilitiesQuery = useGatewayCapabilities(enabled);
   const contracts = gatewayContractsFromCapabilities(capabilitiesQuery.data);
-  const endpoint = contracts?.common?.discovery?.providers || '/api/gateway/discovery/providers';
+  const endpoint = contracts?.common?.discovery?.providers || '';
 
   return useQuery({
     queryKey: ['providers', endpoint],
@@ -18,7 +18,7 @@ export function useProviders(enabled: boolean) {
       }
       return res.items;
     },
-    enabled: enabled && !capabilitiesQuery.isLoading,
+    enabled: enabled && Boolean(endpoint) && !capabilitiesQuery.isLoading && !capabilitiesQuery.isError,
     staleTime: 30_000,
   });
 }
@@ -27,7 +27,7 @@ export function useModels(provider: string | undefined, enabled: boolean) {
   const p = (provider || '').trim();
   const capabilitiesQuery = useGatewayCapabilities(enabled && Boolean(p));
   const contracts = gatewayContractsFromCapabilities(capabilitiesQuery.data);
-  const endpoint = contracts?.common?.discovery?.provider_models || '/api/gateway/discovery/providers/{provider_name}/models';
+  const endpoint = contracts?.common?.discovery?.provider_models || '';
 
   return useQuery({
     queryKey: ['providers', p, 'models', endpoint],
@@ -43,11 +43,10 @@ export function useModels(provider: string | undefined, enabled: boolean) {
       }
       return models;
     },
-    enabled: enabled && Boolean(p) && !capabilitiesQuery.isLoading,
+    enabled: enabled && Boolean(p) && Boolean(endpoint) && !capabilitiesQuery.isLoading && !capabilitiesQuery.isError,
     staleTime: 30_000,
   });
 }
-
 
 
 

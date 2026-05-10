@@ -6,6 +6,8 @@ This repository includes a reference visual editor:
 - Legacy/dev FastAPI host: `web/backend/`
 
 The primary runtime host is now AbstractGateway. The editor saves VisualFlow JSON through Gateway, publishes `.flow` bundles there, starts runs through Gateway, and renders Gateway ledger/artifact/history streams.
+Install a host profile (`abstractflow[all-apple]` or `abstractflow[all-gpu]`)
+to run the local Python host/proxy stack.
 
 See also: [../README.md](../README.md), [getting-started.md](getting-started.md), [faq.md](faq.md), [visualflow.md](visualflow.md), [architecture.md](architecture.md).
 
@@ -31,8 +33,7 @@ npx @abstractframework/flow --gateway-url http://127.0.0.1:8080
 
 Notes:
 - The browser never needs the bearer token directly. The Flow static server injects `Authorization: Bearer ...` while proxying `/api/*` to Gateway.
-- Use `ABSTRACTGATEWAY_URL` / `ABSTRACTFLOW_GATEWAY_URL` or `--gateway-url` to point at a non-default Gateway.
-- `--backend-url` and `ABSTRACTFLOW_BACKEND_URL` remain legacy fallbacks.
+- Use `ABSTRACTGATEWAY_URL` or `ABSTRACTFLOW_GATEWAY_URL` (or `--gateway-url`) to point at a non-default Gateway.
 
 Open:
 - UI: http://localhost:3003
@@ -65,7 +66,7 @@ Open:
 - Frontend: http://localhost:3003 or Vite's printed port
 - Gateway: http://localhost:8080/api/gateway/discovery/capabilities
 
-## Run (legacy/dev FastAPI host)
+## Run (FastAPI Gateway proxy host)
 
 The Python host still serves the built UI and now proxies `/api/gateway/*` to AbstractGateway with server-side auth injection:
 
@@ -79,12 +80,18 @@ export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
 python -m backend --port 3003 --gateway-url http://127.0.0.1:8080
 ```
 
-Evidence: [../web/backend/main.py](../web/backend/main.py) serves `web/frontend/dist` when it exists and proxies Gateway API calls.
+By default, this host mounts only the Gateway proxy, connection/config, UI config, and host metrics routes. To expose the old local `/api/flows`, `/api/ws`, `/api/runs`, `/api/providers`, `/api/tools`, `/api/semantics`, and `/api/memory/kg` compatibility routes, set:
+
+```bash
+export ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1
+```
+
+Evidence: [../web/backend/main.py](../web/backend/main.py) serves `web/frontend/dist` when it exists, proxies Gateway API calls, and gates legacy local runtime routes behind `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME`.
 
 ## Where data is stored
 
 - Gateway stores VisualFlows, bundles, runs, ledgers, workspaces, attachments, and artifacts in its configured data directories.
-- The legacy FastAPI host still has local storage knobs (`ABSTRACTFLOW_FLOWS_DIR`, `ABSTRACTFLOW_RUNTIME_DIR`) for old `/api/flows` and WebSocket paths.
+- The FastAPI compatibility routes still have local storage knobs (`ABSTRACTFLOW_FLOWS_DIR`, `ABSTRACTFLOW_RUNTIME_DIR`), but those routes are opt-in with `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1`.
 
 ## Gateway connectivity and auth
 
@@ -96,7 +103,7 @@ Common env vars / flags:
 - UI CLI flags: `npx @abstractframework/flow --gateway-url ... --gateway-token ...`
 - Python host flags: `abstractflow serve --gateway-url ... --gateway-token ...` (or `python -m backend ...`)
 
-If no gateway token is available, the static Flow server and Python host fail fast with a clear error telling you to export `ABSTRACTGATEWAY_AUTH_TOKEN` or pass `--gateway-token`.
+For the modern editor path, if no gateway token is available the static Flow server and Python host fail fast with a clear error telling you to export `ABSTRACTGATEWAY_AUTH_TOKEN` or pass `--gateway-token`.
 
 Evidence:
 - UI modal: [../web/frontend/src/components/GatewayConnectionModal.tsx](../web/frontend/src/components/GatewayConnectionModal.tsx)
@@ -106,15 +113,11 @@ Evidence:
 
 ## Tools (AbstractCore)
 
-Tool lists shown in the editor come from Gateway:
+Tool lists shown in the editor come from Gateway discovery:
 - HTTP endpoint: `GET /api/gateway/discovery/tools`
 - Execution: tool calls are run by the Gateway/Runtime host tool executor.
 
-By default, the backend exposes a conservative tool set derived from AbstractRuntime’s “default tools” list, plus a small number of extra safe web helpers.
-
-To add or customize tools, update the host:
-- Tool discovery (`GET /api/tools`): `web/backend/routes/tools.py`
-- Tool execution (workspace scoping + mapping executor): `abstractflow/visual/workspace_scoped_tools.py`
+The old local `GET /api/tools` route is available only in the opt-in FastAPI compatibility host. To add or customize tools for the normal editor path, update Gateway's discovery and runtime tool executor.
 
 Evidence: [../web/backend/routes/tools.py](../web/backend/routes/tools.py), [../abstractflow/visual/workspace_scoped_tools.py](../abstractflow/visual/workspace_scoped_tools.py).
 
@@ -128,4 +131,4 @@ The Run UI uses Gateway's replay-first HTTP/SSE contract:
 - stream: `GET /api/gateway/runs/{run_id}/ledger/stream`
 - artifacts: `GET /api/gateway/runs/{run_id}/artifacts/{artifact_id}/content`
 
-The legacy WebSocket host still exists in [../web/backend/routes/ws.py](../web/backend/routes/ws.py) for development/reference use.
+The legacy WebSocket host still exists in [../web/backend/routes/ws.py](../web/backend/routes/ws.py) for development/reference use and is mounted only when `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1`.

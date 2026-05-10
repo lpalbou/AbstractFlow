@@ -32,8 +32,4 @@ npx @abstractframework/flow --port 3003 --host 0.0.0.0 --gateway-url http://127.
 Environment variables:
 - `PORT`, `HOST`
 - `ABSTRACTGATEWAY_URL` (or `ABSTRACTFLOW_GATEWAY_URL`)
-- `ABSTRACTGATEWAY_AUTH_TOKEN` (or `ABSTRACTFLOW_GATEWAY_AUTH_TOKEN`)
-
-## Legacy backend flags
-
-`--backend-url`, `--backend-token`, `ABSTRACTFLOW_BACKEND_URL`, and `BACKEND_URL` remain compatibility fallbacks. Prefer the Gateway names above.
+- `ABSTRACTGATEWAY_AUTH_TOKEN`

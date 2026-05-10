@@ -312,8 +312,8 @@ def _gateway_undeprecate_url(bundle_id: str) -> str:
 
 
 def _gateway_auth_token() -> str:
-    # Prefer canonical gateway env var names (with legacy fallbacks).
-    raw = os.getenv("ABSTRACTGATEWAY_AUTH_TOKEN") or os.getenv("ABSTRACTFLOW_GATEWAY_AUTH_TOKEN") or ""
+    # Prefer canonical gateway token name.
+    raw = os.getenv("ABSTRACTGATEWAY_AUTH_TOKEN") or ""
     return str(raw or "").strip()
 
 
@@ -524,8 +524,10 @@ async def publish_flow(flow_id: str, request: PublishFlowRequest) -> PublishFlow
                 gateway_reloaded = True
                 gateway_reload_error = None
             else:
-                gateway_reloaded = False
-                gateway_reload_error = f"upload: {upload_err}; reload: {reload_err}"
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"Gateway publish completed but bundle not loaded: upload: {upload_err}; reload: {reload_err}",
+                )
 
     return PublishFlowResponse(
         ok=True,

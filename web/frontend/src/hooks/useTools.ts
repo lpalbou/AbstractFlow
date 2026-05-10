@@ -20,7 +20,7 @@ export interface ToolSpec {
 export function useTools(enabled: boolean) {
   const capabilitiesQuery = useGatewayCapabilities(enabled);
   const contracts = gatewayContractsFromCapabilities(capabilitiesQuery.data);
-  const endpoint = contracts?.common?.discovery?.tools || '/api/gateway/discovery/tools';
+  const endpoint = contracts?.common?.discovery?.tools || '';
 
   return useQuery({
     queryKey: ['tools', endpoint],
@@ -32,7 +32,7 @@ export function useTools(enabled: boolean) {
       }
       return res.items;
     },
-    enabled: enabled && !capabilitiesQuery.isLoading,
+    enabled: enabled && Boolean(endpoint) && !capabilitiesQuery.isLoading && !capabilitiesQuery.isError,
     staleTime: 30_000,
   });
 }

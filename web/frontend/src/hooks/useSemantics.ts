@@ -27,12 +27,12 @@ export type SemanticsRegistry = {
 export function useSemanticsRegistry(enabled: boolean) {
   const capabilitiesQuery = useGatewayCapabilities(enabled);
   const contracts = gatewayContractsFromCapabilities(capabilitiesQuery.data);
-  const endpoint = contracts?.common?.discovery?.semantics || '/api/gateway/semantics';
+  const endpoint = contracts?.common?.discovery?.semantics || '';
 
   return useQuery({
     queryKey: ['semantics-registry', endpoint],
     queryFn: () => gatewayJson<SemanticsRegistry>(gatewayPath(endpoint)),
-    enabled: enabled && !capabilitiesQuery.isLoading,
+    enabled: enabled && Boolean(endpoint) && !capabilitiesQuery.isLoading && !capabilitiesQuery.isError,
     staleTime: 60_000,
   });
 }

@@ -4,6 +4,7 @@ import {
   capabilityUnavailable,
   endpointFromDescriptor,
   gatewayJson,
+  getGatewayFlowEditorReadiness,
   jsonRequest,
   type GatewayContracts,
 } from '../utils/gatewayClient';
@@ -36,6 +37,10 @@ async function publishFlow(
   payload: PublishFlowRequest,
   contracts: GatewayContracts | null | undefined
 ): Promise<PublishFlowResponse> {
+  const readiness = getGatewayFlowEditorReadiness(contracts);
+  if (!readiness.operations.publish.ready) {
+    throw new Error(readiness.operations.publish.reason || 'Gateway cannot publish VisualFlows');
+  }
   const publish = contracts?.flow_editor?.visualflows?.publish;
   if (capabilityUnavailable(publish)) {
     const hint = typeof publish?.install_hint === 'string' ? publish.install_hint : '';

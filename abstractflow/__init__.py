@@ -43,23 +43,10 @@ __author__ = "Laurent-Philippe Albou"
 __email__ = "contact@abstractflow.ai"
 __license__ = "MIT"
 
+from importlib import import_module
+
 from ._version import __version__
-
-# Core classes
-from .core.flow import Flow, FlowNode, FlowEdge
-
-# Compiler
-from .compiler import compile_flow
-
-# Runner
-from .runner import FlowRunner
-
-# Adapters (for advanced usage)
-from .adapters import (
-    create_function_node_handler,
-    create_agent_node_handler,
-    create_subflow_node_handler,
-)
+from typing import Any
 
 __all__ = [
     # Version info
@@ -81,6 +68,41 @@ __all__ = [
     "create_subflow_node_handler",
 ]
 
+_RUNTIME_EXPORTS = {
+    "Flow": (".core.flow", "Flow"),
+    "FlowEdge": (".core.flow", "FlowEdge"),
+    "FlowNode": (".core.flow", "FlowNode"),
+    "compile_flow": (".compiler", "compile_flow"),
+    "FlowRunner": (".runner", "FlowRunner"),
+    "create_function_node_handler": (".adapters", "create_function_node_handler"),
+    "create_agent_node_handler": (".adapters", "create_agent_node_handler"),
+    "create_subflow_node_handler": (".adapters", "create_subflow_node_handler"),
+}
+
+_RUNTIME_INSTALL_HINT = (
+    "Install the runtime stack with: pip install \"abstractflow[runtime]\".\n"
+    "For host/profile mode include: pip install \"abstractflow[all-apple]\" or \"abstractflow[all-gpu]\"."
+)
+
+
+def __getattr__(name: str) -> Any:
+    entry = _RUNTIME_EXPORTS.get(name)
+    if entry is None:
+        raise AttributeError(name)
+
+    module_name, attr_name = entry
+    try:
+        module = import_module(module_name, package=__name__)
+        return getattr(module, attr_name)
+    except ModuleNotFoundError as exc:
+        missing = str(exc.name or "").lower()
+        if "abstractruntime" in missing or "abstractcore" in missing:
+            raise RuntimeError(f"{name} requires AbstractRuntime/local stack dependencies. {_RUNTIME_INSTALL_HINT}") from exc
+        raise
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals().keys()) | set(__all__))
 
 def get_version() -> str:
     """Get the current version of AbstractFlow."""

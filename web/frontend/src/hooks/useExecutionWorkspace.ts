@@ -10,7 +10,7 @@ export interface ExecutionWorkspaceInfo {
 export function useExecutionWorkspace(enabled: boolean) {
   const capabilitiesQuery = useGatewayCapabilities(enabled);
   const contracts = gatewayContractsFromCapabilities(capabilitiesQuery.data);
-  const endpoint = contracts?.common?.workspace?.policy_endpoint || '/api/gateway/workspace/policy';
+  const endpoint = contracts?.common?.workspace?.policy_endpoint || '';
 
   return useQuery({
     queryKey: ['runs', 'execution-workspace', endpoint],
@@ -22,7 +22,7 @@ export function useExecutionWorkspace(enabled: boolean) {
       }
       return { default_random_root: '', policy };
     },
-    enabled: enabled && !capabilitiesQuery.isLoading,
+    enabled: enabled && Boolean(endpoint) && !capabilitiesQuery.isLoading && !capabilitiesQuery.isError,
     staleTime: 30_000,
   });
 }

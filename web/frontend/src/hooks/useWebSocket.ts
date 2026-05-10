@@ -16,6 +16,7 @@ import {
   endpointFromDescriptor,
   gatewayFetch,
   gatewayJson,
+  getGatewayFlowEditorReadiness,
   jsonRequest,
   makeGatewayRequestId,
   type GatewayContracts,
@@ -87,6 +88,7 @@ export interface WaitingInfo {
 export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions) {
   const capabilitiesQuery = useGatewayCapabilities(true);
   const contracts: GatewayContracts | null = gatewayContractsFromCapabilities(capabilitiesQuery.data);
+  const gatewayReadiness = getGatewayFlowEditorReadiness(contracts);
   const commonContract = contracts?.common;
   const flowEditorContract = contracts?.flow_editor;
   const streamRef = useRef<EventSource | null>(null);
@@ -260,6 +262,9 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
   }, []);
 
   const submitCommand = useCallback(async (payload: { runId: string; type: string; payload?: Record<string, unknown> }) => {
+    if (!gatewayReadiness.operations.commands.ready) {
+      throw new Error(gatewayReadiness.operations.commands.reason || 'Gateway run command contract is incomplete');
+    }
     const commandId = makeGatewayRequestId('cmd');
     const url = endpointFromDescriptor(commonContract?.runs?.commands, '/api/gateway/commands');
     await gatewayFetch(url, jsonRequest({
@@ -270,7 +275,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
     }, {
       method: 'POST',
     }));
-  }, [commonContract?.runs?.commands]);
+  }, [commonContract?.runs?.commands, gatewayReadiness.operations.commands.ready, gatewayReadiness.operations.commands.reason]);
 
   const autoApproveWait = useCallback(
     async (info: WaitingInfo) => {
@@ -745,6 +750,16 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
 
       try {
         setError(null);
+        if (capabilitiesQuery.isLoading) {
+          throw new Error('Gateway capability discovery is still loading');
+        }
+        if (capabilitiesQuery.isError) {
+          const detail = capabilitiesQuery.error instanceof Error ? `: ${capabilitiesQuery.error.message}` : '';
+          throw new Error(`Gateway capability discovery failed${detail}`);
+        }
+        if (!gatewayReadiness.operations.run.ready) {
+          throw new Error(gatewayReadiness.operations.run.reason || 'Gateway Flow Editor run contract is incomplete');
+        }
         const publishDescriptor = flowEditorContract?.visualflows?.publish;
         if (capabilityUnavailable(publishDescriptor)) {
           const hint =
@@ -762,6 +777,8 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
           ok?: boolean;
           bundle_id?: string;
           bundle_version?: string;
+          gateway_reloaded?: boolean;
+          gateway_reload_error?: string | null;
           detail?: string;
         }>(publishUrl, jsonRequest({ bundle_version: 'dev', overwrite: true, reload_gateway: true }, {
           method: 'POST',
@@ -772,6 +789,9 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
         const bundleId = typeof publishPayload.bundle_id === 'string' ? publishPayload.bundle_id.trim() : '';
         const bundleVersion = typeof publishPayload.bundle_version === 'string' ? publishPayload.bundle_version.trim() : '';
         if (!bundleId) throw new Error('Gateway did not return bundle_id');
+        if (publishPayload.gateway_reloaded === false && publishPayload.gateway_reload_error) {
+          throw new Error(`Gateway publish finished but bundle is not loaded: ${publishPayload.gateway_reload_error}`);
+        }
 
         let inputSchema: GatewayRunInputSchema | null = null;
         const schemaDescriptor = flowEditorContract?.run_input_schema;
@@ -785,7 +805,8 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
             );
             inputSchema = await gatewayJson<GatewayRunInputSchema>(schemaUrl);
           } catch (e) {
-            console.warn('#FALLBACK: failed to load gateway run input schema; using submitted input data', e);
+            const detail = e instanceof Error ? e.message : 'failed to load gateway run input schema';
+            throw new Error(`Gateway returned invalid flow for run: ${detail}`);
           }
         }
         const normalized = normalizeRunInputData(mergedInputData, inputSchema);
@@ -823,7 +844,20 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
         dispatchEvent({ type: 'flow_error', error: msg });
       }
     },
-    [closeSubrunStreams, commonContract?.runs?.start, connectStream, dispatchEvent, flowEditorContract?.run_input_schema, flowEditorContract?.visualflows?.publish, flowId]
+    [
+      capabilitiesQuery.error,
+      capabilitiesQuery.isError,
+      capabilitiesQuery.isLoading,
+      closeSubrunStreams,
+      commonContract?.runs?.start,
+      connectStream,
+      dispatchEvent,
+      flowEditorContract?.run_input_schema,
+      flowEditorContract?.visualflows?.publish,
+      flowId,
+      gatewayReadiness.operations.run.ready,
+      gatewayReadiness.operations.run.reason,
+    ]
   );
 
   // Reset the session id so the next run starts a fresh context.

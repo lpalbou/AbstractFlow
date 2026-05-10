@@ -22,10 +22,13 @@ import { RunSwitcherDropdown } from './RunSwitcherDropdown';
 import { JsonViewer } from './JsonViewer';
 import { KgActiveMemoryPanel } from './KgActiveMemoryPanel';
 import {
+  endpointFromDescriptor,
+  descriptorEndpointAvailable,
   gatewayJson,
   gatewayPath,
   jsonRequest,
   type GatewayContracts,
+  type GatewayEndpointDescriptor,
 } from '../utils/gatewayClient';
 
 type FlowGraphNode = {
@@ -262,7 +265,11 @@ type GeneratedImagePreview = {
   format?: string;
 };
 
-function extractGeneratedImagePreview(value: unknown, runId: string | null): GeneratedImagePreview | null {
+function extractGeneratedImagePreview(
+  value: unknown,
+  runId: string | null,
+  artifactContentDescriptor?: GatewayEndpointDescriptor | string | null
+): GeneratedImagePreview | null {
   if (!runId || !value || typeof value !== 'object' || Array.isArray(value)) return null;
   const obj = value as Record<string, unknown>;
   const name = typeof obj.name === 'string' ? obj.name : '';
@@ -281,10 +288,14 @@ function extractGeneratedImagePreview(value: unknown, runId: string | null): Gen
   if (!artifactId) return null;
   return {
     artifactId,
-    src: gatewayPath('/api/gateway/runs/{run_id}/artifacts/{artifact_id}/content', {
-      run_id: runId,
-      artifact_id: artifactId,
-    }),
+    src: endpointFromDescriptor(
+      artifactContentDescriptor,
+      '/api/gateway/runs/{run_id}/artifacts/{artifact_id}/content',
+      {
+        run_id: runId,
+        artifact_id: artifactId,
+      }
+    ),
     contentType: typeof imageRaw.content_type === 'string' ? imageRaw.content_type : undefined,
     prompt: typeof payloadRaw.prompt === 'string' ? payloadRaw.prompt : undefined,
     provider: typeof payloadRaw.provider === 'string' ? payloadRaw.provider : undefined,
@@ -644,6 +655,16 @@ export function RunFlowModal({
 
   const promptCacheSessionLifecycle = gatewayContracts?.common?.prompt_cache?.session_lifecycle === true;
   const promptCacheSessionEndpoints = gatewayContracts?.common?.prompt_cache?.session_endpoints || {};
+  const runInputDataDescriptor = gatewayContracts?.common?.runs?.input_data || gatewayContracts?.flow_editor?.runs?.input_data;
+  const strictGatewayContract = Boolean(
+    gatewayContracts && typeof gatewayContracts.version === 'number' && gatewayContracts.version >= 1
+  );
+  const artifactMetadataDescriptor =
+    gatewayContracts?.common?.artifacts?.metadata || gatewayContracts?.flow_editor?.artifacts?.metadata;
+  const artifactContentDescriptor =
+    gatewayContracts?.common?.artifacts?.content || gatewayContracts?.flow_editor?.artifacts?.content;
+  const kgMemoryDescriptor = gatewayContracts?.common?.memory;
+  const kgMemoryAvailable = descriptorEndpointAvailable(kgMemoryDescriptor);
   const promptCacheProvider = (
     selectedProvider.trim() ||
     (promptCacheGraphTarget && !promptCacheGraphTarget.multiple ? promptCacheGraphTarget.provider : '')
@@ -1690,11 +1711,30 @@ export function RunFlowModal({
       return;
     }
     let cancelled = false;
+    const hasInputDataDescriptor = descriptorEndpointAvailable(runInputDataDescriptor);
+    const inputDataEndpoint = (() => {
+      if (hasInputDataDescriptor) {
+        return endpointFromDescriptor(runInputDataDescriptor, '/api/gateway/runs/{run_id}/input_data', { run_id: rootRunId });
+      }
+      if (strictGatewayContract) {
+        console.warn('Gateway contract requires runs.input_data for run rehydration; endpoint is not advertised.');
+        return '';
+      }
+      console.warn(
+        '#FALLBACK: runs.input_data descriptor missing in discovery; using legacy canonical route for run detail rehydration compatibility.'
+      );
+      return gatewayPath('/api/gateway/runs/{run_id}/input_data', { run_id: rootRunId });
+    })();
     (async () => {
+      if (!inputDataEndpoint) {
+        if (!cancelled) {
+          setStartInputData(null);
+          setStartInputDefaults(null);
+        }
+        return;
+      }
       try {
-        const payload = await gatewayJson<Record<string, unknown>>(
-          gatewayPath('/api/gateway/runs/{run_id}/input_data', { run_id: rootRunId })
-        );
+        const payload = await gatewayJson<Record<string, unknown>>(inputDataEndpoint);
         let inputData: Record<string, unknown> | null = null;
         let workspace: Record<string, unknown> | null = null;
         if (payload && typeof payload === 'object') {
@@ -1726,7 +1766,7 @@ export function RunFlowModal({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, rootRunId]);
+  }, [isOpen, rootRunId, runInputDataDescriptor, strictGatewayContract]);
 
   // Map (parentRunId:nodeId[:stepId]) -> sub_run_id for subworkflow waits, so the UI can show
   // child run steps even before the parent subflow node completes.
@@ -2232,8 +2272,8 @@ export function RunFlowModal({
   }, [derivedAgentOutput, selectedStep]);
 
   const generatedImagePreview = useMemo(
-    () => extractGeneratedImagePreview(resolvedStepOutput, selectedStep?.runId || rootRunId || null),
-    [resolvedStepOutput, rootRunId, selectedStep?.runId]
+    () => extractGeneratedImagePreview(resolvedStepOutput, selectedStep?.runId || rootRunId || null, artifactContentDescriptor),
+    [artifactContentDescriptor, resolvedStepOutput, rootRunId, selectedStep?.runId]
   );
 
   const computedFinalResult = useMemo(() => {
@@ -2983,7 +3023,11 @@ export function RunFlowModal({
       const fetched = await Promise.all(
         artifactIds.map(async (aid) => {
           return gatewayJson<{ artifact_id: string; payload: unknown }>(
-            gatewayPath('/api/gateway/runs/{run_id}/artifacts/{artifact_id}', { run_id: rootRunId, artifact_id: aid })
+            endpointFromDescriptor(
+              artifactMetadataDescriptor,
+              '/api/gateway/runs/{run_id}/artifacts/{artifact_id}',
+              { run_id: rootRunId, artifact_id: aid }
+            )
           );
         })
       );
@@ -3044,7 +3088,7 @@ export function RunFlowModal({
     return () => {
       cancelled = true;
     };
-  }, [formatValue, isOpen, recallIntoContextArtifacts, rootRunId, selectedStep]);
+  }, [artifactMetadataDescriptor, formatValue, isOpen, recallIntoContextArtifacts, rootRunId, selectedStep]);
 
   const recallIntoContextDisplay = rehydrateArtifactMarkdown || recallIntoContextPreview;
 
@@ -3259,7 +3303,12 @@ export function RunFlowModal({
           </div>
           <div className="run-modal-header-right">
             {flowId && onSelectRunId ? (
-              <RunSwitcherDropdown workflowId={flowId} currentRunId={rootRunId} onSelectRun={onSelectRunId} />
+              <RunSwitcherDropdown
+                workflowId={flowId}
+                currentRunId={rootRunId}
+                gatewayContracts={gatewayContracts}
+                onSelectRun={onSelectRunId}
+              />
             ) : null}
             <button
               type="button"
@@ -4018,13 +4067,14 @@ export function RunFlowModal({
                             </div>
                           ) : null}
 
-                          {selectedStep?.nodeType === 'memory_kg_query' && selectedStep.output != null ? (
+                          {selectedStep?.nodeType === 'memory_kg_query' && selectedStep.output != null && kgMemoryAvailable ? (
                             <div className="run-output-section">
                               <div className="run-output-title">KG / Active Memory Explorer</div>
                               <KgActiveMemoryPanel
                                 runId={rootRunId || null}
                                 title={selectedStep.nodeLabel || selectedStep.nodeId || 'KG'}
                                 output={selectedStep.output}
+                                queryEndpoint={kgMemoryDescriptor}
                               />
                             </div>
                           ) : null}

@@ -14,8 +14,6 @@ def test_resolve_gateway_url_defaults_to_local_gateway(monkeypatch) -> None:
 
 def test_resolve_gateway_token_prefers_canonical_env(monkeypatch) -> None:
     monkeypatch.delenv("ABSTRACTGATEWAY_AUTH_TOKEN", raising=False)
-    monkeypatch.delenv("ABSTRACTFLOW_GATEWAY_AUTH_TOKEN", raising=False)
-    monkeypatch.setenv("ABSTRACTFLOW_GATEWAY_AUTH_TOKEN", "legacy-token")
     monkeypatch.setenv("ABSTRACTGATEWAY_AUTH_TOKEN", "canonical-token")
 
     assert resolve_gateway_token() == "canonical-token"
@@ -23,10 +21,6 @@ def test_resolve_gateway_token_prefers_canonical_env(monkeypatch) -> None:
 
 def test_require_gateway_connection_requires_token(monkeypatch) -> None:
     monkeypatch.delenv("ABSTRACTGATEWAY_AUTH_TOKEN", raising=False)
-    monkeypatch.delenv("ABSTRACTFLOW_GATEWAY_AUTH_TOKEN", raising=False)
-    monkeypatch.delenv("ABSTRACTCODE_GATEWAY_TOKEN", raising=False)
-    monkeypatch.delenv("ABSTRACTGATEWAY_AUTH_TOKENS", raising=False)
-    monkeypatch.delenv("ABSTRACTFLOW_GATEWAY_AUTH_TOKENS", raising=False)
 
     with pytest.raises(ValueError, match="ABSTRACTGATEWAY_AUTH_TOKEN"):
         require_gateway_connection()

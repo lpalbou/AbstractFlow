@@ -3,8 +3,10 @@ import {
   gatewayJson,
   gatewayPath,
   getGatewayContracts,
+  getGatewayFlowEditorReadiness,
   type GatewayCapabilitiesResponse,
   type GatewayContracts,
+  type GatewayFlowEditorReadiness,
 } from '../utils/gatewayClient';
 
 export function useGatewayCapabilities(enabled = true) {
@@ -19,4 +21,10 @@ export function useGatewayCapabilities(enabled = true) {
 
 export function gatewayContractsFromCapabilities(data: GatewayCapabilitiesResponse | undefined | null): GatewayContracts | null {
   return getGatewayContracts(data);
+}
+
+export function gatewayReadinessFromCapabilities(
+  data: GatewayCapabilitiesResponse | undefined | null
+): GatewayFlowEditorReadiness {
+  return getGatewayFlowEditorReadiness(getGatewayContracts(data));
 }

@@ -24,19 +24,11 @@ function parseArgs(argv) {
     gatewayUrl:
       process.env.ABSTRACTGATEWAY_URL ||
       process.env.ABSTRACTFLOW_GATEWAY_URL ||
-      process.env.ABSTRACTFLOW_BACKEND_URL || // #FALLBACK: legacy env var
-      process.env.BACKEND_URL || // #FALLBACK: legacy env var
       'http://127.0.0.1:8080',
     gatewayToken:
       process.env.ABSTRACTGATEWAY_AUTH_TOKEN ||
-      process.env.ABSTRACTFLOW_GATEWAY_AUTH_TOKEN || // #FALLBACK: legacy env var
-      process.env.ABSTRACTCODE_GATEWAY_TOKEN || // #FALLBACK: legacy env var
       '',
   };
-  let gatewayUrlFromCli = false;
-  let legacyCliFlag = false;
-  let gatewayTokenFromCli = false;
-  let legacyTokenFlag = false;
 
   const args = Array.isArray(argv) ? argv.slice() : [];
   for (let i = 0; i < args.length; i += 1) {
@@ -59,39 +51,19 @@ function parseArgs(argv) {
       i += 1;
       continue;
     }
-    if ((a === '--gateway-url' || a === '--backend-url' || a === '--backend') && typeof next === 'string') {
-      if (a !== '--gateway-url') legacyCliFlag = true;
+    if (a === '--gateway-url' && typeof next === 'string') {
       out.gatewayUrl = next;
-      gatewayUrlFromCli = true;
       i += 1;
       continue;
     }
-    if ((a === '--gateway-token' || a === '--backend-token') && typeof next === 'string') {
-      if (a !== '--gateway-token') legacyTokenFlag = true;
+    if (a === '--gateway-token' && typeof next === 'string') {
       out.gatewayToken = next;
-      gatewayTokenFromCli = true;
       i += 1;
       continue;
     }
   }
 
   if (!Number.isFinite(out.port) || out.port <= 0) out.port = 3003;
-  if (legacyCliFlag) {
-    console.warn('#FALLBACK: --backend-url/--backend is deprecated; use --gateway-url');
-  }
-  if (!gatewayUrlFromCli && !process.env.ABSTRACTGATEWAY_URL && !process.env.ABSTRACTFLOW_GATEWAY_URL) {
-    if (process.env.ABSTRACTFLOW_BACKEND_URL || process.env.BACKEND_URL) {
-      console.warn('#FALLBACK: using legacy ABSTRACTFLOW_BACKEND_URL/BACKEND_URL for gateway URL');
-    }
-  }
-  if (legacyTokenFlag) {
-    console.warn('#FALLBACK: --backend-token is deprecated; use --gateway-token');
-  }
-  if (!gatewayTokenFromCli && !process.env.ABSTRACTGATEWAY_AUTH_TOKEN) {
-    if (process.env.ABSTRACTFLOW_GATEWAY_AUTH_TOKEN || process.env.ABSTRACTCODE_GATEWAY_TOKEN) {
-      console.warn('#FALLBACK: using legacy auth token env var for gateway auth');
-    }
-  }
   return out;
 }
 
@@ -107,8 +79,8 @@ Usage:
 
 Env vars:
   PORT, HOST
-  ABSTRACTGATEWAY_URL (or ABSTRACTFLOW_GATEWAY_URL / ABSTRACTFLOW_BACKEND_URL / BACKEND_URL)
-  ABSTRACTGATEWAY_AUTH_TOKEN (or ABSTRACTFLOW_GATEWAY_AUTH_TOKEN / ABSTRACTCODE_GATEWAY_TOKEN)
+  ABSTRACTGATEWAY_URL (or ABSTRACTFLOW_GATEWAY_URL)
+  ABSTRACTGATEWAY_AUTH_TOKEN
 
 Notes:
   - Proxies /api/* to the gateway URL (HTTP + SSE).
@@ -117,7 +89,7 @@ Notes:
   process.exit(0);
 }
 
-if (!String(OPTS.gatewayToken || '').trim()) {
+  if (!String(OPTS.gatewayToken || '').trim()) {
   console.error(
     'AbstractFlow requires gateway authentication. ' +
     'Export ABSTRACTGATEWAY_AUTH_TOKEN or pass --gateway-token <token>.'

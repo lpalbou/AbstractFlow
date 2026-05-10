@@ -28,40 +28,22 @@ _MEMORY_KG_STORE_CACHE_LOCK = threading.Lock()
 # - The UI can set/update the token at runtime (without restarting the backend).
 # - If we didn't key by token, we'd keep using a cached store with a stale token and get 401s.
 _MEMORY_KG_STORE_CACHE: dict[tuple[str, str, str], Any] = {}
+_LOCAL_RUNTIME_INSTALL_HINT = (
+    " Install `abstractagent` if you need the local compatibility execution stack for agent nodes."
+)
 
 def _resolve_gateway_auth_token() -> str | None:
     """Resolve the gateway auth token for host-to-gateway calls.
 
     Canonical env vars:
     - ABSTRACTGATEWAY_AUTH_TOKEN
-    - ABSTRACTFLOW_GATEWAY_AUTH_TOKEN (legacy compatibility)
-
-    Additional host fallbacks:
-    - ABSTRACTCODE_GATEWAY_TOKEN (AbstractCode CLI convention)
-    - ABSTRACTGATEWAY_AUTH_TOKENS / ABSTRACTFLOW_GATEWAY_AUTH_TOKENS (first token)
     """
-    candidates = [
-        "ABSTRACTGATEWAY_AUTH_TOKEN",
-        "ABSTRACTFLOW_GATEWAY_AUTH_TOKEN",
-        "ABSTRACTCODE_GATEWAY_TOKEN",
-    ]
+    candidates = ["ABSTRACTGATEWAY_AUTH_TOKEN"]
     for name in candidates:
         raw = os.getenv(name)
         token = str(raw or "").strip()
         if token:
             return token
-
-    token_lists = [
-        "ABSTRACTGATEWAY_AUTH_TOKENS",
-        "ABSTRACTFLOW_GATEWAY_AUTH_TOKENS",
-    ]
-    for name in token_lists:
-        raw = os.getenv(name)
-        if not isinstance(raw, str) or not raw.strip():
-            continue
-        first = raw.split(",", 1)[0].strip()
-        if first:
-            return first
 
     return None
 
@@ -512,6 +494,7 @@ def create_visual_runner(
             raise RuntimeError(
                 "This flow uses memory_kg_* nodes, but AbstractMemory integration is not available. "
                 "Install `abstractmemory` (and optionally `abstractmemory[lancedb]`)."
+                + _LOCAL_RUNTIME_INSTALL_HINT
             ) from e
 
         # Ensure stores exist so KG handlers can resolve run-tree scope fallbacks.
@@ -863,6 +846,7 @@ def create_visual_runner(
             except Exception as e:  # pragma: no cover
                 raise RuntimeError(
                     "Visual Agent nodes require AbstractAgent to be installed/importable."
+                    + _LOCAL_RUNTIME_INSTALL_HINT
                 ) from e
 
             from abstractcore.tools import ToolDefinition

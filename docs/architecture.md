@@ -122,7 +122,8 @@ The static `@abstractframework/flow` server, Vite dev proxy, and Python FastAPI 
 
 ## Legacy/dev FastAPI host
 
-The reference host in `web/` provides:
+The reference host in `web/` is now a Gateway proxy/static host by default. When
+`ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1` is set, it also provides compatibility routes for:
 - Flow CRUD (`web/backend/routes/flows.py`) storing `./flows/*.json` relative to its working dir
 - Durable stores for runs/ledger/artifacts (`web/backend/services/runtime_stores.py`)
 - WebSocket execution (`web/backend/routes/ws.py`) with message types:
@@ -130,7 +131,9 @@ The reference host in `web/` provides:
   - `{ "type": "resume", "response": "…" }`
   - `{ "type": "control", "action": "pause|resume|cancel", "run_id": "…" }`
 
-These local routes remain for development/reference compatibility. See [web-editor.md](web-editor.md) for current run instructions.
+These local routes remain for development/reference compatibility only. The normal browser editor
+path uses `/api/gateway/*` and Gateway's run/ledger/artifact contracts. See
+[web-editor.md](web-editor.md) for current run instructions.
 
 ## Workflow bundles (`.flow`)
 

@@ -5,7 +5,42 @@ All notable changes to AbstractFlow will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.8] - 2026-05-09
+
+### Added
+- **Gateway contract strictness for run detail helpers**: AbstractFlow now requires Gateway discovery descriptors for
+  `capabilities.contracts.common.runs.input_data` and `capabilities.contracts.common.runs.history_bundle` (or
+  `contracts.flow_editor.runs.*`) before enabling run rehydration and run history replay in the editor UX.
+  Missing helper descriptors in versioned contracts now produce explicit readiness failures instead of
+  implicit path assumptions.
+- **Gateway capability readiness checks**: New `gatewayClient` helpers (`getGatewayFlowEditorReadiness`,
+  `endpointFromDescriptor`, `descriptorEndpointAvailable`) and the `useGatewayCapabilities` hook
+  (`gatewayReadinessFromCapabilities`) for frontend capability discovery.
+- **Gateway connectivity check**: New `check_gateway_connection()` and `require_gateway_connectivity()`
+  functions in `gateway_options.py` for early validation of gateway reachability.
+- **Lazy runtime exports**: `abstractflow.__init__.py` now uses `__getattr__` to lazily import runtime
+  dependencies (Flow, FlowRunner, compile_flow, etc.), enabling a true thin-client install profile.
+- **npm publish job**: Release workflow now publishes the frontend CLI (`@abstractframework/flow`) to npm
+  alongside the PyPI release.
+
+### Changed
+- **Descriptor-driven endpoint usage in editor paths**: `RunFlowModal` and `Toolbar` now resolve
+  run helper endpoints through descriptors and only use fallback canonical paths for legacy, non-versioned
+  Gateway contracts.
+- **CLI workflow bundle loading**: `abstractflow bundle` commands now lazily import `abstractruntime` to
+  avoid hard dependencies on the runtime stack for thin-client users.
+- **Install profile names**: Updated all documentation and CLI error messages to use canonical profiles
+  (`abstractflow`, `abstractflow[runtime]`, `abstractflow[all-apple]`, `abstractflow[all-gpu]`).
+
+### Fixed
+- **Gateway auth token resolution**: Simplified `resolve_gateway_token()` to use a single env var
+  (`ABSTRACTGATEWAY_AUTH_TOKEN`) and removed fragile comma-split fallback.
+
+### Notable cleanup for thin-client direction
+- Documentation and install guidance now use the canonical profiles:
+  - `abstractflow` (thin client)
+  - `abstractflow[runtime]` (local execution stack)
+  - `abstractflow[all-apple]` / `abstractflow[all-gpu]` (Gateway-capable variants)
 
 ## [0.3.7] - 2026-05-06
 
@@ -42,12 +77,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.3] - 2026-02-06
 
 ### Added
-- **`abstractflow[editor]` extra** as the recommended install for the Visual Editor backend (equivalent to `abstractflow[server]` + `abstractflow[agent]`).
+- **Historical install profile**: `abstractflow[standalone]` was the then-current profile for the Visual Editor backend.
+  It is now replaced by the current split: `abstractflow` (thin client), `abstractflow[runtime]` (local execution),
+  `abstractflow[all-apple]`, and `abstractflow[all-gpu]`.
 
 ## [0.3.2] - 2026-02-06
 
 ### Added
-- **Packaged visual editor backend** (FastAPI) as part of `abstractflow[server]`:
+- **Packaged visual editor backend** (FastAPI) as part of the then-current `abstractflow[standalone]` profile:
   - `abstractflow serve ...` CLI subcommand
   - `abstractflow-backend ...` console script (alias of `python -m backend`)
 

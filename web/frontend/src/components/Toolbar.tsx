@@ -19,11 +19,12 @@ import type { ExecutionEvent, FlowRunResult, VisualFlow, RunHistoryResponse, Run
 import { computeRunPreflightIssues } from '../utils/preflight';
 import { useGatewayCapabilities, gatewayContractsFromCapabilities } from '../hooks/useGatewayCapabilities';
 import {
-  capabilityUnavailable,
   endpointFromDescriptor,
   gatewayFetch,
   gatewayJson,
   gatewayPath,
+  descriptorEndpointAvailable,
+  getGatewayFlowEditorReadiness,
   jsonRequest,
   type GatewayContracts,
 } from '../utils/gatewayClient';
@@ -101,12 +102,35 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
   const gatewayCapabilitiesQuery = useGatewayCapabilities(true);
   const gatewayContracts = gatewayContractsFromCapabilities(gatewayCapabilitiesQuery.data);
   const flowEditorContract = gatewayContracts?.flow_editor;
-  const visualflowCrudUnavailable = capabilityUnavailable(flowEditorContract?.visualflows?.crud);
-  const visualflowPublishUnavailable = capabilityUnavailable(flowEditorContract?.visualflows?.publish);
-  const visualflowPublishHint =
-    flowEditorContract?.visualflows?.publish && typeof flowEditorContract.visualflows.publish.install_hint === 'string'
-      ? flowEditorContract.visualflows.publish.install_hint
+  const gatewayReadiness = getGatewayFlowEditorReadiness(gatewayContracts);
+  const strictGatewayContract = Boolean(
+    gatewayContracts && typeof gatewayContracts.version === 'number' && gatewayContracts.version >= 1
+  );
+  const gatewayDiscoveryError =
+    gatewayCapabilitiesQuery.error instanceof Error
+      ? gatewayCapabilitiesQuery.error.message
+      : gatewayCapabilitiesQuery.isError
+        ? 'Gateway capability discovery failed'
+        : '';
+  const gatewayCheckPending = gatewayCapabilitiesQuery.isLoading;
+  const gatewayBlockReason = gatewayCheckPending
+    ? 'Checking Gateway capabilities'
+    : gatewayDiscoveryError
+      ? `Gateway capability discovery failed: ${gatewayDiscoveryError}`
       : '';
+  const visualflowCrudUnavailable = Boolean(gatewayBlockReason || !gatewayReadiness.operations.save.ready);
+  const visualflowPublishUnavailable = Boolean(gatewayBlockReason || !gatewayReadiness.operations.publish.ready);
+  const visualflowRunUnavailable = Boolean(gatewayBlockReason || !gatewayReadiness.operations.run.ready);
+  const runHistoryUnavailable = Boolean(gatewayBlockReason || !gatewayReadiness.operations.history.ready);
+  const saveUnavailableReason = gatewayBlockReason || gatewayReadiness.operations.save.reason || 'Gateway VisualFlow storage is unavailable';
+  const visualflowPublishHint =
+    gatewayBlockReason ||
+    gatewayReadiness.operations.publish.reason ||
+    (flowEditorContract?.visualflows?.publish && typeof flowEditorContract.visualflows.publish.install_hint === 'string'
+      ? flowEditorContract.visualflows.publish.install_hint
+      : '');
+  const visualflowRunHint = gatewayBlockReason || gatewayReadiness.operations.run.reason || visualflowPublishHint;
+  const runHistoryHint = gatewayBlockReason || gatewayReadiness.operations.history.reason || 'Gateway run history is unavailable';
   const {
     flowId,
     flowName,
@@ -207,14 +231,41 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
   );
 
   async function fetchRunHistory(runId: string): Promise<RunHistoryResponse> {
+    const historyBundleDescriptor =
+      gatewayContracts?.common?.runs?.history_bundle || gatewayContracts?.flow_editor?.runs?.history_bundle;
+    const hasHistoryBundleDescriptor = descriptorEndpointAvailable(historyBundleDescriptor);
+    const historyBundlePath = (() => {
+      if (hasHistoryBundleDescriptor) {
+        return endpointFromDescriptor(
+          historyBundleDescriptor,
+          '/api/gateway/runs/{run_id}/history_bundle',
+          { run_id: runId },
+          {
+            include_subruns: true,
+            ledger_mode: 'full',
+          }
+        );
+      }
+      if (strictGatewayContract) {
+        throw new Error('Gateway contract is missing runs.history_bundle; run history replay is unavailable.');
+      }
+      console.warn(
+        '#FALLBACK: runs.history_bundle descriptor missing in discovery; using legacy canonical route for history replay compatibility.'
+      );
+      return gatewayPath(
+        '/api/gateway/runs/{run_id}/history_bundle',
+        { run_id: runId },
+        {
+          include_subruns: true,
+          ledger_mode: 'full',
+        }
+      );
+    })();
     const bundle = await gatewayJson<{
       run?: Record<string, unknown>;
       ledgers?: Record<string, { items?: Array<{ record?: LedgerRecord }> }>;
     }>(
-      gatewayPath('/api/gateway/runs/{run_id}/history_bundle', { run_id: runId }, {
-        include_subruns: true,
-        ledger_mode: 'full',
-      })
+      historyBundlePath
     );
 
   if (!bundle || typeof bundle.run !== 'object') {
@@ -546,7 +597,7 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
   // Handle save
   const handleSave = useCallback(() => {
     if (visualflowCrudUnavailable) {
-      toast.error('Gateway VisualFlow storage is unavailable');
+      toast.error(saveUnavailableReason);
       return;
     }
     const flow = getFlow();
@@ -555,7 +606,7 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
       return;
     }
     saveMutation.mutate({ flow, existingFlowId: flowId });
-  }, [getFlow, saveMutation, flowId, visualflowCrudUnavailable]);
+  }, [getFlow, saveMutation, flowId, saveUnavailableReason, visualflowCrudUnavailable]);
 
   // Handle run - open modal
   const handleRun = useCallback(() => {
@@ -563,8 +614,8 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
       toast.error('Please save the flow first');
       return;
     }
-    if (visualflowPublishUnavailable) {
-      toast.error(visualflowPublishHint || 'Gateway cannot publish VisualFlows');
+    if (visualflowRunUnavailable) {
+      toast.error(visualflowRunHint || 'Gateway cannot run VisualFlows');
       return;
     }
     // If we already have an active/previous run in memory, opening the modal should
@@ -593,8 +644,8 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
     runResult,
     setPreflightIssues,
     traceEvents.length,
-    visualflowPublishHint,
-    visualflowPublishUnavailable,
+    visualflowRunHint,
+    visualflowRunUnavailable,
   ]);
 
   const resetThreadState = useCallback(() => {
@@ -847,6 +898,10 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
 
   // Duplicate the current flow in-place (keeps current editor state as the source).
   const handleDuplicateCurrent = useCallback(async () => {
+    if (visualflowCrudUnavailable) {
+      toast.error(saveUnavailableReason);
+      return;
+    }
     const flow = getFlow();
     const base = (flow.name || 'Untitled').trim() || 'Untitled';
     try {
@@ -858,7 +913,7 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
       const msg = e instanceof Error ? e.message : 'Duplicate failed';
       toast.error(msg);
     }
-  }, [gatewayContracts, getFlow, loadFlow, queryClient]);
+  }, [gatewayContracts, getFlow, loadFlow, queryClient, saveUnavailableReason, visualflowCrudUnavailable]);
 
   const handlePublish = useCallback(() => {
     if (!flowId) {
@@ -922,7 +977,7 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
           className="toolbar-button"
           onClick={handleDuplicateCurrent}
           disabled={visualflowCrudUnavailable}
-          title="Duplicate Flow"
+          title={visualflowCrudUnavailable ? saveUnavailableReason : 'Duplicate Flow'}
         >
           📑 Duplicate
         </button>
@@ -939,7 +994,7 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
           className="toolbar-button"
           onClick={() => setShowFlowLibrary(true)}
           disabled={visualflowCrudUnavailable}
-          title="Load Flow"
+          title={visualflowCrudUnavailable ? saveUnavailableReason : 'Load Flow'}
         >
           📂 Load
         </button>
@@ -948,7 +1003,7 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
           className="toolbar-button"
           onClick={handleSave}
           disabled={saveMutation.isPending || visualflowCrudUnavailable}
-          title="Save Flow"
+          title={visualflowCrudUnavailable ? saveUnavailableReason : 'Save Flow'}
         >
           💾 Save
         </button>
@@ -956,8 +1011,8 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
         <button
           className="toolbar-button primary"
           onClick={handleRun}
-          disabled={!flowId || visualflowPublishUnavailable}
-          title={visualflowPublishUnavailable ? (visualflowPublishHint || 'Gateway cannot publish VisualFlows') : isRunning ? 'Open current run' : 'Run Flow'}
+          disabled={!flowId || visualflowRunUnavailable}
+          title={visualflowRunUnavailable ? (visualflowRunHint || 'Gateway cannot run VisualFlows') : isRunning ? 'Open current run' : 'Run Flow'}
         >
           {isRunning ? '⏳ Running...' : '▶ Run'}
         </button>
@@ -978,8 +1033,8 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
         <button
           className="toolbar-button"
           onClick={() => setShowRunHistory(true)}
-          disabled={!flowId}
-          title="Run history"
+          disabled={!flowId || runHistoryUnavailable}
+          title={runHistoryUnavailable ? runHistoryHint : 'Run history'}
           aria-label="Open run history"
         >
           🕘
@@ -1112,6 +1167,7 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
         isOpen={showRunHistory}
         workflowId={flowId || ''}
         workflowName={flowName}
+        gatewayContracts={gatewayContracts}
         onClose={() => setShowRunHistory(false)}
         onSelectRun={handleSelectHistoryRun}
       />

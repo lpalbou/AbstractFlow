@@ -21,8 +21,13 @@ import sys
 from pathlib import Path
 
 import logging
+import os
 
 logger = logging.getLogger(__name__)
+
+# The product editor path mounts only Gateway proxy routes by default. The historical
+# WebSocket/local-route tests opt into the preserved compatibility host here.
+os.environ.setdefault("ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME", "1")
 
 def _prepend_sys_path(path: Path) -> None:
     p = str(path)
@@ -64,6 +69,5 @@ def _disable_openai_compatible_model_validation() -> None:
 
     OpenAICompatibleProvider._validate_model = _no_validate  # type: ignore[assignment]
     logger.warning("#FALLBACK: disabled OpenAI-compatible model validation for tests")
-
 
 

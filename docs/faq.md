@@ -19,6 +19,7 @@ Evidence: [../pyproject.toml](../pyproject.toml) (`Development Status :: 2 - Pre
 ## What’s the difference between `Flow` and `VisualFlow`?
 
 - `Flow`: programmatic flow IR (re-exported from AbstractRuntime) used by `FlowRunner`.
+- `Flow` requires `abstractflow[runtime]`.
 - `VisualFlow`: portable JSON authoring format (Pydantic models) produced by the web editor and runnable from any host.
 
 Evidence: [../abstractflow/core/flow.py](../abstractflow/core/flow.py), [../abstractflow/visual/models.py](../abstractflow/visual/models.py), [../abstractflow/runner.py](../abstractflow/runner.py).
@@ -26,6 +27,8 @@ Evidence: [../abstractflow/core/flow.py](../abstractflow/core/flow.py), [../abst
 ## Can I execute a VisualFlow JSON without running the web editor?
 
 Yes. Load the JSON into `VisualFlow` and run it with `abstractflow.visual.execute_visual_flow(...)` (or build a runner with `create_visual_runner(...)` if you need access to the runtime/run state).
+This requires the runtime stack with `pip install "abstractflow[runtime]"`.
+Agent-node features also need `abstractflow[agent]`.
 
 Evidence: [../abstractflow/visual/executor.py](../abstractflow/visual/executor.py).
 
@@ -55,10 +58,11 @@ Evidence: [../abstractflow/visual/session_runner.py](../abstractflow/visual/sess
 ## Does `pip install abstractflow` include the web editor UI?
 
 Not the UI. The visual editor has two parts:
-- Backend (FastAPI): included when you install `abstractflow[editor]` (or `abstractflow[server]`) and runnable via `abstractflow serve`.
+- Backend (FastAPI): included when you install a host profile (`abstractflow[all-apple]`
+  or `abstractflow[all-gpu]`) and runnable via `abstractflow serve`.
 - UI (React): published as the npm package `@abstractframework/flow` (run via `npx`).
 
-Evidence: [../pyproject.toml](../pyproject.toml) (`server` extra + `project.scripts`), [../abstractflow/cli.py](../abstractflow/cli.py), [../web/frontend/bin/cli.js](../web/frontend/bin/cli.js).
+Evidence: [../pyproject.toml](../pyproject.toml) (host profile extras + `project.scripts`), [../abstractflow/cli.py](../abstractflow/cli.py), [../web/frontend/bin/cli.js](../web/frontend/bin/cli.js).
 
 ## Where does the web editor store flows and run data?
 
@@ -86,11 +90,12 @@ The editor backend exposes a **conservative default tool set** derived from Abst
 To add or customize tools, you have a few host-level options:
 
 - **Custom host (Python)**: build your own tool executor and pass it to `create_visual_runner(...)`.
-- **Editor backend**: extend the tool discovery route (`GET /api/tools`) and the host tool executor used for runs.
+- **Gateway-backed editor**: extend Gateway tool discovery and the Gateway/Runtime tool executor.
+- **Compatibility FastAPI host**: set `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1`, then extend the old tool discovery route (`GET /api/tools`) and the host tool executor used for local runs.
 - **Upstream defaults**: depending on your deployment, you may choose to replace/extend AbstractRuntime’s “default tools” selection.
 
 Evidence:
-- Tool discovery endpoint: [../web/backend/routes/tools.py](../web/backend/routes/tools.py) (`GET /api/tools`)
+- Compatibility tool discovery endpoint: [../web/backend/routes/tools.py](../web/backend/routes/tools.py) (`GET /api/tools`, only when `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1`)
 - Default tool executor wiring: [../abstractflow/visual/workspace_scoped_tools.py](../abstractflow/visual/workspace_scoped_tools.py)
 - Editor backend wiring: [../web/backend/routes/flows.py](../web/backend/routes/flows.py), [../web/backend/routes/ws.py](../web/backend/routes/ws.py)
 - Run guide: [web-editor.md](web-editor.md)
@@ -105,9 +110,13 @@ Evidence: [../abstractflow/cli.py](../abstractflow/cli.py), [../abstractflow/wor
 
 ## Do I need an AbstractGateway?
 
-Not necessarily. VisualFlow execution is runtime-based and can run locally with AbstractCore integration. The web editor can optionally connect to a gateway (URL/token) for catalogs and bundle upload/reload.
+For the modern browser editor, yes: Gateway is the runtime, persistence, discovery, ledger, and artifact authority. The editor calls same-origin `/api/gateway/*` through a Flow proxy so bearer auth stays server-side.
 
-Evidence: [../abstractflow/visual/executor.py](../abstractflow/visual/executor.py) (gateway token resolution), [../web/backend/services/gateway_connection.py](../web/backend/services/gateway_connection.py), [../web/backend/routes/flows.py](../web/backend/routes/flows.py) (publish/upload/reload).
+For local runtime use, install `abstractflow[runtime]` and run with `abstractflow.visual.execute_visual_flow(...)` or
+`create_visual_runner(...)`. The old FastAPI local runtime routes are compatibility-only and are gated by
+`ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1`.
+
+Evidence: [../web/frontend/src/utils/gatewayClient.ts](../web/frontend/src/utils/gatewayClient.ts), [../web/backend/main.py](../web/backend/main.py), [../abstractflow/visual/executor.py](../abstractflow/visual/executor.py).
 
 ## Why do I see pins in `node.data.inputs/outputs` instead of `node.inputs/outputs`?
 
