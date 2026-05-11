@@ -470,10 +470,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#web-editor-host-fastapi-websockets" class="md-nav__link">
+  <a href="#web-editor-host-gateway-first" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Web editor host (FastAPI + WebSockets)
+        Web editor host (Gateway-first)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#legacydev-fastapi-host" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Legacy/dev FastAPI host
       
     </span>
   </a>
@@ -750,10 +761,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#web-editor-host-fastapi-websockets" class="md-nav__link">
+  <a href="#web-editor-host-gateway-first" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Web editor host (FastAPI + WebSockets)
+        Web editor host (Gateway-first)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#legacydev-fastapi-host" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Legacy/dev FastAPI host
       
     </span>
   </a>
@@ -824,9 +846,9 @@ Scope: describes <strong>implemented behavior</strong> in this repository (no ro
   cli.py                       # `abstractflow` CLI
   workflow_bundle.py           # Bundle helpers (delegates to AbstractRuntime)
 docs/                          # Human docs (this folder)
-web/                           # Reference visual editor app (backend shipped via `abstractflow[server]`)
-  backend/                     # FastAPI backend (CRUD + websocket execution)
-  frontend/                    # React editor + run UI
+web/                           # Reference visual editor app
+  backend/                     # Legacy/dev FastAPI host + Gateway proxy
+  frontend/                    # React editor + Gateway-first run UI
   flows/                       # Default flow storage when running backend from `web/`
   runtime/                     # Default runtime persistence in a source checkout (installed: ~/.abstractflow/runtime)
 tests/                         # Test suite
@@ -834,12 +856,12 @@ tests/                         # Test suite
 <h2 id="high-level-data-and-execution-flow">High-level data and execution flow<a class="headerlink" href="#high-level-data-and-execution-flow" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code>flowchart LR
   subgraph Authoring
-    FE[web/frontend&lt;br/&gt;React editor] --&gt;|save/load VisualFlow JSON| BE[web/backend&lt;br/&gt;FastAPI]
-    BE --&gt;|persists| FLOWS[(web/flows/*.json)]
+    FE[web/frontend&lt;br/&gt;React editor] --&gt;|/api/gateway/*| GW[AbstractGateway&lt;br/&gt;VisualFlows + bundles]
+    GW --&gt;|persists| GWDATA[(Gateway data dirs)]
   end
 
   subgraph Execution
-    HOST[Host process&lt;br/&gt;(web backend / CLI / 3rd party)] --&gt;|validate| VF[VisualFlow models&lt;br/&gt;abstractflow/visual/models.py]
+    HOST[Host process&lt;br/&gt;(Gateway / CLI / 3rd party)] --&gt;|validate| VF[VisualFlow models&lt;br/&gt;abstractflow/visual/models.py]
     HOST --&gt;|create_visual_runner| WIRE[Runtime wiring&lt;br/&gt;abstractflow/visual/executor.py]
     WIRE --&gt; RT[AbstractRuntime Runtime&lt;br/&gt;tick/resume]
     RT --&gt; STORES[(RunStore / LedgerStore / ArtifactStore)]
@@ -847,7 +869,7 @@ tests/                         # Test suite
     RT --&gt;|START_SUBWORKFLOW| REG[WorkflowRegistry]
   end
 
-  BE --&gt;|WS: run/resume/control| HOST
+  FE --&gt;|HTTP/SSE: start/commands/ledger| GW
 </code></pre></div>
 <h2 id="portable-data-model-visualflow-json">Portable data model: VisualFlow JSON<a class="headerlink" href="#portable-data-model-visualflow-json" title="Permanent link">&para;</a></h2>
 <p>The portable authoring format is <code>VisualFlow</code> (Pydantic models):
@@ -883,15 +905,27 @@ tests/                         # Test suite
 - <code>VisualSessionRunner</code> starts derived event-listener workflows as <strong>child runs</strong> in the same session.
 - During <code>run()</code>, it also ticks those child runs so <code>EMIT_EVENT</code> branches make progress without a separate host loop.</p>
 <p>Evidence: <a href="../abstractflow/visual/session_runner.py">../abstractflow/visual/session_runner.py</a>, wiring in <a href="../abstractflow/visual/executor.py">../abstractflow/visual/executor.py</a>, tests in <a href="../tests/test_visual_custom_events.py">../tests/test_visual_custom_events.py</a>.</p>
-<h2 id="web-editor-host-fastapi-websockets">Web editor host (FastAPI + WebSockets)<a class="headerlink" href="#web-editor-host-fastapi-websockets" title="Permanent link">&para;</a></h2>
-<p>The reference host in <code>web/</code> provides:
+<h2 id="web-editor-host-gateway-first">Web editor host (Gateway-first)<a class="headerlink" href="#web-editor-host-gateway-first" title="Permanent link">&para;</a></h2>
+<p>The modern editor is a thin Gateway client:
+- VisualFlow CRUD: <code>GET/POST/PUT/DELETE /api/gateway/visualflows</code>
+- Publish: <code>POST /api/gateway/visualflows/{flow_id}/publish</code>
+- Run input schema: <code>GET /api/gateway/bundles/{bundle_id}/flows/{flow_id}/input_schema</code>
+- Runs/commands: <code>POST /api/gateway/runs/start</code>, <code>POST /api/gateway/commands</code>
+- Replay/stream: <code>GET /api/gateway/runs/{run_id}/ledger</code>, <code>GET /api/gateway/runs/{run_id}/ledger/stream</code>
+- Artifacts: <code>GET /api/gateway/runs/{run_id}/artifacts/...</code></p>
+<p>The static <code>@abstractframework/flow</code> server, Vite dev proxy, and Python FastAPI host all proxy <code>/api/gateway/*</code> and inject the configured Gateway bearer token server-side. This is required because browser <code>EventSource</code> cannot send custom auth headers.</p>
+<h2 id="legacydev-fastapi-host">Legacy/dev FastAPI host<a class="headerlink" href="#legacydev-fastapi-host" title="Permanent link">&para;</a></h2>
+<p>The reference host in <code>web/</code> is now a Gateway proxy/static host by default. When
+<code>ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1</code> is set, it also provides compatibility routes for:
 - Flow CRUD (<code>web/backend/routes/flows.py</code>) storing <code>./flows/*.json</code> relative to its working dir
 - Durable stores for runs/ledger/artifacts (<code>web/backend/services/runtime_stores.py</code>)
 - WebSocket execution (<code>web/backend/routes/ws.py</code>) with message types:
   - <code>{ "type": "run", "input_data": {…} }</code>
   - <code>{ "type": "resume", "response": "…" }</code>
   - <code>{ "type": "control", "action": "pause|resume|cancel", "run_id": "…" }</code></p>
-<p>See <a href="../web-editor/">web-editor.md</a> for run instructions.</p>
+<p>These local routes remain for development/reference compatibility only. The normal browser editor
+path uses <code>/api/gateway/*</code> and Gateway's run/ledger/artifact contracts. See
+<a href="../web-editor/">web-editor.md</a> for current run instructions.</p>
 <h2 id="workflow-bundles-flow">Workflow bundles (<code>.flow</code>)<a class="headerlink" href="#workflow-bundles-flow" title="Permanent link">&para;</a></h2>
 <p>WorkflowBundles package a root VisualFlow JSON plus any referenced subflows into a single <code>.flow</code> (zip) file (manifest + flow JSON files).</p>
 <ul>

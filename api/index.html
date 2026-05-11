@@ -460,6 +460,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#gateway-editor-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gateway editor contract
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#adapters-advanced" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -773,6 +784,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#gateway-editor-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gateway editor contract
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#adapters-advanced" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -825,12 +847,14 @@
 <p>Evidence: <a href="../abstractflow/_version.py">../abstractflow/_version.py</a>, <a href="../abstractflow/__init__.py">../abstractflow/<strong>init</strong>.py</a>, <a href="../pyproject.toml">../pyproject.toml</a>.</p>
 <h2 id="programmatic-flows">Programmatic flows<a class="headerlink" href="#programmatic-flows" title="Permanent link">&para;</a></h2>
 <h3 id="flow-ir">Flow IR<a class="headerlink" href="#flow-ir" title="Permanent link">&para;</a></h3>
-<p><code>Flow</code>, <code>FlowNode</code>, and <code>FlowEdge</code> are re-exported from AbstractRuntime so there is a single source of truth for semantics.</p>
+<p><code>Flow</code>, <code>FlowNode</code>, and <code>FlowEdge</code> are re-exported from AbstractRuntime so there is a single source of truth for semantics.
+These APIs are available with <code>abstractflow[apple]</code> or <code>abstractflow[gpu]</code>.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">abstractflow</span><span class="w"> </span><span class="kn">import</span> <span class="n">Flow</span><span class="p">,</span> <span class="n">FlowNode</span><span class="p">,</span> <span class="n">FlowEdge</span>
 </code></pre></div>
 <p>Evidence: <a href="../abstractflow/core/flow.py">../abstractflow/core/flow.py</a>, <a href="../abstractflow/__init__.py">../abstractflow/<strong>init</strong>.py</a>.</p>
 <h3 id="flowrunner">FlowRunner<a class="headerlink" href="#flowrunner" title="Permanent link">&para;</a></h3>
-<p><code>FlowRunner</code> compiles a <code>Flow</code> to a runtime <code>WorkflowSpec</code> and executes it using an AbstractRuntime <code>Runtime</code>.</p>
+<p><code>FlowRunner</code> compiles a <code>Flow</code> to a runtime <code>WorkflowSpec</code> and executes it using an AbstractRuntime <code>Runtime</code>.
+Available with <code>abstractflow[apple]</code> or <code>abstractflow[gpu]</code>.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">abstractflow</span><span class="w"> </span><span class="kn">import</span> <span class="n">FlowRunner</span>
 </code></pre></div>
 <p>Key behaviors:
@@ -840,7 +864,8 @@
 - Provides <code>start(...)</code>, <code>step(...)</code>, and <code>resume(...)</code> for host-driven execution loops.</p>
 <p>Evidence: <a href="../abstractflow/runner.py">../abstractflow/runner.py</a>.</p>
 <h3 id="compilation">Compilation<a class="headerlink" href="#compilation" title="Permanent link">&para;</a></h3>
-<p>Compilation functions are delegated to AbstractRuntime’s VisualFlow compiler and re-exported:</p>
+<p>Compilation functions are delegated to AbstractRuntime’s VisualFlow compiler and re-exported:
+Requires <code>abstractflow[apple]</code> or <code>abstractflow[gpu]</code>.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">abstractflow</span><span class="w"> </span><span class="kn">import</span> <span class="n">compile_flow</span>
 </code></pre></div>
 <p>Advanced compilation helpers are also re-exported (typically used by hosts/tools, not most end users):</p>
@@ -855,12 +880,15 @@
 <p>Evidence: <a href="../abstractflow/visual/models.py">../abstractflow/visual/models.py</a>, <a href="../abstractflow/visual/__init__.py">../abstractflow/visual/<strong>init</strong>.py</a>.</p>
 <h3 id="execute-a-visualflow">Execute a VisualFlow<a class="headerlink" href="#execute-a-visualflow" title="Permanent link">&para;</a></h3>
 <p>Use <code>execute_visual_flow(...)</code> for a simple “run and return a result” call:</p>
+<p>Requires <code>abstractflow[apple]</code>.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">abstractflow.visual</span><span class="w"> </span><span class="kn">import</span> <span class="n">execute_visual_flow</span>
 </code></pre></div>
 <p>For advanced use cases (custom stores/tool execution, or access to run state/ledger), build a runner:</p>
+<p>Requires <code>abstractflow[apple]</code>.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">abstractflow.visual</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_visual_runner</span>
 </code></pre></div>
 <p>Utilities:</p>
+<p>Requires <code>abstractflow[apple]</code> for runtime flow-spec conversion.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">abstractflow.visual</span><span class="w"> </span><span class="kn">import</span> <span class="n">visual_to_flow</span>
 </code></pre></div>
 <p>Evidence: <a href="../abstractflow/visual/executor.py">../abstractflow/visual/executor.py</a>, <a href="../getting-started/">getting-started.md</a>.</p>
@@ -874,7 +902,8 @@
 </code></pre></div>
 <p>Evidence: <a href="../abstractflow/visual/interfaces.py">../abstractflow/visual/interfaces.py</a>.</p>
 <h2 id="workflow-bundles-flow">Workflow bundles (<code>.flow</code>)<a class="headerlink" href="#workflow-bundles-flow" title="Permanent link">&para;</a></h2>
-<p>WorkflowBundle helpers are available as a thin wrapper around AbstractRuntime’s bundle implementation:</p>
+<p>WorkflowBundle helpers are available as a thin wrapper around AbstractRuntime’s bundle implementation:
+Requires <code>abstractflow[apple]</code>.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">abstractflow.workflow_bundle</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">pack_workflow_bundle</span><span class="p">,</span>
     <span class="n">inspect_workflow_bundle</span><span class="p">,</span>
@@ -882,6 +911,12 @@
 <span class="p">)</span>
 </code></pre></div>
 <p>Evidence: <a href="../abstractflow/workflow_bundle.py">../abstractflow/workflow_bundle.py</a>, <a href="../cli/">cli.md</a>.</p>
+<h2 id="gateway-editor-contract">Gateway editor contract<a class="headerlink" href="#gateway-editor-contract" title="Permanent link">&para;</a></h2>
+<p>The React editor is a thin client for AbstractGateway's versioned discovery contract:</p>
+<div class="highlight"><pre><span></span><code>GET /api/gateway/discovery/capabilities
+</code></pre></div>
+<p>It reads <code>capabilities.contracts.flow_editor</code> for VisualFlow CRUD/publish, run input schema, run start, ledger stream, artifact, and prompt-cache endpoints. The browser calls same-origin <code>/api/gateway/*</code>; the Flow static server/Vite/Python host proxy those requests to Gateway and inject the configured bearer token.</p>
+<p>Evidence: <a href="../web/frontend/src/hooks/useGatewayCapabilities.ts">../web/frontend/src/hooks/useGatewayCapabilities.ts</a>, <a href="../web/frontend/src/utils/gatewayClient.ts">../web/frontend/src/utils/gatewayClient.ts</a>, <a href="../web/backend/main.py">../web/backend/main.py</a>.</p>
 <h2 id="adapters-advanced">Adapters (advanced)<a class="headerlink" href="#adapters-advanced" title="Permanent link">&para;</a></h2>
 <p>If you build custom hosts or want direct control over node handler construction, adapters are re-exported:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">abstractflow.adapters</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
@@ -896,7 +931,7 @@
 - <a href="../abstractflow/cli.py">../abstractflow/cli.py</a></p>
 <p>The CLI includes:
 - WorkflowBundle tools: <code>abstractflow bundle ...</code>
-- Visual editor backend runner (optional): <code>abstractflow serve ...</code> (requires <code>abstractflow[server]</code>)</p>
+- Visual editor backend runner (optional): <code>abstractflow serve ...</code> (requires <code>abstractflow[apple]</code> or <code>abstractflow[gpu]</code>)</p>
 <p>Evidence: <a href="../pyproject.toml">../pyproject.toml</a>, <a href="../abstractflow/cli.py">../abstractflow/cli.py</a>, <a href="../web/backend/cli.py">../web/backend/cli.py</a>.</p>
 
 

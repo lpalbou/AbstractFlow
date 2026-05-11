@@ -68,7 +68,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#visual-editor-reference-app-in-web" class="md-skip">
+        <a href="#visual-editor-gateway-first" class="md-skip">
           Skip to content
         </a>
       
@@ -419,10 +419,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#run-recommended-pypi-npx" class="md-nav__link">
+  <a href="#run-recommended-abstractgateway-npx" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Run (recommended: PyPI + npx)
+        Run (recommended: AbstractGateway + npx)
       
     </span>
   </a>
@@ -441,10 +441,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#run-single-process-production-mode" class="md-nav__link">
+  <a href="#run-fastapi-gateway-proxy-host" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Run (single-process “production” mode)
+        Run (FastAPI Gateway proxy host)
       
     </span>
   </a>
@@ -463,10 +463,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#gateway-connectivity-optional" class="md-nav__link">
+  <a href="#gateway-connectivity-and-auth" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Gateway connectivity (optional)
+        Gateway connectivity and auth
       
     </span>
   </a>
@@ -485,10 +485,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#websocket-execution" class="md-nav__link">
+  <a href="#run-execution" class="md-nav__link">
     <span class="md-ellipsis">
       
-        WebSocket execution
+        Run execution
       
     </span>
   </a>
@@ -584,10 +584,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#run-recommended-pypi-npx" class="md-nav__link">
+  <a href="#run-recommended-abstractgateway-npx" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Run (recommended: PyPI + npx)
+        Run (recommended: AbstractGateway + npx)
       
     </span>
   </a>
@@ -606,10 +606,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#run-single-process-production-mode" class="md-nav__link">
+  <a href="#run-fastapi-gateway-proxy-host" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Run (single-process “production” mode)
+        Run (FastAPI Gateway proxy host)
       
     </span>
   </a>
@@ -628,10 +628,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#gateway-connectivity-optional" class="md-nav__link">
+  <a href="#gateway-connectivity-and-auth" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Gateway connectivity (optional)
+        Gateway connectivity and auth
       
     </span>
   </a>
@@ -650,10 +650,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#websocket-execution" class="md-nav__link">
+  <a href="#run-execution" class="md-nav__link">
     <span class="md-ellipsis">
       
-        WebSocket execution
+        Run execution
       
     </span>
   </a>
@@ -680,98 +680,100 @@
   
 
 
-<h1 id="visual-editor-reference-app-in-web">Visual editor (reference app in <code>web/</code>)<a class="headerlink" href="#visual-editor-reference-app-in-web" title="Permanent link">&para;</a></h1>
+<h1 id="visual-editor-gateway-first">Visual editor (Gateway-first)<a class="headerlink" href="#visual-editor-gateway-first" title="Permanent link">&para;</a></h1>
 <p>This repository includes a reference visual editor:
-- FastAPI backend: <code>web/backend/</code>
-- React frontend: <code>web/frontend/</code></p>
-<p>It is intended for development and as a reference host for executing VisualFlows. For convenience, the backend is also shipped as an <strong>optional</strong> part of the Python package (<code>abstractflow[editor]</code> / <code>abstractflow[server]</code>).</p>
+- React frontend: <code>web/frontend/</code>
+- Gateway proxy/static server: <code>@abstractframework/flow</code>
+- Legacy/dev FastAPI host: <code>web/backend/</code></p>
+<p>The primary runtime host is now AbstractGateway. The editor saves VisualFlow JSON through Gateway, publishes <code>.flow</code> bundles there, starts runs through Gateway, and renders Gateway ledger/artifact/history streams.
+Install a host profile (<code>abstractflow[apple]</code> or <code>abstractflow[gpu]</code>)
+to run the local Python host/proxy stack.</p>
 <p>See also: <a href="../README.md">../README.md</a>, <a href="../getting-started/">getting-started.md</a>, <a href="../faq/">faq.md</a>, <a href="../visualflow/">visualflow.md</a>, <a href="../architecture/">architecture.md</a>.</p>
-<h2 id="run-recommended-pypi-npx">Run (recommended: PyPI + npx)<a class="headerlink" href="#run-recommended-pypi-npx" title="Permanent link">&para;</a></h2>
-<p>Terminal 1 (backend):</p>
+<h2 id="run-recommended-abstractgateway-npx">Run (recommended: AbstractGateway + npx)<a class="headerlink" href="#run-recommended-abstractgateway-npx" title="Permanent link">&para;</a></h2>
+<p>Terminal 1 (Gateway):</p>
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>.venv
 <span class="nb">source</span><span class="w"> </span>.venv/bin/activate
-pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;abstractflow[editor]&quot;</span>
+pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;abstractgateway[http]&quot;</span><span class="w"> </span>abstractflow
 
-abstractflow<span class="w"> </span>serve<span class="w"> </span>--reload<span class="w"> </span>--port<span class="w"> </span><span class="m">8080</span>
-</code></pre></div>
-<p>Alternative entrypoint (equivalent):</p>
-<div class="highlight"><pre><span></span><code>abstractflow-backend<span class="w"> </span>--reload<span class="w"> </span>--port<span class="w"> </span><span class="m">8080</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">ABSTRACTGATEWAY_AUTH_TOKEN</span><span class="o">=</span>dev-token
+abstractgateway<span class="w"> </span>--port<span class="w"> </span><span class="m">8080</span>
 </code></pre></div>
 <p>Terminal 2 (UI):</p>
-<div class="highlight"><pre><span></span><code>npx<span class="w"> </span>@abstractframework/flow
+<div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">ABSTRACTGATEWAY_AUTH_TOKEN</span><span class="o">=</span>dev-token
+npx<span class="w"> </span>@abstractframework/flow<span class="w"> </span>--gateway-url<span class="w"> </span>http://127.0.0.1:8080
 </code></pre></div>
 <p>Notes:
-- The UI expects <code>/api/*</code> on the same origin; the <code>npx</code> server proxies <code>/api/*</code> (HTTP + WebSocket) to the backend (default: <code>http://127.0.0.1:8080</code>).
-- Override the backend target with <code>--backend-url ...</code> (or env <code>ABSTRACTFLOW_BACKEND_URL</code>).
-- <code>abstractflow[editor]</code> is equivalent to installing <code>abstractflow[server]</code> + <code>abstractflow[agent]</code> together.</p>
+- The browser never needs the bearer token directly. The Flow static server injects <code>Authorization: Bearer ...</code> while proxying <code>/api/*</code> to Gateway.
+- Use <code>ABSTRACTGATEWAY_URL</code> or <code>ABSTRACTFLOW_GATEWAY_URL</code> (or <code>--gateway-url</code>) to point at a non-default Gateway.</p>
 <p>Open:
 - UI: http://localhost:3003
-- Backend health: http://localhost:8080/api/health</p>
+- Gateway capabilities: http://localhost:8080/api/gateway/discovery/capabilities</p>
 <h2 id="run-from-source-dev-mode">Run (from source / dev mode)<a class="headerlink" href="#run-from-source-dev-mode" title="Permanent link">&para;</a></h2>
-<p>Terminal 1 (backend):</p>
+<p>Terminal 1 (Gateway):</p>
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>.venv
 <span class="nb">source</span><span class="w"> </span>.venv/bin/activate
-pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[server,agent]&quot;</span>
+pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
+pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>../abstractgateway
 
-<span class="nb">cd</span><span class="w"> </span>web
-python<span class="w"> </span>-m<span class="w"> </span>backend<span class="w"> </span>--reload<span class="w"> </span>--port<span class="w"> </span><span class="m">8080</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">ABSTRACTGATEWAY_AUTH_TOKEN</span><span class="o">=</span>dev-token
+abstractgateway<span class="w"> </span>--port<span class="w"> </span><span class="m">8080</span>
 </code></pre></div>
 <p>Terminal 2 (frontend):</p>
 <div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>web/frontend
 npm<span class="w"> </span>install
+<span class="nb">export</span><span class="w"> </span><span class="nv">ABSTRACTGATEWAY_AUTH_TOKEN</span><span class="o">=</span>dev-token
 npm<span class="w"> </span>run<span class="w"> </span>dev
 </code></pre></div>
 <p>Open:
-- Frontend: http://localhost:3003 (Vite dev server; see <code>web/frontend/package.json</code>)
-- Backend: http://localhost:8080/api/health (FastAPI; see <code>web/backend/main.py</code>)</p>
-<h2 id="run-single-process-production-mode">Run (single-process “production” mode)<a class="headerlink" href="#run-single-process-production-mode" title="Permanent link">&para;</a></h2>
-<p>Build the frontend and let the backend serve it:</p>
+- Frontend: http://localhost:3003 or Vite's printed port
+- Gateway: http://localhost:8080/api/gateway/discovery/capabilities</p>
+<h2 id="run-fastapi-gateway-proxy-host">Run (FastAPI Gateway proxy host)<a class="headerlink" href="#run-fastapi-gateway-proxy-host" title="Permanent link">&para;</a></h2>
+<p>The Python host still serves the built UI and now proxies <code>/api/gateway/*</code> to AbstractGateway with server-side auth injection:</p>
 <div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>web/frontend
 npm<span class="w"> </span>install
 npm<span class="w"> </span>run<span class="w"> </span>build
 
 <span class="nb">cd</span><span class="w"> </span>../
-python<span class="w"> </span>-m<span class="w"> </span>backend<span class="w"> </span>--port<span class="w"> </span><span class="m">8080</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">ABSTRACTGATEWAY_AUTH_TOKEN</span><span class="o">=</span>dev-token
+python<span class="w"> </span>-m<span class="w"> </span>backend<span class="w"> </span>--port<span class="w"> </span><span class="m">3003</span><span class="w"> </span>--gateway-url<span class="w"> </span>http://127.0.0.1:8080
 </code></pre></div>
-<p>Evidence: <a href="../web/backend/main.py">../web/backend/main.py</a> serves <code>web/frontend/dist</code> when it exists.</p>
+<p>By default, this host mounts only the Gateway proxy, connection/config, UI config, and host metrics routes. To expose the old local <code>/api/flows</code>, <code>/api/ws</code>, <code>/api/runs</code>, <code>/api/providers</code>, <code>/api/tools</code>, <code>/api/semantics</code>, and <code>/api/memory/kg</code> compatibility routes, set:</p>
+<div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME</span><span class="o">=</span><span class="m">1</span>
+</code></pre></div>
+<p>Evidence: <a href="../web/backend/main.py">../web/backend/main.py</a> serves <code>web/frontend/dist</code> when it exists, proxies Gateway API calls, and gates legacy local runtime routes behind <code>ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME</code>.</p>
 <h2 id="where-data-is-stored">Where data is stored<a class="headerlink" href="#where-data-is-stored" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Flows: <code>./flows/*.json</code> relative to the backend working directory.</li>
-<li>Override with <code>ABSTRACTFLOW_FLOWS_DIR</code> (recommended when using the packaged backend).</li>
-<li>Evidence: <code>FLOWS_DIR</code> in <a href="../web/backend/routes/flows.py">../web/backend/routes/flows.py</a>.</li>
-<li>Runtime persistence (runs/ledger/artifacts): defaults to:</li>
-<li>source checkout: <code>web/runtime/</code></li>
-<li>installed package: <code>~/.abstractflow/runtime</code></li>
-<li>Override with <code>ABSTRACTFLOW_RUNTIME_DIR</code>.</li>
-<li>Evidence: <a href="../web/backend/services/paths.py">../web/backend/services/paths.py</a>, <a href="../web/backend/services/runtime_stores.py">../web/backend/services/runtime_stores.py</a>.</li>
+<li>Gateway stores VisualFlows, bundles, runs, ledgers, workspaces, attachments, and artifacts in its configured data directories.</li>
+<li>The FastAPI compatibility routes still have local storage knobs (<code>ABSTRACTFLOW_FLOWS_DIR</code>, <code>ABSTRACTFLOW_RUNTIME_DIR</code>), but those routes are opt-in with <code>ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1</code>.</li>
 </ul>
-<h2 id="gateway-connectivity-optional">Gateway connectivity (optional)<a class="headerlink" href="#gateway-connectivity-optional" title="Permanent link">&para;</a></h2>
-<p>The backend can talk to an AbstractGateway for embeddings-backed memory KG operations and bundle publishing/reload.</p>
+<h2 id="gateway-connectivity-and-auth">Gateway connectivity and auth<a class="headerlink" href="#gateway-connectivity-and-auth" title="Permanent link">&para;</a></h2>
+<p>Gateway connectivity is required for the modern editor path.</p>
 <p>Common env vars / flags:
 - <code>ABSTRACTGATEWAY_URL</code> (default <code>http://127.0.0.1:8080</code>)
 - <code>ABSTRACTGATEWAY_AUTH_TOKEN</code>
-- CLI flags: <code>abstractflow serve --gateway-url ... --gateway-token ...</code> (or <code>python -m backend ...</code>) (see <code>web/backend/cli.py</code>)</p>
-<p>If no gateway token is available, backend startup fails with a clear error telling you to export <code>ABSTRACTGATEWAY_AUTH_TOKEN</code> or pass <code>--gateway-token</code>.</p>
+- UI CLI flags: <code>npx @abstractframework/flow --gateway-url ... --gateway-token ...</code>
+- Python host flags: <code>abstractflow serve --gateway-url ... --gateway-token ...</code> (or <code>python -m backend ...</code>)</p>
+<p>For the modern editor path, if no gateway token is available the static Flow server and Python host fail fast with a clear error telling you to export <code>ABSTRACTGATEWAY_AUTH_TOKEN</code> or pass <code>--gateway-token</code>.</p>
 <p>Evidence:
 - UI modal: <a href="../web/frontend/src/components/GatewayConnectionModal.tsx">../web/frontend/src/components/GatewayConnectionModal.tsx</a>
 - Backend persistence + env bootstrap: <a href="../web/backend/services/gateway_connection.py">../web/backend/services/gateway_connection.py</a>
 - Embeddings config check + KG embedder wiring: <a href="../web/backend/routes/connection.py">../web/backend/routes/connection.py</a>, <a href="../web/backend/routes/memory_kg.py">../web/backend/routes/memory_kg.py</a>
-- Bundle upload/reload on publish: <a href="../web/backend/routes/flows.py">../web/backend/routes/flows.py</a></p>
+- Gateway proxy auth injection: <a href="../web/frontend/bin/cli.js">../web/frontend/bin/cli.js</a>, <a href="../web/frontend/vite.config.ts">../web/frontend/vite.config.ts</a>, <a href="../web/backend/main.py">../web/backend/main.py</a></p>
 <h2 id="tools-abstractcore">Tools (AbstractCore)<a class="headerlink" href="#tools-abstractcore" title="Permanent link">&para;</a></h2>
-<p>Tool lists shown in the editor come from the backend:
-- HTTP endpoint: <code>GET /api/tools</code> (<code>web/backend/routes/tools.py</code>)
-- Execution: tool calls are run by the host tool executor (<code>abstractflow/visual/workspace_scoped_tools.py</code>)</p>
-<p>By default, the backend exposes a conservative tool set derived from AbstractRuntime’s “default tools” list, plus a small number of extra safe web helpers.</p>
-<p>To add or customize tools, update the host:
-- Tool discovery (<code>GET /api/tools</code>): <code>web/backend/routes/tools.py</code>
-- Tool execution (workspace scoping + mapping executor): <code>abstractflow/visual/workspace_scoped_tools.py</code></p>
+<p>Tool lists shown in the editor come from Gateway discovery:
+- HTTP endpoint: <code>GET /api/gateway/discovery/tools</code>
+- Execution: tool calls are run by the Gateway/Runtime host tool executor.</p>
+<p>The old local <code>GET /api/tools</code> route is available only in the opt-in FastAPI compatibility host. To add or customize tools for the normal editor path, update Gateway's discovery and runtime tool executor.</p>
 <p>Evidence: <a href="../web/backend/routes/tools.py">../web/backend/routes/tools.py</a>, <a href="../abstractflow/visual/workspace_scoped_tools.py">../abstractflow/visual/workspace_scoped_tools.py</a>.</p>
-<h2 id="websocket-execution">WebSocket execution<a class="headerlink" href="#websocket-execution" title="Permanent link">&para;</a></h2>
-<p>The Run UI uses WebSocket messages:
-- <code>{ "type": "run", "input_data": {…} }</code>
-- <code>{ "type": "resume", "response": "…" }</code>
-- <code>{ "type": "control", "action": "pause|resume|cancel", "run_id": "…" }</code></p>
-<p>Evidence: <a href="../web/backend/routes/ws.py">../web/backend/routes/ws.py</a>.</p>
+<h2 id="run-execution">Run execution<a class="headerlink" href="#run-execution" title="Permanent link">&para;</a></h2>
+<p>The Run UI uses Gateway's replay-first HTTP/SSE contract:
+- publish: <code>POST /api/gateway/visualflows/{flow_id}/publish</code>
+- input schema: <code>GET /api/gateway/bundles/{bundle_id}/flows/{flow_id}/input_schema</code>
+- start: <code>POST /api/gateway/runs/start</code>
+- commands: <code>POST /api/gateway/commands</code>
+- stream: <code>GET /api/gateway/runs/{run_id}/ledger/stream</code>
+- artifacts: <code>GET /api/gateway/runs/{run_id}/artifacts/{artifact_id}/content</code></p>
+<p>The legacy WebSocket host still exists in <a href="../web/backend/routes/ws.py">../web/backend/routes/ws.py</a> for development/reference use and is mounted only when <code>ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1</code>.</p>
 
 
 

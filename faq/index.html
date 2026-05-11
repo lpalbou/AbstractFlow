@@ -867,11 +867,14 @@
 <h2 id="whats-the-difference-between-flow-and-visualflow">What’s the difference between <code>Flow</code> and <code>VisualFlow</code>?<a class="headerlink" href="#whats-the-difference-between-flow-and-visualflow" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>Flow</code>: programmatic flow IR (re-exported from AbstractRuntime) used by <code>FlowRunner</code>.</li>
+<li><code>Flow</code> requires <code>abstractflow[apple]</code>.</li>
 <li><code>VisualFlow</code>: portable JSON authoring format (Pydantic models) produced by the web editor and runnable from any host.</li>
 </ul>
 <p>Evidence: <a href="../abstractflow/core/flow.py">../abstractflow/core/flow.py</a>, <a href="../abstractflow/visual/models.py">../abstractflow/visual/models.py</a>, <a href="../abstractflow/runner.py">../abstractflow/runner.py</a>.</p>
 <h2 id="can-i-execute-a-visualflow-json-without-running-the-web-editor">Can I execute a VisualFlow JSON without running the web editor?<a class="headerlink" href="#can-i-execute-a-visualflow-json-without-running-the-web-editor" title="Permanent link">&para;</a></h2>
-<p>Yes. Load the JSON into <code>VisualFlow</code> and run it with <code>abstractflow.visual.execute_visual_flow(...)</code> (or build a runner with <code>create_visual_runner(...)</code> if you need access to the runtime/run state).</p>
+<p>Yes. Load the JSON into <code>VisualFlow</code> and run it with <code>abstractflow.visual.execute_visual_flow(...)</code> (or build a runner with <code>create_visual_runner(...)</code> if you need access to the runtime/run state).
+This requires the runtime stack with <code>pip install "abstractflow[apple]"</code>.
+Agent-node features also need <code>abstractflow[agent]</code>.</p>
 <p>Evidence: <a href="../abstractflow/visual/executor.py">../abstractflow/visual/executor.py</a>.</p>
 <h2 id="how-do-subflows-work">How do subflows work?<a class="headerlink" href="#how-do-subflows-work" title="Permanent link">&para;</a></h2>
 <p>Subflows are VisualFlows referenced by id from nodes of type <code>subflow</code>:
@@ -888,9 +891,10 @@
 <p>Evidence: <a href="../abstractflow/visual/session_runner.py">../abstractflow/visual/session_runner.py</a>, wiring in <a href="../abstractflow/visual/executor.py">../abstractflow/visual/executor.py</a>.</p>
 <h2 id="does-pip-install-abstractflow-include-the-web-editor-ui">Does <code>pip install abstractflow</code> include the web editor UI?<a class="headerlink" href="#does-pip-install-abstractflow-include-the-web-editor-ui" title="Permanent link">&para;</a></h2>
 <p>Not the UI. The visual editor has two parts:
-- Backend (FastAPI): included when you install <code>abstractflow[editor]</code> (or <code>abstractflow[server]</code>) and runnable via <code>abstractflow serve</code>.
+- Backend (FastAPI): included when you install a host profile (<code>abstractflow[apple]</code>
+  or <code>abstractflow[gpu]</code>) and runnable via <code>abstractflow serve</code>.
 - UI (React): published as the npm package <code>@abstractframework/flow</code> (run via <code>npx</code>).</p>
-<p>Evidence: <a href="../pyproject.toml">../pyproject.toml</a> (<code>server</code> extra + <code>project.scripts</code>), <a href="../abstractflow/cli.py">../abstractflow/cli.py</a>, <a href="../web/frontend/bin/cli.js">../web/frontend/bin/cli.js</a>.</p>
+<p>Evidence: <a href="../pyproject.toml">../pyproject.toml</a> (host profile extras + <code>project.scripts</code>), <a href="../abstractflow/cli.py">../abstractflow/cli.py</a>, <a href="../web/frontend/bin/cli.js">../web/frontend/bin/cli.js</a>.</p>
 <h2 id="where-does-the-web-editor-store-flows-and-run-data">Where does the web editor store flows and run data?<a class="headerlink" href="#where-does-the-web-editor-store-flows-and-run-data" title="Permanent link">&para;</a></h2>
 <p>Defaults:
 - Flows: <code>./flows/*.json</code> relative to the backend working directory (override with <code>ABSTRACTFLOW_FLOWS_DIR</code>).
@@ -909,11 +913,12 @@
 <p>To add or customize tools, you have a few host-level options:</p>
 <ul>
 <li><strong>Custom host (Python)</strong>: build your own tool executor and pass it to <code>create_visual_runner(...)</code>.</li>
-<li><strong>Editor backend</strong>: extend the tool discovery route (<code>GET /api/tools</code>) and the host tool executor used for runs.</li>
+<li><strong>Gateway-backed editor</strong>: extend Gateway tool discovery and the Gateway/Runtime tool executor.</li>
+<li><strong>Compatibility FastAPI host</strong>: set <code>ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1</code>, then extend the old tool discovery route (<code>GET /api/tools</code>) and the host tool executor used for local runs.</li>
 <li><strong>Upstream defaults</strong>: depending on your deployment, you may choose to replace/extend AbstractRuntime’s “default tools” selection.</li>
 </ul>
 <p>Evidence:
-- Tool discovery endpoint: <a href="../web/backend/routes/tools.py">../web/backend/routes/tools.py</a> (<code>GET /api/tools</code>)
+- Compatibility tool discovery endpoint: <a href="../web/backend/routes/tools.py">../web/backend/routes/tools.py</a> (<code>GET /api/tools</code>, only when <code>ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1</code>)
 - Default tool executor wiring: <a href="../abstractflow/visual/workspace_scoped_tools.py">../abstractflow/visual/workspace_scoped_tools.py</a>
 - Editor backend wiring: <a href="../web/backend/routes/flows.py">../web/backend/routes/flows.py</a>, <a href="../web/backend/routes/ws.py">../web/backend/routes/ws.py</a>
 - Run guide: <a href="../web-editor/">web-editor.md</a></p>
@@ -923,8 +928,11 @@
 - The bundle format and packer are owned by AbstractRuntime; AbstractFlow provides a thin wrapper.</p>
 <p>Evidence: <a href="../abstractflow/cli.py">../abstractflow/cli.py</a>, <a href="../abstractflow/workflow_bundle.py">../abstractflow/workflow_bundle.py</a>, tests in <a href="../tests/test_workflow_bundle_pack.py">../tests/test_workflow_bundle_pack.py</a>.</p>
 <h2 id="do-i-need-an-abstractgateway">Do I need an AbstractGateway?<a class="headerlink" href="#do-i-need-an-abstractgateway" title="Permanent link">&para;</a></h2>
-<p>Not necessarily. VisualFlow execution is runtime-based and can run locally with AbstractCore integration. The web editor can optionally connect to a gateway (URL/token) for catalogs and bundle upload/reload.</p>
-<p>Evidence: <a href="../abstractflow/visual/executor.py">../abstractflow/visual/executor.py</a> (gateway token resolution), <a href="../web/backend/services/gateway_connection.py">../web/backend/services/gateway_connection.py</a>, <a href="../web/backend/routes/flows.py">../web/backend/routes/flows.py</a> (publish/upload/reload).</p>
+<p>For the modern browser editor, yes: Gateway is the runtime, persistence, discovery, ledger, and artifact authority. The editor calls same-origin <code>/api/gateway/*</code> through a Flow proxy so bearer auth stays server-side.</p>
+<p>For local runtime use, install <code>abstractflow[apple]</code> and run with <code>abstractflow.visual.execute_visual_flow(...)</code> or
+<code>create_visual_runner(...)</code>. The old FastAPI local runtime routes are compatibility-only and are gated by
+<code>ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1</code>.</p>
+<p>Evidence: <a href="../web/frontend/src/utils/gatewayClient.ts">../web/frontend/src/utils/gatewayClient.ts</a>, <a href="../web/backend/main.py">../web/backend/main.py</a>, <a href="../abstractflow/visual/executor.py">../abstractflow/visual/executor.py</a>.</p>
 <h2 id="why-do-i-see-pins-in-nodedatainputsoutputs-instead-of-nodeinputsoutputs">Why do I see pins in <code>node.data.inputs/outputs</code> instead of <code>node.inputs/outputs</code>?<a class="headerlink" href="#why-do-i-see-pins-in-nodedatainputsoutputs-instead-of-nodeinputsoutputs" title="Permanent link">&para;</a></h2>
 <p>Saved flows from the editor store pin metadata under <code>node.data.inputs</code> / <code>node.data.outputs</code>. The top-level <code>inputs</code> / <code>outputs</code> fields may exist but are often empty.</p>
 <p>Evidence: <a href="../abstractflow/visual/interfaces.py">../abstractflow/visual/interfaces.py</a> (<code>_pin_types</code> reads <code>node.data.*</code>), sample flows in <a href="../web/flows/">../web/flows/</a>.</p>
