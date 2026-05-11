@@ -38,43 +38,27 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-runtime = [
-    # Programmatic flow IR + execution helpers (`Flow`, `FlowRunner`, VisualFlow local execution).
-    "AbstractRuntime>=0.4.6",
-    "abstractcore[tools]>=2.13.10",
-]
 agent = [
     # Enables built-in Agent node creation in the VisualFlow executor.
     "abstractagent>=0.2.0",
 ]
-all-apple = [
+apple = [
     # Full Gateway Apple profile + local control-plane compatibility stack.
     "AbstractRuntime>=0.4.6",
     "abstractcore[tools]>=2.13.10",
-    "abstractgateway[all-apple]>=0.2.3",
+    "abstractgateway[apple]>=0.2.3",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.23.0",
     "websockets>=11.0.0",
 ]
-all-gpu = [
+gpu = [
     # Gateway GPU profile + local control-plane compatibility stack.
     "AbstractRuntime>=0.4.6",
     "abstractcore[tools]>=2.13.10",
-    "abstractgateway[all-gpu]>=0.2.3",
+    "abstractgateway[gpu]>=0.2.3",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.23.0",
     "websockets>=11.0.0",
-]
-dev = [
-    "pytest>=7.0.0",
-    "pytest-asyncio>=0.21.0",
-    "black>=23.0.0",
-    "isort>=5.12.0",
-    "flake8>=6.0.0",
-    "mypy>=1.0.0",
-    "pre-commit>=3.0.0",
-    "mkdocs>=1.6.0",
-    "mkdocs-material>=9.0.0",
 ]
 docs = [
     "mkdocs>=1.6.0",
@@ -86,7 +70,7 @@ ui = [
     "networkx>=3.1.0",
 ]
 #
-# Optional profiles intentionally remain: base, runtime, agent, all-apple, all-gpu.
+# Optional profiles intentionally remain: base, agent, apple, gpu.
 #
 
 [project.urls]

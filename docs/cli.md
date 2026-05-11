@@ -2,9 +2,8 @@
 
 AbstractFlow ships a small CLI focused on:
 - **WorkflowBundle** (`.flow`) utilities
-- running the **Visual Editor backend** (optional; requires `abstractflow[all-apple]` or `abstractflow[all-gpu]`)
-- Note: WorkflowBundle commands require `abstractflow[runtime]` (or any full host profile:
-  `abstractflow[all-apple]`, `abstractflow[all-gpu]`).
+- running the **Visual Editor backend** (optional; requires `abstractflow[apple]` or `abstractflow[gpu]`)
+- Note: WorkflowBundle commands require `abstractflow[apple]` or `abstractflow[gpu]`.
 
 Entry point:
 - `abstractflow` (declared in `pyproject.toml` → `project.scripts`)
@@ -57,7 +56,7 @@ Evidence:
 Run the FastAPI backend used by the visual editor UI:
 
 ```bash
-pip install "abstractflow[all-apple]"  # or abstractflow[all-gpu]
+pip install "abstractflow[apple]"  # or abstractflow[gpu]
 abstractflow serve --reload --port 8080
 ```
 

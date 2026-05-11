@@ -50,19 +50,18 @@ pip install abstractflow
 Requirements: Python **3.10+** (`pyproject.toml`: `requires-python`).
 
 Optional extras (declared in `pyproject.toml`):
-- Runtime stack for local programmatic/VisualFlow execution APIs (`Flow`, `FlowRunner`, `execute_visual_flow`, workflow bundles): `pip install "abstractflow[runtime]"`
+- Host profiles for local programmatic/VisualFlow execution compatibility (`Flow`, `FlowRunner`, `execute_visual_flow`, workflow bundles): `pip install "abstractflow[apple]"` or `pip install "abstractflow[gpu]"`
 - Full host profiles:
-  - Apple-capable: `pip install "abstractflow[all-apple]"`
-  - GPU-capable: `pip install "abstractflow[all-gpu]"`
-- `abstractflow[all-apple]` and `abstractflow[all-gpu]` both include gateway proxy + local compatibility stack.
+  - Apple-capable: `pip install "abstractflow[apple]"`
+  - GPU-capable: `pip install "abstractflow[gpu]"`
+- `abstractflow[apple]` and `abstractflow[gpu]` both include gateway proxy + local compatibility stack.
 - Agent nodes (Visual Agent node support): `pip install "abstractflow[agent]"`
 - Documentation site tools: `pip install "abstractflow[docs]"`
-- Dev tools: `pip install "abstractflow[dev]"`
 
 ## Quickstart (programmatic)
 
 ```python
-# Requires: `abstractflow[runtime]`
+# Requires: `abstractflow[apple]` or `abstractflow[gpu]`
 from abstractflow import Flow, FlowRunner
 
 flow = Flow("linear")
@@ -81,7 +80,7 @@ print(FlowRunner(flow).run({"value": 5}))
 import json
 from abstractflow.visual import VisualFlow, execute_visual_flow
 
-# Requires: `abstractflow[runtime]`
+# Requires: `abstractflow[apple]` or `abstractflow[gpu]`
 with open("my-flow.json", "r", encoding="utf-8") as f:
     vf = VisualFlow.model_validate(json.load(f))
 

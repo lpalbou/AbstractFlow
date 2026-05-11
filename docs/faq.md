@@ -19,7 +19,7 @@ Evidence: [../pyproject.toml](../pyproject.toml) (`Development Status :: 2 - Pre
 ## What’s the difference between `Flow` and `VisualFlow`?
 
 - `Flow`: programmatic flow IR (re-exported from AbstractRuntime) used by `FlowRunner`.
-- `Flow` requires `abstractflow[runtime]`.
+- `Flow` requires `abstractflow[apple]`.
 - `VisualFlow`: portable JSON authoring format (Pydantic models) produced by the web editor and runnable from any host.
 
 Evidence: [../abstractflow/core/flow.py](../abstractflow/core/flow.py), [../abstractflow/visual/models.py](../abstractflow/visual/models.py), [../abstractflow/runner.py](../abstractflow/runner.py).
@@ -27,7 +27,7 @@ Evidence: [../abstractflow/core/flow.py](../abstractflow/core/flow.py), [../abst
 ## Can I execute a VisualFlow JSON without running the web editor?
 
 Yes. Load the JSON into `VisualFlow` and run it with `abstractflow.visual.execute_visual_flow(...)` (or build a runner with `create_visual_runner(...)` if you need access to the runtime/run state).
-This requires the runtime stack with `pip install "abstractflow[runtime]"`.
+This requires the runtime stack with `pip install "abstractflow[apple]"`.
 Agent-node features also need `abstractflow[agent]`.
 
 Evidence: [../abstractflow/visual/executor.py](../abstractflow/visual/executor.py).
@@ -58,8 +58,8 @@ Evidence: [../abstractflow/visual/session_runner.py](../abstractflow/visual/sess
 ## Does `pip install abstractflow` include the web editor UI?
 
 Not the UI. The visual editor has two parts:
-- Backend (FastAPI): included when you install a host profile (`abstractflow[all-apple]`
-  or `abstractflow[all-gpu]`) and runnable via `abstractflow serve`.
+- Backend (FastAPI): included when you install a host profile (`abstractflow[apple]`
+  or `abstractflow[gpu]`) and runnable via `abstractflow serve`.
 - UI (React): published as the npm package `@abstractframework/flow` (run via `npx`).
 
 Evidence: [../pyproject.toml](../pyproject.toml) (host profile extras + `project.scripts`), [../abstractflow/cli.py](../abstractflow/cli.py), [../web/frontend/bin/cli.js](../web/frontend/bin/cli.js).
@@ -112,7 +112,7 @@ Evidence: [../abstractflow/cli.py](../abstractflow/cli.py), [../abstractflow/wor
 
 For the modern browser editor, yes: Gateway is the runtime, persistence, discovery, ledger, and artifact authority. The editor calls same-origin `/api/gateway/*` through a Flow proxy so bearer auth stays server-side.
 
-For local runtime use, install `abstractflow[runtime]` and run with `abstractflow.visual.execute_visual_flow(...)` or
+For local runtime use, install `abstractflow[apple]` and run with `abstractflow.visual.execute_visual_flow(...)` or
 `create_visual_runner(...)`. The old FastAPI local runtime routes are compatibility-only and are gated by
 `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1`.
 

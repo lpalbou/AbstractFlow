@@ -80,8 +80,7 @@ _RUNTIME_EXPORTS = {
 }
 
 _RUNTIME_INSTALL_HINT = (
-    "Install the runtime stack with: pip install \"abstractflow[runtime]\".\n"
-    "For host/profile mode include: pip install \"abstractflow[all-apple]\" or \"abstractflow[all-gpu]\"."
+    'Install the local execution stack with: pip install "abstractflow[apple]" or "abstractflow[gpu]".'
 )
 
 

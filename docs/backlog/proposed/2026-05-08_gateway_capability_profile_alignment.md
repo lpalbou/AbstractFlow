@@ -14,8 +14,8 @@ ledger/history/artifact streams.
 Gateway now has clear Python install profiles:
 
 - `abstractgateway[http]`: lightweight remote/server deployment.
-- `abstractgateway[apple]` / `abstractgateway[all-apple]`: full native Apple deployment.
-- `abstractgateway[gpu]` / `abstractgateway[all-gpu]`: full native GPU deployment.
+- `abstractgateway[apple]`: full native Apple deployment.
+- `abstractgateway[gpu]`: full native GPU deployment.
 - Docker remains limited to the lightweight server image and the explicit NVIDIA server image.
 
 ## Problem
@@ -32,7 +32,7 @@ Make Gateway discovery the source of truth for Flow authoring UX:
   memory/KG readiness, prompt-cache support, tool inventory, and workspace policy from
   `/api/gateway/discovery/capabilities` and related Gateway catalog routes;
 - show node controls only when the connected Gateway advertises the corresponding contract;
-- keep `abstractflow[all-apple]` / `abstractflow[all-gpu]` as UI/proxy install profiles, not a local execution aggregate;
+- keep `abstractflow[apple]` / `abstractflow[gpu]` as UI/proxy install profiles, not a local execution aggregate;
 - document that local hardware setup belongs to `abstractgateway[apple]` or `abstractgateway[gpu]`,
   not to Flow.
 

@@ -193,19 +193,18 @@ pip install abstractflow
 Requirements: Python **3.10+** (`pyproject.toml`: `requires-python`).
 
 Optional extras (declared in `pyproject.toml`):
-- Runtime stack for local programmatic/VisualFlow execution APIs (`Flow`, `FlowRunner`, `execute_visual_flow`, workflow bundles): `pip install "abstractflow[runtime]"`
+- Runtime stack for local programmatic/VisualFlow execution APIs (`Flow`, `FlowRunner`, `execute_visual_flow`, workflow bundles): `pip install "abstractflow[apple]"`
 - Full host profiles:
-  - Apple-capable: `pip install "abstractflow[all-apple]"`
-  - GPU-capable: `pip install "abstractflow[all-gpu]"`
-- `abstractflow[all-apple]` and `abstractflow[all-gpu]` both include gateway proxy + local compatibility stack.
+  - Apple-capable: `pip install "abstractflow[apple]"`
+  - GPU-capable: `pip install "abstractflow[gpu]"`
+- `abstractflow[apple]` and `abstractflow[gpu]` both include gateway proxy + local compatibility stack.
 - Agent nodes (Visual Agent node support): `pip install "abstractflow[agent]"`
 - Documentation site tools: `pip install "abstractflow[docs]"`
-- Dev tools: `pip install "abstractflow[dev]"`
 
 ## Quickstart (programmatic)
 
 ```python
-# Requires: `abstractflow[runtime]`
+# Requires: `abstractflow[apple]`
 from abstractflow import Flow, FlowRunner
 
 flow = Flow("linear")
@@ -224,7 +223,7 @@ print(FlowRunner(flow).run({"value": 5}))
 import json
 from abstractflow.visual import VisualFlow, execute_visual_flow
 
-# Requires: `abstractflow[runtime]`
+# Requires: `abstractflow[apple]`
 with open("my-flow.json", "r", encoding="utf-8") as f:
     vf = VisualFlow.model_validate(json.load(f))
 
@@ -350,12 +349,11 @@ pip install abstractflow
 ```
 
 Optional extras:
-- Runtime APIs (`Flow`, `FlowRunner`, `abstractflow.visual` local execution, workflow bundles): `pip install "abstractflow[runtime]"`
-- Host profile for local Python proxy stack + compatibility routes: `pip install "abstractflow[all-apple]"` or `pip install "abstractflow[all-gpu]"`
-- `abstractflow[all-apple]` and `abstractflow[all-gpu]` both include `abstractflow[runtime]` so local execution helpers are available in compat mode.
+- Runtime APIs (`Flow`, `FlowRunner`, `abstractflow.visual` local execution, workflow bundles): `pip install "abstractflow[apple]"`
+- Host profile for local Python proxy stack + compatibility routes: `pip install "abstractflow[apple]"` or `pip install "abstractflow[gpu]"`
+- `abstractflow[apple]` and `abstractflow[gpu]` both include `abstractflow[apple]` so local execution helpers are available in compat mode.
 - Agent nodes (ReAct workflows): `pip install "abstractflow[agent]"`
 - Documentation site tools: `pip install "abstractflow[docs]"`
-- Dev tools: `pip install "abstractflow[dev]"`
 
 From source (repo root):
 
@@ -368,12 +366,12 @@ Evidence: dependencies and extras are declared in [../pyproject.toml](../pyproje
 For thin-client gateway-first mode, `abstractflow` (without extras) is sufficient. Install `abstractgateway[http]` separately for the backend.
 Enable local runtime compatibility only when needed with `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1`.
 
-If you install a host profile (`all-apple`, `all-gpu`), the local execution stack is already included for compatibility.
+If you install a host profile (`apple`, `gpu`), the local execution stack is already included for compatibility.
 
 Programmatic and local VisualFlow execution examples below require the runtime extra:
 
 ```bash
-pip install "abstractflow[runtime]"
+pip install "abstractflow[apple]"
 ```
 
 ## Programmatic flow (FlowRunner)
@@ -488,7 +486,7 @@ Evidence: [../abstractflow/_version.py](../abstractflow/_version.py), [../abstra
 ### Flow IR
 
 `Flow`, `FlowNode`, and `FlowEdge` are re-exported from AbstractRuntime so there is a single source of truth for semantics.
-These APIs are available with `abstractflow[runtime]` (or any host profile: `abstractflow[all-apple]`, `abstractflow[all-gpu]`).
+These APIs are available with `abstractflow[apple]` (or any host profile: `abstractflow[apple]`, `abstractflow[gpu]`).
 
 ```python
 from abstractflow import Flow, FlowNode, FlowEdge
@@ -499,7 +497,7 @@ Evidence: [../abstractflow/core/flow.py](../abstractflow/core/flow.py), [../abst
 ### FlowRunner
 
 `FlowRunner` compiles a `Flow` to a runtime `WorkflowSpec` and executes it using an AbstractRuntime `Runtime`.
-Available with `abstractflow[runtime]` (or any host profile: `abstractflow[all-apple]`, `abstractflow[all-gpu]`).
+Available with `abstractflow[apple]` (or any host profile: `abstractflow[apple]`, `abstractflow[gpu]`).
 
 ```python
 from abstractflow import FlowRunner
@@ -516,7 +514,7 @@ Evidence: [../abstractflow/runner.py](../abstractflow/runner.py).
 ### Compilation
 
 Compilation functions are delegated to AbstractRuntime’s VisualFlow compiler and re-exported:
-Requires `abstractflow[runtime]` (or any host profile: `abstractflow[all-apple]`, `abstractflow[all-gpu]`).
+Requires `abstractflow[apple]` (or any host profile: `abstractflow[apple]`, `abstractflow[gpu]`).
 
 ```python
 from abstractflow import compile_flow
@@ -546,7 +544,7 @@ Evidence: [../abstractflow/visual/models.py](../abstractflow/visual/models.py), 
 
 Use `execute_visual_flow(...)` for a simple “run and return a result” call:
 
-Requires `abstractflow[runtime]`.
+Requires `abstractflow[apple]`.
 
 ```python
 from abstractflow.visual import execute_visual_flow
@@ -554,7 +552,7 @@ from abstractflow.visual import execute_visual_flow
 
 For advanced use cases (custom stores/tool execution, or access to run state/ledger), build a runner:
 
-Requires `abstractflow[runtime]`.
+Requires `abstractflow[apple]`.
 
 ```python
 from abstractflow.visual import create_visual_runner
@@ -562,7 +560,7 @@ from abstractflow.visual import create_visual_runner
 
 Utilities:
 
-Requires `abstractflow[runtime]` for runtime flow-spec conversion.
+Requires `abstractflow[apple]` for runtime flow-spec conversion.
 
 ```python
 from abstractflow.visual import visual_to_flow
@@ -587,7 +585,7 @@ Evidence: [../abstractflow/visual/interfaces.py](../abstractflow/visual/interfac
 ## Workflow bundles (`.flow`)
 
 WorkflowBundle helpers are available as a thin wrapper around AbstractRuntime’s bundle implementation:
-Requires `abstractflow[runtime]`.
+Requires `abstractflow[apple]`.
 
 ```python
 from abstractflow.workflow_bundle import (
@@ -632,7 +630,7 @@ The `abstractflow` CLI entry point is declared in `pyproject.toml` (`project.scr
 
 The CLI includes:
 - WorkflowBundle tools: `abstractflow bundle ...`
-- Visual editor backend runner (optional): `abstractflow serve ...` (requires `abstractflow[all-apple]` or `abstractflow[all-gpu]`)
+- Visual editor backend runner (optional): `abstractflow serve ...` (requires `abstractflow[apple]` or `abstractflow[gpu]`)
 
 Evidence: [../pyproject.toml](../pyproject.toml), [../abstractflow/cli.py](../abstractflow/cli.py), [../web/backend/cli.py](../web/backend/cli.py).
 
@@ -826,7 +824,7 @@ Evidence: [../pyproject.toml](../pyproject.toml) (`Development Status :: 2 - Pre
 ## What’s the difference between `Flow` and `VisualFlow`?
 
 - `Flow`: programmatic flow IR (re-exported from AbstractRuntime) used by `FlowRunner`.
-- `Flow` requires `abstractflow[runtime]`.
+- `Flow` requires `abstractflow[apple]`.
 - `VisualFlow`: portable JSON authoring format (Pydantic models) produced by the web editor and runnable from any host.
 
 Evidence: [../abstractflow/core/flow.py](../abstractflow/core/flow.py), [../abstractflow/visual/models.py](../abstractflow/visual/models.py), [../abstractflow/runner.py](../abstractflow/runner.py).
@@ -834,7 +832,7 @@ Evidence: [../abstractflow/core/flow.py](../abstractflow/core/flow.py), [../abst
 ## Can I execute a VisualFlow JSON without running the web editor?
 
 Yes. Load the JSON into `VisualFlow` and run it with `abstractflow.visual.execute_visual_flow(...)` (or build a runner with `create_visual_runner(...)` if you need access to the runtime/run state).
-This requires the runtime stack with `pip install "abstractflow[runtime]"`.
+This requires the runtime stack with `pip install "abstractflow[apple]"`.
 Agent-node features also need `abstractflow[agent]`.
 
 Evidence: [../abstractflow/visual/executor.py](../abstractflow/visual/executor.py).
@@ -865,8 +863,8 @@ Evidence: [../abstractflow/visual/session_runner.py](../abstractflow/visual/sess
 ## Does `pip install abstractflow` include the web editor UI?
 
 Not the UI. The visual editor has two parts:
-- Backend (FastAPI): included when you install a host profile (`abstractflow[all-apple]`
-  or `abstractflow[all-gpu]`) and runnable via `abstractflow serve`.
+- Backend (FastAPI): included when you install a host profile (`abstractflow[apple]`
+  or `abstractflow[gpu]`) and runnable via `abstractflow serve`.
 - UI (React): published as the npm package `@abstractframework/flow` (run via `npx`).
 
 Evidence: [../pyproject.toml](../pyproject.toml) (host profile extras + `project.scripts`), [../abstractflow/cli.py](../abstractflow/cli.py), [../web/frontend/bin/cli.js](../web/frontend/bin/cli.js).
@@ -919,7 +917,7 @@ Evidence: [../abstractflow/cli.py](../abstractflow/cli.py), [../abstractflow/wor
 
 For the modern browser editor, yes: Gateway is the runtime, persistence, discovery, ledger, and artifact authority. The editor calls same-origin `/api/gateway/*` through a Flow proxy so bearer auth stays server-side.
 
-For local runtime use, install `abstractflow[runtime]` and run with `abstractflow.visual.execute_visual_flow(...)` or
+For local runtime use, install `abstractflow[apple]` and run with `abstractflow.visual.execute_visual_flow(...)` or
 `create_visual_runner(...)`. The old FastAPI local runtime routes are compatibility-only and are gated by
 `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1`.
 
@@ -1823,8 +1821,8 @@ _RUNTIME_EXPORTS = {
 }
 
 _RUNTIME_INSTALL_HINT = (
-    "Install the runtime stack with: pip install \"abstractflow[runtime]\".\n"
-    "For host/profile mode include: pip install \"abstractflow[all-apple]\" or \"abstractflow[all-gpu]\"."
+    "Install the runtime stack with: pip install \"abstractflow[apple]\".\n"
+    "For host/profile mode include: pip install \"abstractflow[apple]\" or \"abstractflow[gpu]\"."
 )
 
 
@@ -3847,7 +3845,7 @@ This repository includes a reference visual editor:
 - Legacy/dev FastAPI host: `web/backend/`
 
 The primary runtime host is now AbstractGateway. The editor saves VisualFlow JSON through Gateway, publishes `.flow` bundles there, starts runs through Gateway, and renders Gateway ledger/artifact/history streams.
-Install a host profile (`abstractflow[all-apple]` or `abstractflow[all-gpu]`)
+Install a host profile (`abstractflow[apple]` or `abstractflow[gpu]`)
 to run the local Python host/proxy stack.
 
 See also: [../README.md](../README.md), [getting-started.md](getting-started.md), [faq.md](faq.md), [visualflow.md](visualflow.md), [architecture.md](architecture.md).
@@ -7276,9 +7274,9 @@ file: docs/cli.md
 
 AbstractFlow ships a small CLI focused on:
 - **WorkflowBundle** (`.flow`) utilities
-- running the **Visual Editor backend** (optional; requires `abstractflow[all-apple]` or `abstractflow[all-gpu]`)
-- Note: WorkflowBundle commands require `abstractflow[runtime]` (or any full host profile:
-  `abstractflow[all-apple]`, `abstractflow[all-gpu]`).
+- running the **Visual Editor backend** (optional; requires `abstractflow[apple]` or `abstractflow[gpu]`)
+- Note: WorkflowBundle commands require `abstractflow[apple]` (or any full host profile:
+  `abstractflow[apple]`, `abstractflow[gpu]`).
 
 Entry point:
 - `abstractflow` (declared in `pyproject.toml` → `project.scripts`)
@@ -7331,7 +7329,7 @@ Evidence:
 Run the FastAPI backend used by the visual editor UI:
 
 ```bash
-pip install "abstractflow[all-apple]"  # or abstractflow[all-gpu]
+pip install "abstractflow[apple]"  # or abstractflow[gpu]
 abstractflow serve --reload --port 8080
 ```
 
@@ -7387,8 +7385,8 @@ def _load_workflow_bundle_tools():
     except ModuleNotFoundError as exc:
         raise RuntimeError(
             "Workflow bundle commands require the runtime stack. "
-            'Install with: pip install "abstractflow[runtime]" '
-            '(or one host profile: "abstractflow[all-apple]", "abstractflow[all-gpu]").'
+            'Install with: pip install "abstractflow[apple]" '
+            '(or one host profile: "abstractflow[apple]", "abstractflow[gpu]").'
         ) from exc
 
     from .workflow_bundle import inspect_workflow_bundle, pack_workflow_bundle, unpack_workflow_bundle
@@ -7488,7 +7486,7 @@ def main(args: Optional[List[str]] = None) -> int:
             except Exception:
                 sys.stderr.write(
                     "Server dependencies are not installed.\n"
-                    "Install with: pip install \"abstractflow[all-apple]\" or \"abstractflow[all-gpu]\".\n"
+                    "Install with: pip install \"abstractflow[apple]\" or \"abstractflow[gpu]\".\n"
                 )
                 return 2
 
@@ -7499,7 +7497,7 @@ def main(args: Optional[List[str]] = None) -> int:
                 sys.stderr.write(
                     "Failed to import the Visual Editor backend.\n"
                     f"Error: {e}\n"
-                    "Install with: pip install \"abstractflow[all-apple]\" or \"abstractflow[all-gpu]\".\n"
+                    "Install with: pip install \"abstractflow[apple]\" or \"abstractflow[gpu]\".\n"
                 )
                 return 2
 
@@ -7600,20 +7598,20 @@ agent = [
     # Enables built-in Agent node creation in the VisualFlow executor.
     "abstractagent>=0.2.0",
 ]
-all-apple = [
+apple = [
     # Full Gateway Apple profile + local control-plane compatibility stack.
     "AbstractRuntime>=0.4.6",
     "abstractcore[tools]>=2.13.10",
-    "abstractgateway[all-apple]>=0.2.3",
+    "abstractgateway[apple]>=0.2.3",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.23.0",
     "websockets>=11.0.0",
 ]
-all-gpu = [
+gpu = [
     # Gateway GPU profile + local control-plane compatibility stack.
     "AbstractRuntime>=0.4.6",
     "abstractcore[tools]>=2.13.10",
-    "abstractgateway[all-gpu]>=0.2.3",
+    "abstractgateway[gpu]>=0.2.3",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.23.0",
     "websockets>=11.0.0",
@@ -7639,7 +7637,7 @@ ui = [
     "networkx>=3.1.0",
 ]
 #
-# Optional profiles intentionally remain: base, runtime, agent, all-apple, all-gpu.
+# Optional profiles intentionally remain: base, runtime, agent, apple, gpu.
 #
 
 [project.urls]
@@ -8681,10 +8679,9 @@ Evidence: `pyproject.toml` (`project.dependencies`).
 
 Optional Python extras:
 - `abstractflow[agent]`: AbstractAgent
-- `abstractflow[all-apple]`: Full host profile (FastAPI + websockets + all-apple runtime extras)
-- `abstractflow[all-gpu]`: Full host profile (FastAPI + websockets + all-gpu runtime extras)
+- `abstractflow[apple]`: Full host profile (FastAPI + websockets + apple runtime extras)
+- `abstractflow[gpu]`: Full host profile (FastAPI + websockets + gpu runtime extras)
 - `abstractflow[ui]`: Streamlit, Plotly, NetworkX
-- `abstractflow[dev]`: pytest, pytest-asyncio, Black, isort, Flake8, mypy, pre-commit
 - `abstractflow[docs]`: MkDocs and Material theme
 
 Evidence: `pyproject.toml` (`project.optional-dependencies`).
@@ -8700,7 +8697,7 @@ Backend (FastAPI):
 - FastAPI (API + WebSockets)
 - Uvicorn (ASGI server)
 
-Evidence: `web/backend/main.py`, `pyproject.toml` (`all-apple` / `all-gpu` extras).
+Evidence: `web/backend/main.py`, `pyproject.toml` (`apple` / `gpu` extras).
 
 Frontend (React/Vite):
 - React, React DOM
@@ -8750,8 +8747,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Notable cleanup for thin-client direction
 - Documentation and install guidance now use the canonical profiles:
   - `abstractflow` (thin client)
-  - `abstractflow[runtime]` (local execution stack)
-  - `abstractflow[all-apple]` / `abstractflow[all-gpu]` (Gateway-capable variants)
+  - `abstractflow[apple]` (local execution stack)
+  - `abstractflow[apple]` / `abstractflow[gpu]` (Gateway-capable variants)
 
 ## [0.3.7] - 2026-05-06
 
@@ -8789,8 +8786,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Historical install profile**: `abstractflow[standalone]` was the then-current profile for the Visual Editor backend.
-  It is now replaced by the current split: `abstractflow` (thin client), `abstractflow[runtime]` (local execution),
-  `abstractflow[all-apple]`, and `abstractflow[all-gpu]`.
+  It is now replaced by the current split: `abstractflow` (thin client), `abstractflow[apple]` (local execution),
+  `abstractflow[apple]`, and `abstractflow[gpu]`.
 
 ## [0.3.2] - 2026-02-06
 

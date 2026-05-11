@@ -18,12 +18,9 @@ pip install abstractflow
 ```
 
 Optional extras:
-- Runtime APIs (`Flow`, `FlowRunner`, `abstractflow.visual` local execution, workflow bundles): `pip install "abstractflow[runtime]"`
-- Host profile for local Python proxy stack + compatibility routes: `pip install "abstractflow[all-apple]"` or `pip install "abstractflow[all-gpu]"`
-- `abstractflow[all-apple]` and `abstractflow[all-gpu]` both include `abstractflow[runtime]` so local execution helpers are available in compat mode.
+- Host profile for local Python proxy stack + compatibility routes (`Flow`, `FlowRunner`, `abstractflow.visual` local execution, workflow bundles): `pip install "abstractflow[apple]"` or `pip install "abstractflow[gpu]"`
 - Agent nodes (ReAct workflows): `pip install "abstractflow[agent]"`
 - Documentation site tools: `pip install "abstractflow[docs]"`
-- Dev tools: `pip install "abstractflow[dev]"`
 
 From source (repo root):
 
@@ -36,12 +33,12 @@ Evidence: dependencies and extras are declared in [../pyproject.toml](../pyproje
 For thin-client gateway-first mode, `abstractflow` (without extras) is sufficient. Install `abstractgateway[http]` separately for the backend.
 Enable local runtime compatibility only when needed with `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1`.
 
-If you install a host profile (`all-apple`, `all-gpu`), the local execution stack is already included for compatibility.
+If you install a host profile (`apple`, `gpu`), the local execution stack is already included for compatibility.
 
-Programmatic and local VisualFlow execution examples below require the runtime extra:
+Programmatic and local VisualFlow execution examples below require a host profile:
 
 ```bash
-pip install "abstractflow[runtime]"
+pip install "abstractflow[apple]"  # or abstractflow[gpu]
 ```
 
 ## Programmatic flow (FlowRunner)

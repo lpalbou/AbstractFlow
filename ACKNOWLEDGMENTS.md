@@ -37,10 +37,9 @@ Evidence: `pyproject.toml` (`project.dependencies`).
 
 Optional Python extras:
 - `abstractflow[agent]`: AbstractAgent
-- `abstractflow[all-apple]`: Full host profile (FastAPI + websockets + all-apple runtime extras)
-- `abstractflow[all-gpu]`: Full host profile (FastAPI + websockets + all-gpu runtime extras)
+- `abstractflow[apple]`: Full host profile (FastAPI + websockets + apple runtime extras)
+- `abstractflow[gpu]`: Full host profile (FastAPI + websockets + gpu runtime extras)
 - `abstractflow[ui]`: Streamlit, Plotly, NetworkX
-- `abstractflow[dev]`: pytest, pytest-asyncio, Black, isort, Flake8, mypy, pre-commit
 - `abstractflow[docs]`: MkDocs and Material theme
 
 Evidence: `pyproject.toml` (`project.optional-dependencies`).
@@ -56,7 +55,7 @@ Backend (FastAPI):
 - FastAPI (API + WebSockets)
 - Uvicorn (ASGI server)
 
-Evidence: `web/backend/main.py`, `pyproject.toml` (`all-apple` / `all-gpu` extras).
+Evidence: `web/backend/main.py`, `pyproject.toml` (`apple` / `gpu` extras).
 
 Frontend (React/Vite):
 - React, React DOM

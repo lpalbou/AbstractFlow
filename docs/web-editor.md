@@ -6,7 +6,7 @@ This repository includes a reference visual editor:
 - Legacy/dev FastAPI host: `web/backend/`
 
 The primary runtime host is now AbstractGateway. The editor saves VisualFlow JSON through Gateway, publishes `.flow` bundles there, starts runs through Gateway, and renders Gateway ledger/artifact/history streams.
-Install a host profile (`abstractflow[all-apple]` or `abstractflow[all-gpu]`)
+Install a host profile (`abstractflow[apple]` or `abstractflow[gpu]`)
 to run the local Python host/proxy stack.
 
 See also: [../README.md](../README.md), [getting-started.md](getting-started.md), [faq.md](faq.md), [visualflow.md](visualflow.md), [architecture.md](architecture.md).

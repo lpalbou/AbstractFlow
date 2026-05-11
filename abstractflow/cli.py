@@ -24,14 +24,13 @@ from .gateway_options import (
 
 
 def _load_workflow_bundle_tools():
-    """Import workflow bundle helpers only when the optional runtime stack is needed."""
+    """Import workflow bundle helpers only when the local execution stack is needed."""
     try:
         from abstractruntime.workflow_bundle import workflow_bundle_manifest_to_dict
     except ModuleNotFoundError as exc:
         raise RuntimeError(
-            "Workflow bundle commands require the runtime stack. "
-            'Install with: pip install "abstractflow[runtime]" '
-            '(or one host profile: "abstractflow[all-apple]", "abstractflow[all-gpu]").'
+            "Workflow bundle commands require the local execution stack. "
+            'Install with: pip install "abstractflow[apple]" or "abstractflow[gpu]".'
         ) from exc
 
     from .workflow_bundle import inspect_workflow_bundle, pack_workflow_bundle, unpack_workflow_bundle
@@ -131,7 +130,7 @@ def main(args: Optional[List[str]] = None) -> int:
             except Exception:
                 sys.stderr.write(
                     "Server dependencies are not installed.\n"
-                    "Install with: pip install \"abstractflow[all-apple]\" or \"abstractflow[all-gpu]\".\n"
+                    "Install with: pip install \"abstractflow[apple]\" or \"abstractflow[gpu]\".\n"
                 )
                 return 2
 
@@ -142,7 +141,7 @@ def main(args: Optional[List[str]] = None) -> int:
                 sys.stderr.write(
                     "Failed to import the Visual Editor backend.\n"
                     f"Error: {e}\n"
-                    "Install with: pip install \"abstractflow[all-apple]\" or \"abstractflow[all-gpu]\".\n"
+                    "Install with: pip install \"abstractflow[apple]\" or \"abstractflow[gpu]\".\n"
                 )
                 return 2
 

@@ -5,6 +5,20 @@ All notable changes to AbstractFlow will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.9] - 2026-05-11
+
+### Changed
+- Release/install profile guidance now consistently targets canonical install profiles: `abstractflow`, `abstractflow[apple]`, `abstractflow[gpu]`.
+- Runtime profile references and CLI error messages were updated across docs/code paths to remove `all-apple`, `all-gpu`, `runtime`, and `standalone` guidance.
+
+### Fixed
+- Release workflow manual dispatch now handles existing tags safely:
+  - existing `vX.Y.Z` tags for the same commit are reused,
+  - mismatched tag/commit state now fails with a clear remediation message.
+
+### Added
+- Release notes/packaging metadata refresh for the corrected profile taxonomy and corrected dependency/error messaging.
+
 ## [0.3.8] - 2026-05-09
 
 ### Added
@@ -30,7 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CLI workflow bundle loading**: `abstractflow bundle` commands now lazily import `abstractruntime` to
   avoid hard dependencies on the runtime stack for thin-client users.
 - **Install profile names**: Updated all documentation and CLI error messages to use canonical profiles
-  (`abstractflow`, `abstractflow[runtime]`, `abstractflow[all-apple]`, `abstractflow[all-gpu]`).
+  (`abstractflow`, `abstractflow[apple]`, `abstractflow[gpu]`).
 
 ### Fixed
 - **Gateway auth token resolution**: Simplified `resolve_gateway_token()` to use a single env var
@@ -39,8 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Notable cleanup for thin-client direction
 - Documentation and install guidance now use the canonical profiles:
   - `abstractflow` (thin client)
-  - `abstractflow[runtime]` (local execution stack)
-  - `abstractflow[all-apple]` / `abstractflow[all-gpu]` (Gateway-capable variants)
+  - `abstractflow[apple]` / `abstractflow[gpu]` (local execution + gateway-compatible host stack)
 
 ## [0.3.7] - 2026-05-06
 
@@ -78,8 +91,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Historical install profile**: `abstractflow[standalone]` was the then-current profile for the Visual Editor backend.
-  It is now replaced by the current split: `abstractflow` (thin client), `abstractflow[runtime]` (local execution),
-  `abstractflow[all-apple]`, and `abstractflow[all-gpu]`.
+  It is now replaced by the current split: `abstractflow` (thin client),
+  `abstractflow[apple]`, and `abstractflow[gpu]`.
 
 ## [0.3.2] - 2026-02-06
 

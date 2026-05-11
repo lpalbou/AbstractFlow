@@ -32,7 +32,7 @@ Files and symbols inspected:
   events over a local WebSocket.
 - `web/backend/services/executor.py`: thin wrapper around portable local execution helpers.
 - `pyproject.toml`: base package is thin and framework-only; local execution stack is now in
-  `abstractflow[runtime]`; `all-apple` / `all-gpu` add Gateway + FastAPI + compatibility host dependencies,
+  `abstractflow[apple]`; `apple` / `gpu` add Gateway + FastAPI + compatibility host dependencies,
   `agent` adds optional Agent-node dependencies.
 - `abstractflow/cli.py` / `web/backend/cli.py`: guard default host startup behind gateway URL/token check.
 
@@ -69,16 +69,14 @@ There should be two clean entry points:
 - Keep default install path thin for editor-only Gateway clients.
 - Clarify dependency guidance:
   - base: gateway-client library only (no runtime stack by default),
-  - `runtime`: local programmatic/VisualFlow execution stack (`Flow`, `FlowRunner`, local execution helpers),
-- `all-apple`, `all-gpu`: Gateway + FastAPI + compatibility host dependencies + local runtime stack for compatibility mode,
+  - `apple`, `gpu`: Gateway + FastAPI + compatibility host dependencies + local execution stack,
   - `agent`: optional local compatibility support for Agent nodes,
-  - `dev`: tests/docs.
 
 ## Suggested implementation
 
 - Keep and tighten startup mode docs and health-mode visibility.
 - Keep the explicit env-gate for compatibility routes.
-- Ensure generated/auxiliary docs reflect the new profile shape (`all-apple`/`all-gpu` + `agent`, not `local-runtime`).
+- Ensure generated/auxiliary docs reflect the new profile shape (`apple`/`gpu` + `agent`, not `local-runtime`).
 - Add smoke-level check in docs or manual test plan confirming no local route path is used by default UI.
 
 ## Scope
@@ -118,4 +116,4 @@ There should be two clean entry points:
 - [x] Keep local execution routes explicit and opt-in by environment gate.
 - [x] Audit package dependency side effects for truly thin proxy installs.
 - [x] Add tests for default Gateway-only behavior.
-- [x] Plan and implement additional dependency split with no standalone aggregate profile (`all-apple` / `all-gpu` + base/runtimes split).
+- [x] Plan and implement additional dependency split with no standalone aggregate profile (`apple` / `gpu` + base/runtimes split).
