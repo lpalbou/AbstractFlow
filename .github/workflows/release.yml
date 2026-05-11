@@ -207,7 +207,6 @@ jobs:
   publish-npm:
     name: Publish frontend to npm
     runs-on: ubuntu-latest
-    if: ${{ secrets.NPM_TOKEN != '' }}
     needs: [build, ensure-tag]
     environment:
       name: npm
@@ -224,21 +223,26 @@ jobs:
           node-version: "20"
           cache: npm
           cache-dependency-path: web/frontend/package-lock.json
-      - name: Validate npm token
+      - name: Check npm token
+        id: npm-token
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           if [ -z "${NPM_TOKEN}" ]; then
-            echo "NPM_TOKEN is not set. Add NPM_TOKEN secret before enabling npm publish."
-            exit 1
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "NPM_TOKEN is not set. Skipping npm publish for this run."
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+            npm config set //registry.npmjs.org/:_authToken "${NPM_TOKEN}"
           fi
-          npm config set //registry.npmjs.org/:_authToken "${NPM_TOKEN}"
       - name: Install and version frontend package
+        if: steps.npm-token.outputs.publish == 'true'
         working-directory: web/frontend
         run: |
           npm ci
           node -e "const fs=require('fs'); const p='package.json'; const o=JSON.parse(fs.readFileSync(p,'utf8')); o.version='${{ needs.build.outputs.version }}'; fs.writeFileSync(p, JSON.stringify(o, null, 2) + '\\n');"
       - name: Publish
+        if: steps.npm-token.outputs.publish == 'true'
         working-directory: web/frontend
         run: |
           npm run build
