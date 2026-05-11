@@ -167,7 +167,7 @@ jobs:
         run: |
           tag="${{ needs.build.outputs.tag }}"
           if git show-ref --verify --quiet "refs/tags/${tag}"; then
-            remote_sha="$(git rev-parse "refs/tags/${tag}^{ }")"
+            remote_sha="$(git rev-parse "refs/tags/${tag}^{}" 2>/dev/null || git rev-parse "refs/tags/${tag}")"
             local_sha="$(git rev-parse HEAD)"
             if [ "${remote_sha}" != "${local_sha}" ]; then
               echo "Tag ${tag} already exists and points to ${remote_sha}, but current commit is ${local_sha}."
