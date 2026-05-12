@@ -18,8 +18,8 @@ pip install abstractflow
 ```
 
 Optional extras:
-- Host profile for local Python proxy stack + compatibility routes (`Flow`, `FlowRunner`, `abstractflow.visual` local execution, workflow bundles): `pip install "abstractflow[apple]"` or `pip install "abstractflow[gpu]"`
-- Agent nodes (ReAct workflows): `pip install "abstractflow[agent]"`
+- Host profile for local Python proxy stack + compatibility routes (`Flow`, `FlowRunner`, `abstractflow.visual` local execution, workflow bundles, Agent nodes): `pip install "abstractflow[apple]"` or `pip install "abstractflow[gpu]"`
+- Agent nodes only, without the host profile: `pip install "abstractflow[agent]"`
 - Documentation site tools: `pip install "abstractflow[docs]"`
 
 From source (repo root):

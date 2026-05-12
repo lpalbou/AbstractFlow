@@ -40,13 +40,14 @@ dependencies = [
 [project.optional-dependencies]
 agent = [
     # Enables built-in Agent node creation in the VisualFlow executor.
-    "abstractagent>=0.2.0",
+    "abstractagent>=0.3.7",
 ]
 apple = [
     # Apple local control-plane compatibility stack. Install abstractgateway[apple]
     # separately when the Gateway server is needed; Gateway may depend on Flow.
     "AbstractRuntime>=0.4.10",
     "abstractcore[tools]>=2.13.13",
+    "abstractagent>=0.3.7",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.23.0",
     "websockets>=11.0.0",
@@ -56,6 +57,7 @@ gpu = [
     # separately when the Gateway server is needed; Gateway may depend on Flow.
     "AbstractRuntime>=0.4.10",
     "abstractcore[tools]>=2.13.13",
+    "abstractagent>=0.3.7",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.23.0",
     "websockets>=11.0.0",

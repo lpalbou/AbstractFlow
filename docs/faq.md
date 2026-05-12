@@ -28,7 +28,7 @@ Evidence: [../abstractflow/core/flow.py](../abstractflow/core/flow.py), [../abst
 
 Yes. Load the JSON into `VisualFlow` and run it with `abstractflow.visual.execute_visual_flow(...)` (or build a runner with `create_visual_runner(...)` if you need access to the runtime/run state).
 This requires the runtime stack with `pip install "abstractflow[apple]"`.
-Agent-node features also need `abstractflow[agent]`.
+Agent-node features are included in `abstractflow[apple]` and `abstractflow[gpu]`; use `abstractflow[agent]` only when you need Agent nodes without a host profile.
 
 Evidence: [../abstractflow/visual/executor.py](../abstractflow/visual/executor.py).
 
