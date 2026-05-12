@@ -1,6 +1,6 @@
 """Gateway-compatible host metrics endpoints.
 
-This keeps UI widgets (like @abstractutils/monitor-gpu) working when AbstractFlow's
+This keeps UI widgets (like @abstractframework/monitor-gpu) working when AbstractFlow's
 backend is the only server available.
 """
 

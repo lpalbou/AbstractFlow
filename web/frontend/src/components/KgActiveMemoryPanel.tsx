@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 
-import { KgActiveMemoryExplorer, type JsonValue, type KgAssertion, type KgQueryParams, type KgQueryResult } from '@abstractuic/monitor-active-memory';
+import { KgActiveMemoryExplorer, type JsonValue, type KgAssertion, type KgQueryParams, type KgQueryResult } from '@abstractframework/monitor-active-memory';
 import { endpointFromDescriptor, gatewayJson, jsonRequest, type GatewayEndpointDescriptor } from '../utils/gatewayClient';
 
 interface KgActiveMemoryPanelProps {

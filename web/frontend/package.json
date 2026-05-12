@@ -14,10 +14,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/lpalbou/abstractflow.git",
+    "url": "https://github.com/lpalbou/AbstractFlow.git",
     "directory": "web/frontend"
   },
-  "homepage": "https://github.com/lpalbou/abstractflow#readme",
+  "homepage": "https://github.com/lpalbou/AbstractFlow#readme",
   "publishConfig": {
     "access": "public"
   },

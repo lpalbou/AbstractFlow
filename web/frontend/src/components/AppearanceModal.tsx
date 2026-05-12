@@ -1,4 +1,4 @@
-import { FontScaleSelect, HeaderDensitySelect, ThemeSelect } from '@abstractuic/ui-kit';
+import { FontScaleSelect, HeaderDensitySelect, ThemeSelect } from '@abstractframework/ui-kit';
 
 export type AppearanceSettings = {
   theme: string;

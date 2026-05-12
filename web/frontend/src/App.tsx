@@ -6,8 +6,8 @@ import { NodePalette } from './components/NodePalette';
 import { PropertiesPanel } from './components/PropertiesPanel';
 import { Toolbar } from './components/Toolbar';
 import { useFlowStore } from './hooks/useFlow';
-import { applyTheme, applyTypography } from '@abstractuic/ui-kit';
-import { registerMonitorGpuWidget } from '@abstractutils/monitor-gpu';
+import { applyTheme, applyTypography } from '@abstractframework/ui-kit';
+import { registerMonitorGpuWidget } from '@abstractframework/monitor-gpu';
 
 function flag_enabled(value: unknown): boolean {
   const s = String(value ?? '').trim().toLowerCase();

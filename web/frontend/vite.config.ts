@@ -19,10 +19,10 @@ export default defineConfig({
   resolve: {
     alias: [
       { find: '@', replacement: resolve(__dirname, './src') },
-      { find: '@abstractuic/monitor-flow', replacement: resolve(__dirname, '../../../abstractuic/monitor-flow/src') },
-      { find: '@abstractuic/monitor-active-memory', replacement: resolve(__dirname, '../../../abstractuic/monitor-active-memory/src') },
-      { find: '@abstractuic/ui-kit', replacement: resolve(__dirname, '../../../abstractuic/ui-kit/src') },
-      { find: '@abstractutils/monitor-gpu', replacement: resolve(__dirname, '../../../abstractuic/monitor-gpu/src') },
+      { find: '@abstractframework/monitor-flow', replacement: resolve(__dirname, '../../../abstractuic/monitor-flow/src') },
+      { find: '@abstractframework/monitor-active-memory', replacement: resolve(__dirname, '../../../abstractuic/monitor-active-memory/src') },
+      { find: '@abstractframework/ui-kit', replacement: resolve(__dirname, '../../../abstractuic/ui-kit/src') },
+      { find: '@abstractframework/monitor-gpu', replacement: resolve(__dirname, '../../../abstractuic/monitor-gpu/src') },
       // Shared workspace packages (imported from outside this Vite root) can’t
       // resolve `reactflow` via node_modules traversal, so pin it explicitly.
       { find: /^reactflow$/, replacement: resolve(__dirname, './node_modules/reactflow/dist/esm/index.mjs') },

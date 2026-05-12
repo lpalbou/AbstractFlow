@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-import { AgentCyclesPanel, type TraceItem, type TraceStep } from '@abstractuic/monitor-flow';
+import { AgentCyclesPanel, type TraceItem, type TraceStep } from '@abstractframework/monitor-flow';
 
 import type { ExecutionEvent } from '../types/flow';
 
