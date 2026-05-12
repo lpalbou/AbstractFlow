@@ -696,7 +696,7 @@ to run the local Python host/proxy stack.</p>
 pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;abstractgateway[http]&quot;</span><span class="w"> </span>abstractflow
 
 <span class="nb">export</span><span class="w"> </span><span class="nv">ABSTRACTGATEWAY_AUTH_TOKEN</span><span class="o">=</span>dev-token
-abstractgateway<span class="w"> </span>--port<span class="w"> </span><span class="m">8080</span>
+abstractgateway<span class="w"> </span>serve<span class="w"> </span>--port<span class="w"> </span><span class="m">8080</span>
 </code></pre></div>
 <p>Terminal 2 (UI):</p>
 <div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">ABSTRACTGATEWAY_AUTH_TOKEN</span><span class="o">=</span>dev-token
@@ -716,7 +716,7 @@ pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </s
 pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>../abstractgateway
 
 <span class="nb">export</span><span class="w"> </span><span class="nv">ABSTRACTGATEWAY_AUTH_TOKEN</span><span class="o">=</span>dev-token
-abstractgateway<span class="w"> </span>--port<span class="w"> </span><span class="m">8080</span>
+abstractgateway<span class="w"> </span>serve<span class="w"> </span>--port<span class="w"> </span><span class="m">8080</span>
 </code></pre></div>
 <p>Terminal 2 (frontend):</p>
 <div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>web/frontend

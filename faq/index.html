@@ -874,7 +874,7 @@
 <h2 id="can-i-execute-a-visualflow-json-without-running-the-web-editor">Can I execute a VisualFlow JSON without running the web editor?<a class="headerlink" href="#can-i-execute-a-visualflow-json-without-running-the-web-editor" title="Permanent link">&para;</a></h2>
 <p>Yes. Load the JSON into <code>VisualFlow</code> and run it with <code>abstractflow.visual.execute_visual_flow(...)</code> (or build a runner with <code>create_visual_runner(...)</code> if you need access to the runtime/run state).
 This requires the runtime stack with <code>pip install "abstractflow[apple]"</code>.
-Agent-node features also need <code>abstractflow[agent]</code>.</p>
+Agent-node features are included in <code>abstractflow[apple]</code> and <code>abstractflow[gpu]</code>; use <code>abstractflow[agent]</code> only when you need Agent nodes without a host profile.</p>
 <p>Evidence: <a href="../abstractflow/visual/executor.py">../abstractflow/visual/executor.py</a>.</p>
 <h2 id="how-do-subflows-work">How do subflows work?<a class="headerlink" href="#how-do-subflows-work" title="Permanent link">&para;</a></h2>
 <p>Subflows are VisualFlows referenced by id from nodes of type <code>subflow</code>:
