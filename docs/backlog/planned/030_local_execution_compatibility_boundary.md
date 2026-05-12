@@ -32,8 +32,9 @@ Files and symbols inspected:
   events over a local WebSocket.
 - `web/backend/services/executor.py`: thin wrapper around portable local execution helpers.
 - `pyproject.toml`: base package is thin and framework-only; local execution stack is now in
-  `abstractflow[apple]`; `apple` / `gpu` add Gateway + FastAPI + compatibility host dependencies,
-  `agent` adds optional Agent-node dependencies.
+  `abstractflow[apple]`; `apple` / `gpu` add FastAPI + compatibility host dependencies,
+  `agent` adds optional Agent-node dependencies. Gateway stays a separate server package to avoid
+  a circular Flow/Gateway release dependency.
 - `abstractflow/cli.py` / `web/backend/cli.py`: guard default host startup behind gateway URL/token check.
 
 ## Problem
@@ -69,7 +70,8 @@ There should be two clean entry points:
 - Keep default install path thin for editor-only Gateway clients.
 - Clarify dependency guidance:
   - base: gateway-client library only (no runtime stack by default),
-  - `apple`, `gpu`: Gateway + FastAPI + compatibility host dependencies + local execution stack,
+  - `apple`, `gpu`: FastAPI + compatibility host dependencies + local execution stack,
+  - Gateway server: install `abstractgateway[apple]` or `abstractgateway[gpu]` separately,
   - `agent`: optional local compatibility support for Agent nodes,
 
 ## Suggested implementation

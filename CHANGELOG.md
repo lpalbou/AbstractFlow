@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Image, TTS, and STT selectors now write media-specific fields (`image_provider`/`image_model`, `tts_model`, `stt_model`) instead of overloading LLM routing `provider`/`model`.
 
 ### Changed
-- Apple/GPU Flow install profiles now require Gateway `>=0.2.9`, Runtime `>=0.4.10`, and Core `>=2.13.13`.
+- Apple/GPU Flow install profiles now require Runtime `>=0.4.10` and Core `>=2.13.13` while keeping Gateway as a separately installed server dependency to avoid a Flow/Gateway release-order cycle.
 
 ## [0.3.9] - 2026-05-11
 

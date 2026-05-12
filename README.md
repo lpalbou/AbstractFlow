@@ -54,7 +54,7 @@ Optional extras (declared in `pyproject.toml`):
 - Full host profiles:
   - Apple-capable: `pip install "abstractflow[apple]"`
   - GPU-capable: `pip install "abstractflow[gpu]"`
-- `abstractflow[apple]` and `abstractflow[gpu]` both include gateway proxy + local compatibility stack.
+- `abstractflow[apple]` and `abstractflow[gpu]` include the local compatibility stack; install `abstractgateway[apple]` or `abstractgateway[gpu]` separately when you need the Gateway server.
 - Agent nodes (Visual Agent node support): `pip install "abstractflow[agent]"`
 - Documentation site tools: `pip install "abstractflow[docs]"`
 

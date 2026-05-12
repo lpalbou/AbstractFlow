@@ -43,19 +43,19 @@ agent = [
     "abstractagent>=0.2.0",
 ]
 apple = [
-    # Full Gateway Apple profile + local control-plane compatibility stack.
+    # Apple local control-plane compatibility stack. Install abstractgateway[apple]
+    # separately when the Gateway server is needed; Gateway may depend on Flow.
     "AbstractRuntime>=0.4.10",
     "abstractcore[tools]>=2.13.13",
-    "abstractgateway[apple]>=0.2.9",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.23.0",
     "websockets>=11.0.0",
 ]
 gpu = [
-    # Gateway GPU profile + local control-plane compatibility stack.
+    # GPU local control-plane compatibility stack. Install abstractgateway[gpu]
+    # separately when the Gateway server is needed; Gateway may depend on Flow.
     "AbstractRuntime>=0.4.10",
     "abstractcore[tools]>=2.13.13",
-    "abstractgateway[gpu]>=0.2.9",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.23.0",
     "websockets>=11.0.0",
