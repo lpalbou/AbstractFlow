@@ -514,30 +514,32 @@ async def _execute_runner_loop(
 
         return datetime.now(timezone.utc).isoformat()
 
-    def _resolve_waiting_info(state: Any) -> Tuple[str, list, bool, Optional[str], Optional[str]]:
-        """Return (prompt, choices, allow_free_text, wait_key, reason)."""
+    def _resolve_waiting_info(state: Any) -> Tuple[str, list, bool, Optional[str], Optional[str], Dict[str, Any]]:
+        """Return (prompt, choices, allow_free_text, wait_key, reason, details)."""
         wait = getattr(state, "waiting", None)
         if wait is None:
-            return ("Please respond:", [], True, None, None)
+            return ("Please respond:", [], True, None, None, {})
 
         reason = getattr(wait, "reason", None)
         reason_value = reason.value if hasattr(reason, "value") else str(reason) if reason else None
+        raw_details = getattr(wait, "details", None)
+        details = dict(raw_details) if isinstance(raw_details, dict) else {}
 
         if reason_value != "subworkflow":
             prompt = getattr(wait, "prompt", None) or "Please respond:"
             choices = list(getattr(wait, "choices", []) or [])
             allow_free_text = bool(getattr(wait, "allow_free_text", True))
             wait_key = getattr(wait, "wait_key", None)
-            return (prompt, choices, allow_free_text, wait_key, reason_value)
+            return (prompt, choices, allow_free_text, wait_key, reason_value, details)
 
         # Bubble up the deepest waiting child so the UI can render ASK_USER prompts.
         runtime = getattr(runner, "runtime", None)
         if runtime is None:
-            return ("Waiting for subworkflow…", [], True, getattr(wait, "wait_key", None), reason_value)
+            return ("Waiting for subworkflow…", [], True, getattr(wait, "wait_key", None), reason_value, details)
 
         sub_run_id = _extract_sub_run_id(wait)
         if not sub_run_id:
-            return ("Waiting for subworkflow…", [], True, getattr(wait, "wait_key", None), reason_value)
+            return ("Waiting for subworkflow…", [], True, getattr(wait, "wait_key", None), reason_value, details)
 
         current_run_id = sub_run_id
         for _ in range(25):
@@ -560,9 +562,11 @@ async def _execute_runner_loop(
             choices = list(getattr(sub_wait, "choices", []) or [])
             allow_free_text = bool(getattr(sub_wait, "allow_free_text", True))
             wait_key = getattr(sub_wait, "wait_key", None)
-            return (prompt, choices, allow_free_text, wait_key, sub_reason_value)
+            sub_details_raw = getattr(sub_wait, "details", None)
+            sub_details = dict(sub_details_raw) if isinstance(sub_details_raw, dict) else {}
+            return (prompt, choices, allow_free_text, wait_key, sub_reason_value, sub_details)
 
-        return ("Waiting for subworkflow…", [], True, getattr(wait, "wait_key", None), reason_value)
+        return ("Waiting for subworkflow…", [], True, getattr(wait, "wait_key", None), reason_value, details)
 
     def _is_agent_node(node_id: str) -> bool:
         try:
@@ -695,7 +699,7 @@ async def _execute_runner_loop(
                     "node_id": node_before or getattr(state, "current_node", None),
                     "started_at": time.perf_counter(),
                 }
-                prompt, choices, allow_free_text, wait_key, reason = _resolve_waiting_info(state)
+                prompt, choices, allow_free_text, wait_key, reason, details = _resolve_waiting_info(state)
                 await websocket.send_json(
                     {
                         "type": "flow_waiting",
@@ -707,6 +711,7 @@ async def _execute_runner_loop(
                         "prompt": prompt,
                         "choices": choices,
                         "allow_free_text": allow_free_text,
+                        "details": details,
                     }
                 )
                 break
@@ -1507,7 +1512,7 @@ async def _execute_runner_loop(
             # waiting reason requires user input. A root waiting on SUBWORKFLOW completion
             # must keep running so we can tick the child and stream live trace updates.
             if is_root:
-                prompt, choices, allow_free_text, wait_key, reason = _resolve_waiting_info(state)
+                prompt, choices, allow_free_text, wait_key, reason, details = _resolve_waiting_info(state)
                 if reason != "subworkflow":
                     _waiting_runners[connection_id] = runner
                     _waiting_steps[connection_id] = {
@@ -1525,6 +1530,7 @@ async def _execute_runner_loop(
                             "prompt": prompt,
                             "choices": choices,
                             "allow_free_text": allow_free_text,
+                            "details": details,
                         }
                     )
             return state

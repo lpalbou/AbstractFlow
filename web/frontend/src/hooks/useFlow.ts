@@ -16,6 +16,7 @@ import {
 import type { FlowNodeData, VisualFlow, Pin, JsonValue } from '../types/flow';
 import { createNodeData, getNodeTemplate, mergePinDocsFromTemplate, NodeTemplate } from '../types/nodes';
 import { validateConnection } from '../utils/validation';
+import { inferEntryNode, withMultiEntryRouteData } from '../utils/multiEntryRoutes';
 
 interface FlowState {
   // Flow data
@@ -1677,20 +1678,14 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   // Get flow for saving
   getFlow: (): VisualFlow => {
     const state = get();
-
-    // Find entry node: node with no incoming execution edges
-    const execTargets = new Set(
-      state.edges
-        .filter((e) => e.targetHandle === 'exec-in')
-        .map((e) => e.target)
-    );
-    const entryNode = state.nodes.find((n) => !execTargets.has(n.id))?.id;
+    const nodesWithRoutes = withMultiEntryRouteData(state.nodes, state.edges);
+    const entryNode = inferEntryNode(state.nodes, state.edges);
 
     return {
       id: state.flowId || `flow-${Date.now()}`,
       name: state.flowName,
       interfaces: Array.isArray(state.flowInterfaces) ? state.flowInterfaces : [],
-      nodes: state.nodes.map((n) => ({
+      nodes: nodesWithRoutes.map((n) => ({
         id: n.id,
         type: n.data.nodeType,
         position: n.position,

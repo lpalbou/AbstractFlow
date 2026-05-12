@@ -145,6 +145,10 @@ def create_visual_runner(
             "ask_user",
             "answer_user",
             "llm_call",
+            "generate_image",
+            "generate_voice",
+            "transcribe_audio",
+            "listen_voice",
             "tool_calls",
             "wait_until",
             "wait_event",
@@ -255,7 +259,7 @@ def create_visual_runner(
                 needs_registry = True
             if t in {"on_event", "emit_event"}:
                 needs_registry = True
-            if t in {"memory_note", "memory_query", "memory_rehydrate", "memory_compact"}:
+            if t in {"memory_note", "memory_query", "memory_rehydrate", "memory_compact", "generate_image", "generate_voice", "transcribe_audio", "listen_voice"}:
                 needs_artifacts = True
             if t in {"memory_kg_assert", "memory_kg_query"}:
                 needs_memory_kg = True
@@ -346,7 +350,7 @@ def create_visual_runner(
             node_type = _node_type(n)
             if reachable and n.id not in reachable:
                 continue
-            if node_type in {"llm_call", "agent", "tool_calls", "memory_compact"}:
+            if node_type in {"llm_call", "agent", "tool_calls", "memory_compact", "generate_image", "generate_voice", "transcribe_audio"}:
                 has_llm_nodes = True
 
             if node_type == "llm_call":
@@ -362,12 +366,12 @@ def create_visual_runner(
 
                 if not provider_ok and not provider_connected:
                     raise ValueError(
-                        f"LLM_CALL node '{n.id}' in flow '{vf.id}' missing provider "
+                        f"{node_type} node '{n.id}' in flow '{vf.id}' missing provider "
                         "(set effectConfig.provider or connect the provider input pin)"
                     )
                 if not model_ok and not model_connected:
                     raise ValueError(
-                        f"LLM_CALL node '{n.id}' in flow '{vf.id}' missing model "
+                        f"{node_type} node '{n.id}' in flow '{vf.id}' missing model "
                         "(set effectConfig.model or connect the model input pin)"
                     )
                 provider_default = (
@@ -381,6 +385,32 @@ def create_visual_runner(
                     model
                     if model_ok
                     else _infer_connected_pin_default(vf, node_id=n.id, pin_id="model")
+                    if model_connected
+                    else None
+                )
+                _add_pair(provider_default, model_default)
+
+            elif node_type in {"generate_image", "generate_voice", "transcribe_audio"}:
+                cfg = n.data.get("effectConfig", {}) if isinstance(n.data, dict) else {}
+                cfg = cfg if isinstance(cfg, dict) else {}
+                provider = cfg.get("runtime_provider") or cfg.get("runtimeProvider")
+                model = cfg.get("runtime_model") or cfg.get("runtimeModel")
+
+                provider_ok = isinstance(provider, str) and provider.strip()
+                model_ok = isinstance(model, str) and model.strip()
+                provider_connected = _pin_connected(vf, node_id=n.id, pin_id="runtime_provider")
+                model_connected = _pin_connected(vf, node_id=n.id, pin_id="runtime_model")
+                provider_default = (
+                    provider
+                    if provider_ok
+                    else _infer_connected_pin_default(vf, node_id=n.id, pin_id="runtime_provider")
+                    if provider_connected
+                    else None
+                )
+                model_default = (
+                    model
+                    if model_ok
+                    else _infer_connected_pin_default(vf, node_id=n.id, pin_id="runtime_model")
                     if model_connected
                     else None
                 )
@@ -585,8 +615,8 @@ def create_visual_runner(
         # If we can't determine that, fail loudly with a clear error message.
         if provider_model is None:
             raise RuntimeError(
-                "This flow uses LLM nodes (llm_call/agent/memory_compact), but no default provider/model could be determined. "
-                "Set provider+model on a node, or connect provider/model pins to a node with pinDefaults "
+                "This flow uses LLM-backed nodes (llm_call/agent/memory_compact/generate_image/generate_voice/transcribe_audio), but no default provider/model could be determined. "
+                "Set provider+model on an llm_call/agent/memory_compact node, set runtime_provider+runtime_model on a generated media node, or connect the corresponding runtime pins to a node with pinDefaults "
                 "(e.g. ON_FLOW_START), or pass `input_data={'provider': ..., 'model': ...}` when creating the runner."
             )
 

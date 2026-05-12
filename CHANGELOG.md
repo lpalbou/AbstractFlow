@@ -5,6 +5,18 @@ All notable changes to AbstractFlow will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.10] - 2026-05-12
+
+### Added
+- AbstractFlow media node properties now load Gateway voice profiles, TTS models, STT models, provider image models, and cached local vision models from Gateway catalog routes.
+- Generate Image, Generate Voice, Transcribe Audio, and Listen Voice nodes now expose simple Gateway Media controls for local/provider model selection.
+
+### Fixed
+- Image, TTS, and STT selectors now write media-specific fields (`image_provider`/`image_model`, `tts_model`, `stt_model`) instead of overloading LLM routing `provider`/`model`.
+
+### Changed
+- Apple/GPU Flow install profiles now require Gateway `>=0.2.9`, Runtime `>=0.4.10`, and Core `>=2.13.13`.
+
 ## [0.3.9] - 2026-05-11
 
 ### Changed

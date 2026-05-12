@@ -197,6 +197,11 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const gatewayReadiness = getGatewayFlowEditorReadiness(gatewayContracts);
   const providerDiscoveryEndpoint = gatewayContracts?.common?.discovery?.providers || '';
   const providerModelsEndpoint = gatewayContracts?.common?.discovery?.provider_models || '';
+  const voiceCatalogEndpoint = gatewayContracts?.common?.discovery?.voice_voices || '';
+  const ttsModelsEndpoint = gatewayContracts?.common?.discovery?.audio_speech_models || '';
+  const sttModelsEndpoint = gatewayContracts?.common?.discovery?.audio_transcription_models || '';
+  const visionProviderModelsEndpoint = gatewayContracts?.common?.discovery?.vision_provider_models || '';
+  const visionModelsEndpoint = gatewayContracts?.common?.discovery?.vision_models || '';
   const toolsDiscoveryEndpoint = gatewayContracts?.common?.discovery?.tools || '';
   const visualflowCollectionEndpoint = gatewayContracts?.flow_editor?.visualflows?.crud?.collection_endpoint || '';
   const visualflowItemEndpoint = gatewayContracts?.flow_editor?.visualflows?.crud?.item_endpoint || '';
@@ -206,6 +211,11 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const [models, setModels] = useState<string[]>([]);
   const [loadingProviders, setLoadingProviders] = useState(false);
   const [loadingModels, setLoadingModels] = useState(false);
+  const [voiceOptions, setVoiceOptions] = useState<Array<{ value: string; label: string; mode?: string }>>([]);
+  const [ttsModelOptions, setTtsModelOptions] = useState<string[]>([]);
+  const [sttModelOptions, setSttModelOptions] = useState<string[]>([]);
+  const [imageModelOptions, setImageModelOptions] = useState<Array<{ provider: string; model: string; label: string }>>([]);
+  const [loadingMediaModels, setLoadingMediaModels] = useState(false);
 
   // Tool discovery for agent nodes
   const [toolSpecs, setToolSpecs] = useState<ToolSpec[]>([]);
@@ -387,6 +397,102 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       setModels([]);
     }
   }, [gatewayCapabilitiesQuery.isError, providerModelsEndpoint, selectedProvider]);
+
+  useEffect(() => {
+    if (gatewayCapabilitiesQuery.isLoading) return;
+    const anyEndpoint = voiceCatalogEndpoint || ttsModelsEndpoint || sttModelsEndpoint || visionProviderModelsEndpoint || visionModelsEndpoint;
+    if (!anyEndpoint || gatewayCapabilitiesQuery.isError) {
+      setVoiceOptions([]);
+      setTtsModelOptions([]);
+      setSttModelOptions([]);
+      setImageModelOptions([]);
+      setLoadingMediaModels(false);
+      return;
+    }
+
+    const modelId = (item: unknown): string => {
+      if (typeof item === 'string') return item.trim();
+      if (!item || typeof item !== 'object') return '';
+      const rec = item as Record<string, unknown>;
+      for (const key of ['id', 'model', 'model_id', 'name']) {
+        const value = rec[key];
+        if (typeof value === 'string' && value.trim()) return value.trim();
+      }
+      return '';
+    };
+    const uniq = (items: string[]) => Array.from(new Set(items.map((x) => String(x || '').trim()).filter(Boolean)));
+    const modelsFrom = (data: any, ...keys: string[]) => {
+      const out: string[] = [];
+      for (const key of keys) {
+        const values = data && Array.isArray(data[key]) ? data[key] : [];
+        for (const item of values) {
+          const id = modelId(item);
+          if (id) out.push(id);
+        }
+      }
+      if (typeof data?.active_model === 'string' && data.active_model.trim()) out.unshift(data.active_model.trim());
+      return uniq(out);
+    };
+
+    setLoadingMediaModels(true);
+    Promise.all([
+      voiceCatalogEndpoint ? gatewayJson<any>(gatewayPath(voiceCatalogEndpoint)).catch(() => ({})) : Promise.resolve({}),
+      ttsModelsEndpoint ? gatewayJson<any>(gatewayPath(ttsModelsEndpoint)).catch(() => ({})) : Promise.resolve({}),
+      sttModelsEndpoint ? gatewayJson<any>(gatewayPath(sttModelsEndpoint)).catch(() => ({})) : Promise.resolve({}),
+      visionProviderModelsEndpoint ? gatewayJson<any>(gatewayPath(visionProviderModelsEndpoint, {}, { task: 'text_to_image' })).catch(() => ({})) : Promise.resolve({}),
+      visionModelsEndpoint ? gatewayJson<any>(gatewayPath(visionModelsEndpoint)).catch(() => ({})) : Promise.resolve({}),
+    ])
+      .then(([voiceCatalog, ttsCatalog, sttCatalog, imageProviderCatalog, localImageCatalog]) => {
+        const voices: Array<{ value: string; label: string; mode?: string }> = [];
+        const seenVoices = new Set<string>();
+        for (const key of ['profiles', 'voices', 'cloned_voices']) {
+          const values = Array.isArray(voiceCatalog?.[key]) ? voiceCatalog[key] : [];
+          for (const item of values) {
+            if (!item || typeof item !== 'object') continue;
+            const rec = item as Record<string, unknown>;
+            const id = modelId(rec) || String(rec.profile_id || rec.voice_id || '').trim();
+            if (!id || seenVoices.has(id)) continue;
+            seenVoices.add(id);
+            const mode = String(rec.kind || rec.type || '').toLowerCase().includes('clone') ? 'clone' : 'profile';
+            voices.push({ value: id, label: String(rec.label || rec.display_name || id), mode });
+          }
+        }
+        setVoiceOptions(voices);
+        setTtsModelOptions(modelsFrom(ttsCatalog, 'models', 'data', 'tts_models'));
+        setSttModelOptions(modelsFrom(sttCatalog, 'models', 'data', 'stt_models'));
+
+        const imageOptions: Array<{ provider: string; model: string; label: string }> = [];
+        const seenImages = new Set<string>();
+        for (const source of [imageProviderCatalog, localImageCatalog]) {
+          const values = Array.isArray(source?.models) ? source.models : [];
+          for (const item of values) {
+            if (!item || typeof item !== 'object') continue;
+            const rec = item as Record<string, unknown>;
+            const provider = String(rec.provider || rec.provider_id || rec.provider_name || '').trim();
+            const model = modelId(rec);
+            if (!model) continue;
+            const key = `${provider}::${model}`;
+            if (seenImages.has(key)) continue;
+            seenImages.add(key);
+            imageOptions.push({
+              provider,
+              model,
+              label: String(rec.label || rec.display_name || (provider ? `${provider} / ${model}` : model)),
+            });
+          }
+        }
+        setImageModelOptions(imageOptions);
+      })
+      .finally(() => setLoadingMediaModels(false));
+  }, [
+    gatewayCapabilitiesQuery.isError,
+    gatewayCapabilitiesQuery.isLoading,
+    voiceCatalogEndpoint,
+    ttsModelsEndpoint,
+    sttModelsEndpoint,
+    visionProviderModelsEndpoint,
+    visionModelsEndpoint,
+  ]);
 
   // Fetch saved flows when editing a subflow node
   useEffect(() => {
@@ -3821,6 +3927,119 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           <span className="property-hint">
             If disabled, user must choose from provided choices
           </span>
+        </div>
+      )}
+
+      {/* Media capability properties */}
+      {['generate_image', 'generate_voice', 'transcribe_audio', 'listen_voice'].includes(data.nodeType) && (
+        <div className="property-section">
+          <label className="property-label">Gateway Media</label>
+
+          {data.nodeType === 'generate_image' && (
+            <>
+              <div className="property-group">
+                <label className="property-sublabel">Image model</label>
+                <select
+                  className="property-select"
+                  value={(() => {
+                    const provider = data.effectConfig?.image_provider || data.effectConfig?.provider || '';
+                    const model = data.effectConfig?.image_model || data.effectConfig?.model || '';
+                    return model ? `${provider}::${model}` : '';
+                  })()}
+                  onChange={(e) => {
+                    const picked = imageModelOptions.find((item) => `${item.provider}::${item.model}` === e.target.value);
+                    updateNodeData(node.id, {
+                      effectConfig: {
+                        ...data.effectConfig,
+                        image_provider: picked?.provider || undefined,
+                        image_model: picked?.model || undefined,
+                        provider: undefined,
+                        model: undefined,
+                      },
+                    });
+                  }}
+                  disabled={loadingMediaModels}
+                >
+                  <option value="">{loadingMediaModels ? 'Loading...' : 'Gateway default image model'}</option>
+                  {imageModelOptions.map((item) => (
+                    <option key={`${item.provider}:${item.model}`} value={`${item.provider}::${item.model}`}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
+
+          {data.nodeType === 'generate_voice' && (
+            <>
+              <div className="property-group">
+                <label className="property-sublabel">Voice</label>
+                <select
+                  className="property-select"
+                  value={data.effectConfig?.voice || ''}
+                  onChange={(e) => updateNodeData(node.id, { effectConfig: { ...data.effectConfig, voice: e.target.value || undefined } })}
+                  disabled={loadingMediaModels}
+                >
+                  <option value="">{loadingMediaModels ? 'Loading...' : 'Gateway default voice'}</option>
+                  {voiceOptions.map((item) => (
+                    <option key={`${item.mode || 'voice'}:${item.value}`} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="property-group">
+                <label className="property-sublabel">TTS model</label>
+                <select
+                  className="property-select"
+                  value={data.effectConfig?.tts_model || data.effectConfig?.model || ''}
+                  onChange={(e) =>
+                    updateNodeData(node.id, {
+                      effectConfig: { ...data.effectConfig, tts_model: e.target.value || undefined, model: undefined },
+                    })
+                  }
+                  disabled={loadingMediaModels}
+                >
+                  <option value="">{loadingMediaModels ? 'Loading...' : 'Gateway default TTS model'}</option>
+                  {ttsModelOptions.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
+
+          {data.nodeType === 'transcribe_audio' && (
+            <div className="property-group">
+              <label className="property-sublabel">STT model</label>
+              <select
+                className="property-select"
+                value={data.effectConfig?.stt_model || data.effectConfig?.model || ''}
+                onChange={(e) =>
+                  updateNodeData(node.id, {
+                    effectConfig: { ...data.effectConfig, stt_model: e.target.value || undefined, model: undefined },
+                  })
+                }
+                disabled={loadingMediaModels}
+              >
+                <option value="">{loadingMediaModels ? 'Loading...' : 'Gateway default STT model'}</option>
+                {sttModelOptions.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {data.nodeType === 'listen_voice' && (
+            <span className="property-hint">
+              The run will pause with voice-input metadata. Current browser UX falls back to text resume until microphone capture is implemented.
+            </span>
+          )}
         </div>
       )}
 

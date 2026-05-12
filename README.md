@@ -97,7 +97,7 @@ The visual editor talks to AbstractGateway. The Flow server keeps the Gateway be
 # Terminal 1: Gateway
 pip install "abstractgateway[http]" abstractflow
 export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
-abstractgateway --port 8080
+abstractgateway serve --port 8080
 
 # Terminal 2: editor UI (static server + /api/gateway proxy)
 export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
@@ -107,6 +107,12 @@ npx @abstractframework/flow --gateway-url http://127.0.0.1:8080
 Open:
 - UI: http://localhost:3003
 - Gateway capabilities: http://localhost:8080/api/gateway/discovery/capabilities
+
+Media nodes use Gateway as the catalog source. Generate Image, Generate Voice,
+Transcribe Audio, and Listen Voice expose Gateway Media controls populated from
+`/api/gateway/voice/voices`, `/api/gateway/audio/speech/models`,
+`/api/gateway/audio/transcriptions/models`, `/api/gateway/vision/provider_models`,
+and `/api/gateway/vision/models`.
 
 The `abstractflow serve`/FastAPI host is a Gateway proxy by default. Its old local `/api/flows`, `/api/ws`, and `/api/runs` compatibility routes are available only when `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1` is set. See [docs/web-editor.md](docs/web-editor.md) and [docs/architecture.md](docs/architecture.md).
 

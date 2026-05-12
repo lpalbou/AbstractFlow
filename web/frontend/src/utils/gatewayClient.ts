@@ -39,6 +39,11 @@ export interface GatewayCommonContract {
     providers?: string;
     provider_models?: string;
     model_capabilities?: string;
+    voice_voices?: string;
+    audio_speech_models?: string;
+    audio_transcription_models?: string;
+    vision_provider_models?: string;
+    vision_models?: string;
     tools?: string;
     semantics?: string;
   };
@@ -109,6 +114,7 @@ export interface GatewayFlowEditorContract {
   runs?: GatewayCommonContract['runs'];
   ledger?: GatewayCommonContract['ledger'];
   artifacts?: GatewayCommonContract['artifacts'];
+  media?: GatewayMediaContract;
   helpers?: Record<string, string>;
 }
 
@@ -359,20 +365,8 @@ export function getGatewayFlowEditorReadiness(
   const crudItem = add(stringEndpointCheck('flow_editor.visualflows.item', 'VisualFlow item', crud?.item_endpoint));
   const publish = add(endpointCheck('flow_editor.visualflows.publish', 'VisualFlow publish', flow?.visualflows?.publish));
   const runInputSchema = add(endpointCheck('flow_editor.run_input_schema', 'Run input schema', flow?.run_input_schema));
-  const runsInputData = add(
-    endpointCheck(
-      'common.runs.input_data',
-      'Run input rehydration',
-      pickDescriptor(runs?.input_data, flow?.runs?.input_data)
-    )
-  );
-  const runsHistoryBundle = add(
-    endpointCheck(
-      'common.runs.history_bundle',
-      'Run history bundle',
-      pickDescriptor(runs?.history_bundle, flow?.runs?.history_bundle)
-    )
-  );
+  const runsInputData = add(endpointCheck('common.runs.input_data', 'Run input rehydration', pickDescriptor(runs?.input_data, flow?.runs?.input_data)));
+  const runsHistoryBundle = add(endpointCheck('common.runs.history_bundle', 'Run history bundle', pickDescriptor(runs?.history_bundle, flow?.runs?.history_bundle)));
   const runsStart = add(endpointCheck('common.runs.start', 'Run start', pickDescriptor(runs?.start, flow?.runs?.start)));
   const runsList = add(endpointCheck('common.runs.list', 'Run listing', pickDescriptor(runs?.list, flow?.runs?.list)));
   const runsSummary = add(endpointCheck('common.runs.summary', 'Run summary', pickDescriptor(runs?.summary, flow?.runs?.summary)));
@@ -416,7 +410,7 @@ export function getGatewayFlowEditorReadiness(
   const commands = operationStatus([...base, runsCommands]);
 
   const generatedImage = (() => {
-    const image = contracts?.assistant?.media?.generated_image;
+    const image = flow?.media?.generated_image || contracts?.assistant?.media?.generated_image;
     return Boolean(
       descriptorEndpointAvailable(image?.direct_endpoint) ||
         image?.direct_endpoint?.route_available === true ||
@@ -424,7 +418,7 @@ export function getGatewayFlowEditorReadiness(
     );
   })();
   const generatedVoice = (() => {
-    const voice = contracts?.assistant?.media?.generated_voice;
+    const voice = flow?.media?.generated_voice || contracts?.assistant?.media?.generated_voice;
     return Boolean(descriptorEndpointAvailable(voice?.direct_endpoint) || voice?.workflow?.available === true);
   })();
   const promptCacheSessionEndpoints = common?.prompt_cache?.session_endpoints;

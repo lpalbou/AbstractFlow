@@ -21,7 +21,7 @@ source .venv/bin/activate
 pip install "abstractgateway[http]" abstractflow
 
 export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
-abstractgateway --port 8080
+abstractgateway serve --port 8080
 ```
 
 Terminal 2 (UI):
@@ -50,7 +50,7 @@ pip install -e .
 pip install -e ../abstractgateway
 
 export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
-abstractgateway --port 8080
+abstractgateway serve --port 8080
 ```
 
 Terminal 2 (frontend):

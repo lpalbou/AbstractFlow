@@ -104,6 +104,10 @@ export type NodeType =
   | 'ask_user'
   | 'answer_user'
   | 'llm_call'
+  | 'generate_image'
+  | 'generate_voice'
+  | 'transcribe_audio'
+  | 'listen_voice'
   | 'wait_until'
   | 'wait_event'
   | 'emit_event'
@@ -149,6 +153,17 @@ export interface FlowNodeData {
    * Keys are pin ids; values are JSON-serializable (persisted in the flow JSON).
    */
   pinDefaults?: Record<string, JsonValue>;
+  /**
+   * Stable route order for nodes with multiple incoming execution edges.
+   * The editor derives this from exec-in wires on save; the runtime lowers it
+   * into internal join/path-mux nodes.
+   */
+  entryRoutes?: { key: string; sourceNodeId: string; sourceHandle: string; label?: string }[];
+  /**
+   * Optional per-entry data overrides for multi-entry nodes.
+   * Shape: input pin id -> route key -> source pin ref.
+   */
+  inputRouteOverrides?: Record<string, Record<string, { sourceNodeId: string; sourceHandle: string }>>;
   // Node-specific config
   code?: string;           // For code nodes
   codeBody?: string;       // For code nodes (body-only editor)
@@ -204,10 +219,34 @@ export interface FlowNodeData {
   effectConfig?: {
     provider?: string;     // For llm_call
     model?: string;        // For llm_call
+    runtime_provider?: string; // Advanced: runtime LLM provider override for generated media orchestration
+    runtime_model?: string;    // Advanced: runtime LLM model override for generated media orchestration
     temperature?: number;  // For llm_call
     seed?: number;         // For llm_call (-1 = random/unset)
     tools?: string[];      // For llm_call (tool allowlist; resolved to ToolSpecs at execution)
     include_context?: boolean; // For llm_call: include run context/messages as history (Recall into context)
+    image_provider?: string; // For generated image backend/catalog selection
+    image_model?: string;    // For generated image backend/catalog selection
+    tts_provider?: string;   // For generated voice backend/catalog selection
+    tts_model?: string;      // For generated voice backend/catalog selection
+    stt_provider?: string;   // For audio transcription backend/catalog selection
+    stt_model?: string;      // For audio transcription backend/catalog selection
+    format?: string;       // For generated media nodes
+    size?: string;         // For generated image
+    width?: number;        // For generated image
+    height?: number;       // For generated image
+    negative_prompt?: string; // For generated image
+    steps?: number;        // For generated image
+    guidance_scale?: number; // For generated image
+    quality?: string;      // For generated image
+    style?: string;        // For generated image
+    voice?: string;        // For generated voice
+    profile?: string;      // For generated voice
+    speed?: number;        // For generated voice
+    instructions?: string; // For generated voice
+    language?: string;     // For audio transcription/listen
+    wait_key?: string;     // For listen_voice
+    max_duration_s?: number; // For listen_voice
     allowFreeText?: boolean; // For ask_user
     durationType?: 'seconds' | 'minutes' | 'hours' | 'timestamp'; // For wait_until
     allowed_tools?: string[]; // For tool_calls (tool name allowlist; empty => allow none)

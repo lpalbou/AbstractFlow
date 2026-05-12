@@ -44,18 +44,18 @@ agent = [
 ]
 apple = [
     # Full Gateway Apple profile + local control-plane compatibility stack.
-    "AbstractRuntime>=0.4.6",
-    "abstractcore[tools]>=2.13.10",
-    "abstractgateway[apple]>=0.2.3",
+    "AbstractRuntime>=0.4.10",
+    "abstractcore[tools]>=2.13.13",
+    "abstractgateway[apple]>=0.2.9",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.23.0",
     "websockets>=11.0.0",
 ]
 gpu = [
     # Gateway GPU profile + local control-plane compatibility stack.
-    "AbstractRuntime>=0.4.6",
-    "abstractcore[tools]>=2.13.10",
-    "abstractgateway[gpu]>=0.2.3",
+    "AbstractRuntime>=0.4.10",
+    "abstractcore[tools]>=2.13.13",
+    "abstractgateway[gpu]>=0.2.9",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.23.0",
     "websockets>=11.0.0",

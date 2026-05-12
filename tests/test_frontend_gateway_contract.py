@@ -84,12 +84,17 @@ const complete = {
     },
     attachments: { upload: { endpoint: '/attachments/upload' } },
     workspace: { policy_endpoint: '/workspace/policy' },
-    discovery: {
-      providers: '/discovery/providers',
-      provider_models: '/discovery/providers/{provider_name}/models',
-      tools: '/discovery/tools',
-      semantics: '/semantics',
-    },
+        discovery: {
+          providers: '/discovery/providers',
+          provider_models: '/discovery/providers/{provider_name}/models',
+          voice_voices: '/voice/voices',
+          audio_speech_models: '/audio/speech/models',
+          audio_transcription_models: '/audio/transcriptions/models',
+          vision_provider_models: '/vision/provider_models',
+          vision_models: '/vision/models',
+          tools: '/discovery/tools',
+          semantics: '/semantics',
+        },
     prompt_cache: {
       session_lifecycle: true,
       session_endpoints: { status: '/prompt-cache/{session_id}', prepare: '/prompt-cache/{session_id}/prepare' },
@@ -188,6 +193,37 @@ def test_frontend_default_transport_avoids_local_runtime_routes() -> None:
     assert "EventSource" in run_hook
     assert "/api/gateway/runs/{run_id}/ledger/stream" in run_hook
     assert "/api/gateway/runs/start" in run_hook
+
+
+def test_frontend_exposes_gateway_media_node_templates() -> None:
+    flow_types = (FRONTEND / "src" / "types" / "flow.ts").read_text(encoding="utf-8")
+    node_templates = (FRONTEND / "src" / "types" / "nodes.ts").read_text(encoding="utf-8")
+
+    for node_type in ("generate_image", "generate_voice", "transcribe_audio", "listen_voice"):
+        assert f"'{node_type}'" in flow_types
+        assert f"type: '{node_type}'" in node_templates
+
+    assert "category: 'media'" in node_templates
+    assert "image_artifact" in node_templates
+    assert "audio_artifact" in node_templates
+    assert "image_provider" in flow_types
+    assert "image_model" in flow_types
+    assert "tts_model" in flow_types
+    assert "stt_model" in flow_types
+    assert "runtime_provider" in flow_types
+    assert "runtime_model" in flow_types
+    assert "{ id: 'image_provider'" in node_templates
+    assert "{ id: 'image_model'" in node_templates
+    assert "{ id: 'tts_model'" in node_templates
+    assert "{ id: 'stt_model'" in node_templates
+    properties_panel = (FRONTEND / "src" / "components" / "PropertiesPanel.tsx").read_text(encoding="utf-8")
+    assert "data.effectConfig?.image_provider" in properties_panel
+    assert "image_model: picked?.model" in properties_panel
+    assert "data.effectConfig?.tts_model" in properties_panel
+    assert "data.effectConfig?.stt_model" in properties_panel
+    assert "STT model" in properties_panel
+    assert "Optional media/voice provider id." in node_templates
+    assert "Optional audio/STT provider id." in node_templates
 
 
 def test_python_host_local_runtime_routes_are_opt_in(monkeypatch: pytest.MonkeyPatch) -> None:

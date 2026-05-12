@@ -17,9 +17,6 @@ export function validateConnection(
   if (!connection.source || !connection.target) return false;
   if (!connection.sourceHandle || !connection.targetHandle) return false;
 
-  // Can't connect to self
-  if (connection.source === connection.target) return false;
-
   const sourceNode = nodes.find((n) => n.id === connection.source);
   const targetNode = nodes.find((n) => n.id === connection.target);
 
@@ -35,14 +32,23 @@ export function validateConnection(
 
   if (!sourcePin || !targetPin) return false;
 
-  // Inputs accept at most one connection (Blueprint-style).
-  const targetAlreadyConnected = edges.some(
-    (e) => e.target === connection.target && e.targetHandle === connection.targetHandle
-  );
-  if (targetAlreadyConnected) return false;
+  const isExecutionConnection = sourcePin.type === 'execution' && targetPin.type === 'execution';
+
+  // Self-loops are useful for explicit re-entry/recursive execution paths, but only
+  // for exec-out -> exec-in. Data self-wiring stays rejected to avoid hidden cycles.
+  if (connection.source === connection.target && !isExecutionConnection) return false;
+
+  // Data inputs accept at most one connection. Execution inputs intentionally allow
+  // fan-in; the runtime lowers that authoring graph into an internal join_exec node.
+  if (!isExecutionConnection) {
+    const targetAlreadyConnected = edges.some(
+      (e) => e.target === connection.target && e.targetHandle === connection.targetHandle
+    );
+    if (targetAlreadyConnected) return false;
+  }
 
   // Execution outputs are 1:1 (use Sequence nodes for fan-out).
-  if (sourcePin.type === 'execution' && targetPin.type === 'execution') {
+  if (isExecutionConnection) {
     const sourceAlreadyConnected = edges.some(
       (e) => e.source === connection.source && e.sourceHandle === connection.sourceHandle
     );
@@ -159,10 +165,6 @@ export function getConnectionError(
     return 'Invalid connection endpoints';
   }
 
-  if (connection.source === connection.target) {
-    return 'Cannot connect a node to itself';
-  }
-
   const sourceNode = nodes.find((n) => n.id === connection.source);
   const targetNode = nodes.find((n) => n.id === connection.target);
 
@@ -185,14 +187,22 @@ export function getConnectionError(
     return `Input pin '${connection.targetHandle}' not found`;
   }
 
-  const targetAlreadyConnected = edges.some(
-    (e) => e.target === connection.target && e.targetHandle === connection.targetHandle
-  );
-  if (targetAlreadyConnected) {
-    return `Input pin '${connection.targetHandle}' already connected`;
+  const isExecutionConnection = sourcePin.type === 'execution' && targetPin.type === 'execution';
+
+  if (connection.source === connection.target && !isExecutionConnection) {
+    return 'Only execution self-loops are allowed';
   }
 
-  if (sourcePin.type === 'execution' && targetPin.type === 'execution') {
+  if (!isExecutionConnection) {
+    const targetAlreadyConnected = edges.some(
+      (e) => e.target === connection.target && e.targetHandle === connection.targetHandle
+    );
+    if (targetAlreadyConnected) {
+      return `Input pin '${connection.targetHandle}' already connected`;
+    }
+  }
+
+  if (isExecutionConnection) {
     const sourceAlreadyConnected = edges.some(
       (e) => e.source === connection.source && e.sourceHandle === connection.sourceHandle
     );
