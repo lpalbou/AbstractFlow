@@ -5,6 +5,17 @@ All notable changes to AbstractFlow will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.11] - 2026-05-13
+
+### Fixed
+- Media node controls keep image, TTS, and STT model selectors in media-specific fields so runtime LLM provider/model inputs no longer overwrite generated media routing.
+- Listen Voice nodes now expose the Gateway STT model selector and pass the chosen transcription model through wait metadata.
+
+### Changed
+- Apple/GPU Flow profiles now require Runtime `>=0.4.11` and Core `>=2.13.14`.
+- Frontend npm package metadata is aligned with the Python release version for the next npm publication.
+
+
 ## [0.3.10] - 2026-05-12
 
 ### Added

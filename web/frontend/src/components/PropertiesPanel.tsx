@@ -4036,9 +4036,30 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           )}
 
           {data.nodeType === 'listen_voice' && (
-            <span className="property-hint">
-              The run will pause with voice-input metadata. Current browser UX falls back to text resume until microphone capture is implemented.
-            </span>
+            <>
+              <div className="property-group">
+                <label className="property-sublabel">Transcription model</label>
+                <select
+                  className="property-select"
+                  value={data.effectConfig?.stt_model || data.effectConfig?.model || ''}
+                  onChange={(e) =>
+                    updateNodeData(node.id, {
+                      effectConfig: { ...data.effectConfig, stt_model: e.target.value || undefined, model: undefined },
+                    })
+                  }
+                >
+                  <option value="">Gateway default</option>
+                  {sttModelOptions.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <span className="property-hint">
+                The run will pause with voice-input metadata. Current browser UX falls back to text resume until microphone capture is implemented.
+              </span>
+            </>
           )}
         </div>
       )}

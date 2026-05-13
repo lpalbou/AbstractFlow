@@ -462,6 +462,7 @@ const CORE_NODES: NodeTemplate[] = [
       { id: 'exec-in', label: '', type: 'execution' },
       { id: 'prompt', label: 'prompt', type: 'string' },
       { id: 'language', label: 'language', type: 'string' },
+      { id: 'stt_model', label: 'stt_model', type: 'model', description: 'Optional STT model id for host-side voice transcription.' },
       { id: 'max_duration_s', label: 'max_duration_s', type: 'number' },
       { id: 'wait_key', label: 'wait_key', type: 'string' },
     ],
