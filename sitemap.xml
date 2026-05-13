@@ -2,70 +2,70 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/</loc>
-         <lastmod>2026-05-12</lastmod>
+         <lastmod>2026-05-13</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/api/</loc>
-         <lastmod>2026-05-12</lastmod>
+         <lastmod>2026-05-13</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/architecture/</loc>
-         <lastmod>2026-05-12</lastmod>
+         <lastmod>2026-05-13</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/cli/</loc>
-         <lastmod>2026-05-12</lastmod>
+         <lastmod>2026-05-13</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/faq/</loc>
-         <lastmod>2026-05-12</lastmod>
+         <lastmod>2026-05-13</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/getting-started/</loc>
-         <lastmod>2026-05-12</lastmod>
+         <lastmod>2026-05-13</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/visualflow/</loc>
-         <lastmod>2026-05-12</lastmod>
+         <lastmod>2026-05-13</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/web-editor/</loc>
-         <lastmod>2026-05-12</lastmod>
+         <lastmod>2026-05-13</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/completed/001_run-flow-advanced-layout/</loc>
-         <lastmod>2026-05-12</lastmod>
+         <lastmod>2026-05-13</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/completed/010_gateway_only_remote_editor_transport/</loc>
-         <lastmod>2026-05-12</lastmod>
+         <lastmod>2026-05-13</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/completed/040_gateway_capability_schema_and_connection_contract/</loc>
-         <lastmod>2026-05-12</lastmod>
+         <lastmod>2026-05-13</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/completed/060_gateway_contract_helper_endpoint_strictness/</loc>
-         <lastmod>2026-05-12</lastmod>
+         <lastmod>2026-05-13</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/planned/020_draft_run_and_publish_lifecycle/</loc>
-         <lastmod>2026-05-12</lastmod>
+         <lastmod>2026-05-13</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/planned/030_local_execution_compatibility_boundary/</loc>
-         <lastmod>2026-05-12</lastmod>
+         <lastmod>2026-05-13</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/planned/050_gateway_execution_regression_suite/</loc>
-         <lastmod>2026-05-12</lastmod>
+         <lastmod>2026-05-13</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/proposed/2026-05-08_gateway_capability_profile_alignment/</loc>
-         <lastmod>2026-05-12</lastmod>
+         <lastmod>2026-05-13</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/proposed/2026-05-09_abstractflow_gateway_migration_roadmap/</loc>
-         <lastmod>2026-05-12</lastmod>
+         <lastmod>2026-05-13</lastmod>
     </url>
 </urlset>
