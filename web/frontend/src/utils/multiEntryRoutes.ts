@@ -14,8 +14,13 @@ type RouteOverrideRef = {
   sourceHandle: string;
 };
 
-function routeKey(sourceNodeId: string, sourceHandle: string): string {
+export function routeKey(sourceNodeId: string, sourceHandle: string): string {
   return `${sourceNodeId}::${sourceHandle || 'exec-out'}`;
+}
+
+export function isRouteOverrideEdge(edge: Edge): boolean {
+  const data = edge.data as Record<string, unknown> | undefined;
+  return Boolean(data && data.routeOverride === true);
 }
 
 function isExecInEdge(edge: Edge): boolean {
@@ -100,6 +105,31 @@ function cleanInputRouteOverrides(
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
+function routeOverridesFromEdges(
+  node: Node<FlowNodeData>,
+  edges: Edge[],
+  validRouteKeys: Set<string>,
+  validSourceRefs: Set<string>
+): Record<string, Record<string, RouteOverrideRef>> {
+  const out: Record<string, Record<string, RouteOverrideRef>> = {};
+  for (const edge of edges) {
+    if (edge.target !== node.id || !isRouteOverrideEdge(edge)) continue;
+    const pinId = String(edge.targetHandle || '').trim();
+    const sourceNodeId = String(edge.source || '').trim();
+    const sourceHandle = String(edge.sourceHandle || '').trim();
+    const data = edge.data as Record<string, unknown> | undefined;
+    const route = String(data?.routeKey || '').trim();
+    if (!pinId || !sourceNodeId || !sourceHandle || !route) continue;
+    if (!validRouteKeys.has(route)) continue;
+    if (!validSourceRefs.has(routeKey(sourceNodeId, sourceHandle))) continue;
+    out[pinId] = {
+      ...(out[pinId] || {}),
+      [route]: { sourceNodeId, sourceHandle },
+    };
+  }
+  return out;
+}
+
 export function withMultiEntryRouteData(nodes: Node<FlowNodeData>[], edges: Edge[]): Node<FlowNodeData>[] {
   const validSourceRefs = new Set<string>();
   for (const node of nodes) {
@@ -116,8 +146,13 @@ export function withMultiEntryRouteData(nodes: Node<FlowNodeData>[], edges: Edge
       (nextData as any).entryRoutes = routes;
       const validRouteKeys = new Set(routes.map((r) => r.key));
       const overrides = cleanInputRouteOverrides(node.data, validRouteKeys, validSourceRefs);
-      if (overrides) {
-        (nextData as any).inputRouteOverrides = overrides as JsonValue;
+      const edgeOverrides = routeOverridesFromEdges(node, edges, validRouteKeys, validSourceRefs);
+      const mergedOverrides: Record<string, Record<string, RouteOverrideRef>> = { ...(overrides || {}) };
+      for (const [pinId, perRoute] of Object.entries(edgeOverrides)) {
+        mergedOverrides[pinId] = { ...(mergedOverrides[pinId] || {}), ...perRoute };
+      }
+      if (Object.keys(mergedOverrides).length > 0) {
+        (nextData as any).inputRouteOverrides = mergedOverrides as JsonValue;
       } else {
         delete (nextData as any).inputRouteOverrides;
       }

@@ -2,7 +2,7 @@
  * Toolbar component with Run, Save, Export, Import actions.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { useFlowStore } from '../hooks/useFlow';
@@ -97,7 +97,54 @@ async function saveFlow(
     }, { method }));
 }
 
-export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void }) {
+function flowSignatureFor(flow: Partial<VisualFlow> | null | undefined): string {
+  const value = flow || {};
+  const normalizeNode = (node: any) => {
+    if (!node || typeof node !== 'object') return node;
+    return {
+      id: node.id,
+      type: node.type,
+      position: node.position || null,
+      data: node.data || null,
+      parentNode: node.parentNode,
+      parentId: node.parentId,
+      extent: node.extent,
+    };
+  };
+  const normalizeEdge = (edge: any) => {
+    if (!edge || typeof edge !== 'object') return edge;
+    return {
+      id: edge.id,
+      source: edge.source,
+      sourceHandle: edge.sourceHandle,
+      target: edge.target,
+      targetHandle: edge.targetHandle,
+      type: edge.type,
+      data: edge.data || null,
+      label: edge.label,
+    };
+  };
+  return JSON.stringify({
+    name: String(value.name || '').trim(),
+    description: String(value.description || ''),
+    interfaces: Array.isArray(value.interfaces) ? value.interfaces : [],
+    nodes: Array.isArray(value.nodes) ? value.nodes.map(normalizeNode) : [],
+    edges: Array.isArray(value.edges) ? value.edges.map(normalizeEdge) : [],
+    entryNode: value.entryNode || null,
+  });
+}
+
+export function Toolbar({
+  onOpenAppearance,
+  onOpenConnection,
+  onDisconnect,
+  gatewayConnected = false,
+}: {
+  onOpenAppearance?: () => void;
+  onOpenConnection?: () => void;
+  onDisconnect?: () => void;
+  gatewayConnected?: boolean;
+}) {
   const queryClient = useQueryClient();
   const gatewayCapabilitiesQuery = useGatewayCapabilities(true);
   const gatewayContracts = gatewayContractsFromCapabilities(gatewayCapabilitiesQuery.data);
@@ -143,6 +190,7 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
     setIsRunning,
     nodes,
     edges,
+    flowInterfaces,
     setPreflightIssues,
     clearPreflightIssues,
   } = useFlowStore();
@@ -153,16 +201,43 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [showLifecycleModal, setShowLifecycleModal] = useState(false);
   const [showNewFlowModal, setShowNewFlowModal] = useState(false);
+  const [suppressUserPromptFallback, setSuppressUserPromptFallback] = useState(false);
   const [runResult, setRunResult] = useState<FlowRunResult | null>(null);
   const [executionEvents, setExecutionEvents] = useState<ExecutionEvent[]>([]);
   const [traceEvents, setTraceEvents] = useState<ExecutionEvent[]>([]);
   const [threadRootRunId, setThreadRootRunId] = useState<string | null>(null);
+  const [runWorkflowId, setRunWorkflowId] = useState<string | null>(null);
   const threadRootRunIdRef = useRef<string | null>(null);
   const threadRunMapRef = useRef<Map<string, string>>(new Map());
   const followUpPendingThreadRef = useRef<string | null>(null);
+  const activeFlowIdRef = useRef<string | null>(flowId || null);
   const [inspectedRun, setInspectedRun] = useState<RunSummary | null>(null);
   const [inspectedEvents, setInspectedEvents] = useState<ExecutionEvent[]>([]);
   const [inspectedTraceEvents, setInspectedTraceEvents] = useState<ExecutionEvent[]>([]);
+  const isEmptyFlow = nodes.length === 0 && edges.length === 0;
+  const currentFlowSignature = useMemo(
+    () => flowSignatureFor(getFlow()),
+    [edges, flowInterfaces, flowName, getFlow, nodes]
+  );
+  const [savedFlowSignature, setSavedFlowSignature] = useState(() => flowSignatureFor(getFlow()));
+  const savedFlowIdentityRef = useRef<string | null>(flowId || null);
+  const hasUnsavedChanges = !isEmptyFlow && currentFlowSignature !== savedFlowSignature;
+  const saveDisabledReason = visualflowCrudUnavailable
+    ? saveUnavailableReason
+    : isEmptyFlow
+      ? 'Add at least one node before saving'
+      : !hasUnsavedChanges
+        ? 'No unsaved changes'
+        : 'Save Flow';
+
+  useEffect(() => {
+    const nextFlowId = flowId || null;
+    if (savedFlowIdentityRef.current === nextFlowId) return;
+    savedFlowIdentityRef.current = nextFlowId;
+    if (nextFlowId || isEmptyFlow) {
+      setSavedFlowSignature(currentFlowSignature);
+    }
+  }, [currentFlowSignature, flowId, isEmptyFlow]);
 
   const formatValue = useCallback((value: unknown) => {
     if (value == null) return '';
@@ -389,6 +464,7 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
       try {
         const flow = await fetchFlow(selectedFlowId, gatewayContracts);
         loadFlow(flow);
+        setSavedFlowSignature(flowSignatureFor(flow));
         setShowFlowLibrary(false);
         toast.success(`Loaded "${flow.name}"`);
       } catch (error) {
@@ -403,7 +479,10 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
       const name = nextName.trim();
       if (!name) return;
       const updated = await renameFlow(id, name, gatewayContracts);
-      if (flowId && id === flowId) setFlowName(updated.name);
+      if (flowId && id === flowId) {
+        setFlowName(updated.name);
+        setSavedFlowSignature(flowSignatureFor(updated));
+      }
       queryClient.invalidateQueries({ queryKey: ['flows'] });
       toast.success('Renamed');
     },
@@ -418,6 +497,7 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
         // We only have the flow name in store; description lives in the saved flow object.
         // Loading is the simplest way to keep all metadata consistent.
         loadFlow(updated);
+        setSavedFlowSignature(flowSignatureFor(updated));
       }
       queryClient.invalidateQueries({ queryKey: ['flows'] });
       toast.success('Description updated');
@@ -430,6 +510,7 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
       const updated = await updateFlowInterfaces(id, nextInterfaces, gatewayContracts);
       if (flowId && id === flowId) {
         loadFlow(updated);
+        setSavedFlowSignature(flowSignatureFor(updated));
       }
       queryClient.invalidateQueries({ queryKey: ['flows'] });
       toast.success('Interfaces updated');
@@ -443,6 +524,7 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
       if (flowId && id === flowId) {
         // Keep the current graph but mark it as unsaved.
         setFlowId(null);
+        setSavedFlowSignature('');
         toast.success('Deleted (editor is now unsaved)');
       } else {
         toast.success('Deleted');
@@ -461,6 +543,7 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
       const created = await duplicateFlow(src, `${base} (copy)`, gatewayContracts);
       queryClient.invalidateQueries({ queryKey: ['flows'] });
       loadFlow(created);
+      setSavedFlowSignature(flowSignatureFor(created));
       setShowFlowLibrary(false);
       toast.success(`Duplicated as "${created.name}"`);
     },
@@ -471,8 +554,22 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
   const saveMutation = useMutation({
     mutationFn: ({ flow, existingFlowId }: { flow: VisualFlow; existingFlowId: string | null }) =>
       saveFlow(flow, existingFlowId, gatewayContracts),
-    onSuccess: (savedFlow) => {
-      loadFlow(savedFlow);
+    onSuccess: (savedFlow, variables) => {
+      const savedId = typeof savedFlow.id === 'string' && savedFlow.id.trim()
+        ? savedFlow.id
+        : variables.existingFlowId;
+      if (savedId) {
+        setFlowId(savedId);
+      }
+      const savedSnapshot: VisualFlow = {
+        ...variables.flow,
+        id: savedId || variables.flow.id,
+        name: typeof savedFlow.name === 'string' ? savedFlow.name : variables.flow.name,
+        description: typeof savedFlow.description === 'string' ? savedFlow.description : variables.flow.description,
+        interfaces: Array.isArray(savedFlow.interfaces) ? savedFlow.interfaces : variables.flow.interfaces,
+      };
+      setSavedFlowSignature(flowSignatureFor(savedSnapshot));
+      queryClient.invalidateQueries({ queryKey: ['flows'] });
       toast.success('Flow saved!');
     },
     onError: (error) => {
@@ -500,6 +597,7 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
       console.log('Execution event:', event);
       if (event.type === 'flow_start') {
         const actualRunId = typeof event.runId === 'string' ? event.runId.trim() : '';
+        if (actualRunId && flowId) setRunWorkflowId((prev) => prev || flowId);
         const pendingThreadId = followUpPendingThreadRef.current;
         const isFollowUp = Boolean(pendingThreadId);
         const resolvedThreadId = pendingThreadId || threadRootRunIdRef.current || actualRunId;
@@ -600,13 +698,20 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
       toast.error(saveUnavailableReason);
       return;
     }
+    if (isEmptyFlow) {
+      toast.error('Add at least one node before saving');
+      return;
+    }
+    if (!hasUnsavedChanges) {
+      return;
+    }
     const flow = getFlow();
     if (!flow.name.trim()) {
       toast.error('Please enter a flow name');
       return;
     }
     saveMutation.mutate({ flow, existingFlowId: flowId });
-  }, [getFlow, saveMutation, flowId, saveUnavailableReason, visualflowCrudUnavailable]);
+  }, [flowId, getFlow, hasUnsavedChanges, isEmptyFlow, saveMutation, saveUnavailableReason, visualflowCrudUnavailable]);
 
   // Handle run - open modal
   const handleRun = useCallback(() => {
@@ -622,6 +727,7 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
     // *not* reset anything. Users should be able to hide/reopen the run modal to
     // observe progress and revisit results.
     if (isRunning || inspectedRun || runResult || executionEvents.length > 0 || traceEvents.length > 0) {
+      setSuppressUserPromptFallback(false);
       setShowRunModal(true);
       return;
     }
@@ -632,6 +738,7 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
       return;
     }
     clearPreflightIssues();
+    setSuppressUserPromptFallback(false);
     setShowRunModal(true);
   }, [
     clearPreflightIssues,
@@ -655,6 +762,22 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
     setThreadRootRunId(null);
   }, []);
 
+  useEffect(() => {
+    const nextFlowId = flowId || null;
+    if (activeFlowIdRef.current === nextFlowId) return;
+    activeFlowIdRef.current = nextFlowId;
+    setShowRunModal(false);
+    setInspectedRun(null);
+    setInspectedEvents([]);
+    setInspectedTraceEvents([]);
+    setRunResult(null);
+    setExecutionEvents([]);
+    setTraceEvents([]);
+    setRunWorkflowId(null);
+    setSuppressUserPromptFallback(false);
+    resetThreadState();
+  }, [flowId, resetThreadState]);
+
   // Handle run from modal
   const handleRunExecute = useCallback((inputData: Record<string, unknown>) => {
     if (!flowId) return;
@@ -665,6 +788,8 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
     setRunResult(null);
     setExecutionEvents([]);
     setTraceEvents([]);
+    setRunWorkflowId(flowId);
+    setSuppressUserPromptFallback(false);
     resetThreadState();
     runFlow(inputData);
   }, [flowId, resetThreadState, runFlow, setIsRunning]);
@@ -672,6 +797,7 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
   // Handle modal close
   const handleRunModalClose = useCallback(() => {
     // Close = hide. Keep state so the user can reopen the modal (even after completion).
+    setSuppressUserPromptFallback(true);
     setShowRunModal(false);
   }, []);
 
@@ -684,6 +810,7 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
     setRunResult(null);
     setExecutionEvents([]);
     setTraceEvents([]);
+    setRunWorkflowId(null);
     resetThreadState();
   }, [inspectedRun, resetThreadState]);
 
@@ -816,6 +943,7 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
 
       followUpPendingThreadRef.current = threadId;
       setIsRunning(true);
+      setRunWorkflowId(flowId);
       setInspectedRun(null);
       setInspectedEvents([]);
       setInspectedTraceEvents([]);
@@ -882,6 +1010,7 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
         const text = await file.text();
         const flow = JSON.parse(text) as VisualFlow;
         loadFlow(flow);
+        setSavedFlowSignature('');
         toast.success('Flow imported!');
       } catch (err) {
         toast.error('Failed to import flow');
@@ -908,6 +1037,7 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
       const created = await duplicateFlow(flow, `${base} (copy)`, gatewayContracts);
       queryClient.invalidateQueries({ queryKey: ['flows'] });
       loadFlow(created);
+      setSavedFlowSignature(flowSignatureFor(created));
       toast.success(`Duplicated as "${created.name}"`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Duplicate failed';
@@ -974,64 +1104,71 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
 
         {/* Actions */}
         <button
-          className="toolbar-button"
+          className="toolbar-button icon-button"
           onClick={handleDuplicateCurrent}
           disabled={visualflowCrudUnavailable}
           title={visualflowCrudUnavailable ? saveUnavailableReason : 'Duplicate Flow'}
+          aria-label="Duplicate Flow"
         >
-          📑 Duplicate
+          ⧉
         </button>
 
         <button
-          className="toolbar-button"
+          className="toolbar-button icon-button"
           onClick={handleNew}
           title="New Flow"
+          aria-label="New Flow"
         >
-          📄 New
+          ＋
         </button>
 
         <button
-          className="toolbar-button"
+          className="toolbar-button icon-button"
           onClick={() => setShowFlowLibrary(true)}
           disabled={visualflowCrudUnavailable}
           title={visualflowCrudUnavailable ? saveUnavailableReason : 'Load Flow'}
+          aria-label="Load Flow"
         >
-          📂 Load
+          📂
         </button>
 
         <button
-          className="toolbar-button"
+          className={`toolbar-button icon-button save-button ${hasUnsavedChanges ? 'dirty' : ''}`}
           onClick={handleSave}
-          disabled={saveMutation.isPending || visualflowCrudUnavailable}
-          title={visualflowCrudUnavailable ? saveUnavailableReason : 'Save Flow'}
+          disabled={saveMutation.isPending || visualflowCrudUnavailable || isEmptyFlow || !hasUnsavedChanges}
+          title={saveDisabledReason}
+          aria-label="Save Flow"
         >
-          💾 Save
+          💾
+          {hasUnsavedChanges ? <span className="save-dirty-dot" aria-hidden="true" /> : null}
         </button>
 
         <button
-          className="toolbar-button primary"
+          className="toolbar-button icon-button primary"
           onClick={handleRun}
           disabled={!flowId || visualflowRunUnavailable}
           title={visualflowRunUnavailable ? (visualflowRunHint || 'Gateway cannot run VisualFlows') : isRunning ? 'Open current run' : 'Run Flow'}
+          aria-label={isRunning ? 'Open current run' : 'Run Flow'}
         >
-          {isRunning ? '⏳ Running...' : '▶ Run'}
+          {isRunning ? '⏳' : '▶'}
         </button>
 
         <button
-          className="toolbar-button"
+          className="toolbar-button icon-button"
           onClick={handlePublish}
           disabled={isRunning || !flowId || visualflowPublishUnavailable}
           title={visualflowPublishUnavailable ? (visualflowPublishHint || 'Gateway cannot publish VisualFlows') : 'Publish WorkflowBundle (.flow)'}
+          aria-label="Publish WorkflowBundle"
         >
-          📦 Publish
+          📦
         </button>
 
-        <button className="toolbar-button" onClick={handleLifecycle} disabled={isRunning || !flowId} title="Deprecate/undeprecate workflow on gateway">
-          🧬 Lifecycle
+        <button className="toolbar-button icon-button" onClick={handleLifecycle} disabled={isRunning || !flowId} title="Lifecycle on gateway" aria-label="Lifecycle on gateway">
+          🔄
         </button>
 
         <button
-          className="toolbar-button"
+          className="toolbar-button icon-button"
           onClick={() => setShowRunHistory(true)}
           disabled={!flowId || runHistoryUnavailable}
           title={runHistoryUnavailable ? runHistoryHint : 'Run history'}
@@ -1043,46 +1180,42 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
         <div className="toolbar-divider" />
 
         <button
-          className="toolbar-button"
+          className="toolbar-button icon-button"
           onClick={handleExport}
           title="Export Flow"
+          aria-label="Export Flow"
         >
-          📤 Export
+          ⇧
         </button>
 
         <button
-          className="toolbar-button"
+          className="toolbar-button icon-button"
           onClick={handleImport}
           title="Import Flow"
+          aria-label="Import Flow"
         >
-          📥 Import
+          ⇩
         </button>
 
+        <div className="toolbar-spacer" />
 
         <button
-          className="toolbar-button"
+          className="toolbar-button icon-button"
           onClick={() => onOpenAppearance?.()}
           title="Appearance (theme + typography)"
           aria-label="Open appearance settings"
         >
-          🎨
+          ◐
         </button>
 
-        {/* Status indicator */}
-        <div className="toolbar-status">
-          <span
-            className={`status-dot ${
-              isRunning ? 'running' : flowId ? 'saved' : 'unsaved'
-            }`}
-          />
-          <span className="status-text">
-            {isRunning
-              ? 'Running'
-              : flowId
-              ? 'Saved'
-              : 'Unsaved'}
-          </span>
-        </div>
+        <button
+          className={`toolbar-button ${gatewayConnected ? '' : 'primary'}`}
+          onClick={() => (gatewayConnected ? onDisconnect?.() : onOpenConnection?.())}
+          title={gatewayConnected ? 'Disconnect from gateway' : 'Connect to gateway'}
+          aria-label={gatewayConnected ? 'Disconnect from gateway' : 'Connect to gateway'}
+        >
+          {gatewayConnected ? 'Disconnect' : 'Connect'}
+        </button>
       </div>
 
       {showNewFlowModal ? (
@@ -1098,7 +1231,9 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
                 className="modal-button danger"
                 onClick={() => {
                   setShowNewFlowModal(false);
+                  clearRunState();
                   clearFlow();
+                  setSavedFlowSignature(flowSignatureFor({ name: 'Untitled Flow', description: '', interfaces: [], nodes: [], edges: [] }));
                   toast.success('Created new flow');
                 }}
               >
@@ -1140,7 +1275,7 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
         isOpen={showRunModal}
         onClose={handleRunModalClose}
         onRun={handleRunExecute}
-        onFollowUpSubmit={handleFollowUpSubmit}
+        onFollowUpSubmit={!viewing && runWorkflowId && runWorkflowId === flowId ? handleFollowUpSubmit : undefined}
         onNewRun={handleNewRun}
         onApproveAll={handleApproveAll}
         isRunning={viewing ? runningLike : isRunning}
@@ -1152,6 +1287,7 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
         waitingInfo={viewing ? waitingInfo2 : waitingInfo}
         stableSessionId={stableSessionId}
         threadRootRunId={viewing ? undefined : threadRootRunId || undefined}
+        runWorkflowId={viewing ? inspectedRun?.workflow_id || flowId || null : runWorkflowId}
         gatewayContracts={gatewayContracts}
         onResume={resumeFlow}
         onPause={() => pauseRun(inspectedRun?.run_id)}
@@ -1205,7 +1341,7 @@ export function Toolbar({ onOpenAppearance }: { onOpenAppearance?: () => void })
 
       {/* User Prompt Modal (fallback) */}
       <UserPromptModal
-        isOpen={isWaiting && !showRunModal}
+        isOpen={isWaiting && !showRunModal && !suppressUserPromptFallback}
         prompt={waitingInfo?.prompt || 'Please respond:'}
         choices={waitingInfo?.choices || []}
         allowFreeText={waitingInfo?.allowFreeText ?? true}

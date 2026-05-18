@@ -24,8 +24,11 @@ const PIN_INFO: PinInfo[] = [
   { type: 'assertions', label: 'Assertions', shape: '\u25A0', description: 'KG assertions list (assertion[])' },
   { type: 'array', label: 'Array', shape: '\u25A0', description: 'Collections' },
   { type: 'tools', label: 'Tools', shape: '\u25A0', description: 'Tool allowlist (string[])' },
-  { type: 'provider', label: 'Provider', shape: '\u25CF', description: 'LLM provider id/name (string-like)' },
-  { type: 'model', label: 'Model', shape: '\u25CF', description: 'LLM model id/name (string-like)' },
+  { type: 'provider_text', label: 'Text Provider', shape: '\u25CF', description: 'Text/LLM provider id/name' },
+  { type: 'provider_image', label: 'Image Provider', shape: '\u25CF', description: 'Image-generation provider id' },
+  { type: 'provider_voice', label: 'Voice Provider', shape: '\u25CF', description: 'Voice/TTS/STT provider id' },
+  { type: 'provider', label: 'Provider (legacy)', shape: '\u25CF', description: 'Legacy unscoped provider id/name' },
+  { type: 'model', label: 'Model', shape: '\u25CF', description: 'Model id/name scoped by the selected provider' },
   { type: 'agent', label: 'Agent', shape: '\u2B22', description: 'Agent reference' },
   { type: 'any', label: 'Any', shape: '\u25CF', description: 'Accepts any type' },
 ];
@@ -68,6 +71,7 @@ export function PinLegend() {
               <li>Assertion is compatible with Object</li>
               <li>"Tools" is compatible with Array (specialized string[])</li>
               <li>"Assertions" is compatible with Array (specialized assertion[])</li>
+              <li>Providers are modality-scoped; model pins stay generic and are scoped by the selected provider</li>
             </ul>
           </div>
         </div>

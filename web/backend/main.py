@@ -82,6 +82,16 @@ def _runtime_health() -> dict[str, object]:
         "gateway_token_source": token_source,
     }
 
+def _gateway_proxy_timeout_s(default: float = 30.0) -> float:
+    raw = os.getenv("ABSTRACTFLOW_GATEWAY_PROXY_TIMEOUT_S", "").strip()
+    try:
+        value = float(raw) if raw else float(default)
+    except Exception:
+        value = float(default)
+    if value <= 0:
+        value = float(default)
+    return max(1.0, min(value, 120.0))
+
 @app.on_event("startup")
 async def _startup_connectivity_guard() -> None:
     if local_runtime_enabled():
@@ -93,17 +103,18 @@ async def _startup_connectivity_guard() -> None:
 
     try:
         gateway_url, gateway_token, _ = resolve_effective_gateway_connection()
-        require_gateway_connectivity(gateway_url=gateway_url, gateway_token=gateway_token, timeout_s=4.0)
+        require_gateway_connectivity(gateway_url=gateway_url, gateway_token=gateway_token, timeout_s=1.5)
         logging.getLogger(__name__).info(
             "Connected to AbstractGateway at %s",
             gateway_url,
         )
     except ValueError as e:
-        raise RuntimeError(
-            "AbstractFlow is running in Gateway-only mode and could not complete the startup check. "
-            "Set ABSTRACTGATEWAY_URL (or ABSTRACTFLOW_GATEWAY_URL) and ABSTRACTGATEWAY_AUTH_TOKEN, and verify the Gateway is reachable. "
-            f"Connectivity check failed: {e}"
-        ) from e
+        logging.getLogger(__name__).warning(
+            "AbstractFlow started without a verified AbstractGateway connection. "
+            "The browser connection dialog can configure gateway URL/token. "
+            "Connectivity check failed: %s",
+            e,
+        )
 
 
 @app.get("/api/health")
@@ -171,7 +182,7 @@ async def proxy_gateway_api(path: str, request: Request):
     )
 
     try:
-        resp = urlopen(req)
+        resp = urlopen(req, timeout=_gateway_proxy_timeout_s())
     except HTTPError as e:
         detail = e.read()
         return Response(

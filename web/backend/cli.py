@@ -14,7 +14,6 @@ import sys
 import uvicorn
 from abstractflow.gateway_options import (
     local_runtime_enabled,
-    require_gateway_connection,
     require_gateway_connectivity,
     resolve_gateway_token,
     resolve_gateway_url,
@@ -44,14 +43,19 @@ def main(argv: list[str] | None = None) -> None:
         if local_mode:
             print("Running in local runtime compatibility mode (ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1).")
         else:
-            gateway_url, gateway_token = require_gateway_connection(
-                gateway_url=args.gateway_url,
-                gateway_token=args.gateway_token,
-            )
-            require_gateway_connectivity(gateway_url=gateway_url, gateway_token=gateway_token)
-            os.environ["ABSTRACTGATEWAY_URL"] = resolve_gateway_url(gateway_url)
-            os.environ["ABSTRACTFLOW_GATEWAY_URL"] = resolve_gateway_url(gateway_url)
-            os.environ["ABSTRACTGATEWAY_AUTH_TOKEN"] = resolve_gateway_token(gateway_token)
+            gateway_url = resolve_gateway_url(args.gateway_url)
+            gateway_token = resolve_gateway_token(args.gateway_token)
+            os.environ["ABSTRACTGATEWAY_URL"] = gateway_url
+            os.environ["ABSTRACTFLOW_GATEWAY_URL"] = gateway_url
+            if gateway_token:
+                require_gateway_connectivity(gateway_url=gateway_url, gateway_token=gateway_token)
+                os.environ["ABSTRACTGATEWAY_AUTH_TOKEN"] = gateway_token
+            else:
+                print(
+                    "AbstractFlow started without a gateway token. "
+                    "Use the browser connection dialog to configure AbstractGateway.",
+                    file=sys.stderr,
+                )
 
         if args.gateway_url:
             os.environ["ABSTRACTGATEWAY_URL"] = resolve_gateway_url(args.gateway_url)

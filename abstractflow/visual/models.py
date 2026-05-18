@@ -28,8 +28,14 @@ class PinType(str, Enum):
     ASSERTIONS = "assertions"  # Teal - List of KG assertion objects (assertion[])
     ARRAY = "array"  # Orange #FF8800 - Collections
     TOOLS = "tools"  # Orange - Tool allowlist (string[])
-    PROVIDER = "provider"  # Cyan-blue - LLM provider id/name (string-like)
-    MODEL = "model"  # Purple - LLM model id/name (string-like)
+    PROVIDER = "provider"  # Legacy text/LLM provider id/name (string-like)
+    MODEL = "model"  # Legacy text/LLM model id/name (string-like)
+    PROVIDER_TEXT = "provider_text"  # Text/LLM provider id/name (string-like)
+    MODEL_TEXT = "model_text"  # Text/LLM model id/name (string-like)
+    PROVIDER_IMAGE = "provider_image"  # Image-generation provider/backend id (string-like)
+    MODEL_IMAGE = "model_image"  # Image-generation model id/name (string-like)
+    PROVIDER_VOICE = "provider_voice"  # Voice/STT/TTS provider/backend id (string-like)
+    MODEL_VOICE = "model_voice"  # Voice/STT/TTS model id/name (string-like)
     AGENT = "agent"  # Blue #4488FF - Agent reference
     ANY = "any"  # Gray #888888 - Accepts any type
 

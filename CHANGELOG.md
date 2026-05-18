@@ -5,6 +5,16 @@ All notable changes to AbstractFlow will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.12] - 2026-05-19
+
+### Fixed
+- Generate Image, Generate Voice, Transcribe Audio, and Listen Voice selectors now rely on Gateway/Core provider catalogs instead of hardcoded media model fallbacks.
+- Supertonic voice options now come from the Gateway voice catalog, so Flow surfaces the same voices that Gateway/Core can execute.
+- Media nodes keep image, TTS, and STT provider/model selections in media-specific fields instead of falling back to generic LLM `provider`/`model` values.
+
+### Changed
+- Apple/GPU Flow profiles now require Gateway `>=0.2.11`, Runtime `>=0.4.12`, and Core `>=2.13.15`.
+
 ## [0.3.11] - 2026-05-13
 
 ### Fixed

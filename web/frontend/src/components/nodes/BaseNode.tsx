@@ -7,19 +7,26 @@
  */
 
 import { Fragment, memo, type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Handle, Position, NodeProps, useEdges, useUpdateNodeInternals } from 'reactflow';
+import { Handle, Position, NodeProps, useEdges, useReactFlow, useUpdateNodeInternals } from 'reactflow';
 import { clsx } from 'clsx';
 import type { FlowNodeData, JsonValue, PinType } from '../../types/flow';
 import { PIN_COLORS, isEntryNodeType } from '../../types/flow';
 import { PinShape } from '../pins/PinShape';
 import { useFlowStore } from '../../hooks/useFlow';
 import { useModels, useProviders } from '../../hooks/useProviders';
+import { useGatewayCapabilities, gatewayContractsFromCapabilities } from '../../hooks/useGatewayCapabilities';
 import { useTools } from '../../hooks/useTools';
 import { collectCustomEventNames } from '../../utils/events';
 import { extractFunctionBody, generatePythonTransformCode } from '../../utils/codegen';
 import { upsertPythonAvailableVariablesComments } from '../../utils/codegen';
 import AfSelect from '../inputs/AfSelect';
 import AfMultiSelect from '../inputs/AfMultiSelect';
+import { gatewayJson, gatewayPath } from '../../utils/gatewayClient';
+import {
+  applyImagePinDefaultPatch,
+  extractImageModelParameterMetadata,
+  type MediaModelParameterMetadata,
+} from '../../utils/mediaModelParams';
 import { getNodeTemplate } from '../../types/nodes';
 import { AfTooltip } from '../AfTooltip';
 import { CodeEditorModal } from '../CodeEditorModal';
@@ -34,6 +41,94 @@ import {
   LLM_RESULT_SCHEMA,
   type JsonSchema,
 } from '../../schemas/known_json_schemas';
+
+type SelectOption = { value: string; label: string };
+type MediaModelOption = { provider: string; model: string; label: string; scopeModel?: string } & MediaModelParameterMetadata;
+type ProviderOptionMap = Record<string, SelectOption[]>;
+type MediaCatalogScope = 'image' | 'tts' | 'stt';
+type MediaCatalogRequest = {
+  seq: number;
+  scope: MediaCatalogScope;
+  provider?: string;
+  model?: string;
+  providersOnly?: boolean;
+  includeProviders?: boolean;
+};
+
+const DEFAULT_IMAGE_FORMATS = ['png', 'jpeg', 'webp'];
+const DEFAULT_TTS_FORMATS = ['wav'];
+const DEFAULT_TTS_QUALITY_PRESETS: SelectOption[] = [
+  { value: 'low', label: 'low / fast' },
+  { value: 'standard', label: 'standard' },
+  { value: 'high', label: 'high quality' },
+];
+const OPENAI_TTS_FORMATS = ['mp3', 'opus', 'aac', 'flac', 'wav', 'pcm'];
+const DEFAULT_STT_FORMATS = ['json', 'text', 'verbose_json', 'srt', 'vtt'];
+
+function formatOptionsFrom(values: unknown, fallback: string[]): SelectOption[] {
+  const raw = Array.isArray(values) ? values : fallback;
+  const seen = new Set<string>();
+  const out: SelectOption[] = [];
+  for (const item of raw) {
+    if (typeof item !== 'string') continue;
+    const value = item.trim();
+    if (!value || seen.has(value)) continue;
+    seen.add(value);
+    out.push({ value, label: value });
+  }
+  if (out.length > 0) return out;
+  return fallback.map((value) => ({ value, label: value }));
+}
+
+function normalizeMediaProvider(value: string): string {
+  return String(value || '').trim().toLowerCase().replace(/_/g, '-');
+}
+
+function providerOptionMapValues(map: ProviderOptionMap, provider: string, fallback: SelectOption[]): SelectOption[] {
+  const normalized = normalizeMediaProvider(provider);
+  if (!normalized) return fallback;
+  return map[normalized] || map[provider] || [];
+}
+
+function ttsFormatFallback(provider: string): string[] {
+  const p = normalizeMediaProvider(provider);
+  if (p === 'openai' || p === 'openai-compatible' || p === 'remote') return OPENAI_TTS_FORMATS;
+  return DEFAULT_TTS_FORMATS;
+}
+
+function canonicalImageModelForProvider(provider: string, model: string): string {
+  const normalizedProvider = normalizeMediaProvider(provider);
+  let clean = String(model || '').trim();
+  if (!clean) return '';
+  const lowered = clean.toLowerCase();
+  if ((normalizedProvider === 'huggingface' || normalizedProvider === 'hf') && lowered.startsWith('diffusers/')) {
+    clean = clean.slice('diffusers/'.length).trim();
+  }
+  if ((normalizedProvider === 'openai' || normalizedProvider === 'openai-compatible') && lowered.startsWith('openai-compatible/')) {
+    clean = clean.slice('openai-compatible/'.length).trim();
+  }
+  return clean;
+}
+
+function imageDefaultsForProvider(provider: string): Record<string, JsonValue | undefined> {
+  const normalized = normalizeMediaProvider(provider);
+  if (normalized === 'openai' || normalized === 'openai-compatible') {
+    return {
+      size: 'auto',
+      width: undefined,
+      height: undefined,
+      steps: undefined,
+      guidance_scale: undefined,
+    };
+  }
+  return {
+    size: undefined,
+    width: 512,
+    height: 512,
+    steps: 20,
+    guidance_scale: 7.5,
+  };
+}
 
 const OnEventNameInline = memo(function OnEventNameInline({
   nodeId,
@@ -232,7 +327,10 @@ const VarDeclInline = memo(function VarDeclInline({
     { value: 'boolean', label: 'boolean' },
     { value: 'number', label: 'number' },
     { value: 'string', label: 'string' },
-    { value: 'provider', label: 'provider' },
+    { value: 'provider_text', label: 'provider_text' },
+    { value: 'provider_image', label: 'provider_image' },
+    { value: 'provider_voice', label: 'provider_voice' },
+    { value: 'provider', label: 'provider (legacy)' },
     { value: 'model', label: 'model' },
     { value: 'object', label: 'object' },
     { value: 'assertion', label: 'assertion' },
@@ -287,7 +385,17 @@ const VarDeclInline = memo(function VarDeclInline({
       );
     }
 
-    if (varType === 'string' || varType === 'provider' || varType === 'model') {
+    if (
+      varType === 'string' ||
+      varType === 'provider' ||
+      varType === 'model' ||
+      varType === 'provider_text' ||
+      varType === 'model_text' ||
+      varType === 'provider_image' ||
+      varType === 'model_image' ||
+      varType === 'provider_voice' ||
+      varType === 'model_voice'
+    ) {
       return (
         <input
           className="af-pin-input nodrag"
@@ -428,6 +536,7 @@ export const BaseNode = memo(function BaseNode({
   const isExecuting = executingNodeId === id;
   const isRecent = Boolean(recentNodeIds && (recentNodeIds as Record<string, true>)[id]);
   const edges = useEdges();
+  const { setEdges } = useReactFlow();
   const updateNodeInternals = useUpdateNodeInternals();
 
   const isTriggerNode = isEntryNodeType(data.nodeType);
@@ -497,6 +606,12 @@ export const BaseNode = memo(function BaseNode({
             t === 'string' ||
             t === 'provider' ||
             t === 'model' ||
+            t === 'provider_text' ||
+            t === 'model_text' ||
+            t === 'provider_image' ||
+            t === 'model_image' ||
+            t === 'provider_voice' ||
+            t === 'model_voice' ||
             t === 'object' ||
             t === 'assertion' ||
             t === 'assertions' ||
@@ -676,6 +791,12 @@ export const BaseNode = memo(function BaseNode({
   const isEmitEventNode = data.nodeType === 'emit_event';
   const inputData = data.inputs.filter((p) => {
     if (p.type === 'execution') return false;
+    // `profile` is still a real override pin, but showing both voice and profile
+    // unconnected makes TTS look like it needs two voice selectors. Keep the
+    // advanced profile override available only when a wire explicitly targets it.
+    if (data.nodeType === 'generate_voice' && p.id === 'profile' && !isPinConnected('profile', true)) {
+      return false;
+    }
     // Keep emit_event "session_id" as an advanced pin: hide it unless connected.
     if (isEmitEventNode && p.id === 'session_id' && !isPinConnected('session_id', true)) {
       return false;
@@ -717,6 +838,11 @@ export const BaseNode = memo(function BaseNode({
   const isBoolVarNode = data.nodeType === 'bool_var';
   const isVarDeclNode = data.nodeType === 'var_decl';
   const isProviderModelsNode = data.nodeType === 'provider_models';
+  const isGenerateImageNode = data.nodeType === 'generate_image';
+  const isGenerateVoiceNode = data.nodeType === 'generate_voice';
+  const isTranscribeAudioNode = data.nodeType === 'transcribe_audio';
+  const isListenVoiceNode = data.nodeType === 'listen_voice';
+  const isMediaNode = isGenerateImageNode || isGenerateVoiceNode || isTranscribeAudioNode || isListenVoiceNode;
   const isDelayNode = data.nodeType === 'wait_until';
   const isOnEventNode = data.nodeType === 'on_event';
   const isOnScheduleNode = data.nodeType === 'on_schedule';
@@ -732,8 +858,10 @@ export const BaseNode = memo(function BaseNode({
   // NOTE: Subflow control pins (inherit_context) are configured via pin defaults on the pin row.
   // We intentionally avoid a separate non-pin checkbox to keep the UI single-source-of-truth.
 
-  const subflowHasProviderPin = isSubflowNode && data.inputs.some((p) => p.id === 'provider' || p.type === 'provider');
-  const subflowHasModelPin = isSubflowNode && data.inputs.some((p) => p.id === 'model' || p.type === 'model');
+  const subflowHasProviderPin =
+    isSubflowNode && data.inputs.some((p) => p.id === 'provider' || p.type === 'provider' || p.type === 'provider_text');
+  const subflowHasModelPin =
+    isSubflowNode && data.inputs.some((p) => p.id === 'model' || p.type === 'model' || p.type === 'model_text');
   const subflowHasToolsPin = isSubflowNode && data.inputs.some((p) => p.id === 'tools' || p.type === 'tools');
 
   const hasModelControls = isLlmNode || isAgentNode || subflowHasModelPin;
@@ -762,6 +890,52 @@ export const BaseNode = memo(function BaseNode({
         ? pinnedModel
         : '';
 
+  const firstConfigString = (...values: unknown[]): string => {
+    for (const value of values) {
+      const raw = typeof value === 'string' ? value.trim() : '';
+      if (raw) return raw;
+    }
+    return '';
+  };
+  const selectedImageProvider = firstConfigString(data.effectConfig?.image_provider, pinDefaults.image_provider, pinDefaults.provider_image);
+  const selectedImageModel = firstConfigString(data.effectConfig?.image_model, pinDefaults.image_model, pinDefaults.model_image);
+  const selectedTtsProvider = firstConfigString(data.effectConfig?.tts_provider, pinDefaults.tts_provider, pinDefaults.provider_voice);
+  const selectedTtsModel = firstConfigString(data.effectConfig?.tts_model, pinDefaults.tts_model, pinDefaults.model_voice);
+  const selectedVoice = firstConfigString(data.effectConfig?.voice, pinDefaults.voice);
+  const selectedProfile = firstConfigString(data.effectConfig?.profile, pinDefaults.profile);
+  const selectedTtsQualityPreset =
+    typeof data.effectConfig?.quality_preset === 'string'
+      ? data.effectConfig.quality_preset
+      : typeof data.pinDefaults?.quality_preset === 'string'
+        ? data.pinDefaults.quality_preset
+        : 'standard';
+  const selectedSttProvider = firstConfigString(data.effectConfig?.stt_provider, pinDefaults.stt_provider, pinDefaults.provider_voice);
+  const selectedSttModel = firstConfigString(data.effectConfig?.stt_model, pinDefaults.stt_model, pinDefaults.model_voice);
+
+  const mediaCapabilitiesQuery = useGatewayCapabilities(isMediaNode);
+  const gatewayContracts = gatewayContractsFromCapabilities(mediaCapabilitiesQuery.data);
+  const generatedImageContract =
+    gatewayContracts?.flow_editor?.media?.generated_image || gatewayContracts?.assistant?.media?.generated_image;
+  const generatedVoiceContract =
+    gatewayContracts?.flow_editor?.media?.generated_voice || gatewayContracts?.assistant?.media?.generated_voice;
+  const mediaDiscovery = gatewayContracts?.common?.discovery || {};
+  const voiceCatalogEndpoint = mediaDiscovery.voice_voices || '';
+  const ttsModelsEndpoint = mediaDiscovery.audio_speech_models || '';
+  const sttModelsEndpoint = mediaDiscovery.audio_transcription_models || '';
+  const visionProviderModelsEndpoint = mediaDiscovery.vision_provider_models || '';
+  const visionModelsEndpoint = mediaDiscovery.vision_models || '';
+
+  const [mediaLoading, setMediaLoading] = useState(false);
+  const [mediaCatalogRequest, setMediaCatalogRequest] = useState<MediaCatalogRequest | null>(null);
+  const [imageProviderCatalogOptions, setImageProviderCatalogOptions] = useState<SelectOption[]>([]);
+  const [imageModelOptions, setImageModelOptions] = useState<MediaModelOption[]>([]);
+  const [ttsProviderOptions, setTtsProviderOptions] = useState<SelectOption[]>([]);
+  const [ttsModelOptions, setTtsModelOptions] = useState<MediaModelOption[]>([]);
+  const [sttProviderOptions, setSttProviderOptions] = useState<SelectOption[]>([]);
+  const [sttModelOptions, setSttModelOptions] = useState<MediaModelOption[]>([]);
+  const [voiceOptions, setVoiceOptions] = useState<MediaModelOption[]>([]);
+  const [profileOptions, setProfileOptions] = useState<MediaModelOption[]>([]);
+  const [ttsFormatsByProvider, setTtsFormatsByProvider] = useState<ProviderOptionMap>({});
 
   const providersQuery = useProviders(hasProviderDropdown && (!providerConnected || !modelConnected));
   const modelsQuery = useModels(
@@ -775,6 +949,485 @@ export const BaseNode = memo(function BaseNode({
   const tools = Array.isArray(toolsQuery.data) ? toolsQuery.data : [];
 
   const modelOptions = useMemo(() => models.map((m) => ({ value: m, label: m })), [models]);
+  const requestMediaCatalog = useCallback((scope: MediaCatalogScope, options: Omit<MediaCatalogRequest, 'seq' | 'scope'> = {}) => {
+    setMediaCatalogRequest((prev) => ({
+      seq: (prev?.seq || 0) + 1,
+      scope,
+      ...options,
+    }));
+  }, []);
+
+  const imageProviderOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const out: SelectOption[] = [];
+    const add = (provider: string, label?: string) => {
+      const clean = normalizeMediaProvider(provider);
+      if (!clean || seen.has(clean)) return;
+      seen.add(clean);
+      out.push({ value: clean, label: label || clean });
+    };
+    for (const option of imageProviderCatalogOptions) add(option.value, option.label);
+    for (const option of imageModelOptions) add(option.provider);
+    if (selectedImageProvider) add(selectedImageProvider);
+    return out;
+  }, [imageModelOptions, imageProviderCatalogOptions, selectedImageProvider]);
+  const visibleImageModelOptions = useMemo(() => {
+    if (!selectedImageProvider) return imageModelOptions.map((option) => ({ value: option.model, label: option.label }));
+    return imageModelOptions
+      .filter((option) => normalizeMediaProvider(option.provider) === normalizeMediaProvider(selectedImageProvider))
+      .map((option) => ({ value: option.model, label: option.label }));
+  }, [imageModelOptions, selectedImageProvider]);
+  const visibleTtsModelOptions = useMemo(() => {
+    const baseOptions = selectedTtsProvider
+      ? ttsModelOptions.filter((option) => normalizeMediaProvider(option.provider) === normalizeMediaProvider(selectedTtsProvider))
+      : ttsModelOptions;
+    return baseOptions.map((option) => ({ value: option.model, label: option.label }));
+  }, [selectedTtsProvider, ttsModelOptions]);
+  const visibleVoiceOptions = useMemo(() => {
+    const selectedScope = selectedTtsModel.trim().toLowerCase();
+    const providerOptions = selectedTtsProvider
+      ? voiceOptions.filter((option) => normalizeMediaProvider(option.provider) === normalizeMediaProvider(selectedTtsProvider))
+      : voiceOptions;
+    const scopedOptions = providerOptions.filter((option) => {
+      const scope = (option.scopeModel || '').trim().toLowerCase();
+      return !selectedScope || !scope || scope === selectedScope;
+    });
+    return (scopedOptions.length > 0 ? scopedOptions : providerOptions).map((option) => ({
+      value: option.model,
+      label: option.label,
+    }));
+  }, [selectedTtsModel, selectedTtsProvider, voiceOptions]);
+  const visibleProfileOptions = useMemo(() => {
+    const selectedScope = selectedTtsModel.trim().toLowerCase();
+    const providerOptions = selectedTtsProvider
+      ? profileOptions.filter((option) => normalizeMediaProvider(option.provider) === normalizeMediaProvider(selectedTtsProvider))
+      : profileOptions;
+    const scopedOptions = providerOptions.filter((option) => {
+      const scope = (option.scopeModel || '').trim().toLowerCase();
+      return !selectedScope || !scope || scope === selectedScope;
+    });
+    return (scopedOptions.length > 0 ? scopedOptions : providerOptions).map((option) => ({
+      value: option.model,
+      label: option.label,
+    }));
+  }, [profileOptions, selectedTtsModel, selectedTtsProvider]);
+  const visibleSttModelOptions = useMemo(() => {
+    const options = selectedSttProvider
+      ? sttModelOptions.filter((option) => normalizeMediaProvider(option.provider) === normalizeMediaProvider(selectedSttProvider))
+      : sttModelOptions;
+    return options.map((option) => ({ value: option.model, label: option.label }));
+  }, [selectedSttProvider, sttModelOptions]);
+  const imageFormatOptions = useMemo(
+    () => formatOptionsFrom(generatedImageContract?.direct_endpoint?.formats, DEFAULT_IMAGE_FORMATS),
+    [generatedImageContract?.direct_endpoint?.formats]
+  );
+  const ttsFormatOptions = useMemo(
+    () => {
+      const providerSpecific = providerOptionMapValues(ttsFormatsByProvider, selectedTtsProvider, []);
+      if (providerSpecific.length > 0) return providerSpecific;
+      const fallback = ttsFormatFallback(selectedTtsProvider);
+      if (normalizeMediaProvider(selectedTtsProvider) === 'piper') {
+        return formatOptionsFrom(undefined, fallback);
+      }
+      return formatOptionsFrom(generatedVoiceContract?.direct_endpoint?.formats, fallback);
+    },
+    [generatedVoiceContract?.direct_endpoint?.formats, selectedTtsProvider, ttsFormatsByProvider]
+  );
+  const sttFormatOptions = useMemo(() => formatOptionsFrom(undefined, DEFAULT_STT_FORMATS), []);
+
+  useEffect(() => {
+    if (!isMediaNode || !mediaCatalogRequest) return;
+
+    let cancelled = false;
+    const request = mediaCatalogRequest;
+
+    const asRecord = (value: unknown): Record<string, unknown> | null =>
+      value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+    const asArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
+    const text = (...values: unknown[]) => {
+      for (const value of values) {
+        if (typeof value === 'string' && value.trim()) return value.trim();
+      }
+      return '';
+    };
+    const addOption = (list: SelectOption[], seen: Set<string>, value: string, label?: string) => {
+      const clean = value.trim();
+      if (!clean || seen.has(clean)) return;
+      seen.add(clean);
+      list.push({ value: clean, label: label?.trim() || clean });
+    };
+    const addProvider = (list: SelectOption[], seen: Set<string>, value: string, label?: string) => {
+      const clean = normalizeMediaProvider(value);
+      if (!clean || clean === 'cloned') return;
+      addOption(list, seen, clean, label || clean);
+    };
+    const addProvidersFromArray = (list: SelectOption[], seen: Set<string>, values: unknown[]) => {
+      for (const item of values) {
+        if (typeof item === 'string') {
+          addProvider(list, seen, item);
+          continue;
+        }
+        const record = asRecord(item);
+        if (record) {
+          addProvider(list, seen, text(record.id, record.name, record.provider, record.engine_id), text(record.label, record.display_name, record.name));
+        }
+      }
+    };
+    const addMediaOption = (
+      list: MediaModelOption[],
+      seen: Set<string>,
+      provider: string,
+      model: string,
+      label?: string,
+      scopeModel?: string,
+      metadata?: MediaModelParameterMetadata
+    ) => {
+      const cleanModel = model.trim();
+      const cleanProvider = normalizeMediaProvider(provider);
+      const cleanScopeModel = typeof scopeModel === 'string' ? scopeModel.trim() : '';
+      if (!cleanModel) return;
+      const key = `${cleanProvider}:${cleanModel.toLowerCase()}`;
+      if (seen.has(key)) {
+        const cleanLabel = label?.trim();
+        const existing = list.find((option) => option.provider === cleanProvider && option.model.toLowerCase() === cleanModel.toLowerCase());
+        if (existing) {
+          if (cleanScopeModel && !existing.scopeModel) existing.scopeModel = cleanScopeModel;
+          if (metadata?.parameterDefaults && !existing.parameterDefaults) existing.parameterDefaults = metadata.parameterDefaults;
+          if (metadata?.parameterConstraints && !existing.parameterConstraints) existing.parameterConstraints = metadata.parameterConstraints;
+          if (cleanLabel) {
+            const defaultLabel = cleanProvider ? `${cleanProvider} / ${cleanModel}` : cleanModel;
+            if (!existing.label || existing.label === defaultLabel || existing.label === cleanModel || existing.label.endsWith(` / ${cleanModel}`)) {
+              existing.label = cleanLabel;
+            }
+          }
+        }
+        return;
+      }
+      seen.add(key);
+      list.push({
+        provider: cleanProvider,
+        model: cleanModel,
+        label: label?.trim() || (cleanProvider ? `${cleanProvider} / ${cleanModel}` : cleanModel),
+        scopeModel: cleanScopeModel || undefined,
+        parameterDefaults: metadata?.parameterDefaults,
+        parameterConstraints: metadata?.parameterConstraints,
+      });
+    };
+    const appendImageModels = (list: MediaModelOption[], seen: Set<string>, values: unknown[], provider: string) => {
+      for (const item of values) {
+        if (typeof item === 'string') {
+          addMediaOption(list, seen, provider, item);
+          continue;
+        }
+        const record = asRecord(item);
+        if (!record) continue;
+        const itemProvider = text(record.provider, record.engine_id, record.backend, provider);
+        const model = canonicalImageModelForProvider(itemProvider, text(record.model, record.model_id, record.id, record.name));
+        const label = text(record.label, record.display_name, record.name);
+        addMediaOption(list, seen, itemProvider, model, label || undefined, undefined, extractImageModelParameterMetadata(record));
+      }
+    };
+    const appendProviderValueMap = (list: MediaModelOption[], seen: Set<string>, payload: unknown, labelPrefix = '') => {
+      const record = asRecord(payload);
+      if (!record) return;
+      for (const [provider, values] of Object.entries(record)) {
+        for (const item of asArray(values)) {
+            if (typeof item === 'string') addMediaOption(list, seen, provider, item, labelPrefix ? `${labelPrefix} ${item}` : undefined);
+            else {
+              const itemRecord = asRecord(item);
+              if (!itemRecord) continue;
+              const model = canonicalImageModelForProvider(provider, text(itemRecord.model, itemRecord.model_id, itemRecord.id, itemRecord.name));
+              addMediaOption(
+                list,
+                seen,
+                provider,
+                model,
+                text(itemRecord.label, itemRecord.display_name, itemRecord.name) || undefined,
+                undefined,
+                extractImageModelParameterMetadata(itemRecord)
+              );
+            }
+          }
+        }
+    };
+    const formatMapFrom = (payload: unknown): ProviderOptionMap => {
+      const record = asRecord(payload);
+      const out: ProviderOptionMap = {};
+      if (!record) return out;
+      for (const [provider, values] of Object.entries(record)) {
+        const key = normalizeMediaProvider(provider);
+        const options = formatOptionsFrom(values, []);
+        if (key && options.length > 0) out[key] = options;
+      }
+      return out;
+    };
+    const scanImagePayload = (list: MediaModelOption[], seen: Set<string>, providersList: SelectOption[], seenProviders: Set<string>, payload: unknown) => {
+      if (Array.isArray(payload)) {
+        appendImageModels(list, seen, payload, '');
+        return;
+      }
+      const record = asRecord(payload);
+      if (!record) return;
+      addProvidersFromArray(providersList, seenProviders, asArray(record.providers));
+      const rootProvider = text(record.provider, record.engine_id, record.backend, record.active_provider);
+      appendImageModels(list, seen, asArray(record.models), rootProvider);
+      appendImageModels(list, seen, asArray(record.available_models), rootProvider);
+      appendImageModels(list, seen, asArray(record.local_models), rootProvider);
+      for (const key of ['provider_models', 'models_by_provider', 'providers']) {
+        const byProvider = asRecord(record[key]);
+        if (!byProvider) continue;
+        for (const [provider, modelsForProvider] of Object.entries(byProvider)) {
+          appendImageModels(list, seen, asArray(modelsForProvider), provider);
+        }
+      }
+    };
+
+    const loadMediaOptions = async () => {
+      setMediaLoading(true);
+      try {
+        const queryFor = (provider?: string, model?: string, providersOnly?: boolean) => {
+          const query: Record<string, string | boolean> = {};
+          if (provider) query.provider = provider;
+          if (model) query.model = model;
+          if (providersOnly) query.providers_only = true;
+          return query;
+        };
+        const imageProviderListQuery = {
+          task: 'text_to_image',
+          ...queryFor(undefined, undefined, true),
+        };
+        const imageModelQuery = {
+          task: 'text_to_image',
+          ...queryFor(request.provider, undefined, false),
+        };
+        const ttsQuery = queryFor(request.provider, request.model, request.providersOnly);
+        const ttsProviderListQuery = queryFor(undefined, undefined, true);
+        const sttQuery = queryFor(request.provider, undefined, request.providersOnly);
+        const sttProviderListQuery = queryFor(undefined, undefined, true);
+        const optionalCatalog = <T,>(promise: Promise<T>): Promise<T | null> =>
+          promise.catch((err) => {
+            console.warn('[BaseNode] optional media catalog request failed', err);
+            return null;
+          });
+        const shouldFetchTtsProviders = request.scope === 'tts' && voiceCatalogEndpoint && (request.providersOnly || request.includeProviders);
+        const shouldFetchTtsCatalog = request.scope === 'tts' && !request.providersOnly && voiceCatalogEndpoint;
+        const shouldFetchSttProviders = request.scope === 'stt' && voiceCatalogEndpoint && (request.providersOnly || request.includeProviders);
+        const shouldFetchImageProviders =
+          request.scope === 'image' && visionProviderModelsEndpoint && (request.providersOnly || request.includeProviders || !request.provider);
+        const shouldFetchImageModels = request.scope === 'image' && !request.providersOnly && request.provider && visionProviderModelsEndpoint;
+        const [voiceProvidersCatalog, voiceCatalog, speechCatalog, sttProvidersCatalog, transcriptionCatalog, visionProvidersCatalog, visionProviderCatalog, visionModelCatalog] = await Promise.all([
+          shouldFetchTtsProviders
+            ? optionalCatalog(gatewayJson<Record<string, unknown>>(gatewayPath(voiceCatalogEndpoint, {}, ttsProviderListQuery), { timeoutMs: 5_000 }))
+            : Promise.resolve(null),
+          shouldFetchTtsCatalog
+            ? optionalCatalog(gatewayJson<Record<string, unknown>>(gatewayPath(voiceCatalogEndpoint, {}, ttsQuery), { timeoutMs: 30_000 }))
+            : Promise.resolve(null),
+          request.scope === 'tts' && !request.providersOnly && ttsModelsEndpoint
+            ? optionalCatalog(gatewayJson<Record<string, unknown>>(gatewayPath(ttsModelsEndpoint, {}, ttsQuery), { timeoutMs: 30_000 }))
+            : Promise.resolve(null),
+          shouldFetchSttProviders
+            ? optionalCatalog(gatewayJson<Record<string, unknown>>(gatewayPath(voiceCatalogEndpoint, {}, sttProviderListQuery), { timeoutMs: 5_000 }))
+            : Promise.resolve(null),
+          request.scope === 'stt' && !request.providersOnly && sttModelsEndpoint
+            ? optionalCatalog(gatewayJson<Record<string, unknown>>(gatewayPath(sttModelsEndpoint, {}, sttQuery), { timeoutMs: 30_000 }))
+            : Promise.resolve(null),
+          shouldFetchImageProviders
+            ? optionalCatalog(gatewayJson<Record<string, unknown>>(gatewayPath(visionProviderModelsEndpoint, {}, imageProviderListQuery), { timeoutMs: 5_000 }))
+            : Promise.resolve(null),
+          shouldFetchImageModels
+            ? optionalCatalog(gatewayJson<Record<string, unknown>>(gatewayPath(visionProviderModelsEndpoint, {}, imageModelQuery), { timeoutMs: 30_000 }))
+            : Promise.resolve(null),
+          request.scope === 'image' && !request.provider && !request.providersOnly && visionModelsEndpoint
+            ? optionalCatalog(gatewayJson<Record<string, unknown>>(gatewayPath(visionModelsEndpoint), { timeoutMs: 30_000 }))
+            : Promise.resolve(null),
+        ]);
+
+        const nextVoiceOptions: MediaModelOption[] = [];
+        const nextProfileOptions: MediaModelOption[] = [];
+        const nextTtsProviders: SelectOption[] = [];
+        const nextSttProviders: SelectOption[] = [];
+        const nextTtsModels: MediaModelOption[] = [];
+        const nextSttModels: MediaModelOption[] = [];
+        const nextImageModels: MediaModelOption[] = [];
+        const nextImageProviders: SelectOption[] = [];
+        const seenVoices = new Set<string>();
+        const seenProfiles = new Set<string>();
+        const seenTtsProviders = new Set<string>();
+        const seenSttProviders = new Set<string>();
+        const seenTtsModels = new Set<string>();
+        const seenSttModels = new Set<string>();
+        const seenImageModels = new Set<string>();
+        const seenImageProviders = new Set<string>();
+
+        const voiceProvidersRecord = asRecord(voiceProvidersCatalog);
+        if (voiceProvidersRecord) {
+          addProvidersFromArray(nextTtsProviders, seenTtsProviders, asArray(voiceProvidersRecord.providers));
+          addProvidersFromArray(nextTtsProviders, seenTtsProviders, asArray(voiceProvidersRecord.tts_providers));
+          addProvidersFromArray(nextSttProviders, seenSttProviders, asArray(voiceProvidersRecord.stt_providers));
+        }
+
+        const sttProvidersRecord = asRecord(sttProvidersCatalog);
+        if (sttProvidersRecord) {
+          addProvidersFromArray(nextSttProviders, seenSttProviders, asArray(sttProvidersRecord.providers));
+          addProvidersFromArray(nextSttProviders, seenSttProviders, asArray(sttProvidersRecord.stt_providers));
+        }
+
+        const voiceRecord = asRecord(voiceCatalog);
+        let nextTtsFormatsByProvider: ProviderOptionMap = {};
+        if (voiceRecord) {
+          nextTtsFormatsByProvider = formatMapFrom(voiceRecord.tts_formats_by_provider);
+          addProvidersFromArray(nextTtsProviders, seenTtsProviders, asArray(voiceRecord.providers));
+          addProvidersFromArray(nextTtsProviders, seenTtsProviders, asArray(voiceRecord.tts_providers));
+          addProvidersFromArray(nextSttProviders, seenSttProviders, asArray(voiceRecord.stt_providers));
+          addProvider(nextTtsProviders, seenTtsProviders, text(voiceRecord.active_tts_provider, voiceRecord.engine_id));
+          addProvider(nextSttProviders, seenSttProviders, text(voiceRecord.active_stt_provider));
+          appendProviderValueMap(nextTtsModels, seenTtsModels, voiceRecord.tts_models_by_provider);
+          appendProviderValueMap(nextSttModels, seenSttModels, voiceRecord.stt_models_by_provider);
+          for (const profile of asArray(voiceRecord.profiles)) {
+            const record = asRecord(profile);
+            if (!record) continue;
+            const tags = asRecord(record.tags);
+            const params = asRecord(record.params);
+            const provider = text(record.provider, tags?.provider, params?.provider, record.engine_id, tags?.engine_id, params?.engine_id);
+            const profileId = text(record.profile_id, record.id, record.name);
+            const modelId = text(params?.model, params?.model_id, params?.model_filename, record.model, record.model_id);
+            const voiceId = text(record.voice_id, params?.voice, record.voice, profileId);
+            addProvider(nextTtsProviders, seenTtsProviders, provider);
+            addMediaOption(nextProfileOptions, seenProfiles, provider, profileId, text(record.label, record.display_name, record.name), modelId);
+            addMediaOption(nextVoiceOptions, seenVoices, provider, voiceId, text(record.label, record.display_name, record.name, params?.voice, record.voice), modelId);
+            addMediaOption(nextTtsModels, seenTtsModels, provider, modelId);
+          }
+          for (const key of ['voices', 'cloned_voices']) {
+            for (const voice of asArray(voiceRecord[key])) {
+              const record = asRecord(voice);
+              if (typeof voice === 'string') {
+                addMediaOption(nextVoiceOptions, seenVoices, '', voice);
+                continue;
+              }
+              if (!record) continue;
+              const tags = asRecord(record.tags);
+              const params = asRecord(record.params);
+              const kind = text(record.kind).toLowerCase();
+              const rawEngine = text(record.engine, params?.engine, tags?.engine, record.engine_id, tags?.engine_id, params?.engine_id);
+              const rawProvider = text(record.provider, tags?.provider, params?.provider, rawEngine);
+              const provider = normalizeMediaProvider(rawProvider === 'cloned' ? rawEngine : rawProvider);
+              if (provider && provider !== 'cloned') {
+                addProvider(nextTtsProviders, seenTtsProviders, provider);
+              }
+              const voiceId = text(record.voice_id, params?.voice, record.voice, record.profile_id, record.id, record.name);
+              const scopeModel = text(params?.model, params?.model_id, params?.model_filename, record.model, record.model_id);
+              const displayName = text(record.display_name, record.label, record.name);
+              const label =
+                kind === 'clone' && displayName && displayName !== voiceId
+                  ? `${displayName} / ${voiceId.slice(0, 10)}...`
+                  : text(record.label, record.display_name, record.name, record.voice);
+              addMediaOption(
+                nextVoiceOptions,
+                seenVoices,
+                provider,
+                voiceId,
+                label,
+                scopeModel
+              );
+            }
+          }
+          const appendNonCloneMap = (list: MediaModelOption[], seen: Set<string>, payload: unknown) => {
+            const record = asRecord(payload);
+            if (!record) return;
+            for (const [provider, values] of Object.entries(record)) {
+              if (normalizeMediaProvider(provider) === 'cloned') continue;
+              for (const item of asArray(values)) {
+                if (typeof item === 'string') addMediaOption(list, seen, provider, item);
+                else {
+                  const itemRecord = asRecord(item);
+                  if (!itemRecord) continue;
+                  const model = text(itemRecord.model, itemRecord.model_id, itemRecord.id, itemRecord.name);
+                  addMediaOption(list, seen, provider, model, text(itemRecord.label, itemRecord.display_name, itemRecord.name) || undefined);
+                }
+              }
+            }
+          };
+          appendNonCloneMap(nextVoiceOptions, seenVoices, voiceRecord.tts_voices_by_provider);
+          appendNonCloneMap(nextProfileOptions, seenProfiles, voiceRecord.tts_profiles_by_provider);
+        }
+        const speechRecord = asRecord(speechCatalog);
+        if (speechRecord) {
+          addProvidersFromArray(nextTtsProviders, seenTtsProviders, asArray(speechRecord.providers));
+          addProvider(nextTtsProviders, seenTtsProviders, text(speechRecord.provider, speechRecord.engine_id, speechRecord.active_provider));
+          appendProviderValueMap(nextTtsModels, seenTtsModels, speechRecord.models_by_provider || speechRecord.tts_models_by_provider);
+        }
+
+        const transcriptionRecord = asRecord(transcriptionCatalog);
+        if (transcriptionRecord) {
+          addProvidersFromArray(nextSttProviders, seenSttProviders, asArray(transcriptionRecord.providers));
+          addProvider(nextSttProviders, seenSttProviders, text(transcriptionRecord.provider, transcriptionRecord.engine_id, transcriptionRecord.active_provider));
+          appendProviderValueMap(nextSttModels, seenSttModels, transcriptionRecord.models_by_provider || transcriptionRecord.stt_models_by_provider);
+        }
+
+        scanImagePayload(nextImageModels, seenImageModels, nextImageProviders, seenImageProviders, visionProvidersCatalog);
+        scanImagePayload(nextImageModels, seenImageModels, nextImageProviders, seenImageProviders, visionProviderCatalog);
+        scanImagePayload(nextImageModels, seenImageModels, nextImageProviders, seenImageProviders, visionModelCatalog);
+        for (const option of nextImageModels) addProvider(nextImageProviders, seenImageProviders, option.provider);
+
+        if (!cancelled) {
+          if (request.scope === 'tts') {
+            setTtsProviderOptions(nextTtsProviders);
+            setTtsFormatsByProvider(nextTtsFormatsByProvider);
+            if (!request.providersOnly) {
+              setVoiceOptions(nextVoiceOptions);
+              setProfileOptions(nextProfileOptions);
+              setTtsModelOptions(nextTtsModels);
+            }
+          }
+          if (request.scope === 'stt') {
+            setSttProviderOptions(nextSttProviders);
+            if (!request.providersOnly) setSttModelOptions(nextSttModels);
+          }
+          if (request.scope === 'image') {
+            setImageProviderCatalogOptions(nextImageProviders);
+            if (!request.providersOnly) setImageModelOptions(nextImageModels);
+          }
+        }
+      } catch (err) {
+        console.warn('[BaseNode] media catalog discovery failed', err);
+        if (!cancelled) {
+          if (request.scope === 'tts') {
+            setTtsProviderOptions([]);
+            if (!request.providersOnly) {
+              setVoiceOptions([]);
+              setProfileOptions([]);
+              setTtsModelOptions([]);
+              setTtsFormatsByProvider({});
+            }
+          }
+          if (request.scope === 'stt') {
+            setSttProviderOptions([]);
+            if (!request.providersOnly) setSttModelOptions([]);
+          }
+          if (request.scope === 'image') {
+            setImageProviderCatalogOptions([]);
+            if (!request.providersOnly) setImageModelOptions([]);
+          }
+        }
+      } finally {
+        if (!cancelled) setMediaLoading(false);
+      }
+    };
+
+    loadMediaOptions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isMediaNode,
+    mediaCatalogRequest,
+    voiceCatalogEndpoint,
+    ttsModelsEndpoint,
+    sttModelsEndpoint,
+    visionProviderModelsEndpoint,
+    visionModelsEndpoint,
+  ]);
 
   const toolOptions = useMemo(() => {
     const out = tools
@@ -959,6 +1612,189 @@ export const BaseNode = memo(function BaseNode({
     [data.providerModelsConfig, id, isProviderModelsNode, updateNodeData]
   );
 
+  const setEffectConfigPatch = useCallback(
+    (patch: Record<string, unknown>) => {
+      updateNodeData(id, {
+        effectConfig: {
+          ...(data.effectConfig || {}),
+          ...patch,
+        } as FlowNodeData['effectConfig'],
+      });
+    },
+    [data.effectConfig, id, updateNodeData]
+  );
+
+  const setImageProviderSelection = useCallback(
+    (provider: string | null | undefined) => {
+      const clean = provider ? normalizeMediaProvider(provider) : '';
+      const nextDefaults = { ...(data.pinDefaults || {}) };
+      for (const [key, value] of Object.entries(imageDefaultsForProvider(clean))) {
+        if (value === undefined) delete nextDefaults[key];
+        else nextDefaults[key] = value;
+      }
+      updateNodeData(id, {
+        effectConfig: {
+          ...(data.effectConfig || {}),
+          image_provider: clean || undefined,
+          image_model: undefined,
+          provider: undefined,
+          model: undefined,
+        } as FlowNodeData['effectConfig'],
+        pinDefaults: nextDefaults,
+      });
+      if (clean) requestMediaCatalog('image', { provider: clean });
+    },
+    [data.effectConfig, data.pinDefaults, id, requestMediaCatalog, updateNodeData]
+  );
+
+  const setImageModelSelection = useCallback(
+    (model: string | null | undefined) => {
+      const cleanModel = typeof model === 'string' ? model.trim() : '';
+      const match = imageModelOptions.find(
+        (option) => option.model === cleanModel && (!selectedImageProvider || option.provider === selectedImageProvider)
+      );
+      updateNodeData(id, {
+        effectConfig: {
+          ...(data.effectConfig || {}),
+          image_provider: match?.provider || selectedImageProvider || undefined,
+          image_model: cleanModel || undefined,
+          provider: undefined,
+          model: undefined,
+        } as FlowNodeData['effectConfig'],
+        pinDefaults: applyImagePinDefaultPatch(data.pinDefaults || {}, match),
+      });
+    },
+    [data.effectConfig, data.pinDefaults, id, imageModelOptions, selectedImageProvider, updateNodeData]
+  );
+
+  const setTtsProviderSelection = useCallback(
+    (provider: string | null | undefined) => {
+      const clean = provider ? normalizeMediaProvider(provider) : '';
+      const formats = providerOptionMapValues(ttsFormatsByProvider, clean, formatOptionsFrom(undefined, ttsFormatFallback(clean)));
+      const nextDefaults = { ...(data.pinDefaults || {}) };
+      nextDefaults.format = formats[0]?.value || 'wav';
+      updateNodeData(id, {
+        effectConfig: {
+          ...(data.effectConfig || {}),
+          tts_provider: clean || undefined,
+          provider: undefined,
+          tts_model: undefined,
+          model: undefined,
+          voice: undefined,
+          profile: undefined,
+        } as FlowNodeData['effectConfig'],
+        pinDefaults: nextDefaults,
+      });
+      if (clean) requestMediaCatalog('tts', { provider: clean });
+    },
+    [data.effectConfig, data.pinDefaults, id, requestMediaCatalog, ttsFormatsByProvider, updateNodeData]
+  );
+
+  const setSttProviderSelection = useCallback(
+    (provider: string | null | undefined) => {
+      const clean = provider ? normalizeMediaProvider(provider) : '';
+      updateNodeData(id, {
+        effectConfig: {
+          ...(data.effectConfig || {}),
+          stt_provider: clean || undefined,
+          provider: undefined,
+          stt_model: undefined,
+          model: undefined,
+        } as FlowNodeData['effectConfig'],
+      });
+      if (clean) requestMediaCatalog('stt', { provider: clean });
+    },
+    [data.effectConfig, id, requestMediaCatalog, updateNodeData]
+  );
+
+  useEffect(() => {
+    if (!isGenerateImageNode || !selectedImageProvider) return;
+    const normalized = normalizeMediaProvider(selectedImageProvider);
+    const current = data.pinDefaults || {};
+    const nextDefaults = { ...current };
+    let changed = false;
+    if (normalized === 'openai' || normalized === 'openai-compatible') {
+      if (nextDefaults.size !== 'auto') {
+        nextDefaults.size = 'auto';
+        changed = true;
+      }
+      for (const key of ['width', 'height', 'steps', 'guidance_scale'] as const) {
+        if (nextDefaults[key] !== undefined) {
+          delete nextDefaults[key];
+          changed = true;
+        }
+      }
+    } else if (nextDefaults.size === 'auto') {
+      delete nextDefaults.size;
+      if (nextDefaults.width === undefined) nextDefaults.width = 512;
+      if (nextDefaults.height === undefined) nextDefaults.height = 512;
+      if (nextDefaults.steps === undefined) nextDefaults.steps = 20;
+      if (nextDefaults.guidance_scale === undefined) nextDefaults.guidance_scale = 7.5;
+      changed = true;
+    }
+    if (changed) updateNodeData(id, { pinDefaults: nextDefaults });
+  }, [data.pinDefaults, id, isGenerateImageNode, selectedImageProvider, updateNodeData]);
+
+  useEffect(() => {
+    if (mediaLoading || mediaCapabilitiesQuery.isLoading) return;
+
+    if (isGenerateImageNode && selectedImageProvider && selectedImageModel) {
+      const ok = visibleImageModelOptions.some((option) => option.value === selectedImageModel);
+      if (visibleImageModelOptions.length > 0 && !ok) setEffectConfigPatch({ image_model: undefined, model: undefined });
+    }
+
+    if (isGenerateVoiceNode && selectedTtsProvider) {
+      const patch: Record<string, unknown> = {};
+      if (ttsProviderOptions.length > 0 && !ttsProviderOptions.some((option) => option.value === selectedTtsProvider)) {
+        patch.tts_provider = undefined;
+        patch.provider = undefined;
+        patch.tts_model = undefined;
+        patch.model = undefined;
+        patch.voice = undefined;
+        patch.profile = undefined;
+      }
+      if (selectedTtsModel && visibleTtsModelOptions.length > 0 && !visibleTtsModelOptions.some((option) => option.value === selectedTtsModel)) {
+        patch.tts_model = undefined;
+        patch.model = undefined;
+        patch.voice = undefined;
+        patch.profile = undefined;
+      }
+      if (selectedVoice && visibleVoiceOptions.length > 0 && !visibleVoiceOptions.some((option) => option.value === selectedVoice)) {
+        patch.voice = undefined;
+      }
+      if (selectedProfile && visibleProfileOptions.length > 0 && !visibleProfileOptions.some((option) => option.value === selectedProfile)) {
+        patch.profile = undefined;
+      }
+      if (Object.keys(patch).length > 0) setEffectConfigPatch(patch);
+    }
+
+    if ((isListenVoiceNode || isTranscribeAudioNode) && selectedSttProvider && selectedSttModel) {
+      const ok = visibleSttModelOptions.some((option) => option.value === selectedSttModel);
+      if (visibleSttModelOptions.length > 0 && !ok) setEffectConfigPatch({ stt_model: undefined, model: undefined });
+    }
+  }, [
+    isGenerateImageNode,
+    isGenerateVoiceNode,
+    isListenVoiceNode,
+    isTranscribeAudioNode,
+    mediaCapabilitiesQuery.isLoading,
+    mediaLoading,
+    selectedImageModel,
+    selectedImageProvider,
+    selectedProfile,
+    selectedSttModel,
+    selectedSttProvider,
+    selectedTtsModel,
+    selectedTtsProvider,
+    selectedVoice,
+    setEffectConfigPatch,
+    visibleImageModelOptions,
+    visibleProfileOptions,
+    visibleSttModelOptions,
+    visibleTtsModelOptions,
+    visibleVoiceOptions,
+  ]);
+
   const setProviderModel = useCallback(
     (provider: string | undefined, model: string | undefined) => {
       if (isSubflowNode) {
@@ -1062,6 +1898,12 @@ export const BaseNode = memo(function BaseNode({
         t === 'string' ||
         t === 'provider' ||
         t === 'model' ||
+        t === 'provider_text' ||
+        t === 'model_text' ||
+        t === 'provider_image' ||
+        t === 'model_image' ||
+        t === 'provider_voice' ||
+        t === 'model_voice' ||
         t === 'object' ||
         t === 'assertion' ||
         t === 'assertions' ||
@@ -1291,6 +2133,46 @@ export const BaseNode = memo(function BaseNode({
     [data.outputs, id, isParallelLike, updateNodeData]
   );
 
+  const removeThenPin = useCallback(
+    (e: MouseEvent, pinId: string) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!isSequenceLike && !isParallelLike) return;
+
+      const removedIdx = parseThenIndex(pinId);
+      if (removedIdx === null) return;
+
+      const thenPins = data.outputs.filter((p) => p.type === 'execution' && parseThenIndex(p.id) !== null);
+      if (thenPins.length <= 1) return;
+
+      const remappedHandles = new Map<string, string>();
+      const nextOutputs = data.outputs
+        .filter((p) => !(p.type === 'execution' && p.id === pinId))
+        .map((p) => {
+          if (p.type !== 'execution') return p;
+          const idx = parseThenIndex(p.id);
+          if (idx === null || idx < removedIdx) return p;
+          const nextIdx = idx - 1;
+          const nextId = `then:${nextIdx}`;
+          remappedHandles.set(p.id, nextId);
+          return { ...p, id: nextId, label: `Then ${nextIdx}` };
+        });
+
+      setEdges((currentEdges) =>
+        currentEdges
+          .filter((edge) => !(edge.source === id && edge.sourceHandle === pinId))
+          .map((edge) => {
+            if (edge.source !== id || !edge.sourceHandle) return edge;
+            const nextHandle = remappedHandles.get(edge.sourceHandle);
+            if (!nextHandle) return edge;
+            return { ...edge, sourceHandle: nextHandle };
+          })
+      );
+      updateNodeData(id, { outputs: nextOutputs });
+    },
+    [data.outputs, id, isParallelLike, isSequenceLike, setEdges, updateNodeData]
+  );
+
   const addSwitchCasePin = useCallback(
     (e: MouseEvent) => {
       e.preventDefault();
@@ -1464,6 +2346,16 @@ export const BaseNode = memo(function BaseNode({
                     {thenPins.map((pin) => (
                       <div key={pin.id} className="pin-row output exec-branch nodrag">
                         <span className="pin-label">{pin.label}</span>
+                        <button
+                          type="button"
+                          className="exec-remove-pin"
+                          title={`Remove ${pin.label}`}
+                          aria-label={`Remove ${pin.label}`}
+                          disabled={thenPins.length <= 1}
+                          onClick={(e) => removeThenPin(e, pin.id)}
+                        >
+                          -
+                        </button>
                         <span
                           className="pin-shape"
                           style={{ color: PIN_COLORS.execution }}
@@ -1724,7 +2616,13 @@ export const BaseNode = memo(function BaseNode({
                   pin.type === 'number' ||
                   pin.type === 'boolean' ||
                   pin.type === 'provider' ||
-                  pin.type === 'model';
+                  pin.type === 'model' ||
+                  pin.type === 'provider_text' ||
+                  pin.type === 'model_text' ||
+                  pin.type === 'provider_image' ||
+                  pin.type === 'model_image' ||
+                  pin.type === 'provider_voice' ||
+                  pin.type === 'model_voice';
                 const isEmitEventName = isEmitEventNode && pin.id === 'name';
                 const isEmitEventScopePin = isEmitEventNode && pin.id === 'scope';
                 const isOnEventScopePin = isOnEventNode && pin.id === 'scope';
@@ -1751,9 +2649,33 @@ export const BaseNode = memo(function BaseNode({
 	                const isSubflowScopePin = isSubflowNode && pin.id === 'scope';
 	                const isMemoryTagsModePin = isMemoryQueryNode && pin.id === 'tags_mode';
 	                const isMemoryPlacementPin = isMemoryRehydrateNode && pin.id === 'placement';
+                  const isImageProviderPin = isGenerateImageNode && pin.id === 'image_provider';
+                  const isImageModelPin = isGenerateImageNode && pin.id === 'image_model';
+                  const isImageFormatPin = isGenerateImageNode && pin.id === 'format';
+                  const isTtsProviderPin = isGenerateVoiceNode && pin.id === 'tts_provider';
+                  const isTtsModelPin = isGenerateVoiceNode && pin.id === 'tts_model';
+                  const isTtsFormatPin = isGenerateVoiceNode && pin.id === 'format';
+                  const isTtsQualityPresetPin = isGenerateVoiceNode && pin.id === 'quality_preset';
+                  const isVoicePin = isGenerateVoiceNode && pin.id === 'voice';
+                  const isVoiceProfilePin = isGenerateVoiceNode && pin.id === 'profile';
+                  const isSttProviderPin = (isListenVoiceNode || isTranscribeAudioNode) && pin.id === 'stt_provider';
+                  const isSttModelPin = (isListenVoiceNode || isTranscribeAudioNode) && pin.id === 'stt_model';
+                  const isSttFormatPin = isTranscribeAudioNode && pin.id === 'format';
 		                const hasSpecialControl =
 		                  (hasProviderDropdown && pin.id === 'provider') ||
 		                  (hasModelControls && pin.id === 'model') ||
+                      isImageProviderPin ||
+                      isImageModelPin ||
+                      isImageFormatPin ||
+                      isTtsProviderPin ||
+                      isTtsModelPin ||
+                      isTtsFormatPin ||
+                      isTtsQualityPresetPin ||
+                      isVoicePin ||
+                      isVoiceProfilePin ||
+                      isSttProviderPin ||
+                      isSttModelPin ||
+                      isSttFormatPin ||
 	                  ((isAgentNode || isLlmNode || subflowHasToolsPin) && pin.id === 'tools') ||
 	                  (isVarNode && pin.id === 'name') ||
 	                  isCompareOpPin ||
@@ -2048,9 +2970,234 @@ export const BaseNode = memo(function BaseNode({
                   }
                 }
 
+                if (isImageProviderPin && !connected) {
+                  controls.push(
+                    <AfSelect
+                      key="image-provider"
+                      variant="pin"
+                      value={selectedImageProvider}
+                      placeholder={mediaLoading || mediaCapabilitiesQuery.isLoading ? 'Loading…' : 'Gateway default'}
+                      options={imageProviderOptions}
+                      disabled={mediaCapabilitiesQuery.isLoading}
+                      loading={mediaLoading || mediaCapabilitiesQuery.isLoading}
+                      searchable
+                      searchPlaceholder="Search image providers…"
+                      clearable
+                      minPopoverWidth={300}
+                      onOpen={() => requestMediaCatalog('image', { providersOnly: true })}
+                      onChange={(v) => setImageProviderSelection(v)}
+                    />
+                  );
+                }
+
+                if (isImageModelPin && !connected) {
+                  controls.push(
+                    <AfSelect
+                      key="image-model"
+                      variant="pin"
+                      value={selectedImageModel}
+                      placeholder={mediaLoading || mediaCapabilitiesQuery.isLoading ? 'Loading…' : selectedImageProvider ? 'Select…' : 'Select model…'}
+                      options={visibleImageModelOptions}
+                      disabled={mediaCapabilitiesQuery.isLoading || !selectedImageProvider}
+                      loading={mediaCapabilitiesQuery.isLoading || (mediaLoading && visibleImageModelOptions.length === 0)}
+                      searchable
+                      searchPlaceholder="Search image models…"
+                      clearable
+                      minPopoverWidth={400}
+                      onChange={(v) => setImageModelSelection(v)}
+                    />
+                  );
+                }
+
+                if (isTtsProviderPin && !connected) {
+                  controls.push(
+                    <AfSelect
+                      key="tts-provider"
+                      variant="pin"
+                      value={selectedTtsProvider}
+                      placeholder={mediaLoading || mediaCapabilitiesQuery.isLoading ? 'Loading…' : 'Gateway default'}
+                      options={ttsProviderOptions}
+                      disabled={mediaCapabilitiesQuery.isLoading}
+                      loading={mediaLoading || mediaCapabilitiesQuery.isLoading}
+                      searchable
+                      searchPlaceholder="Search TTS providers…"
+                      clearable
+                      minPopoverWidth={300}
+                      onOpen={() => requestMediaCatalog('tts', { providersOnly: true })}
+                      onChange={(v) => setTtsProviderSelection(v)}
+                    />
+                  );
+                }
+
+                if (isTtsModelPin && !connected) {
+                  controls.push(
+                    <AfSelect
+                      key="tts-model"
+                      variant="pin"
+                      value={selectedTtsModel}
+                      placeholder={mediaLoading || mediaCapabilitiesQuery.isLoading ? 'Loading…' : 'Select…'}
+                      options={visibleTtsModelOptions}
+                      disabled={mediaCapabilitiesQuery.isLoading || !selectedTtsProvider}
+                      loading={mediaCapabilitiesQuery.isLoading || (mediaLoading && visibleTtsModelOptions.length === 0)}
+                      searchable
+                      searchPlaceholder="Search TTS models…"
+                      clearable
+                      minPopoverWidth={380}
+                      onOpen={() => {
+                        if (selectedTtsProvider) requestMediaCatalog('tts', { provider: selectedTtsProvider });
+                      }}
+                      onChange={(v) => setEffectConfigPatch({ tts_model: v || undefined, model: undefined, voice: undefined, profile: undefined })}
+                    />
+                  );
+                }
+
+                if (isVoicePin && !connected) {
+                  controls.push(
+                    <AfSelect
+                      key="voice"
+                      variant="pin"
+                      value={selectedVoice}
+                      placeholder={mediaLoading || mediaCapabilitiesQuery.isLoading ? 'Loading…' : 'Select voice…'}
+                      options={visibleVoiceOptions}
+                      disabled={mediaCapabilitiesQuery.isLoading || !selectedTtsProvider}
+                      loading={mediaCapabilitiesQuery.isLoading || (mediaLoading && visibleVoiceOptions.length === 0)}
+                      searchable
+                      searchPlaceholder="Search voices…"
+                      clearable
+                      minPopoverWidth={320}
+                      onOpen={() => {
+                        if (selectedTtsProvider) {
+                          requestMediaCatalog('tts', { provider: selectedTtsProvider, model: selectedTtsModel || undefined });
+                        }
+                      }}
+                      onChange={(v) => setEffectConfigPatch({ voice: v || undefined })}
+                    />
+                  );
+                }
+
+                if (isVoiceProfilePin && !connected) {
+                  controls.push(
+                    <AfSelect
+                      key="voice-profile"
+                      variant="pin"
+                      value={selectedProfile}
+                      placeholder={mediaLoading || mediaCapabilitiesQuery.isLoading ? 'Loading…' : 'Select profile…'}
+                      options={visibleProfileOptions}
+                      disabled={mediaCapabilitiesQuery.isLoading || !selectedTtsProvider}
+                      loading={mediaCapabilitiesQuery.isLoading || (mediaLoading && visibleProfileOptions.length === 0)}
+                      searchable
+                      searchPlaceholder="Search voice profiles…"
+                      clearable
+                      minPopoverWidth={340}
+                      onOpen={() => {
+                        if (selectedTtsProvider) {
+                          requestMediaCatalog('tts', { provider: selectedTtsProvider, model: selectedTtsModel || undefined });
+                        }
+                      }}
+                      onChange={(v) => setEffectConfigPatch({ profile: v || undefined })}
+                    />
+                  );
+                }
+
+                if (isTtsQualityPresetPin && !connected) {
+                  controls.push(
+                    <AfSelect
+                      key="tts-quality-preset"
+                      variant="pin"
+                      value={selectedTtsQualityPreset}
+                      placeholder="standard"
+                      options={DEFAULT_TTS_QUALITY_PRESETS}
+                      searchable={false}
+                      clearable={false}
+                      minPopoverWidth={180}
+                      onChange={(v) => {
+                        const next = v || 'standard';
+                        setPinDefault('quality_preset', next);
+                        setEffectConfigPatch({ quality_preset: next });
+                      }}
+                    />
+                  );
+                }
+
+                if (isSttProviderPin && !connected) {
+                  controls.push(
+                    <AfSelect
+                      key="stt-provider"
+                      variant="pin"
+                      value={selectedSttProvider}
+                      placeholder={mediaLoading || mediaCapabilitiesQuery.isLoading ? 'Loading…' : 'Gateway default'}
+                      options={sttProviderOptions}
+                      disabled={mediaCapabilitiesQuery.isLoading}
+                      loading={mediaLoading || mediaCapabilitiesQuery.isLoading}
+                      searchable
+                      searchPlaceholder="Search STT providers…"
+                      clearable
+                      minPopoverWidth={300}
+                      onOpen={() => requestMediaCatalog('stt', { providersOnly: true })}
+                      onChange={(v) => setSttProviderSelection(v)}
+                    />
+                  );
+                }
+
+                if (isSttModelPin && !connected) {
+                  controls.push(
+                    <AfSelect
+                      key="stt-model"
+                      variant="pin"
+                      value={selectedSttModel}
+                      placeholder={mediaLoading || mediaCapabilitiesQuery.isLoading ? 'Loading…' : 'Select…'}
+                      options={visibleSttModelOptions}
+                      disabled={mediaCapabilitiesQuery.isLoading || !selectedSttProvider}
+                      loading={mediaLoading || mediaCapabilitiesQuery.isLoading}
+                      searchable
+                      searchPlaceholder="Search STT models…"
+                      clearable
+                      minPopoverWidth={380}
+                      onOpen={() => {
+                        if (selectedSttProvider) requestMediaCatalog('stt', { provider: selectedSttProvider });
+                      }}
+                      onChange={(v) => setEffectConfigPatch({ stt_model: v || undefined, model: undefined })}
+                    />
+                  );
+                }
+
+                if ((isImageFormatPin || isTtsFormatPin || isSttFormatPin) && !connected) {
+                  const fallbackFormat = isImageFormatPin ? 'png' : isTtsFormatPin ? 'wav' : 'json';
+                  const options = isImageFormatPin
+                    ? imageFormatOptions
+                    : isTtsFormatPin
+                      ? ttsFormatOptions
+                      : sttFormatOptions;
+                  const raw = pinDefaults.format;
+                  const currentFormat = typeof raw === 'string' && raw.trim() ? raw.trim() : fallbackFormat;
+                  controls.push(
+                    <AfSelect
+                      key="media-format"
+                      variant="pin"
+                      value={currentFormat}
+                      placeholder={fallbackFormat}
+                      options={options}
+                      searchable={false}
+                      clearable={false}
+                      minPopoverWidth={180}
+                      onChange={(v) => setPinDefault('format', v || fallbackFormat)}
+                    />
+                  );
+                }
+
                 if (!connected && isPrimitive && !hasSpecialControl) {
                   const raw = pinDefaults[pin.id];
-                  if (pin.type === 'string' || pin.type === 'provider' || pin.type === 'model') {
+                  if (
+                    pin.type === 'string' ||
+                    pin.type === 'provider' ||
+                    pin.type === 'model' ||
+                    pin.type === 'provider_text' ||
+                    pin.type === 'model_text' ||
+                    pin.type === 'provider_image' ||
+                    pin.type === 'model_image' ||
+                    pin.type === 'provider_voice' ||
+                    pin.type === 'model_voice'
+                  ) {
                     controls.push(
                       <input
                         key="pin-default"

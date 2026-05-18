@@ -296,9 +296,38 @@
 .toolbar-button {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   padding: 6px 12px;
   font-size: var(--font-size-sm);
+}
+
+.toolbar-button.icon-button {
+  position: relative;
+  min-width: 40px;
+  padding: 6px 10px;
+  font-size: calc(16px * var(--font-scale));
+  line-height: 1;
+}
+
+.toolbar-button.save-button.dirty {
+  border-color: rgba(255, 176, 0, 0.72);
+  box-shadow: 0 0 0 1px rgba(255, 176, 0, 0.10), 0 0 16px rgba(255, 176, 0, 0.16);
+}
+
+.toolbar-button.save-button:disabled {
+  opacity: 0.45;
+}
+
+.save-dirty-dot {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #ffb000;
+  box-shadow: 0 0 8px rgba(255, 176, 0, 0.7);
 }
 
 .toolbar-status {

@@ -36,6 +36,12 @@ function normalizeString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function isAbstractStatusResult(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return normalizeString(record.name) === 'abstract.status';
+}
+
 function extractWaitInfo(rec: LedgerRecord) {
   const res = rec && typeof rec === 'object' ? rec.result : null;
   const wait = res && typeof res === 'object' ? (res as Record<string, unknown>).wait : null;
@@ -113,6 +119,11 @@ export function mapLedgerRecordToEvents(rec: LedgerRecord, state: LedgerMappingS
     events.push({ type: 'node_start', runId, stepId, nodeId, ts });
     if (ts) openNodes.set(nodeId, ts);
   } else if (status === 'completed') {
+    if (isAbstractStatusResult(rec.result)) {
+      events.push(traceUpdateEvent(rec, nodeId, runId));
+      return events;
+    }
+
     const ts = endedAt || startedAt;
     const dur = durationMs(startedAt, endedAt);
     events.push({

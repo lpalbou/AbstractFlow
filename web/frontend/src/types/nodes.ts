@@ -226,8 +226,8 @@ const CORE_NODES: NodeTemplate[] = [
 	        description:
 	          'Memory configuration object (KG/span/session controls). If set, overrides this node’s recall/ingest behavior; if unset, runtime defaults apply.',
 	      },
-	      { id: 'provider', label: 'provider', type: 'provider', description: 'LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider.' },
-	      { id: 'model', label: 'model', type: 'model', description: 'LLM model id/name. If unset, uses the node’s configured model.' },
+	      { id: 'provider', label: 'provider', type: 'provider_text', description: 'Text/LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider.' },
+	      { id: 'model', label: 'model', type: 'model', description: 'Text/LLM model id/name. If unset, uses the node’s configured model.' },
 	      { id: 'system', label: 'system', type: 'string', description: 'Optional system prompt for this agent instance (high priority instructions).' },
 	      { id: 'prompt', label: 'prompt', type: 'string', description: 'User prompt/task string for the agent to solve.' },
 	      { id: 'tools', label: 'tools', type: 'tools', description: 'Allowlist of tool names this agent can call (defense-in-depth; runtime still enforces allowlists).' },
@@ -327,8 +327,8 @@ const CORE_NODES: NodeTemplate[] = [
 	        description:
 	          'Memory configuration object (KG/span/session controls). If set, overrides this call’s recall behavior; if unset, runtime defaults apply.',
 	      },
-	      { id: 'provider', label: 'provider', type: 'provider', description: 'LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider.' },
-	      { id: 'model', label: 'model', type: 'model', description: 'LLM model id/name. If unset, uses the node’s configured model.' },
+	      { id: 'provider', label: 'provider', type: 'provider_text', description: 'Text/LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider.' },
+	      { id: 'model', label: 'model', type: 'model', description: 'Text/LLM model id/name. If unset, uses the node’s configured model.' },
 	      { id: 'system', label: 'system', type: 'string', description: 'Optional system prompt for this single call.' },
 	      { id: 'prompt', label: 'prompt', type: 'string', description: 'User prompt/content for this single call.' },
 	      { id: 'tools', label: 'tools', type: 'tools', description: 'Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node).' },
@@ -373,8 +373,8 @@ const CORE_NODES: NodeTemplate[] = [
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
       { id: 'prompt', label: 'prompt', type: 'string', description: 'Image prompt.' },
-      { id: 'image_provider', label: 'image_provider', type: 'provider', description: 'Optional image provider/backend. Legacy provider pins are treated as an image provider fallback.' },
-      { id: 'image_model', label: 'image_model', type: 'model', description: 'Optional image model id. Legacy model pins are treated as an image model fallback.' },
+      { id: 'image_provider', label: 'provider', type: 'provider_image', description: 'Optional image provider/backend.' },
+      { id: 'image_model', label: 'model', type: 'model', description: 'Optional image model id for the selected image provider.' },
       { id: 'size', label: 'size', type: 'string', description: 'Optional size like 1024x1024.' },
       { id: 'width', label: 'width', type: 'number' },
       { id: 'height', label: 'height', type: 'number' },
@@ -405,10 +405,11 @@ const CORE_NODES: NodeTemplate[] = [
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
       { id: 'text', label: 'text', type: 'string', description: 'Text to speak.' },
-      { id: 'tts_provider', label: 'tts_provider', type: 'string', description: 'Optional media/voice provider id. Legacy provider pins are treated as a TTS provider fallback.' },
-      { id: 'voice', label: 'voice', type: 'string', description: 'Optional cloned voice id.' },
-      { id: 'profile', label: 'profile', type: 'string', description: 'Optional base voice profile.' },
-      { id: 'tts_model', label: 'tts_model', type: 'model', description: 'Optional TTS model id. Legacy model pins are treated as a TTS model fallback.' },
+      { id: 'tts_provider', label: 'provider', type: 'provider_voice', description: 'Optional media/voice provider id.' },
+      { id: 'tts_model', label: 'model', type: 'model', description: 'Optional TTS model/language/voice model for the selected provider.' },
+      { id: 'voice', label: 'voice', type: 'string', description: 'Optional base or cloned voice for the selected provider.' },
+      { id: 'profile', label: 'profile', type: 'string', description: 'Advanced legacy voice profile override.' },
+      { id: 'quality_preset', label: 'quality', type: 'string', description: 'Optional AbstractVoice quality preset: low, standard, or high.' },
       { id: 'format', label: 'format', type: 'string', description: 'wav or mp3.' },
       { id: 'speed', label: 'speed', type: 'number' },
       { id: 'instructions', label: 'instructions', type: 'string' },
@@ -434,9 +435,9 @@ const CORE_NODES: NodeTemplate[] = [
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
       { id: 'audio_artifact', label: 'audio_artifact', type: 'object', description: 'Audio artifact ref.' },
-      { id: 'stt_provider', label: 'stt_provider', type: 'string', description: 'Optional audio/STT provider id. Legacy provider pins are treated as an STT provider fallback.' },
+      { id: 'stt_provider', label: 'provider', type: 'provider_voice', description: 'Optional audio/STT provider id.' },
       { id: 'language', label: 'language', type: 'string' },
-      { id: 'stt_model', label: 'stt_model', type: 'model', description: 'Optional STT model id. Legacy model pins are treated as an STT model fallback.' },
+      { id: 'stt_model', label: 'model', type: 'model', description: 'Optional STT model id for the selected voice provider.' },
       { id: 'prompt', label: 'prompt', type: 'string' },
       { id: 'format', label: 'format', type: 'string' },
       { id: 'temperature', label: 'temperature', type: 'number' },
@@ -462,7 +463,8 @@ const CORE_NODES: NodeTemplate[] = [
       { id: 'exec-in', label: '', type: 'execution' },
       { id: 'prompt', label: 'prompt', type: 'string' },
       { id: 'language', label: 'language', type: 'string' },
-      { id: 'stt_model', label: 'stt_model', type: 'model', description: 'Optional STT model id for host-side voice transcription.' },
+      { id: 'stt_provider', label: 'provider', type: 'provider_voice', description: 'Optional STT provider id for host-side voice transcription.' },
+      { id: 'stt_model', label: 'model', type: 'model', description: 'Optional STT model id for the selected voice provider.' },
       { id: 'max_duration_s', label: 'max_duration_s', type: 'number' },
       { id: 'wait_key', label: 'wait_key', type: 'string' },
     ],
@@ -799,8 +801,8 @@ const DATA_NODES: NodeTemplate[] = [
       { id: 'schema', label: 'schema', type: 'string', description: 'Schema identifier (default: abstractcode.agent.v1.meta).' },
       { id: 'version', label: 'version', type: 'number', description: 'Schema version number (default: 1).' },
       { id: 'output_mode', label: 'output_mode', type: 'string', description: 'Output mode: unstructured | structured.' },
-      { id: 'provider', label: 'provider', type: 'provider', description: 'Provider id/name (e.g. lmstudio).' },
-      { id: 'model', label: 'model', type: 'model', description: 'Model id/name.' },
+      { id: 'provider', label: 'provider', type: 'provider_text', description: 'Text/LLM provider id/name (e.g. lmstudio).' },
+      { id: 'model', label: 'model', type: 'model', description: 'Text/LLM model id/name.' },
       { id: 'sub_run_id', label: 'sub_run_id', type: 'string', description: 'Optional sub-run id (Agent nodes).' },
       { id: 'iterations', label: 'iterations', type: 'number', description: 'Optional iteration count (Agent nodes).' },
       { id: 'tool_calls', label: 'tool_calls', type: 'number', description: 'Optional tool call count.' },
@@ -1123,12 +1125,12 @@ const LITERAL_NODES: NodeTemplate[] = [
       {
         id: 'provider',
         label: 'provider',
-        type: 'provider',
+        type: 'provider_text',
         description: 'Provider id to list models for. If this pin is not connected, the node’s selected provider is used.',
       },
     ],
     outputs: [
-      { id: 'provider', label: 'provider', type: 'provider', description: 'Resolved provider id used to compute the models list.' },
+      { id: 'provider', label: 'provider', type: 'provider_text', description: 'Resolved provider id used to compute the models list.' },
       {
         id: 'models',
         label: 'models',
@@ -1348,7 +1350,7 @@ const MEMORY_NODES: NodeTemplate[] = [
       { id: 'owner_id', label: 'owner_id', type: 'string', description: 'Optional explicit owner id override (advanced; normally derived from scope).' },
       { id: 'min_score', label: 'min_score', type: 'number', description: 'Optional cosine similarity threshold (semantic query_text only). Range ~[-1..1]; start with 0.2–0.4.' },
       { id: 'max_input_tokens', label: 'max_input_tokens', type: 'number', description: 'Optional token budget for Active Memory packing (KG → prompt). If set, returns active_memory_text + packets.' },
-      { id: 'model', label: 'model', type: 'model', description: 'Optional model id used for token estimation (improves budgeting accuracy).' },
+      { id: 'model', label: 'model', type: 'model', description: 'Optional text model id used for token estimation (improves budgeting accuracy).' },
       { id: 'limit', label: 'limit', type: 'number', description: 'Max assertions to return (default 100).' },
     ],
     outputs: [
@@ -1539,6 +1541,33 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
     outputs: [...template.outputs],
     // Default pin values for input-driven nodes
     ...(template.type === 'agent' && { pinDefaults: { max_iterations: 50 } }),
+    ...(template.type === 'generate_image' && {
+      pinDefaults: {
+        format: 'png',
+        width: 512,
+        height: 512,
+        steps: 20,
+        guidance_scale: 7.5,
+      },
+    }),
+    ...(template.type === 'generate_voice' && {
+      pinDefaults: {
+        format: 'wav',
+        quality_preset: 'standard',
+        speed: 1.0,
+      },
+    }),
+    ...(template.type === 'transcribe_audio' && {
+      pinDefaults: {
+        format: 'json',
+        temperature: 0,
+      },
+    }),
+    ...(template.type === 'listen_voice' && {
+      pinDefaults: {
+        max_duration_s: 30,
+      },
+    }),
     // Default code for code nodes
     ...(template.type === 'code' && {
       codeBody: defaultCodeBody,

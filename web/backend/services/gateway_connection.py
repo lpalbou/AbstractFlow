@@ -1,8 +1,8 @@
 """Gateway connection configuration for AbstractFlow Web.
 
-AbstractFlow's memory KG uses gateway-managed embeddings (via /api/gateway/embeddings).
-When gateway security is enabled, the AbstractFlow backend must hold a Bearer token
-to call those endpoints.
+AbstractFlow is a thin client: it must hold a server-side Gateway Bearer token
+before the browser can use workflow CRUD, publish, run, discovery, or embeddings
+endpoints.
 
 This module provides:
 - a small persisted config (runtime dir)
@@ -108,7 +108,7 @@ def apply_gateway_connection_to_env(*, gateway_url: Optional[str], gateway_token
     if url:
         os.environ["ABSTRACTFLOW_GATEWAY_URL"] = url
         # Keep canonical env var too (some callers read it).
-        os.environ.setdefault("ABSTRACTGATEWAY_URL", url)
+        os.environ["ABSTRACTGATEWAY_URL"] = url
     if token:
         os.environ["ABSTRACTGATEWAY_AUTH_TOKEN"] = token
 
@@ -137,20 +137,42 @@ def resolve_effective_gateway_connection() -> Tuple[str, Optional[str], str]:
     return (str(url2).strip().rstrip("/"), token2.strip() if isinstance(token2, str) and token2.strip() else None, "config" if token2 else "none")
 
 
-def fetch_gateway_embeddings_config(*, gateway_url: str, token: Optional[str], timeout_s: float = 4.0) -> Dict[str, Any]:
-    base = str(gateway_url or "").strip().rstrip("/")
-    url = f"{base}/api/gateway/embeddings/config"
+def fetch_gateway_connection_check(*, gateway_url: str, token: Optional[str], timeout_s: float = 1.5) -> Dict[str, Any]:
+    """Check that Flow can reach Gateway with the configured token.
 
-    headers = {"Content-Type": "application/json"}
-    if isinstance(token, str) and token.strip():
-        headers["Authorization"] = f"Bearer {token.strip()}"
+    This is a login/reachability check only. It intentionally avoids provider,
+    model, voice, vision, or embeddings discovery because those are optional
+    capability probes and can legitimately be unavailable offline.
+    """
+    base = str(gateway_url or "").strip().rstrip("/")
+    if not base:
+        return {"ok": False, "error": "Gateway URL is required"}
+    if not isinstance(token, str) or not token.strip():
+        return {"ok": False, "error": "Gateway token missing"}
+
+    url = f"{base}/api/gateway/ping"
+
+    headers = {
+        "Accept": "application/json",
+        "Authorization": f"Bearer {token.strip()}",
+    }
 
     req = Request(url=url, method="GET", headers=headers)
     try:
         with urlopen(req, timeout=float(timeout_s)) as resp:
+            status_code = int(getattr(resp, "status", 200))
             raw = resp.read().decode("utf-8")
-        data = json.loads(raw)
-        return data if isinstance(data, dict) else {"ok": False, "error": "Invalid response"}
+        data = json.loads(raw) if raw else {}
+        return {
+            "ok": True,
+            "provider": "gateway",
+            "model": "ping",
+            "auth_checked": True,
+            "gateway_url": base,
+            "http_status": status_code,
+            "service": data.get("service") if isinstance(data, dict) else None,
+            "gateway_status": data.get("status") if isinstance(data, dict) else None,
+        }
     except HTTPError as e:
         detail = ""
         try:
@@ -162,3 +184,8 @@ def fetch_gateway_embeddings_config(*, gateway_url: str, token: Optional[str], t
         return {"ok": False, "error": f"Request failed: {e}"}
     except Exception as e:
         return {"ok": False, "error": str(e)}
+
+
+def fetch_gateway_embeddings_config(*, gateway_url: str, token: Optional[str], timeout_s: float = 1.5) -> Dict[str, Any]:
+    """Backward-compatible name used by older Flow UI code paths."""
+    return fetch_gateway_connection_check(gateway_url=gateway_url, token=token, timeout_s=timeout_s)

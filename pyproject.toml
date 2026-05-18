@@ -43,20 +43,22 @@ agent = [
     "abstractagent>=0.3.7",
 ]
 apple = [
-    # Apple local control-plane compatibility stack. Install abstractgateway[apple]
-    # separately when the Gateway server is needed; Gateway may depend on Flow.
-    "AbstractRuntime>=0.4.11",
-    "abstractcore[tools]>=2.13.14",
+    # Apple local control-plane + Gateway stack. This profile is intentionally
+    # the full user-facing local install, so media engine extras cascade through
+    # abstractgateway[apple] -> abstractvoice[all-apple]/abstractvision[all-apple].
+    "abstractgateway[apple]>=0.2.11",
+    "AbstractRuntime>=0.4.12",
+    "abstractcore[tools]>=2.13.15",
     "abstractagent>=0.3.7",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.23.0",
     "websockets>=11.0.0",
 ]
 gpu = [
-    # GPU local control-plane compatibility stack. Install abstractgateway[gpu]
-    # separately when the Gateway server is needed; Gateway may depend on Flow.
-    "AbstractRuntime>=0.4.11",
-    "abstractcore[tools]>=2.13.14",
+    # GPU local control-plane + Gateway stack.
+    "abstractgateway[gpu]>=0.2.11",
+    "AbstractRuntime>=0.4.12",
+    "abstractcore[tools]>=2.13.15",
     "abstractagent>=0.3.7",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.23.0",

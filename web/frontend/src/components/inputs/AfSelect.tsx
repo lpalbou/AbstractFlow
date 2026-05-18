@@ -19,6 +19,7 @@ export interface AfSelectProps {
   clearable?: boolean;
   minPopoverWidth?: number;
   variant?: 'pin' | 'panel';
+  onOpen?: () => void;
   onChange: (value: string) => void;
 }
 
@@ -34,11 +35,13 @@ export function AfSelect({
   clearable = false,
   minPopoverWidth = 240,
   variant = 'panel',
+  onOpen,
   onChange,
 }: AfSelectProps) {
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
+  const onOpenRef = useRef(onOpen);
 
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -93,7 +96,12 @@ export function AfSelect({
   }, []);
 
   useEffect(() => {
+    onOpenRef.current = onOpen;
+  }, [onOpen]);
+
+  useEffect(() => {
     if (!open) return;
+    onOpenRef.current?.();
     recalcPosition();
     const onResize = () => recalcPosition();
     window.addEventListener('resize', onResize);
@@ -190,7 +198,7 @@ export function AfSelect({
         aria-expanded={open}
       >
         <span className={clsx('af-select-value', !showValue && 'af-select-value--placeholder')}>
-          {loading ? 'Loading…' : triggerText}
+          {loading && !showValue ? 'Loading…' : triggerText}
         </span>
 
         {clearable && showValue ? (
@@ -286,7 +294,4 @@ export function AfSelect({
 }
 
 export default AfSelect;
-
-
-
 

@@ -15,8 +15,8 @@ import {
 } from 'reactflow';
 import type { FlowNodeData, VisualFlow, Pin, JsonValue } from '../types/flow';
 import { createNodeData, getNodeTemplate, mergePinDocsFromTemplate, NodeTemplate } from '../types/nodes';
-import { validateConnection } from '../utils/validation';
-import { inferEntryNode, withMultiEntryRouteData } from '../utils/multiEntryRoutes';
+import { inferRouteOverrideRouteKey, validateConnection } from '../utils/validation';
+import { inferEntryNode, isRouteOverrideEdge, routeKey as buildRouteKey, withMultiEntryRouteData } from '../utils/multiEntryRoutes';
 
 interface FlowState {
   // Flow data
@@ -272,11 +272,20 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const sourceNode = state.nodes.find((n) => n.id === connection.source);
     const sourcePin = sourceNode?.data.outputs.find((p) => p.id === connection.sourceHandle);
     const animated = sourcePin?.type === 'execution';
+    const routeKey = inferRouteOverrideRouteKey(state.nodes, state.edges, connection);
 
     const newEdge = {
       ...connection,
       id: `edge-${Date.now()}`,
-      animated,
+      animated: routeKey ? false : animated,
+      ...(routeKey
+        ? {
+            data: {
+              routeOverride: true,
+              routeKey,
+            },
+          }
+        : {}),
     };
 
     set({
@@ -761,7 +770,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                 want({ id: 'use_context', label: 'use_context', type: 'boolean' }),
                 want({ id: 'context', label: 'context', type: 'object' }),
                 want({ id: 'memory', label: 'memory', type: 'memory' }),
-                want({ id: 'provider', label: 'provider', type: 'provider' }),
+                want({ id: 'provider', label: 'provider', type: 'provider_text' }),
                 want({ id: 'model', label: 'model', type: 'model' }),
                 want({ id: 'system', label: 'system', type: 'string' }),
                 want({ id: 'prompt', label: 'prompt', type: 'string' }),
@@ -776,7 +785,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                 want({ id: 'use_context', label: 'use_context', type: 'boolean' }),
                 want({ id: 'context', label: 'context', type: 'object' }),
                 want({ id: 'memory', label: 'memory', type: 'memory' }),
-                want({ id: 'provider', label: 'provider', type: 'provider' }),
+                want({ id: 'provider', label: 'provider', type: 'provider_text' }),
                 want({ id: 'model', label: 'model', type: 'model' }),
                 want({ id: 'system', label: 'system', type: 'string' }),
                 want({ id: 'prompt', label: 'prompt', type: 'string' }),
@@ -957,7 +966,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 	                  want({ id: 'schema', label: 'schema', type: 'string' }),
 	                  want({ id: 'version', label: 'version', type: 'number' }),
 	                  want({ id: 'output_mode', label: 'output_mode', type: 'string' }),
-	                  want({ id: 'provider', label: 'provider', type: 'provider' }),
+	                  want({ id: 'provider', label: 'provider', type: 'provider_text' }),
 	                  want({ id: 'model', label: 'model', type: 'model' }),
 	                  want({ id: 'sub_run_id', label: 'sub_run_id', type: 'string' }),
 	                  want({ id: 'iterations', label: 'iterations', type: 'number' }),
@@ -1339,7 +1348,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         };
       }
 
-      // UX migration: promote well-known LLM routing pins to dedicated types.
+      // UX migration: promote well-known LLM routing pins to dedicated scoped types.
       // (Provider/model are string-like, but typed pins enable dropdowns + edge coloring.)
       const upgradePins = (pins: Pin[] | undefined): Pin[] | undefined => {
         if (!Array.isArray(pins) || pins.length === 0) return pins;
@@ -1350,7 +1359,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             const label = String(p.label || '').trim();
             if (id === 'provider' && label === 'provider') {
               changed = true;
-              return { ...p, type: 'provider' as const };
+              return { ...p, type: 'provider_text' as const };
             }
             if (id === 'model' && label === 'model') {
               changed = true;
@@ -1378,10 +1387,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
         const prevProvider = byId.get('provider');
         const providerPin: Pin = !prevProvider
-          ? { id: 'provider', label: 'provider', type: 'provider' }
-          : prevProvider.label === 'provider' && prevProvider.type === 'provider'
+          ? { id: 'provider', label: 'provider', type: 'provider_text' }
+          : prevProvider.label === 'provider' && prevProvider.type === 'provider_text'
             ? prevProvider
-            : { ...prevProvider, label: 'provider', type: 'provider' };
+            : { ...prevProvider, label: 'provider', type: 'provider_text' };
 
         data = { ...data, inputs: [providerPin, ...extras] };
       }
@@ -1423,6 +1432,212 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         })();
 
         data = { ...data, pinDefaults: nextDefaults, inputs: [...canonicalInputs, ...extras] };
+      }
+
+      // Backward-compat: media nodes added before inline media controls had empty
+      // local-friendly defaults, leaving basic settings blank in existing flows.
+      if (['generate_image', 'generate_voice', 'transcribe_audio', 'listen_voice'].includes(data.nodeType)) {
+        const prevDefaults =
+          data.pinDefaults && typeof data.pinDefaults === 'object' ? (data.pinDefaults as Record<string, unknown>) : {};
+        const normalizeScopedMediaValue = (value: unknown, provider: unknown = ''): string => {
+          const raw = typeof value === 'string' ? value.trim() : '';
+          if (!raw) return '';
+          const providerText = typeof provider === 'string' ? provider.trim() : '';
+          const spacedPrefix = providerText ? `${providerText} / ` : '';
+          if (spacedPrefix && raw.toLowerCase().startsWith(spacedPrefix.toLowerCase())) {
+            return raw.slice(spacedPrefix.length).trim();
+          }
+          const parts = raw.split(' / ');
+          if (parts.length > 1) return parts.slice(1).join(' / ').trim();
+          return raw;
+        };
+        const firstString = (...values: unknown[]): string => {
+          for (const value of values) {
+            const raw = typeof value === 'string' ? value.trim() : '';
+            if (raw) return raw;
+          }
+          return '';
+        };
+        const reorderInputs = (canonical: Pin[]): Pin[] => {
+          const existingInputs = Array.isArray(data.inputs) ? data.inputs : [];
+          const byId = new Map(existingInputs.map((p) => [p.id, p] as const));
+          const used = new Set<string>();
+
+          const want = (pin: Pin): Pin => {
+            const prev = byId.get(pin.id);
+            used.add(pin.id);
+            if (!prev) return pin;
+            if (prev.label === pin.label && prev.type === pin.type && prev.description === pin.description) return prev;
+            return { ...prev, label: pin.label, type: pin.type, description: pin.description };
+          };
+
+          const ordered = canonical.map(want);
+          const extras = existingInputs.filter((p) => !used.has(p.id));
+          return [...ordered, ...extras];
+        };
+        const canonicalInputs =
+          data.nodeType === 'generate_voice'
+            ? [
+                { id: 'exec-in', label: '', type: 'execution' as const },
+                { id: 'text', label: 'text', type: 'string' as const, description: 'Text to speak.' },
+                { id: 'tts_provider', label: 'provider', type: 'provider_voice' as const, description: 'Optional media/voice provider id. Legacy provider pins are treated as a TTS provider fallback.' },
+                { id: 'tts_model', label: 'model', type: 'model' as const, description: 'Optional TTS model/language/voice model for the selected provider.' },
+                { id: 'voice', label: 'voice', type: 'string' as const, description: 'Optional base or cloned voice for the selected provider.' },
+                { id: 'profile', label: 'profile', type: 'string' as const, description: 'Advanced legacy voice profile override.' },
+                { id: 'quality_preset', label: 'quality', type: 'string' as const, description: 'Optional AbstractVoice quality preset: low, standard, or high.' },
+                { id: 'format', label: 'format', type: 'string' as const, description: 'wav or mp3.' },
+                { id: 'speed', label: 'speed', type: 'number' as const },
+                { id: 'instructions', label: 'instructions', type: 'string' as const },
+              ]
+            : data.nodeType === 'generate_image'
+              ? [
+                  { id: 'exec-in', label: '', type: 'execution' as const },
+                  { id: 'prompt', label: 'prompt', type: 'string' as const, description: 'Image prompt.' },
+                  { id: 'image_provider', label: 'provider', type: 'provider_image' as const, description: 'Optional image provider/backend. Legacy provider pins are treated as an image provider fallback.' },
+                  { id: 'image_model', label: 'model', type: 'model' as const, description: 'Optional image model id for the selected image provider.' },
+                  { id: 'size', label: 'size', type: 'string' as const, description: 'Optional size like 1024x1024.' },
+                  { id: 'width', label: 'width', type: 'number' as const },
+                  { id: 'height', label: 'height', type: 'number' as const },
+                  { id: 'format', label: 'format', type: 'string' as const, description: 'png, jpg, or webp.' },
+                  { id: 'seed', label: 'seed', type: 'number' as const },
+                  { id: 'steps', label: 'steps', type: 'number' as const },
+                  { id: 'guidance_scale', label: 'guidance', type: 'number' as const },
+                  { id: 'negative_prompt', label: 'negative', type: 'string' as const },
+                ]
+              : data.nodeType === 'transcribe_audio'
+                ? [
+                    { id: 'exec-in', label: '', type: 'execution' as const },
+                    { id: 'audio_artifact', label: 'audio_artifact', type: 'object' as const, description: 'Audio artifact ref.' },
+                    { id: 'stt_provider', label: 'provider', type: 'provider_voice' as const, description: 'Optional audio/STT provider id. Legacy provider pins are treated as an STT provider fallback.' },
+                    { id: 'stt_model', label: 'model', type: 'model' as const, description: 'Optional STT model id for the selected voice provider.' },
+                    { id: 'language', label: 'language', type: 'string' as const },
+                    { id: 'prompt', label: 'prompt', type: 'string' as const },
+                    { id: 'format', label: 'format', type: 'string' as const },
+                    { id: 'temperature', label: 'temperature', type: 'number' as const },
+                  ]
+                : data.nodeType === 'listen_voice'
+                  ? [
+                      { id: 'exec-in', label: '', type: 'execution' as const },
+                      { id: 'prompt', label: 'prompt', type: 'string' as const },
+                      { id: 'language', label: 'language', type: 'string' as const },
+                      { id: 'stt_provider', label: 'provider', type: 'provider_voice' as const, description: 'Optional STT provider id for host-side voice transcription.' },
+                      { id: 'stt_model', label: 'model', type: 'model' as const, description: 'Optional STT model id for the selected voice provider.' },
+                      { id: 'max_duration_s', label: 'max_duration_s', type: 'number' as const },
+                      { id: 'wait_key', label: 'wait_key', type: 'string' as const },
+                    ]
+                  : [];
+        if (canonicalInputs.length > 0) {
+          data = { ...data, inputs: reorderInputs(canonicalInputs) };
+        }
+        const mediaDefaults: Record<string, JsonValue> =
+          data.nodeType === 'generate_image'
+            ? { format: 'png', width: 512, height: 512, steps: 20, guidance_scale: 7.5 }
+            : data.nodeType === 'generate_voice'
+              ? { format: 'wav', quality_preset: 'standard', speed: 1.0 }
+              : data.nodeType === 'transcribe_audio'
+                ? { format: 'json', temperature: 0 }
+                : { max_duration_s: 30 };
+        let changedDefaults = false;
+        const nextDefaults: Record<string, JsonValue> = { ...(prevDefaults as Record<string, JsonValue>) };
+        if (data.nodeType === 'generate_voice') {
+          const provider = normalizeScopedMediaValue(firstString(nextDefaults.tts_provider, nextDefaults.ttsProvider, nextDefaults.provider));
+          const rawVoice = firstString(nextDefaults.voice);
+          const legacyProfile = firstString(nextDefaults.profile);
+          const voice = normalizeScopedMediaValue(firstString(rawVoice, legacyProfile), provider);
+          const model = normalizeScopedMediaValue(firstString(nextDefaults.tts_model, nextDefaults.ttsModel, nextDefaults.model), provider);
+          if (provider && nextDefaults.tts_provider !== provider) {
+            nextDefaults.tts_provider = provider;
+            changedDefaults = true;
+          }
+          if (voice && nextDefaults.voice !== voice) {
+            nextDefaults.voice = voice;
+            changedDefaults = true;
+          }
+          const normalizedLegacyProfile = normalizeScopedMediaValue(legacyProfile, provider);
+          if (legacyProfile && normalizedLegacyProfile === voice && nextDefaults.profile === legacyProfile) {
+            delete nextDefaults.profile;
+            changedDefaults = true;
+          }
+          if (model && nextDefaults.tts_model !== model) {
+            nextDefaults.tts_model = model;
+            changedDefaults = true;
+          }
+        } else if (data.nodeType === 'generate_image') {
+          const provider = normalizeScopedMediaValue(firstString(nextDefaults.image_provider, nextDefaults.imageProvider, nextDefaults.provider));
+          const model = normalizeScopedMediaValue(firstString(nextDefaults.image_model, nextDefaults.imageModel, nextDefaults.model), provider);
+          if (provider && nextDefaults.image_provider !== provider) {
+            nextDefaults.image_provider = provider;
+            changedDefaults = true;
+          }
+          if (model && nextDefaults.image_model !== model) {
+            nextDefaults.image_model = model;
+            changedDefaults = true;
+          }
+        } else if (data.nodeType === 'transcribe_audio' || data.nodeType === 'listen_voice') {
+          const provider = normalizeScopedMediaValue(firstString(nextDefaults.stt_provider, nextDefaults.sttProvider, nextDefaults.provider));
+          const model = normalizeScopedMediaValue(firstString(nextDefaults.stt_model, nextDefaults.sttModel, nextDefaults.model), provider);
+          if (provider && nextDefaults.stt_provider !== provider) {
+            nextDefaults.stt_provider = provider;
+            changedDefaults = true;
+          }
+          if (model && nextDefaults.stt_model !== model) {
+            nextDefaults.stt_model = model;
+            changedDefaults = true;
+          }
+        }
+        for (const [key, value] of Object.entries(mediaDefaults)) {
+          if (nextDefaults[key] === undefined || nextDefaults[key] === null || nextDefaults[key] === '') {
+            nextDefaults[key] = value;
+            changedDefaults = true;
+          }
+        }
+        const nextEffectConfig: Record<string, JsonValue> = {
+          ...((data.effectConfig && typeof data.effectConfig === 'object' ? data.effectConfig : {}) as Record<string, JsonValue>),
+        };
+        let changedEffectConfig = false;
+        const setEffectIfMissing = (key: string, value: string) => {
+          if (!value) return;
+          if (typeof nextEffectConfig[key] === 'string' && String(nextEffectConfig[key]).trim()) return;
+          nextEffectConfig[key] = value;
+          changedEffectConfig = true;
+        };
+        if (data.nodeType === 'generate_voice') {
+          const provider = normalizeScopedMediaValue(firstString(nextEffectConfig.tts_provider, nextDefaults.tts_provider, nextEffectConfig.provider, nextDefaults.provider));
+          const model = normalizeScopedMediaValue(firstString(nextEffectConfig.tts_model, nextDefaults.tts_model, nextEffectConfig.model, nextDefaults.model), provider);
+          const rawEffectVoice = firstString(nextEffectConfig.voice);
+          const rawDefaultVoice = firstString(nextDefaults.voice);
+          const rawEffectProfile = firstString(nextEffectConfig.profile);
+          const rawDefaultProfile = firstString(nextDefaults.profile);
+          const voice = normalizeScopedMediaValue(firstString(rawEffectVoice, rawDefaultVoice, rawEffectProfile, rawDefaultProfile), provider);
+          const profile = normalizeScopedMediaValue(firstString(nextEffectConfig.profile, nextDefaults.profile), provider);
+          const quality = firstString(nextEffectConfig.quality_preset, nextDefaults.quality_preset, nextEffectConfig.quality, nextDefaults.quality);
+          setEffectIfMissing('tts_provider', provider);
+          setEffectIfMissing('tts_model', model);
+          setEffectIfMissing('voice', voice);
+          if (profile && profile !== voice) {
+            setEffectIfMissing('profile', profile);
+          } else if (profile && profile === voice) {
+            delete nextEffectConfig.profile;
+            changedEffectConfig = true;
+          }
+          setEffectIfMissing('quality_preset', quality);
+        } else if (data.nodeType === 'generate_image') {
+          const provider = normalizeScopedMediaValue(firstString(nextEffectConfig.image_provider, nextDefaults.image_provider, nextEffectConfig.provider, nextDefaults.provider));
+          const model = normalizeScopedMediaValue(firstString(nextEffectConfig.image_model, nextDefaults.image_model, nextEffectConfig.model, nextDefaults.model), provider);
+          setEffectIfMissing('image_provider', provider);
+          setEffectIfMissing('image_model', model);
+        } else if (data.nodeType === 'transcribe_audio' || data.nodeType === 'listen_voice') {
+          const provider = normalizeScopedMediaValue(firstString(nextEffectConfig.stt_provider, nextDefaults.stt_provider, nextEffectConfig.provider, nextDefaults.provider));
+          const model = normalizeScopedMediaValue(firstString(nextEffectConfig.stt_model, nextDefaults.stt_model, nextEffectConfig.model, nextDefaults.model), provider);
+          setEffectIfMissing('stt_provider', provider);
+          setEffectIfMissing('stt_model', model);
+        }
+        if (changedDefaults) {
+          data = { ...data, pinDefaults: nextDefaults };
+        }
+        if (changedEffectConfig) {
+          data = { ...data, effectConfig: nextEffectConfig as FlowNodeData['effectConfig'] };
+        }
       }
 
       // Canonical ordering for JSON render nodes.
@@ -1652,6 +1867,59 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       return sourceHasHandle && targetHasHandle;
     });
 
+    // Route-specific data overrides are persisted as node.data.inputRouteOverrides,
+    // not as normal runtime edges. Reconstruct lightweight visual edges on load so
+    // users can see and edit per-entry-path values without sending duplicate data
+    // edges to the compiler.
+    const displayEdges: Edge[] = [...validEdges];
+    const edgeKey = (edge: Edge): string =>
+      [
+        edge.source || '',
+        edge.sourceHandle || '',
+        edge.target || '',
+        edge.targetHandle || '',
+        String((edge.data as any)?.routeKey || ''),
+        (edge.data as any)?.routeOverride === true ? 'route' : 'edge',
+      ].join('|');
+    const seenDisplayEdges = new Set(displayEdges.map(edgeKey));
+    for (const node of nodes) {
+      const rawOverrides = (node.data as any).inputRouteOverrides;
+      if (!rawOverrides || typeof rawOverrides !== 'object' || Array.isArray(rawOverrides)) continue;
+      for (const [pinId, perRoute] of Object.entries(rawOverrides as Record<string, unknown>)) {
+        if (!pinId || !perRoute || typeof perRoute !== 'object' || Array.isArray(perRoute)) continue;
+        const targetHasHandle = node.data.inputs.some((p) => p.id === pinId);
+        if (!targetHasHandle) continue;
+        for (const [route, ref] of Object.entries(perRoute as Record<string, unknown>)) {
+          if (!route || !ref || typeof ref !== 'object' || Array.isArray(ref)) continue;
+          const sourceNodeId = String((ref as any).sourceNodeId || (ref as any).source || '').trim();
+          const sourceHandle = String((ref as any).sourceHandle || (ref as any).handle || '').trim();
+          if (!sourceNodeId || !sourceHandle) continue;
+          const sourceNode = nodeById.get(sourceNodeId);
+          if (!sourceNode || !sourceNode.data.outputs.some((p) => p.id === sourceHandle)) continue;
+          const routeStillExists = validEdges.some(
+            (edge) =>
+              edge.target === node.id &&
+              edge.targetHandle === 'exec-in' &&
+              buildRouteKey(String(edge.source || '').trim(), String(edge.sourceHandle || 'exec-out').trim() || 'exec-out') === route
+          );
+          if (!routeStillExists) continue;
+          const nextEdge: Edge = {
+            id: `route-override-${sourceNodeId}-${sourceHandle}-${node.id}-${pinId}-${String(route).replace(/[^a-zA-Z0-9_-]+/g, '-')}`,
+            source: sourceNodeId,
+            sourceHandle,
+            target: node.id,
+            targetHandle: pinId,
+            animated: false,
+            data: { routeOverride: true, routeKey: route },
+          };
+          const key = edgeKey(nextEdge);
+          if (seenDisplayEdges.has(key)) continue;
+          seenDisplayEdges.add(key);
+          displayEdges.push(nextEdge);
+        }
+      }
+    }
+
     // Ensure newly added nodes get unique ids after load/import.
     // Node ids are generated as `node-{n}`.
     let maxNodeId = 0;
@@ -1669,7 +1937,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       flowName: flow.name,
       flowInterfaces: Array.isArray(flow.interfaces) ? flow.interfaces : [],
       nodes,
-      edges: validEdges,
+      edges: displayEdges,
       selectedNode: null,
       selectedEdge: null,
     });
@@ -1691,14 +1959,16 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         position: n.position,
         data: n.data,
       })),
-      edges: state.edges.map((e) => ({
-        id: e.id,
-        source: e.source,
-        sourceHandle: e.sourceHandle || '',
-        target: e.target,
-        targetHandle: e.targetHandle || '',
-        animated: e.animated,
-      })),
+      edges: state.edges
+        .filter((e) => !isRouteOverrideEdge(e))
+        .map((e) => ({
+          id: e.id,
+          source: e.source,
+          sourceHandle: e.sourceHandle || '',
+          target: e.target,
+          targetHandle: e.targetHandle || '',
+          animated: e.animated,
+        })),
       entryNode,
     };
   },

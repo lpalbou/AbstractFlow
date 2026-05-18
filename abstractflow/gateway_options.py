@@ -51,9 +51,13 @@ def check_gateway_connection(
     *,
     gateway_url: str | None = None,
     gateway_token: str | None = None,
-    timeout_s: float = 3.0,
+    timeout_s: float = 1.5,
 ) -> tuple[bool, str | None]:
-    """Verify connectivity to AbstractGateway's discovery endpoint.
+    """Verify cheap authenticated connectivity to AbstractGateway.
+
+    This deliberately calls `/api/gateway/ping`, not capability/model
+    discovery. Provider discovery can probe optional backends and must never
+    decide whether Flow itself is allowed to start.
 
     Returns `(True, None)` on success and `(False, error_message)` on failure.
     """
@@ -70,11 +74,12 @@ def check_gateway_connection(
         "Content-Type": "application/json",
         "Authorization": f"Bearer {token}",
     }
-    req = Request(url=f"{url}/api/gateway/discovery/capabilities", headers=headers, method="GET")
+    ping_url = f"{url}/api/gateway/ping"
+    req = Request(url=ping_url, headers=headers, method="GET")
     try:
         with urlopen(req, timeout=float(timeout_s)) as resp:
             if int(getattr(resp, "status", 200)) >= 400:
-                return False, f"Gateway returned HTTP {getattr(resp, 'status', 'unknown')} for {url}/api/gateway/discovery/capabilities"
+                return False, f"Gateway returned HTTP {getattr(resp, 'status', 'unknown')} for {ping_url}"
     except HTTPError as e:
         detail = ""
         try:
@@ -97,7 +102,7 @@ def require_gateway_connectivity(
     *,
     gateway_url: str | None = None,
     gateway_token: str | None = None,
-    timeout_s: float = 3.0,
+    timeout_s: float = 1.5,
 ) -> None:
     """Require that AbstractGateway is reachable before starting editor/runtime paths."""
     ok, detail = check_gateway_connection(

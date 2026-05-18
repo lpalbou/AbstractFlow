@@ -57,13 +57,26 @@ function parseJsonish(value: string, fallback: unknown): unknown {
   }
 }
 
+function isProviderOrModelVisualType(value: string): boolean {
+  return [
+    'provider',
+    'model',
+    'provider_text',
+    'model_text',
+    'provider_image',
+    'model_image',
+    'provider_voice',
+    'model_voice',
+  ].includes(value);
+}
+
 function coerceValue(value: unknown, pin: GatewayInputPin): unknown {
   const visualType = typeof pin.type === 'string' ? pin.type.trim().toLowerCase() : '';
   const jsonType = schemaType(pin.schema).toLowerCase();
   const target = visualType || jsonType;
 
   if (value == null) return value;
-  if (target === 'string' || target === 'provider' || target === 'model') {
+  if (target === 'string' || isProviderOrModelVisualType(target)) {
     return typeof value === 'string' ? value : String(value);
   }
   if (target === 'number' || target === 'integer') {
@@ -146,6 +159,12 @@ export function gatewayPinTypeToVisualPinType(pin: GatewayInputPin): PinType {
     raw === 'tools' ||
     raw === 'provider' ||
     raw === 'model' ||
+    raw === 'provider_text' ||
+    raw === 'model_text' ||
+    raw === 'provider_image' ||
+    raw === 'model_image' ||
+    raw === 'provider_voice' ||
+    raw === 'model_voice' ||
     raw === 'agent' ||
     raw === 'any'
   ) {

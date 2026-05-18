@@ -5,6 +5,69 @@
 import type { Node, Connection, Edge } from 'reactflow';
 import type { FlowNodeData, PinType } from '../types/flow';
 
+function routeKey(sourceNodeId: string, sourceHandle: string): string {
+  return `${sourceNodeId}::${sourceHandle || 'exec-out'}`;
+}
+
+function edgeData(edge: Edge): Record<string, unknown> {
+  return edge.data && typeof edge.data === 'object' && !Array.isArray(edge.data) ? (edge.data as Record<string, unknown>) : {};
+}
+
+const PROVIDER_PIN_TYPES = new Set<PinType>(['provider', 'provider_text', 'provider_image', 'provider_voice']);
+const MODEL_PIN_TYPES = new Set<PinType>(['model', 'model_text', 'model_image', 'model_voice']);
+
+function providerScope(type: PinType): 'text' | 'image' | 'voice' | 'legacy' | null {
+  if (type === 'provider') return 'legacy';
+  if (type === 'provider_text') return 'text';
+  if (type === 'provider_image') return 'image';
+  if (type === 'provider_voice') return 'voice';
+  return null;
+}
+
+export function inferRouteOverrideRouteKey(
+  nodes: Node<FlowNodeData>[],
+  edges: Edge[],
+  connection: Connection
+): string | null {
+  if (!connection.source || !connection.target || !connection.sourceHandle || !connection.targetHandle) return null;
+
+  const sourceNode = nodes.find((n) => n.id === connection.source);
+  const targetNode = nodes.find((n) => n.id === connection.target);
+  if (!sourceNode || !targetNode) return null;
+
+  const sourcePin = sourceNode.data.outputs.find((p) => p.id === connection.sourceHandle);
+  const targetPin = targetNode.data.inputs.find((p) => p.id === connection.targetHandle);
+  if (!sourcePin || !targetPin) return null;
+  if (sourcePin.type === 'execution' || targetPin.type === 'execution') return null;
+  if (!areTypesCompatible(sourcePin.type, targetPin.type)) return null;
+
+  const targetAlreadyConnected = edges.some(
+    (e) => e.target === connection.target && e.targetHandle === connection.targetHandle && edgeData(e).routeOverride !== true
+  );
+  if (!targetAlreadyConnected) return null;
+
+  const incomingExec = edges.filter((e) => e.target === connection.target && e.targetHandle === 'exec-in');
+  if (incomingExec.length < 2) return null;
+
+  const directRoutes = incomingExec.filter((e) => e.source === connection.source);
+  if (directRoutes.length !== 1) return null;
+
+  const direct = directRoutes[0];
+  const key = routeKey(String(direct.source || '').trim(), String(direct.sourceHandle || 'exec-out').trim() || 'exec-out');
+  if (!key || key === '::exec-out') return null;
+
+  const routeAlreadyOverridden = edges.some((e) => {
+    const data = edgeData(e);
+    return (
+      e.target === connection.target &&
+      e.targetHandle === connection.targetHandle &&
+      data.routeOverride === true &&
+      data.routeKey === key
+    );
+  });
+  return routeAlreadyOverridden ? null : key;
+}
+
 /**
  * Validate a connection between two nodes.
  * Returns true if the connection is valid based on pin types.
@@ -42,9 +105,9 @@ export function validateConnection(
   // fan-in; the runtime lowers that authoring graph into an internal join_exec node.
   if (!isExecutionConnection) {
     const targetAlreadyConnected = edges.some(
-      (e) => e.target === connection.target && e.targetHandle === connection.targetHandle
+      (e) => e.target === connection.target && e.targetHandle === connection.targetHandle && edgeData(e).routeOverride !== true
     );
-    if (targetAlreadyConnected) return false;
+    if (targetAlreadyConnected && !inferRouteOverrideRouteKey(nodes, edges, connection)) return false;
   }
 
   // Execution outputs are 1:1 (use Sequence nodes for fan-out).
@@ -144,10 +207,23 @@ export function areTypesCompatible(
     return true;
   }
 
-  // Provider/model are string-like (but we keep them as distinct types for UX).
-  if (sourceType === 'provider' && (targetType === 'provider' || targetType === 'string')) return true;
-  if (sourceType === 'model' && (targetType === 'model' || targetType === 'string')) return true;
-  if (sourceType === 'string' && (targetType === 'provider' || targetType === 'model')) return true;
+  // Providers are modality-scoped for UX and safety. Legacy `provider` may bridge
+  // into scoped pins for older saved flows. New scoped provider pins do not cross
+  // modalities.
+  if (PROVIDER_PIN_TYPES.has(sourceType) || PROVIDER_PIN_TYPES.has(targetType)) {
+    const sourceScope = providerScope(sourceType);
+    const targetScope = providerScope(targetType);
+    if (sourceType === 'string' || targetType === 'string') return true;
+    if (sourceScope && targetScope) return sourceScope === targetScope || sourceScope === 'legacy' || targetScope === 'legacy';
+  }
+
+  // Models are deliberately generic. The selected provider pin determines which
+  // catalog a model value comes from; model_* aliases remain accepted only for
+  // compatibility with old saved flows.
+  if (MODEL_PIN_TYPES.has(sourceType) || MODEL_PIN_TYPES.has(targetType)) {
+    if (sourceType === 'string' || targetType === 'string') return true;
+    if (MODEL_PIN_TYPES.has(sourceType) && MODEL_PIN_TYPES.has(targetType)) return true;
+  }
 
   // Exact type match
   return sourceType === targetType;
@@ -195,9 +271,14 @@ export function getConnectionError(
 
   if (!isExecutionConnection) {
     const targetAlreadyConnected = edges.some(
-      (e) => e.target === connection.target && e.targetHandle === connection.targetHandle
+      (e) => e.target === connection.target && e.targetHandle === connection.targetHandle && edgeData(e).routeOverride !== true
     );
     if (targetAlreadyConnected) {
+      if (inferRouteOverrideRouteKey(nodes, edges, connection)) return null;
+      const incomingExecCount = edges.filter((e) => e.target === connection.target && e.targetHandle === 'exec-in').length;
+      if (incomingExecCount > 1) {
+        return `Input pin '${connection.targetHandle}' already has a default value. For multi-entry nodes, connect from a direct execution predecessor or use route overrides for per-path values.`;
+      }
       return `Input pin '${connection.targetHandle}' already connected`;
     }
   }

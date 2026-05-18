@@ -794,6 +794,14 @@ def create_visual_runner(
                 pass
 
     flow = visual_to_flow(visual_flow)
+
+    def _attach_runtime_context(flow_obj: Any) -> None:
+        try:
+            flow_obj._artifact_store = runtime.artifact_store  # type: ignore[attr-defined]
+        except Exception:
+            pass
+
+    _attach_runtime_context(flow)
     # Build and register custom event listener workflows (On Event nodes).
     event_listener_specs: list[Any] = []
     if needs_registry:
@@ -835,6 +843,7 @@ def create_visual_runner(
                         dn.data["agentConfig"] = cfg
 
                 listener_flow = visual_to_flow(derived)
+                _attach_runtime_context(listener_flow)
                 listener_spec = compile_flow(listener_flow)
                 event_listener_specs.append(listener_spec)
     runner: FlowRunner
@@ -848,6 +857,7 @@ def create_visual_runner(
         registry.register(runner.workflow)
         for vf in ordered[1:]:
             child_flow = visual_to_flow(vf)
+            _attach_runtime_context(child_flow)
             child_spec = compile_flow(child_flow)
             registry.register(child_spec)
         for spec in event_listener_specs:

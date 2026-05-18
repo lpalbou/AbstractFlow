@@ -5,7 +5,7 @@
 import type { Node, Edge } from 'reactflow';
 import type { FlowNodeData, VisualFlow, VisualNode, VisualEdge } from '../types/flow';
 import { getNodeTemplate, createNodeData, mergePinDocsFromTemplate } from '../types/nodes';
-import { inferEntryNode, withMultiEntryRouteData } from './multiEntryRoutes';
+import { inferEntryNode, isRouteOverrideEdge, withMultiEntryRouteData } from './multiEntryRoutes';
 
 /**
  * Convert React Flow nodes/edges to VisualFlow format for API.
@@ -24,14 +24,16 @@ export function toVisualFlow(
     data: node.data,
   }));
 
-  const visualEdges: VisualEdge[] = edges.map((edge) => ({
-    id: edge.id,
-    source: edge.source,
-    sourceHandle: edge.sourceHandle || '',
-    target: edge.target,
-    targetHandle: edge.targetHandle || '',
-    animated: edge.animated,
-  }));
+  const visualEdges: VisualEdge[] = edges
+    .filter((edge) => !isRouteOverrideEdge(edge))
+    .map((edge) => ({
+      id: edge.id,
+      source: edge.source,
+      sourceHandle: edge.sourceHandle || '',
+      target: edge.target,
+      targetHandle: edge.targetHandle || '',
+      animated: edge.animated,
+    }));
 
   const entryNode = inferEntryNode(nodes, edges);
 

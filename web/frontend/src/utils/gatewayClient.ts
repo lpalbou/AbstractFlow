@@ -473,13 +473,23 @@ async function gatewayErrorFromResponse(res: Response): Promise<GatewayHttpError
   return new GatewayHttpError(msg, res.status, detail);
 }
 
-export async function gatewayFetch(path: string, init?: RequestInit): Promise<Response> {
-  const res = await fetch(path, init);
+export async function gatewayFetch(path: string, init?: RequestInit & { timeoutMs?: number }): Promise<Response> {
+  const timeoutMs = typeof init?.timeoutMs === 'number' ? init.timeoutMs : 30_000;
+  const controller = typeof AbortController !== 'undefined' && timeoutMs > 0 ? new AbortController() : null;
+  const timeout = controller ? window.setTimeout(() => controller.abort(), timeoutMs) : null;
+  const { timeoutMs: _timeoutMs, signal, ...fetchInit } = init || {};
+  const mergedSignal = signal || controller?.signal;
+  let res: Response;
+  try {
+    res = await fetch(path, { ...fetchInit, signal: mergedSignal });
+  } finally {
+    if (timeout !== null) window.clearTimeout(timeout);
+  }
   if (!res.ok) throw await gatewayErrorFromResponse(res);
   return res;
 }
 
-export async function gatewayJson<T>(path: string, init?: RequestInit): Promise<T> {
+export async function gatewayJson<T>(path: string, init?: RequestInit & { timeoutMs?: number }): Promise<T> {
   const res = await gatewayFetch(path, init);
   return (await res.json()) as T;
 }

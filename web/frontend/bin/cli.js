@@ -10,24 +10,60 @@
 
 import * as http from 'http';
 import * as https from 'https';
-import { readFileSync, existsSync, statSync } from 'fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'fs';
 import { join, extname, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { homedir } from 'os';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DIST_DIR = join(__dirname, '..', 'dist');
+const DEFAULT_GATEWAY_URL = 'http://127.0.0.1:8080';
+
+function connectionConfigPath() {
+  return join(homedir() || '.', '.abstractflow', 'gateway_connection.json');
+}
+
+function readPersistedConnection() {
+  try {
+    const path = connectionConfigPath();
+    if (!existsSync(path) || !statSync(path).isFile()) return {};
+    const data = JSON.parse(readFileSync(path, 'utf8'));
+    return data && typeof data === 'object' ? data : {};
+  } catch {
+    return {};
+  }
+}
+
+function writePersistedConnection(payload) {
+  const path = connectionConfigPath();
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+  try {
+    chmodSync(path, 0o600);
+  } catch {
+    // ignore
+  }
+}
+
+function clearPersistedConnection() {
+  try {
+    const path = connectionConfigPath();
+    if (existsSync(path)) unlinkSync(path);
+  } catch {
+    // ignore
+  }
+}
 
 function parseArgs(argv) {
+  const persisted = readPersistedConnection();
+  const envUrl = process.env.ABSTRACTGATEWAY_URL || process.env.ABSTRACTFLOW_GATEWAY_URL || '';
+  const envToken = process.env.ABSTRACTGATEWAY_AUTH_TOKEN || '';
   const out = {
     host: process.env.HOST || '0.0.0.0',
     port: Number.parseInt(String(process.env.PORT || '3003'), 10),
-    gatewayUrl:
-      process.env.ABSTRACTGATEWAY_URL ||
-      process.env.ABSTRACTFLOW_GATEWAY_URL ||
-      'http://127.0.0.1:8080',
-    gatewayToken:
-      process.env.ABSTRACTGATEWAY_AUTH_TOKEN ||
-      '',
+    gatewayUrl: envUrl || String(persisted.gateway_url || '') || DEFAULT_GATEWAY_URL,
+    gatewayToken: envToken || String(persisted.gateway_token || ''),
+    gatewayTokenSource: envToken ? 'env' : persisted.gateway_token ? 'config' : 'none',
   };
 
   const args = Array.isArray(argv) ? argv.slice() : [];
@@ -58,6 +94,7 @@ function parseArgs(argv) {
     }
     if (a === '--gateway-token' && typeof next === 'string') {
       out.gatewayToken = next;
+      out.gatewayTokenSource = 'arg';
       i += 1;
       continue;
     }
@@ -84,30 +121,29 @@ Env vars:
 
 Notes:
   - Proxies /api/* to the gateway URL (HTTP + SSE).
+  - If no gateway token is configured, the browser startup dialog can collect one.
   - Start the gateway with: abstractgateway --port 8080
 `);
   process.exit(0);
 }
 
-  if (!String(OPTS.gatewayToken || '').trim()) {
-  console.error(
-    'AbstractFlow requires gateway authentication. ' +
-    'Export ABSTRACTGATEWAY_AUTH_TOKEN or pass --gateway-token <token>.'
-  );
-  process.exit(1);
-}
+const CONNECTION = {
+  gatewayUrl: String(OPTS.gatewayUrl || DEFAULT_GATEWAY_URL).trim().replace(/\/+$/, '') || DEFAULT_GATEWAY_URL,
+  gatewayToken: String(OPTS.gatewayToken || '').trim(),
+  tokenSource: String(OPTS.gatewayTokenSource || 'none'),
+};
 
-let BACKEND;
-try {
-  BACKEND = new URL(String(OPTS.gatewayUrl || '').trim());
-} catch {
-  console.error(`Invalid gateway URL: ${String(OPTS.gatewayUrl || '')}`);
-  process.exit(2);
+function resolveBackend(gatewayUrl = CONNECTION.gatewayUrl) {
+  const backend = new URL(String(gatewayUrl || DEFAULT_GATEWAY_URL).trim());
+  if (!backend.port) {
+    backend.port = backend.protocol === 'https:' ? '443' : '80';
+  }
+  return {
+    url: backend,
+    origin: `${backend.protocol}//${backend.host}`,
+    client: backend.protocol === 'https:' ? https : http,
+  };
 }
-if (!BACKEND.port) {
-  BACKEND.port = BACKEND.protocol === 'https:' ? '443' : '80';
-}
-const BACKEND_ORIGIN = `${BACKEND.protocol}//${BACKEND.host}`;
 
 // MIME types for common file extensions
 const MIME_TYPES = {
@@ -147,19 +183,160 @@ function serveFile(res, filePath) {
   }
 }
 
+function sendJson(res, status, payload) {
+  res.writeHead(status, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(payload, null, 2));
+}
+
+function readRequestJson(req) {
+  return new Promise((resolve) => {
+    const chunks = [];
+    req.on('data', (chunk) => chunks.push(chunk));
+    req.on('end', () => {
+      try {
+        const raw = Buffer.concat(chunks).toString('utf8');
+        resolve(raw ? JSON.parse(raw) : {});
+      } catch {
+        resolve({});
+      }
+    });
+    req.on('error', () => resolve({}));
+  });
+}
+
+function checkGatewayConnection(gatewayUrl = CONNECTION.gatewayUrl, gatewayToken = CONNECTION.gatewayToken) {
+  return new Promise((resolve) => {
+    let backend;
+    try {
+      backend = resolveBackend(gatewayUrl);
+    } catch (err) {
+      resolve({ ok: false, error: `Invalid gateway URL: ${String(err?.message || err)}` });
+      return;
+    }
+    const token = String(gatewayToken || '').trim();
+    if (!token) {
+      resolve({ ok: false, error: 'Gateway token missing' });
+      return;
+    }
+
+    const req = backend.client.request(
+      {
+        protocol: backend.url.protocol,
+        hostname: backend.url.hostname,
+        port: backend.url.port,
+        method: 'GET',
+        path: '/api/gateway/discovery/capabilities',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+        timeout: 4000,
+      },
+      (resp) => {
+        const chunks = [];
+        resp.on('data', (chunk) => chunks.push(chunk));
+        resp.on('end', () => {
+          if ((resp.statusCode || 0) >= 200 && (resp.statusCode || 0) < 300) {
+            resolve({ ok: true, provider: 'gateway', model: 'discovery' });
+          } else {
+            const body = Buffer.concat(chunks).toString('utf8');
+            resolve({ ok: false, error: `HTTP ${resp.statusCode || 0}: ${body || resp.statusMessage || 'Gateway error'}` });
+          }
+        });
+      }
+    );
+    req.on('timeout', () => {
+      req.destroy();
+      resolve({ ok: false, error: 'Gateway check timed out' });
+    });
+    req.on('error', (err) => resolve({ ok: false, error: String(err?.message || err) }));
+    req.end();
+  });
+}
+
+async function connectionStatusPayload() {
+  const gateway = await checkGatewayConnection();
+  return {
+    ok: Boolean(gateway.ok),
+    gateway_url: CONNECTION.gatewayUrl,
+    has_token: Boolean(CONNECTION.gatewayToken),
+    token_source: CONNECTION.tokenSource || (CONNECTION.gatewayToken ? 'runtime' : 'none'),
+    embeddings: gateway,
+    gateway,
+  };
+}
+
+async function handleConnectionApi(req, res) {
+  if (req.method === 'GET') {
+    sendJson(res, 200, await connectionStatusPayload());
+    return;
+  }
+  if (req.method === 'POST') {
+    const payload = await readRequestJson(req);
+    const nextUrl = typeof payload.gateway_url === 'string' ? payload.gateway_url.trim().replace(/\/+$/, '') : '';
+    const nextToken = typeof payload.gateway_token === 'string' ? payload.gateway_token.trim() : '';
+    const candidateUrl = nextUrl || CONNECTION.gatewayUrl;
+    const candidateToken = nextToken || CONNECTION.gatewayToken;
+    const gateway = await checkGatewayConnection(candidateUrl, candidateToken);
+    if (!gateway.ok) {
+      sendJson(res, 401, { detail: gateway.error || 'Gateway connection failed', gateway });
+      return;
+    }
+    if (payload.validate_only === true) {
+      sendJson(res, 200, {
+        ok: true,
+        gateway_url: candidateUrl,
+        has_token: Boolean(candidateToken),
+        token_source: candidateToken ? 'candidate' : 'none',
+        embeddings: gateway,
+        gateway,
+      });
+      return;
+    }
+    CONNECTION.gatewayUrl = candidateUrl;
+    CONNECTION.gatewayToken = candidateToken;
+    CONNECTION.tokenSource = nextToken ? 'runtime' : CONNECTION.tokenSource;
+    if (payload.persist === true) {
+      writePersistedConnection({
+        version: 1,
+        updated_at: new Date().toISOString(),
+        gateway_url: CONNECTION.gatewayUrl,
+        gateway_token: CONNECTION.gatewayToken,
+      });
+      if (CONNECTION.gatewayToken) CONNECTION.tokenSource = 'config';
+    }
+    sendJson(res, 200, await connectionStatusPayload());
+    return;
+  }
+  if (req.method === 'DELETE') {
+    clearPersistedConnection();
+    CONNECTION.gatewayToken = '';
+    CONNECTION.tokenSource = 'none';
+    sendJson(res, 200, { ok: true });
+    return;
+  }
+  sendJson(res, 405, { detail: 'Method not allowed' });
+}
+
 function proxyApiRequest(req, res) {
-  const client = BACKEND.protocol === 'https:' ? https : http;
-  const headers = { ...req.headers, host: BACKEND.host };
+  let backend;
+  try {
+    backend = resolveBackend();
+  } catch (err) {
+    sendJson(res, 500, { detail: `Invalid gateway URL: ${String(err?.message || err)}` });
+    return;
+  }
+  const headers = { ...req.headers, host: backend.url.host };
   const authHeader = headers.authorization || headers.Authorization;
-  if (OPTS.gatewayToken && !authHeader) {
-    headers.authorization = `Bearer ${String(OPTS.gatewayToken).trim()}`;
+  if (CONNECTION.gatewayToken && !authHeader) {
+    headers.authorization = `Bearer ${String(CONNECTION.gatewayToken).trim()}`;
   }
 
-  const proxyReq = client.request(
+  const proxyReq = backend.client.request(
     {
-      protocol: BACKEND.protocol,
-      hostname: BACKEND.hostname,
-      port: BACKEND.port,
+      protocol: backend.url.protocol,
+      hostname: backend.url.hostname,
+      port: backend.url.port,
       method: req.method,
       path: req.url,
       headers,
@@ -175,7 +352,7 @@ function proxyApiRequest(req, res) {
     res.end(
       JSON.stringify(
         {
-          detail: `Backend not reachable at ${BACKEND_ORIGIN} (${String(err?.message || err)})`,
+          detail: `Backend not reachable at ${backend.origin} (${String(err?.message || err)})`,
         },
         null,
         2
@@ -188,17 +365,27 @@ function proxyApiRequest(req, res) {
 }
 
 function proxyApiWebSocket(req, socket, head) {
-  const client = BACKEND.protocol === 'https:' ? https : http;
-  const headers = { ...req.headers, host: BACKEND.host };
+  let backend;
+  try {
+    backend = resolveBackend();
+  } catch {
+    try {
+      socket.destroy();
+    } catch {
+      // ignore
+    }
+    return;
+  }
+  const headers = { ...req.headers, host: backend.url.host };
   const authHeader = headers.authorization || headers.Authorization;
-  if (OPTS.gatewayToken && !authHeader) {
-    headers.authorization = `Bearer ${String(OPTS.gatewayToken).trim()}`;
+  if (CONNECTION.gatewayToken && !authHeader) {
+    headers.authorization = `Bearer ${String(CONNECTION.gatewayToken).trim()}`;
   }
 
-  const proxyReq = client.request({
-    protocol: BACKEND.protocol,
-    hostname: BACKEND.hostname,
-    port: BACKEND.port,
+  const proxyReq = backend.client.request({
+    protocol: backend.url.protocol,
+    hostname: backend.url.hostname,
+    port: backend.url.port,
     method: req.method || 'GET',
     path: req.url,
     headers,
@@ -280,6 +467,11 @@ const server = http.createServer((req, res) => {
   let pathname = url.pathname;
 
   // Proxy backend API calls.
+  if (pathname === '/api/connection/gateway') {
+    void handleConnectionApi(req, res);
+    return;
+  }
+
   if (pathname.startsWith('/api/')) {
     proxyApiRequest(req, res);
     return;
@@ -345,7 +537,7 @@ server.listen(PORT, HOST, () => {
 
   🌐 Local:   http://localhost:${PORT}
   🌐 Network: http://${HOST}:${PORT}
-  🔌 Gateway: ${BACKEND_ORIGIN}
+  🔌 Gateway: ${resolveBackend().origin}
 
   📐 Drag-and-drop workflow authoring
   💾 Export .flow bundles for deployment

@@ -6,6 +6,7 @@
  */
 
 import { useState, useCallback, useMemo, useEffect, useRef, type DragEvent } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useFlowStore } from '../hooks/useFlow';
 import type { ExecutionEvent, ExecutionMetrics, Pin, FlowRunResult, RunSummary } from '../types/flow';
 import { isEntryNodeType } from '../types/flow';
@@ -24,6 +25,7 @@ import { KgActiveMemoryPanel } from './KgActiveMemoryPanel';
 import {
   endpointFromDescriptor,
   descriptorEndpointAvailable,
+  gatewayFetch,
   gatewayJson,
   gatewayPath,
   jsonRequest,
@@ -96,6 +98,7 @@ interface RunFlowModalProps {
   runSummary?: RunSummary | null;
   stableSessionId?: string;
   threadRootRunId?: string;
+  runWorkflowId?: string | null;
   gatewayContracts?: GatewayContracts | null;
 }
 
@@ -104,7 +107,7 @@ type JsonParseResult<T> =
   | { ok: false; error: string };
 
 type FollowUpMessage = { role: 'user' | 'assistant'; content: string };
-type FollowUpContext = { messages: FollowUpMessage[] };
+type FollowUpContext = { messages: FollowUpMessage[]; workflowKey?: string; rootRunId?: string | null };
 
 function parseJson<T>(raw: string): JsonParseResult<T> {
   const text = typeof raw === 'string' ? raw.trim() : '';
@@ -265,6 +268,29 @@ type GeneratedImagePreview = {
   format?: string;
 };
 
+type GeneratedAudioPreview = {
+  artifactId: string;
+  src: string;
+  contentType?: string;
+  text?: string;
+  provider?: string;
+  model?: string;
+  voice?: string;
+  format?: string;
+};
+
+type GeneratedTextPreview = {
+  artifactId: string;
+  text: string;
+  provider?: string;
+  model?: string;
+};
+
+type RunGeneratedArtifact =
+  | { kind: 'image'; preview: GeneratedImagePreview; stepLabel: string }
+  | { kind: 'audio'; preview: GeneratedAudioPreview; stepLabel: string }
+  | { kind: 'text'; preview: GeneratedTextPreview; stepLabel: string };
+
 function extractGeneratedImagePreview(
   value: unknown,
   runId: string | null,
@@ -276,14 +302,36 @@ function extractGeneratedImagePreview(
   const payloadRaw = obj.payload && typeof obj.payload === 'object' && !Array.isArray(obj.payload)
     ? (obj.payload as Record<string, unknown>)
     : obj;
-  const imageRaw = payloadRaw.image_artifact && typeof payloadRaw.image_artifact === 'object' && !Array.isArray(payloadRaw.image_artifact)
-    ? (payloadRaw.image_artifact as Record<string, unknown>)
-    : null;
-  if (name && name !== 'abstract.media.image.generated' && !imageRaw) return null;
-  if (!imageRaw) return null;
+  const asRecord = (item: unknown): Record<string, unknown> | null =>
+    item && typeof item === 'object' && !Array.isArray(item) ? (item as Record<string, unknown>) : null;
+  const directArtifactRaw = payloadRaw.image_artifact ?? payloadRaw.artifact_ref ?? payloadRaw.image;
+  const directImage = asRecord(directArtifactRaw);
+  const directArtifactId =
+    typeof directArtifactRaw === 'string' && directArtifactRaw.trim() ? directArtifactRaw.trim() : '';
+  const outputs = asRecord(payloadRaw.outputs);
+  const outputImageRaw = outputs?.image;
+  const imageItems = Array.isArray(outputImageRaw) ? outputImageRaw : outputImageRaw != null ? [outputImageRaw] : [];
+  const generatedItem = imageItems.find((item) => typeof item === 'string' || asRecord(item));
+  const generatedRecord = asRecord(generatedItem);
+  const generatedArtifactRaw =
+    generatedRecord?.artifact_ref ??
+    generatedRecord?.image_artifact ??
+    generatedRecord?.artifact ??
+    generatedItem;
+  const generatedArtifact = asRecord(generatedArtifactRaw);
+  const generatedArtifactId =
+    typeof generatedArtifactRaw === 'string' && generatedArtifactRaw.trim()
+      ? generatedArtifactRaw.trim()
+      : '';
+  const imageRaw = directImage || generatedArtifact;
+  if (name && name !== 'abstract.media.image.generated' && !imageRaw && !directArtifactId && !generatedArtifactId) return null;
   const artifactId =
-    (typeof imageRaw.artifact_id === 'string' && imageRaw.artifact_id.trim()) ||
-    (typeof imageRaw.$artifact === 'string' && imageRaw.$artifact.trim()) ||
+    (imageRaw && typeof imageRaw.artifact_id === 'string' && imageRaw.artifact_id.trim()) ||
+    (imageRaw && typeof imageRaw.$artifact === 'string' && imageRaw.$artifact.trim()) ||
+    directArtifactId ||
+    generatedArtifactId ||
+    (typeof payloadRaw.artifact_id === 'string' && payloadRaw.artifact_id.trim()) ||
+    (typeof payloadRaw.$artifact === 'string' && payloadRaw.$artifact.trim()) ||
     '';
   if (!artifactId) return null;
   return {
@@ -296,14 +344,298 @@ function extractGeneratedImagePreview(
         artifact_id: artifactId,
       }
     ),
-    contentType: typeof imageRaw.content_type === 'string' ? imageRaw.content_type : undefined,
-    prompt: typeof payloadRaw.prompt === 'string' ? payloadRaw.prompt : undefined,
-    provider: typeof payloadRaw.provider === 'string' ? payloadRaw.provider : undefined,
-    model: typeof payloadRaw.model === 'string' ? payloadRaw.model : undefined,
-    width: typeof payloadRaw.width === 'number' ? payloadRaw.width : undefined,
-    height: typeof payloadRaw.height === 'number' ? payloadRaw.height : undefined,
-    format: typeof payloadRaw.format === 'string' ? payloadRaw.format : undefined,
+    contentType: imageRaw && typeof imageRaw.content_type === 'string' ? imageRaw.content_type : typeof generatedRecord?.content_type === 'string' ? generatedRecord.content_type : undefined,
+    prompt: typeof payloadRaw.prompt === 'string' ? payloadRaw.prompt : typeof generatedRecord?.prompt === 'string' ? generatedRecord.prompt : undefined,
+    provider: typeof payloadRaw.provider === 'string' ? payloadRaw.provider : typeof generatedRecord?.provider === 'string' ? generatedRecord.provider : undefined,
+    model: typeof payloadRaw.model === 'string' ? payloadRaw.model : typeof generatedRecord?.model === 'string' ? generatedRecord.model : undefined,
+    width: typeof payloadRaw.width === 'number' ? payloadRaw.width : typeof generatedRecord?.width === 'number' ? generatedRecord.width : undefined,
+    height: typeof payloadRaw.height === 'number' ? payloadRaw.height : typeof generatedRecord?.height === 'number' ? generatedRecord.height : undefined,
+    format: typeof payloadRaw.format === 'string' ? payloadRaw.format : typeof generatedRecord?.format === 'string' ? generatedRecord.format : undefined,
   };
+}
+
+function extractGeneratedAudioPreview(
+  value: unknown,
+  runId: string | null,
+  artifactContentDescriptor?: GatewayEndpointDescriptor | string | null
+): GeneratedAudioPreview | null {
+  if (!runId || !value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const obj = value as Record<string, unknown>;
+  const name = typeof obj.name === 'string' ? obj.name : '';
+  const payloadRaw = obj.payload && typeof obj.payload === 'object' && !Array.isArray(obj.payload)
+    ? (obj.payload as Record<string, unknown>)
+    : obj;
+  const allowedEventName =
+    !name ||
+    name === 'abstract.media.voice.generated' ||
+    name === 'abstract.media.audio.generated' ||
+    name === 'abstract.voice.tts';
+
+  const directAudio = payloadRaw.audio_artifact && typeof payloadRaw.audio_artifact === 'object' && !Array.isArray(payloadRaw.audio_artifact)
+    ? (payloadRaw.audio_artifact as Record<string, unknown>)
+    : null;
+  const outputs = payloadRaw.outputs && typeof payloadRaw.outputs === 'object' && !Array.isArray(payloadRaw.outputs)
+    ? (payloadRaw.outputs as Record<string, unknown>)
+    : null;
+  const voiceItems = Array.isArray(outputs?.voice) ? outputs?.voice as unknown[] : Array.isArray(outputs?.audio) ? outputs?.audio as unknown[] : [];
+  const generatedItem = voiceItems.find((item) => item && typeof item === 'object' && !Array.isArray(item)) as Record<string, unknown> | undefined;
+  const itemArtifact = generatedItem?.artifact_ref && typeof generatedItem.artifact_ref === 'object' && !Array.isArray(generatedItem.artifact_ref)
+    ? (generatedItem.artifact_ref as Record<string, unknown>)
+    : null;
+  const itemArtifactId = typeof generatedItem?.artifact_ref === 'string' && generatedItem.artifact_ref.trim()
+    ? generatedItem.artifact_ref.trim()
+    : '';
+  const audioRaw = directAudio || itemArtifact;
+  const hasAudioArtifactShape =
+    Boolean(directAudio) ||
+    Boolean(itemArtifact) ||
+    Boolean(itemArtifactId) ||
+    (typeof payloadRaw.artifact_id === 'string' && Boolean(payloadRaw.artifact_id.trim())) ||
+    (typeof payloadRaw.$artifact === 'string' && Boolean(payloadRaw.$artifact.trim()));
+  if (!allowedEventName && !hasAudioArtifactShape) return null;
+
+  const artifactId =
+    (audioRaw && typeof audioRaw.artifact_id === 'string' && audioRaw.artifact_id.trim()) ||
+    (audioRaw && typeof audioRaw.$artifact === 'string' && audioRaw.$artifact.trim()) ||
+    itemArtifactId ||
+    (typeof payloadRaw.artifact_id === 'string' && payloadRaw.artifact_id.trim()) ||
+    (typeof payloadRaw.$artifact === 'string' && payloadRaw.$artifact.trim()) ||
+    '';
+  if (!artifactId) return null;
+
+  return {
+    artifactId,
+    src: endpointFromDescriptor(
+      artifactContentDescriptor,
+      '/api/gateway/runs/{run_id}/artifacts/{artifact_id}/content',
+      {
+        run_id: runId,
+        artifact_id: artifactId,
+      }
+    ),
+    contentType: audioRaw && typeof audioRaw.content_type === 'string' ? audioRaw.content_type : typeof generatedItem?.content_type === 'string' ? generatedItem.content_type : undefined,
+    text: typeof payloadRaw.text === 'string' ? payloadRaw.text : typeof payloadRaw.prompt === 'string' ? payloadRaw.prompt : undefined,
+    provider: typeof payloadRaw.provider === 'string' ? payloadRaw.provider : typeof generatedItem?.provider === 'string' ? generatedItem.provider : undefined,
+    model: typeof payloadRaw.model === 'string' ? payloadRaw.model : typeof generatedItem?.model === 'string' ? generatedItem.model : undefined,
+    voice: typeof payloadRaw.voice === 'string' ? payloadRaw.voice : typeof generatedItem?.voice === 'string' ? generatedItem.voice : undefined,
+    format: typeof payloadRaw.format === 'string' ? payloadRaw.format : typeof generatedItem?.format === 'string' ? generatedItem.format : undefined,
+  };
+}
+
+function extractGeneratedTextPreview(value: unknown, step: { id: string; nodeType?: string }): GeneratedTextPreview | null {
+  const nodeType = String(step.nodeType || '').trim();
+  if (!['llm_call', 'agent', 'memory_compact'].includes(nodeType)) return null;
+  if (value == null) return null;
+
+  const asRecord = (item: unknown): Record<string, unknown> | null =>
+    item && typeof item === 'object' && !Array.isArray(item) ? (item as Record<string, unknown>) : null;
+  const pickText = (item: unknown): string => {
+    if (typeof item === 'string') return item.trim();
+    const obj = asRecord(item);
+    if (!obj) return '';
+    for (const key of ['content', 'text', 'message', 'response', 'result', 'output']) {
+      const raw = obj[key];
+      if (typeof raw === 'string' && raw.trim()) return raw.trim();
+    }
+    for (const key of ['result', 'output', 'data']) {
+      const nested = pickText(obj[key]);
+      if (nested) return nested;
+    }
+    return '';
+  };
+  const root = asRecord(value);
+  const text = pickText(value);
+  if (!text) return null;
+
+  const raw = asRecord(root?.raw) || asRecord(root?.raw_response);
+  const result = asRecord(root?.result);
+  const provider =
+    (typeof root?.provider === 'string' && root.provider.trim()) ||
+    (typeof result?.provider === 'string' && result.provider.trim()) ||
+    (typeof raw?.provider === 'string' && raw.provider.trim()) ||
+    undefined;
+  const model =
+    (typeof root?.model === 'string' && root.model.trim()) ||
+    (typeof result?.model === 'string' && result.model.trim()) ||
+    (typeof raw?.model === 'string' && raw.model.trim()) ||
+    undefined;
+
+  return {
+    artifactId: `text:${step.id}`,
+    text,
+    provider,
+    model,
+  };
+}
+
+function useArtifactObjectUrl(src: string | null | undefined, contentType?: string) {
+  const [state, setState] = useState<{ objectUrl: string; loading: boolean; error: string | null }>({
+    objectUrl: '',
+    loading: false,
+    error: null,
+  });
+
+  useEffect(() => {
+    const url = typeof src === 'string' ? src.trim() : '';
+    if (!url) {
+      setState({ objectUrl: '', loading: false, error: null });
+      return;
+    }
+
+    let active = true;
+    let objectUrl = '';
+    setState({ objectUrl: '', loading: true, error: null });
+
+    gatewayFetch(url)
+      .then(async (res) => {
+        const rawBlob = await res.blob();
+        const blob =
+          contentType && rawBlob.type !== contentType
+            ? new Blob([await rawBlob.arrayBuffer()], { type: contentType })
+            : rawBlob;
+        objectUrl = URL.createObjectURL(blob);
+        if (active) setState({ objectUrl, loading: false, error: null });
+        else URL.revokeObjectURL(objectUrl);
+      })
+      .catch((err) => {
+        const message = err instanceof Error ? err.message : 'Failed to load artifact';
+        if (active) setState({ objectUrl: '', loading: false, error: message });
+      });
+
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [contentType, src]);
+
+  return state;
+}
+
+function GeneratedImageCard({ preview, compact = false }: { preview: GeneratedImagePreview; compact?: boolean }) {
+  const { objectUrl, loading, error } = useArtifactObjectUrl(preview.src, preview.contentType || 'image/png');
+  const displayUrl = objectUrl || preview.src;
+  return (
+    <div className={`run-generated-image ${compact ? 'run-generated-artifact-card' : ''}`}>
+      {loading ? (
+        <div className="run-details-empty">Loading image artifact...</div>
+      ) : error ? (
+        <div className="run-details-error">{error}</div>
+      ) : (
+        <img
+          src={displayUrl}
+          alt={preview.prompt || preview.artifactId}
+          className="run-generated-image-img"
+        />
+      )}
+      <div className="run-output-meta">
+        {preview.prompt && !compact ? (
+          <div>
+            <span className="run-output-meta-key">Prompt</span>
+            <span className="run-output-meta-val">{preview.prompt}</span>
+          </div>
+        ) : null}
+        {(preview.provider || preview.model) ? (
+          <div>
+            <span className="run-output-meta-key">Model</span>
+            <span className="run-output-meta-val">
+              {preview.provider ? <span className="run-metric-badge metric-provider">{preview.provider}</span> : null}
+              {preview.model ? <span className="run-metric-badge metric-model">{preview.model}</span> : null}
+            </span>
+          </div>
+        ) : null}
+        <div>
+          <span className="run-output-meta-key">Artifact</span>
+          <span className="run-output-meta-val">{preview.artifactId}</span>
+        </div>
+        <div>
+          <span className="run-output-meta-key">Open</span>
+          <span className="run-output-meta-val">
+            <a className="run-output-link" href={displayUrl} target="_blank" rel="noreferrer" download={`${preview.artifactId}.${preview.format || 'png'}`}>
+              artifact content
+            </a>
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GeneratedAudioCard({ preview, autoPlay = false, compact = false }: { preview: GeneratedAudioPreview; autoPlay?: boolean; compact?: boolean }) {
+  const { objectUrl, loading, error } = useArtifactObjectUrl(preview.src, preview.contentType || 'audio/wav');
+  const displayUrl = objectUrl || preview.src;
+  return (
+    <div className={`run-generated-audio ${compact ? 'run-generated-artifact-card' : ''}`}>
+      {loading ? (
+        <div className="run-details-empty">Loading audio artifact...</div>
+      ) : error ? (
+        <div className="run-details-error">{error}</div>
+      ) : (
+        <audio
+          src={displayUrl}
+          controls
+          autoPlay={autoPlay}
+          className="run-generated-audio-player"
+        />
+      )}
+      <div className="run-output-meta">
+        {preview.text && !compact ? (
+          <div>
+            <span className="run-output-meta-key">Text</span>
+            <span className="run-output-meta-val">{preview.text}</span>
+          </div>
+        ) : null}
+        {(preview.provider || preview.model || preview.voice) ? (
+          <div>
+            <span className="run-output-meta-key">Voice</span>
+            <span className="run-output-meta-val">
+              {preview.provider ? <span className="run-metric-badge metric-provider">{preview.provider}</span> : null}
+              {preview.model ? <span className="run-metric-badge metric-model">{preview.model}</span> : null}
+              {preview.voice ? <span className="run-metric-badge">{preview.voice}</span> : null}
+            </span>
+          </div>
+        ) : null}
+        <div>
+          <span className="run-output-meta-key">Artifact</span>
+          <span className="run-output-meta-val">{preview.artifactId}</span>
+        </div>
+        <div>
+          <span className="run-output-meta-key">Open</span>
+          <span className="run-output-meta-val">
+            <a className="run-output-link" href={displayUrl} target="_blank" rel="noreferrer" download={`${preview.artifactId}.${preview.format || 'wav'}`}>
+              artifact content
+            </a>
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GeneratedTextCard({ preview, compact = false }: { preview: GeneratedTextPreview; compact?: boolean }) {
+  return (
+    <div className={`run-generated-text ${compact ? 'run-generated-artifact-card' : ''}`}>
+      <div className="run-details-markdown run-generated-text-body">
+        <MarkdownRenderer markdown={preview.text} />
+      </div>
+      <div className="run-output-meta">
+        {(preview.provider || preview.model) ? (
+          <div>
+            <span className="run-output-meta-key">Model</span>
+            <span className="run-output-meta-val">
+              {preview.provider ? <span className="run-metric-badge metric-provider">{preview.provider}</span> : null}
+              {preview.model ? <span className="run-metric-badge metric-model">{preview.model}</span> : null}
+            </span>
+          </div>
+        ) : null}
+        {!compact ? (
+          <div>
+            <span className="run-output-meta-key">Artifact</span>
+            <span className="run-output-meta-val">{preview.artifactId}</span>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 function MinimizeWindowIcon({ size = 18 }: { size?: number }) {
@@ -500,12 +832,164 @@ function getPlaceholderForPin(pin: Pin): string {
     case 'array':
       return '[ ]';
     case 'provider':
+    case 'provider_text':
+    case 'provider_image':
+    case 'provider_voice':
       return 'Select provider…';
     case 'model':
+    case 'model_text':
+    case 'model_image':
+    case 'model_voice':
       return 'Select model…';
     default:
       return '';
   }
+}
+
+type ProviderScope = 'text' | 'image' | 'voice';
+type RunSelectOption = { value: string; label: string };
+
+function providerScopeForPin(pin: Pin): ProviderScope | null {
+  if (pin.type === 'provider_image' || pin.id === 'image_provider' || pin.id === 'provider_image') return 'image';
+  if (
+    pin.type === 'provider_voice' ||
+    pin.id === 'tts_provider' ||
+    pin.id === 'stt_provider' ||
+    pin.id === 'provider_voice'
+  ) {
+    return 'voice';
+  }
+  if (pin.type === 'provider' || pin.type === 'provider_text' || pin.id === 'provider') return 'text';
+  return null;
+}
+
+function isTextProviderInputPin(pin: Pin): boolean {
+  return providerScopeForPin(pin) === 'text';
+}
+
+function isImageProviderInputPin(pin: Pin): boolean {
+  return providerScopeForPin(pin) === 'image';
+}
+
+function isVoiceProviderInputPin(pin: Pin): boolean {
+  return providerScopeForPin(pin) === 'voice';
+}
+
+function modelScopeForPin(pin: Pin, pins: Pin[]): ProviderScope {
+  if (pin.type === 'model_image' || pin.id === 'image_model' || pin.id === 'model_image') return 'image';
+  if (
+    pin.type === 'model_voice' ||
+    pin.id === 'tts_model' ||
+    pin.id === 'stt_model' ||
+    pin.id === 'model_voice'
+  ) {
+    return 'voice';
+  }
+  if (pin.type === 'model_text' || pin.id === 'model_text') return 'text';
+
+  // Generic `model` is intentionally scoped by the provider pin in the same
+  // launch form. If a form only exposes an image or voice provider, the model
+  // dropdown must use that catalog rather than the generic LLM model catalog.
+  if (pin.type === 'model' || pin.id === 'model') {
+    const scopes = new Set(pins.map(providerScopeForPin).filter(Boolean) as ProviderScope[]);
+    if (scopes.size === 1 && scopes.has('image')) return 'image';
+    if (scopes.size === 1 && scopes.has('voice')) return 'voice';
+    return 'text';
+  }
+  return 'text';
+}
+
+function isModelInputPin(pin: Pin): boolean {
+  return pin.type === 'model' || pin.type === 'model_text' || pin.type === 'model_image' || pin.type === 'model_voice' || pin.id === 'model' || pin.id.endsWith('_model');
+}
+
+function textValue(value: unknown): string {
+  return typeof value === 'string' && value.trim() ? value.trim() : '';
+}
+
+function recordValue(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+function arrayValue(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function dedupeOptions(options: RunSelectOption[]): RunSelectOption[] {
+  const seen = new Set<string>();
+  const out: RunSelectOption[] = [];
+  for (const option of options) {
+    const value = textValue(option.value);
+    if (!value) continue;
+    const key = value.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ value, label: textValue(option.label) || value });
+  }
+  return out;
+}
+
+function optionId(item: unknown): string {
+  if (typeof item === 'string') return item.trim();
+  const rec = recordValue(item);
+  if (!rec) return '';
+  for (const key of ['id', 'model', 'model_id', 'name', 'voice_id', 'profile_id']) {
+    const value = textValue(rec[key]);
+    if (value) return value;
+  }
+  return '';
+}
+
+function optionLabel(item: unknown, fallback: string): string {
+  const rec = recordValue(item);
+  if (!rec) return fallback;
+  return textValue(rec.label) || textValue(rec.display_name) || textValue(rec.name) || fallback;
+}
+
+function providerOptionsFromCatalog(payload: unknown, keys: string[]): RunSelectOption[] {
+  const rec = recordValue(payload);
+  if (!rec) return [];
+  const out: RunSelectOption[] = [];
+  const add = (value: unknown) => {
+    const id = typeof value === 'string' ? value.trim() : optionId(value);
+    if (!id) return;
+    out.push({ value: id, label: optionLabel(value, id) });
+  };
+  for (const key of keys) {
+    for (const item of arrayValue(rec[key])) add(item);
+  }
+  for (const key of ['models_by_provider', 'provider_models', 'tts_models_by_provider', 'stt_models_by_provider']) {
+    const map = recordValue(rec[key]);
+    if (!map) continue;
+    for (const provider of Object.keys(map)) add(provider);
+  }
+  return dedupeOptions(out);
+}
+
+function modelOptionsFromCatalog(payload: unknown, provider: string, keys: string[]): RunSelectOption[] {
+  const rec = recordValue(payload);
+  if (!rec) return [];
+  const out: RunSelectOption[] = [];
+  const wanted = provider.trim().toLowerCase();
+  const add = (item: unknown, itemProvider = provider) => {
+    const id = optionId(item);
+    if (!id) return;
+    const recItem = recordValue(item);
+    const p = textValue(recItem?.provider) || textValue(recItem?.provider_id) || textValue(recItem?.provider_name) || itemProvider;
+    if (wanted && p && p.trim().toLowerCase() !== wanted) return;
+    out.push({ value: id, label: optionLabel(item, p ? `${p} / ${id}` : id) });
+  };
+  for (const key of keys) {
+    for (const item of arrayValue(rec[key])) add(item);
+  }
+  for (const key of ['models_by_provider', 'provider_models', 'tts_models_by_provider', 'stt_models_by_provider']) {
+    const map = recordValue(rec[key]);
+    if (!map) continue;
+    for (const [mapProvider, values] of Object.entries(map)) {
+      for (const item of arrayValue(values)) add(item, mapProvider);
+    }
+  }
+  return dedupeOptions(out);
 }
 
 export function RunFlowModal({
@@ -530,9 +1014,29 @@ export function RunFlowModal({
   runSummary = null,
   stableSessionId,
   threadRootRunId,
+  runWorkflowId,
   gatewayContracts = null,
 }: RunFlowModalProps) {
   const { nodes, edges, flowName, flowId, lastLoopProgress, loopProgressByNodeId } = useFlowStore();
+  const currentWorkflowKey = useMemo(() => (typeof flowId === 'string' ? flowId.trim() : ''), [flowId]);
+  const runWorkflowKey = useMemo(() => {
+    const raw =
+      (typeof runWorkflowId === 'string' && runWorkflowId.trim()) ||
+      (typeof runSummary?.workflow_id === 'string' && runSummary.workflow_id.trim()) ||
+      '';
+    if (!raw || !currentWorkflowKey) return raw;
+    if (
+      raw === currentWorkflowKey ||
+      raw.endsWith(`:${currentWorkflowKey}`) ||
+      raw.endsWith(`/${currentWorkflowKey}`)
+    ) {
+      return currentWorkflowKey;
+    }
+    return raw;
+  }, [currentWorkflowKey, runSummary?.workflow_id, runWorkflowId]);
+  const followUpWorkflowKey = useMemo(() => {
+    return runWorkflowKey || currentWorkflowKey;
+  }, [currentWorkflowKey, runWorkflowKey]);
 
   const memoryScopeOptions = useMemo(() => {
     // Heuristic: `scope` is a platform-wide memory routing enum.
@@ -587,7 +1091,7 @@ export function RunFlowModal({
   const [showIgnoredPaths, setShowIgnoredPaths] = useState(false);
   const [sessionIdOverride, setSessionIdOverride] = useState('');
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
-  const [rawJsonOpen, setRawJsonOpen] = useState(true);
+  const [rawJsonOpen, setRawJsonOpen] = useState(false);
   // Nested subflow observability: folded by default; per-step expansion keyed by the
   // parent step id (stable across this modal's event stream).
   const [expandedSubflows, setExpandedSubflows] = useState<Record<string, boolean>>({});
@@ -630,17 +1134,37 @@ export function RunFlowModal({
     return typeof stableSessionId === 'string' && stableSessionId.trim() ? stableSessionId.trim() : '';
   }, [stableSessionId, startInputData]);
 
-  const providerPinId = useMemo(() => {
-    const pin = formInputPins.find((p) => p.type === 'provider' || p.id === 'provider');
+  const textProviderPinId = useMemo(() => {
+    const pin = formInputPins.find(isTextProviderInputPin);
     return pin?.id || null;
   }, [formInputPins]);
 
   const selectedProvider = useMemo(() => {
-    return providerPinId ? (formValues[providerPinId] || '') : '';
-  }, [formValues, providerPinId]);
+    return textProviderPinId ? (formValues[textProviderPinId] || '') : '';
+  }, [formValues, textProviderPinId]);
+
+  const imageProviderPinId = useMemo(() => {
+    const pin = formInputPins.find(isImageProviderInputPin);
+    return pin?.id || null;
+  }, [formInputPins]);
+
+  const selectedImageProvider = useMemo(() => {
+    return imageProviderPinId ? (formValues[imageProviderPinId] || '') : '';
+  }, [formValues, imageProviderPinId]);
+
+  const voiceProviderPinId = useMemo(() => {
+    const pin = formInputPins.find(isVoiceProviderInputPin);
+    return pin?.id || null;
+  }, [formInputPins]);
+
+  const selectedVoiceProvider = useMemo(() => {
+    return voiceProviderPinId ? (formValues[voiceProviderPinId] || '') : '';
+  }, [formValues, voiceProviderPinId]);
+
+  const voiceModelMode = voiceProviderPinId && voiceProviderPinId.toLowerCase().includes('stt') ? 'stt' : 'tts';
 
   const modelPinId = useMemo(() => {
-    const pin = formInputPins.find((p) => p.type === 'model' || p.id === 'model');
+    const pin = formInputPins.find((p) => isModelInputPin(p) && modelScopeForPin(p, formInputPins) === 'text');
     return pin?.id || null;
   }, [formInputPins]);
 
@@ -701,12 +1225,112 @@ export function RunFlowModal({
         ? promptCacheResult.hint.trim()
         : '';
 
-  const wantProviderDropdown = Boolean(isOpen && formInputPins.some((p) => p.type === 'provider' || p.id === 'provider'));
-  const wantModelDropdown = Boolean(isOpen && formInputPins.some((p) => p.type === 'model' || p.id === 'model'));
+  const wantProviderDropdown = Boolean(isOpen && formInputPins.some(isTextProviderInputPin));
+  const wantModelDropdown = Boolean(
+    isOpen && formInputPins.some((p) => isModelInputPin(p) && modelScopeForPin(p, formInputPins) === 'text')
+  );
   const providersQuery = useProviders(wantProviderDropdown);
   const modelsQuery = useModels(selectedProvider || undefined, wantModelDropdown);
   const providers = Array.isArray(providersQuery.data) ? providersQuery.data : [];
   const models = Array.isArray(modelsQuery.data) ? modelsQuery.data : [];
+
+  const discovery = gatewayContracts?.common?.discovery || {};
+  const visionProviderModelsEndpoint = discovery.vision_provider_models || '';
+  const voiceCatalogEndpoint = discovery.voice_voices || '';
+  const ttsModelsEndpoint = discovery.audio_speech_models || '';
+  const sttModelsEndpoint = discovery.audio_transcription_models || '';
+
+  const wantsImageProviderDropdown = Boolean(isOpen && formInputPins.some(isImageProviderInputPin));
+  const wantsImageModelDropdown = Boolean(
+    isOpen && formInputPins.some((p) => isModelInputPin(p) && modelScopeForPin(p, formInputPins) === 'image')
+  );
+  const imageProvidersQuery = useQuery({
+    queryKey: ['run-input', 'image-providers', visionProviderModelsEndpoint],
+    enabled: wantsImageProviderDropdown && Boolean(visionProviderModelsEndpoint),
+    staleTime: 30_000,
+    queryFn: async () => {
+      const data = await gatewayJson<Record<string, unknown>>(
+        gatewayPath(visionProviderModelsEndpoint, {}, { task: 'text_to_image', providers_only: true }),
+        { timeoutMs: 5_000 }
+      );
+      return providerOptionsFromCatalog(data, ['providers', 'image_providers']);
+    },
+  });
+  const imageModelsQuery = useQuery({
+    queryKey: ['run-input', 'image-models', visionProviderModelsEndpoint, selectedImageProvider],
+    enabled: wantsImageModelDropdown && Boolean(visionProviderModelsEndpoint) && Boolean(selectedImageProvider.trim()),
+    staleTime: 30_000,
+    queryFn: async () => {
+      const data = await gatewayJson<Record<string, unknown>>(
+        gatewayPath(visionProviderModelsEndpoint, {}, { task: 'text_to_image', provider: selectedImageProvider }),
+        { timeoutMs: 30_000 }
+      );
+      return modelOptionsFromCatalog(data, selectedImageProvider, ['models', 'items', 'available_models', 'local_models']);
+    },
+  });
+  const imageProviderOptions = Array.isArray(imageProvidersQuery.data) ? imageProvidersQuery.data : [];
+  const imageModelOptions = Array.isArray(imageModelsQuery.data) ? imageModelsQuery.data : [];
+
+  const wantsVoiceProviderDropdown = Boolean(isOpen && formInputPins.some(isVoiceProviderInputPin));
+  const wantsVoiceModelDropdown = Boolean(
+    isOpen && formInputPins.some((p) => isModelInputPin(p) && modelScopeForPin(p, formInputPins) === 'voice')
+  );
+  const voiceProvidersQuery = useQuery({
+    queryKey: ['run-input', 'voice-providers', voiceCatalogEndpoint, ttsModelsEndpoint, sttModelsEndpoint, voiceModelMode],
+    enabled: wantsVoiceProviderDropdown && Boolean(voiceCatalogEndpoint || ttsModelsEndpoint || sttModelsEndpoint),
+    staleTime: 30_000,
+    queryFn: async () => {
+      const providerKeys =
+        voiceModelMode === 'stt' ? ['stt_providers', 'providers'] : ['tts_providers', 'providers'];
+      const modelEndpoint = voiceModelMode === 'stt' ? sttModelsEndpoint : ttsModelsEndpoint;
+      const [voiceData, modelData] = await Promise.all([
+        voiceCatalogEndpoint
+          ? gatewayJson<Record<string, unknown>>(
+              gatewayPath(voiceCatalogEndpoint, {}, { providers_only: true }),
+              { timeoutMs: 5_000 }
+            ).catch(() => ({}))
+          : Promise.resolve({}),
+        modelEndpoint
+          ? gatewayJson<Record<string, unknown>>(gatewayPath(modelEndpoint, {}, {}), { timeoutMs: 5_000 }).catch(() => ({}))
+          : Promise.resolve({}),
+      ]);
+      return dedupeOptions([
+        ...providerOptionsFromCatalog(voiceData, providerKeys),
+        ...providerOptionsFromCatalog(modelData, ['providers']),
+      ]);
+    },
+  });
+  const voiceModelsQuery = useQuery({
+    queryKey: ['run-input', 'voice-models', voiceModelMode, selectedVoiceProvider, voiceCatalogEndpoint, ttsModelsEndpoint, sttModelsEndpoint],
+    enabled:
+      wantsVoiceModelDropdown &&
+      Boolean(selectedVoiceProvider.trim()) &&
+      Boolean(voiceModelMode === 'stt' ? sttModelsEndpoint : ttsModelsEndpoint || voiceCatalogEndpoint),
+    staleTime: 30_000,
+    queryFn: async () => {
+      const modelEndpoint = voiceModelMode === 'stt' ? sttModelsEndpoint : ttsModelsEndpoint;
+      const [modelData, voiceData] = await Promise.all([
+        modelEndpoint
+          ? gatewayJson<Record<string, unknown>>(
+              gatewayPath(modelEndpoint, {}, { provider: selectedVoiceProvider }),
+              { timeoutMs: 30_000 }
+            ).catch(() => ({}))
+          : Promise.resolve({}),
+        voiceModelMode === 'tts' && voiceCatalogEndpoint
+          ? gatewayJson<Record<string, unknown>>(
+              gatewayPath(voiceCatalogEndpoint, {}, { provider: selectedVoiceProvider }),
+              { timeoutMs: 30_000 }
+            ).catch(() => ({}))
+          : Promise.resolve({}),
+      ]);
+      return dedupeOptions([
+        ...modelOptionsFromCatalog(modelData, selectedVoiceProvider, ['models', 'items', 'data', 'tts_models', 'stt_models']),
+        ...modelOptionsFromCatalog(voiceData, selectedVoiceProvider, ['models', 'tts_models']),
+      ]);
+    },
+  });
+  const voiceProviderOptions = Array.isArray(voiceProvidersQuery.data) ? voiceProvidersQuery.data : [];
+  const voiceModelOptions = Array.isArray(voiceModelsQuery.data) ? voiceModelsQuery.data : [];
 
   const wantToolsDropdown = Boolean(isOpen && formInputPins.some((p) => p.type === 'tools'));
   const toolsQuery = useTools(wantToolsDropdown);
@@ -1363,6 +1987,8 @@ export function RunFlowModal({
 
       const obj = value as Record<string, unknown>;
       const direct =
+        (typeof obj.content === 'string' && obj.content) ||
+        (typeof obj.text === 'string' && obj.text) ||
         (typeof obj.message === 'string' && obj.message) ||
         (typeof obj.response === 'string' && obj.response) ||
         '';
@@ -1371,6 +1997,8 @@ export function RunFlowModal({
       const nested = obj.result;
       if (nested && typeof nested === 'object') {
         const nestedObj = nested as Record<string, unknown>;
+        if (typeof nestedObj.content === 'string' && nestedObj.content) return nestedObj.content;
+        if (typeof nestedObj.text === 'string' && nestedObj.text) return nestedObj.text;
         if (typeof nestedObj.result === 'string' && nestedObj.result) return nestedObj.result;
         if (typeof nestedObj.message === 'string' && nestedObj.message) return nestedObj.message;
         if (typeof nestedObj.response === 'string' && nestedObj.response) return nestedObj.response;
@@ -1379,6 +2007,8 @@ export function RunFlowModal({
       const nestedOutput = obj.output;
       if (nestedOutput && typeof nestedOutput === 'object') {
         const outObj = nestedOutput as Record<string, unknown>;
+        if (typeof outObj.content === 'string' && outObj.content) return outObj.content;
+        if (typeof outObj.text === 'string' && outObj.text) return outObj.text;
         if (typeof outObj.output === 'string' && outObj.output) return outObj.output;
         if (typeof outObj.result === 'string' && outObj.result) return outObj.result;
         if (typeof outObj.message === 'string' && outObj.message) return outObj.message;
@@ -1397,6 +2027,8 @@ export function RunFlowModal({
       return text;
     };
 
+    const hasExplicitFlowEnd = Array.from(nodeById.values()).some((n) => n.data?.nodeType === 'on_flow_end');
+
     const nodeMeta = (nodeId: string | undefined) => {
       if (!nodeId) return null;
       const n = nodeById.get(nodeId);
@@ -1407,6 +2039,14 @@ export function RunFlowModal({
             type: 'ask_user',
             icon: '...',
             color: '#3a4a5a',
+          };
+        }
+        if (nodeId === '__implicit_flow_end__') {
+          return {
+            label: 'On Flow End',
+            type: 'on_flow_end',
+            icon: '🏁',
+            color: '#2f8f8d',
           };
         }
         return null;
@@ -1424,7 +2064,33 @@ export function RunFlowModal({
       const evRunId = getActualRunId(ev);
       const evStepId = typeof ev.stepId === 'string' && ev.stepId.trim() ? ev.stepId.trim() : undefined;
       // We show only node steps in the left timeline; flow-level status is surfaced in the header / final result.
-      if (ev.type === 'flow_start' || ev.type === 'flow_complete') continue;
+      if (ev.type === 'flow_start') continue;
+      if (ev.type === 'flow_complete') {
+        if (!hasExplicitFlowEnd) {
+          const implicitId = '__implicit_flow_end__';
+          const meta = nodeMeta(implicitId);
+          const runKey = evRunId || ev.runId || '';
+          const alreadyAdded = all.some((s) => s.nodeId === implicitId && (s.runId || '') === runKey);
+          if (!alreadyAdded) {
+            all.push({
+              id: `flow_complete:${runKey || 'root'}:${i}`,
+              status: 'completed',
+              runId: evRunId || ev.runId,
+              runtimeStepId: evStepId,
+              nodeId: implicitId,
+              nodeLabel: meta?.label,
+              nodeType: meta?.type,
+              nodeIcon: meta?.icon,
+              nodeColor: meta?.color,
+              summary: 'Workflow completed',
+              metrics: ev.meta,
+              startedAt: typeof ev.ts === 'string' ? ev.ts : undefined,
+              endedAt: typeof ev.ts === 'string' ? ev.ts : undefined,
+            });
+          }
+        }
+        continue;
+      }
 
       if (ev.type === 'node_start') {
         const key = `${evRunId || ''}:${ev.nodeId || ''}`;
@@ -2127,11 +2793,11 @@ export function RunFlowModal({
     ? 'This node executes as a durable sub-run so its internal steps can stream in real time.'
     : 'This node is still processing. The output will appear when it completes.';
 
-  // Keep the per-step Raw JSON section predictably unfolded when switching steps.
+  // Keep raw JSON available for debugging without making it the default view.
   useEffect(() => {
     if (!isOpen) return;
     if (!selectedStepId) return;
-    setRawJsonOpen(true);
+    setRawJsonOpen(false);
   }, [isOpen, selectedStepId]);
 
   const parentRunId = useMemo(() => {
@@ -2275,6 +2941,65 @@ export function RunFlowModal({
     () => extractGeneratedImagePreview(resolvedStepOutput, selectedStep?.runId || rootRunId || null, artifactContentDescriptor),
     [artifactContentDescriptor, resolvedStepOutput, rootRunId, selectedStep?.runId]
   );
+  const generatedAudioPreview = useMemo(
+    () => extractGeneratedAudioPreview(resolvedStepOutput, selectedStep?.runId || rootRunId || null, artifactContentDescriptor),
+    [artifactContentDescriptor, resolvedStepOutput, rootRunId, selectedStep?.runId]
+  );
+
+  const stepArtifactPreviewById = useMemo(() => {
+    const map = new Map<string, { kind: 'image' | 'audio' | 'text'; artifactId: string }>();
+    for (const step of steps) {
+      const output = step.output;
+      if (output == null) continue;
+      const runId = step.runId || rootRunId || null;
+      const image = extractGeneratedImagePreview(output, runId, artifactContentDescriptor);
+      if (image) {
+        map.set(step.id, { kind: 'image', artifactId: image.artifactId });
+        continue;
+      }
+      const audio = extractGeneratedAudioPreview(output, runId, artifactContentDescriptor);
+      if (audio) map.set(step.id, { kind: 'audio', artifactId: audio.artifactId });
+      const text = extractGeneratedTextPreview(output, step);
+      if (text) map.set(step.id, { kind: 'text', artifactId: text.artifactId });
+    }
+    return map;
+  }, [artifactContentDescriptor, rootRunId, steps]);
+
+  const runArtifactSummary = useMemo<RunGeneratedArtifact[]>(() => {
+    const out: RunGeneratedArtifact[] = [];
+    const seen = new Set<string>();
+    for (const step of steps) {
+      const output = step.output;
+      if (output == null) continue;
+      const runId = step.runId || rootRunId || null;
+      const stepLabel = step.nodeLabel || step.nodeId || step.nodeType || step.id;
+      const image = extractGeneratedImagePreview(output, runId, artifactContentDescriptor);
+      if (image) {
+        const key = `image:${image.artifactId}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          out.push({ kind: 'image', preview: image, stepLabel });
+        }
+      }
+      const audio = extractGeneratedAudioPreview(output, runId, artifactContentDescriptor);
+      if (audio) {
+        const key = `audio:${audio.artifactId}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          out.push({ kind: 'audio', preview: audio, stepLabel });
+        }
+      }
+      const text = extractGeneratedTextPreview(output, step);
+      if (text) {
+        const key = `text:${step.id}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          out.push({ kind: 'text', preview: text, stepLabel });
+        }
+      }
+    }
+    return out;
+  }, [artifactContentDescriptor, rootRunId, steps]);
 
   const computedFinalResult = useMemo(() => {
     if (steps.length === 0) return null;
@@ -2296,10 +3021,23 @@ export function RunFlowModal({
 
   const showFinalResult = useMemo(() => {
     if (!effectiveResult || isRunning) return false;
+    if (effectiveResult.success && runArtifactSummary.length > 0) return false;
     if (steps.length === 0) return true;
     const last = steps[steps.length - 1];
-    return Boolean(last && selectedStepId === last.id);
-  }, [effectiveResult, isRunning, selectedStepId, steps]);
+    if (!last || selectedStepId !== last.id) return false;
+    if (selectedStep?.output != null && effectiveResult.result != null) {
+      return stringifyJson(selectedStep.output) !== stringifyJson(effectiveResult.result);
+    }
+    return true;
+  }, [effectiveResult, isRunning, runArtifactSummary.length, selectedStep?.output, selectedStepId, steps]);
+
+  const showRunArtifactSummary = useMemo(() => {
+    if (runArtifactSummary.length === 0) return false;
+    if (generatedImagePreview || generatedAudioPreview) return false;
+    if (!selectedStep) return true;
+    const last = steps[steps.length - 1];
+    return selectedStep.nodeType === 'on_flow_end' || selectedStep.id === last?.id;
+  }, [generatedAudioPreview, generatedImagePreview, runArtifactSummary.length, selectedStep, steps]);
 
   const runStatusLabel = useMemo(() => {
     if (isPaused) return 'PAUSED';
@@ -2579,6 +3317,7 @@ export function RunFlowModal({
   }, []);
 
   const followUpSeed = useMemo(() => {
+    if (!followUpWorkflowKey) return null;
     const baseMessages: FollowUpMessage[] = [];
     const ctxRaw = startInputData?.context;
     if (ctxRaw && typeof ctxRaw === 'object' && !Array.isArray(ctxRaw)) {
@@ -2612,14 +3351,31 @@ export function RunFlowModal({
       }
     }
 
-    return baseMessages.length > 0 ? { messages: baseMessages } : null;
-  }, [effectiveResult, extractFollowUpAnswer, extractFollowUpPrompt, startInputData]);
+    return baseMessages.length > 0 ? { messages: baseMessages, workflowKey: followUpWorkflowKey, rootRunId } : null;
+  }, [effectiveResult, extractFollowUpAnswer, extractFollowUpPrompt, followUpWorkflowKey, rootRunId, startInputData]);
+
+  useEffect(() => {
+    setFollowUpContext((prev) => (!prev || prev.workflowKey === currentWorkflowKey ? prev : null));
+    setLastRunSeed((prev) => (!prev || prev.workflowKey === currentWorkflowKey ? prev : null));
+    setShowFollowUpModal(false);
+    setFollowUpError(null);
+    setFollowUpDraft('');
+    setFollowUpAttachments([]);
+  }, [currentWorkflowKey]);
 
   useEffect(() => {
     if (!followUpSeed) return;
+    if (!followUpSeed.workflowKey || followUpSeed.workflowKey !== followUpWorkflowKey) return;
     if (isRunning || isPaused || isWaiting) return;
     setLastRunSeed(followUpSeed);
-  }, [followUpSeed, isPaused, isRunning, isWaiting]);
+  }, [followUpSeed, followUpWorkflowKey, isPaused, isRunning, isWaiting]);
+
+  const activeFollowUpSeed = useMemo(() => {
+    if (!currentWorkflowKey || !followUpWorkflowKey || currentWorkflowKey !== followUpWorkflowKey) return null;
+    if (lastRunSeed?.workflowKey === followUpWorkflowKey) return lastRunSeed;
+    if (followUpSeed?.workflowKey === followUpWorkflowKey) return followUpSeed;
+    return null;
+  }, [currentWorkflowKey, followUpSeed, followUpWorkflowKey, lastRunSeed]);
 
   const addFollowUpFiles = useCallback((incoming: FileList | File[]) => {
     const files = Array.from(incoming || []);
@@ -2666,7 +3422,11 @@ export function RunFlowModal({
       setFollowUpError('Please enter a follow up message.');
       return;
     }
-    const seed = lastRunSeed || followUpSeed;
+    const seed = activeFollowUpSeed;
+    if (!seed) {
+      setFollowUpError('Follow Up is only available for the workflow/run that produced this result.');
+      return;
+    }
     setFollowUpSubmitting(true);
     setFollowUpError(null);
     try {
@@ -2688,10 +3448,9 @@ export function RunFlowModal({
     }
   }, [
     derivedSessionId,
+    activeFollowUpSeed,
     followUpAttachments,
     followUpDraft,
-    followUpSeed,
-    lastRunSeed,
     onFollowUpSubmit,
     rootRunId,
     threadId,
@@ -2785,7 +3544,9 @@ export function RunFlowModal({
     if (obj.result && typeof obj.result === 'object') {
       const res = obj.result as Record<string, unknown>;
       if (typeof res.task === 'string' && res.task.trim()) task = res.task.trim();
-      if (typeof res.result === 'string' && res.result.trim()) previewText = res.result.trim();
+      if (typeof res.content === 'string' && res.content.trim()) previewText = res.content.trim();
+      if (!previewText && typeof res.text === 'string' && res.text.trim()) previewText = res.text.trim();
+      if (!previewText && typeof res.result === 'string' && res.result.trim()) previewText = res.result.trim();
       if (!previewText && typeof res.message === 'string' && res.message.trim()) previewText = res.message.trim();
       if (!previewText && typeof res.response === 'string' && res.response.trim()) previewText = res.response.trim();
       if (typeof res.provider === 'string' && res.provider.trim()) provider = res.provider.trim();
@@ -2793,12 +3554,16 @@ export function RunFlowModal({
       if ('usage' in res) usage = res.usage;
     }
 
+    if (!previewText && typeof obj.content === 'string' && obj.content.trim()) previewText = obj.content.trim();
+    if (!previewText && typeof obj.text === 'string' && obj.text.trim()) previewText = obj.text.trim();
     if (!previewText && typeof obj.message === 'string' && obj.message.trim()) previewText = obj.message.trim();
     if (!previewText && typeof obj.response === 'string' && obj.response.trim()) previewText = obj.response.trim();
 	    if (!previewText && typeof obj.result === 'string' && obj.result.trim()) previewText = obj.result.trim();
     if (!previewText && typeof obj.output === 'string' && obj.output.trim()) previewText = obj.output.trim();
     if (!previewText && obj.output && typeof obj.output === 'object') {
       const outObj = obj.output as Record<string, unknown>;
+      if (typeof outObj.content === 'string' && outObj.content.trim()) previewText = outObj.content.trim();
+      if (!previewText && typeof outObj.text === 'string' && outObj.text.trim()) previewText = outObj.text.trim();
       if (typeof outObj.output === 'string' && outObj.output.trim()) previewText = outObj.output.trim();
       if (!previewText && typeof outObj.result === 'string' && outObj.result.trim()) previewText = outObj.result.trim();
       if (!previewText && typeof outObj.message === 'string' && outObj.message.trim()) previewText = outObj.message.trim();
@@ -2883,6 +3648,11 @@ export function RunFlowModal({
 	    if (!task && !previewText && scratchpad == null && !provider && !model && !usage && !benchmark && !subRunId) return null;
 	    return { task, previewText, previewIsJson, scratchpad, provider, model, usage, benchmark, subRunId, raw: value, cleaned };
 	  }, [beautifyJsonText, resolvedStepOutput, selectedStep]);
+
+  const showGenericOutputPreview = Boolean(outputPreview?.previewText) && !(
+    Boolean(generatedImagePreview || generatedAudioPreview) && Boolean(outputPreview?.previewIsJson)
+  );
+  const isImplicitFlowEndStep = selectedStep?.nodeId === '__implicit_flow_end__';
 
   const selectedEventIndex = useMemo(() => {
     if (!selectedStep?.id) return null;
@@ -3125,6 +3895,7 @@ export function RunFlowModal({
       Boolean(memorizeContentPreview) ||
       Boolean(recallIntoContextDisplay) ||
       Boolean(generatedImagePreview) ||
+      Boolean(generatedAudioPreview) ||
       (selectedStep.nodeType === 'on_flow_start' && Boolean(onFlowStartParams)) ||
       Boolean(outputPreview?.task) ||
       Boolean(outputPreview?.benchmark) ||
@@ -3134,7 +3905,7 @@ export function RunFlowModal({
       Boolean(outputPreview?.model) ||
       outputPreview?.scratchpad != null;
     return !hasPreviewBlocks;
-  }, [generatedImagePreview, memorizeContentPreview, onFlowStartParams, outputPreview, recallIntoContextDisplay, resolvedStepOutput, selectedStep]);
+  }, [generatedAudioPreview, generatedImagePreview, memorizeContentPreview, onFlowStartParams, outputPreview, recallIntoContextDisplay, resolvedStepOutput, selectedStep]);
 
   const lastRawJsonStepIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -3525,6 +4296,14 @@ export function RunFlowModal({
                                   {depth > 0 ? <span className="run-metric-badge metric-depth">d{depth}</span> : null}
                                   {s.provider ? <span className="run-metric-badge metric-provider">{s.provider}</span> : null}
                                   {s.model ? <span className="run-metric-badge metric-model">{s.model}</span> : null}
+                                  {stepArtifactPreviewById.get(s.id) ? (
+                                    <span
+                                      className="run-metric-badge metric-artifact"
+                                      title={`Artifact ${stepArtifactPreviewById.get(s.id)?.artifactId}`}
+                                    >
+                                      {stepArtifactPreviewById.get(s.id)?.kind}
+                                    </span>
+                                  ) : null}
                                   {s.nodeId ? <span className="run-step-id">{s.nodeId}</span> : null}
                                   {s.status === 'completed' && s.metrics ? (
                                     <span className="run-step-metrics">
@@ -3719,7 +4498,7 @@ export function RunFlowModal({
 	                            Copy content
 	                          </button>
 	                        ) : null}
-                        {outputPreview?.previewText ? (
+                        {showGenericOutputPreview && outputPreview?.previewText ? (
                           <button type="button" className="modal-button" onClick={() => copyToClipboard(outputPreview.previewText)}>
                             Copy preview
                           </button>
@@ -3735,6 +4514,7 @@ export function RunFlowModal({
                         memorizeContentPreview ||
                         recallIntoContextDisplay ||
                         generatedImagePreview ||
+                        generatedAudioPreview ||
                         (selectedStep?.nodeType === 'on_flow_start' && onFlowStartParams) ||
                         (selectedStep?.nodeType === 'memory_kg_query' && selectedStep.output != null)) ? (
                         <div className="run-output-preview">
@@ -3854,38 +4634,14 @@ export function RunFlowModal({
                           {generatedImagePreview ? (
                             <div className="run-output-section">
                               <div className="run-output-title">Generated image</div>
-                              <div className="run-generated-image">
-                                <img
-                                  src={generatedImagePreview.src}
-                                  alt={generatedImagePreview.prompt || generatedImagePreview.artifactId}
-                                  className="run-generated-image-img"
-                                />
-                                <div className="run-output-meta">
-                                  {generatedImagePreview.prompt ? (
-                                    <div>
-                                      <span className="run-output-meta-key">Prompt</span>
-                                      <span className="run-output-meta-val">{generatedImagePreview.prompt}</span>
-                                    </div>
-                                  ) : null}
-                                  {(generatedImagePreview.provider || generatedImagePreview.model) ? (
-                                    <div>
-                                      <span className="run-output-meta-key">Model</span>
-                                      <span className="run-output-meta-val">
-                                        {generatedImagePreview.provider ? (
-                                          <span className="run-metric-badge metric-provider">{generatedImagePreview.provider}</span>
-                                        ) : null}
-                                        {generatedImagePreview.model ? (
-                                          <span className="run-metric-badge metric-model">{generatedImagePreview.model}</span>
-                                        ) : null}
-                                      </span>
-                                    </div>
-                                  ) : null}
-                                  <div>
-                                    <span className="run-output-meta-key">Artifact</span>
-                                    <span className="run-output-meta-val">{generatedImagePreview.artifactId}</span>
-                                  </div>
-                                </div>
-                              </div>
+                              <GeneratedImageCard preview={generatedImagePreview} />
+                            </div>
+                          ) : null}
+
+                          {generatedAudioPreview ? (
+                            <div className="run-output-section">
+                              <div className="run-output-title">Generated voice</div>
+                              <GeneratedAudioCard preview={generatedAudioPreview} autoPlay />
                             </div>
                           ) : null}
 
@@ -4052,7 +4808,7 @@ export function RunFlowModal({
                             </div>
                           ) : null}
 
-                          {outputPreview?.previewText ? (
+                          {showGenericOutputPreview && outputPreview?.previewText ? (
                             <div className="run-output-section">
                               <div className="run-output-title">Preview</div>
                               {outputPreview.previewIsJson ? (
@@ -4122,11 +4878,19 @@ export function RunFlowModal({
                         open={rawJsonOpen}
                         onToggle={(e) => setRawJsonOpen((e.currentTarget as HTMLDetailsElement).open)}
                       >
-                        <summary>Raw JSON</summary>
+                        <summary>Debug JSON</summary>
                         {rawJsonOpen ? (
                           <JsonViewer key={selectedStep.id} value={resolvedStepOutput} collapseAfterDepth={99} />
                         ) : null}
                       </details>
+                    </>
+                  ) : isImplicitFlowEndStep ? (
+                    <>
+                      {subflowTracePanel}
+                      {agentTracePanel}
+                      {runArtifactSummary.length === 0 ? (
+                        <div className="run-details-empty">Workflow completed. No artifacts were produced.</div>
+                      ) : null}
                     </>
                   ) : (
                     <>
@@ -4135,6 +4899,41 @@ export function RunFlowModal({
                       <div className="run-details-empty">No output for this step.</div>
                     </>
                   )}
+
+                  {showRunArtifactSummary ? (
+                    <div className="run-output-section">
+                      <div className="run-output-title">Artifacts created</div>
+                      <div className="run-generated-artifact-grid">
+                        {runArtifactSummary.map((item) => (
+                          <div className="run-generated-artifact-item" key={`${item.kind}:${item.preview.artifactId}`}>
+                            <div className="run-output-meta-badges">
+                              <span className="run-metric-badge">{item.kind}</span>
+                              <span className="run-metric-badge metric-provider">{item.stepLabel}</span>
+                              {item.kind === 'text' ? (
+                                <button
+                                  type="button"
+                                  className="run-artifact-copy"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    void copyToClipboard(item.preview.text);
+                                  }}
+                                >
+                                  Copy
+                                </button>
+                              ) : null}
+                            </div>
+                            {item.kind === 'image' ? (
+                              <GeneratedImageCard preview={item.preview} compact />
+                            ) : item.kind === 'audio' ? (
+                              <GeneratedAudioCard preview={item.preview} compact />
+                            ) : (
+                              <GeneratedTextCard preview={item.preview} compact />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
 
                   {showFinalResult && effectiveResult ? (
                     <div className="run-final">
@@ -4344,7 +5143,65 @@ export function RunFlowModal({
                           const inputType = getInputTypeForPin(pin.type);
                           const value = formValues[pin.id] || '';
 
-                          if (pin.type === 'provider' || pin.id === 'provider') {
+                          if (isImageProviderInputPin(pin)) {
+                            return (
+                              <div key={pin.id} className="run-form-field">
+                                <label className="run-form-label">
+                                  {pin.label}
+                                  <span className="run-form-type">({pin.type})</span>
+                                </label>
+                                <AfSelect
+                                  value={value}
+                                  placeholder={imageProvidersQuery.isLoading ? 'Loading…' : 'Select…'}
+                                  options={imageProviderOptions}
+                                  disabled={imageProvidersQuery.isLoading}
+                                  loading={imageProvidersQuery.isLoading}
+                                  searchable
+                                  searchPlaceholder="Search image providers…"
+                                  onChange={(v) =>
+                                    setFormValues((prev) => {
+                                      const next = { ...prev, [pin.id]: v };
+                                      for (const candidate of formInputPins) {
+                                        if (isModelInputPin(candidate) && modelScopeForPin(candidate, formInputPins) === 'image') next[candidate.id] = '';
+                                      }
+                                      return next;
+                                    })
+                                  }
+                                />
+                              </div>
+                            );
+                          }
+
+                          if (isVoiceProviderInputPin(pin)) {
+                            return (
+                              <div key={pin.id} className="run-form-field">
+                                <label className="run-form-label">
+                                  {pin.label}
+                                  <span className="run-form-type">({pin.type})</span>
+                                </label>
+                                <AfSelect
+                                  value={value}
+                                  placeholder={voiceProvidersQuery.isLoading ? 'Loading…' : 'Select…'}
+                                  options={voiceProviderOptions}
+                                  disabled={voiceProvidersQuery.isLoading}
+                                  loading={voiceProvidersQuery.isLoading}
+                                  searchable
+                                  searchPlaceholder={voiceModelMode === 'stt' ? 'Search STT providers…' : 'Search TTS providers…'}
+                                  onChange={(v) =>
+                                    setFormValues((prev) => {
+                                      const next = { ...prev, [pin.id]: v };
+                                      for (const candidate of formInputPins) {
+                                        if (isModelInputPin(candidate) && modelScopeForPin(candidate, formInputPins) === 'voice') next[candidate.id] = '';
+                                      }
+                                      return next;
+                                    })
+                                  }
+                                />
+                              </div>
+                            );
+                          }
+
+                          if (isTextProviderInputPin(pin)) {
                             return (
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
@@ -4359,13 +5216,36 @@ export function RunFlowModal({
                                   loading={providersQuery.isLoading}
                                   searchable
                                   searchPlaceholder="Search providers…"
-                                  onChange={(v) => handleFieldChange(pin.id, v)}
+                                  onChange={(v) =>
+                                    setFormValues((prev) => {
+                                      const next = { ...prev, [pin.id]: v };
+                                      for (const candidate of formInputPins) {
+                                        if (isModelInputPin(candidate) && modelScopeForPin(candidate, formInputPins) === 'text') next[candidate.id] = '';
+                                      }
+                                      return next;
+                                    })
+                                  }
                                 />
                               </div>
                             );
                           }
 
-                          if (pin.type === 'model' || pin.id === 'model') {
+                          if (isModelInputPin(pin)) {
+                            const scope = modelScopeForPin(pin, formInputPins);
+                            const scopeProvider =
+                              scope === 'image' ? selectedImageProvider : scope === 'voice' ? selectedVoiceProvider : selectedProvider;
+                            const scopeLoading =
+                              scope === 'image'
+                                ? imageModelsQuery.isLoading
+                                : scope === 'voice'
+                                  ? voiceModelsQuery.isLoading
+                                  : modelsQuery.isLoading;
+                            const scopeOptions =
+                              scope === 'image'
+                                ? imageModelOptions
+                                : scope === 'voice'
+                                  ? voiceModelOptions
+                                  : models.map((m) => ({ value: m, label: m }));
                             return (
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
@@ -4375,14 +5255,22 @@ export function RunFlowModal({
                                 <AfSelect
                                   value={value}
                                   placeholder={
-                                    !selectedProvider ? 'Pick provider…' : modelsQuery.isLoading ? 'Loading…' : 'Select…'
+                                    !scopeProvider ? 'Pick provider…' : scopeLoading ? 'Loading…' : 'Select…'
                                   }
-                                  options={models.map((m) => ({ value: m, label: m }))}
-                                  disabled={!selectedProvider}
-                                  loading={modelsQuery.isLoading}
+                                  options={scopeOptions}
+                                  disabled={!scopeProvider}
+                                  loading={scopeLoading}
                                   allowCustom
                                   searchable
-                                  searchPlaceholder="Search models…"
+                                  searchPlaceholder={
+                                    scope === 'image'
+                                      ? 'Search image models…'
+                                      : scope === 'voice'
+                                        ? voiceModelMode === 'stt'
+                                          ? 'Search STT models…'
+                                          : 'Search TTS models…'
+                                        : 'Search models…'
+                                  }
                                   onChange={(v) => handleFieldChange(pin.id, v)}
                                 />
                               </div>
@@ -4732,7 +5620,7 @@ export function RunFlowModal({
                 </button>
               )}
 
-              {(hasRunData || result) && !isRunning && !isPaused && !isWaiting && onFollowUpSubmit && (
+              {(hasRunData || result) && !isRunning && !isPaused && !isWaiting && onFollowUpSubmit && activeFollowUpSeed && (
                 <button
                   className="modal-button cancel"
                   onClick={() => {

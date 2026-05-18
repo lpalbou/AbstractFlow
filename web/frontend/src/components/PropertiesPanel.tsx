@@ -25,7 +25,13 @@ import {
   upsertPythonAvailableVariablesComments,
 } from '../utils/codegen';
 import { collectCustomEventNames } from '../utils/events';
+import { areTypesCompatible } from '../utils/validation';
 import { gatewayJson, gatewayPath, getGatewayFlowEditorReadiness } from '../utils/gatewayClient';
+import {
+  applyImagePinDefaultPatch,
+  extractImageModelParameterMetadata,
+  type MediaModelParameterMetadata,
+} from '../utils/mediaModelParams';
 import {
   AGENT_META_SCHEMA,
   AGENT_RESULT_SCHEMA,
@@ -36,6 +42,24 @@ import {
   LLM_META_SCHEMA,
   LLM_RESULT_SCHEMA,
 } from '../schemas/known_json_schemas';
+
+const DEFAULT_IMAGE_FORMATS = ['png', 'jpeg', 'webp'];
+const DEFAULT_TTS_FORMATS = ['wav', 'mp3'];
+const DEFAULT_STT_FORMATS = ['json', 'text', 'verbose_json', 'srt', 'vtt'];
+
+function formatValuesFrom(values: unknown, fallback: string[]): string[] {
+  const raw = Array.isArray(values) ? values : fallback;
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of raw) {
+    if (typeof item !== 'string') continue;
+    const value = item.trim();
+    if (!value || seen.has(value)) continue;
+    seen.add(value);
+    out.push(value);
+  }
+  return out.length > 0 ? out : fallback;
+}
 
 interface PropertiesPanelProps {
   node: Node<FlowNodeData> | null;
@@ -73,11 +97,22 @@ const DATA_PIN_TYPES: DataPinType[] = [
   'assertions',
   'array',
   'tools',
+  'provider_text',
+  'provider_image',
+  'provider_voice',
   'provider',
   'model',
   'agent',
   'any',
 ];
+
+function isTextProviderPin(pin: Pin): boolean {
+  return pin.type === 'provider' || pin.type === 'provider_text' || pin.id === 'provider';
+}
+
+function isTextModelPin(pin: Pin): boolean {
+  return pin.type === 'model' || pin.type === 'model_text' || pin.type === 'model_image' || pin.type === 'model_voice' || pin.id === 'model';
+}
 
 function normalizePinId(raw: string): string {
   const trimmed = raw.trim();
@@ -194,6 +229,13 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const [showCodeEditor, setShowCodeEditor] = useState(false);
   const gatewayCapabilitiesQuery = useGatewayCapabilities(true);
   const gatewayContracts = gatewayContractsFromCapabilities(gatewayCapabilitiesQuery.data);
+  const generatedImageContract =
+    gatewayContracts?.flow_editor?.media?.generated_image || gatewayContracts?.assistant?.media?.generated_image;
+  const generatedVoiceContract =
+    gatewayContracts?.flow_editor?.media?.generated_voice || gatewayContracts?.assistant?.media?.generated_voice;
+  const imageFormatOptions = formatValuesFrom(generatedImageContract?.direct_endpoint?.formats, DEFAULT_IMAGE_FORMATS);
+  const ttsFormatOptions = formatValuesFrom(generatedVoiceContract?.direct_endpoint?.formats, DEFAULT_TTS_FORMATS);
+  const sttFormatOptions = formatValuesFrom(undefined, DEFAULT_STT_FORMATS);
   const gatewayReadiness = getGatewayFlowEditorReadiness(gatewayContracts);
   const providerDiscoveryEndpoint = gatewayContracts?.common?.discovery?.providers || '';
   const providerModelsEndpoint = gatewayContracts?.common?.discovery?.provider_models || '';
@@ -201,7 +243,6 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const ttsModelsEndpoint = gatewayContracts?.common?.discovery?.audio_speech_models || '';
   const sttModelsEndpoint = gatewayContracts?.common?.discovery?.audio_transcription_models || '';
   const visionProviderModelsEndpoint = gatewayContracts?.common?.discovery?.vision_provider_models || '';
-  const visionModelsEndpoint = gatewayContracts?.common?.discovery?.vision_models || '';
   const toolsDiscoveryEndpoint = gatewayContracts?.common?.discovery?.tools || '';
   const visualflowCollectionEndpoint = gatewayContracts?.flow_editor?.visualflows?.crud?.collection_endpoint || '';
   const visualflowItemEndpoint = gatewayContracts?.flow_editor?.visualflows?.crud?.item_endpoint || '';
@@ -214,8 +255,26 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const [voiceOptions, setVoiceOptions] = useState<Array<{ value: string; label: string; mode?: string }>>([]);
   const [ttsModelOptions, setTtsModelOptions] = useState<string[]>([]);
   const [sttModelOptions, setSttModelOptions] = useState<string[]>([]);
-  const [imageModelOptions, setImageModelOptions] = useState<Array<{ provider: string; model: string; label: string }>>([]);
+  const [imageModelOptions, setImageModelOptions] = useState<Array<{ provider: string; model: string; label: string } & MediaModelParameterMetadata>>([]);
   const [loadingMediaModels, setLoadingMediaModels] = useState(false);
+  const [mediaCatalogRequest, setMediaCatalogRequest] = useState<{
+    seq: number;
+    scope: 'image' | 'tts' | 'stt';
+    provider?: string;
+    model?: string;
+  } | null>(null);
+
+  const requestMediaCatalog = useCallback(
+    (scope: 'image' | 'tts' | 'stt', options: { provider?: string; model?: string } = {}) => {
+      setMediaCatalogRequest((prev) => ({
+        seq: (prev?.seq || 0) + 1,
+        scope,
+        provider: options.provider,
+        model: options.model,
+      }));
+    },
+    []
+  );
 
   // Tool discovery for agent nodes
   const [toolSpecs, setToolSpecs] = useState<ToolSpec[]>([]);
@@ -250,6 +309,15 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         node.data.outputs.some((p) => p.type === 'assertion')
     );
   const semanticsQuery = useSemanticsRegistry(wantsSemanticsRegistry);
+  const usesGenericProviderCatalog = Boolean(
+    node &&
+      (node.data.nodeType === 'agent' ||
+        node.data.nodeType === 'llm_call' ||
+        ((node.data.nodeType === 'on_flow_start' || node.data.nodeType === 'on_flow_end') &&
+          (node.data.nodeType === 'on_flow_start' ? node.data.outputs : node.data.inputs).some(
+            (p) => isTextProviderPin(p) || isTextModelPin(p)
+          )))
+  );
 
   useEffect(() => {
     setShowCodeEditor(false);
@@ -290,6 +358,11 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
   // Fetch provider catalogs only after Gateway advertises the discovery route.
   useEffect(() => {
+    if (!usesGenericProviderCatalog) {
+      setProviders([]);
+      setLoadingProviders(false);
+      return;
+    }
     if (gatewayCapabilitiesQuery.isLoading) return;
     if (!providerDiscoveryEndpoint || gatewayCapabilitiesQuery.isError) {
       setProviders([]);
@@ -306,7 +379,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       })
       .catch((err) => console.error('Failed to fetch providers:', err))
       .finally(() => setLoadingProviders(false));
-  }, [gatewayCapabilitiesQuery.isError, gatewayCapabilitiesQuery.isLoading, providerDiscoveryEndpoint]);
+  }, [gatewayCapabilitiesQuery.isError, gatewayCapabilitiesQuery.isLoading, providerDiscoveryEndpoint, usesGenericProviderCatalog]);
 
   // Fetch available tools only after Gateway advertises the discovery route.
   useEffect(() => {
@@ -352,6 +425,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
   // Fetch models when provider changes (agent/llm_call nodes + IO defaults on start/end nodes).
   const selectedProvider = (() => {
+    if (!usesGenericProviderCatalog) return '';
     const n = node?.data;
     const fromAgent = n?.agentConfig?.provider;
     const fromEffect = (n?.effectConfig as any)?.provider;
@@ -360,7 +434,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
     if (n && (n.nodeType === 'on_flow_start' || n.nodeType === 'on_flow_end')) {
       const pins = n.nodeType === 'on_flow_start' ? n.outputs : n.inputs;
-      const providerPin = pins.find((p) => p.type === 'provider' || p.id === 'provider');
+      const providerPin = pins.find(isTextProviderPin);
       const raw = providerPin && n.pinDefaults ? (n.pinDefaults as any)[providerPin.id] : undefined;
       if (typeof raw === 'string' && raw.trim()) return raw.trim();
     }
@@ -399,22 +473,18 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   }, [gatewayCapabilitiesQuery.isError, providerModelsEndpoint, selectedProvider]);
 
   useEffect(() => {
-    if (gatewayCapabilitiesQuery.isLoading) return;
-    const anyEndpoint = voiceCatalogEndpoint || ttsModelsEndpoint || sttModelsEndpoint || visionProviderModelsEndpoint || visionModelsEndpoint;
-    if (!anyEndpoint || gatewayCapabilitiesQuery.isError) {
-      setVoiceOptions([]);
-      setTtsModelOptions([]);
-      setSttModelOptions([]);
-      setImageModelOptions([]);
+    if (gatewayCapabilitiesQuery.isLoading || !mediaCatalogRequest) return;
+    if (gatewayCapabilitiesQuery.isError) {
       setLoadingMediaModels(false);
       return;
     }
 
+    const request = mediaCatalogRequest;
     const modelId = (item: unknown): string => {
       if (typeof item === 'string') return item.trim();
       if (!item || typeof item !== 'object') return '';
       const rec = item as Record<string, unknown>;
-      for (const key of ['id', 'model', 'model_id', 'name']) {
+      for (const key of ['id', 'model', 'model_id', 'name', 'voice_id', 'profile_id']) {
         const value = rec[key];
         if (typeof value === 'string' && value.trim()) return value.trim();
       }
@@ -433,42 +503,29 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       if (typeof data?.active_model === 'string' && data.active_model.trim()) out.unshift(data.active_model.trim());
       return uniq(out);
     };
+    const query = (extra: Record<string, string | undefined>) =>
+      Object.fromEntries(Object.entries(extra).filter(([, v]) => typeof v === 'string' && v.trim()));
 
     setLoadingMediaModels(true);
-    Promise.all([
-      voiceCatalogEndpoint ? gatewayJson<any>(gatewayPath(voiceCatalogEndpoint)).catch(() => ({})) : Promise.resolve({}),
-      ttsModelsEndpoint ? gatewayJson<any>(gatewayPath(ttsModelsEndpoint)).catch(() => ({})) : Promise.resolve({}),
-      sttModelsEndpoint ? gatewayJson<any>(gatewayPath(sttModelsEndpoint)).catch(() => ({})) : Promise.resolve({}),
-      visionProviderModelsEndpoint ? gatewayJson<any>(gatewayPath(visionProviderModelsEndpoint, {}, { task: 'text_to_image' })).catch(() => ({})) : Promise.resolve({}),
-      visionModelsEndpoint ? gatewayJson<any>(gatewayPath(visionModelsEndpoint)).catch(() => ({})) : Promise.resolve({}),
-    ])
-      .then(([voiceCatalog, ttsCatalog, sttCatalog, imageProviderCatalog, localImageCatalog]) => {
-        const voices: Array<{ value: string; label: string; mode?: string }> = [];
-        const seenVoices = new Set<string>();
-        for (const key of ['profiles', 'voices', 'cloned_voices']) {
-          const values = Array.isArray(voiceCatalog?.[key]) ? voiceCatalog[key] : [];
-          for (const item of values) {
-            if (!item || typeof item !== 'object') continue;
-            const rec = item as Record<string, unknown>;
-            const id = modelId(rec) || String(rec.profile_id || rec.voice_id || '').trim();
-            if (!id || seenVoices.has(id)) continue;
-            seenVoices.add(id);
-            const mode = String(rec.kind || rec.type || '').toLowerCase().includes('clone') ? 'clone' : 'profile';
-            voices.push({ value: id, label: String(rec.label || rec.display_name || id), mode });
-          }
-        }
-        setVoiceOptions(voices);
-        setTtsModelOptions(modelsFrom(ttsCatalog, 'models', 'data', 'tts_models'));
-        setSttModelOptions(modelsFrom(sttCatalog, 'models', 'data', 'stt_models'));
 
-        const imageOptions: Array<{ provider: string; model: string; label: string }> = [];
-        const seenImages = new Set<string>();
-        for (const source of [imageProviderCatalog, localImageCatalog]) {
-          const values = Array.isArray(source?.models) ? source.models : [];
+    if (request.scope === 'image') {
+      if (!request.provider || !visionProviderModelsEndpoint) {
+        setImageModelOptions([]);
+        setLoadingMediaModels(false);
+        return;
+      }
+      gatewayJson<any>(
+        gatewayPath(visionProviderModelsEndpoint, {}, query({ task: 'text_to_image', provider: request.provider })),
+        { timeoutMs: 30_000 }
+      )
+        .then((imageProviderCatalog) => {
+          const imageOptions: Array<{ provider: string; model: string; label: string } & MediaModelParameterMetadata> = [];
+          const seenImages = new Set<string>();
+          const values = Array.isArray(imageProviderCatalog?.models) ? imageProviderCatalog.models : [];
           for (const item of values) {
             if (!item || typeof item !== 'object') continue;
             const rec = item as Record<string, unknown>;
-            const provider = String(rec.provider || rec.provider_id || rec.provider_name || '').trim();
+            const provider = String(rec.provider || rec.provider_id || rec.provider_name || request.provider || '').trim();
             const model = modelId(rec);
             if (!model) continue;
             const key = `${provider}::${model}`;
@@ -478,20 +535,77 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               provider,
               model,
               label: String(rec.label || rec.display_name || (provider ? `${provider} / ${model}` : model)),
+              ...extractImageModelParameterMetadata(rec),
             });
           }
-        }
-        setImageModelOptions(imageOptions);
-      })
-      .finally(() => setLoadingMediaModels(false));
+          setImageModelOptions(imageOptions);
+        })
+        .catch(() => setImageModelOptions([]))
+        .finally(() => setLoadingMediaModels(false));
+      return;
+    }
+
+    if (request.scope === 'tts') {
+      if (!request.provider) {
+        setVoiceOptions([]);
+        setTtsModelOptions([]);
+        setLoadingMediaModels(false);
+        return;
+      }
+      Promise.all([
+        voiceCatalogEndpoint
+          ? gatewayJson<any>(
+              gatewayPath(voiceCatalogEndpoint, {}, query({ provider: request.provider, model: request.model })),
+              { timeoutMs: 30_000 }
+            ).catch(() => ({}))
+          : Promise.resolve({}),
+        ttsModelsEndpoint
+          ? gatewayJson<any>(gatewayPath(ttsModelsEndpoint, {}, query({ provider: request.provider })), { timeoutMs: 30_000 }).catch(
+              () => ({})
+            )
+          : Promise.resolve({}),
+      ])
+        .then(([voiceCatalog, ttsCatalog]) => {
+          const voices: Array<{ value: string; label: string; mode?: string }> = [];
+          const seenVoices = new Set<string>();
+          for (const key of ['profiles', 'voices', 'cloned_voices']) {
+            const values = Array.isArray(voiceCatalog?.[key]) ? voiceCatalog[key] : [];
+            for (const item of values) {
+              if (!item || typeof item !== 'object') continue;
+              const rec = item as Record<string, unknown>;
+              const id = modelId(rec);
+              if (!id || seenVoices.has(id)) continue;
+              seenVoices.add(id);
+              const mode = String(rec.kind || rec.type || '').toLowerCase().includes('clone') ? 'clone' : 'profile';
+              voices.push({ value: id, label: String(rec.label || rec.display_name || id), mode });
+            }
+          }
+          setVoiceOptions(voices);
+          setTtsModelOptions(modelsFrom(ttsCatalog, 'models', 'data', 'tts_models'));
+        })
+        .finally(() => setLoadingMediaModels(false));
+      return;
+    }
+
+    if (request.scope === 'stt') {
+      if (!request.provider || !sttModelsEndpoint) {
+        setSttModelOptions([]);
+        setLoadingMediaModels(false);
+        return;
+      }
+      gatewayJson<any>(gatewayPath(sttModelsEndpoint, {}, query({ provider: request.provider })), { timeoutMs: 30_000 })
+        .then((sttCatalog) => setSttModelOptions(modelsFrom(sttCatalog, 'models', 'data', 'stt_models')))
+        .catch(() => setSttModelOptions([]))
+        .finally(() => setLoadingMediaModels(false));
+    }
   }, [
     gatewayCapabilitiesQuery.isError,
     gatewayCapabilitiesQuery.isLoading,
+    mediaCatalogRequest,
     voiceCatalogEndpoint,
     ttsModelsEndpoint,
     sttModelsEndpoint,
     visionProviderModelsEndpoint,
-    visionModelsEndpoint,
   ]);
 
   // Fetch saved flows when editing a subflow node
@@ -928,6 +1042,77 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     updateNodeData(node.id, { pinDefaults: nextDefaults as any });
   };
 
+  const normalizeRouteHandle = (handle: unknown): string => {
+    const value = typeof handle === 'string' ? handle.trim() : '';
+    return value || 'exec-out';
+  };
+  const routeKeyFor = (sourceNodeId: string, sourceHandle: string): string =>
+    `${sourceNodeId}::${normalizeRouteHandle(sourceHandle)}`;
+  const entryRoutes = edges
+    .filter((e) => e.target === node.id && e.targetHandle === 'exec-in')
+    .map((edge, index) => {
+      const sourceNodeId = String(edge.source || '').trim();
+      const sourceHandle = normalizeRouteHandle(edge.sourceHandle);
+      const source = nodes.find((n) => n.id === sourceNodeId);
+      const sourceLabel = source?.data?.label || source?.data?.nodeType || sourceNodeId;
+      const existing = Array.isArray((data as any).entryRoutes)
+        ? (data as any).entryRoutes.find((route: any) => route?.sourceNodeId === sourceNodeId && normalizeRouteHandle(route?.sourceHandle) === sourceHandle)
+        : undefined;
+      return {
+        key: routeKeyFor(sourceNodeId, sourceHandle),
+        sourceNodeId,
+        sourceHandle,
+        label: String(existing?.label || (sourceHandle === 'exec-out' ? sourceLabel : `${sourceLabel} / ${sourceHandle}`) || `Entry ${index + 1}`),
+      };
+    })
+    .sort((a, b) => a.key.localeCompare(b.key));
+  const multiEntryRoutes = entryRoutes.length > 1 ? entryRoutes : [];
+
+  const outputOptionsForPin = (pin: Pin) => {
+    const options: Array<{ value: string; label: string }> = [{ value: '', label: 'Use normal/default input' }];
+    for (const source of nodes) {
+      for (const output of source.data.outputs || []) {
+        if (!output || output.type === 'execution') continue;
+        if (!areTypesCompatible(output.type, pin.type)) continue;
+        const sourceLabel = source.data.label || source.data.nodeType || source.id;
+        options.push({
+          value: `${source.id}::${output.id}`,
+          label: `${sourceLabel}.${output.label || output.id}`,
+        });
+      }
+    }
+    return options;
+  };
+
+  const routeOverrideValue = (pinId: string, routeKey: string): string => {
+    const raw = (data as any).inputRouteOverrides;
+    const ref = raw && typeof raw === 'object' ? raw?.[pinId]?.[routeKey] : undefined;
+    const sourceNodeId = typeof ref?.sourceNodeId === 'string' ? ref.sourceNodeId.trim() : '';
+    const sourceHandle = typeof ref?.sourceHandle === 'string' ? ref.sourceHandle.trim() : '';
+    return sourceNodeId && sourceHandle ? `${sourceNodeId}::${sourceHandle}` : '';
+  };
+
+  const setRouteInputOverride = (pinId: string, routeKey: string, value: string) => {
+    const raw = (data as any).inputRouteOverrides;
+    const next: Record<string, Record<string, { sourceNodeId: string; sourceHandle: string }>> =
+      raw && typeof raw === 'object' && !Array.isArray(raw) ? { ...(raw as any) } : {};
+    const perPin = next[pinId] && typeof next[pinId] === 'object' ? { ...next[pinId] } : {};
+
+    if (!value) {
+      delete perPin[routeKey];
+    } else {
+      const [sourceNodeId, sourceHandle] = value.split('::');
+      if (sourceNodeId && sourceHandle) perPin[routeKey] = { sourceNodeId, sourceHandle };
+    }
+
+    if (Object.keys(perPin).length > 0) next[pinId] = perPin;
+    else delete next[pinId];
+
+    updateNodeData(node.id, {
+      inputRouteOverrides: Object.keys(next).length > 0 ? (next as any) : undefined,
+    } as any);
+  };
+
   const updateAgentConfig = (patch: Partial<NonNullable<FlowNodeData['agentConfig']>>) => {
     updateNodeData(node.id, {
       agentConfig: {
@@ -1114,6 +1299,53 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         </ul>
       </div>
 
+      {multiEntryRoutes.length > 0 && (
+        <div className="property-section">
+          <label className="property-label">Multi-entry routing</label>
+          <span className="property-hint">
+            This node has multiple incoming execution paths. Defaults and normal data wires apply to every path; use route overrides for per-path values like A to X and B to X without wiring duplicate data inputs.
+          </span>
+          <div className="property-group">
+            <label className="property-sublabel">Entries</label>
+            <ul className="pins-list">
+              {multiEntryRoutes.map((route) => (
+                <li key={route.key} className="pin-info">
+                  <span className="pin-name">{route.label}</span>
+                  <span className="pin-type">{route.sourceHandle}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          {data.inputs
+            .filter((pin) => pin.type !== 'execution')
+            .map((pin) => {
+              const options = outputOptionsForPin(pin);
+              if (options.length <= 1) return null;
+              return (
+                <div className="property-group" key={`route-overrides-${pin.id}`}>
+                  <label className="property-sublabel">{pin.label || pin.id}</label>
+                  {multiEntryRoutes.map((route) => (
+                    <div className="property-row" key={`${pin.id}-${route.key}`}>
+                      <span className="property-hint" style={{ minWidth: 96 }}>{route.label}</span>
+                      <select
+                        className="property-select"
+                        value={routeOverrideValue(pin.id, route.key)}
+                        onChange={(e) => setRouteInputOverride(pin.id, route.key, e.target.value)}
+                      >
+                        {options.map((option) => (
+                          <option key={option.value || 'default'} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+        </div>
+      )}
+
       {/* Pin default values (unconnected primitive pins).
           This keeps the right panel consistent with inline pin editors on nodes. */}
       {(() => {
@@ -1280,6 +1512,38 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                       <option value="error">error</option>
                     </select>
                     <span className="property-hint">Controls host styling when rendering this message.</span>
+                  </div>
+                );
+              }
+
+              if (
+                pin.id === 'format' &&
+                (data.nodeType === 'generate_image' || data.nodeType === 'generate_voice' || data.nodeType === 'transcribe_audio')
+              ) {
+                const fallback =
+                  data.nodeType === 'generate_image' ? 'png' : data.nodeType === 'generate_voice' ? 'wav' : 'json';
+                const baseOptions =
+                  data.nodeType === 'generate_image'
+                    ? imageFormatOptions
+                    : data.nodeType === 'generate_voice'
+                      ? ttsFormatOptions
+                      : sttFormatOptions;
+                const current = typeof raw === 'string' && raw.trim() ? raw.trim() : fallback;
+                const options = baseOptions.includes(current) ? baseOptions : [current, ...baseOptions];
+                return (
+                  <div key={pin.id} className="property-group">
+                    <label className="property-sublabel">{rowLabel}</label>
+                    <select
+                      className="property-select"
+                      value={current}
+                      onChange={(e) => setPinDefault(pin.id, e.target.value)}
+                    >
+                      {options.map((v) => (
+                        <option key={v} value={v}>
+                          {v}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 );
               }
@@ -3063,7 +3327,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               .map((t) => ({ value: t.name.trim(), label: t.name.trim() }))
               .sort((a, b) => a.label.localeCompare(b.label));
 
-            const providerParam = params.find((p) => p.type === 'provider' || p.id === 'provider');
+            const providerParam = params.find(isTextProviderPin);
             const providerDefault =
               providerParam && data.pinDefaults && typeof (data.pinDefaults as any)[providerParam.id] === 'string'
                 ? String((data.pinDefaults as any)[providerParam.id] || '')
@@ -3073,7 +3337,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               const raw = data.pinDefaults ? (data.pinDefaults as any)[pin.id] : undefined;
               const defaultHint = `Default value for ${pin.id}`;
 
-              if (pin.type === 'provider') {
+              if (isTextProviderPin(pin)) {
                 const value = typeof raw === 'string' ? raw : '';
                 return (
                   <AfSelect
@@ -3087,7 +3351,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 );
               }
 
-              if (pin.type === 'model') {
+              if (isTextModelPin(pin)) {
                 const value = typeof raw === 'string' ? raw : '';
                 const disabled = !providerDefault;
                 return (
@@ -3430,7 +3694,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               .map((t) => ({ value: t.name.trim(), label: t.name.trim() }))
               .sort((a, b) => a.label.localeCompare(b.label));
 
-            const providerOut = outs.find((p) => p.type === 'provider' || p.id === 'provider');
+            const providerOut = outs.find(isTextProviderPin);
             const providerDefault =
               providerOut && data.pinDefaults && typeof (data.pinDefaults as any)[providerOut.id] === 'string'
                 ? String((data.pinDefaults as any)[providerOut.id] || '')
@@ -3440,7 +3704,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               const raw = data.pinDefaults ? (data.pinDefaults as any)[pin.id] : undefined;
               const defaultHint = `Default value for ${pin.id}`;
 
-              if (pin.type === 'provider') {
+              if (isTextProviderPin(pin)) {
                 const value = typeof raw === 'string' ? raw : '';
                 return (
                   <AfSelect
@@ -3454,7 +3718,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 );
               }
 
-              if (pin.type === 'model') {
+              if (isTextModelPin(pin)) {
                 const value = typeof raw === 'string' ? raw : '';
                 const disabled = !providerDefault;
                 return (
@@ -3942,10 +4206,14 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 <select
                   className="property-select"
                   value={(() => {
-                    const provider = data.effectConfig?.image_provider || data.effectConfig?.provider || '';
-                    const model = data.effectConfig?.image_model || data.effectConfig?.model || '';
+                    const provider = data.effectConfig?.image_provider || '';
+                    const model = data.effectConfig?.image_model || '';
                     return model ? `${provider}::${model}` : '';
                   })()}
+                  onFocus={() => {
+                    const provider = data.effectConfig?.image_provider || '';
+                    if (provider) requestMediaCatalog('image', { provider });
+                  }}
                   onChange={(e) => {
                     const picked = imageModelOptions.find((item) => `${item.provider}::${item.model}` === e.target.value);
                     updateNodeData(node.id, {
@@ -3956,6 +4224,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                         provider: undefined,
                         model: undefined,
                       },
+                      pinDefaults: applyImagePinDefaultPatch(data.pinDefaults || {}, picked),
                     });
                   }}
                   disabled={loadingMediaModels}
@@ -3978,6 +4247,11 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 <select
                   className="property-select"
                   value={data.effectConfig?.voice || ''}
+                  onFocus={() => {
+                    const provider = data.effectConfig?.tts_provider || '';
+                    const model = data.effectConfig?.tts_model || '';
+                    if (provider) requestMediaCatalog('tts', { provider, model });
+                  }}
                   onChange={(e) => updateNodeData(node.id, { effectConfig: { ...data.effectConfig, voice: e.target.value || undefined } })}
                   disabled={loadingMediaModels}
                 >
@@ -3993,7 +4267,11 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 <label className="property-sublabel">TTS model</label>
                 <select
                   className="property-select"
-                  value={data.effectConfig?.tts_model || data.effectConfig?.model || ''}
+                  value={data.effectConfig?.tts_model || ''}
+                  onFocus={() => {
+                    const provider = data.effectConfig?.tts_provider || '';
+                    if (provider) requestMediaCatalog('tts', { provider });
+                  }}
                   onChange={(e) =>
                     updateNodeData(node.id, {
                       effectConfig: { ...data.effectConfig, tts_model: e.target.value || undefined, model: undefined },
@@ -4017,7 +4295,11 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               <label className="property-sublabel">STT model</label>
               <select
                 className="property-select"
-                value={data.effectConfig?.stt_model || data.effectConfig?.model || ''}
+                value={data.effectConfig?.stt_model || ''}
+                onFocus={() => {
+                  const provider = data.effectConfig?.stt_provider || '';
+                  if (provider) requestMediaCatalog('stt', { provider });
+                }}
                 onChange={(e) =>
                   updateNodeData(node.id, {
                     effectConfig: { ...data.effectConfig, stt_model: e.target.value || undefined, model: undefined },
@@ -4041,7 +4323,11 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 <label className="property-sublabel">Transcription model</label>
                 <select
                   className="property-select"
-                  value={data.effectConfig?.stt_model || data.effectConfig?.model || ''}
+                  value={data.effectConfig?.stt_model || ''}
+                  onFocus={() => {
+                    const provider = data.effectConfig?.stt_provider || '';
+                    if (provider) requestMediaCatalog('stt', { provider });
+                  }}
                   onChange={(e) =>
                     updateNodeData(node.id, {
                       effectConfig: { ...data.effectConfig, stt_model: e.target.value || undefined, model: undefined },

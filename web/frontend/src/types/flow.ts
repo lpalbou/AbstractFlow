@@ -14,8 +14,14 @@ export type PinType =
   | 'assertions' // Teal - List of KG assertion objects (assertion[])
   | 'array'     // Orange #FF8800 - Collections
   | 'tools'     // Orange - Tool allowlist (string[])
-  | 'provider'  // Cyan-blue - LLM provider id/name (string-like)
-  | 'model'     // Purple - LLM model id/name (string-like)
+  | 'provider'  // Legacy text/LLM provider id/name (string-like)
+  | 'model'     // Model id/name (string-like; scoped by the selected provider pin)
+  | 'provider_text'  // Text/LLM provider id/name (string-like)
+  | 'model_text'     // Compatibility alias for old saved flows; new flows use `model`
+  | 'provider_image' // Image provider/backend id (string-like)
+  | 'model_image'    // Compatibility alias for old saved flows; new flows use `model`
+  | 'provider_voice' // Voice/TTS/STT provider/backend id (string-like)
+  | 'model_voice'    // Compatibility alias for old saved flows; new flows use `model`
   | 'agent'     // Blue #4488FF - Agent reference
   | 'any';      // Gray #888888 - Accepts any type
 
@@ -33,6 +39,12 @@ export const PIN_COLORS: Record<PinType, string> = {
   tools: '#FF8800',
   provider: '#00D2FF',
   model: '#9D4EDD',
+  provider_text: '#00D2FF',
+  model_text: '#9D4EDD',
+  provider_image: '#19D3B8',
+  model_image: '#9D4EDD',
+  provider_voice: '#22D3EE',
+  model_voice: '#9D4EDD',
   agent: '#4488FF',
   any: '#888888',
 };
@@ -242,6 +254,7 @@ export interface FlowNodeData {
     style?: string;        // For generated image
     voice?: string;        // For generated voice
     profile?: string;      // For generated voice
+    quality_preset?: string; // For generated voice quality preset
     speed?: number;        // For generated voice
     instructions?: string; // For generated voice
     language?: string;     // For audio transcription/listen
