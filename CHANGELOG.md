@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Media nodes keep image, TTS, and STT provider/model selections in media-specific fields instead of falling back to generic LLM `provider`/`model` values.
 
 ### Changed
-- Apple/GPU Flow profiles now require Gateway `>=0.2.12`, Runtime `>=0.4.12`, and Core `>=2.13.15`.
+- Apple/GPU Flow profiles now require Gateway `>=0.2.13`, Runtime `>=0.4.13`, and Core `>=2.13.15`.
 
 ## [0.3.11] - 2026-05-13
 
