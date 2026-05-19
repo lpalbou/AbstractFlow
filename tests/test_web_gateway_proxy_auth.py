@@ -36,9 +36,10 @@ def test_python_web_gateway_proxy_injects_gateway_auth(monkeypatch, tmp_path) ->
 
     captured = {}
 
-    def fake_urlopen(req):
+    def fake_urlopen(req, timeout=None):
         captured["url"] = req.full_url
         captured["authorization"] = req.headers.get("Authorization")
+        captured["timeout"] = timeout
         return _FakeGatewayResponse({"ok": True})
 
     import backend.main as main

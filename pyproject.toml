@@ -46,7 +46,7 @@ apple = [
     # Apple local control-plane + Gateway stack. This profile is intentionally
     # the full user-facing local install, so media engine extras cascade through
     # abstractgateway[apple] -> abstractvoice[all-apple]/abstractvision[all-apple].
-    "abstractgateway[apple]>=0.2.11",
+    "abstractgateway[apple]>=0.2.12",
     "AbstractRuntime>=0.4.12",
     "abstractcore[tools]>=2.13.15",
     "abstractagent>=0.3.7",
@@ -56,7 +56,7 @@ apple = [
 ]
 gpu = [
     # GPU local control-plane + Gateway stack.
-    "abstractgateway[gpu]>=0.2.11",
+    "abstractgateway[gpu]>=0.2.12",
     "AbstractRuntime>=0.4.12",
     "abstractcore[tools]>=2.13.15",
     "abstractagent>=0.3.7",
