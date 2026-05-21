@@ -138,6 +138,7 @@ class NodeType(str, Enum):
     ASK_USER = "ask_user"
     ANSWER_USER = "answer_user"
     LLM_CALL = "llm_call"
+    MODEL_RESIDENCY = "model_residency"
     GENERATE_IMAGE = "generate_image"
     GENERATE_VOICE = "generate_voice"
     TRANSCRIBE_AUDIO = "transcribe_audio"

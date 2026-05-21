@@ -48,6 +48,81 @@ def _resolve_gateway_auth_token() -> str | None:
     return None
 
 
+def _env_first(*names: str) -> str:
+    for name in names:
+        raw = os.getenv(name)
+        value = str(raw or "").strip()
+        if value:
+            return value
+    return ""
+
+
+class _UnavailableModelResidencyControl:
+    """Control-plane adapter used when standalone local Flow cannot manage residency."""
+
+    def _payload(
+        self,
+        *,
+        operation: str,
+        task: Optional[str] = None,
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        message = (
+            "Model residency controls are not available in standalone local Flow compatibility mode. "
+            "Run the flow through AbstractGateway."
+        )
+        return {
+            "ok": False,
+            "supported": False,
+            "available": False,
+            "operation": operation,
+            "task": task,
+            "provider": provider,
+            "model": model,
+            "models": [] if operation == "list_loaded" else None,
+            "error": message,
+            "warnings": [message],
+            "code": "model_residency_unavailable",
+            "config_hint": "Use Gateway-hosted runs for model residency controls.",
+            "diagnostics": {"source": "abstractflow.local"},
+        }
+
+    def list_model_residency(
+        self,
+        *,
+        task: Optional[str] = None,
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        _ = kwargs
+        return self._payload(operation="list_loaded", task=task, provider=provider, model=model)
+
+    def load_model_residency(
+        self,
+        *,
+        task: str,
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        _ = kwargs
+        return self._payload(operation="load", task=task, provider=provider, model=model)
+
+    def unload_model_residency(
+        self,
+        *,
+        task: Optional[str] = None,
+        runtime_id: Optional[str] = None,
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        _ = (runtime_id, kwargs)
+        return self._payload(operation="unload", task=task, provider=provider, model=model)
+
+
 
 
 def create_visual_runner(
@@ -145,6 +220,7 @@ def create_visual_runner(
             "ask_user",
             "answer_user",
             "llm_call",
+            "model_residency",
             "generate_image",
             "generate_voice",
             "transcribe_audio",
@@ -267,6 +343,8 @@ def create_visual_runner(
     # Detect whether this flow tree needs AbstractCore LLM integration.
     # Provider/model can be supplied either via node config *or* via connected input pins.
     has_llm_nodes = False
+    has_non_residency_abstractcore_nodes = False
+    needs_model_residency = False
     llm_configs: set[tuple[str, str]] = set()
     default_llm: tuple[str, str] | None = None
     provider_hints: list[str] = []
@@ -350,8 +428,12 @@ def create_visual_runner(
             node_type = _node_type(n)
             if reachable and n.id not in reachable:
                 continue
-            if node_type in {"llm_call", "agent", "tool_calls", "memory_compact", "generate_image", "generate_voice", "transcribe_audio"}:
+            if node_type in {"llm_call", "agent", "tool_calls", "memory_compact", "model_residency", "generate_image", "generate_voice", "transcribe_audio"}:
                 has_llm_nodes = True
+                if node_type == "model_residency":
+                    needs_model_residency = True
+                else:
+                    has_non_residency_abstractcore_nodes = True
 
             if node_type == "llm_call":
                 cfg = n.data.get("effectConfig", {}) if isinstance(n.data, dict) else {}
@@ -415,6 +497,13 @@ def create_visual_runner(
                     else None
                 )
                 _add_pair(provider_default, model_default)
+
+            elif node_type == "model_residency":
+                cfg = n.data.get("effectConfig", {}) if isinstance(n.data, dict) else {}
+                cfg = cfg if isinstance(cfg, dict) else {}
+                task = str(cfg.get("task") or "").strip()
+                if task in {"", "text_generation"}:
+                    _add_pair(cfg.get("provider"), cfg.get("model"))
 
             elif node_type == "memory_compact":
                 cfg = n.data.get("effectConfig", {}) if isinstance(n.data, dict) else {}
@@ -614,141 +703,163 @@ def create_visual_runner(
         #
         # If we can't determine that, fail loudly with a clear error message.
         if provider_model is None:
-            raise RuntimeError(
-                "This flow uses LLM-backed nodes (llm_call/agent/memory_compact/generate_image/generate_voice/transcribe_audio), but no default provider/model could be determined. "
-                "Set provider+model on an llm_call/agent/memory_compact node, set runtime_provider+runtime_model on a generated media node, or connect the corresponding runtime pins to a node with pinDefaults "
-                "(e.g. ON_FLOW_START), or pass `input_data={'provider': ..., 'model': ...}` when creating the runner."
-            )
-
-        provider, model = provider_model
-        try:
-            from abstractruntime.integrations.abstractcore.factory import create_local_runtime
-            # Older/newer AbstractRuntime distributions expose tool executors differently.
-            # Tool execution is not required for plain LLM_CALL-only flows, so we make
-            # this optional and fall back to the factory defaults.
-            try:
-                from abstractruntime.integrations.abstractcore import MappingToolExecutor  # type: ignore
-            except Exception:  # pragma: no cover
+            if needs_model_residency and not has_non_residency_abstractcore_nodes:
                 try:
-                    from abstractruntime.integrations.abstractcore.tool_executor import MappingToolExecutor  # type: ignore
-                except Exception:  # pragma: no cover
-                    MappingToolExecutor = None  # type: ignore[assignment]
-            try:
-                from abstractruntime.integrations.abstractcore.default_tools import get_default_tools  # type: ignore
-            except Exception:  # pragma: no cover
-                get_default_tools = None  # type: ignore[assignment]
-        except Exception as e:  # pragma: no cover
-            raise RuntimeError(
-                "This flow uses LLM nodes (llm_call/agent), but the installed AbstractRuntime "
-                "does not provide the AbstractCore integration. Install/enable the integration "
-                "or remove LLM nodes from the flow."
-            ) from e
+                    from abstractruntime.core.models import EffectType
+                    from abstractruntime.integrations.abstractcore.effect_handlers import make_model_residency_handler
+                except Exception as e:  # pragma: no cover
+                    raise RuntimeError(
+                        "This flow uses model_residency nodes, but the installed AbstractRuntime "
+                        "does not provide the AbstractCore residency effect handler. "
+                        "Install `abstractruntime[abstractcore]`."
+                    ) from e
+                control = _UnavailableModelResidencyControl()
 
-        effective_tool_executor = tool_executor
-        if effective_tool_executor is None and MappingToolExecutor is not None and callable(get_default_tools):
-            try:
-                tools = list(get_default_tools())  # type: ignore[misc]
-                # Include a couple of safe web helpers that ship with `abstractcore[tools]` but
-                # are not part of AbstractRuntime's default tool list yet.
-                try:
-                    from abstractcore.tools.common_tools import skim_url, skim_websearch
-
-                    def _tool_name(func: Any) -> str:
-                        tool_def = getattr(func, "_tool_definition", None)
-                        if tool_def is not None:
-                            name = getattr(tool_def, "name", None)
-                            if isinstance(name, str) and name.strip():
-                                return name.strip()
-                        name = getattr(func, "__name__", "")
-                        return str(name or "").strip()
-
-                    seen = {_tool_name(t) for t in tools if callable(t)}
-                    for t in [skim_url, skim_websearch]:
-                        if not callable(t):
-                            continue
-                        name = _tool_name(t)
-                        if not name or name in seen:
-                            continue
-                        seen.add(name)
-                        tools.append(t)
-                except Exception:
-                    pass
-
-                effective_tool_executor = MappingToolExecutor.from_tools(tools)  # type: ignore[attr-defined]
-            except Exception:
-                effective_tool_executor = None
-
-        # LLM timeout policy (web-hosted workflow execution).
-        #
-        # Contract:
-        # - AbstractRuntime (the orchestrator) is the authority for execution policy such as timeouts.
-        # - This host can *override* that policy via env for deployments that want a different SLO.
-        #
-        # Env overrides:
-        # - ABSTRACTFLOW_LLM_TIMEOUT_S (float seconds)
-        # - ABSTRACTFLOW_LLM_TIMEOUT (alias)
-        #
-        # Set to 0 or a negative value to opt into "unlimited".
-        llm_kwargs: Dict[str, Any] = {}
-        timeout_raw = os.getenv("ABSTRACTFLOW_LLM_TIMEOUT_S") or os.getenv("ABSTRACTFLOW_LLM_TIMEOUT")
-        if timeout_raw is None or not str(timeout_raw).strip():
-            # No override: let the orchestrator (AbstractRuntime) apply its default.
-            pass
-        else:
-            raw = str(timeout_raw).strip().lower()
-            if raw in {"none", "null", "inf", "infinite", "unlimited"}:
-                # Explicit override: opt back into unlimited HTTP requests.
-                llm_kwargs["timeout"] = None
+                handlers = {EffectType.MODEL_RESIDENCY: make_model_residency_handler(control=control)}
+                if extra_effect_handlers:
+                    handlers.update(dict(extra_effect_handlers))
+                runtime = Runtime(
+                    run_store=run_store or InMemoryRunStore(),
+                    ledger_store=ledger_store or InMemoryLedgerStore(),
+                    effect_handlers=handlers,
+                    artifact_store=artifact_store,
+                )
             else:
+                raise RuntimeError(
+                    "This flow uses AbstractCore-backed nodes (llm_call/agent/memory_compact/model_residency/generate_image/generate_voice/transcribe_audio), but no default provider/model could be determined. "
+                    "Set provider+model on an llm_call/agent/memory_compact node, set runtime_provider+runtime_model on a generated media node, or connect the corresponding runtime pins to a node with pinDefaults "
+                    "(e.g. ON_FLOW_START), or pass `input_data={'provider': ..., 'model': ...}` when creating the runner."
+                )
+        if provider_model is not None:
+            provider, model = provider_model
+            try:
+                from abstractruntime.integrations.abstractcore.factory import create_local_runtime
+                # Older/newer AbstractRuntime distributions expose tool executors differently.
+                # Tool execution is not required for plain LLM_CALL-only flows, so we make
+                # this optional and fall back to the factory defaults.
                 try:
-                    timeout_s = float(raw)
+                    from abstractruntime.integrations.abstractcore import MappingToolExecutor  # type: ignore
+                except Exception:  # pragma: no cover
+                    try:
+                        from abstractruntime.integrations.abstractcore.tool_executor import MappingToolExecutor  # type: ignore
+                    except Exception:  # pragma: no cover
+                        MappingToolExecutor = None  # type: ignore[assignment]
+                try:
+                    from abstractruntime.integrations.abstractcore.default_tools import get_default_tools  # type: ignore
+                except Exception:  # pragma: no cover
+                    get_default_tools = None  # type: ignore[assignment]
+            except Exception as e:  # pragma: no cover
+                raise RuntimeError(
+                    "This flow uses AbstractCore-backed nodes (llm_call/agent/model_residency/media), but the installed AbstractRuntime "
+                    "does not provide the AbstractCore integration. Install/enable the integration "
+                    "or remove LLM nodes from the flow."
+                ) from e
+
+            effective_tool_executor = tool_executor
+            if effective_tool_executor is None and MappingToolExecutor is not None and callable(get_default_tools):
+                try:
+                    tools = list(get_default_tools())  # type: ignore[misc]
+                    # Include a couple of safe web helpers that ship with `abstractcore[tools]` but
+                    # are not part of AbstractRuntime's default tool list yet.
+                    try:
+                        from abstractcore.tools.common_tools import skim_url, skim_websearch
+
+                        def _tool_name(func: Any) -> str:
+                            tool_def = getattr(func, "_tool_definition", None)
+                            if tool_def is not None:
+                                name = getattr(tool_def, "name", None)
+                                if isinstance(name, str) and name.strip():
+                                    return name.strip()
+                            name = getattr(func, "__name__", "")
+                            return str(name or "").strip()
+
+                        seen = {_tool_name(t) for t in tools if callable(t)}
+                        for t in [skim_url, skim_websearch]:
+                            if not callable(t):
+                                continue
+                            name = _tool_name(t)
+                            if not name or name in seen:
+                                continue
+                            seen.add(name)
+                            tools.append(t)
+                    except Exception:
+                        pass
+
+                    effective_tool_executor = MappingToolExecutor.from_tools(tools)  # type: ignore[attr-defined]
                 except Exception:
-                    timeout_s = None
-                # Only override when parsing succeeded; otherwise fall back to AbstractCore config default.
-                if timeout_s is None:
-                    pass
-                elif isinstance(timeout_s, (int, float)) and timeout_s <= 0:
-                    # Consistent with the documented behavior: <=0 => unlimited.
+                    effective_tool_executor = None
+
+            # LLM timeout policy (web-hosted workflow execution).
+            #
+            # Contract:
+            # - AbstractRuntime (the orchestrator) is the authority for execution policy such as timeouts.
+            # - This host can *override* that policy via env for deployments that want a different SLO.
+            #
+            # Env overrides:
+            # - ABSTRACTFLOW_LLM_TIMEOUT_S (float seconds)
+            # - ABSTRACTFLOW_LLM_TIMEOUT (alias)
+            #
+            # Set to 0 or a negative value to opt into "unlimited".
+            llm_kwargs: Dict[str, Any] = {}
+            timeout_raw = os.getenv("ABSTRACTFLOW_LLM_TIMEOUT_S") or os.getenv("ABSTRACTFLOW_LLM_TIMEOUT")
+            if timeout_raw is None or not str(timeout_raw).strip():
+                # No override: let the orchestrator (AbstractRuntime) apply its default.
+                pass
+            else:
+                raw = str(timeout_raw).strip().lower()
+                if raw in {"none", "null", "inf", "infinite", "unlimited"}:
+                    # Explicit override: opt back into unlimited HTTP requests.
                     llm_kwargs["timeout"] = None
                 else:
-                    llm_kwargs["timeout"] = timeout_s
+                    try:
+                        timeout_s = float(raw)
+                    except Exception:
+                        timeout_s = None
+                    # Only override when parsing succeeded; otherwise fall back to AbstractCore config default.
+                    if timeout_s is None:
+                        pass
+                    elif isinstance(timeout_s, (int, float)) and timeout_s <= 0:
+                        # Consistent with the documented behavior: <=0 => unlimited.
+                        llm_kwargs["timeout"] = None
+                    else:
+                        llm_kwargs["timeout"] = timeout_s
 
-        # Output token budget for web-hosted runs.
-        #
-        # Contract: do not impose an arbitrary default cap here. When unset, the runtime/provider
-        # uses the model's declared capabilities (`model_capabilities.json`) for its defaults.
-        #
-        # Operators can still override via env (including disabling by setting <=0 / "unlimited").
-        max_out_raw = os.getenv("ABSTRACTFLOW_LLM_MAX_OUTPUT_TOKENS") or os.getenv("ABSTRACTFLOW_MAX_OUTPUT_TOKENS")
-        max_out: Optional[int] = None
-        if max_out_raw is None or not str(max_out_raw).strip():
-            max_out = None
-        else:
-            try:
-                max_out = int(str(max_out_raw).strip())
-            except Exception:
+            # Output token budget for web-hosted runs.
+            #
+            # Contract: do not impose an arbitrary default cap here. When unset, the runtime/provider
+            # uses the model's declared capabilities (`model_capabilities.json`) for its defaults.
+            #
+            # Operators can still override via env (including disabling by setting <=0 / "unlimited").
+            max_out_raw = os.getenv("ABSTRACTFLOW_LLM_MAX_OUTPUT_TOKENS") or os.getenv("ABSTRACTFLOW_MAX_OUTPUT_TOKENS")
+            max_out: Optional[int] = None
+            if max_out_raw is None or not str(max_out_raw).strip():
                 max_out = None
-        if isinstance(max_out, int) and max_out <= 0:
-            max_out = None
+            else:
+                try:
+                    max_out = int(str(max_out_raw).strip())
+                except Exception:
+                    max_out = None
+            if isinstance(max_out, int) and max_out <= 0:
+                max_out = None
 
-        # Pass runtime config to initialize `_limits.max_output_tokens`.
-        try:
-            from abstractruntime.core.config import RuntimeConfig
-            runtime_config = RuntimeConfig(max_output_tokens=max_out)
-        except Exception:  # pragma: no cover
-            runtime_config = None
+            # Pass runtime config to initialize `_limits.max_output_tokens`.
+            try:
+                from abstractruntime.core.config import RuntimeConfig
+                runtime_config = RuntimeConfig(max_output_tokens=max_out)
+            except Exception:  # pragma: no cover
+                runtime_config = None
 
-        runtime = create_local_runtime(
-            provider=provider,
-            model=model,
-            llm_kwargs=llm_kwargs,
-            tool_executor=effective_tool_executor,
-            run_store=run_store,
-            ledger_store=ledger_store,
-            artifact_store=artifact_store,
-            config=runtime_config,
-            extra_effect_handlers=extra_effect_handlers,
-        )
+            runtime = create_local_runtime(
+                provider=provider,
+                model=model,
+                llm_kwargs=llm_kwargs,
+                tool_executor=effective_tool_executor,
+                run_store=run_store,
+                ledger_store=ledger_store,
+                artifact_store=artifact_store,
+                config=runtime_config,
+                extra_effect_handlers=extra_effect_handlers,
+            )
     else:
         runtime_kwargs: Dict[str, Any] = {
             "run_store": run_store or InMemoryRunStore(),

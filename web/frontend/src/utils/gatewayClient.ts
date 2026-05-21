@@ -58,6 +58,22 @@ export interface GatewayCommonContract {
       rebuild?: string;
     };
   };
+  model_residency?: GatewayEndpointDescriptor & {
+    endpoints?: {
+      loaded?: GatewayEndpointDescriptor | string;
+      load?: GatewayEndpointDescriptor | string;
+      unload?: GatewayEndpointDescriptor | string;
+    };
+    loaded?: GatewayEndpointDescriptor | string;
+    load?: GatewayEndpointDescriptor | string;
+    unload?: GatewayEndpointDescriptor | string;
+    tasks?: string[];
+    operations?: string[];
+    supports?: Record<string, boolean>;
+    source?: string;
+    config_hint?: string;
+    ledger?: string;
+  };
   memory?: GatewayEndpointDescriptor & {
     route_available?: boolean;
     structured_query?: boolean;
@@ -80,6 +96,8 @@ export interface GatewayGeneratedImageContract {
   direct_endpoint?: GatewayEndpointDescriptor & {
     route_available?: boolean;
     event_name?: string;
+    durability?: string;
+    returns_child_run_id?: boolean;
     formats?: string[];
     max_image_bytes?: number;
     config_hint?: string;
@@ -171,6 +189,7 @@ export interface GatewayOptionalFeatureStatus {
   generatedImage: boolean;
   generatedVoice: boolean;
   attachmentsUpload: boolean;
+  modelResidency: boolean;
 }
 
 export interface GatewayFlowEditorReadiness {
@@ -422,6 +441,18 @@ export function getGatewayFlowEditorReadiness(
     return Boolean(descriptorEndpointAvailable(voice?.direct_endpoint) || voice?.workflow?.available === true);
   })();
   const promptCacheSessionEndpoints = common?.prompt_cache?.session_endpoints;
+  const modelResidency = common?.model_residency;
+  const modelResidencyEndpoints = modelResidency?.endpoints || {};
+  const modelResidencyRouteAvailable =
+    modelResidency?.route_available !== false &&
+    (
+      descriptorEndpointAvailable(modelResidencyEndpoints.loaded) ||
+      descriptorEndpointAvailable(modelResidencyEndpoints.load) ||
+      descriptorEndpointAvailable(modelResidencyEndpoints.unload) ||
+      descriptorEndpointAvailable(modelResidency?.loaded) ||
+      descriptorEndpointAvailable(modelResidency?.load) ||
+      descriptorEndpointAvailable(modelResidency?.unload)
+    );
 
   return {
     ready: save.ready && publishStatus.ready && run.ready && history.ready && artifactStatus.ready,
@@ -449,6 +480,7 @@ export function getGatewayFlowEditorReadiness(
       generatedImage,
       generatedVoice,
       attachmentsUpload: descriptorEndpointAvailable(common?.attachments?.upload),
+      modelResidency: Boolean(modelResidencyRouteAvailable),
     },
   };
 }

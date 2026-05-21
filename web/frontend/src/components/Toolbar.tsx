@@ -13,6 +13,7 @@ import { UserPromptModal } from './UserPromptModal';
 import { FlowLibraryModal } from './FlowLibraryModal';
 import { PublishFlowModal } from './PublishFlowModal';
 import { WorkflowLifecycleModal } from './WorkflowLifecycleModal';
+import { ModelResidencyPanel } from './ModelResidencyPanel';
 import { closeOpenNodes, createLedgerMappingState, mapLedgerRecordToEvents, type LedgerRecord } from '../utils/ledgerEvents';
 import { mapGatewayRunSummary } from '../utils/gatewayRuns';
 import type { ExecutionEvent, FlowRunResult, VisualFlow, RunHistoryResponse, RunSummary } from '../types/flow';
@@ -71,6 +72,39 @@ async function duplicateFlow(source: VisualFlow, newName: string, contracts: Gat
       edges: source.edges,
       entryNode: source.entryNode,
     }, { method: 'POST' }));
+}
+
+function TransferFlowIcon({ direction }: { direction: 'up' | 'down' }) {
+  const isUp = direction === 'up';
+  return (
+    <svg
+      className="toolbar-transfer-icon"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d={isUp ? 'M12 16V5' : 'M12 8v11'}
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path
+        d={isUp ? 'M7.5 9.5 12 5l4.5 4.5' : 'M7.5 14.5 12 19l4.5-4.5'}
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d={isUp ? 'M6 19h12' : 'M6 5h12'}
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
 }
 
 // API functions
@@ -200,6 +234,7 @@ export function Toolbar({
   const [showRunHistory, setShowRunHistory] = useState(false);
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [showLifecycleModal, setShowLifecycleModal] = useState(false);
+  const [showModelResidency, setShowModelResidency] = useState(false);
   const [showNewFlowModal, setShowNewFlowModal] = useState(false);
   const [suppressUserPromptFallback, setSuppressUserPromptFallback] = useState(false);
   const [runResult, setRunResult] = useState<FlowRunResult | null>(null);
@@ -1180,12 +1215,28 @@ export function Toolbar({
         <div className="toolbar-divider" />
 
         <button
+          className="toolbar-button"
+          onClick={() => setShowModelResidency(true)}
+          title={
+            gatewayReadiness.optional.modelResidency
+              ? 'Loaded models'
+              : 'Loaded models unavailable from Gateway'
+          }
+          aria-label="Open loaded models"
+        >
+          <span aria-hidden="true">◫</span>
+          <span>Models</span>
+        </button>
+
+        <div className="toolbar-divider" />
+
+        <button
           className="toolbar-button icon-button"
           onClick={handleExport}
           title="Export Flow"
           aria-label="Export Flow"
         >
-          ⇧
+          <TransferFlowIcon direction="up" />
         </button>
 
         <button
@@ -1194,7 +1245,7 @@ export function Toolbar({
           title="Import Flow"
           aria-label="Import Flow"
         >
-          ⇩
+          <TransferFlowIcon direction="down" />
         </button>
 
         <div className="toolbar-spacer" />
@@ -1337,6 +1388,12 @@ export function Toolbar({
         flowName={flowName}
         gatewayContracts={gatewayContracts}
         onClose={() => setShowLifecycleModal(false)}
+      />
+
+      <ModelResidencyPanel
+        isOpen={showModelResidency}
+        gatewayContracts={gatewayContracts}
+        onClose={() => setShowModelResidency(false)}
       />
 
       {/* User Prompt Modal (fallback) */}

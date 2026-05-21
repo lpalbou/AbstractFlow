@@ -147,6 +147,73 @@ function isExecutionHandle(value: unknown): boolean {
   return handle.includes('exec');
 }
 
+function isResidencyNoOpResult(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  return (value as Record<string, unknown>).ok === false;
+}
+
+function extractPreferredModelInfo(value: unknown): { provider?: string; model?: string } {
+  if (!value || typeof value !== 'object') return {};
+  const obj = value as Record<string, unknown>;
+  const pick = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+
+  let provider = pick(obj.media_provider);
+  let model = pick(obj.media_model);
+
+  const metadata = obj.metadata;
+  if ((!provider || !model) && metadata && typeof metadata === 'object') {
+    const m = metadata as Record<string, unknown>;
+    provider = provider ?? pick(m.media_provider);
+    model = model ?? pick(m.media_model);
+  }
+
+  const outputs = obj.outputs;
+  if ((!provider || !model) && outputs && typeof outputs === 'object') {
+    const outputGroups = outputs as Record<string, unknown>;
+    for (const value of Object.values(outputGroups)) {
+      if (!Array.isArray(value)) continue;
+      const item = value.find((entry) => entry && typeof entry === 'object') as Record<string, unknown> | undefined;
+      if (!item) continue;
+      provider = provider ?? pick(item.media_provider) ?? pick(item.provider);
+      model = model ?? pick(item.media_model) ?? pick(item.model);
+      if (provider || model) break;
+    }
+  }
+
+  provider = provider ?? pick(obj.provider);
+  model = model ?? pick(obj.model);
+
+  if ((!provider || !model) && metadata && typeof metadata === 'object') {
+    const m = metadata as Record<string, unknown>;
+    provider = provider ?? pick(m.provider);
+    model = model ?? pick(m.model);
+  }
+
+  const raw = obj.raw;
+  if ((!provider || !model) && raw && typeof raw === 'object') {
+    const r = raw as Record<string, unknown>;
+    provider = provider ?? pick(r.provider);
+    model = model ?? pick(r.model);
+  }
+
+  const nested = obj.result;
+  if ((!provider || !model) && nested && typeof nested === 'object') {
+    const n = nested as Record<string, unknown>;
+    provider = provider ?? pick(n.media_provider) ?? pick(n.provider);
+    model = model ?? pick(n.media_model) ?? pick(n.model);
+  }
+
+  return { provider, model };
+}
+
+function parseSequenceHandleIndex(value: unknown): number | null {
+  const handle = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  const match = /^then:(\d+)$/.exec(handle);
+  if (!match) return null;
+  const n = Number.parseInt(match[1], 10);
+  return Number.isFinite(n) ? n : null;
+}
+
 function reachableExecutionNodeIds(nodes: FlowGraphNode[], edges: FlowGraphEdge[]): Set<string> {
   const starts = nodes
     .filter((n) => {
@@ -334,6 +401,24 @@ function extractGeneratedImagePreview(
     (typeof payloadRaw.$artifact === 'string' && payloadRaw.$artifact.trim()) ||
     '';
   if (!artifactId) return null;
+  const imageProvider =
+    (imageRaw && typeof imageRaw.media_provider === 'string' && imageRaw.media_provider.trim()) ||
+    (typeof generatedRecord?.media_provider === 'string' && generatedRecord.media_provider.trim()) ||
+    (imageRaw && typeof imageRaw.provider === 'string' && imageRaw.provider.trim()) ||
+    (typeof generatedRecord?.provider === 'string' && generatedRecord.provider.trim()) ||
+    (typeof payloadRaw.image_provider === 'string' && payloadRaw.image_provider.trim()) ||
+    (typeof payloadRaw.media_provider === 'string' && payloadRaw.media_provider.trim()) ||
+    (typeof payloadRaw.provider === 'string' && payloadRaw.provider.trim()) ||
+    undefined;
+  const imageModel =
+    (imageRaw && typeof imageRaw.media_model === 'string' && imageRaw.media_model.trim()) ||
+    (typeof generatedRecord?.media_model === 'string' && generatedRecord.media_model.trim()) ||
+    (imageRaw && typeof imageRaw.model === 'string' && imageRaw.model.trim()) ||
+    (typeof generatedRecord?.model === 'string' && generatedRecord.model.trim()) ||
+    (typeof payloadRaw.image_model === 'string' && payloadRaw.image_model.trim()) ||
+    (typeof payloadRaw.media_model === 'string' && payloadRaw.media_model.trim()) ||
+    (typeof payloadRaw.model === 'string' && payloadRaw.model.trim()) ||
+    undefined;
   return {
     artifactId,
     src: endpointFromDescriptor(
@@ -346,8 +431,8 @@ function extractGeneratedImagePreview(
     ),
     contentType: imageRaw && typeof imageRaw.content_type === 'string' ? imageRaw.content_type : typeof generatedRecord?.content_type === 'string' ? generatedRecord.content_type : undefined,
     prompt: typeof payloadRaw.prompt === 'string' ? payloadRaw.prompt : typeof generatedRecord?.prompt === 'string' ? generatedRecord.prompt : undefined,
-    provider: typeof payloadRaw.provider === 'string' ? payloadRaw.provider : typeof generatedRecord?.provider === 'string' ? generatedRecord.provider : undefined,
-    model: typeof payloadRaw.model === 'string' ? payloadRaw.model : typeof generatedRecord?.model === 'string' ? generatedRecord.model : undefined,
+    provider: imageProvider,
+    model: imageModel,
     width: typeof payloadRaw.width === 'number' ? payloadRaw.width : typeof generatedRecord?.width === 'number' ? generatedRecord.width : undefined,
     height: typeof payloadRaw.height === 'number' ? payloadRaw.height : typeof generatedRecord?.height === 'number' ? generatedRecord.height : undefined,
     format: typeof payloadRaw.format === 'string' ? payloadRaw.format : typeof generatedRecord?.format === 'string' ? generatedRecord.format : undefined,
@@ -402,6 +487,22 @@ function extractGeneratedAudioPreview(
     (typeof payloadRaw.$artifact === 'string' && payloadRaw.$artifact.trim()) ||
     '';
   if (!artifactId) return null;
+  const audioProvider =
+    (generatedItem && typeof generatedItem.media_provider === 'string' && generatedItem.media_provider.trim()) ||
+    (audioRaw && typeof audioRaw.media_provider === 'string' && audioRaw.media_provider.trim()) ||
+    (generatedItem && typeof generatedItem.provider === 'string' && generatedItem.provider.trim()) ||
+    (audioRaw && typeof audioRaw.provider === 'string' && audioRaw.provider.trim()) ||
+    (typeof payloadRaw.media_provider === 'string' && payloadRaw.media_provider.trim()) ||
+    (typeof payloadRaw.provider === 'string' && payloadRaw.provider.trim()) ||
+    undefined;
+  const audioModel =
+    (generatedItem && typeof generatedItem.media_model === 'string' && generatedItem.media_model.trim()) ||
+    (audioRaw && typeof audioRaw.media_model === 'string' && audioRaw.media_model.trim()) ||
+    (generatedItem && typeof generatedItem.model === 'string' && generatedItem.model.trim()) ||
+    (audioRaw && typeof audioRaw.model === 'string' && audioRaw.model.trim()) ||
+    (typeof payloadRaw.media_model === 'string' && payloadRaw.media_model.trim()) ||
+    (typeof payloadRaw.model === 'string' && payloadRaw.model.trim()) ||
+    undefined;
 
   return {
     artifactId,
@@ -415,8 +516,8 @@ function extractGeneratedAudioPreview(
     ),
     contentType: audioRaw && typeof audioRaw.content_type === 'string' ? audioRaw.content_type : typeof generatedItem?.content_type === 'string' ? generatedItem.content_type : undefined,
     text: typeof payloadRaw.text === 'string' ? payloadRaw.text : typeof payloadRaw.prompt === 'string' ? payloadRaw.prompt : undefined,
-    provider: typeof payloadRaw.provider === 'string' ? payloadRaw.provider : typeof generatedItem?.provider === 'string' ? generatedItem.provider : undefined,
-    model: typeof payloadRaw.model === 'string' ? payloadRaw.model : typeof generatedItem?.model === 'string' ? generatedItem.model : undefined,
+    provider: audioProvider,
+    model: audioModel,
     voice: typeof payloadRaw.voice === 'string' ? payloadRaw.voice : typeof generatedItem?.voice === 'string' ? generatedItem.voice : undefined,
     format: typeof payloadRaw.format === 'string' ? payloadRaw.format : typeof generatedItem?.format === 'string' ? generatedItem.format : undefined,
   };
@@ -1058,6 +1159,77 @@ export function RunFlowModal({
     nodes.forEach((n) => map.set(n.id, n));
     return map;
   }, [nodes]);
+
+  const resolveNodeMeta = useCallback((nodeId: string | undefined) => {
+    if (!nodeId) return null;
+    const n = nodeById.get(nodeId);
+    if (!n) {
+      if (nodeId === '__follow_up__') {
+        return {
+          label: 'Follow Up',
+          type: 'ask_user',
+          icon: '...',
+          color: '#3a4a5a',
+        };
+      }
+      if (nodeId === '__implicit_flow_end__') {
+        return {
+          label: 'On Flow End',
+          type: 'on_flow_end',
+          icon: '🏁',
+          color: '#2f8f8d',
+        };
+      }
+      return null;
+    }
+    return {
+      label: n.data.label || nodeId,
+      type: n.data.nodeType,
+      icon: n.data.icon,
+      color: n.data.headerColor,
+    };
+  }, [nodeById]);
+
+  const sequenceLayouts = useMemo(() => {
+    const out = new Map<string, Array<{ handleId: string; index: number; label: string; targetNodeId: string }>>();
+
+    for (const node of nodes) {
+      if (node.data?.nodeType !== 'sequence') continue;
+
+      const labelByHandle = new Map<string, string>();
+      const outputs = Array.isArray(node.data?.outputs) ? node.data.outputs : [];
+      for (const pin of outputs) {
+        if (!pin) continue;
+        const handleId = pickNonEmptyString(pin.id);
+        const idx = parseSequenceHandleIndex(handleId);
+        if (idx == null) continue;
+        const label = pickNonEmptyString(pin.label) || `Then ${idx}`;
+        labelByHandle.set(handleId, label);
+      }
+
+      const branches: Array<{ handleId: string; index: number; label: string; targetNodeId: string }> = [];
+      for (const edge of edges) {
+        if (pickNonEmptyString(edge.source) !== node.id) continue;
+        if (pickNonEmptyString(edge.targetHandle) !== 'exec-in') continue;
+        const handleId = pickNonEmptyString(edge.sourceHandle);
+        const idx = parseSequenceHandleIndex(handleId);
+        const targetNodeId = pickNonEmptyString(edge.target);
+        if (idx == null || !targetNodeId) continue;
+        branches.push({
+          handleId,
+          index: idx,
+          label: labelByHandle.get(handleId) || `Then ${idx}`,
+          targetNodeId,
+        });
+      }
+
+      if (branches.length === 0) continue;
+      branches.sort((a, b) => a.index - b.index || a.handleId.localeCompare(b.handleId));
+      out.set(node.id, branches);
+    }
+
+    return out;
+  }, [edges, nodes]);
 
   // Find the entry node (node with no incoming execution edges, typically event nodes)
   const entryNode = useMemo(() => {
@@ -1925,60 +2097,42 @@ export function RunFlowModal({
       return merged;
     };
 
-    const extractModelInfo = (value: unknown): { provider?: string; model?: string } => {
-      if (!value || typeof value !== 'object') return {};
-      const obj = value as Record<string, unknown>;
-      const pick = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+	    const extractModelInfo = (value: unknown): { provider?: string; model?: string } => {
+	      const { provider, model } = extractPreferredModelInfo(value);
 
-      // Common shapes:
-      // - llm_call: { response: "...", raw: { provider, model, usage, ... } }
-      // - agent: { result: { provider, model, ... }, scratchpad: ... }
-      let provider = pick(obj.provider);
-      let model = pick(obj.model);
-
-      const raw = obj.raw;
-      if ((!provider || !model) && raw && typeof raw === 'object') {
-        const r = raw as Record<string, unknown>;
-        provider = provider ?? pick(r.provider);
-        model = model ?? pick(r.model);
-      }
-
-      const nested = obj.result;
-      if ((!provider || !model) && nested && typeof nested === 'object') {
-        const n = nested as Record<string, unknown>;
-        provider = provider ?? pick(n.provider);
-        model = model ?? pick(n.model);
-      }
-
-      // Agent nodes may not expose provider/model directly; try to infer from the last llm_call
-      // step inside the scratchpad trace.
-      const scratchpad = obj.scratchpad;
-      if ((!provider || !model) && scratchpad && typeof scratchpad === 'object') {
-        const sp = scratchpad as Record<string, unknown>;
-        const steps = Array.isArray(sp.steps) ? sp.steps : [];
-        for (let i = steps.length - 1; i >= 0; i--) {
-          const st = steps[i];
+	      // Agent nodes may not expose provider/model directly; try to infer from the last llm_call
+	      // step inside the scratchpad trace.
+	      const obj = value as Record<string, unknown>;
+	      const pick = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+	      let providerValue = provider;
+	      let modelValue = model;
+	      const scratchpad = obj.scratchpad;
+	      if ((!providerValue || !modelValue) && scratchpad && typeof scratchpad === 'object') {
+	        const sp = scratchpad as Record<string, unknown>;
+	        const steps = Array.isArray(sp.steps) ? sp.steps : [];
+	        for (let i = steps.length - 1; i >= 0; i--) {
+	          const st = steps[i];
           if (!st || typeof st !== 'object') continue;
           const stepObj = st as Record<string, unknown>;
           const effect = stepObj.effect && typeof stepObj.effect === 'object' ? (stepObj.effect as Record<string, unknown>) : null;
           const effectType = effect && typeof effect.type === 'string' ? effect.type : '';
           if (effectType !== 'llm_call') continue;
 
-          const payload =
-            effect && effect.payload && typeof effect.payload === 'object' ? (effect.payload as Record<string, unknown>) : null;
-          provider = provider ?? pick(payload?.provider);
-          model = model ?? pick(payload?.model);
+	          const payload =
+	            effect && effect.payload && typeof effect.payload === 'object' ? (effect.payload as Record<string, unknown>) : null;
+	          providerValue = providerValue ?? pick(payload?.provider);
+	          modelValue = modelValue ?? pick(payload?.model);
 
-          const result = stepObj.result && typeof stepObj.result === 'object' ? (stepObj.result as Record<string, unknown>) : null;
-          provider = provider ?? pick(result?.provider);
-          model = model ?? pick(result?.model);
+	          const result = stepObj.result && typeof stepObj.result === 'object' ? (stepObj.result as Record<string, unknown>) : null;
+	          providerValue = providerValue ?? pick(result?.provider);
+	          modelValue = modelValue ?? pick(result?.model);
 
-          if (provider || model) break;
-        }
-      }
+	          if (providerValue || modelValue) break;
+	        }
+	      }
 
-      return { provider, model };
-    };
+	      return { provider: providerValue, model: modelValue };
+	    };
 
     const pickSummary = (value: unknown): string => {
       if (value == null) return '';
@@ -2029,36 +2183,6 @@ export function RunFlowModal({
 
     const hasExplicitFlowEnd = Array.from(nodeById.values()).some((n) => n.data?.nodeType === 'on_flow_end');
 
-    const nodeMeta = (nodeId: string | undefined) => {
-      if (!nodeId) return null;
-      const n = nodeById.get(nodeId);
-      if (!n) {
-        if (nodeId === '__follow_up__') {
-          return {
-            label: 'Follow Up',
-            type: 'ask_user',
-            icon: '...',
-            color: '#3a4a5a',
-          };
-        }
-        if (nodeId === '__implicit_flow_end__') {
-          return {
-            label: 'On Flow End',
-            type: 'on_flow_end',
-            icon: '🏁',
-            color: '#2f8f8d',
-          };
-        }
-        return null;
-      }
-      return {
-        label: n.data.label || nodeId,
-        type: n.data.nodeType,
-        icon: n.data.icon,
-        color: n.data.headerColor,
-      };
-    };
-
     for (let i = 0; i < events.length; i++) {
       const ev = events[i];
       const evRunId = getActualRunId(ev);
@@ -2068,7 +2192,7 @@ export function RunFlowModal({
       if (ev.type === 'flow_complete') {
         if (!hasExplicitFlowEnd) {
           const implicitId = '__implicit_flow_end__';
-          const meta = nodeMeta(implicitId);
+          const meta = resolveNodeMeta(implicitId);
           const runKey = evRunId || ev.runId || '';
           const alreadyAdded = all.some((s) => s.nodeId === implicitId && (s.runId || '') === runKey);
           if (!alreadyAdded) {
@@ -2094,7 +2218,7 @@ export function RunFlowModal({
 
       if (ev.type === 'node_start') {
         const key = `${evRunId || ''}:${ev.nodeId || ''}`;
-        const meta = nodeMeta(ev.nodeId);
+        const meta = resolveNodeMeta(ev.nodeId);
         const step: Step = {
           id: `node_start:${ev.nodeId || 'unknown'}:${i}`,
           status: 'running',
@@ -2117,7 +2241,7 @@ export function RunFlowModal({
         const key = `${evRunId || ''}:${nodeId || ''}`;
         const idx = nodeId ? openByNode.get(key) : undefined;
         const mi = extractModelInfo(ev.result);
-        const meta = nodeMeta(nodeId);
+        const meta = resolveNodeMeta(nodeId);
         const terminalKey = meta?.type === 'on_flow_end' && nodeId ? `${evRunId || ''}:${nodeId}` : '';
         const existingTerminalIdx = terminalKey ? terminalIndexByNode.get(terminalKey) : undefined;
         if (typeof existingTerminalIdx === 'number' && typeof idx !== 'number') {
@@ -2236,7 +2360,7 @@ export function RunFlowModal({
           continue;
         }
 
-        const meta = nodeMeta(nodeId);
+        const meta = resolveNodeMeta(nodeId);
         all.push({
           id: `flow_waiting:${nodeId || 'unknown'}:${i}`,
           status,
@@ -2286,7 +2410,7 @@ export function RunFlowModal({
       entryNode.data?.nodeType === 'on_flow_start' &&
       !all.some((s) => s.nodeId === entryNode.id || s.nodeType === 'on_flow_start')
     ) {
-      const meta = nodeMeta(entryNode.id);
+      const meta = resolveNodeMeta(entryNode.id);
       const createdAt =
         typeof runSummary?.created_at === 'string' && (!runSummary.run_id || runSummary.run_id === rootRunId)
           ? runSummary.created_at
@@ -2325,7 +2449,7 @@ export function RunFlowModal({
     }
 
     return { threadId, rootRunId, rootRunIds: displayRootRunIds, rootSteps, stepById, stepsByRunId };
-  }, [entryNode, events, nodeById, runSummary?.created_at, runSummary?.run_id, startInputData, threadRootRunId]);
+  }, [entryNode, events, nodeById, resolveNodeMeta, runSummary?.created_at, runSummary?.run_id, startInputData, threadRootRunId]);
   const threadId = runSteps.threadId;
   const rootRunIds = runSteps.rootRunIds;
   const rootRunId = runSteps.rootRunId;
@@ -2600,7 +2724,15 @@ export function RunFlowModal({
     setExpandedSubflows((prev) => ({ ...prev, [id]: !prev[id] }));
   }, []);
 
-  type StepTreeNode = { stepId: string; depth: number; children: StepTreeNode[]; childRunId?: string };
+  type SequenceBranchGroup = { key: string; label: string; nodes: StepTreeNode[] };
+  type StepTreeNode = {
+    stepId: string;
+    depth: number;
+    children: StepTreeNode[];
+    childRunId?: string;
+    sequenceBranches?: SequenceBranchGroup[];
+    synthetic?: boolean;
+  };
   const MAX_STEP_TREE_DEPTH = 3;
 
   const stepTree = useMemo<StepTreeNode[]>(() => {
@@ -2674,35 +2806,264 @@ export function RunFlowModal({
     return out;
   }, [rootRunId, rootRunIds, stepsByRunId, subworkflowLinks]);
 
+  const sequenceDisplay = useMemo(() => {
+    const displayStepById = new Map(stepById);
+    if (stepTree.length === 0 || sequenceLayouts.size === 0) {
+      return { stepTree, stepById: displayStepById };
+    }
+
+    const findIndexFrom = (items: StepTreeNode[], start: number, predicate: (node: StepTreeNode) => boolean): number => {
+      for (let i = Math.max(0, start); i < items.length; i++) {
+        if (predicate(items[i])) return i;
+      }
+      return -1;
+    };
+
+    const stepForNode = (node: StepTreeNode): Step | null => displayStepById.get(node.stepId) || stepById.get(node.stepId) || null;
+
+    const collectSteps = (items: StepTreeNode[]): Step[] => {
+      const out: Step[] = [];
+      const seen = new Set<string>();
+      const visit = (nodes: StepTreeNode[]) => {
+        for (const item of nodes) {
+          const step = stepForNode(item);
+          if (step && !seen.has(step.id)) {
+            seen.add(step.id);
+            out.push(step);
+          }
+          if (item.sequenceBranches?.length) {
+            for (const branch of item.sequenceBranches) visit(branch.nodes);
+          }
+          if (item.children?.length) visit(item.children);
+        }
+      };
+      visit(items);
+      return out;
+    };
+
+    const earliestStartedAt = (items: Step[]): string | undefined => {
+      let best: string | undefined;
+      for (const step of items) {
+        const ts = typeof step.startedAt === 'string' ? step.startedAt : undefined;
+        if (!ts) continue;
+        if (!best || ts.localeCompare(best) < 0) best = ts;
+      }
+      return best;
+    };
+
+    const buildDisplaySequenceStep = ({
+      sequenceNodeId,
+      anchorNode,
+      realStep,
+      branches,
+      syntheticId,
+    }: {
+      sequenceNodeId: string;
+      anchorNode: StepTreeNode;
+      realStep: Step | null;
+      branches: SequenceBranchGroup[];
+      syntheticId: string;
+    }): Step => {
+      const meta = resolveNodeMeta(sequenceNodeId);
+      const branchSteps = collectSteps(branches.flatMap((branch) => branch.nodes));
+      const failed = branchSteps.find((step) => step.status === 'failed');
+      const hasRunningish = branchSteps.some((step) => step.status === 'running' || step.status === 'waiting');
+      const baseStep = realStep || stepForNode(anchorNode);
+      const fallbackSummary = branches.length > 0 ? branches.map((branch) => branch.label).join(' → ') : 'Sequence';
+      const status: StepStatus = realStep
+        ? realStep.status
+        : failed
+          ? 'failed'
+          : hasRunningish || branchSteps.length > 0
+            ? 'running'
+            : 'running';
+
+      return {
+        id: realStep?.id || syntheticId,
+        status,
+        runId: realStep?.runId || baseStep?.runId,
+        runtimeStepId: realStep?.runtimeStepId,
+        nodeId: sequenceNodeId,
+        nodeLabel: meta?.label || realStep?.nodeLabel || sequenceNodeId,
+        nodeType: meta?.type || realStep?.nodeType || 'sequence',
+        nodeIcon: meta?.icon || realStep?.nodeIcon,
+        nodeColor: meta?.color || realStep?.nodeColor,
+        summary: realStep?.summary || fallbackSummary,
+        output: realStep?.output,
+        error: realStep?.error || failed?.error,
+        metrics: realStep?.metrics,
+        startedAt: realStep?.startedAt || earliestStartedAt(branchSteps) || baseStep?.startedAt,
+        endedAt: realStep?.endedAt,
+        waiting: realStep?.waiting,
+      };
+    };
+
+    const groupSequenceNodes = (items: StepTreeNode[], excludedSequenceIds: Set<string> = new Set()): StepTreeNode[] => {
+      if (items.length === 0) return items;
+
+      type Candidate = {
+        anchor: number;
+        endExclusive: number;
+        node: StepTreeNode;
+      };
+
+      const candidates: Candidate[] = [];
+
+      for (const [sequenceNodeId, branches] of sequenceLayouts.entries()) {
+        if (excludedSequenceIds.has(sequenceNodeId)) continue;
+
+        const realIndex = findIndexFrom(items, 0, (item) => stepForNode(item)?.nodeId === sequenceNodeId);
+        const hits: Array<{ branch: (typeof branches)[number]; index: number }> = [];
+        let searchFrom = 0;
+        for (const branch of branches) {
+          const hitIndex = findIndexFrom(items, searchFrom, (item) => stepForNode(item)?.nodeId === branch.targetNodeId);
+          if (hitIndex < 0) continue;
+          hits.push({ branch, index: hitIndex });
+          searchFrom = hitIndex + 1;
+        }
+
+        if (hits.length === 0 && realIndex < 0) continue;
+
+        const firstBranchIndex = hits.length > 0 ? hits[0].index : Number.MAX_SAFE_INTEGER;
+        const anchor = Math.min(realIndex >= 0 ? realIndex : Number.MAX_SAFE_INTEGER, firstBranchIndex);
+        if (!Number.isFinite(anchor)) continue;
+
+        const anchorNode = items[anchor];
+        if (!anchorNode) continue;
+
+        const nextHitIndexByPosition = new Map<number, number>();
+        for (let i = 0; i < hits.length; i++) {
+          const current = hits[i];
+          const next = hits[i + 1];
+          nextHitIndexByPosition.set(current.index, next ? next.index : -1);
+        }
+
+        let lastConsumed = realIndex >= 0 ? realIndex + 1 : anchor + 1;
+        const branchGroups: SequenceBranchGroup[] = branches.map((branch) => {
+          const hit = hits.find((entry) => entry.branch.handleId === branch.handleId);
+          if (!hit) {
+            return {
+              key: `${sequenceNodeId}:${branch.handleId}:${anchor}:empty`,
+              label: branch.label,
+              nodes: [],
+            };
+          }
+
+          const nextHit = nextHitIndexByPosition.get(hit.index) ?? -1;
+          const segmentEnd =
+            nextHit > hit.index
+              ? nextHit
+              : realIndex > hit.index
+                ? realIndex
+                : hit.index + 1;
+          const rawSegment = items.slice(hit.index, Math.max(hit.index + 1, segmentEnd));
+          const nextExcluded = new Set(excludedSequenceIds);
+          nextExcluded.add(sequenceNodeId);
+          const nodes = groupSequenceNodes(rawSegment, nextExcluded);
+          lastConsumed = Math.max(lastConsumed, Math.max(hit.index + 1, segmentEnd));
+          return {
+            key: `${sequenceNodeId}:${branch.handleId}:${hit.index}`,
+            label: branch.label,
+            nodes,
+          };
+        });
+
+        const syntheticId = `synthetic:sequence:${sequenceNodeId}:${anchor}:${anchorNode.stepId}`;
+        const realStep = realIndex >= 0 ? stepById.get(items[realIndex].stepId) || null : null;
+        const displayStep = buildDisplaySequenceStep({
+          sequenceNodeId,
+          anchorNode,
+          realStep,
+          branches: branchGroups,
+          syntheticId,
+        });
+        displayStepById.set(displayStep.id, displayStep);
+
+        candidates.push({
+          anchor,
+          endExclusive: Math.max(lastConsumed, realIndex >= 0 ? realIndex + 1 : anchor + 1),
+          node: {
+            stepId: displayStep.id,
+            depth: anchorNode.depth,
+            children: [],
+            sequenceBranches: branchGroups,
+            synthetic: !realStep,
+          },
+        });
+      }
+
+      if (candidates.length === 0) return items;
+
+      candidates.sort((a, b) => a.anchor - b.anchor || b.endExclusive - a.endExclusive);
+      const selected = new Map<number, Candidate>();
+      let cursor = -1;
+      for (const candidate of candidates) {
+        if (candidate.anchor < cursor) continue;
+        selected.set(candidate.anchor, candidate);
+        cursor = candidate.endExclusive;
+      }
+
+      const out: StepTreeNode[] = [];
+      for (let i = 0; i < items.length;) {
+        const candidate = selected.get(i);
+        if (candidate) {
+          out.push(candidate.node);
+          i = candidate.endExclusive;
+          continue;
+        }
+        out.push(items[i]);
+        i += 1;
+      }
+      return out;
+    };
+
+    return {
+      stepTree: groupSequenceNodes(stepTree),
+      stepById: displayStepById,
+    };
+  }, [resolveNodeMeta, sequenceLayouts, stepById, stepTree]);
+  const displayStepTree = sequenceDisplay.stepTree;
+  const displayStepById = sequenceDisplay.stepById;
+
   // Auto-expand running subflows so long-running nested runs are observable by default.
   // If the user explicitly collapses (sets false), do not override.
   useEffect(() => {
     if (!isOpen) return;
-    if (stepTree.length === 0) return;
+    if (displayStepTree.length === 0) return;
     setExpandedSubflows((prev) => {
       let changed = false;
       const next: Record<string, boolean> = { ...prev };
 
       const visit = (nodes: StepTreeNode[]) => {
         for (const n of nodes) {
-          if (!n.children || n.children.length === 0) continue;
-          // Keep the execution list readable: only auto-expand direct subflows (depth 0).
-          if (n.depth > 0) continue;
-          const s = stepById.get(n.stepId);
+          const nestedSequenceNodes = n.sequenceBranches?.flatMap((branch) => branch.nodes) || [];
+          const hasNestedContent = (n.children && n.children.length > 0) || nestedSequenceNodes.length > 0;
+          if (!hasNestedContent) continue;
+          // Keep the execution list readable: only auto-expand direct root-flow groups.
+          if (n.depth > 0) {
+            visit(n.children || []);
+            if (nestedSequenceNodes.length > 0) visit(nestedSequenceNodes);
+            continue;
+          }
+          const s = displayStepById.get(n.stepId);
           if (!s) continue;
 
           const isRunningish = s.status === 'running' || s.status === 'waiting';
-          if (isRunningish && !(n.stepId in prev)) {
+          const isSequence = s.nodeType === 'sequence';
+          if ((isRunningish || isSequence) && !(n.stepId in prev)) {
             next[n.stepId] = true;
             changed = true;
           }
+
+          visit(n.children || []);
+          if (nestedSequenceNodes.length > 0) visit(nestedSequenceNodes);
         }
       };
-      visit(stepTree);
+      visit(displayStepTree);
 
       return changed ? next : prev;
     });
-  }, [isOpen, stepById, stepTree]);
+  }, [displayStepById, displayStepTree, isOpen]);
 
   // Keep selection valid; default to last step.
   useEffect(() => {
@@ -2711,9 +3072,9 @@ export function RunFlowModal({
       setSelectedStepId(null);
       return;
     }
-    if (selectedStepId && stepById.has(selectedStepId)) return;
+    if (selectedStepId && displayStepById.has(selectedStepId)) return;
     setSelectedStepId(steps[steps.length - 1].id);
-  }, [isOpen, steps, selectedStepId, stepById]);
+  }, [displayStepById, isOpen, selectedStepId, steps]);
 
   // Follow the live execution: when new steps arrive during a run (or waiting),
   // auto-select the latest step so the user always sees what's happening.
@@ -2728,8 +3089,8 @@ export function RunFlowModal({
 
   const selectedStep = useMemo(() => {
     if (!selectedStepId) return null;
-    return stepById.get(selectedStepId) || null;
-  }, [selectedStepId, stepById]);
+    return displayStepById.get(selectedStepId) || null;
+  }, [displayStepById, selectedStepId]);
   const waitingInfoDetails =
     waitingInfo?.details && typeof waitingInfo.details === 'object'
       ? (waitingInfo.details as Record<string, unknown>)
@@ -2774,6 +3135,7 @@ export function RunFlowModal({
   const isToolApprovalWait = approvalMode === 'approval_required' || approvalKind === 'tool_approval';
   const showWaitingPanel = Boolean(waitingPayload) && selectedStep?.status === 'waiting';
   const isSubworkflowWait = waitingReasonRaw.trim().toLowerCase() === 'subworkflow';
+  const selectedResidencyNoOp = selectedStep?.nodeType === 'model_residency' && isResidencyNoOpResult(selectedStep.output);
   const selectedDurationLabel =
     selectedStep?.metrics && selectedStep.metrics.duration_ms != null
       ? formatDuration(selectedStep.metrics.duration_ms)
@@ -3503,17 +3865,18 @@ export function RunFlowModal({
       };
     }
 
-    const obj = value as Record<string, unknown>;
+	    const obj = value as Record<string, unknown>;
 
-	    let task: string | null = null;
-	    let previewText: string | null = null;
-	    let previewIsJson = false;
-	    let scratchpad: unknown = null;
-	    let provider: string | null = null;
-	    let model: string | null = null;
-	    let usage: unknown = null;
-	    let benchmark: Record<string, unknown> | null = null;
-	    let subRunId: string | null = null;
+		    let task: string | null = null;
+		    let previewText: string | null = null;
+		    let previewIsJson = false;
+		    let scratchpad: unknown = null;
+		    const preferredModelInfo = extractPreferredModelInfo(obj);
+		    let provider: string | null = preferredModelInfo.provider || null;
+		    let model: string | null = preferredModelInfo.model || null;
+		    let usage: unknown = null;
+		    let benchmark: Record<string, unknown> | null = null;
+		    let subRunId: string | null = null;
 
     const asRecord = (v: unknown): Record<string, unknown> | null => {
       if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
@@ -3549,10 +3912,12 @@ export function RunFlowModal({
       if (!previewText && typeof res.result === 'string' && res.result.trim()) previewText = res.result.trim();
       if (!previewText && typeof res.message === 'string' && res.message.trim()) previewText = res.message.trim();
       if (!previewText && typeof res.response === 'string' && res.response.trim()) previewText = res.response.trim();
-      if (typeof res.provider === 'string' && res.provider.trim()) provider = res.provider.trim();
-      if (typeof res.model === 'string' && res.model.trim()) model = res.model.trim();
-      if ('usage' in res) usage = res.usage;
-    }
+	      if (!provider && typeof res.media_provider === 'string' && res.media_provider.trim()) provider = res.media_provider.trim();
+	      if (!model && typeof res.media_model === 'string' && res.media_model.trim()) model = res.media_model.trim();
+	      if (!provider && typeof res.provider === 'string' && res.provider.trim()) provider = res.provider.trim();
+	      if (!model && typeof res.model === 'string' && res.model.trim()) model = res.model.trim();
+	      if ('usage' in res) usage = res.usage;
+	    }
 
     if (!previewText && typeof obj.content === 'string' && obj.content.trim()) previewText = obj.content.trim();
     if (!previewText && typeof obj.text === 'string' && obj.text.trim()) previewText = obj.text.trim();
@@ -3569,8 +3934,10 @@ export function RunFlowModal({
       if (!previewText && typeof outObj.message === 'string' && outObj.message.trim()) previewText = outObj.message.trim();
       if (!previewText && typeof outObj.response === 'string' && outObj.response.trim()) previewText = outObj.response.trim();
     }
-	    if (!provider && typeof obj.provider === 'string' && obj.provider.trim()) provider = obj.provider.trim();
-	    if (!model && typeof obj.model === 'string' && obj.model.trim()) model = obj.model.trim();
+		    if (!provider && typeof obj.media_provider === 'string' && obj.media_provider.trim()) provider = obj.media_provider.trim();
+		    if (!model && typeof obj.media_model === 'string' && obj.media_model.trim()) model = obj.media_model.trim();
+		    if (!provider && typeof obj.provider === 'string' && obj.provider.trim()) provider = obj.provider.trim();
+		    if (!model && typeof obj.model === 'string' && obj.model.trim()) model = obj.model.trim();
 	    if (!usage && 'usage' in obj) usage = obj.usage;
 	    if (!subRunId && typeof obj.sub_run_id === 'string' && obj.sub_run_id.trim()) subRunId = obj.sub_run_id.trim();
 
@@ -3945,6 +4312,17 @@ export function RunFlowModal({
     return s ? s.toUpperCase() : 'UNKNOWN';
   };
 
+  const traceStatusInfo = (step: Record<string, unknown>) => {
+    const status = typeof step.status === 'string' ? step.status : 'unknown';
+    const effect = step.effect && typeof step.effect === 'object' ? (step.effect as Record<string, unknown>) : null;
+    const effectType = effect && typeof effect.type === 'string' ? effect.type : '';
+    const result = step.result && typeof step.result === 'object' ? (step.result as Record<string, unknown>) : null;
+    if (status === 'completed' && effectType === 'model_residency' && isResidencyNoOpResult(result)) {
+      return { label: 'NO-OP', className: 'waiting' };
+    }
+    return { label: traceStatusLabel(status), className: status };
+  };
+
   const traceEffectSummary = (step: Record<string, unknown>) => {
     const effect = step.effect && typeof step.effect === 'object' ? (step.effect as Record<string, unknown>) : null;
     const effectType = effect && typeof effect.type === 'string' ? effect.type : 'effect';
@@ -4043,6 +4421,44 @@ export function RunFlowModal({
         .filter(Boolean)
         .join(' · ');
       return { title: 'TOOL_CALLS', meta, preview };
+    }
+
+    if (effectType === 'model_residency') {
+      const operation =
+        (payload && typeof payload.operation === 'string' ? payload.operation : '') ||
+        (result && typeof result.operation === 'string' ? result.operation : '') ||
+        'model_residency';
+      const task =
+        (payload && typeof payload.task === 'string' ? payload.task : '') ||
+        (result && typeof result.task === 'string' ? result.task : '') ||
+        '';
+      const provider =
+        (payload && typeof payload.provider === 'string' ? payload.provider : '') ||
+        (result && typeof result.provider === 'string' ? result.provider : '') ||
+        '';
+      const model =
+        (payload && typeof payload.model === 'string' ? payload.model : '') ||
+        (result && typeof result.model === 'string' ? result.model : '') ||
+        '';
+      const modelsRaw = result ? result.models : null;
+      const modelCount = Array.isArray(modelsRaw) ? modelsRaw.length : null;
+      const loadedNew = result && typeof result.loaded_new === 'boolean' ? result.loaded_new : null;
+      const unloaded = result && typeof result.unloaded === 'boolean' ? result.unloaded : null;
+      const error = result && typeof result.error === 'string' ? result.error : '';
+      const warningsRaw = result ? result.warnings : null;
+      const warnings = Array.isArray(warningsRaw) ? warningsRaw.filter((x): x is string => typeof x === 'string') : [];
+      const meta = [
+        operation,
+        task,
+        provider && model ? `${provider}/${model}` : provider || model,
+        modelCount != null ? `${modelCount} loaded` : null,
+        loadedNew != null ? (loadedNew ? 'loaded new' : 'already loaded') : null,
+        unloaded != null ? (unloaded ? 'unloaded' : 'not resident') : null,
+        durationMs != null ? formatDuration(durationMs) : null,
+      ]
+        .filter(Boolean)
+        .join(' · ');
+      return { title: 'MODEL_RESIDENCY', meta, preview: error || warnings[0] || '' };
     }
 
     if (effectType === 'ask_user') {
@@ -4205,13 +4621,13 @@ export function RunFlowModal({
               ) : null}
 
               <div className="run-steps-list">
-                {stepTree.length === 0 ? (
+                {displayStepTree.length === 0 ? (
                   <div className="run-steps-empty">No execution events yet.</div>
                 ) : (
                   (() => {
                     const renderNodes = (nodes: StepTreeNode[]): Array<JSX.Element | null> => {
                       return nodes.map((n, idx) => {
-                        const s = stepById.get(n.stepId);
+                        const s = displayStepById.get(n.stepId);
                         if (!s) return null;
 
                         const selected = s.id === selectedStepId;
@@ -4219,16 +4635,18 @@ export function RunFlowModal({
                         const bg = hexToRgba(color, 0.12);
                         const waitReason = typeof s.waiting?.reason === 'string' ? s.waiting.reason.toLowerCase() : '';
                         const isSubworkflowWait = waitReason === 'subworkflow';
-                        const statusLabel =
+                        const statusInfo =
                           s.status === 'running'
-                            ? 'RUNNING'
+                            ? { label: 'RUNNING', className: 'running' }
                             : s.status === 'completed'
-                              ? 'OK'
+                              ? s.nodeType === 'model_residency' && isResidencyNoOpResult(s.output)
+                                ? { label: 'NO-OP', className: 'waiting' }
+                                : { label: 'OK', className: 'completed' }
                               : s.status === 'waiting'
                                 ? isSubworkflowWait
-                                  ? 'RUNNING'
-                                  : 'WAITING'
-                                : 'FAILED';
+                                  ? { label: 'RUNNING', className: 'running' }
+                                  : { label: 'WAITING', className: 'waiting' }
+                                : { label: 'FAILED', className: 'failed' };
                         const startedAtLabel = formatStepTime(s.startedAt);
                         const durationLabel =
                           s.status === 'completed' && s.metrics && s.metrics.duration_ms != null
@@ -4236,7 +4654,9 @@ export function RunFlowModal({
                             : '';
 
                         const hasChildren = Array.isArray(n.children) && n.children.length > 0;
-                        const expanded = hasChildren && expandedSubflows[s.id] === true;
+                        const hasSequenceBranches = Array.isArray(n.sequenceBranches) && n.sequenceBranches.length > 0;
+                        const hasNestedContent = hasChildren || hasSequenceBranches;
+                        const expanded = hasNestedContent && expandedSubflows[s.id] === true;
                         const depth = typeof n.depth === 'number' && n.depth > 0 ? n.depth : 0;
 
                         return (
@@ -4250,10 +4670,18 @@ export function RunFlowModal({
                               <div className="run-step-main">
                                 <div className="run-step-top">
                                   <div className="run-step-left">
-                                    {hasChildren ? (
+                                    {hasNestedContent ? (
                                       <span
                                         className="run-step-toggle"
-                                        title={expanded ? 'Collapse subflow steps' : 'Expand subflow steps'}
+                                        title={
+                                          hasSequenceBranches
+                                            ? expanded
+                                              ? 'Collapse sequence paths'
+                                              : 'Expand sequence paths'
+                                            : expanded
+                                              ? 'Collapse subflow steps'
+                                              : 'Expand subflow steps'
+                                        }
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           toggleSubflowExpansion(s.id);
@@ -4273,9 +4701,9 @@ export function RunFlowModal({
                                     <span className="run-step-label">{s.nodeLabel || s.nodeId || 'node'}</span>
                                   </div>
                                   <span className="run-step-right">
-                                    <span className={`run-step-status ${s.status}`}>
+                                    <span className={`run-step-status ${statusInfo.className}`}>
                                       {s.status === 'running' ? <span className="run-spinner" aria-label="running" /> : null}
-                                      {statusLabel}
+                                      {statusInfo.label}
                                     </span>
                                     {durationLabel ? (
                                       <span className="run-metric-badge metric-duration" title="Duration">
@@ -4333,6 +4761,20 @@ export function RunFlowModal({
                               </div>
                             </button>
 
+                            {hasSequenceBranches && expanded ? (
+                              <div className="run-sequence-branches">
+                                {(n.sequenceBranches || []).map((branch) => (
+                                  <div key={branch.key} className="run-sequence-branch">
+                                    {branch.nodes.length > 0 ? (
+                                      <div className="run-sequence-branch-body">{renderNodes(branch.nodes)}</div>
+                                    ) : (
+                                      <div className="run-sequence-branch-empty">Pending…</div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+
                             {hasChildren && expanded ? (
                               <div className="run-step-children">{renderNodes(n.children)}</div>
                             ) : null}
@@ -4341,7 +4783,7 @@ export function RunFlowModal({
                       });
                     };
 
-                    return renderNodes(stepTree);
+                    return renderNodes(displayStepTree);
                   })()
                 )}
               </div>
@@ -4359,6 +4801,11 @@ export function RunFlowModal({
                     {selectedDurationLabel ? (
                       <span className="run-metric-badge metric-duration" title="Duration">
                         {selectedDurationLabel}
+                      </span>
+                    ) : null}
+                    {selectedResidencyNoOp ? (
+                      <span className="run-metric-badge metric-status" title="Optional residency request completed without changing runtime state">
+                        NO-OP
                       </span>
                     ) : null}
                     {parentRunId && onSelectRunId ? (
@@ -4384,11 +4831,18 @@ export function RunFlowModal({
                 ) : null}
               </div>
 
-	              {selectedStep ? (
-	                <div className={detailsBodyClass}>
-	                  {selectedStep.status === 'running' ? (
-	                    <>
-	                      <div className="run-working">
+		              {selectedStep ? (
+		                <div className={detailsBodyClass}>
+                      {selectedResidencyNoOp ? (
+                        <div className="run-waiting">
+                          <div className="run-waiting-prompt">
+                            This residency request completed without changing runtime state.
+                          </div>
+                        </div>
+                      ) : null}
+		                  {selectedStep.status === 'running' ? (
+		                    <>
+		                      <div className="run-working">
 	                        <span className="run-spinner" aria-label="working" />
 	                        <div>
 	                          <div className="run-working-title">{runningTitle}</div>
@@ -4842,13 +5296,12 @@ export function RunFlowModal({
                               <div className="run-output-title">Trace</div>
                               <div className="run-trace">
                                 {traceSteps.map((t, idx) => {
-                                  const status = typeof t.status === 'string' ? t.status : 'unknown';
-                                  const label = traceStatusLabel(status);
+                                  const statusInfo = traceStatusInfo(t);
                                   const summary = traceEffectSummary(t);
                                   return (
-                                    <div key={idx} className={`run-trace-step ${status}`}>
+                                    <div key={idx} className={`run-trace-step ${statusInfo.className}`}>
                                       <div className="run-trace-top">
-                                        <span className={`run-trace-status ${status}`}>{label}</span>
+                                        <span className={`run-trace-status ${statusInfo.className}`}>{statusInfo.label}</span>
                                         <span className="run-trace-effect">{summary.title}</span>
                                         {summary.meta ? <span className="run-trace-meta">{summary.meta}</span> : null}
                                         <span className="run-trace-time">{formatTraceTime(t.ts)}</span>

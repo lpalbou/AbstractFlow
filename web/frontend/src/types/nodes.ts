@@ -365,6 +365,36 @@ const CORE_NODES: NodeTemplate[] = [
     category: 'core',
   },
   {
+    type: 'model_residency',
+    icon: '&#x25EB;',
+    label: 'Load / Unload Model',
+    description: 'Model residency controls for listing, warming, or unloading Gateway/Core resident models. Load keeps the model warm by default; unload is explicit.',
+    headerColor: '#14B8A6',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'operation', label: 'operation', type: 'string', description: 'list_loaded, load, or unload.' },
+      { id: 'task', label: 'task', type: 'string', description: 'text_generation, image_generation, tts, or stt.' },
+      { id: 'provider', label: 'provider', type: 'provider', description: 'Provider/backend id to load or filter.' },
+      { id: 'model', label: 'model', type: 'model', description: 'Model id to load or filter.' },
+      { id: 'runtime_id', label: 'runtime_id', type: 'string', description: 'Runtime id returned by loaded/list calls; preferred for unload.' },
+      { id: 'options', label: 'options', type: 'object', description: 'Optional provider-specific load/unload options.' },
+      { id: 'pin', label: 'keep_loaded', type: 'boolean', description: 'When loading, keep resident until explicit unload.' },
+      { id: 'required', label: 'required', type: 'boolean', description: 'When true, fail this step if the residency call fails.' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'success', label: 'success', type: 'boolean' },
+      { id: 'runtime', label: 'runtime', type: 'object' },
+      { id: 'models', label: 'models', type: 'array' },
+      { id: 'loaded_new', label: 'loaded_new', type: 'boolean' },
+      { id: 'unloaded', label: 'unloaded', type: 'boolean' },
+      { id: 'result', label: 'result', type: 'object' },
+      { id: 'warnings', label: 'warnings', type: 'array' },
+      { id: 'error', label: 'error', type: 'string' },
+    ],
+    category: 'core',
+  },
+  {
     type: 'generate_image',
     icon: '&#x1F5BC;',
     label: 'Generate Image',
@@ -1541,6 +1571,20 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
     outputs: [...template.outputs],
     // Default pin values for input-driven nodes
     ...(template.type === 'agent' && { pinDefaults: { max_iterations: 50 } }),
+    ...(template.type === 'model_residency' && {
+      pinDefaults: {
+        operation: 'load',
+        task: 'image_generation',
+        pin: true,
+        required: false,
+      },
+      effectConfig: {
+        operation: 'load',
+        task: 'image_generation',
+        pin: true,
+        required: false,
+      },
+    }),
     ...(template.type === 'generate_image' && {
       pinDefaults: {
         format: 'png',

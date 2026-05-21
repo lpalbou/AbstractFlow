@@ -43,7 +43,8 @@ export function NodePalette() {
       return visibleNodes.filter(
         (n) =>
           n.label.toLowerCase().includes(term) ||
-          n.type.toLowerCase().includes(term)
+          n.type.toLowerCase().includes(term) ||
+          n.description.toLowerCase().includes(term)
       );
     },
     [searchTerm]

@@ -310,6 +310,12 @@
   line-height: 1;
 }
 
+.toolbar-transfer-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
 .toolbar-button.save-button.dirty {
   border-color: rgba(255, 176, 0, 0.72);
   box-shadow: 0 0 0 1px rgba(255, 176, 0, 0.10), 0 0 16px rgba(255, 176, 0, 0.16);

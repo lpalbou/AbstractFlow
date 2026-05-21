@@ -150,6 +150,50 @@ def _gateway_proxy_response_headers(headers: object) -> dict[str, str]:
     return out
 
 
+def _gateway_proxy_content_type(headers: object) -> str:
+    get = getattr(headers, "get", None)
+    if not callable(get):
+        return ""
+    return str(get("content-type", "") or get("Content-Type", "") or "")
+
+
+def _gateway_proxy_is_event_stream(headers: object) -> bool:
+    return "text/event-stream" in _gateway_proxy_content_type(headers).lower()
+
+
+def _bytes_chunk(value: object) -> bytes:
+    if isinstance(value, bytes):
+        return value
+    if isinstance(value, bytearray):
+        return bytes(value)
+    return str(value).encode("utf-8")
+
+
+def _iter_gateway_proxy_response(resp: object, *, event_stream: bool = False):
+    try:
+        if event_stream:
+            readline = getattr(resp, "readline", None)
+            if callable(readline):
+                while True:
+                    chunk = readline()
+                    if not chunk:
+                        break
+                    yield _bytes_chunk(chunk)
+                return
+
+        read = getattr(resp, "read")
+        while True:
+            chunk = read(64 * 1024)
+            if not chunk:
+                break
+            yield _bytes_chunk(chunk)
+    finally:
+        try:
+            resp.close()
+        except Exception:
+            pass
+
+
 def _gateway_proxy_request_headers(request: Request, token: str | None) -> dict[str, str]:
     out: dict[str, str] = {}
     for key, value in request.headers.items():
@@ -198,24 +242,18 @@ async def proxy_gateway_api(path: str, request: Request):
             media_type="application/json",
         )
 
-    def _iter_response():
-        try:
-            while True:
-                chunk = resp.read(64 * 1024)
-                if not chunk:
-                    break
-                yield chunk
-        finally:
-            try:
-                resp.close()
-            except Exception:
-                pass
+    resp_headers = getattr(resp, "headers", {})
+    event_stream = _gateway_proxy_is_event_stream(resp_headers)
+    response_headers = _gateway_proxy_response_headers(resp_headers)
+    if event_stream:
+        response_headers.setdefault("Cache-Control", "no-cache")
+        response_headers.setdefault("X-Accel-Buffering", "no")
 
     return StreamingResponse(
-        _iter_response(),
+        _iter_gateway_proxy_response(resp, event_stream=event_stream),
         status_code=int(getattr(resp, "status", 200) or 200),
-        headers=_gateway_proxy_response_headers(getattr(resp, "headers", {})),
-        media_type=getattr(resp, "headers", {}).get("content-type") if getattr(resp, "headers", None) else None,
+        headers=response_headers,
+        media_type=_gateway_proxy_content_type(resp_headers) if resp_headers else None,
     )
 
 

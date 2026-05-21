@@ -16,7 +16,7 @@ import ProviderModelsPanel from './ProviderModelsPanel';
 import { JsonSchemaNodeEditor } from './JsonSchemaNodeEditor';
 import { JsonValueEditor } from './JsonValueEditor';
 import { AfTooltip } from './AfTooltip';
-import AfSelect from './inputs/AfSelect';
+import AfSelect, { type AfSelectOption } from './inputs/AfSelect';
 import AfMultiSelect from './inputs/AfMultiSelect';
 import {
   extractFunctionBody,
@@ -27,6 +27,7 @@ import {
 import { collectCustomEventNames } from '../utils/events';
 import { areTypesCompatible } from '../utils/validation';
 import { gatewayJson, gatewayPath, getGatewayFlowEditorReadiness } from '../utils/gatewayClient';
+import { insertModelResidencyStep } from '../utils/modelResidencyGraph';
 import {
   applyImagePinDefaultPatch,
   extractImageModelParameterMetadata,
@@ -112,6 +113,10 @@ function isTextProviderPin(pin: Pin): boolean {
 
 function isTextModelPin(pin: Pin): boolean {
   return pin.type === 'model' || pin.type === 'model_text' || pin.type === 'model_image' || pin.type === 'model_voice' || pin.id === 'model';
+}
+
+function normalizeMediaProvider(value: string): string {
+  return String(value || '').trim().toLowerCase().replace(/_/g, '-');
 }
 
 function normalizePinId(raw: string): string {
@@ -219,6 +224,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const {
     updateNodeData,
     deleteNode,
+    setNodes,
     setEdges,
     flowId,
     nodes,
@@ -253,7 +259,9 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const [loadingProviders, setLoadingProviders] = useState(false);
   const [loadingModels, setLoadingModels] = useState(false);
   const [voiceOptions, setVoiceOptions] = useState<Array<{ value: string; label: string; mode?: string }>>([]);
+  const [ttsProviderOptions, setTtsProviderOptions] = useState<string[]>([]);
   const [ttsModelOptions, setTtsModelOptions] = useState<string[]>([]);
+  const [sttProviderOptions, setSttProviderOptions] = useState<string[]>([]);
   const [sttModelOptions, setSttModelOptions] = useState<string[]>([]);
   const [imageModelOptions, setImageModelOptions] = useState<Array<{ provider: string; model: string; label: string } & MediaModelParameterMetadata>>([]);
   const [loadingMediaModels, setLoadingMediaModels] = useState(false);
@@ -309,10 +317,42 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         node.data.outputs.some((p) => p.type === 'assertion')
     );
   const semanticsQuery = useSemanticsRegistry(wantsSemanticsRegistry);
+  const modelResidencyTaskForCatalog =
+    node?.data?.nodeType === 'model_residency'
+      ? String(node.data.effectConfig?.task || node.data.pinDefaults?.task || 'image_generation')
+      : '';
+  const modelResidencyTaskOptions = (() => {
+    const residency = gatewayContracts?.common?.model_residency;
+    const supports = residency?.supports || {};
+    const rawTasks =
+      Array.isArray(residency?.tasks) && residency.tasks.length > 0
+        ? residency.tasks
+        : ['text_generation', 'image_generation', 'tts', 'stt'];
+    const seen = new Set<string>();
+    const out: AfSelectOption[] = [];
+    const labelFor = (task: string) => {
+      if (task === 'text_generation') return 'Text generation';
+      if (task === 'image_generation') return 'Image generation';
+      if (task === 'tts') return 'Speech';
+      if (task === 'stt') return 'Transcription';
+      return task.replace(/_/g, ' ');
+    };
+    for (const task of rawTasks) {
+      if (typeof task !== 'string') continue;
+      const clean = task.trim();
+      if (!clean || seen.has(clean)) continue;
+      if (supports[clean] === false) continue;
+      if ((clean === 'tts' || clean === 'stt') && supports[clean] !== true) continue;
+      seen.add(clean);
+      out.push({ value: clean, label: labelFor(clean) });
+    }
+    return out.length > 0 ? out : [{ value: 'text_generation', label: 'Text generation' }];
+  })();
   const usesGenericProviderCatalog = Boolean(
     node &&
       (node.data.nodeType === 'agent' ||
         node.data.nodeType === 'llm_call' ||
+        (node.data.nodeType === 'model_residency' && modelResidencyTaskForCatalog === 'text_generation') ||
         ((node.data.nodeType === 'on_flow_start' || node.data.nodeType === 'on_flow_end') &&
           (node.data.nodeType === 'on_flow_start' ? node.data.outputs : node.data.inputs).some(
             (p) => isTextProviderPin(p) || isTextModelPin(p)
@@ -431,6 +471,10 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     const fromEffect = (n?.effectConfig as any)?.provider;
     if (typeof fromAgent === 'string' && fromAgent.trim()) return fromAgent;
     if (typeof fromEffect === 'string' && fromEffect.trim()) return fromEffect;
+    if (n?.nodeType === 'model_residency' && modelResidencyTaskForCatalog === 'text_generation') {
+      const raw = n.pinDefaults?.provider;
+      if (typeof raw === 'string' && raw.trim()) return raw.trim();
+    }
 
     if (n && (n.nodeType === 'on_flow_start' || n.nodeType === 'on_flow_end')) {
       const pins = n.nodeType === 'on_flow_start' ? n.outputs : n.inputs;
@@ -503,13 +547,29 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       if (typeof data?.active_model === 'string' && data.active_model.trim()) out.unshift(data.active_model.trim());
       return uniq(out);
     };
+    const providersFrom = (data: any, arrayKeys: string[], mapKeys: string[] = []) => {
+      const out: string[] = [];
+      for (const key of arrayKeys) {
+        const values = data && Array.isArray(data[key]) ? data[key] : [];
+        for (const item of values) {
+          if (typeof item === 'string' && item.trim()) out.push(item.trim());
+        }
+      }
+      for (const key of mapKeys) {
+        const values = data && data[key] && typeof data[key] === 'object' ? Object.keys(data[key]) : [];
+        for (const item of values) {
+          if (typeof item === 'string' && item.trim()) out.push(item.trim());
+        }
+      }
+      return uniq(out);
+    };
     const query = (extra: Record<string, string | undefined>) =>
       Object.fromEntries(Object.entries(extra).filter(([, v]) => typeof v === 'string' && v.trim()));
 
     setLoadingMediaModels(true);
 
     if (request.scope === 'image') {
-      if (!request.provider || !visionProviderModelsEndpoint) {
+      if (!visionProviderModelsEndpoint) {
         setImageModelOptions([]);
         setLoadingMediaModels(false);
         return;
@@ -523,6 +583,19 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           const seenImages = new Set<string>();
           const values = Array.isArray(imageProviderCatalog?.models) ? imageProviderCatalog.models : [];
           for (const item of values) {
+            if (typeof item === 'string') {
+              const raw = item.trim();
+              if (!raw) continue;
+              const parts = raw.split(' / ');
+              const provider = (parts.length >= 2 ? parts[0] : request.provider || '').trim();
+              const model = (parts.length >= 2 ? parts.slice(1).join(' / ') : raw).trim();
+              if (!provider || !model) continue;
+              const key = `${provider}::${model}`;
+              if (seenImages.has(key)) continue;
+              seenImages.add(key);
+              imageOptions.push({ provider, model, label: raw });
+              continue;
+            }
             if (!item || typeof item !== 'object') continue;
             const rec = item as Record<string, unknown>;
             const provider = String(rec.provider || rec.provider_id || rec.provider_name || request.provider || '').trim();
@@ -546,12 +619,6 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     }
 
     if (request.scope === 'tts') {
-      if (!request.provider) {
-        setVoiceOptions([]);
-        setTtsModelOptions([]);
-        setLoadingMediaModels(false);
-        return;
-      }
       Promise.all([
         voiceCatalogEndpoint
           ? gatewayJson<any>(
@@ -566,6 +633,12 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           : Promise.resolve({}),
       ])
         .then(([voiceCatalog, ttsCatalog]) => {
+          setTtsProviderOptions(
+            uniq([
+              ...providersFrom(voiceCatalog, ['tts_providers', 'providers', 'available_tts_providers'], ['tts_models_by_provider', 'tts_profiles_by_provider', 'tts_voices_by_provider']),
+              ...providersFrom(ttsCatalog, ['tts_providers', 'providers', 'available_providers'], ['models_by_provider', 'tts_models_by_provider']),
+            ])
+          );
           const voices: Array<{ value: string; label: string; mode?: string }> = [];
           const seenVoices = new Set<string>();
           for (const key of ['profiles', 'voices', 'cloned_voices']) {
@@ -583,19 +656,33 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           setVoiceOptions(voices);
           setTtsModelOptions(modelsFrom(ttsCatalog, 'models', 'data', 'tts_models'));
         })
+        .catch(() => {
+          setTtsProviderOptions([]);
+          setVoiceOptions([]);
+          setTtsModelOptions([]);
+        })
         .finally(() => setLoadingMediaModels(false));
       return;
     }
 
     if (request.scope === 'stt') {
-      if (!request.provider || !sttModelsEndpoint) {
+      if (!sttModelsEndpoint) {
+        setSttProviderOptions([]);
         setSttModelOptions([]);
         setLoadingMediaModels(false);
         return;
       }
       gatewayJson<any>(gatewayPath(sttModelsEndpoint, {}, query({ provider: request.provider })), { timeoutMs: 30_000 })
-        .then((sttCatalog) => setSttModelOptions(modelsFrom(sttCatalog, 'models', 'data', 'stt_models')))
-        .catch(() => setSttModelOptions([]))
+        .then((sttCatalog) => {
+          setSttProviderOptions(
+            providersFrom(sttCatalog, ['stt_providers', 'providers', 'available_providers'], ['models_by_provider', 'stt_models_by_provider'])
+          );
+          setSttModelOptions(modelsFrom(sttCatalog, 'models', 'data', 'stt_models'));
+        })
+        .catch(() => {
+          setSttProviderOptions([]);
+          setSttModelOptions([]);
+        })
         .finally(() => setLoadingMediaModels(false));
     }
   }, [
@@ -1207,6 +1294,117 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     }
   };
 
+  const residencyTarget = (() => {
+    const first = (...values: unknown[]) => {
+      for (const value of values) {
+        const raw = typeof value === 'string' ? value.trim() : '';
+        if (raw) return raw;
+      }
+      return '';
+    };
+    if (data.nodeType === 'llm_call') {
+      return {
+        task: 'text_generation',
+        provider: isInputPinConnected('provider') ? '' : first(data.effectConfig?.provider, data.pinDefaults?.provider),
+        model: isInputPinConnected('model') ? '' : first(data.effectConfig?.model, data.pinDefaults?.model),
+        blockedReason:
+          isInputPinConnected('provider') || isInputPinConnected('model')
+            ? 'Provider or model comes from connected pins. Add a dedicated Model Residency node for dynamic control.'
+            : '',
+        eligible: true,
+      };
+    }
+    if (data.nodeType === 'agent') {
+      return {
+        task: 'text_generation',
+        provider: isInputPinConnected('provider') ? '' : first(data.agentConfig?.provider, data.pinDefaults?.provider),
+        model: isInputPinConnected('model') ? '' : first(data.agentConfig?.model, data.pinDefaults?.model),
+        blockedReason:
+          isInputPinConnected('provider') || isInputPinConnected('model')
+            ? 'Provider or model comes from connected pins. Add a dedicated Model Residency node for dynamic control.'
+            : '',
+        eligible: true,
+      };
+    }
+    if (data.nodeType === 'generate_image') {
+      return {
+        task: 'image_generation',
+        provider: isInputPinConnected('image_provider')
+          ? ''
+          : first(data.effectConfig?.image_provider, data.pinDefaults?.image_provider, data.effectConfig?.provider, data.pinDefaults?.provider),
+        model: isInputPinConnected('image_model')
+          ? ''
+          : first(data.effectConfig?.image_model, data.pinDefaults?.image_model, data.effectConfig?.model, data.pinDefaults?.model),
+        blockedReason:
+          isInputPinConnected('image_provider') || isInputPinConnected('image_model')
+            ? 'Image provider or model comes from connected pins. Add a dedicated Model Residency node for dynamic control.'
+            : '',
+        eligible: true,
+      };
+    }
+    if (data.nodeType === 'generate_voice') {
+      return {
+        task: 'tts',
+        provider: isInputPinConnected('tts_provider')
+          ? ''
+          : first(data.effectConfig?.tts_provider, data.pinDefaults?.tts_provider, data.effectConfig?.provider, data.pinDefaults?.provider),
+        model: isInputPinConnected('tts_model')
+          ? ''
+          : first(data.effectConfig?.tts_model, data.pinDefaults?.tts_model, data.effectConfig?.model, data.pinDefaults?.model),
+        blockedReason:
+          isInputPinConnected('tts_provider') || isInputPinConnected('tts_model')
+            ? 'Voice provider or model comes from connected pins. Add a dedicated Model Residency node for dynamic control.'
+            : '',
+        eligible: true,
+      };
+    }
+    if (data.nodeType === 'transcribe_audio' || data.nodeType === 'listen_voice') {
+      return {
+        task: 'stt',
+        provider: isInputPinConnected('stt_provider')
+          ? ''
+          : first(data.effectConfig?.stt_provider, data.pinDefaults?.stt_provider, data.effectConfig?.provider, data.pinDefaults?.provider),
+        model: isInputPinConnected('stt_model')
+          ? ''
+          : first(data.effectConfig?.stt_model, data.pinDefaults?.stt_model, data.effectConfig?.model, data.pinDefaults?.model),
+        blockedReason:
+          isInputPinConnected('stt_provider') || isInputPinConnected('stt_model')
+            ? 'Transcription provider or model comes from connected pins. Add a dedicated Model Residency node for dynamic control.'
+            : '',
+        eligible: true,
+      };
+    }
+    return null;
+  })();
+
+  const addModelResidencyStep = (operation: 'load' | 'unload') => {
+    if (!residencyTarget?.eligible) return;
+    const provider = residencyTarget.provider.trim();
+    const model = residencyTarget.model.trim();
+    if (!provider || !model) {
+      toast.error('Select a concrete provider and model before adding a residency step.');
+      return;
+    }
+    try {
+      const result = insertModelResidencyStep({
+        nodes,
+        edges,
+        selectedNode: node,
+        operation,
+        target: {
+          task: residencyTarget.task,
+          provider,
+          model,
+        },
+      });
+      setNodes(result.nodes);
+      setEdges(result.edges);
+      toast.success(operation === 'load' ? 'Warm-up step added before this node' : 'Unload step added after this node');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not add model residency step.');
+    }
+  };
+
   return (
     <div className="properties-panel">
       <h3>Properties</h3>
@@ -1241,6 +1439,41 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           disabled
         />
       </div>
+
+      {residencyTarget && (
+        <div className="property-section">
+          <label className="property-label">Model Residency</label>
+          <span className="property-hint">
+            Add explicit ledgered warm/unload steps for this node&apos;s selected model.
+          </span>
+          <div className="property-group">
+            <label className="property-sublabel">Target</label>
+            <span className="property-hint">
+              {residencyTarget.provider && residencyTarget.model
+                ? `${residencyTarget.provider} / ${residencyTarget.model}`
+                : residencyTarget.blockedReason || 'Select a concrete provider and model first. Gateway defaults cannot be preloaded explicitly.'}
+            </span>
+          </div>
+          <div className="property-actions-row">
+            <button
+              type="button"
+              className="modal-button"
+              disabled={!residencyTarget.provider || !residencyTarget.model || Boolean(residencyTarget.blockedReason)}
+              onClick={() => addModelResidencyStep('load')}
+            >
+              Add warm-up step before
+            </button>
+            <button
+              type="button"
+              className="modal-button"
+              disabled={!residencyTarget.provider || !residencyTarget.model || Boolean(residencyTarget.blockedReason)}
+              onClick={() => addModelResidencyStep('unload')}
+            >
+              Add unload step after
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="property-section">
         <label className="property-label">Input Key (optional)</label>
@@ -4193,6 +4426,208 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           </span>
         </div>
       )}
+
+      {data.nodeType === 'model_residency' && (() => {
+        const updateResidency = (patch: Record<string, unknown>) => {
+          const nextEffect = { ...(data.effectConfig || {}) } as Record<string, unknown>;
+          const nextDefaults = { ...(data.pinDefaults || {}) } as Record<string, unknown>;
+          for (const [key, value] of Object.entries(patch)) {
+            if (value === undefined || value === null || value === '') {
+              delete nextEffect[key];
+              delete nextDefaults[key];
+            } else {
+              nextEffect[key] = value;
+              nextDefaults[key] = value;
+            }
+          }
+          updateNodeData(node.id, {
+            effectConfig: nextEffect as FlowNodeData['effectConfig'],
+            pinDefaults: nextDefaults as FlowNodeData['pinDefaults'],
+          });
+        };
+        const operation = data.effectConfig?.operation || data.pinDefaults?.operation || 'load';
+        const task = data.effectConfig?.task || data.pinDefaults?.task || 'image_generation';
+        const provider = data.effectConfig?.provider || data.pinDefaults?.provider || '';
+        const model = data.effectConfig?.model || data.pinDefaults?.model || '';
+        const pin = typeof data.effectConfig?.pin === 'boolean'
+          ? data.effectConfig.pin
+          : typeof data.pinDefaults?.pin === 'boolean'
+            ? data.pinDefaults.pin
+            : true;
+        const required = typeof data.effectConfig?.required === 'boolean'
+          ? data.effectConfig.required
+          : typeof data.pinDefaults?.required === 'boolean'
+            ? data.pinDefaults.required
+            : false;
+        const taskValue = String(task || 'image_generation');
+        const providerValue = String(provider || '');
+        const modelValue = String(model || '');
+        const addOption = (out: AfSelectOption[], seen: Set<string>, value: string, label?: string) => {
+          const clean = String(value || '').trim();
+          if (!clean || seen.has(clean)) return;
+          seen.add(clean);
+          out.push({ value: clean, label: label || clean });
+        };
+        const residencyProviderOptions: AfSelectOption[] = [];
+        const seenProviders = new Set<string>();
+        if (taskValue === 'text_generation') {
+          for (const item of providers) addOption(residencyProviderOptions, seenProviders, item.name, item.display_name || item.name);
+        } else if (taskValue === 'image_generation') {
+          for (const item of imageModelOptions) addOption(residencyProviderOptions, seenProviders, item.provider);
+        } else if (taskValue === 'tts') {
+          for (const item of ttsProviderOptions) addOption(residencyProviderOptions, seenProviders, item);
+        } else if (taskValue === 'stt') {
+          for (const item of sttProviderOptions) addOption(residencyProviderOptions, seenProviders, item);
+        }
+        addOption(residencyProviderOptions, seenProviders, providerValue);
+
+        const residencyModelOptions: AfSelectOption[] = [];
+        const seenModels = new Set<string>();
+        if (taskValue === 'text_generation') {
+          for (const item of models) addOption(residencyModelOptions, seenModels, item);
+        } else if (taskValue === 'image_generation') {
+          const normalizedProvider = normalizeMediaProvider(providerValue);
+          for (const item of imageModelOptions) {
+            if (normalizedProvider && normalizeMediaProvider(item.provider) !== normalizedProvider) continue;
+            addOption(residencyModelOptions, seenModels, item.model, item.label);
+          }
+        } else if (taskValue === 'tts') {
+          for (const item of ttsModelOptions) addOption(residencyModelOptions, seenModels, item);
+        } else if (taskValue === 'stt') {
+          for (const item of sttModelOptions) addOption(residencyModelOptions, seenModels, item);
+        }
+        addOption(residencyModelOptions, seenModels, modelValue);
+
+        const providerLoading = taskValue === 'text_generation' ? loadingProviders : loadingMediaModels;
+        const modelLoading = taskValue === 'text_generation' ? loadingModels : loadingMediaModels;
+        const taskPlaceholder =
+          taskValue === 'image_generation'
+            ? 'Image generation'
+            : taskValue === 'tts'
+              ? 'Speech'
+              : taskValue === 'stt'
+                ? 'Transcription'
+                : 'Text generation';
+        const providerPlaceholder =
+          taskValue === 'image_generation'
+            ? 'Image provider…'
+            : taskValue === 'tts'
+              ? 'Speech provider…'
+              : taskValue === 'stt'
+                ? 'Transcription provider…'
+                : 'Provider…';
+        const modelPlaceholder =
+          taskValue === 'tts'
+            ? 'Speech model…'
+            : taskValue === 'stt'
+              ? 'Transcription model…'
+              : 'Model…';
+        return (
+          <div className="property-section">
+            <label className="property-label">Model Residency</label>
+            <div className="property-group">
+              <label className="property-sublabel">Operation</label>
+              <select
+                className="property-select"
+                value={String(operation)}
+                onChange={(e) => updateResidency({ operation: e.target.value || 'load' })}
+              >
+                <option value="load">Load</option>
+                <option value="list_loaded">List loaded</option>
+                <option value="unload">Unload</option>
+              </select>
+            </div>
+            <div className="property-group">
+              <label className="property-sublabel">Task</label>
+              <AfSelect
+                value={taskValue}
+                options={modelResidencyTaskOptions}
+                placeholder={taskPlaceholder}
+                searchable={false}
+                clearable={false}
+                minPopoverWidth={220}
+                onChange={(value) => updateResidency({ task: value || 'image_generation', provider: undefined, model: undefined })}
+              />
+            </div>
+            <div className="property-group">
+              <label className="property-sublabel">Provider</label>
+              {providerPinConnected ? (
+                <span className="property-hint">Provided by connected pin.</span>
+              ) : (
+                <AfSelect
+                  value={providerValue}
+                  options={residencyProviderOptions}
+                  placeholder={providerLoading ? 'Loading…' : providerPlaceholder}
+                  loading={providerLoading}
+                  searchable
+                  allowCustom
+                  clearable
+                  minPopoverWidth={300}
+                  searchPlaceholder="Search providers…"
+                  onOpen={() => {
+                    if (taskValue === 'image_generation') requestMediaCatalog('image');
+                    if (taskValue === 'tts') requestMediaCatalog('tts');
+                    if (taskValue === 'stt') requestMediaCatalog('stt');
+                  }}
+                  onChange={(value) => {
+                    const nextProvider = value.trim();
+                    updateResidency({ provider: nextProvider || undefined, model: undefined });
+                    if (taskValue === 'image_generation' && nextProvider) requestMediaCatalog('image', { provider: nextProvider });
+                    if (taskValue === 'tts') requestMediaCatalog('tts', { provider: nextProvider || undefined });
+                    if (taskValue === 'stt') requestMediaCatalog('stt', { provider: nextProvider || undefined });
+                  }}
+                />
+              )}
+            </div>
+            <div className="property-group">
+              <label className="property-sublabel">Model</label>
+              {modelPinConnected ? (
+                <span className="property-hint">Provided by connected pin.</span>
+              ) : (
+                <AfSelect
+                  value={modelValue}
+                  options={residencyModelOptions}
+                  placeholder={!providerValue ? 'Pick provider…' : modelLoading ? 'Loading…' : modelPlaceholder}
+                  disabled={!providerValue}
+                  loading={modelLoading}
+                  searchable
+                  allowCustom
+                  clearable
+                  minPopoverWidth={420}
+                  searchPlaceholder="Search models…"
+                  onOpen={() => {
+                    if (taskValue === 'image_generation') requestMediaCatalog('image', providerValue ? { provider: providerValue } : {});
+                    if (taskValue === 'tts') requestMediaCatalog('tts', providerValue ? { provider: providerValue } : {});
+                    if (taskValue === 'stt') requestMediaCatalog('stt', providerValue ? { provider: providerValue } : {});
+                  }}
+                  onChange={(value) => updateResidency({ model: value.trim() || undefined })}
+                />
+              )}
+            </div>
+            <label className="toggle-container">
+              <input
+                type="checkbox"
+                className="toggle-checkbox"
+                checked={pin}
+                onChange={(e) => updateResidency({ pin: e.target.checked })}
+              />
+              <span className="toggle-label">Keep loaded until explicit unload</span>
+            </label>
+            <label className="toggle-container">
+              <input
+                type="checkbox"
+                className="toggle-checkbox"
+                checked={required}
+                onChange={(e) => updateResidency({ required: e.target.checked })}
+              />
+              <span className="toggle-label">Fail this step if the control call fails</span>
+            </label>
+            <span className="property-hint">
+              Residency controls optimize speed and memory. Historical runs use the recorded ledger result, not the current loaded-models panel.
+            </span>
+          </div>
+        );
+      })()}
 
       {/* Media capability properties */}
       {['generate_image', 'generate_voice', 'transcribe_audio', 'listen_voice'].includes(data.nodeType) && (

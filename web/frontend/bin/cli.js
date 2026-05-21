@@ -188,6 +188,38 @@ function sendJson(res, status, payload) {
   res.end(JSON.stringify(payload, null, 2));
 }
 
+const HOP_BY_HOP_HEADERS = new Set([
+  'connection',
+  'keep-alive',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'te',
+  'trailer',
+  'trailers',
+  'transfer-encoding',
+  'upgrade',
+]);
+
+function isEventStreamResponse(headers) {
+  const value = headers?.['content-type'] || headers?.['Content-Type'] || '';
+  return String(Array.isArray(value) ? value.join(',') : value).toLowerCase().includes('text/event-stream');
+}
+
+function proxyResponseHeaders(headers, eventStream = false) {
+  const out = {};
+  for (const [key, value] of Object.entries(headers || {})) {
+    const k = String(key).toLowerCase();
+    if (HOP_BY_HOP_HEADERS.has(k) || k === 'content-length') continue;
+    out[key] = value;
+  }
+  if (eventStream) {
+    const keys = new Set(Object.keys(out).map((key) => key.toLowerCase()));
+    if (!keys.has('cache-control')) out['Cache-Control'] = 'no-cache';
+    if (!keys.has('x-accel-buffering')) out['X-Accel-Buffering'] = 'no';
+  }
+  return out;
+}
+
 function readRequestJson(req) {
   return new Promise((resolve) => {
     const chunks = [];
@@ -342,7 +374,11 @@ function proxyApiRequest(req, res) {
       headers,
     },
     (proxyRes) => {
-      res.writeHead(proxyRes.statusCode || 502, proxyRes.headers);
+      const eventStream = isEventStreamResponse(proxyRes.headers);
+      res.writeHead(proxyRes.statusCode || 502, proxyResponseHeaders(proxyRes.headers, eventStream));
+      if (eventStream && typeof res.flushHeaders === 'function') {
+        res.flushHeaders();
+      }
       proxyRes.pipe(res);
     }
   );

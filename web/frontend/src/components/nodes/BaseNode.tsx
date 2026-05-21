@@ -9,6 +9,7 @@
 import { Fragment, memo, type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Handle, Position, NodeProps, useEdges, useReactFlow, useUpdateNodeInternals } from 'reactflow';
 import { clsx } from 'clsx';
+import toast from 'react-hot-toast';
 import type { FlowNodeData, JsonValue, PinType } from '../../types/flow';
 import { PIN_COLORS, isEntryNodeType } from '../../types/flow';
 import { PinShape } from '../pins/PinShape';
@@ -22,6 +23,7 @@ import { upsertPythonAvailableVariablesComments } from '../../utils/codegen';
 import AfSelect from '../inputs/AfSelect';
 import AfMultiSelect from '../inputs/AfMultiSelect';
 import { gatewayJson, gatewayPath } from '../../utils/gatewayClient';
+import { insertModelResidencyStep, type ModelResidencyOperation } from '../../utils/modelResidencyGraph';
 import {
   applyImagePinDefaultPatch,
   extractImageModelParameterMetadata,
@@ -82,6 +84,14 @@ function formatOptionsFrom(values: unknown, fallback: string[]): SelectOption[] 
 
 function normalizeMediaProvider(value: string): string {
   return String(value || '').trim().toLowerCase().replace(/_/g, '-');
+}
+
+function firstConfigString(...values: unknown[]): string {
+  for (const value of values) {
+    const raw = typeof value === 'string' ? value.trim() : '';
+    if (raw) return raw;
+  }
+  return '';
 }
 
 function providerOptionMapValues(map: ProviderOptionMap, provider: string, fallback: SelectOption[]): SelectOption[] {
@@ -531,7 +541,7 @@ export const BaseNode = memo(function BaseNode({
     }
   }, [data.nodeType]);
 
-  const { executingNodeId, disconnectPin, updateNodeData, recentNodeIds, loopProgressByNodeId } = useFlowStore();
+  const { executingNodeId, disconnectPin, updateNodeData, setNodes, recentNodeIds, loopProgressByNodeId } = useFlowStore();
   const allNodes = useFlowStore((s) => s.nodes);
   const isExecuting = executingNodeId === id;
   const isRecent = Boolean(recentNodeIds && (recentNodeIds as Record<string, true>)[id]);
@@ -838,6 +848,7 @@ export const BaseNode = memo(function BaseNode({
   const isBoolVarNode = data.nodeType === 'bool_var';
   const isVarDeclNode = data.nodeType === 'var_decl';
   const isProviderModelsNode = data.nodeType === 'provider_models';
+  const isModelResidencyNode = data.nodeType === 'model_residency';
   const isGenerateImageNode = data.nodeType === 'generate_image';
   const isGenerateVoiceNode = data.nodeType === 'generate_voice';
   const isTranscribeAudioNode = data.nodeType === 'transcribe_audio';
@@ -889,14 +900,141 @@ export const BaseNode = memo(function BaseNode({
       : subflowHasModelPin
         ? pinnedModel
         : '';
-
-  const firstConfigString = (...values: unknown[]): string => {
-    for (const value of values) {
-      const raw = typeof value === 'string' ? value.trim() : '';
-      if (raw) return raw;
+  const residencyAuthoringTarget = useMemo(() => {
+    if (isLlmNode) {
+      const blocked = providerConnected || modelConnected;
+      return {
+        task: 'text_generation',
+        provider: blocked ? '' : firstConfigString(data.effectConfig?.provider, pinDefaults.provider),
+        model: blocked ? '' : firstConfigString(data.effectConfig?.model, pinDefaults.model),
+        blockedReason: blocked ? 'Dynamic provider/model is wired from pins.' : '',
+      };
     }
-    return '';
-  };
+    if (isAgentNode) {
+      const blocked = providerConnected || modelConnected;
+      return {
+        task: 'text_generation',
+        provider: blocked ? '' : firstConfigString(data.agentConfig?.provider, pinDefaults.provider),
+        model: blocked ? '' : firstConfigString(data.agentConfig?.model, pinDefaults.model),
+        blockedReason: blocked ? 'Dynamic provider/model is wired from pins.' : '',
+      };
+    }
+    if (isGenerateImageNode) {
+      const providerBlocked = isPinConnected('image_provider', true);
+      const modelBlocked = isPinConnected('image_model', true);
+      const blocked = providerBlocked || modelBlocked;
+      return {
+        task: 'image_generation',
+        provider: blocked
+          ? ''
+          : firstConfigString(data.effectConfig?.image_provider, pinDefaults.image_provider, data.effectConfig?.provider, pinDefaults.provider),
+        model: blocked
+          ? ''
+          : firstConfigString(data.effectConfig?.image_model, pinDefaults.image_model, data.effectConfig?.model, pinDefaults.model),
+        blockedReason: blocked ? 'Dynamic image provider/model is wired from pins.' : '',
+      };
+    }
+    if (isGenerateVoiceNode) {
+      const providerBlocked = isPinConnected('tts_provider', true);
+      const modelBlocked = isPinConnected('tts_model', true);
+      const blocked = providerBlocked || modelBlocked;
+      return {
+        task: 'tts',
+        provider: blocked
+          ? ''
+          : firstConfigString(data.effectConfig?.tts_provider, pinDefaults.tts_provider, data.effectConfig?.provider, pinDefaults.provider),
+        model: blocked
+          ? ''
+          : firstConfigString(data.effectConfig?.tts_model, pinDefaults.tts_model, data.effectConfig?.model, pinDefaults.model),
+        blockedReason: blocked ? 'Dynamic voice provider/model is wired from pins.' : '',
+      };
+    }
+    if (isTranscribeAudioNode || isListenVoiceNode) {
+      const providerBlocked = isPinConnected('stt_provider', true);
+      const modelBlocked = isPinConnected('stt_model', true);
+      const blocked = providerBlocked || modelBlocked;
+      return {
+        task: 'stt',
+        provider: blocked
+          ? ''
+          : firstConfigString(data.effectConfig?.stt_provider, pinDefaults.stt_provider, data.effectConfig?.provider, pinDefaults.provider),
+        model: blocked
+          ? ''
+          : firstConfigString(data.effectConfig?.stt_model, pinDefaults.stt_model, data.effectConfig?.model, pinDefaults.model),
+        blockedReason: blocked ? 'Dynamic transcription provider/model is wired from pins.' : '',
+      };
+    }
+    return null;
+  }, [
+    data.agentConfig?.model,
+    data.agentConfig?.provider,
+    data.effectConfig?.image_model,
+    data.effectConfig?.image_provider,
+    data.effectConfig?.model,
+    data.effectConfig?.provider,
+    data.effectConfig?.stt_model,
+    data.effectConfig?.stt_provider,
+    data.effectConfig?.tts_model,
+    data.effectConfig?.tts_provider,
+    isAgentNode,
+    isGenerateImageNode,
+    isGenerateVoiceNode,
+    isListenVoiceNode,
+    isLlmNode,
+    isTranscribeAudioNode,
+    modelConnected,
+    pinDefaults.image_model,
+    pinDefaults.image_provider,
+    pinDefaults.model,
+    pinDefaults.provider,
+    pinDefaults.stt_model,
+    pinDefaults.stt_provider,
+    pinDefaults.tts_model,
+    pinDefaults.tts_provider,
+    providerConnected,
+    edges,
+    id,
+  ]);
+
+  const handleAddModelResidencyStep = useCallback(
+    (operation: ModelResidencyOperation) => {
+      const target = residencyAuthoringTarget;
+      if (!target) return;
+      if (target.blockedReason) {
+        toast.error(`${target.blockedReason} Add a dedicated Model Residency node for explicit control.`);
+        return;
+      }
+      if (!target.provider || !target.model) {
+        toast.error('Select a concrete provider and model before adding a residency step.');
+        return;
+      }
+      const selectedNode = allNodes.find((n) => n.id === id);
+      if (!selectedNode) {
+        toast.error('Selected node was not found in the current graph.');
+        return;
+      }
+      try {
+        const result = insertModelResidencyStep({
+          nodes: allNodes,
+          edges,
+          selectedNode,
+          operation,
+          target: {
+            task: target.task,
+            provider: target.provider,
+            model: target.model,
+          },
+        });
+        setNodes(result.nodes);
+        setEdges(result.edges);
+        toast.success(operation === 'load' ? 'Warm-up step added before this node' : 'Unload step added after this node');
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Could not add model residency step.');
+      }
+    },
+    [allNodes, edges, id, residencyAuthoringTarget, setEdges, setNodes]
+  );
+
   const selectedImageProvider = firstConfigString(data.effectConfig?.image_provider, pinDefaults.image_provider, pinDefaults.provider_image);
   const selectedImageModel = firstConfigString(data.effectConfig?.image_model, pinDefaults.image_model, pinDefaults.model_image);
   const selectedTtsProvider = firstConfigString(data.effectConfig?.tts_provider, pinDefaults.tts_provider, pinDefaults.provider_voice);
@@ -911,8 +1049,24 @@ export const BaseNode = memo(function BaseNode({
         : 'standard';
   const selectedSttProvider = firstConfigString(data.effectConfig?.stt_provider, pinDefaults.stt_provider, pinDefaults.provider_voice);
   const selectedSttModel = firstConfigString(data.effectConfig?.stt_model, pinDefaults.stt_model, pinDefaults.model_voice);
+  const selectedResidencyOperation = firstConfigString(data.effectConfig?.operation, pinDefaults.operation) || 'load';
+  const selectedResidencyTask = firstConfigString(data.effectConfig?.task, pinDefaults.task) || 'image_generation';
+  const selectedResidencyProvider = firstConfigString(data.effectConfig?.provider, pinDefaults.provider);
+  const selectedResidencyModel = firstConfigString(data.effectConfig?.model, pinDefaults.model);
+  const selectedResidencyPin =
+    typeof data.effectConfig?.pin === 'boolean'
+      ? data.effectConfig.pin
+      : typeof pinDefaults.pin === 'boolean'
+        ? pinDefaults.pin
+        : true;
+  const selectedResidencyRequired =
+    typeof data.effectConfig?.required === 'boolean'
+      ? data.effectConfig.required
+      : typeof pinDefaults.required === 'boolean'
+        ? pinDefaults.required
+        : false;
 
-  const mediaCapabilitiesQuery = useGatewayCapabilities(isMediaNode);
+  const mediaCapabilitiesQuery = useGatewayCapabilities(isMediaNode || isModelResidencyNode);
   const gatewayContracts = gatewayContractsFromCapabilities(mediaCapabilitiesQuery.data);
   const generatedImageContract =
     gatewayContracts?.flow_editor?.media?.generated_image || gatewayContracts?.assistant?.media?.generated_image;
@@ -937,10 +1091,16 @@ export const BaseNode = memo(function BaseNode({
   const [profileOptions, setProfileOptions] = useState<MediaModelOption[]>([]);
   const [ttsFormatsByProvider, setTtsFormatsByProvider] = useState<ProviderOptionMap>({});
 
-  const providersQuery = useProviders(hasProviderDropdown && (!providerConnected || !modelConnected));
+  const residencyTextCatalogEnabled = isModelResidencyNode && selectedResidencyTask === 'text_generation';
+  const providersQuery = useProviders(
+    (hasProviderDropdown && (!providerConnected || !modelConnected)) ||
+    (residencyTextCatalogEnabled && (!isPinConnected('provider', true) || !isPinConnected('model', true)))
+  );
   const modelsQuery = useModels(
-    selectedProvider,
-    (hasModelControls && !modelConnected) || (isProviderModelsNode && !providerConnected)
+    isModelResidencyNode ? selectedResidencyProvider : selectedProvider,
+    (hasModelControls && !modelConnected) ||
+      (isProviderModelsNode && !providerConnected) ||
+      (residencyTextCatalogEnabled && Boolean(selectedResidencyProvider) && !isPinConnected('model', true))
   );
   const toolsQuery = useTools((isAgentNode || isLlmNode || isToolsAllowlistNode || isVarDeclNode || isToolParametersNode || subflowHasToolsPin) && !toolsConnected);
 
@@ -977,6 +1137,31 @@ export const BaseNode = memo(function BaseNode({
       .filter((option) => normalizeMediaProvider(option.provider) === normalizeMediaProvider(selectedImageProvider))
       .map((option) => ({ value: option.model, label: option.label }));
   }, [imageModelOptions, selectedImageProvider]);
+  const residencyProviderOptions = useMemo(() => {
+    if (selectedResidencyTask === 'image_generation') {
+      const seen = new Set<string>();
+      const out: SelectOption[] = [];
+      const add = (value: string, label?: string) => {
+        const clean = value.trim();
+        if (!clean || seen.has(clean)) return;
+        seen.add(clean);
+        out.push({ value: clean, label: label || clean });
+      };
+      for (const option of imageProviderOptions) add(option.value, option.label);
+      if (selectedResidencyProvider) add(selectedResidencyProvider);
+      return out;
+    }
+    if (selectedResidencyTask === 'tts') {
+      return ttsProviderOptions.map((option) => ({ value: option.value, label: option.label }));
+    }
+    if (selectedResidencyTask === 'stt') {
+      return sttProviderOptions.map((option) => ({ value: option.value, label: option.label }));
+    }
+    if (selectedResidencyTask === 'text_generation') {
+      return providers.map((p) => ({ value: p.name, label: p.display_name || p.name }));
+    }
+    return selectedResidencyProvider ? [{ value: selectedResidencyProvider, label: selectedResidencyProvider }] : [];
+  }, [imageProviderOptions, providers, selectedResidencyProvider, selectedResidencyTask, sttProviderOptions, ttsProviderOptions]);
   const visibleTtsModelOptions = useMemo(() => {
     const baseOptions = selectedTtsProvider
       ? ttsModelOptions.filter((option) => normalizeMediaProvider(option.provider) === normalizeMediaProvider(selectedTtsProvider))
@@ -1017,6 +1202,34 @@ export const BaseNode = memo(function BaseNode({
       : sttModelOptions;
     return options.map((option) => ({ value: option.model, label: option.label }));
   }, [selectedSttProvider, sttModelOptions]);
+  const residencyModelOptions = useMemo(() => {
+    if (selectedResidencyTask === 'image_generation') {
+      const options = !selectedResidencyProvider
+        ? imageModelOptions
+        : imageModelOptions.filter((option) => normalizeMediaProvider(option.provider) === normalizeMediaProvider(selectedResidencyProvider));
+      const seen = new Set<string>();
+      const out: SelectOption[] = [];
+      const add = (value: string, label?: string) => {
+        const clean = value.trim();
+        if (!clean || seen.has(clean)) return;
+        seen.add(clean);
+        out.push({ value: clean, label: label || clean });
+      };
+      for (const option of options) add(option.model, option.label);
+      if (selectedResidencyModel) add(selectedResidencyModel);
+      return out;
+    }
+    if (selectedResidencyTask === 'tts') {
+      return visibleTtsModelOptions;
+    }
+    if (selectedResidencyTask === 'stt') {
+      return visibleSttModelOptions;
+    }
+    if (selectedResidencyTask === 'text_generation') {
+      return models.map((m) => ({ value: m, label: m }));
+    }
+    return selectedResidencyModel ? [{ value: selectedResidencyModel, label: selectedResidencyModel }] : [];
+  }, [imageModelOptions, models, selectedResidencyModel, selectedResidencyProvider, selectedResidencyTask, visibleSttModelOptions, visibleTtsModelOptions]);
   const imageFormatOptions = useMemo(
     () => formatOptionsFrom(generatedImageContract?.direct_endpoint?.formats, DEFAULT_IMAGE_FORMATS),
     [generatedImageContract?.direct_endpoint?.formats]
@@ -1036,7 +1249,7 @@ export const BaseNode = memo(function BaseNode({
   const sttFormatOptions = useMemo(() => formatOptionsFrom(undefined, DEFAULT_STT_FORMATS), []);
 
   useEffect(() => {
-    if (!isMediaNode || !mediaCatalogRequest) return;
+    if ((!isMediaNode && !isModelResidencyNode) || !mediaCatalogRequest) return;
 
     let cancelled = false;
     const request = mediaCatalogRequest;
@@ -1420,6 +1633,7 @@ export const BaseNode = memo(function BaseNode({
       cancelled = true;
     };
   }, [
+    isModelResidencyNode,
     isMediaNode,
     mediaCatalogRequest,
     voiceCatalogEndpoint,
@@ -1705,6 +1919,57 @@ export const BaseNode = memo(function BaseNode({
       if (clean) requestMediaCatalog('stt', { provider: clean });
     },
     [data.effectConfig, id, requestMediaCatalog, updateNodeData]
+  );
+
+  const setModelResidencyPatch = useCallback(
+    (patch: Record<string, JsonValue | undefined>) => {
+      const nextEffect = { ...(data.effectConfig || {}) } as Record<string, JsonValue | undefined>;
+      const nextDefaults = { ...(data.pinDefaults || {}) } as Record<string, JsonValue | undefined>;
+      for (const [key, value] of Object.entries(patch)) {
+        if (value === undefined || value === null || value === '') {
+          delete nextEffect[key];
+          delete nextDefaults[key];
+        } else {
+          nextEffect[key] = value;
+          nextDefaults[key] = value;
+        }
+      }
+      updateNodeData(id, {
+        effectConfig: nextEffect as FlowNodeData['effectConfig'],
+        pinDefaults: nextDefaults as FlowNodeData['pinDefaults'],
+      });
+    },
+    [data.effectConfig, data.pinDefaults, id, updateNodeData]
+  );
+
+  const setModelResidencyTask = useCallback(
+    (task: string) => {
+      const clean = task || 'image_generation';
+      setModelResidencyPatch({ task: clean, provider: undefined, model: undefined });
+      if (clean === 'image_generation') requestMediaCatalog('image', { providersOnly: true });
+      if (clean === 'tts') requestMediaCatalog('tts', { providersOnly: true });
+      if (clean === 'stt') requestMediaCatalog('stt', { providersOnly: true });
+    },
+    [requestMediaCatalog, setModelResidencyPatch]
+  );
+
+  const setModelResidencyProvider = useCallback(
+    (provider: string | null | undefined) => {
+      const clean = provider ? provider.trim() : '';
+      setModelResidencyPatch({ provider: clean || undefined, model: undefined });
+      if (selectedResidencyTask === 'image_generation' && clean) requestMediaCatalog('image', { provider: clean });
+      if (selectedResidencyTask === 'tts') requestMediaCatalog('tts', { provider: clean || undefined });
+      if (selectedResidencyTask === 'stt') requestMediaCatalog('stt', { provider: clean || undefined });
+    },
+    [requestMediaCatalog, selectedResidencyTask, setModelResidencyPatch]
+  );
+
+  const setModelResidencyModel = useCallback(
+    (model: string | null | undefined) => {
+      const clean = model ? model.trim() : '';
+      setModelResidencyPatch({ model: clean || undefined });
+    },
+    [setModelResidencyPatch]
   );
 
   useEffect(() => {
@@ -2580,6 +2845,44 @@ export const BaseNode = memo(function BaseNode({
           </div>
         )}
 
+        {selected && residencyAuthoringTarget && (
+          <>
+            <div className="node-residency-row nodrag">
+              <button
+                type="button"
+                className="node-residency-button nodrag"
+                disabled={!residencyAuthoringTarget.provider || !residencyAuthoringTarget.model || Boolean(residencyAuthoringTarget.blockedReason)}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleAddModelResidencyStep('load');
+                }}
+                title="Insert a warm-up step before this node"
+              >
+                Warm before
+              </button>
+              <button
+                type="button"
+                className="node-residency-button nodrag"
+                disabled={!residencyAuthoringTarget.provider || !residencyAuthoringTarget.model || Boolean(residencyAuthoringTarget.blockedReason)}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleAddModelResidencyStep('unload');
+                }}
+                title="Insert an unload step after this node"
+              >
+                Unload after
+              </button>
+            </div>
+            <div className="node-residency-target nodrag">
+              {residencyAuthoringTarget.provider && residencyAuthoringTarget.model
+                ? `${residencyAuthoringTarget.provider} / ${residencyAuthoringTarget.model}`
+                : residencyAuthoringTarget.blockedReason || 'Select a concrete provider and model to preload explicitly.'}
+            </div>
+          </>
+        )}
+
         {/* Data input pins */}
         <div className="pins-left" style={{ ['--pin-label-width' as any]: inputLabelWidth }}>
           {inputData.map((pin) => (
@@ -2661,9 +2964,21 @@ export const BaseNode = memo(function BaseNode({
                   const isSttProviderPin = (isListenVoiceNode || isTranscribeAudioNode) && pin.id === 'stt_provider';
                   const isSttModelPin = (isListenVoiceNode || isTranscribeAudioNode) && pin.id === 'stt_model';
                   const isSttFormatPin = isTranscribeAudioNode && pin.id === 'format';
+                  const isResidencyOperationPin = isModelResidencyNode && pin.id === 'operation';
+                  const isResidencyTaskPin = isModelResidencyNode && pin.id === 'task';
+                  const isResidencyProviderPin = isModelResidencyNode && pin.id === 'provider';
+                  const isResidencyModelPin = isModelResidencyNode && pin.id === 'model';
+                  const isResidencyPinPin = isModelResidencyNode && pin.id === 'pin';
+                  const isResidencyRequiredPin = isModelResidencyNode && pin.id === 'required';
 		                const hasSpecialControl =
 		                  (hasProviderDropdown && pin.id === 'provider') ||
 		                  (hasModelControls && pin.id === 'model') ||
+                      isResidencyOperationPin ||
+                      isResidencyTaskPin ||
+                      isResidencyProviderPin ||
+                      isResidencyModelPin ||
+                      isResidencyPinPin ||
+                      isResidencyRequiredPin ||
                       isImageProviderPin ||
                       isImageModelPin ||
                       isImageFormatPin ||
@@ -2968,6 +3283,135 @@ export const BaseNode = memo(function BaseNode({
                       />
                     );
                   }
+                }
+
+                if (isResidencyOperationPin && !connected) {
+                  controls.push(
+                    <AfSelect
+                      key="model-residency-operation"
+                      variant="pin"
+                      value={selectedResidencyOperation}
+                      placeholder="load"
+                      options={[
+                        { value: 'load', label: 'load' },
+                        { value: 'list_loaded', label: 'list loaded' },
+                        { value: 'unload', label: 'unload' },
+                      ]}
+                      searchable={false}
+                      minPopoverWidth={180}
+                      onChange={(v) => setModelResidencyPatch({ operation: v || 'load' })}
+                    />
+                  );
+                }
+
+                if (isResidencyTaskPin && !connected) {
+                  controls.push(
+                    <AfSelect
+                      key="model-residency-task"
+                      variant="pin"
+                      value={selectedResidencyTask}
+                      placeholder="image"
+                      options={[
+                        { value: 'image_generation', label: 'image' },
+                        { value: 'text_generation', label: 'text' },
+                        { value: 'tts', label: 'speech' },
+                        { value: 'stt', label: 'transcription' },
+                      ]}
+                      searchable={false}
+                      minPopoverWidth={180}
+                      onChange={setModelResidencyTask}
+                    />
+                  );
+                }
+
+                if (isResidencyProviderPin && !connected) {
+                  controls.push(
+                    <AfSelect
+                      key="model-residency-provider"
+                      variant="pin"
+                      value={selectedResidencyProvider}
+                      placeholder={
+                        mediaLoading || providersQuery.isLoading || mediaCapabilitiesQuery.isLoading
+                          ? 'Loading…'
+                          : 'Select…'
+                      }
+                      options={residencyProviderOptions}
+                      disabled={mediaCapabilitiesQuery.isLoading}
+                      loading={mediaLoading || providersQuery.isLoading || mediaCapabilitiesQuery.isLoading}
+                      searchable
+                      allowCustom
+                      searchPlaceholder="Search providers…"
+                      clearable
+                      minPopoverWidth={300}
+                      onOpen={() => {
+                        if (selectedResidencyTask === 'image_generation') requestMediaCatalog('image', { providersOnly: true });
+                        if (selectedResidencyTask === 'tts') requestMediaCatalog('tts', { providersOnly: true });
+                        if (selectedResidencyTask === 'stt') requestMediaCatalog('stt', { providersOnly: true });
+                      }}
+                      onChange={setModelResidencyProvider}
+                    />
+                  );
+                }
+
+                if (isResidencyModelPin && !connected) {
+                  controls.push(
+                    <AfSelect
+                      key="model-residency-model"
+                      variant="pin"
+                      value={selectedResidencyModel}
+                      placeholder={
+                        !selectedResidencyProvider
+                          ? 'Pick provider…'
+                          : mediaLoading || modelsQuery.isLoading || mediaCapabilitiesQuery.isLoading
+                            ? 'Loading…'
+                            : 'Select…'
+                      }
+                      options={residencyModelOptions}
+                      disabled={mediaCapabilitiesQuery.isLoading || !selectedResidencyProvider}
+                      loading={mediaLoading || modelsQuery.isLoading || mediaCapabilitiesQuery.isLoading}
+                      searchable
+                      allowCustom
+                      searchPlaceholder="Search models…"
+                      clearable
+                      minPopoverWidth={420}
+                      onOpen={() => {
+                        if (selectedResidencyTask === 'image_generation' && selectedResidencyProvider) {
+                          requestMediaCatalog('image', { provider: selectedResidencyProvider });
+                        }
+                        if (selectedResidencyTask === 'tts' && selectedResidencyProvider) {
+                          requestMediaCatalog('tts', { provider: selectedResidencyProvider });
+                        }
+                        if (selectedResidencyTask === 'stt' && selectedResidencyProvider) {
+                          requestMediaCatalog('stt', { provider: selectedResidencyProvider });
+                        }
+                      }}
+                      onChange={setModelResidencyModel}
+                    />
+                  );
+                }
+
+                if ((isResidencyPinPin || isResidencyRequiredPin) && !connected) {
+                  const current = isResidencyPinPin ? selectedResidencyPin : selectedResidencyRequired;
+                  const key = isResidencyPinPin ? 'pin' : 'required';
+                  controls.push(
+                    <label
+                      key={`model-residency-${key}`}
+                      className="af-pin-checkbox nodrag"
+                      title={isResidencyPinPin ? 'Keep loaded until explicit unload' : 'Fail step when residency control fails'}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        className="af-pin-checkbox-input"
+                        type="checkbox"
+                        checked={current}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => setModelResidencyPatch({ [key]: e.target.checked })}
+                      />
+                      <span className="af-pin-checkbox-box" aria-hidden="true" />
+                    </label>
+                  );
                 }
 
                 if (isImageProviderPin && !connected) {

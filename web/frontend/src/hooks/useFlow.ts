@@ -1640,6 +1640,58 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         }
       }
 
+      if (data.nodeType === 'model_residency') {
+        const existingInputs = Array.isArray(data.inputs) ? data.inputs : [];
+        const byId = new Map(existingInputs.map((p) => [p.id, p] as const));
+        const used = new Set<string>();
+        const want = (pin: Pin): Pin => {
+          const prev = byId.get(pin.id);
+          used.add(pin.id);
+          if (!prev) return pin;
+          if (prev.label === pin.label && prev.type === pin.type && prev.description === pin.description) return prev;
+          return { ...prev, label: pin.label, type: pin.type, description: pin.description };
+        };
+        const canonicalInputSpecs: Pin[] = [
+          { id: 'exec-in', label: '', type: 'execution' },
+          { id: 'operation', label: 'operation', type: 'string', description: 'list_loaded, load, or unload.' },
+          { id: 'task', label: 'task', type: 'string', description: 'text_generation or image_generation.' },
+          { id: 'provider', label: 'provider', type: 'provider', description: 'Provider/backend id to load or filter.' },
+          { id: 'model', label: 'model', type: 'model', description: 'Model id to load or filter.' },
+          { id: 'runtime_id', label: 'runtime_id', type: 'string', description: 'Runtime id returned by loaded/list calls; preferred for unload.' },
+          { id: 'options', label: 'options', type: 'object', description: 'Optional provider-specific load/unload options.' },
+          { id: 'pin', label: 'keep_loaded', type: 'boolean', description: 'When loading, keep resident until explicit unload.' },
+          { id: 'required', label: 'required', type: 'boolean', description: 'When true, fail this step if the residency call fails.' },
+        ];
+        const canonicalInputs: Pin[] = canonicalInputSpecs.map(want);
+        const extras = existingInputs.filter((p) => !used.has(p.id));
+        data = { ...data, inputs: [...canonicalInputs, ...extras] };
+
+        const prevDefaults =
+          data.pinDefaults && typeof data.pinDefaults === 'object' ? (data.pinDefaults as Record<string, JsonValue>) : {};
+        const prevEffect =
+          data.effectConfig && typeof data.effectConfig === 'object' ? (data.effectConfig as Record<string, JsonValue>) : {};
+        const nextDefaults: Record<string, JsonValue> = { ...prevDefaults };
+        const nextEffect: Record<string, JsonValue> = { ...prevEffect };
+        let changedDefaults = false;
+        let changedEffect = false;
+        const setDefault = (key: string, value: JsonValue) => {
+          if (nextDefaults[key] === undefined || nextDefaults[key] === null || nextDefaults[key] === '') {
+            nextDefaults[key] = value;
+            changedDefaults = true;
+          }
+          if (nextEffect[key] === undefined || nextEffect[key] === null || nextEffect[key] === '') {
+            nextEffect[key] = value;
+            changedEffect = true;
+          }
+        };
+        setDefault('operation', 'load');
+        setDefault('task', 'image_generation');
+        setDefault('pin', true);
+        setDefault('required', false);
+        if (changedDefaults) data = { ...data, pinDefaults: nextDefaults };
+        if (changedEffect) data = { ...data, effectConfig: nextEffect as FlowNodeData['effectConfig'] };
+      }
+
       // Canonical ordering for JSON render nodes.
       // Backward-compat: older flows may have `indent`/`sort_keys` pins; ensure `mode` exists so the inline dropdown is available.
       if (data.nodeType === 'stringify_json') {

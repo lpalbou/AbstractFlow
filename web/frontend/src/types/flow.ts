@@ -116,6 +116,7 @@ export type NodeType =
   | 'ask_user'
   | 'answer_user'
   | 'llm_call'
+  | 'model_residency'
   | 'generate_image'
   | 'generate_voice'
   | 'transcribe_audio'
@@ -231,6 +232,15 @@ export interface FlowNodeData {
   effectConfig?: {
     provider?: string;     // For llm_call
     model?: string;        // For llm_call
+    operation?: string;    // For model_residency: list_loaded, load, unload
+    task?: string;         // For model_residency: text_generation, image_generation, tts, stt
+    runtime_id?: string;   // For model_residency unload
+    base_url?: string;     // For model_residency disambiguation/remote provider override
+    timeout_s?: number;    // For model_residency load/unload control calls
+    provider_api_key?: string; // For model_residency provider-scoped control calls
+    options?: Record<string, any>; // For model_residency provider-specific load/unload options
+    pin?: boolean;         // For model_residency load: keep resident until explicit unload
+    required?: boolean;    // For model_residency: fail the step when the control call fails
     runtime_provider?: string; // Advanced: runtime LLM provider override for generated media orchestration
     runtime_model?: string;    // Advanced: runtime LLM model override for generated media orchestration
     temperature?: number;  // For llm_call
