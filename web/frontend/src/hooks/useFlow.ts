@@ -17,6 +17,7 @@ import type { FlowNodeData, VisualFlow, Pin, JsonValue } from '../types/flow';
 import { createNodeData, getNodeTemplate, mergePinDocsFromTemplate, NodeTemplate } from '../types/nodes';
 import { inferRouteOverrideRouteKey, validateConnection } from '../utils/validation';
 import { inferEntryNode, isRouteOverrideEdge, routeKey as buildRouteKey, withMultiEntryRouteData } from '../utils/multiEntryRoutes';
+import { isLegacyMusicCompatNode, normalizeLegacyMusicCompatVisualFlow } from '../utils/visualFlowCompat';
 
 interface FlowState {
   // Flow data
@@ -543,7 +544,19 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
   // Load a flow from API
   loadFlow: (flow) => {
-    const rawEdges = Array.isArray(flow.edges) ? flow.edges : [];
+    const normalizedFlow = normalizeLegacyMusicCompatVisualFlow(
+      Array.isArray(flow.nodes) ? flow.nodes : [],
+      Array.isArray(flow.edges) ? flow.edges : []
+    );
+    const hiddenRuntimeNodeIds = new Set(
+      normalizedFlow.nodes
+        .filter((node) => isLegacyMusicCompatNode(node))
+        .map((node) => node.id)
+    );
+    const flowNodes = normalizedFlow.nodes.filter((node) => !hiddenRuntimeNodeIds.has(node.id));
+    const rawEdges = normalizedFlow.edges.filter(
+      (edge) => !hiddenRuntimeNodeIds.has(edge.source) && !hiddenRuntimeNodeIds.has(edge.target)
+    );
     const connectedInputHandlesByNodeId = new Map<string, Set<string>>();
     const connectedOutputHandlesByNodeId = new Map<string, Set<string>>();
     for (const e of rawEdges) {
@@ -563,8 +576,9 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       }
     }
 
-    const nodes: Node<FlowNodeData>[] = flow.nodes.map((vn) => {
-      const template = getNodeTemplate(vn.type);
+    const nodes: Node<FlowNodeData>[] = flowNodes.map((vn) => {
+      const authoredType = (vn.data as FlowNodeData | undefined)?.nodeType;
+      const template = getNodeTemplate(authoredType || vn.type) || getNodeTemplate(vn.type);
       let data: FlowNodeData = template
         ? { ...createNodeData(template), ...vn.data }
         : (vn.data as FlowNodeData);
@@ -1436,7 +1450,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
       // Backward-compat: media nodes added before inline media controls had empty
       // local-friendly defaults, leaving basic settings blank in existing flows.
-      if (['generate_image', 'generate_voice', 'transcribe_audio', 'listen_voice'].includes(data.nodeType)) {
+      if (['generate_image', 'edit_image', 'image_to_image', 'generate_voice', 'generate_music', 'transcribe_audio', 'listen_voice'].includes(data.nodeType)) {
         const prevDefaults =
           data.pinDefaults && typeof data.pinDefaults === 'object' ? (data.pinDefaults as Record<string, unknown>) : {};
         const normalizeScopedMediaValue = (value: unknown, provider: unknown = ''): string => {
@@ -1458,8 +1472,20 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           }
           return '';
         };
+        const legacyMusicBackendKeys = ['music_backend', 'musicBackend', 'backend_music', 'backend'];
+        const deleteLegacyMusicBackendKeys = (target: Record<string, JsonValue>): boolean => {
+          let changed = false;
+          for (const key of legacyMusicBackendKeys) {
+            if (key in target) {
+              delete target[key];
+              changed = true;
+            }
+          }
+          return changed;
+        };
         const reorderInputs = (canonical: Pin[]): Pin[] => {
           const existingInputs = Array.isArray(data.inputs) ? data.inputs : [];
+          const dropLegacyInputIds = data.nodeType === 'generate_music' ? new Set(legacyMusicBackendKeys) : new Set<string>();
           const byId = new Map(existingInputs.map((p) => [p.id, p] as const));
           const used = new Set<string>();
 
@@ -1472,7 +1498,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           };
 
           const ordered = canonical.map(want);
-          const extras = existingInputs.filter((p) => !used.has(p.id));
+          const extras = existingInputs.filter((p) => !used.has(p.id) && !dropLegacyInputIds.has(p.id));
           return [...ordered, ...extras];
         };
         const canonicalInputs =
@@ -1489,6 +1515,32 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                 { id: 'speed', label: 'speed', type: 'number' as const },
                 { id: 'instructions', label: 'instructions', type: 'string' as const },
               ]
+            : data.nodeType === 'generate_music'
+              ? (getNodeTemplate('generate_music')?.inputs || [])
+            : data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
+              ? [
+                  { id: 'exec-in', label: '', type: 'execution' as const },
+                  { id: 'prompt', label: 'prompt', type: 'string' as const, description: 'Instruction for the image edit.' },
+                  {
+                    id: data.nodeType === 'image_to_image' ? 'source_image' : 'image_artifact',
+                    label: data.nodeType === 'image_to_image' ? 'source_image' : 'image_artifact',
+                    type: 'object' as const,
+                    description: 'Source image artifact ref. Wire from Generate Image, or use an uploaded/selected artifact.',
+                  },
+                  { id: 'mask_artifact', label: 'mask_artifact', type: 'object' as const, description: 'Optional mask artifact ref.' },
+                  { id: 'image_provider', label: 'provider', type: 'provider_image' as const, description: 'Optional image edit provider/backend.' },
+                  { id: 'image_model', label: 'model', type: 'model' as const, description: 'Optional image edit model id for the selected provider.' },
+                  { id: 'size', label: 'size', type: 'string' as const, description: 'Optional size like 1024x1024.' },
+                  { id: 'width', label: 'width', type: 'number' as const },
+                  { id: 'height', label: 'height', type: 'number' as const },
+                  { id: 'format', label: 'format', type: 'string' as const, description: 'png, jpg, or webp.' },
+                  { id: 'seed', label: 'seed', type: 'number' as const },
+                  { id: 'steps', label: 'steps', type: 'number' as const },
+                  { id: 'guidance_scale', label: 'guidance', type: 'number' as const },
+                  { id: 'strength', label: 'strength', type: 'number' as const, description: 'Optional edit strength.' },
+                  { id: 'negative_prompt', label: 'negative', type: 'string' as const },
+                  { id: 'extra', label: 'extra', type: 'object' as const, description: 'Optional provider-specific image edit options.' },
+                ]
             : data.nodeType === 'generate_image'
               ? [
                   { id: 'exec-in', label: '', type: 'execution' as const },
@@ -1530,10 +1582,12 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           data = { ...data, inputs: reorderInputs(canonicalInputs) };
         }
         const mediaDefaults: Record<string, JsonValue> =
-          data.nodeType === 'generate_image'
+          data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
             ? { format: 'png', width: 512, height: 512, steps: 20, guidance_scale: 7.5 }
             : data.nodeType === 'generate_voice'
               ? { format: 'wav', quality_preset: 'standard', speed: 1.0 }
+              : data.nodeType === 'generate_music'
+                ? { format: 'wav' }
               : data.nodeType === 'transcribe_audio'
                 ? { format: 'json', temperature: 0 }
                 : { max_duration_s: 30 };
@@ -1562,7 +1616,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             nextDefaults.tts_model = model;
             changedDefaults = true;
           }
-        } else if (data.nodeType === 'generate_image') {
+        } else if (data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image') {
           const provider = normalizeScopedMediaValue(firstString(nextDefaults.image_provider, nextDefaults.imageProvider, nextDefaults.provider));
           const model = normalizeScopedMediaValue(firstString(nextDefaults.image_model, nextDefaults.imageModel, nextDefaults.model), provider);
           if (provider && nextDefaults.image_provider !== provider) {
@@ -1571,6 +1625,21 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           }
           if (model && nextDefaults.image_model !== model) {
             nextDefaults.image_model = model;
+            changedDefaults = true;
+          }
+        } else if (data.nodeType === 'generate_music') {
+          const legacyBackend = normalizeScopedMediaValue(firstString(nextDefaults.music_backend, nextDefaults.musicBackend, nextDefaults.backend_music, nextDefaults.backend));
+          const provider = normalizeScopedMediaValue(firstString(legacyBackend, nextDefaults.music_provider, nextDefaults.musicProvider, nextDefaults.provider));
+          const model = normalizeScopedMediaValue(firstString(nextDefaults.music_model, nextDefaults.musicModel, nextDefaults.model), provider);
+          if (provider && nextDefaults.music_provider !== provider) {
+            nextDefaults.music_provider = provider;
+            changedDefaults = true;
+          }
+          if (model && nextDefaults.music_model !== model) {
+            nextDefaults.music_model = model;
+            changedDefaults = true;
+          }
+          if (deleteLegacyMusicBackendKeys(nextDefaults)) {
             changedDefaults = true;
           }
         } else if (data.nodeType === 'transcribe_audio' || data.nodeType === 'listen_voice') {
@@ -1621,11 +1690,20 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             changedEffectConfig = true;
           }
           setEffectIfMissing('quality_preset', quality);
-        } else if (data.nodeType === 'generate_image') {
+        } else if (data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image') {
           const provider = normalizeScopedMediaValue(firstString(nextEffectConfig.image_provider, nextDefaults.image_provider, nextEffectConfig.provider, nextDefaults.provider));
           const model = normalizeScopedMediaValue(firstString(nextEffectConfig.image_model, nextDefaults.image_model, nextEffectConfig.model, nextDefaults.model), provider);
           setEffectIfMissing('image_provider', provider);
           setEffectIfMissing('image_model', model);
+        } else if (data.nodeType === 'generate_music') {
+          const legacyBackend = normalizeScopedMediaValue(firstString(nextEffectConfig.music_backend, nextEffectConfig.musicBackend, nextEffectConfig.backend_music, nextEffectConfig.backend));
+          const provider = normalizeScopedMediaValue(firstString(legacyBackend, nextEffectConfig.music_provider, nextDefaults.music_provider, nextEffectConfig.provider, nextDefaults.provider));
+          const model = normalizeScopedMediaValue(firstString(nextEffectConfig.music_model, nextDefaults.music_model, nextEffectConfig.model, nextDefaults.model), provider);
+          setEffectIfMissing('music_provider', provider);
+          setEffectIfMissing('music_model', model);
+          if (deleteLegacyMusicBackendKeys(nextEffectConfig)) {
+            changedEffectConfig = true;
+          }
         } else if (data.nodeType === 'transcribe_audio' || data.nodeType === 'listen_voice') {
           const provider = normalizeScopedMediaValue(firstString(nextEffectConfig.stt_provider, nextDefaults.stt_provider, nextEffectConfig.provider, nextDefaults.provider));
           const model = normalizeScopedMediaValue(firstString(nextEffectConfig.stt_model, nextDefaults.stt_model, nextEffectConfig.model, nextDefaults.model), provider);
@@ -1654,7 +1732,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         const canonicalInputSpecs: Pin[] = [
           { id: 'exec-in', label: '', type: 'execution' },
           { id: 'operation', label: 'operation', type: 'string', description: 'list_loaded, load, or unload.' },
-          { id: 'task', label: 'task', type: 'string', description: 'text_generation or image_generation.' },
+          { id: 'task', label: 'task', type: 'string', description: 'text_generation, image_generation, tts, stt, or music_generation.' },
           { id: 'provider', label: 'provider', type: 'provider', description: 'Provider/backend id to load or filter.' },
           { id: 'model', label: 'model', type: 'model', description: 'Model id to load or filter.' },
           { id: 'runtime_id', label: 'runtime_id', type: 'string', description: 'Runtime id returned by loaded/list calls; preferred for unload.' },
@@ -1869,7 +1947,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       };
     });
 
-    const edges: Edge[] = flow.edges.map((ve) => ({
+    const edges: Edge[] = rawEdges.map((ve) => ({
       id: ve.id,
       source: ve.source,
       sourceHandle: ve.sourceHandle,
@@ -2000,27 +2078,30 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     const state = get();
     const nodesWithRoutes = withMultiEntryRouteData(state.nodes, state.edges);
     const entryNode = inferEntryNode(state.nodes, state.edges);
+    const visualNodes = nodesWithRoutes.map((n) => ({
+      id: n.id,
+      type: n.data.nodeType,
+      position: n.position,
+      data: n.data,
+    }));
+    const visualEdges = state.edges
+      .filter((e) => !isRouteOverrideEdge(e))
+      .map((e) => ({
+        id: e.id,
+        source: e.source,
+        sourceHandle: e.sourceHandle || '',
+        target: e.target,
+        targetHandle: e.targetHandle || '',
+        animated: e.animated,
+      }));
+    const normalizedFlow = normalizeLegacyMusicCompatVisualFlow(visualNodes, visualEdges);
 
     return {
       id: state.flowId || `flow-${Date.now()}`,
       name: state.flowName,
       interfaces: Array.isArray(state.flowInterfaces) ? state.flowInterfaces : [],
-      nodes: nodesWithRoutes.map((n) => ({
-        id: n.id,
-        type: n.data.nodeType,
-        position: n.position,
-        data: n.data,
-      })),
-      edges: state.edges
-        .filter((e) => !isRouteOverrideEdge(e))
-        .map((e) => ({
-          id: e.id,
-          source: e.source,
-          sourceHandle: e.sourceHandle || '',
-          target: e.target,
-          targetHandle: e.targetHandle || '',
-          animated: e.animated,
-        })),
+      nodes: normalizedFlow.nodes,
+      edges: normalizedFlow.edges,
       entryNode,
     };
   },

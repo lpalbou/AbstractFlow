@@ -766,6 +766,10 @@ export function Toolbar({
       setShowRunModal(true);
       return;
     }
+    if (hasUnsavedChanges) {
+      toast.error('Save the flow before running current changes');
+      return;
+    }
     const issues = computeRunPreflightIssues(nodes, edges);
     if (issues.length > 0) {
       setPreflightIssues(issues);
@@ -780,6 +784,7 @@ export function Toolbar({
     edges,
     executionEvents.length,
     flowId,
+    hasUnsavedChanges,
     inspectedRun,
     isRunning,
     nodes,

@@ -13,6 +13,7 @@ directory (and other monorepo src-layout packages) to `sys.path` when needed.
 __version__ = "0.1.0"
 
 from pathlib import Path
+import os
 import sys
 
 def _ensure_path(path: Path) -> None:
@@ -36,18 +37,26 @@ _flow_root = repo_root / "abstractflow"  # package-at-root layout
 if _flow_root.is_dir():
     _ensure_path(_flow_root)
 
-_runtime_src = repo_root / "abstractruntime" / "src"  # src-layout
-if _runtime_src.is_dir():
-    _ensure_path(_runtime_src)
+_local_runtime_enabled = str(os.getenv("ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME", "")).strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 
-_agent_src = repo_root / "abstractagent" / "src"  # src-layout
-if _agent_src.is_dir():
-    _ensure_path(_agent_src)
+if _local_runtime_enabled:
+    _runtime_src = repo_root / "abstractruntime" / "src"  # src-layout
+    if _runtime_src.is_dir():
+        _ensure_path(_runtime_src)
 
-_core_root = repo_root / "abstractcore"  # package-at-root layout
-if _core_root.is_dir():
-    _ensure_path(_core_root)
+    _agent_src = repo_root / "abstractagent" / "src"  # src-layout
+    if _agent_src.is_dir():
+        _ensure_path(_agent_src)
 
-_memory_src = repo_root / "abstractmemory" / "src"  # src-layout
-if _memory_src.is_dir():
-    _ensure_path(_memory_src)
+    _core_root = repo_root / "abstractcore"  # package-at-root layout
+    if _core_root.is_dir():
+        _ensure_path(_core_root)
+
+    _memory_src = repo_root / "abstractmemory" / "src"  # src-layout
+    if _memory_src.is_dir():
+        _ensure_path(_memory_src)

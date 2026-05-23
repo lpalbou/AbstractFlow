@@ -53,3 +53,27 @@ def test_python_web_gateway_proxy_injects_gateway_auth(monkeypatch, tmp_path) ->
     assert res.json() == {"ok": True}
     assert captured["url"] == "http://gateway.local:8080/api/gateway/discovery/capabilities"
     assert captured["authorization"] == "Bearer secret-token"
+    assert captured["timeout"] == 900.0
+
+
+def test_python_web_gateway_proxy_timeout_is_configurable_and_capped(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("ABSTRACTFLOW_RUNTIME_DIR", str(tmp_path))
+    monkeypatch.setenv("ABSTRACTGATEWAY_URL", "http://gateway.local:8080")
+    monkeypatch.setenv("ABSTRACTGATEWAY_AUTH_TOKEN", "secret-token")
+    monkeypatch.setenv("ABSTRACTFLOW_GATEWAY_PROXY_TIMEOUT_S", "9999")
+
+    captured = {}
+
+    def fake_urlopen(req, timeout=None):
+        captured["timeout"] = timeout
+        return _FakeGatewayResponse({"ok": True})
+
+    import backend.main as main
+
+    monkeypatch.setattr(main, "urlopen", fake_urlopen)
+
+    with TestClient(main.app) as client:
+        res = client.get("/api/gateway/runs/run-1/artifacts/artifact-1/content")
+
+    assert res.status_code == 200
+    assert captured["timeout"] == 3600.0

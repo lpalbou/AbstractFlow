@@ -67,6 +67,8 @@ function isProviderOrModelVisualType(value: string): boolean {
     'model_image',
     'provider_voice',
     'model_voice',
+    'provider_music',
+    'model_music',
   ].includes(value);
 }
 
@@ -165,6 +167,8 @@ export function gatewayPinTypeToVisualPinType(pin: GatewayInputPin): PinType {
     raw === 'model_image' ||
     raw === 'provider_voice' ||
     raw === 'model_voice' ||
+    raw === 'provider_music' ||
+    raw === 'model_music' ||
     raw === 'agent' ||
     raw === 'any'
   ) {

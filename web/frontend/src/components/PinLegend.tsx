@@ -27,6 +27,7 @@ const PIN_INFO: PinInfo[] = [
   { type: 'provider_text', label: 'Text Provider', shape: '\u25CF', description: 'Text/LLM provider id/name' },
   { type: 'provider_image', label: 'Image Provider', shape: '\u25CF', description: 'Image-generation provider id' },
   { type: 'provider_voice', label: 'Voice Provider', shape: '\u25CF', description: 'Voice/TTS/STT provider id' },
+  { type: 'provider_music', label: 'Music Provider', shape: '\u25CF', description: 'Music-generation provider id' },
   { type: 'provider', label: 'Provider (legacy)', shape: '\u25CF', description: 'Legacy unscoped provider id/name' },
   { type: 'model', label: 'Model', shape: '\u25CF', description: 'Model id/name scoped by the selected provider' },
   { type: 'agent', label: 'Agent', shape: '\u2B22', description: 'Agent reference' },

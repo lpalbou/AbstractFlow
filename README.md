@@ -2,9 +2,9 @@
 
 Diagram-based, **durable** AI workflows for Python.
 
-AbstractFlow is part of the [AbstractFramework ecosystem](https://github.com/lpalbou/AbstractFramework) and is built on:
-- [AbstractRuntime](https://github.com/lpalbou/abstractruntime): durable runs, waits, subworkflows, stores
-- [AbstractCore](https://github.com/lpalbou/abstractcore): providers/models/tools (used via runtime integrations)
+AbstractFlow is part of the [AbstractFramework ecosystem](https://github.com/lpalbou/AbstractFramework).
+The editor is Gateway-first: AbstractFlow talks to AbstractGateway for discovery, persistence,
+runs, ledgers, artifacts, and media. Gateway owns the Runtime/Core deployment stack.
 
 It provides:
 - A small programmatic API (`Flow`, `FlowRunner`) for building and running flows in Python.
@@ -19,12 +19,13 @@ Evidence (code): [abstractflow/runner.py](abstractflow/runner.py), [abstractflow
 
 ```mermaid
 flowchart LR
-  UI[Visual editor UI<br/>npx @abstractframework/flow] <-->|/api/gateway/*| GW[AbstractGateway<br/>runs/ledger/artifacts/bundles]
+  UI[Visual editor UI<br/>npx @abstractframework/flow] <-->|/api/gateway/*| GW[AbstractGateway<br/>discovery/runs/ledger/artifacts/bundles/media]
+  GW --> RT[AbstractRuntime Runtime]
+  RT --> AC[AbstractCore providers/models/tools]
 
   HOST[Any host process<br/>CLI / server / notebook] --> VF[VisualFlow models<br/>abstractflow/visual/models.py]
   HOST --> RUN[create_visual_runner / execute_visual_flow<br/>abstractflow/visual/executor.py]
-  RUN --> RT[AbstractRuntime Runtime]
-  RT -->|effects| AC[AbstractCore]
+  RUN -. optional local compatibility .-> RT
   RT --> STORES[(Run/Ledger/Artifacts stores)]
 ```
 
@@ -54,7 +55,7 @@ Optional extras (declared in `pyproject.toml`):
 - Full host profiles:
   - Apple-capable: `pip install "abstractflow[apple]"`
   - GPU-capable: `pip install "abstractflow[gpu]"`
-- `abstractflow[apple]` and `abstractflow[gpu]` include the local compatibility stack and Visual Agent node support; install `abstractgateway[apple]` or `abstractgateway[gpu]` separately when you need the Gateway server.
+- `abstractflow[apple]` and `abstractflow[gpu]` pull the matching `abstractgateway[...]` host profile and Visual Agent support. Flow no longer names `AbstractRuntime` or `abstractcore` directly in these profiles; Gateway owns that deployment stack. AbstractFlow `0.3.13` expects Gateway `>=0.2.17` for the current media/catalog/residency contracts.
 - Agent nodes only, without the host profile: `pip install "abstractflow[agent]"`
 - Documentation site tools: `pip install "abstractflow[docs]"`
 
@@ -108,11 +109,17 @@ Open:
 - UI: http://localhost:3003
 - Gateway capabilities: http://localhost:8080/api/gateway/discovery/capabilities
 
-Media nodes use Gateway as the catalog source. Generate Image, Generate Voice,
-Transcribe Audio, and Listen Voice expose Gateway Media controls populated from
+Media nodes use Gateway as the catalog and execution source. Generate Image,
+Edit Image/Image-to-Image, Generate Voice, Generate Music, Transcribe Audio, and
+Listen Voice expose Gateway Media controls populated from catalog routes such as
+`/api/gateway/vision/models`, `/api/gateway/vision/provider_models`,
 `/api/gateway/voice/voices`, `/api/gateway/audio/speech/models`,
-`/api/gateway/audio/transcriptions/models`, `/api/gateway/vision/provider_models`,
-and `/api/gateway/vision/models`.
+`/api/gateway/audio/transcriptions/models`, and
+`/api/gateway/audio/music/{providers,models}`. When Gateway exposes
+`common.readiness`, Flow uses it as a conservative surface-readiness overlay
+while still resolving concrete calls from endpoint descriptors. Generated images,
+voice, and music are artifacts; the Run modal renders previews/players from
+Gateway artifact content while leaving raw ledger JSON available for debugging.
 
 The `abstractflow serve`/FastAPI host is a Gateway proxy by default. Its old local `/api/flows`, `/api/ws`, and `/api/runs` compatibility routes are available only when `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1` is set. See [docs/web-editor.md](docs/web-editor.md) and [docs/architecture.md](docs/architecture.md).
 

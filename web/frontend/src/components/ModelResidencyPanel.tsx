@@ -10,6 +10,10 @@ import {
   type ModelResidencyRecord,
 } from '../hooks/useModelResidency';
 import { descriptorEndpointAvailable, gatewayJson, gatewayPath, type GatewayContracts } from '../utils/gatewayClient';
+import {
+  modelOptionsFromGatewayCatalog,
+  providerOptionsFromGatewayCatalog,
+} from '../utils/gatewayCatalog';
 import AfSelect, { type AfSelectOption } from './inputs/AfSelect';
 
 interface ModelResidencyPanelProps {
@@ -139,23 +143,23 @@ function taskLabel(task: string): string {
   if (task === 'image_generation') return 'Image';
   if (task === 'tts') return 'Speech';
   if (task === 'stt') return 'Transcription';
+  if (task === 'music_generation') return 'Music';
   return task.replace(/_/g, ' ');
 }
 
 function taskOptions(contracts: GatewayContracts | null): AfSelectOption[] {
   const residency = contracts?.common?.model_residency;
-  const supports = residency?.supports || {};
-  const rawTasks = Array.isArray(residency?.tasks) && residency.tasks.length > 0
-    ? residency.tasks
-    : ['text_generation', 'image_generation', 'tts', 'stt'];
+  const canonicalTasks = ['text_generation', 'image_generation', 'tts', 'stt', 'music_generation'];
+  const rawTasks = [
+    ...canonicalTasks,
+    ...(Array.isArray(residency?.tasks) ? residency.tasks : []),
+  ];
   const seen = new Set<string>();
   const out: AfSelectOption[] = [];
   for (const task of rawTasks) {
     if (typeof task !== 'string') continue;
     const t = task.trim();
     if (!t || seen.has(t)) continue;
-    if (supports[t] === false) continue;
-    if ((t === 'tts' || t === 'stt') && supports[t] !== true) continue;
     seen.add(t);
     out.push({ value: t, label: taskLabel(t) });
   }
@@ -188,15 +192,68 @@ function runtimeIdFor(row: ModelResidencyRecord): string {
   return firstString(row.runtime_id, row.load_id, row.id);
 }
 
+function isDefaultRuntimeConfigRow(row: ModelResidencyRecord): boolean {
+  return (
+    row.default === true &&
+    firstString(row.source) === 'abstractruntime.local' &&
+    firstString(row.isolation) === 'in_process' &&
+    row.provider_resident !== true &&
+    row.provider_residency_verified !== true
+  );
+}
+
 function statusText(row: ModelResidencyRecord): string {
-  return firstString(row.state, row.health) || (row.resident === false || row.loaded === false ? 'not resident' : 'resident');
+  if (isDefaultRuntimeConfigRow(row)) return 'runtime default config';
+  const raw = firstString(row.state, row.health);
+  if (raw === 'provider_loaded') return 'provider loaded';
+  if (raw === 'client_cached') return 'runtime client cached';
+  if (raw === 'client_cached_unverified') return 'runtime cache unverified';
+  if (raw === 'not_found') return 'not resident';
+  if (raw === 'not_loaded') return 'not loaded';
+  return raw || (row.resident === false || row.loaded === false ? 'not resident' : 'resident');
 }
 
 function statusKind(row: ModelResidencyRecord): 'ok' | 'muted' | 'error' {
+  if (isDefaultRuntimeConfigRow(row)) return 'muted';
   const text = statusText(row).toLowerCase();
   if (firstString(row.error) || text.includes('error') || text.includes('fail') || text.includes('unhealthy')) return 'error';
   if (row.resident === false || row.loaded === false || text.includes('not') || text.includes('unloaded')) return 'muted';
   return 'ok';
+}
+
+function residencyResultMessage(result: Record<string, unknown>, fallback: string): string {
+  const warning = Array.isArray(result.warnings)
+    ? result.warnings.find((item) => typeof item === 'string' && item.trim())
+    : '';
+  return firstString(result.error, warning, result.message, result.code) || fallback;
+}
+
+function unloadButtonTitle(row: ModelResidencyRecord, unloadAvailable: boolean): string | undefined {
+  if (!unloadAvailable) return 'Unload endpoint not advertised by this Gateway runtime.';
+  if (isDefaultRuntimeConfigRow(row)) {
+    return 'This is Gateway/Runtime default configuration, not proof of a loaded provider model. Change Gateway config or restart the Runtime process to remove it.';
+  }
+  if (row.default === true && row.provider_resident !== true) {
+    return 'This default Runtime client is cached, but the provider does not report the model as loaded. Restart Gateway to remove the default client cache.';
+  }
+  if (row.default === true) {
+    return 'This is the default Runtime client; provider unload is best-effort and the Runtime client remains cached.';
+  }
+  if (row.provider_resident === false) {
+    return 'Provider does not report this model as loaded; unload clears the Runtime client cache.';
+  }
+  return undefined;
+}
+
+function canUnloadRow(row: ModelResidencyRecord, unloadAvailable: boolean): boolean {
+  return unloadAvailable && !isDefaultRuntimeConfigRow(row);
+}
+
+function providerLoadedText(row: ModelResidencyRecord): string {
+  if (row.provider_resident === true || row.provider_loaded === true) return 'yes';
+  if (row.provider_resident === false || row.provider_loaded === false) return 'no';
+  if (row.loaded === true || row.resident === true) return 'runtime cached';
+  return '-';
 }
 
 export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: ModelResidencyPanelProps) {
@@ -206,7 +263,10 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
   const loadAvailable = residencyEndpointAvailable(gatewayContracts, 'load');
   const unloadAvailable = residencyEndpointAvailable(gatewayContracts, 'unload');
   const controlsAvailable = routeAvailable && residency?.available !== false;
-  const configHint = typeof residency?.config_hint === 'string' ? residency.config_hint : '';
+  const configHint =
+    typeof residency?.config_hint === 'string' && !/abstractcore/i.test(residency.config_hint)
+      ? residency.config_hint
+      : '';
   const tasks = useMemo(() => taskOptions(gatewayContracts), [gatewayContracts]);
   const [task, setTask] = useState(() => tasks[0]?.value || 'text_generation');
   const [provider, setProvider] = useState('');
@@ -230,6 +290,8 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
   const voiceCatalogEndpoint = gatewayContracts?.common?.discovery?.voice_voices || '';
   const ttsModelsEndpoint = gatewayContracts?.common?.discovery?.audio_speech_models || '';
   const sttModelsEndpoint = gatewayContracts?.common?.discovery?.audio_transcription_models || '';
+  const musicProvidersEndpoint = gatewayContracts?.common?.discovery?.audio_music_providers || '';
+  const musicModelsEndpoint = gatewayContracts?.common?.discovery?.audio_music_models || '';
   const imageCatalogQuery = useQuery({
     queryKey: ['gateway', 'model-residency', 'vision-provider-models', visionEndpoint],
     queryFn: async () => parseProviderModelCatalog(await gatewayJson<unknown>(gatewayPath(visionEndpoint, {}, { task: 'text_to_image' }))),
@@ -258,6 +320,20 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
     staleTime: 30_000,
     retry: 1,
   });
+  const musicProvidersQuery = useQuery({
+    queryKey: ['gateway', 'model-residency', 'music-providers', musicProvidersEndpoint],
+    queryFn: async () => gatewayJson<unknown>(gatewayPath(musicProvidersEndpoint, {}, { task: 'text_to_music' })),
+    enabled: isOpen && controlsAvailable && task === 'music_generation' && Boolean(musicProvidersEndpoint),
+    staleTime: 30_000,
+    retry: 1,
+  });
+  const musicModelsQuery = useQuery({
+    queryKey: ['gateway', 'model-residency', 'music-models', musicModelsEndpoint, provider],
+    queryFn: async () => gatewayJson<unknown>(gatewayPath(musicModelsEndpoint, {}, { task: 'text_to_music', provider: provider || undefined })),
+    enabled: isOpen && controlsAvailable && task === 'music_generation' && Boolean(musicModelsEndpoint),
+    staleTime: 30_000,
+    retry: 1,
+  });
 
   const imagePairs = imageCatalogQuery.data || [];
   const providerOptions = useMemo<AfSelectOption[]>(() => {
@@ -276,12 +352,15 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
       for (const option of providerValuesFrom(ttsModelsQuery.data, ['tts_providers', 'providers', 'available_providers'], ['models_by_provider', 'tts_models_by_provider'])) add(option);
     } else if (task === 'stt') {
       for (const option of providerValuesFrom(sttCatalogQuery.data, ['stt_providers', 'providers', 'available_providers'], ['models_by_provider', 'stt_models_by_provider'])) add(option);
+    } else if (task === 'music_generation') {
+      for (const option of providerOptionsFromGatewayCatalog(musicProvidersQuery.data, ['music_providers', 'providers', 'available_providers', 'provider_details'], ['models_by_provider', 'music_models_by_provider'])) add(option.value, option.label);
+      for (const option of providerOptionsFromGatewayCatalog(musicModelsQuery.data, ['music_providers', 'providers', 'available_providers'], ['models_by_provider', 'music_models_by_provider'])) add(option.value, option.label);
     } else {
       for (const option of providersQuery.data || []) add(option.name, option.display_name || option.name);
     }
     if (provider) add(provider);
     return out;
-  }, [imagePairs, provider, providersQuery.data, sttCatalogQuery.data, task, ttsModelsQuery.data, ttsVoiceCatalogQuery.data]);
+  }, [imagePairs, musicModelsQuery.data, musicProvidersQuery.data, provider, providersQuery.data, sttCatalogQuery.data, task, ttsModelsQuery.data, ttsVoiceCatalogQuery.data]);
 
   const modelOptions = useMemo<AfSelectOption[]>(() => {
     const seen = new Set<string>();
@@ -300,16 +379,18 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
       for (const option of stringValuesFrom(ttsModelsQuery.data, ['models', 'data', 'tts_models'])) add(option);
     } else if (task === 'stt') {
       for (const option of stringValuesFrom(sttCatalogQuery.data, ['models', 'data', 'stt_models'])) add(option);
+    } else if (task === 'music_generation') {
+      for (const option of modelOptionsFromGatewayCatalog(musicModelsQuery.data, provider, ['models', 'items', 'data', 'provider_models', 'music_models'], ['models_by_provider', 'music_models_by_provider'])) add(option.value, option.label);
     } else {
       for (const item of modelsQuery.data || []) add(item);
     }
     if (model) add(model);
     return out;
-  }, [imagePairs, model, modelsQuery.data, provider, sttCatalogQuery.data, task, ttsModelsQuery.data]);
+  }, [imagePairs, model, modelsQuery.data, musicModelsQuery.data, provider, sttCatalogQuery.data, task, ttsModelsQuery.data]);
 
   const rows = loadedQuery.data?.models || [];
   const busy = loadMutation.isPending || unloadMutation.isPending;
-  const loadDisabled = !controlsAvailable || !loadAvailable || busy || !task || !provider.trim() || !model.trim();
+  const loadDisabled = !controlsAvailable || !loadAvailable || busy || !task;
   const partialControlHint =
     !loadedAvailable
       ? 'This Gateway runtime does not advertise loaded-model listing.'
@@ -327,6 +408,8 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
         ? 'Speech provider…'
         : task === 'stt'
           ? 'Transcription provider…'
+          : task === 'music_generation'
+            ? 'Music provider…'
           : 'Provider…';
   const modelPlaceholder =
     !provider
@@ -337,32 +420,42 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
           ? 'Speech model…'
           : task === 'stt'
             ? 'Transcription model…'
+            : task === 'music_generation'
+              ? 'Music model…'
             : 'Model…';
   const providerLoading =
     providersQuery.isLoading ||
     imageCatalogQuery.isLoading ||
     ttsVoiceCatalogQuery.isLoading ||
     ttsModelsQuery.isLoading ||
-    sttCatalogQuery.isLoading;
+    sttCatalogQuery.isLoading ||
+    musicProvidersQuery.isLoading ||
+    musicModelsQuery.isLoading;
   const modelLoading =
     modelsQuery.isLoading ||
     imageCatalogQuery.isLoading ||
     ttsModelsQuery.isLoading ||
-    sttCatalogQuery.isLoading;
+    sttCatalogQuery.isLoading ||
+    musicModelsQuery.isLoading;
 
   const loadSelected = async () => {
     if (loadDisabled) return;
     try {
       const result = await loadMutation.mutateAsync({
         task,
-        provider: provider.trim(),
-        model: model.trim(),
+        provider: provider.trim() || undefined,
+        model: model.trim() || undefined,
         pin,
       });
       if (result.ok === false) {
-        toast.error(firstString(result.error, result.code) || 'Model load request failed');
+        toast.error(residencyResultMessage(result, 'Model load request failed'));
       } else {
-        toast.success(result.loaded_new === false ? 'Model already loaded' : 'Model load requested');
+        const msg = residencyResultMessage(
+          result,
+          result.loaded_new === false ? 'Model was not newly loaded' : 'Model load requested'
+        );
+        if (result.loaded_new === false) toast(msg);
+        else toast.success(msg);
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Model load request failed');
@@ -383,9 +476,11 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
         model: rid ? undefined : m || undefined,
       });
       if (result.ok === false) {
-        toast.error(firstString(result.error, result.code) || 'Model unload request failed');
+        toast.error(residencyResultMessage(result, 'Model unload request failed'));
       } else {
-        toast.success(result.unloaded === false ? 'Model was not resident' : 'Model unloaded');
+        const msg = residencyResultMessage(result, result.unloaded === false ? 'No resident provider model was unloaded' : 'Model unloaded');
+        if (result.unloaded === false) toast(msg);
+        else toast.success(msg);
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Model unload request failed');
@@ -399,8 +494,8 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
       <div className="modal model-residency-modal" onClick={(e) => e.stopPropagation()}>
         <div className="model-residency-header">
           <div>
-            <h3>Loaded Models</h3>
-            <p>Current Gateway/Runtime state. Loaded models stay resident until an explicit unload or provider eviction.</p>
+            <h3>Model Residency</h3>
+            <p>Gateway/Runtime model state. Configured defaults may appear even when the provider has no loaded model.</p>
           </div>
           <button type="button" className="modal-button cancel" onClick={onClose}>Close</button>
         </div>
@@ -465,6 +560,11 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
               </button>
             </div>
 
+            <div className="model-residency-note">
+              For server-backed providers such as LM Studio, this panel separates provider residency, Runtime client cache,
+              and Gateway default configuration. Only provider-resident rows are proof of a loaded model in the provider UI.
+            </div>
+
             {partialControlHint ? (
               <div className="model-residency-empty">
                 {partialControlHint}
@@ -493,7 +593,7 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
                       <th>Model</th>
                       <th>Runtime</th>
                       <th>Status</th>
-                      <th>Loaded</th>
+                      <th>Provider Loaded</th>
                       <th>Last Used</th>
                       <th />
                     </tr>
@@ -507,6 +607,8 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
                         <td className="model-residency-runtime">
                           {runtimeIdFor(row) || '-'}
                           {firstString(row.source) ? <span>{firstString(row.source)}</span> : null}
+                          {isDefaultRuntimeConfigRow(row) ? <span>gateway default config</span> : null}
+                          {row.provider_resident === false ? <span>provider not resident</span> : null}
                         </td>
                         <td>
                           <span className={`model-residency-status model-residency-status--${statusKind(row)}`}>
@@ -514,10 +616,10 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
                             {row.pinned === true ? ' · pinned' : ''}
                           </span>
                         </td>
-                        <td>{displayDate(row.loaded_at) || '-'}</td>
+                        <td>{providerLoadedText(row)}</td>
                         <td>{displayDate(row.last_used_at) || '-'}</td>
                         <td>
-                          <button type="button" className="modal-button danger" disabled={busy || !unloadAvailable} onClick={() => unloadRow(row)} title={!unloadAvailable ? 'Unload endpoint not advertised by this Gateway runtime.' : undefined}>
+                          <button type="button" className="modal-button danger" disabled={busy || !canUnloadRow(row, unloadAvailable)} onClick={() => unloadRow(row)} title={unloadButtonTitle(row, unloadAvailable)}>
                             Unload
                           </button>
                         </td>

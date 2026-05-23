@@ -27,7 +27,11 @@ import {
 import { collectCustomEventNames } from '../utils/events';
 import { areTypesCompatible } from '../utils/validation';
 import { gatewayJson, gatewayPath, getGatewayFlowEditorReadiness } from '../utils/gatewayClient';
-import { insertModelResidencyStep } from '../utils/modelResidencyGraph';
+import {
+  modelOptionsFromGatewayCatalog,
+  providerOptionsFromGatewayCatalog,
+} from '../utils/gatewayCatalog';
+import { insertModelResidencyStep, modelResidencyTaskUnsupportedReason } from '../utils/modelResidencyGraph';
 import {
   applyImagePinDefaultPatch,
   extractImageModelParameterMetadata,
@@ -47,6 +51,7 @@ import {
 const DEFAULT_IMAGE_FORMATS = ['png', 'jpeg', 'webp'];
 const DEFAULT_TTS_FORMATS = ['wav', 'mp3'];
 const DEFAULT_STT_FORMATS = ['json', 'text', 'verbose_json', 'srt', 'vtt'];
+const DEFAULT_MUSIC_FORMATS = ['wav', 'mp3', 'flac'];
 
 function formatValuesFrom(values: unknown, fallback: string[]): string[] {
   const raw = Array.isArray(values) ? values : fallback;
@@ -101,6 +106,7 @@ const DATA_PIN_TYPES: DataPinType[] = [
   'provider_text',
   'provider_image',
   'provider_voice',
+  'provider_music',
   'provider',
   'model',
   'agent',
@@ -112,7 +118,14 @@ function isTextProviderPin(pin: Pin): boolean {
 }
 
 function isTextModelPin(pin: Pin): boolean {
-  return pin.type === 'model' || pin.type === 'model_text' || pin.type === 'model_image' || pin.type === 'model_voice' || pin.id === 'model';
+  return (
+    pin.type === 'model' ||
+    pin.type === 'model_text' ||
+    pin.type === 'model_image' ||
+    pin.type === 'model_voice' ||
+    pin.type === 'model_music' ||
+    pin.id === 'model'
+  );
 }
 
 function normalizeMediaProvider(value: string): string {
@@ -237,17 +250,40 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const gatewayContracts = gatewayContractsFromCapabilities(gatewayCapabilitiesQuery.data);
   const generatedImageContract =
     gatewayContracts?.flow_editor?.media?.generated_image || gatewayContracts?.assistant?.media?.generated_image;
+  const editedImageContract =
+    gatewayContracts?.flow_editor?.media?.edited_image || gatewayContracts?.assistant?.media?.edited_image;
   const generatedVoiceContract =
     gatewayContracts?.flow_editor?.media?.generated_voice || gatewayContracts?.assistant?.media?.generated_voice;
+  const generatedMusicContract =
+    gatewayContracts?.flow_editor?.media?.generated_music || gatewayContracts?.assistant?.media?.generated_music;
   const imageFormatOptions = formatValuesFrom(generatedImageContract?.direct_endpoint?.formats, DEFAULT_IMAGE_FORMATS);
   const ttsFormatOptions = formatValuesFrom(generatedVoiceContract?.direct_endpoint?.formats, DEFAULT_TTS_FORMATS);
   const sttFormatOptions = formatValuesFrom(undefined, DEFAULT_STT_FORMATS);
+  const musicFormatOptions = formatValuesFrom(generatedMusicContract?.direct_endpoint?.formats, DEFAULT_MUSIC_FORMATS);
   const gatewayReadiness = getGatewayFlowEditorReadiness(gatewayContracts);
   const providerDiscoveryEndpoint = gatewayContracts?.common?.discovery?.providers || '';
   const providerModelsEndpoint = gatewayContracts?.common?.discovery?.provider_models || '';
   const voiceCatalogEndpoint = gatewayContracts?.common?.discovery?.voice_voices || '';
   const ttsModelsEndpoint = gatewayContracts?.common?.discovery?.audio_speech_models || '';
   const sttModelsEndpoint = gatewayContracts?.common?.discovery?.audio_transcription_models || '';
+  const musicProvidersEndpoint =
+    gatewayContracts?.common?.discovery?.audio_music_providers ||
+    (typeof generatedMusicContract?.direct_endpoint?.providers_endpoint === 'string' ? generatedMusicContract.direct_endpoint.providers_endpoint : '');
+  const musicModelsEndpoint =
+    gatewayContracts?.common?.discovery?.audio_music_models ||
+    (typeof generatedMusicContract?.direct_endpoint?.provider_models_endpoint === 'string' ? generatedMusicContract.direct_endpoint.provider_models_endpoint : '');
+  const musicProviderModelsTask =
+    typeof generatedMusicContract?.direct_endpoint?.provider_models_task === 'string' && generatedMusicContract.direct_endpoint.provider_models_task.trim()
+      ? generatedMusicContract.direct_endpoint.provider_models_task.trim()
+      : 'text_to_music';
+  const generatedImageProviderModelsTask =
+    typeof generatedImageContract?.direct_endpoint?.provider_models_task === 'string' && generatedImageContract.direct_endpoint.provider_models_task.trim()
+      ? generatedImageContract.direct_endpoint.provider_models_task.trim()
+      : 'text_to_image';
+  const editedImageProviderModelsTask =
+    typeof editedImageContract?.direct_endpoint?.provider_models_task === 'string' && editedImageContract.direct_endpoint.provider_models_task.trim()
+      ? editedImageContract.direct_endpoint.provider_models_task.trim()
+      : 'image_to_image';
   const visionProviderModelsEndpoint = gatewayContracts?.common?.discovery?.vision_provider_models || '';
   const toolsDiscoveryEndpoint = gatewayContracts?.common?.discovery?.tools || '';
   const visualflowCollectionEndpoint = gatewayContracts?.flow_editor?.visualflows?.crud?.collection_endpoint || '';
@@ -263,22 +299,26 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const [ttsModelOptions, setTtsModelOptions] = useState<string[]>([]);
   const [sttProviderOptions, setSttProviderOptions] = useState<string[]>([]);
   const [sttModelOptions, setSttModelOptions] = useState<string[]>([]);
+  const [musicProviderOptions, setMusicProviderOptions] = useState<string[]>([]);
+  const [musicModelOptions, setMusicModelOptions] = useState<string[]>([]);
   const [imageModelOptions, setImageModelOptions] = useState<Array<{ provider: string; model: string; label: string } & MediaModelParameterMetadata>>([]);
   const [loadingMediaModels, setLoadingMediaModels] = useState(false);
   const [mediaCatalogRequest, setMediaCatalogRequest] = useState<{
     seq: number;
-    scope: 'image' | 'tts' | 'stt';
+    scope: 'image' | 'tts' | 'stt' | 'music';
     provider?: string;
     model?: string;
+    task?: string;
   } | null>(null);
 
   const requestMediaCatalog = useCallback(
-    (scope: 'image' | 'tts' | 'stt', options: { provider?: string; model?: string } = {}) => {
+    (scope: 'image' | 'tts' | 'stt' | 'music', options: { provider?: string; model?: string; task?: string } = {}) => {
       setMediaCatalogRequest((prev) => ({
         seq: (prev?.seq || 0) + 1,
         scope,
         provider: options.provider,
         model: options.model,
+        task: options.task,
       }));
     },
     []
@@ -323,11 +363,14 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       : '';
   const modelResidencyTaskOptions = (() => {
     const residency = gatewayContracts?.common?.model_residency;
-    const supports = residency?.supports || {};
-    const rawTasks =
-      Array.isArray(residency?.tasks) && residency.tasks.length > 0
-        ? residency.tasks
-        : ['text_generation', 'image_generation', 'tts', 'stt'];
+    const rawTasks = [
+      'text_generation',
+      'image_generation',
+      'tts',
+      'stt',
+      'music_generation',
+      ...(Array.isArray(residency?.tasks) ? residency.tasks : []),
+    ];
     const seen = new Set<string>();
     const out: AfSelectOption[] = [];
     const labelFor = (task: string) => {
@@ -335,14 +378,13 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       if (task === 'image_generation') return 'Image generation';
       if (task === 'tts') return 'Speech';
       if (task === 'stt') return 'Transcription';
+      if (task === 'music_generation') return 'Music generation';
       return task.replace(/_/g, ' ');
     };
     for (const task of rawTasks) {
       if (typeof task !== 'string') continue;
       const clean = task.trim();
       if (!clean || seen.has(clean)) continue;
-      if (supports[clean] === false) continue;
-      if ((clean === 'tts' || clean === 'stt') && supports[clean] !== true) continue;
       seen.add(clean);
       out.push({ value: clean, label: labelFor(clean) });
     }
@@ -536,32 +578,18 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     };
     const uniq = (items: string[]) => Array.from(new Set(items.map((x) => String(x || '').trim()).filter(Boolean)));
     const modelsFrom = (data: any, ...keys: string[]) => {
-      const out: string[] = [];
-      for (const key of keys) {
-        const values = data && Array.isArray(data[key]) ? data[key] : [];
-        for (const item of values) {
-          const id = modelId(item);
-          if (id) out.push(id);
-        }
-      }
+      const out = modelOptionsFromGatewayCatalog(data, request.provider || '', keys, [
+        'models_by_provider',
+        'provider_models',
+        'tts_models_by_provider',
+        'stt_models_by_provider',
+        'music_models_by_provider',
+      ]).map((option) => option.value);
       if (typeof data?.active_model === 'string' && data.active_model.trim()) out.unshift(data.active_model.trim());
       return uniq(out);
     };
     const providersFrom = (data: any, arrayKeys: string[], mapKeys: string[] = []) => {
-      const out: string[] = [];
-      for (const key of arrayKeys) {
-        const values = data && Array.isArray(data[key]) ? data[key] : [];
-        for (const item of values) {
-          if (typeof item === 'string' && item.trim()) out.push(item.trim());
-        }
-      }
-      for (const key of mapKeys) {
-        const values = data && data[key] && typeof data[key] === 'object' ? Object.keys(data[key]) : [];
-        for (const item of values) {
-          if (typeof item === 'string' && item.trim()) out.push(item.trim());
-        }
-      }
-      return uniq(out);
+      return providerOptionsFromGatewayCatalog(data, arrayKeys, mapKeys).map((option) => option.value);
     };
     const query = (extra: Record<string, string | undefined>) =>
       Object.fromEntries(Object.entries(extra).filter(([, v]) => typeof v === 'string' && v.trim()));
@@ -574,10 +602,10 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         setLoadingMediaModels(false);
         return;
       }
-      gatewayJson<any>(
-        gatewayPath(visionProviderModelsEndpoint, {}, query({ task: 'text_to_image', provider: request.provider })),
-        { timeoutMs: 30_000 }
-      )
+      const task = request.task || generatedImageProviderModelsTask;
+      gatewayJson<any>(gatewayPath(visionProviderModelsEndpoint, {}, query({ task, provider: request.provider })), {
+        timeoutMs: 30_000,
+      })
         .then((imageProviderCatalog) => {
           const imageOptions: Array<{ provider: string; model: string; label: string } & MediaModelParameterMetadata> = [];
           const seenImages = new Set<string>();
@@ -684,6 +712,44 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           setSttModelOptions([]);
         })
         .finally(() => setLoadingMediaModels(false));
+      return;
+    }
+
+    if (request.scope === 'music') {
+      if (!musicProvidersEndpoint && !musicModelsEndpoint) {
+        setMusicProviderOptions([]);
+        setMusicModelOptions([]);
+        setLoadingMediaModels(false);
+        return;
+      }
+      Promise.all([
+        musicProvidersEndpoint
+          ? gatewayJson<any>(
+              gatewayPath(musicProvidersEndpoint, {}, query({ task: musicProviderModelsTask })),
+              { timeoutMs: 5_000 }
+            ).catch(() => ({}))
+          : Promise.resolve({}),
+        musicModelsEndpoint
+          ? gatewayJson<any>(
+              gatewayPath(musicModelsEndpoint, {}, query({ task: musicProviderModelsTask, provider: request.provider })),
+              { timeoutMs: 30_000 }
+            ).catch(() => ({}))
+          : Promise.resolve({}),
+      ])
+        .then(([providerCatalog, modelCatalog]) => {
+          setMusicProviderOptions(
+            uniq([
+              ...providersFrom(providerCatalog, ['music_providers', 'providers', 'available_providers', 'provider_details'], ['models_by_provider']),
+              ...providersFrom(modelCatalog, ['music_providers', 'providers', 'available_providers'], ['models_by_provider']),
+            ])
+          );
+          setMusicModelOptions(modelsFrom(modelCatalog, 'models', 'data', 'provider_models', 'music_models'));
+        })
+        .catch(() => {
+          setMusicProviderOptions([]);
+          setMusicModelOptions([]);
+        })
+        .finally(() => setLoadingMediaModels(false));
     }
   }, [
     gatewayCapabilitiesQuery.isError,
@@ -692,6 +758,10 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     voiceCatalogEndpoint,
     ttsModelsEndpoint,
     sttModelsEndpoint,
+    musicProvidersEndpoint,
+    musicModelsEndpoint,
+    musicProviderModelsTask,
+    generatedImageProviderModelsTask,
     visionProviderModelsEndpoint,
   ]);
 
@@ -1303,30 +1373,34 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       return '';
     };
     if (data.nodeType === 'llm_call') {
+      const pinBlocked = isInputPinConnected('provider') || isInputPinConnected('model');
+      const unsupportedReason = modelResidencyTaskUnsupportedReason(gatewayContracts, 'text_generation');
       return {
         task: 'text_generation',
         provider: isInputPinConnected('provider') ? '' : first(data.effectConfig?.provider, data.pinDefaults?.provider),
         model: isInputPinConnected('model') ? '' : first(data.effectConfig?.model, data.pinDefaults?.model),
-        blockedReason:
-          isInputPinConnected('provider') || isInputPinConnected('model')
-            ? 'Provider or model comes from connected pins. Add a dedicated Model Residency node for dynamic control.'
-            : '',
+        blockedReason: pinBlocked
+          ? 'Provider or model comes from connected pins. Add a dedicated Model Residency node for dynamic control.'
+          : unsupportedReason,
         eligible: true,
       };
     }
     if (data.nodeType === 'agent') {
+      const pinBlocked = isInputPinConnected('provider') || isInputPinConnected('model');
+      const unsupportedReason = modelResidencyTaskUnsupportedReason(gatewayContracts, 'text_generation');
       return {
         task: 'text_generation',
         provider: isInputPinConnected('provider') ? '' : first(data.agentConfig?.provider, data.pinDefaults?.provider),
         model: isInputPinConnected('model') ? '' : first(data.agentConfig?.model, data.pinDefaults?.model),
-        blockedReason:
-          isInputPinConnected('provider') || isInputPinConnected('model')
-            ? 'Provider or model comes from connected pins. Add a dedicated Model Residency node for dynamic control.'
-            : '',
+        blockedReason: pinBlocked
+          ? 'Provider or model comes from connected pins. Add a dedicated Model Residency node for dynamic control.'
+          : unsupportedReason,
         eligible: true,
       };
     }
-    if (data.nodeType === 'generate_image') {
+    if (data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image') {
+      const pinBlocked = isInputPinConnected('image_provider') || isInputPinConnected('image_model');
+      const unsupportedReason = modelResidencyTaskUnsupportedReason(gatewayContracts, 'image_generation');
       return {
         task: 'image_generation',
         provider: isInputPinConnected('image_provider')
@@ -1335,14 +1409,15 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         model: isInputPinConnected('image_model')
           ? ''
           : first(data.effectConfig?.image_model, data.pinDefaults?.image_model, data.effectConfig?.model, data.pinDefaults?.model),
-        blockedReason:
-          isInputPinConnected('image_provider') || isInputPinConnected('image_model')
-            ? 'Image provider or model comes from connected pins. Add a dedicated Model Residency node for dynamic control.'
-            : '',
+        blockedReason: pinBlocked
+          ? 'Image provider or model comes from connected pins. Add a dedicated Model Residency node for dynamic control.'
+          : unsupportedReason,
         eligible: true,
       };
     }
     if (data.nodeType === 'generate_voice') {
+      const pinBlocked = isInputPinConnected('tts_provider') || isInputPinConnected('tts_model');
+      const unsupportedReason = modelResidencyTaskUnsupportedReason(gatewayContracts, 'tts');
       return {
         task: 'tts',
         provider: isInputPinConnected('tts_provider')
@@ -1351,14 +1426,32 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         model: isInputPinConnected('tts_model')
           ? ''
           : first(data.effectConfig?.tts_model, data.pinDefaults?.tts_model, data.effectConfig?.model, data.pinDefaults?.model),
-        blockedReason:
-          isInputPinConnected('tts_provider') || isInputPinConnected('tts_model')
-            ? 'Voice provider or model comes from connected pins. Add a dedicated Model Residency node for dynamic control.'
-            : '',
+        blockedReason: pinBlocked
+          ? 'Voice provider or model comes from connected pins. Add a dedicated Model Residency node for dynamic control.'
+          : unsupportedReason,
+        eligible: true,
+      };
+    }
+    if (data.nodeType === 'generate_music') {
+      const pinBlocked = isInputPinConnected('music_provider') || isInputPinConnected('music_model');
+      const unsupportedReason = modelResidencyTaskUnsupportedReason(gatewayContracts, 'music_generation');
+      return {
+        task: 'music_generation',
+        provider: isInputPinConnected('music_provider')
+          ? ''
+          : first(data.effectConfig?.music_provider, data.pinDefaults?.music_provider, data.effectConfig?.provider, data.pinDefaults?.provider),
+        model: isInputPinConnected('music_model')
+          ? ''
+          : first(data.effectConfig?.music_model, data.pinDefaults?.music_model, data.effectConfig?.model, data.pinDefaults?.model),
+        blockedReason: pinBlocked
+          ? 'Music provider or model comes from connected pins. Add a dedicated Model Residency node for dynamic control.'
+          : unsupportedReason,
         eligible: true,
       };
     }
     if (data.nodeType === 'transcribe_audio' || data.nodeType === 'listen_voice') {
+      const pinBlocked = isInputPinConnected('stt_provider') || isInputPinConnected('stt_model');
+      const unsupportedReason = modelResidencyTaskUnsupportedReason(gatewayContracts, 'stt');
       return {
         task: 'stt',
         provider: isInputPinConnected('stt_provider')
@@ -1367,10 +1460,9 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         model: isInputPinConnected('stt_model')
           ? ''
           : first(data.effectConfig?.stt_model, data.pinDefaults?.stt_model, data.effectConfig?.model, data.pinDefaults?.model),
-        blockedReason:
-          isInputPinConnected('stt_provider') || isInputPinConnected('stt_model')
-            ? 'Transcription provider or model comes from connected pins. Add a dedicated Model Residency node for dynamic control.'
-            : '',
+        blockedReason: pinBlocked
+          ? 'Transcription provider or model comes from connected pins. Add a dedicated Model Residency node for dynamic control.'
+          : unsupportedReason,
         eligible: true,
       };
     }
@@ -1379,12 +1471,12 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
   const addModelResidencyStep = (operation: 'load' | 'unload') => {
     if (!residencyTarget?.eligible) return;
-    const provider = residencyTarget.provider.trim();
-    const model = residencyTarget.model.trim();
-    if (!provider || !model) {
-      toast.error('Select a concrete provider and model before adding a residency step.');
+    if (residencyTarget.blockedReason) {
+      toast.error(residencyTarget.blockedReason);
       return;
     }
+    const provider = residencyTarget.provider.trim();
+    const model = residencyTarget.model.trim();
     try {
       const result = insertModelResidencyStep({
         nodes,
@@ -1449,16 +1541,18 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           <div className="property-group">
             <label className="property-sublabel">Target</label>
             <span className="property-hint">
-              {residencyTarget.provider && residencyTarget.model
+              {residencyTarget.blockedReason
+                ? residencyTarget.blockedReason
+                : residencyTarget.provider && residencyTarget.model
                 ? `${residencyTarget.provider} / ${residencyTarget.model}`
-                : residencyTarget.blockedReason || 'Select a concrete provider and model first. Gateway defaults cannot be preloaded explicitly.'}
+                : `Gateway default ${residencyTarget.task.replace(/_/g, ' ')}`}
             </span>
           </div>
           <div className="property-actions-row">
             <button
               type="button"
               className="modal-button"
-              disabled={!residencyTarget.provider || !residencyTarget.model || Boolean(residencyTarget.blockedReason)}
+              disabled={Boolean(residencyTarget.blockedReason)}
               onClick={() => addModelResidencyStep('load')}
             >
               Add warm-up step before
@@ -1466,7 +1560,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
             <button
               type="button"
               className="modal-button"
-              disabled={!residencyTarget.provider || !residencyTarget.model || Boolean(residencyTarget.blockedReason)}
+              disabled={Boolean(residencyTarget.blockedReason)}
               onClick={() => addModelResidencyStep('unload')}
             >
               Add unload step after
@@ -1751,15 +1845,26 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
               if (
                 pin.id === 'format' &&
-                (data.nodeType === 'generate_image' || data.nodeType === 'generate_voice' || data.nodeType === 'transcribe_audio')
+                (data.nodeType === 'generate_image' ||
+                  data.nodeType === 'edit_image' ||
+                  data.nodeType === 'image_to_image' ||
+                  data.nodeType === 'generate_voice' ||
+                  data.nodeType === 'generate_music' ||
+                  data.nodeType === 'transcribe_audio')
               ) {
                 const fallback =
-                  data.nodeType === 'generate_image' ? 'png' : data.nodeType === 'generate_voice' ? 'wav' : 'json';
+                  data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
+                    ? 'png'
+                    : data.nodeType === 'transcribe_audio'
+                      ? 'json'
+                      : 'wav';
                 const baseOptions =
-                  data.nodeType === 'generate_image'
+                  data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
                     ? imageFormatOptions
                     : data.nodeType === 'generate_voice'
                       ? ttsFormatOptions
+                      : data.nodeType === 'generate_music'
+                        ? musicFormatOptions
                       : sttFormatOptions;
                 const current = typeof raw === 'string' && raw.trim() ? raw.trim() : fallback;
                 const options = baseOptions.includes(current) ? baseOptions : [current, ...baseOptions];
@@ -4478,6 +4583,8 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           for (const item of ttsProviderOptions) addOption(residencyProviderOptions, seenProviders, item);
         } else if (taskValue === 'stt') {
           for (const item of sttProviderOptions) addOption(residencyProviderOptions, seenProviders, item);
+        } else if (taskValue === 'music_generation') {
+          for (const item of musicProviderOptions) addOption(residencyProviderOptions, seenProviders, item);
         }
         addOption(residencyProviderOptions, seenProviders, providerValue);
 
@@ -4495,6 +4602,8 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           for (const item of ttsModelOptions) addOption(residencyModelOptions, seenModels, item);
         } else if (taskValue === 'stt') {
           for (const item of sttModelOptions) addOption(residencyModelOptions, seenModels, item);
+        } else if (taskValue === 'music_generation') {
+          for (const item of musicModelOptions) addOption(residencyModelOptions, seenModels, item);
         }
         addOption(residencyModelOptions, seenModels, modelValue);
 
@@ -4507,7 +4616,9 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               ? 'Speech'
               : taskValue === 'stt'
                 ? 'Transcription'
-                : 'Text generation';
+                : taskValue === 'music_generation'
+                  ? 'Music generation'
+                  : 'Text generation';
         const providerPlaceholder =
           taskValue === 'image_generation'
             ? 'Image provider…'
@@ -4515,13 +4626,17 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               ? 'Speech provider…'
               : taskValue === 'stt'
                 ? 'Transcription provider…'
-                : 'Provider…';
+                : taskValue === 'music_generation'
+                  ? 'Music provider…'
+                  : 'Provider…';
         const modelPlaceholder =
           taskValue === 'tts'
             ? 'Speech model…'
             : taskValue === 'stt'
               ? 'Transcription model…'
-              : 'Model…';
+              : taskValue === 'music_generation'
+                ? 'Music model…'
+                : 'Model…';
         return (
           <div className="property-section">
             <label className="property-label">Model Residency</label>
@@ -4568,6 +4683,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                     if (taskValue === 'image_generation') requestMediaCatalog('image');
                     if (taskValue === 'tts') requestMediaCatalog('tts');
                     if (taskValue === 'stt') requestMediaCatalog('stt');
+                    if (taskValue === 'music_generation') requestMediaCatalog('music');
                   }}
                   onChange={(value) => {
                     const nextProvider = value.trim();
@@ -4575,6 +4691,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                     if (taskValue === 'image_generation' && nextProvider) requestMediaCatalog('image', { provider: nextProvider });
                     if (taskValue === 'tts') requestMediaCatalog('tts', { provider: nextProvider || undefined });
                     if (taskValue === 'stt') requestMediaCatalog('stt', { provider: nextProvider || undefined });
+                    if (taskValue === 'music_generation') requestMediaCatalog('music', { provider: nextProvider || undefined });
                   }}
                 />
               )}
@@ -4587,7 +4704,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 <AfSelect
                   value={modelValue}
                   options={residencyModelOptions}
-                  placeholder={!providerValue ? 'Pick provider…' : modelLoading ? 'Loading…' : modelPlaceholder}
+                  placeholder={!providerValue ? 'Auto (Gateway default)' : modelLoading ? 'Loading…' : modelPlaceholder}
                   disabled={!providerValue}
                   loading={modelLoading}
                   searchable
@@ -4599,6 +4716,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                     if (taskValue === 'image_generation') requestMediaCatalog('image', providerValue ? { provider: providerValue } : {});
                     if (taskValue === 'tts') requestMediaCatalog('tts', providerValue ? { provider: providerValue } : {});
                     if (taskValue === 'stt') requestMediaCatalog('stt', providerValue ? { provider: providerValue } : {});
+                    if (taskValue === 'music_generation') requestMediaCatalog('music', providerValue ? { provider: providerValue } : {});
                   }}
                   onChange={(value) => updateResidency({ model: value.trim() || undefined })}
                 />
@@ -4630,14 +4748,14 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       })()}
 
       {/* Media capability properties */}
-      {['generate_image', 'generate_voice', 'transcribe_audio', 'listen_voice'].includes(data.nodeType) && (
+      {['generate_image', 'edit_image', 'image_to_image', 'generate_voice', 'generate_music', 'transcribe_audio', 'listen_voice'].includes(data.nodeType) && (
         <div className="property-section">
           <label className="property-label">Gateway Media</label>
 
-          {data.nodeType === 'generate_image' && (
+          {(data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image') && (
             <>
               <div className="property-group">
-                <label className="property-sublabel">Image model</label>
+                <label className="property-sublabel">{data.nodeType === 'generate_image' ? 'Image model' : 'Image edit model'}</label>
                 <select
                   className="property-select"
                   value={(() => {
@@ -4647,7 +4765,15 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                   })()}
                   onFocus={() => {
                     const provider = data.effectConfig?.image_provider || '';
-                    if (provider) requestMediaCatalog('image', { provider });
+                    if (provider) {
+                      requestMediaCatalog('image', {
+                        provider,
+                        task:
+                          data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
+                            ? editedImageProviderModelsTask
+                            : generatedImageProviderModelsTask,
+                      });
+                    }
                   }}
                   onChange={(e) => {
                     const picked = imageModelOptions.find((item) => `${item.provider}::${item.model}` === e.target.value);
@@ -4664,7 +4790,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                   }}
                   disabled={loadingMediaModels}
                 >
-                  <option value="">{loadingMediaModels ? 'Loading...' : 'Gateway default image model'}</option>
+                  <option value="">{loadingMediaModels ? 'Loading...' : 'Auto (Gateway default image model)'}</option>
                   {imageModelOptions.map((item) => (
                     <option key={`${item.provider}:${item.model}`} value={`${item.provider}::${item.model}`}>
                       {item.label}
@@ -4690,7 +4816,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                   onChange={(e) => updateNodeData(node.id, { effectConfig: { ...data.effectConfig, voice: e.target.value || undefined } })}
                   disabled={loadingMediaModels}
                 >
-                  <option value="">{loadingMediaModels ? 'Loading...' : 'Gateway default voice'}</option>
+                  <option value="">{loadingMediaModels ? 'Loading...' : 'Auto (Gateway default voice)'}</option>
                   {voiceOptions.map((item) => (
                     <option key={`${item.mode || 'voice'}:${item.value}`} value={item.value}>
                       {item.label}
@@ -4714,10 +4840,90 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                   }
                   disabled={loadingMediaModels}
                 >
-                  <option value="">{loadingMediaModels ? 'Loading...' : 'Gateway default TTS model'}</option>
+                  <option value="">{loadingMediaModels ? 'Loading...' : 'Auto (Gateway default TTS model)'}</option>
                   {ttsModelOptions.map((m) => (
                     <option key={m} value={m}>
                       {m}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
+
+          {data.nodeType === 'generate_music' && (
+            <>
+              <div className="property-group">
+                <label className="property-sublabel">Music provider</label>
+                <select
+                  className="property-select"
+                  value={data.effectConfig?.music_provider || ''}
+                  onFocus={() => requestMediaCatalog('music')}
+                  onChange={(e) => {
+                    const provider = e.target.value.trim();
+                    updateNodeData(node.id, {
+                      effectConfig: {
+                        ...data.effectConfig,
+                        music_provider: provider || undefined,
+                        music_model: undefined,
+                        provider: undefined,
+                        model: undefined,
+                      },
+                    });
+                    if (provider) requestMediaCatalog('music', { provider });
+                  }}
+                  disabled={loadingMediaModels}
+                >
+                  <option value="">{loadingMediaModels ? 'Loading...' : 'Auto (Gateway default music provider)'}</option>
+                  {musicProviderOptions.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="property-group">
+                <label className="property-sublabel">Music model</label>
+                <select
+                  className="property-select"
+                  value={data.effectConfig?.music_model || ''}
+                  onFocus={() => {
+                    const provider = data.effectConfig?.music_provider || '';
+                    if (provider) requestMediaCatalog('music', { provider });
+                  }}
+                  onChange={(e) =>
+                    updateNodeData(node.id, {
+                      effectConfig: {
+                        ...data.effectConfig,
+                        music_model: e.target.value || undefined,
+                        model: undefined,
+                      },
+                    })
+                  }
+                  disabled={loadingMediaModels || !data.effectConfig?.music_provider}
+                >
+                  <option value="">{loadingMediaModels ? 'Loading...' : 'Auto (Gateway default music model)'}</option>
+                  {musicModelOptions.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="property-group">
+                <label className="property-sublabel">Format</label>
+                <select
+                  className="property-select"
+                  value={String(data.pinDefaults?.format || data.effectConfig?.format || 'wav')}
+                  onChange={(e) =>
+                    updateNodeData(node.id, {
+                      pinDefaults: { ...(data.pinDefaults || {}), format: e.target.value || 'wav' },
+                    })
+                  }
+                >
+                  {musicFormatOptions.map((fmt) => (
+                    <option key={fmt} value={fmt}>
+                      {fmt}
                     </option>
                   ))}
                 </select>
@@ -4742,7 +4948,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 }
                 disabled={loadingMediaModels}
               >
-                <option value="">{loadingMediaModels ? 'Loading...' : 'Gateway default STT model'}</option>
+                <option value="">{loadingMediaModels ? 'Loading...' : 'Auto (Gateway default STT model)'}</option>
                 {sttModelOptions.map((m) => (
                   <option key={m} value={m}>
                     {m}
@@ -4769,7 +4975,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                     })
                   }
                 >
-                  <option value="">Gateway default</option>
+                  <option value="">Auto (Gateway default)</option>
                   {sttModelOptions.map((m) => (
                     <option key={m} value={m}>
                       {m}

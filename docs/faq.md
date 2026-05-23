@@ -66,7 +66,12 @@ Evidence: [../pyproject.toml](../pyproject.toml) (host profile extras + `project
 
 ## Where does the web editor store flows and run data?
 
-Defaults:
+In the modern Gateway-first editor path, Gateway stores VisualFlows, bundles,
+runs, ledgers, attachments, workspaces, and artifacts in its configured data
+directories.
+
+The old FastAPI local runtime routes still have compatibility defaults, but only
+when `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1` is set:
 - Flows: `./flows/*.json` relative to the backend working directory (override with `ABSTRACTFLOW_FLOWS_DIR`).
 - Runtime persistence (runs/ledger/artifacts):
   - source checkout: `web/runtime/`

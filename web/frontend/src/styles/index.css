@@ -2280,7 +2280,9 @@ button.primary:hover:not(:disabled) {
 
 .model-residency-modal {
   width: min(1080px, calc(100vw - 48px));
+  max-width: min(1080px, calc(100vw - 48px));
   max-height: min(780px, calc(100vh - 48px));
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -2307,6 +2309,13 @@ button.primary:hover:not(:disabled) {
   grid-template-columns: minmax(130px, 0.7fr) minmax(180px, 1fr) minmax(260px, 1.5fr) auto auto auto;
   gap: 10px;
   align-items: center;
+}
+
+.model-residency-note {
+  margin-top: -4px;
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
 }
 
 .model-residency-pin {
@@ -2539,6 +2548,10 @@ button.primary:hover:not(:disabled) {
 }
 
 .run-metric-badge {
+  display: inline-block;
+  vertical-align: middle;
+  min-width: 0;
+  max-width: 100%;
   font-family: var(--font-mono);
   font-size: var(--font-size-xxs);
   padding: 2px 6px;
@@ -2547,6 +2560,8 @@ button.primary:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.04);
   color: var(--text-secondary);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .run-metric-badge.metric-duration {
@@ -3800,6 +3815,15 @@ button.primary:hover:not(:disabled) {
   gap: 6px;
   font-size: var(--font-size-sm);
   color: var(--text-secondary);
+  min-width: 0;
+}
+
+.run-output-meta > div {
+  display: grid;
+  grid-template-columns: minmax(54px, max-content) minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  min-width: 0;
 }
 
 .run-output-meta-key {
@@ -3809,7 +3833,7 @@ button.primary:hover:not(:disabled) {
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  margin-right: 8px;
+  margin-right: 0;
 }
 
 .run-output-meta-val {
@@ -3817,6 +3841,8 @@ button.primary:hover:not(:disabled) {
   color: var(--text-primary);
   white-space: pre-wrap;
   word-break: break-word;
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
 
 .run-output-link {
@@ -3833,6 +3859,12 @@ button.primary:hover:not(:disabled) {
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.run-output-meta-badges .run-metric-badge {
+  max-width: 100%;
 }
 
 .run-output-meta-json {
@@ -3843,6 +3875,7 @@ button.primary:hover:not(:disabled) {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-width: 0;
 }
 
 .run-generated-image-img {
@@ -3858,6 +3891,7 @@ button.primary:hover:not(:disabled) {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-width: 0;
 }
 
 .run-generated-audio-player {
@@ -3869,6 +3903,7 @@ button.primary:hover:not(:disabled) {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-width: 0;
 }
 
 .run-generated-text-body {
@@ -3897,7 +3932,7 @@ button.primary:hover:not(:disabled) {
 
 .run-generated-artifact-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
   gap: 12px;
 }
 
@@ -3905,6 +3940,8 @@ button.primary:hover:not(:disabled) {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-width: 0;
+  overflow: hidden;
   padding: 12px;
   border: 1px solid var(--bg-tertiary);
   border-radius: 12px;

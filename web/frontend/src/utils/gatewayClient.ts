@@ -7,6 +7,59 @@ export interface GatewayEndpointDescriptor {
   [key: string]: unknown;
 }
 
+export interface GatewaySurfaceReadinessMediaSurface {
+  available?: boolean;
+  route_available?: boolean;
+  configured?: boolean;
+  workflow_available?: boolean;
+  config_hint?: string;
+  [key: string]: unknown;
+}
+
+export interface GatewaySurfaceReadinessContract {
+  contract?: string;
+  version?: number;
+  truth_scope?: string;
+  limitations?: string[];
+  surfaces?: {
+    media?: Record<string, GatewaySurfaceReadinessMediaSurface | undefined>;
+    model_residency?: {
+      available?: boolean;
+      route_available?: boolean;
+      supported_tasks?: string[];
+      unsupported_tasks?: string[];
+      supports?: Record<string, boolean>;
+      [key: string]: unknown;
+    };
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
+export interface GatewayDurableBlocPromptCacheContract {
+  available?: boolean;
+  route_available?: boolean;
+  lifecycle_available?: boolean;
+  source?: string;
+  endpoints?: {
+    upsert_text?: string;
+    record?: string;
+    list?: string;
+    delete?: string;
+    kv_manifest?: string;
+    kv_list?: string;
+    kv_ensure?: string;
+    kv_load?: string;
+    kv_delete?: string;
+    kv_prune?: string;
+  };
+  stable_identifiers?: string[];
+  exact_reuse_binding_param?: string;
+  ledger?: string;
+  config_hint?: string;
+  [key: string]: unknown;
+}
+
 export interface GatewayCommonContract {
   runs?: {
     start?: GatewayEndpointDescriptor;
@@ -42,14 +95,24 @@ export interface GatewayCommonContract {
     voice_voices?: string;
     audio_speech_models?: string;
     audio_transcription_models?: string;
+    audio_music_providers?: string;
+    audio_music_models?: string;
     vision_provider_models?: string;
     vision_models?: string;
     tools?: string;
     semantics?: string;
+    catalog_contract?: {
+      contract?: string;
+      version?: number;
+      metadata_field?: string;
+      primary_items_field?: string;
+      [key: string]: unknown;
+    };
   };
   prompt_cache?: {
     provider_controls?: boolean;
     session_lifecycle?: boolean;
+    durable_blocs?: GatewayDurableBlocPromptCacheContract;
     endpoints?: Record<string, string>;
     session_endpoints?: {
       status?: string;
@@ -82,6 +145,7 @@ export interface GatewayCommonContract {
     config_hint?: string;
     error?: string;
   };
+  readiness?: GatewaySurfaceReadinessContract;
 }
 
 export interface GatewayMediaWorkflowDescriptor {
@@ -95,6 +159,7 @@ export interface GatewayMediaWorkflowDescriptor {
 export interface GatewayGeneratedImageContract {
   direct_endpoint?: GatewayEndpointDescriptor & {
     route_available?: boolean;
+    configured?: boolean;
     event_name?: string;
     durability?: string;
     returns_child_run_id?: boolean;
@@ -106,13 +171,31 @@ export interface GatewayGeneratedImageContract {
 }
 
 export interface GatewayGeneratedVoiceContract {
-  direct_endpoint?: GatewayEndpointDescriptor;
+  direct_endpoint?: GatewayEndpointDescriptor & { configured?: boolean };
+  workflow?: GatewayMediaWorkflowDescriptor;
+}
+
+export interface GatewayGeneratedMusicContract {
+  direct_endpoint?: GatewayEndpointDescriptor & {
+    route_available?: boolean;
+    configured?: boolean;
+    providers_endpoint?: string;
+    provider_models_endpoint?: string;
+    provider_models_task?: string;
+    durability?: string;
+    returns_child_run_id?: boolean;
+    formats?: string[];
+    selected_backend?: string;
+    config_hint?: string;
+  };
   workflow?: GatewayMediaWorkflowDescriptor;
 }
 
 export interface GatewayMediaContract {
   generated_image?: GatewayGeneratedImageContract;
+  edited_image?: GatewayGeneratedImageContract;
   generated_voice?: GatewayGeneratedVoiceContract;
+  generated_music?: GatewayGeneratedMusicContract;
   [key: string]: unknown;
 }
 
@@ -185,9 +268,12 @@ export interface GatewayOptionalFeatureStatus {
   semantics: boolean;
   workspacePolicy: boolean;
   promptCacheSessions: boolean;
+  promptCacheDurableBlocs: boolean;
   kgMemory: boolean;
   generatedImage: boolean;
+  editedImage: boolean;
   generatedVoice: boolean;
+  generatedMusic: boolean;
   attachmentsUpload: boolean;
   modelResidency: boolean;
 }
@@ -279,6 +365,20 @@ export function descriptorEndpointAvailable(
   return Boolean(endpointTemplateFromDescriptor(descriptor));
 }
 
+export function durableBlocPromptCacheAvailable(
+  contract: GatewayDurableBlocPromptCacheContract | undefined | null
+): boolean {
+  if (!contract || contract.route_available === false || contract.available === false) return false;
+  const endpoints = contract.endpoints || {};
+  return Boolean(
+    stringEndpointAvailable(endpoints.record) &&
+      stringEndpointAvailable(endpoints.kv_manifest) &&
+      stringEndpointAvailable(endpoints.kv_list) &&
+      stringEndpointAvailable(endpoints.kv_ensure) &&
+      stringEndpointAvailable(endpoints.kv_load)
+  );
+}
+
 export function capabilityUnavailable(descriptor: { available?: boolean } | undefined | null): boolean {
   return descriptor ? descriptor.available === false : false;
 }
@@ -293,6 +393,36 @@ export function getGatewayContracts(payload: GatewayCapabilitiesResponse | Gatew
 
 function stringEndpointAvailable(value: unknown): boolean {
   return typeof value === 'string' && value.trim().length > 0;
+}
+
+function gatewaySurfaceReadiness(
+  common: GatewayCommonContract | undefined | null
+): GatewaySurfaceReadinessContract | null {
+  const readiness = common?.readiness;
+  return readiness?.contract === 'gateway_surface_readiness_v1' ? readiness : null;
+}
+
+function gatewayMediaSurface(
+  readiness: GatewaySurfaceReadinessContract | null,
+  key: string
+): GatewaySurfaceReadinessMediaSurface | undefined {
+  const surface = readiness?.surfaces?.media?.[key];
+  return surface && typeof surface === 'object' ? surface : undefined;
+}
+
+function gatewayDirectMediaSurfaceAllows(surface: GatewaySurfaceReadinessMediaSurface | undefined): boolean {
+  if (!surface) return true;
+  return surface.available === true && surface.route_available !== false && surface.configured !== false;
+}
+
+function gatewayWorkflowMediaSurfaceAllows(surface: GatewaySurfaceReadinessMediaSurface | undefined): boolean {
+  if (!surface) return true;
+  return surface.workflow_available === true;
+}
+
+function gatewayModelResidencySurfaceAllows(readiness: GatewaySurfaceReadinessContract | null): boolean {
+  const surface = readiness?.surfaces?.model_residency;
+  return !surface || surface.route_available !== false;
 }
 
 function pickDescriptor(
@@ -355,6 +485,7 @@ export function getGatewayFlowEditorReadiness(
   const ledger = common?.ledger || flow?.ledger;
   const artifacts = common?.artifacts || flow?.artifacts;
   const crud = flow?.visualflows?.crud;
+  const surfaceReadiness = gatewaySurfaceReadiness(common);
 
   const checks: GatewayCapabilityCheck[] = [];
   const add = (check: GatewayCapabilityCheck) => {
@@ -427,20 +558,53 @@ export function getGatewayFlowEditorReadiness(
   const history = operationStatus([...base, runsHistoryBundle, runsList, runsSummary, ledgerReplay, artifactsList, artifactsMetadata, artifactsContent]);
   const artifactStatus = operationStatus([...base, artifactsList, artifactsMetadata, artifactsContent]);
   const commands = operationStatus([...base, runsCommands]);
+  const directGeneratedMediaAvailable = (
+    direct: (GatewayEndpointDescriptor & { route_available?: boolean; configured?: boolean }) | undefined | null,
+    surface: GatewaySurfaceReadinessMediaSurface | undefined
+  ): boolean =>
+    Boolean(
+      direct &&
+        direct.available !== false &&
+        direct.route_available !== false &&
+        direct.configured !== false &&
+        gatewayDirectMediaSurfaceAllows(surface) &&
+        descriptorEndpointAvailable(direct)
+    );
 
   const generatedImage = (() => {
     const image = flow?.media?.generated_image || contracts?.assistant?.media?.generated_image;
+    const surface = gatewayMediaSurface(surfaceReadiness, 'generated_image');
     return Boolean(
-      descriptorEndpointAvailable(image?.direct_endpoint) ||
-        image?.direct_endpoint?.route_available === true ||
-        image?.workflow?.available === true
+      (image?.workflow?.available === true && gatewayWorkflowMediaSurfaceAllows(surface)) ||
+        directGeneratedMediaAvailable(image?.direct_endpoint, surface)
+    );
+  })();
+  const editedImage = (() => {
+    const image = flow?.media?.edited_image || contracts?.assistant?.media?.edited_image;
+    const surface = gatewayMediaSurface(surfaceReadiness, 'edited_image');
+    return Boolean(
+      (image?.workflow?.available === true && gatewayWorkflowMediaSurfaceAllows(surface)) ||
+        directGeneratedMediaAvailable(image?.direct_endpoint, surface)
     );
   })();
   const generatedVoice = (() => {
     const voice = flow?.media?.generated_voice || contracts?.assistant?.media?.generated_voice;
-    return Boolean(descriptorEndpointAvailable(voice?.direct_endpoint) || voice?.workflow?.available === true);
+    const surface = gatewayMediaSurface(surfaceReadiness, 'generated_voice');
+    return Boolean(
+      (voice?.workflow?.available === true && gatewayWorkflowMediaSurfaceAllows(surface)) ||
+        directGeneratedMediaAvailable(voice?.direct_endpoint, surface)
+    );
+  })();
+  const generatedMusic = (() => {
+    const music = flow?.media?.generated_music || contracts?.assistant?.media?.generated_music;
+    const surface = gatewayMediaSurface(surfaceReadiness, 'generated_music');
+    return Boolean(
+      (music?.workflow?.available === true && gatewayWorkflowMediaSurfaceAllows(surface)) ||
+        directGeneratedMediaAvailable(music?.direct_endpoint, surface)
+    );
   })();
   const promptCacheSessionEndpoints = common?.prompt_cache?.session_endpoints;
+  const durableBlocPromptCache = common?.prompt_cache?.durable_blocs;
   const modelResidency = common?.model_residency;
   const modelResidencyEndpoints = modelResidency?.endpoints || {};
   const modelResidencyRouteAvailable =
@@ -476,11 +640,14 @@ export function getGatewayFlowEditorReadiness(
           stringEndpointAvailable(promptCacheSessionEndpoints?.status) &&
           stringEndpointAvailable(promptCacheSessionEndpoints?.prepare)
       ),
+      promptCacheDurableBlocs: durableBlocPromptCacheAvailable(durableBlocPromptCache),
       kgMemory: Boolean(common?.memory?.available === true && descriptorEndpointAvailable(common.memory)),
       generatedImage,
+      editedImage,
       generatedVoice,
+      generatedMusic,
       attachmentsUpload: descriptorEndpointAvailable(common?.attachments?.upload),
-      modelResidency: Boolean(modelResidencyRouteAvailable),
+      modelResidency: Boolean(modelResidencyRouteAvailable && gatewayModelResidencySurfaceAllows(surfaceReadiness)),
     },
   };
 }

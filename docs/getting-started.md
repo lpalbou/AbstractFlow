@@ -18,7 +18,7 @@ pip install abstractflow
 ```
 
 Optional extras:
-- Host profile for local Python proxy stack + compatibility routes (`Flow`, `FlowRunner`, `abstractflow.visual` local execution, workflow bundles, Agent nodes): `pip install "abstractflow[apple]"` or `pip install "abstractflow[gpu]"`
+- Host profile for the Python proxy stack + matching Gateway deployment profile + compatibility routes (`Flow`, `FlowRunner`, `abstractflow.visual` local execution, workflow bundles, Agent nodes): `pip install "abstractflow[apple]"` or `pip install "abstractflow[gpu]"`
 - Agent nodes only, without the host profile: `pip install "abstractflow[agent]"`
 - Documentation site tools: `pip install "abstractflow[docs]"`
 
@@ -108,13 +108,44 @@ Quick start (no repo clone needed):
 ```bash
 pip install "abstractgateway[http]" abstractflow
 export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
-abstractgateway --port 8080
+abstractgateway serve --port 8080
 
 export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
 npx @abstractframework/flow --gateway-url http://127.0.0.1:8080
 ```
 
 Tip (from source): install Flow and Gateway editably, then run `npm run dev` from `web/frontend` with `ABSTRACTGATEWAY_AUTH_TOKEN` set so Vite can inject Gateway auth in its proxy.
+
+## Create media with Gateway nodes
+
+In the editor, add media nodes from the palette:
+- `Generate Image`: prompt to image artifact.
+- `Edit Image`: prompt plus source image artifact, optional mask, to image artifact. `Image-to-Image` is accepted as a legacy alias when loading older flows.
+- `Generate Voice`: text to voice/audio artifact.
+- `Generate Music`: prompt/lyrics/duration to music artifact.
+- `Transcribe Audio` / `Listen Voice`: audio input to text.
+
+For the simple path, leave provider/model as `Auto` and let Gateway resolve the
+configured backend. If you need reproducibility, choose explicit provider/model
+values from the Gateway catalog selectors. Music catalog data comes from
+`/api/gateway/audio/music/providers` and `/api/gateway/audio/music/models`.
+
+Generated media is returned as Gateway artifacts. The Run modal renders images
+and audio/music players first; raw ledger JSON and artifact IDs remain available
+for debugging.
+
+For image editing, wire `image_artifact` from a previous `Generate Image` node
+or use the `Artifacts` palette primitives (`Image Artifact`, `Voice Artifact`,
+`Music Artifact`, etc.) to paste an existing Gateway `$artifact` id. A richer
+browser artifact picker/upload flow is tracked separately.
+
+Example Generate Music path:
+1. Drag `On Flow Start`, `Generate Music`, and `On Flow End` onto the canvas.
+2. Wire execution `On Flow Start -> Generate Music -> On Flow End`.
+3. Wire or type a `prompt` such as `short heroic fantasy theme with brass and strings`.
+4. Leave provider/model as `Auto (Gateway default)` unless you need a specific backend.
+5. Save, then click `Run Flow`.
+6. Open the Generate Music result and play the returned music artifact.
 
 ## Workflow bundles (`.flow`)
 

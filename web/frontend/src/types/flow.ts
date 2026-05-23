@@ -22,6 +22,8 @@ export type PinType =
   | 'model_image'    // Compatibility alias for old saved flows; new flows use `model`
   | 'provider_voice' // Voice/TTS/STT provider/backend id (string-like)
   | 'model_voice'    // Compatibility alias for old saved flows; new flows use `model`
+  | 'provider_music' // Music-generation provider/backend id (string-like)
+  | 'model_music'    // Compatibility alias for old saved flows; new flows use `model`
   | 'agent'     // Blue #4488FF - Agent reference
   | 'any';      // Gray #888888 - Accepts any type
 
@@ -45,6 +47,8 @@ export const PIN_COLORS: Record<PinType, string> = {
   model_image: '#9D4EDD',
   provider_voice: '#22D3EE',
   model_voice: '#9D4EDD',
+  provider_music: '#F59E0B',
+  model_music: '#9D4EDD',
   agent: '#4488FF',
   any: '#888888',
 };
@@ -118,7 +122,10 @@ export type NodeType =
   | 'llm_call'
   | 'model_residency'
   | 'generate_image'
+  | 'edit_image'
+  | 'image_to_image'
   | 'generate_voice'
+  | 'generate_music'
   | 'transcribe_audio'
   | 'listen_voice'
   | 'wait_until'
@@ -233,7 +240,7 @@ export interface FlowNodeData {
     provider?: string;     // For llm_call
     model?: string;        // For llm_call
     operation?: string;    // For model_residency: list_loaded, load, unload
-    task?: string;         // For model_residency: text_generation, image_generation, tts, stt
+    task?: string;         // For model_residency: text_generation, image_generation, tts, stt, music_generation
     runtime_id?: string;   // For model_residency unload
     base_url?: string;     // For model_residency disambiguation/remote provider override
     timeout_s?: number;    // For model_residency load/unload control calls
@@ -249,10 +256,15 @@ export interface FlowNodeData {
     include_context?: boolean; // For llm_call: include run context/messages as history (Recall into context)
     image_provider?: string; // For generated image backend/catalog selection
     image_model?: string;    // For generated image backend/catalog selection
+    image_artifact?: any;    // For image edit source artifact
+    source_image?: any;      // For image edit/source-image alias
+    mask_artifact?: any;     // For optional image edit mask artifact
     tts_provider?: string;   // For generated voice backend/catalog selection
     tts_model?: string;      // For generated voice backend/catalog selection
     stt_provider?: string;   // For audio transcription backend/catalog selection
     stt_model?: string;      // For audio transcription backend/catalog selection
+    music_provider?: string; // For generated music backend/catalog selection
+    music_model?: string;    // For generated music backend/catalog selection
     format?: string;       // For generated media nodes
     size?: string;         // For generated image
     width?: number;        // For generated image
@@ -260,6 +272,7 @@ export interface FlowNodeData {
     negative_prompt?: string; // For generated image
     steps?: number;        // For generated image
     guidance_scale?: number; // For generated image
+    strength?: number;     // For image edit / image-to-image
     quality?: string;      // For generated image
     style?: string;        // For generated image
     voice?: string;        // For generated voice
@@ -267,6 +280,24 @@ export interface FlowNodeData {
     quality_preset?: string; // For generated voice quality preset
     speed?: number;        // For generated voice
     instructions?: string; // For generated voice
+    lyrics?: string;       // For generated music
+    duration_s?: number;   // For generated music
+    num_inference_steps?: number; // For generated music
+    instrumental?: boolean; // For generated music
+    enhance_prompt?: boolean; // For generated music
+    structure_prompt?: boolean; // For generated music
+    auto_lyrics?: boolean; // For generated music
+    text_planner_mode?: string; // For generated music
+    vocal_language?: string; // For generated music
+    sample_rate?: number;  // For generated music
+    bpm?: number;          // For generated music
+    keyscale?: string;     // For generated music
+    timesignature?: string; // For generated music
+    composition_plan?: any; // For generated music
+    positive_styles?: string[]; // For generated music
+    negative_styles?: string[]; // For generated music
+    planning?: boolean;    // For generated music
+    extra?: Record<string, any>; // Provider-specific media options
     language?: string;     // For audio transcription/listen
     wait_key?: string;     // For listen_voice
     max_duration_s?: number; // For listen_voice

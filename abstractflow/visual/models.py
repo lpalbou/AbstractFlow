@@ -36,6 +36,8 @@ class PinType(str, Enum):
     MODEL_IMAGE = "model_image"  # Image-generation model id/name (string-like)
     PROVIDER_VOICE = "provider_voice"  # Voice/STT/TTS provider/backend id (string-like)
     MODEL_VOICE = "model_voice"  # Voice/STT/TTS model id/name (string-like)
+    PROVIDER_MUSIC = "provider_music"  # Music-generation provider/backend id (string-like)
+    MODEL_MUSIC = "model_music"  # Music-generation model id/name (string-like)
     AGENT = "agent"  # Blue #4488FF - Agent reference
     ANY = "any"  # Gray #888888 - Accepts any type
 
@@ -140,7 +142,10 @@ class NodeType(str, Enum):
     LLM_CALL = "llm_call"
     MODEL_RESIDENCY = "model_residency"
     GENERATE_IMAGE = "generate_image"
+    EDIT_IMAGE = "edit_image"
+    IMAGE_TO_IMAGE = "image_to_image"
     GENERATE_VOICE = "generate_voice"
+    GENERATE_MUSIC = "generate_music"
     TRANSCRIBE_AUDIO = "transcribe_audio"
     LISTEN_VOICE = "listen_voice"
     WAIT_UNTIL = "wait_until"

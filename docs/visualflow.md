@@ -43,6 +43,25 @@ Note on pins in saved JSON:
 
 Evidence: [../abstractflow/visual/interfaces.py](../abstractflow/visual/interfaces.py) (`_pin_types` reads `node.data.*`) and sample flows in [../web/flows/](../web/flows/).
 
+## Native media nodes
+
+Current media authoring nodes are saved as native VisualFlow node types:
+- `generate_image`
+- `edit_image`
+- `image_to_image` (legacy alias normalized by the editor)
+- `generate_voice`
+- `generate_music`
+- `transcribe_audio`
+- `listen_voice`
+
+Generated image, voice, and music outputs should be treated as artifacts. Gateway
+is the preferred execution host for these nodes because it owns media catalogs,
+child runs, artifact persistence, and provider/runtime configuration.
+
+Compatibility note: old saved flows that used the temporary browser-side
+Generate Music lowering are normalized back to native `generate_music` when they
+are loaded or saved by the current editor.
+
 ## Subflows
 
 Subflows are regular VisualFlows referenced by id from a node of type `subflow`.

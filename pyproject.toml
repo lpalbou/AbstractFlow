@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "abstractflow"
 dynamic = ["version"]
-description = "Diagram-based AI workflow generation built on AbstractCore"
+description = "Gateway-first visual workflow authoring for AbstractFramework"
 readme = "README.md"
 license = "MIT"
 authors = [
@@ -16,7 +16,7 @@ maintainers = [
 ]
 keywords = [
     "ai", "workflow", "diagram", "llm", "automation", 
-    "visual-programming", "abstractcore", "machine-learning"
+    "visual-programming", "abstractgateway", "machine-learning"
 ]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
@@ -45,10 +45,8 @@ agent = [
 apple = [
     # Apple local control-plane + Gateway stack. This profile is intentionally
     # the full user-facing local install, so media engine extras cascade through
-    # abstractgateway[apple] -> abstractvoice[all-apple]/abstractvision[all-apple].
-    "abstractgateway[apple]>=0.2.14",
-    "AbstractRuntime>=0.4.15",
-    "abstractcore[tools]>=2.13.15",
+    # abstractgateway[apple] into the runtime-owned media engine extras.
+    "abstractgateway[apple]>=0.2.17",
     "abstractagent>=0.3.7",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.23.0",
@@ -56,9 +54,7 @@ apple = [
 ]
 gpu = [
     # GPU local control-plane + Gateway stack.
-    "abstractgateway[gpu]>=0.2.14",
-    "AbstractRuntime>=0.4.15",
-    "abstractcore[tools]>=2.13.15",
+    "abstractgateway[gpu]>=0.2.17",
     "abstractagent>=0.3.7",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.23.0",

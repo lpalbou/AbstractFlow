@@ -6,6 +6,7 @@ import type { Node, Edge } from 'reactflow';
 import type { FlowNodeData, VisualFlow, VisualNode, VisualEdge } from '../types/flow';
 import { getNodeTemplate, createNodeData, mergePinDocsFromTemplate } from '../types/nodes';
 import { inferEntryNode, isRouteOverrideEdge, withMultiEntryRouteData } from './multiEntryRoutes';
+import { isLegacyMusicCompatNode, normalizeLegacyMusicCompatVisualFlow } from './visualFlowCompat';
 
 /**
  * Convert React Flow nodes/edges to VisualFlow format for API.
@@ -35,13 +36,14 @@ export function toVisualFlow(
       animated: edge.animated,
     }));
 
+  const normalizedFlow = normalizeLegacyMusicCompatVisualFlow(visualNodes, visualEdges);
   const entryNode = inferEntryNode(nodes, edges);
 
   return {
     id,
     name,
-    nodes: visualNodes,
-    edges: visualEdges,
+    nodes: normalizedFlow.nodes,
+    edges: normalizedFlow.edges,
     entryNode,
   };
 }
@@ -53,9 +55,23 @@ export function fromVisualFlow(flow: VisualFlow): {
   nodes: Node<FlowNodeData>[];
   edges: Edge[];
 } {
-  const nodes: Node<FlowNodeData>[] = flow.nodes.map((vn) => {
+  const normalized = normalizeLegacyMusicCompatVisualFlow(
+    Array.isArray(flow.nodes) ? flow.nodes : [],
+    Array.isArray(flow.edges) ? flow.edges : []
+  );
+  const hiddenRuntimeNodeIds = new Set(
+    normalized.nodes
+      .filter((node) => isLegacyMusicCompatNode(node))
+      .map((node) => node.id)
+  );
+  const flowNodes = normalized.nodes.filter((node) => !hiddenRuntimeNodeIds.has(node.id));
+  const flowEdges = normalized.edges.filter(
+    (edge) => !hiddenRuntimeNodeIds.has(edge.source) && !hiddenRuntimeNodeIds.has(edge.target)
+  );
+  const nodes: Node<FlowNodeData>[] = flowNodes.map((vn) => {
     // Get template for node type
-    const template = getNodeTemplate(vn.type);
+    const authoredType = (vn.data as FlowNodeData | undefined)?.nodeType;
+    const template = getNodeTemplate(authoredType || vn.type) || getNodeTemplate(vn.type);
 
     // Create node data from template, merged with saved data
     const dataBase: FlowNodeData = template
@@ -150,7 +166,7 @@ export function fromVisualFlow(flow: VisualFlow): {
     };
   });
 
-  const edges: Edge[] = flow.edges.map((ve) => ({
+  const edges: Edge[] = flowEdges.map((ve) => ({
     id: ve.id,
     source: ve.source,
     sourceHandle: ve.sourceHandle,

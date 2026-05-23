@@ -20,6 +20,7 @@ def test_agent_response_schema_pin_triggers_structured_output_postpass() -> None
         "properties": {"answer": {"type": "string"}},
         "required": ["answer"],
     }
+    binding: Dict[str, Any] = {"binding_id": "bind-agent", "key": "work:agent"}
 
     visual = VisualFlow(
         id="vf",
@@ -34,6 +35,12 @@ def test_agent_response_schema_pin_triggers_structured_output_postpass() -> None
                 data={"literalValue": schema},
             ),
             VisualNode(
+                id="binding",
+                type=NodeType.LITERAL_JSON,
+                position=Position(x=0, y=0),
+                data={"literalValue": binding},
+            ),
+            VisualNode(
                 id="agent",
                 type=NodeType.AGENT,
                 position=Position(x=0, y=0),
@@ -43,6 +50,7 @@ def test_agent_response_schema_pin_triggers_structured_output_postpass() -> None
         edges=[
             VisualEdge(id="e1", source="start", sourceHandle="exec-out", target="agent", targetHandle="exec-in"),
             VisualEdge(id="d1", source="schema", sourceHandle="value", target="agent", targetHandle="response_schema"),
+            VisualEdge(id="d2", source="binding", sourceHandle="value", target="agent", targetHandle="prompt_cache_binding"),
         ],
     )
 
@@ -61,6 +69,11 @@ def test_agent_response_schema_pin_triggers_structured_output_postpass() -> None
     plan1 = spec.get_node("agent")(run, _dummy_ctx())
     assert plan1.effect is not None
     assert plan1.effect.type.value == "start_subworkflow"
+    payload_vars = plan1.effect.payload.get("vars")
+    assert isinstance(payload_vars, dict)
+    runtime_ns = payload_vars.get("_runtime")
+    assert isinstance(runtime_ns, dict)
+    assert runtime_ns.get("prompt_cache_binding") == binding
 
     # Simulate the subworkflow completing by writing the expected durable key that the agent handler reads:
     # result_key = "_temp.agent.{node_id}.sub"
@@ -86,6 +99,8 @@ def test_agent_response_schema_pin_triggers_structured_output_postpass() -> None
     payload = dict(plan2.effect.payload or {})
     assert payload.get("response_schema") == schema
     assert payload.get("response_schema_name") == "Agent_agent"
-
+    params = payload.get("params")
+    assert isinstance(params, dict)
+    assert params.get("prompt_cache_binding") == binding
 
 

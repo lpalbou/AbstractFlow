@@ -29,12 +29,13 @@ There is also a secondary observability issue for generated media nodes:
 
 ## Proposed Direction
 
-### 1. Render `completed + ok:false` as warning/no-op
+### 1. Render `completed + ok:false` as skipped/unsupported
 
 For `model_residency` steps:
 
 - `status=completed` and `result.ok=true` => `OK`
-- `status=completed` and `result.ok=false` => `WARNING` / `NO-OP`
+- `status=completed` and `result.supported=false` => `UNSUPPORTED`
+- `status=completed` and `result.ok=false` => `SKIPPED`
 - `status=failed` => `FAILED`
 
 The run should still be overall successful when `required=false`, but the step itself must not look green.
@@ -47,7 +48,7 @@ If `contracts.common.model_residency.supports.image_generation` is false, disabl
 
 Same for `tts` and `stt`.
 
-Do not stop users from creating an explicit node if they deliberately want a ledgered no-op/warning step, but the common
+Do not stop users from creating an explicit node if they deliberately want a ledgered skipped/unsupported step, but the common
 shortcut path should not imply availability when the contract says otherwise.
 
 ### 3. Distinguish runtime model from media model in the run modal
@@ -69,7 +70,7 @@ Keep using:
 
 ## Acceptance Criteria
 
-- Optional unsupported warmup steps render as warnings/no-ops, not green success.
+- Optional unsupported warmup steps render as skipped/unsupported, not green success.
 - Inline warm/unload shortcuts reflect Gateway contract support per task.
 - Run details separate media model identity from runtime orchestration identity.
 - No ledger semantics are changed; only presentation and authoring guidance are improved.

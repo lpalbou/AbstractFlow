@@ -1,6 +1,6 @@
 # AbstractFlow
 
-> Diagram-based, durable AI workflows for Python (portable VisualFlow JSON, AbstractRuntime-backed execution, reference web editor).
+> Diagram-based, durable AI workflows for Python (portable VisualFlow JSON, Gateway-first reference web editor, optional local Runtime compatibility).
 
 This repository ships:
 - the Python package `abstractflow/` (PyPI: `abstractflow`)
@@ -8,8 +8,9 @@ This repository ships:
 
 AbstractFlow is part of the AbstractFramework ecosystem:
 - https://github.com/lpalbou/AbstractFramework
-- built on AbstractRuntime: https://github.com/lpalbou/abstractruntime
-- and AbstractCore: https://github.com/lpalbou/abstractcore
+- normal editor runs go through AbstractGateway: https://github.com/lpalbou/abstractgateway
+- local compatibility delegates to AbstractRuntime: https://github.com/lpalbou/abstractruntime
+- provider/model/tool effects are owned by Gateway/Runtime/Core
 
 Agent usage tips:
 - All linked paths are repo-root relative.
@@ -48,9 +49,12 @@ Agent usage tips:
 ## Web Editor Host (FastAPI)
 
 - [Web editor guide](docs/web-editor.md): Run backend/frontend, storage locations, gateway env vars
-- [WebSocket execution](web/backend/routes/ws.py): `{type:"run"|"resume"|"control"}` protocol and event stream
-- [Flow CRUD + publish](web/backend/routes/flows.py): flow persistence (`ABSTRACTFLOW_FLOWS_DIR`) + bundle publishing
-- [Tool discovery](web/backend/routes/tools.py): `GET /api/tools` used by the UI allowlist picker
+- [Gateway client contract](web/frontend/src/utils/gatewayClient.ts): versioned capabilities, `common.readiness` overlay, endpoint descriptors
+- [Gateway catalog helpers](web/frontend/src/utils/gatewayCatalog.ts): canonical `gateway_catalog_v1` + legacy catalog normalization
+- [VisualFlow legacy compatibility](web/frontend/src/utils/visualFlowCompat.ts): imports old lowered music flows as native `generate_music`
+- [WebSocket execution](web/backend/routes/ws.py): compatibility-only `{type:"run"|"resume"|"control"}` protocol and event stream
+- [Flow CRUD + publish](web/backend/routes/flows.py): compatibility-only flow persistence (`ABSTRACTFLOW_FLOWS_DIR`) + bundle publishing
+- [Tool discovery](web/backend/routes/tools.py): compatibility-only `GET /api/tools`
 - [Runtime persistence paths](web/backend/services/paths.py): `ABSTRACTFLOW_RUNTIME_DIR` defaulting rules
 - [Execution workspaces](web/backend/services/execution_workspace.py): `ABSTRACTFLOW_BASE_EXECUTION` and workspace aliasing
 - [Backend app](web/backend/main.py): FastAPI app + static serving rules

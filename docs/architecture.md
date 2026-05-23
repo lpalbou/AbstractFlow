@@ -1,13 +1,10 @@
 # AbstractFlow — Architecture (Current)
 
-> Updated: 2026-02-09  
+> Updated: 2026-05-22
 > Scope: describes **implemented behavior** in this repository (no roadmap claims).
 
-AbstractFlow is a workflow authoring + orchestration layer in the [AbstractFramework ecosystem](https://github.com/lpalbou/AbstractFramework), built on:
-- **AbstractRuntime**: durable runs, waits, subworkflows, stores (`RunStore`/`LedgerStore`/`ArtifactStore`)
-- **AbstractCore** (via runtime integration): LLM + tool effects
-- **AbstractAgent** (optional): Agent node subworkflows (ReAct)
-- **AbstractMemory** (optional): memory/KG nodes
+AbstractFlow is a workflow authoring + orchestration layer in the [AbstractFramework ecosystem](https://github.com/lpalbou/AbstractFramework).
+For the browser editor, Flow is Gateway-first: AbstractGateway owns discovery, persistence, run execution, ledgers, artifacts, media, and the Runtime/Core deployment stack. AbstractFlow keeps optional local Runtime/Core compatibility for Python hosts and development.
 
 See also: [../README.md](../README.md), [getting-started.md](getting-started.md), [api.md](api.md), [faq.md](faq.md), [visualflow.md](visualflow.md), [web-editor.md](web-editor.md), [cli.md](cli.md).
 
@@ -37,7 +34,7 @@ tests/                         # Test suite
 ```mermaid
 flowchart LR
   subgraph Authoring
-    FE[web/frontend<br/>React editor] -->|/api/gateway/*| GW[AbstractGateway<br/>VisualFlows + bundles]
+    FE[web/frontend<br/>React editor] -->|/api/gateway/*| GW[AbstractGateway<br/>VisualFlows + bundles + runs + media]
     GW -->|persists| GWDATA[(Gateway data dirs)]
   end
 
@@ -119,6 +116,31 @@ The modern editor is a thin Gateway client:
 - Artifacts: `GET /api/gateway/runs/{run_id}/artifacts/...`
 
 The static `@abstractframework/flow` server, Vite dev proxy, and Python FastAPI host all proxy `/api/gateway/*` and inject the configured Gateway bearer token server-side. This is required because browser `EventSource` cannot send custom auth headers.
+
+## Gateway media and catalog contracts
+
+The editor discovers generated media support from Gateway capabilities rather
+than local Runtime/Core imports:
+- `assistant.media.generated_image`
+- `assistant.media.edited_image`
+- `assistant.media.generated_voice`
+- `assistant.media.generated_music`
+
+Gateway catalog endpoints can return `gateway_catalog_v1` (`catalog` metadata +
+canonical `items`) or older legacy arrays/maps. The frontend adapter normalizes
+both and uses those catalogs for image, voice, transcription, and music
+provider/model selectors.
+
+Gateway `common.readiness` (`gateway_surface_readiness_v1`) is consumed as a
+surface-level readiness overlay for optional media/model-residency UX. It does
+not replace endpoint descriptors, because Flow still needs those descriptors to
+construct the actual Gateway requests.
+
+Native media authoring nodes are persisted as native VisualFlow node types:
+`generate_image`, `edit_image`, `image_to_image`, `generate_voice`,
+`generate_music`, `transcribe_audio`, and `listen_voice`. Old saved music flows
+that used the temporary browser-side lowering are normalized back to native
+`generate_music` when loaded or saved.
 
 ## Legacy/dev FastAPI host
 

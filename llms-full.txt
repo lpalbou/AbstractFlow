@@ -23,6 +23,9 @@ Included local files (repo-root relative, in order):
 - abstractflow/compiler.py
 - abstractflow/workflow_bundle.py
 - docs/web-editor.md
+- web/frontend/src/utils/gatewayClient.ts
+- web/frontend/src/utils/gatewayCatalog.ts
+- web/frontend/src/utils/visualFlowCompat.ts
 - web/backend/routes/ws.py
 - web/backend/routes/flows.py
 - web/backend/routes/tools.py
@@ -51,7 +54,7 @@ file: llms.txt
 
 # AbstractFlow
 
-> Diagram-based, durable AI workflows for Python (portable VisualFlow JSON, AbstractRuntime-backed execution, reference web editor).
+> Diagram-based, durable AI workflows for Python (portable VisualFlow JSON, Gateway-first reference web editor, optional local Runtime compatibility).
 
 This repository ships:
 - the Python package `abstractflow/` (PyPI: `abstractflow`)
@@ -59,8 +62,9 @@ This repository ships:
 
 AbstractFlow is part of the AbstractFramework ecosystem:
 - https://github.com/lpalbou/AbstractFramework
-- built on AbstractRuntime: https://github.com/lpalbou/abstractruntime
-- and AbstractCore: https://github.com/lpalbou/abstractcore
+- normal editor runs go through AbstractGateway: https://github.com/lpalbou/abstractgateway
+- local compatibility delegates to AbstractRuntime: https://github.com/lpalbou/abstractruntime
+- provider/model/tool effects are owned by Gateway/Runtime/Core
 
 Agent usage tips:
 - All linked paths are repo-root relative.
@@ -99,9 +103,12 @@ Agent usage tips:
 ## Web Editor Host (FastAPI)
 
 - [Web editor guide](docs/web-editor.md): Run backend/frontend, storage locations, gateway env vars
-- [WebSocket execution](web/backend/routes/ws.py): `{type:"run"|"resume"|"control"}` protocol and event stream
-- [Flow CRUD + publish](web/backend/routes/flows.py): flow persistence (`ABSTRACTFLOW_FLOWS_DIR`) + bundle publishing
-- [Tool discovery](web/backend/routes/tools.py): `GET /api/tools` used by the UI allowlist picker
+- [Gateway client contract](web/frontend/src/utils/gatewayClient.ts): versioned capabilities, `common.readiness` overlay, endpoint descriptors
+- [Gateway catalog helpers](web/frontend/src/utils/gatewayCatalog.ts): canonical `gateway_catalog_v1` + legacy catalog normalization
+- [VisualFlow legacy compatibility](web/frontend/src/utils/visualFlowCompat.ts): imports old lowered music flows as native `generate_music`
+- [WebSocket execution](web/backend/routes/ws.py): compatibility-only `{type:"run"|"resume"|"control"}` protocol and event stream
+- [Flow CRUD + publish](web/backend/routes/flows.py): compatibility-only flow persistence (`ABSTRACTFLOW_FLOWS_DIR`) + bundle publishing
+- [Tool discovery](web/backend/routes/tools.py): compatibility-only `GET /api/tools`
 - [Runtime persistence paths](web/backend/services/paths.py): `ABSTRACTFLOW_RUNTIME_DIR` defaulting rules
 - [Execution workspaces](web/backend/services/execution_workspace.py): `ABSTRACTFLOW_BASE_EXECUTION` and workspace aliasing
 - [Backend app](web/backend/main.py): FastAPI app + static serving rules
@@ -145,9 +152,9 @@ file: README.md
 
 Diagram-based, **durable** AI workflows for Python.
 
-AbstractFlow is part of the [AbstractFramework ecosystem](https://github.com/lpalbou/AbstractFramework) and is built on:
-- [AbstractRuntime](https://github.com/lpalbou/abstractruntime): durable runs, waits, subworkflows, stores
-- [AbstractCore](https://github.com/lpalbou/abstractcore): providers/models/tools (used via runtime integrations)
+AbstractFlow is part of the [AbstractFramework ecosystem](https://github.com/lpalbou/AbstractFramework).
+The editor is Gateway-first: AbstractFlow talks to AbstractGateway for discovery, persistence,
+runs, ledgers, artifacts, and media. Gateway owns the Runtime/Core deployment stack.
 
 It provides:
 - A small programmatic API (`Flow`, `FlowRunner`) for building and running flows in Python.
@@ -162,12 +169,13 @@ Evidence (code): [abstractflow/runner.py](abstractflow/runner.py), [abstractflow
 
 ```mermaid
 flowchart LR
-  UI[Visual editor UI<br/>npx @abstractframework/flow] <-->|/api/gateway/*| GW[AbstractGateway<br/>runs/ledger/artifacts/bundles]
+  UI[Visual editor UI<br/>npx @abstractframework/flow] <-->|/api/gateway/*| GW[AbstractGateway<br/>discovery/runs/ledger/artifacts/bundles/media]
+  GW --> RT[AbstractRuntime Runtime]
+  RT --> AC[AbstractCore providers/models/tools]
 
   HOST[Any host process<br/>CLI / server / notebook] --> VF[VisualFlow models<br/>abstractflow/visual/models.py]
   HOST --> RUN[create_visual_runner / execute_visual_flow<br/>abstractflow/visual/executor.py]
-  RUN --> RT[AbstractRuntime Runtime]
-  RT -->|effects| AC[AbstractCore]
+  RUN -. optional local compatibility .-> RT
   RT --> STORES[(Run/Ledger/Artifacts stores)]
 ```
 
@@ -193,18 +201,18 @@ pip install abstractflow
 Requirements: Python **3.10+** (`pyproject.toml`: `requires-python`).
 
 Optional extras (declared in `pyproject.toml`):
-- Runtime stack for local programmatic/VisualFlow execution APIs (`Flow`, `FlowRunner`, `execute_visual_flow`, workflow bundles): `pip install "abstractflow[apple]"`
+- Host profiles for local programmatic/VisualFlow execution compatibility (`Flow`, `FlowRunner`, `execute_visual_flow`, workflow bundles): `pip install "abstractflow[apple]"` or `pip install "abstractflow[gpu]"`
 - Full host profiles:
   - Apple-capable: `pip install "abstractflow[apple]"`
   - GPU-capable: `pip install "abstractflow[gpu]"`
-- `abstractflow[apple]` and `abstractflow[gpu]` both include gateway proxy + local compatibility stack.
-- Agent nodes (Visual Agent node support): `pip install "abstractflow[agent]"`
+- `abstractflow[apple]` and `abstractflow[gpu]` pull the matching `abstractgateway[...]` host profile and Visual Agent support. Flow no longer names `AbstractRuntime` or `abstractcore` directly in these profiles; Gateway owns that deployment stack. AbstractFlow `0.3.13` expects Gateway `>=0.2.17` for the current media/catalog/residency contracts.
+- Agent nodes only, without the host profile: `pip install "abstractflow[agent]"`
 - Documentation site tools: `pip install "abstractflow[docs]"`
 
 ## Quickstart (programmatic)
 
 ```python
-# Requires: `abstractflow[apple]`
+# Requires: `abstractflow[apple]` or `abstractflow[gpu]`
 from abstractflow import Flow, FlowRunner
 
 flow = Flow("linear")
@@ -223,7 +231,7 @@ print(FlowRunner(flow).run({"value": 5}))
 import json
 from abstractflow.visual import VisualFlow, execute_visual_flow
 
-# Requires: `abstractflow[apple]`
+# Requires: `abstractflow[apple]` or `abstractflow[gpu]`
 with open("my-flow.json", "r", encoding="utf-8") as f:
     vf = VisualFlow.model_validate(json.load(f))
 
@@ -240,7 +248,7 @@ The visual editor talks to AbstractGateway. The Flow server keeps the Gateway be
 # Terminal 1: Gateway
 pip install "abstractgateway[http]" abstractflow
 export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
-abstractgateway --port 8080
+abstractgateway serve --port 8080
 
 # Terminal 2: editor UI (static server + /api/gateway proxy)
 export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
@@ -250,6 +258,18 @@ npx @abstractframework/flow --gateway-url http://127.0.0.1:8080
 Open:
 - UI: http://localhost:3003
 - Gateway capabilities: http://localhost:8080/api/gateway/discovery/capabilities
+
+Media nodes use Gateway as the catalog and execution source. Generate Image,
+Edit Image/Image-to-Image, Generate Voice, Generate Music, Transcribe Audio, and
+Listen Voice expose Gateway Media controls populated from catalog routes such as
+`/api/gateway/vision/models`, `/api/gateway/vision/provider_models`,
+`/api/gateway/voice/voices`, `/api/gateway/audio/speech/models`,
+`/api/gateway/audio/transcriptions/models`, and
+`/api/gateway/audio/music/{providers,models}`. When Gateway exposes
+`common.readiness`, Flow uses it as a conservative surface-readiness overlay
+while still resolving concrete calls from endpoint descriptors. Generated images,
+voice, and music are artifacts; the Run modal renders previews/players from
+Gateway artifact content while leaving raw ledger JSON available for debugging.
 
 The `abstractflow serve`/FastAPI host is a Gateway proxy by default. Its old local `/api/flows`, `/api/ws`, and `/api/runs` compatibility routes are available only when `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1` is set. See [docs/web-editor.md](docs/web-editor.md) and [docs/architecture.md](docs/architecture.md).
 
@@ -284,7 +304,7 @@ file: docs/README.md
 
 # AbstractFlow documentation
 
-AbstractFlow is a Python library (plus a reference web UI) for authoring and executing **durable** AI workflows.
+AbstractFlow is a Python library plus a Gateway-first reference web UI for authoring and executing **durable** AI workflows.
 
 This doc set is intentionally:
 - **actionable** (commands and entrypoints you can run)
@@ -319,6 +339,7 @@ This doc set is intentionally:
 - Flow execution convenience: [../abstractflow/runner.py](../abstractflow/runner.py) (`FlowRunner`)
 - VisualFlow schema (portable JSON): [../abstractflow/visual/models.py](../abstractflow/visual/models.py)
 - VisualFlow host wiring + execution: [../abstractflow/visual/executor.py](../abstractflow/visual/executor.py)
+- Gateway client contracts/catalogs: [../web/frontend/src/utils/gatewayClient.ts](../web/frontend/src/utils/gatewayClient.ts), [../web/frontend/src/utils/gatewayCatalog.ts](../web/frontend/src/utils/gatewayCatalog.ts)
 - VisualFlow interface contracts: [../abstractflow/visual/interfaces.py](../abstractflow/visual/interfaces.py)
 - WorkflowBundle helpers (thin wrapper): [../abstractflow/workflow_bundle.py](../abstractflow/workflow_bundle.py)
 - CLI entrypoint: [../abstractflow/cli.py](../abstractflow/cli.py)
@@ -349,10 +370,8 @@ pip install abstractflow
 ```
 
 Optional extras:
-- Runtime APIs (`Flow`, `FlowRunner`, `abstractflow.visual` local execution, workflow bundles): `pip install "abstractflow[apple]"`
-- Host profile for local Python proxy stack + compatibility routes: `pip install "abstractflow[apple]"` or `pip install "abstractflow[gpu]"`
-- `abstractflow[apple]` and `abstractflow[gpu]` both include `abstractflow[apple]` so local execution helpers are available in compat mode.
-- Agent nodes (ReAct workflows): `pip install "abstractflow[agent]"`
+- Host profile for the Python proxy stack + matching Gateway deployment profile + compatibility routes (`Flow`, `FlowRunner`, `abstractflow.visual` local execution, workflow bundles, Agent nodes): `pip install "abstractflow[apple]"` or `pip install "abstractflow[gpu]"`
+- Agent nodes only, without the host profile: `pip install "abstractflow[agent]"`
 - Documentation site tools: `pip install "abstractflow[docs]"`
 
 From source (repo root):
@@ -368,10 +387,10 @@ Enable local runtime compatibility only when needed with `ABSTRACTFLOW_ENABLE_LO
 
 If you install a host profile (`apple`, `gpu`), the local execution stack is already included for compatibility.
 
-Programmatic and local VisualFlow execution examples below require the runtime extra:
+Programmatic and local VisualFlow execution examples below require a host profile:
 
 ```bash
-pip install "abstractflow[apple]"
+pip install "abstractflow[apple]"  # or abstractflow[gpu]
 ```
 
 ## Programmatic flow (FlowRunner)
@@ -441,13 +460,44 @@ Quick start (no repo clone needed):
 ```bash
 pip install "abstractgateway[http]" abstractflow
 export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
-abstractgateway --port 8080
+abstractgateway serve --port 8080
 
 export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
 npx @abstractframework/flow --gateway-url http://127.0.0.1:8080
 ```
 
 Tip (from source): install Flow and Gateway editably, then run `npm run dev` from `web/frontend` with `ABSTRACTGATEWAY_AUTH_TOKEN` set so Vite can inject Gateway auth in its proxy.
+
+## Create media with Gateway nodes
+
+In the editor, add media nodes from the palette:
+- `Generate Image`: prompt to image artifact.
+- `Edit Image`: prompt plus source image artifact, optional mask, to image artifact. `Image-to-Image` is accepted as a legacy alias when loading older flows.
+- `Generate Voice`: text to voice/audio artifact.
+- `Generate Music`: prompt/lyrics/duration to music artifact.
+- `Transcribe Audio` / `Listen Voice`: audio input to text.
+
+For the simple path, leave provider/model as `Auto` and let Gateway resolve the
+configured backend. If you need reproducibility, choose explicit provider/model
+values from the Gateway catalog selectors. Music catalog data comes from
+`/api/gateway/audio/music/providers` and `/api/gateway/audio/music/models`.
+
+Generated media is returned as Gateway artifacts. The Run modal renders images
+and audio/music players first; raw ledger JSON and artifact IDs remain available
+for debugging.
+
+For image editing, wire `image_artifact` from a previous `Generate Image` node
+or use the `Artifacts` palette primitives (`Image Artifact`, `Voice Artifact`,
+`Music Artifact`, etc.) to paste an existing Gateway `$artifact` id. A richer
+browser artifact picker/upload flow is tracked separately.
+
+Example Generate Music path:
+1. Drag `On Flow Start`, `Generate Music`, and `On Flow End` onto the canvas.
+2. Wire execution `On Flow Start -> Generate Music -> On Flow End`.
+3. Wire or type a `prompt` such as `short heroic fantasy theme with brass and strings`.
+4. Leave provider/model as `Auto (Gateway default)` unless you need a specific backend.
+5. Save, then click `Run Flow`.
+6. Open the Generate Music result and play the returned music artifact.
 
 ## Workflow bundles (`.flow`)
 
@@ -486,7 +536,7 @@ Evidence: [../abstractflow/_version.py](../abstractflow/_version.py), [../abstra
 ### Flow IR
 
 `Flow`, `FlowNode`, and `FlowEdge` are re-exported from AbstractRuntime so there is a single source of truth for semantics.
-These APIs are available with `abstractflow[apple]` (or any host profile: `abstractflow[apple]`, `abstractflow[gpu]`).
+These APIs are available with `abstractflow[apple]` or `abstractflow[gpu]`.
 
 ```python
 from abstractflow import Flow, FlowNode, FlowEdge
@@ -497,7 +547,7 @@ Evidence: [../abstractflow/core/flow.py](../abstractflow/core/flow.py), [../abst
 ### FlowRunner
 
 `FlowRunner` compiles a `Flow` to a runtime `WorkflowSpec` and executes it using an AbstractRuntime `Runtime`.
-Available with `abstractflow[apple]` (or any host profile: `abstractflow[apple]`, `abstractflow[gpu]`).
+Available with `abstractflow[apple]` or `abstractflow[gpu]`.
 
 ```python
 from abstractflow import FlowRunner
@@ -514,7 +564,7 @@ Evidence: [../abstractflow/runner.py](../abstractflow/runner.py).
 ### Compilation
 
 Compilation functions are delegated to AbstractRuntime’s VisualFlow compiler and re-exported:
-Requires `abstractflow[apple]` (or any host profile: `abstractflow[apple]`, `abstractflow[gpu]`).
+Requires `abstractflow[apple]` or `abstractflow[gpu]`.
 
 ```python
 from abstractflow import compile_flow
@@ -605,7 +655,19 @@ The React editor is a thin client for AbstractGateway's versioned discovery cont
 GET /api/gateway/discovery/capabilities
 ```
 
-It reads `capabilities.contracts.flow_editor` for VisualFlow CRUD/publish, run input schema, run start, ledger stream, artifact, and prompt-cache endpoints. The browser calls same-origin `/api/gateway/*`; the Flow static server/Vite/Python host proxy those requests to Gateway and inject the configured bearer token.
+It reads `capabilities.contracts.flow_editor` plus `capabilities.contracts.common` for VisualFlow CRUD/publish, run input schema, run start, ledger stream, artifact, and prompt-cache endpoints. Session prompt cache and durable bloc exact-reuse bindings are separate contract tracks (`common.prompt_cache.session_lifecycle` and `common.prompt_cache.durable_blocs`). Gateway catalog routes may return the canonical `gateway_catalog_v1` envelope (`catalog` metadata plus `items`) or older legacy arrays/maps; the editor normalizes both.
+
+When Gateway advertises `common.readiness.contract = gateway_surface_readiness_v1`, the editor uses that surface summary as a conservative overlay for optional media/model-residency UX. Endpoint descriptors remain the authority for actual request paths.
+
+Generated media is discovered through the Gateway contracts:
+- `assistant.media.generated_image`
+- `assistant.media.edited_image`
+- `assistant.media.generated_voice`
+- `assistant.media.generated_music`
+
+Model residency is discovered through `common.model_residency` and includes `music_generation` when the Gateway/runtime stack supports music warmup/list/unload semantics.
+
+The browser calls same-origin `/api/gateway/*`; the Flow static server/Vite/Python host proxy those requests to Gateway and inject the configured bearer token.
 
 Evidence: [../web/frontend/src/hooks/useGatewayCapabilities.ts](../web/frontend/src/hooks/useGatewayCapabilities.ts), [../web/frontend/src/utils/gatewayClient.ts](../web/frontend/src/utils/gatewayClient.ts), [../web/backend/main.py](../web/backend/main.py).
 
@@ -640,14 +702,11 @@ file: docs/architecture.md
 
 # AbstractFlow — Architecture (Current)
 
-> Updated: 2026-02-09  
+> Updated: 2026-05-22
 > Scope: describes **implemented behavior** in this repository (no roadmap claims).
 
-AbstractFlow is a workflow authoring + orchestration layer in the [AbstractFramework ecosystem](https://github.com/lpalbou/AbstractFramework), built on:
-- **AbstractRuntime**: durable runs, waits, subworkflows, stores (`RunStore`/`LedgerStore`/`ArtifactStore`)
-- **AbstractCore** (via runtime integration): LLM + tool effects
-- **AbstractAgent** (optional): Agent node subworkflows (ReAct)
-- **AbstractMemory** (optional): memory/KG nodes
+AbstractFlow is a workflow authoring + orchestration layer in the [AbstractFramework ecosystem](https://github.com/lpalbou/AbstractFramework).
+For the browser editor, Flow is Gateway-first: AbstractGateway owns discovery, persistence, run execution, ledgers, artifacts, media, and the Runtime/Core deployment stack. AbstractFlow keeps optional local Runtime/Core compatibility for Python hosts and development.
 
 See also: [../README.md](../README.md), [getting-started.md](getting-started.md), [api.md](api.md), [faq.md](faq.md), [visualflow.md](visualflow.md), [web-editor.md](web-editor.md), [cli.md](cli.md).
 
@@ -677,7 +736,7 @@ tests/                         # Test suite
 ```mermaid
 flowchart LR
   subgraph Authoring
-    FE[web/frontend<br/>React editor] -->|/api/gateway/*| GW[AbstractGateway<br/>VisualFlows + bundles]
+    FE[web/frontend<br/>React editor] -->|/api/gateway/*| GW[AbstractGateway<br/>VisualFlows + bundles + runs + media]
     GW -->|persists| GWDATA[(Gateway data dirs)]
   end
 
@@ -760,6 +819,31 @@ The modern editor is a thin Gateway client:
 
 The static `@abstractframework/flow` server, Vite dev proxy, and Python FastAPI host all proxy `/api/gateway/*` and inject the configured Gateway bearer token server-side. This is required because browser `EventSource` cannot send custom auth headers.
 
+## Gateway media and catalog contracts
+
+The editor discovers generated media support from Gateway capabilities rather
+than local Runtime/Core imports:
+- `assistant.media.generated_image`
+- `assistant.media.edited_image`
+- `assistant.media.generated_voice`
+- `assistant.media.generated_music`
+
+Gateway catalog endpoints can return `gateway_catalog_v1` (`catalog` metadata +
+canonical `items`) or older legacy arrays/maps. The frontend adapter normalizes
+both and uses those catalogs for image, voice, transcription, and music
+provider/model selectors.
+
+Gateway `common.readiness` (`gateway_surface_readiness_v1`) is consumed as a
+surface-level readiness overlay for optional media/model-residency UX. It does
+not replace endpoint descriptors, because Flow still needs those descriptors to
+construct the actual Gateway requests.
+
+Native media authoring nodes are persisted as native VisualFlow node types:
+`generate_image`, `edit_image`, `image_to_image`, `generate_voice`,
+`generate_music`, `transcribe_audio`, and `listen_voice`. Old saved music flows
+that used the temporary browser-side lowering are normalized back to native
+`generate_music` when loaded or saved.
+
 ## Legacy/dev FastAPI host
 
 The reference host in `web/` is now a Gateway proxy/static host by default. When
@@ -833,7 +917,7 @@ Evidence: [../abstractflow/core/flow.py](../abstractflow/core/flow.py), [../abst
 
 Yes. Load the JSON into `VisualFlow` and run it with `abstractflow.visual.execute_visual_flow(...)` (or build a runner with `create_visual_runner(...)` if you need access to the runtime/run state).
 This requires the runtime stack with `pip install "abstractflow[apple]"`.
-Agent-node features also need `abstractflow[agent]`.
+Agent-node features are included in `abstractflow[apple]` and `abstractflow[gpu]`; use `abstractflow[agent]` only when you need Agent nodes without a host profile.
 
 Evidence: [../abstractflow/visual/executor.py](../abstractflow/visual/executor.py).
 
@@ -871,7 +955,12 @@ Evidence: [../pyproject.toml](../pyproject.toml) (host profile extras + `project
 
 ## Where does the web editor store flows and run data?
 
-Defaults:
+In the modern Gateway-first editor path, Gateway stores VisualFlows, bundles,
+runs, ledgers, attachments, workspaces, and artifacts in its configured data
+directories.
+
+The old FastAPI local runtime routes still have compatibility defaults, but only
+when `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1` is set:
 - Flows: `./flows/*.json` relative to the backend working directory (override with `ABSTRACTFLOW_FLOWS_DIR`).
 - Runtime persistence (runs/ledger/artifacts):
   - source checkout: `web/runtime/`
@@ -986,6 +1075,25 @@ Note on pins in saved JSON:
 
 Evidence: [../abstractflow/visual/interfaces.py](../abstractflow/visual/interfaces.py) (`_pin_types` reads `node.data.*`) and sample flows in [../web/flows/](../web/flows/).
 
+## Native media nodes
+
+Current media authoring nodes are saved as native VisualFlow node types:
+- `generate_image`
+- `edit_image`
+- `image_to_image` (legacy alias normalized by the editor)
+- `generate_voice`
+- `generate_music`
+- `transcribe_audio`
+- `listen_voice`
+
+Generated image, voice, and music outputs should be treated as artifacts. Gateway
+is the preferred execution host for these nodes because it owns media catalogs,
+child runs, artifact persistence, and provider/runtime configuration.
+
+Compatibility note: old saved flows that used the temporary browser-side
+Generate Music lowering are normalized back to native `generate_music` when they
+are loaded or saved by the current editor.
+
 ## Subflows
 
 Subflows are regular VisualFlows referenced by id from a node of type `subflow`.
@@ -1042,8 +1150,16 @@ class PinType(str, Enum):
     ASSERTIONS = "assertions"  # Teal - List of KG assertion objects (assertion[])
     ARRAY = "array"  # Orange #FF8800 - Collections
     TOOLS = "tools"  # Orange - Tool allowlist (string[])
-    PROVIDER = "provider"  # Cyan-blue - LLM provider id/name (string-like)
-    MODEL = "model"  # Purple - LLM model id/name (string-like)
+    PROVIDER = "provider"  # Legacy text/LLM provider id/name (string-like)
+    MODEL = "model"  # Legacy text/LLM model id/name (string-like)
+    PROVIDER_TEXT = "provider_text"  # Text/LLM provider id/name (string-like)
+    MODEL_TEXT = "model_text"  # Text/LLM model id/name (string-like)
+    PROVIDER_IMAGE = "provider_image"  # Image-generation provider/backend id (string-like)
+    MODEL_IMAGE = "model_image"  # Image-generation model id/name (string-like)
+    PROVIDER_VOICE = "provider_voice"  # Voice/STT/TTS provider/backend id (string-like)
+    MODEL_VOICE = "model_voice"  # Voice/STT/TTS model id/name (string-like)
+    PROVIDER_MUSIC = "provider_music"  # Music-generation provider/backend id (string-like)
+    MODEL_MUSIC = "model_music"  # Music-generation model id/name (string-like)
     AGENT = "agent"  # Blue #4488FF - Agent reference
     ANY = "any"  # Gray #888888 - Accepts any type
 
@@ -1146,6 +1262,14 @@ class NodeType(str, Enum):
     ASK_USER = "ask_user"
     ANSWER_USER = "answer_user"
     LLM_CALL = "llm_call"
+    MODEL_RESIDENCY = "model_residency"
+    GENERATE_IMAGE = "generate_image"
+    EDIT_IMAGE = "edit_image"
+    IMAGE_TO_IMAGE = "image_to_image"
+    GENERATE_VOICE = "generate_voice"
+    GENERATE_MUSIC = "generate_music"
+    TRANSCRIBE_AUDIO = "transcribe_audio"
+    LISTEN_VOICE = "listen_voice"
     WAIT_UNTIL = "wait_until"
     WAIT_EVENT = "wait_event"
     EMIT_EVENT = "emit_event"
@@ -1821,8 +1945,7 @@ _RUNTIME_EXPORTS = {
 }
 
 _RUNTIME_INSTALL_HINT = (
-    "Install the runtime stack with: pip install \"abstractflow[apple]\".\n"
-    "For host/profile mode include: pip install \"abstractflow[apple]\" or \"abstractflow[gpu]\"."
+    'Install the local execution stack with: pip install "abstractflow[apple]" or "abstractflow[gpu]".'
 )
 
 
@@ -2315,6 +2438,81 @@ def _resolve_gateway_auth_token() -> str | None:
     return None
 
 
+def _env_first(*names: str) -> str:
+    for name in names:
+        raw = os.getenv(name)
+        value = str(raw or "").strip()
+        if value:
+            return value
+    return ""
+
+
+class _UnavailableModelResidencyControl:
+    """Control-plane adapter used when standalone local Flow cannot manage residency."""
+
+    def _payload(
+        self,
+        *,
+        operation: str,
+        task: Optional[str] = None,
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        message = (
+            "Model residency controls are not available in standalone local Flow compatibility mode. "
+            "Run the flow through AbstractGateway."
+        )
+        return {
+            "ok": False,
+            "supported": False,
+            "available": False,
+            "operation": operation,
+            "task": task,
+            "provider": provider,
+            "model": model,
+            "models": [] if operation == "list_loaded" else None,
+            "error": message,
+            "warnings": [message],
+            "code": "model_residency_unavailable",
+            "config_hint": "Use Gateway-hosted runs for model residency controls.",
+            "diagnostics": {"source": "abstractflow.local"},
+        }
+
+    def list_model_residency(
+        self,
+        *,
+        task: Optional[str] = None,
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        _ = kwargs
+        return self._payload(operation="list_loaded", task=task, provider=provider, model=model)
+
+    def load_model_residency(
+        self,
+        *,
+        task: str,
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        _ = kwargs
+        return self._payload(operation="load", task=task, provider=provider, model=model)
+
+    def unload_model_residency(
+        self,
+        *,
+        task: Optional[str] = None,
+        runtime_id: Optional[str] = None,
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        _ = (runtime_id, kwargs)
+        return self._payload(operation="unload", task=task, provider=provider, model=model)
+
+
 
 
 def create_visual_runner(
@@ -2412,6 +2610,14 @@ def create_visual_runner(
             "ask_user",
             "answer_user",
             "llm_call",
+            "model_residency",
+            "generate_image",
+            "edit_image",
+            "image_to_image",
+            "generate_voice",
+            "generate_music",
+            "transcribe_audio",
+            "listen_voice",
             "tool_calls",
             "wait_until",
             "wait_event",
@@ -2522,7 +2728,19 @@ def create_visual_runner(
                 needs_registry = True
             if t in {"on_event", "emit_event"}:
                 needs_registry = True
-            if t in {"memory_note", "memory_query", "memory_rehydrate", "memory_compact"}:
+            if t in {
+                "memory_note",
+                "memory_query",
+                "memory_rehydrate",
+                "memory_compact",
+                "generate_image",
+                "edit_image",
+                "image_to_image",
+                "generate_voice",
+                "generate_music",
+                "transcribe_audio",
+                "listen_voice",
+            }:
                 needs_artifacts = True
             if t in {"memory_kg_assert", "memory_kg_query"}:
                 needs_memory_kg = True
@@ -2530,6 +2748,8 @@ def create_visual_runner(
     # Detect whether this flow tree needs AbstractCore LLM integration.
     # Provider/model can be supplied either via node config *or* via connected input pins.
     has_llm_nodes = False
+    has_non_residency_abstractcore_nodes = False
+    needs_model_residency = False
     llm_configs: set[tuple[str, str]] = set()
     default_llm: tuple[str, str] | None = None
     provider_hints: list[str] = []
@@ -2613,8 +2833,24 @@ def create_visual_runner(
             node_type = _node_type(n)
             if reachable and n.id not in reachable:
                 continue
-            if node_type in {"llm_call", "agent", "tool_calls", "memory_compact"}:
+            if node_type in {
+                "llm_call",
+                "agent",
+                "tool_calls",
+                "memory_compact",
+                "model_residency",
+                "generate_image",
+                "edit_image",
+                "image_to_image",
+                "generate_voice",
+                "generate_music",
+                "transcribe_audio",
+            }:
                 has_llm_nodes = True
+                if node_type == "model_residency":
+                    needs_model_residency = True
+                else:
+                    has_non_residency_abstractcore_nodes = True
 
             if node_type == "llm_call":
                 cfg = n.data.get("effectConfig", {}) if isinstance(n.data, dict) else {}
@@ -2629,12 +2865,12 @@ def create_visual_runner(
 
                 if not provider_ok and not provider_connected:
                     raise ValueError(
-                        f"LLM_CALL node '{n.id}' in flow '{vf.id}' missing provider "
+                        f"{node_type} node '{n.id}' in flow '{vf.id}' missing provider "
                         "(set effectConfig.provider or connect the provider input pin)"
                     )
                 if not model_ok and not model_connected:
                     raise ValueError(
-                        f"LLM_CALL node '{n.id}' in flow '{vf.id}' missing model "
+                        f"{node_type} node '{n.id}' in flow '{vf.id}' missing model "
                         "(set effectConfig.model or connect the model input pin)"
                     )
                 provider_default = (
@@ -2652,6 +2888,68 @@ def create_visual_runner(
                     else None
                 )
                 _add_pair(provider_default, model_default)
+
+            elif node_type in {
+                "generate_image",
+                "edit_image",
+                "image_to_image",
+                "generate_voice",
+                "generate_music",
+                "transcribe_audio",
+            }:
+                cfg = n.data.get("effectConfig", {}) if isinstance(n.data, dict) else {}
+                cfg = cfg if isinstance(cfg, dict) else {}
+                scoped_provider_pin = {
+                    "generate_image": "image_provider",
+                    "edit_image": "image_provider",
+                    "image_to_image": "image_provider",
+                    "generate_voice": "tts_provider",
+                    "generate_music": "music_provider",
+                    "transcribe_audio": "stt_provider",
+                }.get(node_type, "runtime_provider")
+                scoped_model_pin = {
+                    "generate_image": "image_model",
+                    "edit_image": "image_model",
+                    "image_to_image": "image_model",
+                    "generate_voice": "tts_model",
+                    "generate_music": "music_model",
+                    "transcribe_audio": "stt_model",
+                }.get(node_type, "runtime_model")
+                provider = cfg.get("runtime_provider") or cfg.get("runtimeProvider") or cfg.get(scoped_provider_pin)
+                model = cfg.get("runtime_model") or cfg.get("runtimeModel") or cfg.get(scoped_model_pin)
+
+                provider_ok = isinstance(provider, str) and provider.strip()
+                model_ok = isinstance(model, str) and model.strip()
+                provider_connected = _pin_connected(vf, node_id=n.id, pin_id="runtime_provider") or _pin_connected(
+                    vf, node_id=n.id, pin_id=scoped_provider_pin
+                )
+                model_connected = _pin_connected(vf, node_id=n.id, pin_id="runtime_model") or _pin_connected(
+                    vf, node_id=n.id, pin_id=scoped_model_pin
+                )
+                if provider_ok:
+                    provider_default = provider
+                elif provider_connected:
+                    provider_default = _infer_connected_pin_default(
+                        vf, node_id=n.id, pin_id="runtime_provider"
+                    ) or _infer_connected_pin_default(vf, node_id=n.id, pin_id=scoped_provider_pin)
+                else:
+                    provider_default = None
+                if model_ok:
+                    model_default = model
+                elif model_connected:
+                    model_default = _infer_connected_pin_default(
+                        vf, node_id=n.id, pin_id="runtime_model"
+                    ) or _infer_connected_pin_default(vf, node_id=n.id, pin_id=scoped_model_pin)
+                else:
+                    model_default = None
+                _add_pair(provider_default, model_default)
+
+            elif node_type == "model_residency":
+                cfg = n.data.get("effectConfig", {}) if isinstance(n.data, dict) else {}
+                cfg = cfg if isinstance(cfg, dict) else {}
+                task = str(cfg.get("task") or "").strip()
+                if task in {"", "text_generation"}:
+                    _add_pair(cfg.get("provider"), cfg.get("model"))
 
             elif node_type == "memory_compact":
                 cfg = n.data.get("effectConfig", {}) if isinstance(n.data, dict) else {}
@@ -2851,141 +3149,163 @@ def create_visual_runner(
         #
         # If we can't determine that, fail loudly with a clear error message.
         if provider_model is None:
-            raise RuntimeError(
-                "This flow uses LLM nodes (llm_call/agent/memory_compact), but no default provider/model could be determined. "
-                "Set provider+model on a node, or connect provider/model pins to a node with pinDefaults "
-                "(e.g. ON_FLOW_START), or pass `input_data={'provider': ..., 'model': ...}` when creating the runner."
-            )
-
-        provider, model = provider_model
-        try:
-            from abstractruntime.integrations.abstractcore.factory import create_local_runtime
-            # Older/newer AbstractRuntime distributions expose tool executors differently.
-            # Tool execution is not required for plain LLM_CALL-only flows, so we make
-            # this optional and fall back to the factory defaults.
-            try:
-                from abstractruntime.integrations.abstractcore import MappingToolExecutor  # type: ignore
-            except Exception:  # pragma: no cover
+            if needs_model_residency and not has_non_residency_abstractcore_nodes:
                 try:
-                    from abstractruntime.integrations.abstractcore.tool_executor import MappingToolExecutor  # type: ignore
-                except Exception:  # pragma: no cover
-                    MappingToolExecutor = None  # type: ignore[assignment]
-            try:
-                from abstractruntime.integrations.abstractcore.default_tools import get_default_tools  # type: ignore
-            except Exception:  # pragma: no cover
-                get_default_tools = None  # type: ignore[assignment]
-        except Exception as e:  # pragma: no cover
-            raise RuntimeError(
-                "This flow uses LLM nodes (llm_call/agent), but the installed AbstractRuntime "
-                "does not provide the AbstractCore integration. Install/enable the integration "
-                "or remove LLM nodes from the flow."
-            ) from e
+                    from abstractruntime.core.models import EffectType
+                    from abstractruntime.integrations.abstractcore.effect_handlers import make_model_residency_handler
+                except Exception as e:  # pragma: no cover
+                    raise RuntimeError(
+                        "This flow uses model_residency nodes, but the installed AbstractRuntime "
+                        "does not provide the AbstractCore residency effect handler. "
+                        "Install `abstractruntime[abstractcore]`."
+                    ) from e
+                control = _UnavailableModelResidencyControl()
 
-        effective_tool_executor = tool_executor
-        if effective_tool_executor is None and MappingToolExecutor is not None and callable(get_default_tools):
-            try:
-                tools = list(get_default_tools())  # type: ignore[misc]
-                # Include a couple of safe web helpers that ship with `abstractcore[tools]` but
-                # are not part of AbstractRuntime's default tool list yet.
-                try:
-                    from abstractcore.tools.common_tools import skim_url, skim_websearch
-
-                    def _tool_name(func: Any) -> str:
-                        tool_def = getattr(func, "_tool_definition", None)
-                        if tool_def is not None:
-                            name = getattr(tool_def, "name", None)
-                            if isinstance(name, str) and name.strip():
-                                return name.strip()
-                        name = getattr(func, "__name__", "")
-                        return str(name or "").strip()
-
-                    seen = {_tool_name(t) for t in tools if callable(t)}
-                    for t in [skim_url, skim_websearch]:
-                        if not callable(t):
-                            continue
-                        name = _tool_name(t)
-                        if not name or name in seen:
-                            continue
-                        seen.add(name)
-                        tools.append(t)
-                except Exception:
-                    pass
-
-                effective_tool_executor = MappingToolExecutor.from_tools(tools)  # type: ignore[attr-defined]
-            except Exception:
-                effective_tool_executor = None
-
-        # LLM timeout policy (web-hosted workflow execution).
-        #
-        # Contract:
-        # - AbstractRuntime (the orchestrator) is the authority for execution policy such as timeouts.
-        # - This host can *override* that policy via env for deployments that want a different SLO.
-        #
-        # Env overrides:
-        # - ABSTRACTFLOW_LLM_TIMEOUT_S (float seconds)
-        # - ABSTRACTFLOW_LLM_TIMEOUT (alias)
-        #
-        # Set to 0 or a negative value to opt into "unlimited".
-        llm_kwargs: Dict[str, Any] = {}
-        timeout_raw = os.getenv("ABSTRACTFLOW_LLM_TIMEOUT_S") or os.getenv("ABSTRACTFLOW_LLM_TIMEOUT")
-        if timeout_raw is None or not str(timeout_raw).strip():
-            # No override: let the orchestrator (AbstractRuntime) apply its default.
-            pass
-        else:
-            raw = str(timeout_raw).strip().lower()
-            if raw in {"none", "null", "inf", "infinite", "unlimited"}:
-                # Explicit override: opt back into unlimited HTTP requests.
-                llm_kwargs["timeout"] = None
+                handlers = {EffectType.MODEL_RESIDENCY: make_model_residency_handler(control=control)}
+                if extra_effect_handlers:
+                    handlers.update(dict(extra_effect_handlers))
+                runtime = Runtime(
+                    run_store=run_store or InMemoryRunStore(),
+                    ledger_store=ledger_store or InMemoryLedgerStore(),
+                    effect_handlers=handlers,
+                    artifact_store=artifact_store,
+                )
             else:
+                raise RuntimeError(
+                    "This flow uses AbstractCore-backed nodes (llm_call/agent/memory_compact/model_residency/media), but no default provider/model could be determined. "
+                    "Set provider+model on an llm_call/agent/memory_compact node, set runtime_provider+runtime_model on a generated media node, or connect the corresponding runtime pins to a node with pinDefaults "
+                    "(e.g. ON_FLOW_START), or pass `input_data={'provider': ..., 'model': ...}` when creating the runner."
+                )
+        if provider_model is not None:
+            provider, model = provider_model
+            try:
+                from abstractruntime.integrations.abstractcore.factory import create_local_runtime
+                # Older/newer AbstractRuntime distributions expose tool executors differently.
+                # Tool execution is not required for plain LLM_CALL-only flows, so we make
+                # this optional and fall back to the factory defaults.
                 try:
-                    timeout_s = float(raw)
+                    from abstractruntime.integrations.abstractcore import MappingToolExecutor  # type: ignore
+                except Exception:  # pragma: no cover
+                    try:
+                        from abstractruntime.integrations.abstractcore.tool_executor import MappingToolExecutor  # type: ignore
+                    except Exception:  # pragma: no cover
+                        MappingToolExecutor = None  # type: ignore[assignment]
+                try:
+                    from abstractruntime.integrations.abstractcore.default_tools import get_default_tools  # type: ignore
+                except Exception:  # pragma: no cover
+                    get_default_tools = None  # type: ignore[assignment]
+            except Exception as e:  # pragma: no cover
+                raise RuntimeError(
+                    "This flow uses AbstractCore-backed nodes (llm_call/agent/model_residency/media), but the installed AbstractRuntime "
+                    "does not provide the AbstractCore integration. Install/enable the integration "
+                    "or remove LLM nodes from the flow."
+                ) from e
+
+            effective_tool_executor = tool_executor
+            if effective_tool_executor is None and MappingToolExecutor is not None and callable(get_default_tools):
+                try:
+                    tools = list(get_default_tools())  # type: ignore[misc]
+                    # Include a couple of safe web helpers that ship with `abstractcore[tools]` but
+                    # are not part of AbstractRuntime's default tool list yet.
+                    try:
+                        from abstractcore.tools.common_tools import skim_url, skim_websearch
+
+                        def _tool_name(func: Any) -> str:
+                            tool_def = getattr(func, "_tool_definition", None)
+                            if tool_def is not None:
+                                name = getattr(tool_def, "name", None)
+                                if isinstance(name, str) and name.strip():
+                                    return name.strip()
+                            name = getattr(func, "__name__", "")
+                            return str(name or "").strip()
+
+                        seen = {_tool_name(t) for t in tools if callable(t)}
+                        for t in [skim_url, skim_websearch]:
+                            if not callable(t):
+                                continue
+                            name = _tool_name(t)
+                            if not name or name in seen:
+                                continue
+                            seen.add(name)
+                            tools.append(t)
+                    except Exception:
+                        pass
+
+                    effective_tool_executor = MappingToolExecutor.from_tools(tools)  # type: ignore[attr-defined]
                 except Exception:
-                    timeout_s = None
-                # Only override when parsing succeeded; otherwise fall back to AbstractCore config default.
-                if timeout_s is None:
-                    pass
-                elif isinstance(timeout_s, (int, float)) and timeout_s <= 0:
-                    # Consistent with the documented behavior: <=0 => unlimited.
+                    effective_tool_executor = None
+
+            # LLM timeout policy (web-hosted workflow execution).
+            #
+            # Contract:
+            # - AbstractRuntime (the orchestrator) is the authority for execution policy such as timeouts.
+            # - This host can *override* that policy via env for deployments that want a different SLO.
+            #
+            # Env overrides:
+            # - ABSTRACTFLOW_LLM_TIMEOUT_S (float seconds)
+            # - ABSTRACTFLOW_LLM_TIMEOUT (alias)
+            #
+            # Set to 0 or a negative value to opt into "unlimited".
+            llm_kwargs: Dict[str, Any] = {}
+            timeout_raw = os.getenv("ABSTRACTFLOW_LLM_TIMEOUT_S") or os.getenv("ABSTRACTFLOW_LLM_TIMEOUT")
+            if timeout_raw is None or not str(timeout_raw).strip():
+                # No override: let the orchestrator (AbstractRuntime) apply its default.
+                pass
+            else:
+                raw = str(timeout_raw).strip().lower()
+                if raw in {"none", "null", "inf", "infinite", "unlimited"}:
+                    # Explicit override: opt back into unlimited HTTP requests.
                     llm_kwargs["timeout"] = None
                 else:
-                    llm_kwargs["timeout"] = timeout_s
+                    try:
+                        timeout_s = float(raw)
+                    except Exception:
+                        timeout_s = None
+                    # Only override when parsing succeeded; otherwise fall back to AbstractCore config default.
+                    if timeout_s is None:
+                        pass
+                    elif isinstance(timeout_s, (int, float)) and timeout_s <= 0:
+                        # Consistent with the documented behavior: <=0 => unlimited.
+                        llm_kwargs["timeout"] = None
+                    else:
+                        llm_kwargs["timeout"] = timeout_s
 
-        # Output token budget for web-hosted runs.
-        #
-        # Contract: do not impose an arbitrary default cap here. When unset, the runtime/provider
-        # uses the model's declared capabilities (`model_capabilities.json`) for its defaults.
-        #
-        # Operators can still override via env (including disabling by setting <=0 / "unlimited").
-        max_out_raw = os.getenv("ABSTRACTFLOW_LLM_MAX_OUTPUT_TOKENS") or os.getenv("ABSTRACTFLOW_MAX_OUTPUT_TOKENS")
-        max_out: Optional[int] = None
-        if max_out_raw is None or not str(max_out_raw).strip():
-            max_out = None
-        else:
-            try:
-                max_out = int(str(max_out_raw).strip())
-            except Exception:
+            # Output token budget for web-hosted runs.
+            #
+            # Contract: do not impose an arbitrary default cap here. When unset, the runtime/provider
+            # uses the model's declared capabilities (`model_capabilities.json`) for its defaults.
+            #
+            # Operators can still override via env (including disabling by setting <=0 / "unlimited").
+            max_out_raw = os.getenv("ABSTRACTFLOW_LLM_MAX_OUTPUT_TOKENS") or os.getenv("ABSTRACTFLOW_MAX_OUTPUT_TOKENS")
+            max_out: Optional[int] = None
+            if max_out_raw is None or not str(max_out_raw).strip():
                 max_out = None
-        if isinstance(max_out, int) and max_out <= 0:
-            max_out = None
+            else:
+                try:
+                    max_out = int(str(max_out_raw).strip())
+                except Exception:
+                    max_out = None
+            if isinstance(max_out, int) and max_out <= 0:
+                max_out = None
 
-        # Pass runtime config to initialize `_limits.max_output_tokens`.
-        try:
-            from abstractruntime.core.config import RuntimeConfig
-            runtime_config = RuntimeConfig(max_output_tokens=max_out)
-        except Exception:  # pragma: no cover
-            runtime_config = None
+            # Pass runtime config to initialize `_limits.max_output_tokens`.
+            try:
+                from abstractruntime.core.config import RuntimeConfig
+                runtime_config = RuntimeConfig(max_output_tokens=max_out)
+            except Exception:  # pragma: no cover
+                runtime_config = None
 
-        runtime = create_local_runtime(
-            provider=provider,
-            model=model,
-            llm_kwargs=llm_kwargs,
-            tool_executor=effective_tool_executor,
-            run_store=run_store,
-            ledger_store=ledger_store,
-            artifact_store=artifact_store,
-            config=runtime_config,
-            extra_effect_handlers=extra_effect_handlers,
-        )
+            runtime = create_local_runtime(
+                provider=provider,
+                model=model,
+                llm_kwargs=llm_kwargs,
+                tool_executor=effective_tool_executor,
+                run_store=run_store,
+                ledger_store=ledger_store,
+                artifact_store=artifact_store,
+                config=runtime_config,
+                extra_effect_handlers=extra_effect_handlers,
+            )
     else:
         runtime_kwargs: Dict[str, Any] = {
             "run_store": run_store or InMemoryRunStore(),
@@ -3031,6 +3351,14 @@ def create_visual_runner(
                 pass
 
     flow = visual_to_flow(visual_flow)
+
+    def _attach_runtime_context(flow_obj: Any) -> None:
+        try:
+            flow_obj._artifact_store = runtime.artifact_store  # type: ignore[attr-defined]
+        except Exception:
+            pass
+
+    _attach_runtime_context(flow)
     # Build and register custom event listener workflows (On Event nodes).
     event_listener_specs: list[Any] = []
     if needs_registry:
@@ -3072,6 +3400,7 @@ def create_visual_runner(
                         dn.data["agentConfig"] = cfg
 
                 listener_flow = visual_to_flow(derived)
+                _attach_runtime_context(listener_flow)
                 listener_spec = compile_flow(listener_flow)
                 event_listener_specs.append(listener_spec)
     runner: FlowRunner
@@ -3085,6 +3414,7 @@ def create_visual_runner(
         registry.register(runner.workflow)
         for vf in ordered[1:]:
             child_flow = visual_to_flow(vf)
+            _attach_runtime_context(child_flow)
             child_spec = compile_flow(child_flow)
             registry.register(child_spec)
         for spec in event_listener_specs:
@@ -3860,7 +4190,7 @@ source .venv/bin/activate
 pip install "abstractgateway[http]" abstractflow
 
 export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
-abstractgateway --port 8080
+abstractgateway serve --port 8080
 ```
 
 Terminal 2 (UI):
@@ -3878,6 +4208,37 @@ Open:
 - UI: http://localhost:3003
 - Gateway capabilities: http://localhost:8080/api/gateway/discovery/capabilities
 
+## Media nodes
+
+The editor surfaces Gateway media capabilities as native graph nodes:
+- `Generate Image`
+- `Edit Image` (`Image-to-Image` is a legacy alias for old saved flows)
+- `Generate Voice`
+- `Generate Music`
+- `Transcribe Audio`
+- `Listen Voice`
+
+Provider/model selectors are populated from Gateway catalog endpoints. Current
+Gateway catalog responses may use the `gateway_catalog_v1` envelope (`catalog`
+metadata plus canonical `items`) or older legacy arrays/maps; the editor accepts
+both. Leave provider/model as `Auto` for the simple path, or choose explicit
+provider/model/backend values for reproducible runs.
+
+If Gateway advertises `common.readiness.contract = gateway_surface_readiness_v1`,
+the editor uses that surface summary to hide or disable optional media/model
+controls that Gateway says are not route/config ready. The editor still uses the
+endpoint descriptors for concrete request paths.
+
+Generated image, voice, and music results are Gateway artifacts. The Run modal
+renders images and audio/music players from artifact content and keeps child run,
+artifact metadata, ledger, and raw JSON details available for debugging.
+
+Model residency controls are also Gateway-driven. If the Gateway advertises
+the model-residency routes, text, image, voice, transcription, and music
+warmup/list/unload authoring remains available through Gateway. Gateway/Runtime
+still owns the final support decision and returns skipped/unsupported results
+when a connected deployment cannot honor a specific residency operation.
+
 ## Run (from source / dev mode)
 
 Terminal 1 (Gateway):
@@ -3889,7 +4250,7 @@ pip install -e .
 pip install -e ../abstractgateway
 
 export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
-abstractgateway --port 8080
+abstractgateway serve --port 8080
 ```
 
 Terminal 2 (frontend):
@@ -3971,6 +4332,1185 @@ The Run UI uses Gateway's replay-first HTTP/SSE contract:
 - artifacts: `GET /api/gateway/runs/{run_id}/artifacts/{artifact_id}/content`
 
 The legacy WebSocket host still exists in [../web/backend/routes/ws.py](../web/backend/routes/ws.py) for development/reference use and is mounted only when `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1`.
+
+---
+file: web/frontend/src/utils/gatewayClient.ts
+---
+
+export type GatewayQueryValue = string | number | boolean | null | undefined;
+
+export interface GatewayEndpointDescriptor {
+  available?: boolean;
+  endpoint?: string;
+  transport?: string;
+  [key: string]: unknown;
+}
+
+export interface GatewaySurfaceReadinessMediaSurface {
+  available?: boolean;
+  route_available?: boolean;
+  configured?: boolean;
+  workflow_available?: boolean;
+  config_hint?: string;
+  [key: string]: unknown;
+}
+
+export interface GatewaySurfaceReadinessContract {
+  contract?: string;
+  version?: number;
+  truth_scope?: string;
+  limitations?: string[];
+  surfaces?: {
+    media?: Record<string, GatewaySurfaceReadinessMediaSurface | undefined>;
+    model_residency?: {
+      available?: boolean;
+      route_available?: boolean;
+      supported_tasks?: string[];
+      unsupported_tasks?: string[];
+      supports?: Record<string, boolean>;
+      [key: string]: unknown;
+    };
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
+export interface GatewayDurableBlocPromptCacheContract {
+  available?: boolean;
+  route_available?: boolean;
+  lifecycle_available?: boolean;
+  source?: string;
+  endpoints?: {
+    upsert_text?: string;
+    record?: string;
+    list?: string;
+    delete?: string;
+    kv_manifest?: string;
+    kv_list?: string;
+    kv_ensure?: string;
+    kv_load?: string;
+    kv_delete?: string;
+    kv_prune?: string;
+  };
+  stable_identifiers?: string[];
+  exact_reuse_binding_param?: string;
+  ledger?: string;
+  config_hint?: string;
+  [key: string]: unknown;
+}
+
+export interface GatewayCommonContract {
+  runs?: {
+    start?: GatewayEndpointDescriptor;
+    schedule?: GatewayEndpointDescriptor;
+    summary?: GatewayEndpointDescriptor;
+    list?: GatewayEndpointDescriptor;
+    input_data?: GatewayEndpointDescriptor;
+    history_bundle?: GatewayEndpointDescriptor;
+    commands?: GatewayEndpointDescriptor & { types?: string[] };
+  };
+  ledger?: {
+    replay?: GatewayEndpointDescriptor;
+    batch?: GatewayEndpointDescriptor;
+    stream?: GatewayEndpointDescriptor;
+  };
+  artifacts?: {
+    list?: GatewayEndpointDescriptor;
+    metadata?: GatewayEndpointDescriptor;
+    content?: GatewayEndpointDescriptor;
+  };
+  attachments?: {
+    upload?: GatewayEndpointDescriptor;
+    max_upload_bytes?: number;
+  };
+  workspace?: {
+    policy_endpoint?: string;
+  };
+  discovery?: {
+    capabilities?: string;
+    providers?: string;
+    provider_models?: string;
+    model_capabilities?: string;
+    voice_voices?: string;
+    audio_speech_models?: string;
+    audio_transcription_models?: string;
+    audio_music_providers?: string;
+    audio_music_models?: string;
+    vision_provider_models?: string;
+    vision_models?: string;
+    tools?: string;
+    semantics?: string;
+    catalog_contract?: {
+      contract?: string;
+      version?: number;
+      metadata_field?: string;
+      primary_items_field?: string;
+      [key: string]: unknown;
+    };
+  };
+  prompt_cache?: {
+    provider_controls?: boolean;
+    session_lifecycle?: boolean;
+    durable_blocs?: GatewayDurableBlocPromptCacheContract;
+    endpoints?: Record<string, string>;
+    session_endpoints?: {
+      status?: string;
+      prepare?: string;
+      clear?: string;
+      rebuild?: string;
+    };
+  };
+  model_residency?: GatewayEndpointDescriptor & {
+    endpoints?: {
+      loaded?: GatewayEndpointDescriptor | string;
+      load?: GatewayEndpointDescriptor | string;
+      unload?: GatewayEndpointDescriptor | string;
+    };
+    loaded?: GatewayEndpointDescriptor | string;
+    load?: GatewayEndpointDescriptor | string;
+    unload?: GatewayEndpointDescriptor | string;
+    tasks?: string[];
+    operations?: string[];
+    supports?: Record<string, boolean>;
+    source?: string;
+    config_hint?: string;
+    ledger?: string;
+  };
+  memory?: GatewayEndpointDescriptor & {
+    route_available?: boolean;
+    structured_query?: boolean;
+    semantic_query?: boolean;
+    backend?: string;
+    config_hint?: string;
+    error?: string;
+  };
+  readiness?: GatewaySurfaceReadinessContract;
+}
+
+export interface GatewayMediaWorkflowDescriptor {
+  available?: boolean;
+  backend?: string | null;
+  config_hint?: string;
+  event_contract?: string;
+  [key: string]: unknown;
+}
+
+export interface GatewayGeneratedImageContract {
+  direct_endpoint?: GatewayEndpointDescriptor & {
+    route_available?: boolean;
+    configured?: boolean;
+    event_name?: string;
+    durability?: string;
+    returns_child_run_id?: boolean;
+    formats?: string[];
+    max_image_bytes?: number;
+    config_hint?: string;
+  };
+  workflow?: GatewayMediaWorkflowDescriptor;
+}
+
+export interface GatewayGeneratedVoiceContract {
+  direct_endpoint?: GatewayEndpointDescriptor & { configured?: boolean };
+  workflow?: GatewayMediaWorkflowDescriptor;
+}
+
+export interface GatewayGeneratedMusicContract {
+  direct_endpoint?: GatewayEndpointDescriptor & {
+    route_available?: boolean;
+    configured?: boolean;
+    providers_endpoint?: string;
+    provider_models_endpoint?: string;
+    provider_models_task?: string;
+    durability?: string;
+    returns_child_run_id?: boolean;
+    formats?: string[];
+    selected_backend?: string;
+    config_hint?: string;
+  };
+  workflow?: GatewayMediaWorkflowDescriptor;
+}
+
+export interface GatewayMediaContract {
+  generated_image?: GatewayGeneratedImageContract;
+  edited_image?: GatewayGeneratedImageContract;
+  generated_voice?: GatewayGeneratedVoiceContract;
+  generated_music?: GatewayGeneratedMusicContract;
+  [key: string]: unknown;
+}
+
+export interface GatewayFlowEditorContract {
+  available?: boolean;
+  version?: number;
+  visualflows?: {
+    crud?: {
+      available?: boolean;
+      collection_endpoint?: string;
+      item_endpoint?: string;
+    };
+    publish?: GatewayEndpointDescriptor & { install_hint?: string };
+  };
+  bundles?: Record<string, GatewayEndpointDescriptor | undefined>;
+  run_input_schema?: GatewayEndpointDescriptor & { version?: number };
+  runs?: GatewayCommonContract['runs'];
+  ledger?: GatewayCommonContract['ledger'];
+  artifacts?: GatewayCommonContract['artifacts'];
+  media?: GatewayMediaContract;
+  helpers?: Record<string, string>;
+}
+
+export interface GatewayAssistantContract {
+  available?: boolean;
+  version?: number;
+  runs?: GatewayCommonContract['runs'];
+  ledger?: GatewayCommonContract['ledger'];
+  artifacts?: GatewayCommonContract['artifacts'];
+  voice?: Record<string, unknown>;
+  media?: GatewayMediaContract;
+  prompt_cache?: Record<string, unknown>;
+}
+
+export interface GatewayContracts {
+  version?: number;
+  common?: GatewayCommonContract;
+  flow_editor?: GatewayFlowEditorContract;
+  assistant?: GatewayAssistantContract;
+  [key: string]: unknown;
+}
+
+export interface GatewayCapabilities {
+  contracts?: GatewayContracts;
+  [key: string]: unknown;
+}
+
+export interface GatewayCapabilitiesResponse {
+  capabilities?: GatewayCapabilities;
+}
+
+export interface GatewayCapabilityCheck {
+  key: string;
+  label: string;
+  ok: boolean;
+  reason?: string;
+}
+
+export interface GatewayFlowOperationStatus {
+  ready: boolean;
+  reason: string;
+  missing: string[];
+  checks: GatewayCapabilityCheck[];
+}
+
+export interface GatewayOptionalFeatureStatus {
+  providers: boolean;
+  providerModels: boolean;
+  tools: boolean;
+  semantics: boolean;
+  workspacePolicy: boolean;
+  promptCacheSessions: boolean;
+  promptCacheDurableBlocs: boolean;
+  kgMemory: boolean;
+  generatedImage: boolean;
+  editedImage: boolean;
+  generatedVoice: boolean;
+  generatedMusic: boolean;
+  attachmentsUpload: boolean;
+  modelResidency: boolean;
+}
+
+export interface GatewayFlowEditorReadiness {
+  ready: boolean;
+  checks: GatewayCapabilityCheck[];
+  operations: {
+    save: GatewayFlowOperationStatus;
+    publish: GatewayFlowOperationStatus;
+    run: GatewayFlowOperationStatus;
+    history: GatewayFlowOperationStatus;
+    artifacts: GatewayFlowOperationStatus;
+    commands: GatewayFlowOperationStatus;
+  };
+  optional: GatewayOptionalFeatureStatus;
+}
+
+export class GatewayHttpError extends Error {
+  status: number;
+  detail: unknown;
+
+  constructor(message: string, status: number, detail: unknown) {
+    super(message);
+    this.name = 'GatewayHttpError';
+    this.status = status;
+    this.detail = detail;
+  }
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+export function gatewayPath(
+  template: string,
+  params: Record<string, string | number | boolean | null | undefined> = {},
+  query: Record<string, GatewayQueryValue> = {}
+): string {
+  let path = String(template || '').trim();
+  if (!path) path = '/api/gateway';
+  if (!path.startsWith('/')) path = `/${path}`;
+  if (!path.startsWith('/api/gateway')) path = `/api/gateway${path}`;
+
+  path = path.replace(/\{([^}]+)\}/g, (_m, key: string) => {
+    const raw = params[key];
+    return encodeURIComponent(String(raw ?? ''));
+  });
+
+  const qs = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === null || value === '') continue;
+    qs.set(key, String(value));
+  }
+  const queryString = qs.toString();
+  return queryString ? `${path}?${queryString}` : path;
+}
+
+export function endpointFromDescriptor(
+  descriptor: GatewayEndpointDescriptor | string | undefined | null,
+  fallback: string,
+  params: Record<string, string | number | boolean | null | undefined> = {},
+  query: Record<string, GatewayQueryValue> = {}
+): string {
+  const endpoint =
+    typeof descriptor === 'string'
+      ? descriptor
+      : descriptor && typeof descriptor.endpoint === 'string' && descriptor.endpoint.trim()
+        ? descriptor.endpoint
+        : fallback;
+  return gatewayPath(endpoint, params, query);
+}
+
+export function endpointTemplateFromDescriptor(
+  descriptor: GatewayEndpointDescriptor | string | undefined | null
+): string {
+  if (typeof descriptor === 'string') return descriptor.trim();
+  if (descriptor && typeof descriptor.endpoint === 'string') return descriptor.endpoint.trim();
+  return '';
+}
+
+export function descriptorEndpointAvailable(
+  descriptor: GatewayEndpointDescriptor | string | undefined | null
+): boolean {
+  if (typeof descriptor === 'string') return Boolean(descriptor.trim());
+  if (!descriptor || typeof descriptor !== 'object') return false;
+  if (descriptor.available === false) return false;
+  if ((descriptor as Record<string, unknown>).route_available === false) return false;
+  return Boolean(endpointTemplateFromDescriptor(descriptor));
+}
+
+export function durableBlocPromptCacheAvailable(
+  contract: GatewayDurableBlocPromptCacheContract | undefined | null
+): boolean {
+  if (!contract || contract.route_available === false || contract.available === false) return false;
+  const endpoints = contract.endpoints || {};
+  return Boolean(
+    stringEndpointAvailable(endpoints.record) &&
+      stringEndpointAvailable(endpoints.kv_manifest) &&
+      stringEndpointAvailable(endpoints.kv_list) &&
+      stringEndpointAvailable(endpoints.kv_ensure) &&
+      stringEndpointAvailable(endpoints.kv_load)
+  );
+}
+
+export function capabilityUnavailable(descriptor: { available?: boolean } | undefined | null): boolean {
+  return descriptor ? descriptor.available === false : false;
+}
+
+export function getGatewayContracts(payload: GatewayCapabilitiesResponse | GatewayCapabilities | null | undefined): GatewayContracts | null {
+  const top = asRecord(payload);
+  if (!top) return null;
+  const caps = asRecord(top.capabilities) || top;
+  const contracts = asRecord(caps.contracts);
+  return contracts ? (contracts as GatewayContracts) : null;
+}
+
+function stringEndpointAvailable(value: unknown): boolean {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function gatewaySurfaceReadiness(
+  common: GatewayCommonContract | undefined | null
+): GatewaySurfaceReadinessContract | null {
+  const readiness = common?.readiness;
+  return readiness?.contract === 'gateway_surface_readiness_v1' ? readiness : null;
+}
+
+function gatewayMediaSurface(
+  readiness: GatewaySurfaceReadinessContract | null,
+  key: string
+): GatewaySurfaceReadinessMediaSurface | undefined {
+  const surface = readiness?.surfaces?.media?.[key];
+  return surface && typeof surface === 'object' ? surface : undefined;
+}
+
+function gatewayDirectMediaSurfaceAllows(surface: GatewaySurfaceReadinessMediaSurface | undefined): boolean {
+  if (!surface) return true;
+  return surface.available === true && surface.route_available !== false && surface.configured !== false;
+}
+
+function gatewayWorkflowMediaSurfaceAllows(surface: GatewaySurfaceReadinessMediaSurface | undefined): boolean {
+  if (!surface) return true;
+  return surface.workflow_available === true;
+}
+
+function gatewayModelResidencySurfaceAllows(readiness: GatewaySurfaceReadinessContract | null): boolean {
+  const surface = readiness?.surfaces?.model_residency;
+  return !surface || surface.route_available !== false;
+}
+
+function pickDescriptor(
+  ...items: Array<GatewayEndpointDescriptor | string | undefined | null>
+): GatewayEndpointDescriptor | string | undefined {
+  return items.find((item) => {
+    if (typeof item === 'string') return item.trim().length > 0;
+    return Boolean(item && typeof item === 'object');
+  }) || undefined;
+}
+
+function endpointCheck(
+  key: string,
+  label: string,
+  descriptor: GatewayEndpointDescriptor | string | undefined | null
+): GatewayCapabilityCheck {
+  if (descriptorEndpointAvailable(descriptor)) return { key, label, ok: true };
+  if (descriptor && typeof descriptor === 'object') {
+    const hint =
+      typeof (descriptor as Record<string, unknown>).install_hint === 'string'
+        ? String((descriptor as Record<string, unknown>).install_hint).trim()
+        : '';
+    if (descriptor.available === false) {
+      return { key, label, ok: false, reason: hint || `${label} is not available from Gateway.` };
+    }
+    if ((descriptor as Record<string, unknown>).route_available === false) {
+      return { key, label, ok: false, reason: `${label} route is not available from Gateway.` };
+    }
+  }
+  return { key, label, ok: false, reason: `${label} endpoint is missing from Gateway discovery.` };
+}
+
+function stringEndpointCheck(key: string, label: string, value: unknown): GatewayCapabilityCheck {
+  return stringEndpointAvailable(value)
+    ? { key, label, ok: true }
+    : { key, label, ok: false, reason: `${label} endpoint is missing from Gateway discovery.` };
+}
+
+function operationStatus(checks: GatewayCapabilityCheck[]): GatewayFlowOperationStatus {
+  const failed = checks.filter((c) => !c.ok);
+  if (failed.length === 0) {
+    return { ready: true, reason: '', missing: [], checks };
+  }
+  const missing = failed.map((c) => c.label);
+  const reason =
+    failed
+      .map((c) => c.reason || `${c.label} is unavailable.`)
+      .filter(Boolean)
+      .slice(0, 3)
+      .join(' ') || 'Gateway Flow Editor contract is incomplete.';
+  return { ready: false, reason, missing, checks };
+}
+
+export function getGatewayFlowEditorReadiness(
+  contracts: GatewayContracts | null | undefined
+): GatewayFlowEditorReadiness {
+  const flow = contracts?.flow_editor;
+  const common = contracts?.common;
+  const runs = common?.runs || flow?.runs;
+  const ledger = common?.ledger || flow?.ledger;
+  const artifacts = common?.artifacts || flow?.artifacts;
+  const crud = flow?.visualflows?.crud;
+  const surfaceReadiness = gatewaySurfaceReadiness(common);
+
+  const checks: GatewayCapabilityCheck[] = [];
+  const add = (check: GatewayCapabilityCheck) => {
+    checks.push(check);
+    return check;
+  };
+
+  const contractVersion = add({
+    key: 'contracts.version',
+    label: 'Gateway client contract v1',
+    ok: Boolean(contracts && typeof contracts.version === 'number' && contracts.version >= 1),
+    reason: 'Gateway discovery did not return a versioned client contract.',
+  });
+  const flowEditor = add({
+    key: 'flow_editor.available',
+    label: 'Flow Editor contract',
+    ok: flow?.available === true,
+    reason: 'Gateway discovery did not advertise contracts.flow_editor.available.',
+  });
+  const crudAvailable = add({
+    key: 'flow_editor.visualflows.crud',
+    label: 'VisualFlow CRUD',
+    ok: Boolean(crud && crud.available !== false),
+    reason: 'Gateway VisualFlow CRUD is not available.',
+  });
+  const crudCollection = add(stringEndpointCheck('flow_editor.visualflows.collection', 'VisualFlow collection', crud?.collection_endpoint));
+  const crudItem = add(stringEndpointCheck('flow_editor.visualflows.item', 'VisualFlow item', crud?.item_endpoint));
+  const publish = add(endpointCheck('flow_editor.visualflows.publish', 'VisualFlow publish', flow?.visualflows?.publish));
+  const runInputSchema = add(endpointCheck('flow_editor.run_input_schema', 'Run input schema', flow?.run_input_schema));
+  const runsInputData = add(endpointCheck('common.runs.input_data', 'Run input rehydration', pickDescriptor(runs?.input_data, flow?.runs?.input_data)));
+  const runsHistoryBundle = add(endpointCheck('common.runs.history_bundle', 'Run history bundle', pickDescriptor(runs?.history_bundle, flow?.runs?.history_bundle)));
+  const runsStart = add(endpointCheck('common.runs.start', 'Run start', pickDescriptor(runs?.start, flow?.runs?.start)));
+  const runsList = add(endpointCheck('common.runs.list', 'Run listing', pickDescriptor(runs?.list, flow?.runs?.list)));
+  const runsSummary = add(endpointCheck('common.runs.summary', 'Run summary', pickDescriptor(runs?.summary, flow?.runs?.summary)));
+  const runsCommands = add(endpointCheck('common.runs.commands', 'Run commands', pickDescriptor(runs?.commands, flow?.runs?.commands)));
+  const ledgerReplay = add(endpointCheck('common.ledger.replay', 'Ledger replay', pickDescriptor(ledger?.replay, flow?.ledger?.replay)));
+  const ledgerStreamBase = add(endpointCheck('common.ledger.stream', 'Ledger stream', pickDescriptor(ledger?.stream, flow?.ledger?.stream)));
+  const streamTransport = (() => {
+    const desc = pickDescriptor(ledger?.stream, flow?.ledger?.stream);
+    if (!ledgerStreamBase.ok) return ledgerStreamBase;
+    if (desc && typeof desc === 'object' && typeof desc.transport === 'string' && desc.transport && desc.transport !== 'sse') {
+      return {
+        key: 'common.ledger.stream.transport',
+        label: 'SSE ledger stream',
+        ok: false,
+        reason: `Gateway ledger stream transport '${desc.transport}' is not supported by this editor.`,
+      };
+    }
+    return { key: 'common.ledger.stream.transport', label: 'SSE ledger stream', ok: true };
+  })();
+  add(streamTransport);
+  const artifactsList = add(endpointCheck('common.artifacts.list', 'Artifact listing', pickDescriptor(artifacts?.list, flow?.artifacts?.list)));
+  const artifactsMetadata = add(endpointCheck('common.artifacts.metadata', 'Artifact metadata', pickDescriptor(artifacts?.metadata, flow?.artifacts?.metadata)));
+  const artifactsContent = add(endpointCheck('common.artifacts.content', 'Artifact content', pickDescriptor(artifacts?.content, flow?.artifacts?.content)));
+
+  const base = [contractVersion, flowEditor];
+  const save = operationStatus([...base, crudAvailable, crudCollection, crudItem]);
+  const publishStatus = operationStatus([...base, publish]);
+  const run = operationStatus([
+    ...base,
+    publish,
+    runInputSchema,
+    runsInputData,
+    runsStart,
+    runsSummary,
+    runsCommands,
+    ledgerStreamBase,
+    streamTransport,
+  ]);
+  const history = operationStatus([...base, runsHistoryBundle, runsList, runsSummary, ledgerReplay, artifactsList, artifactsMetadata, artifactsContent]);
+  const artifactStatus = operationStatus([...base, artifactsList, artifactsMetadata, artifactsContent]);
+  const commands = operationStatus([...base, runsCommands]);
+  const directGeneratedMediaAvailable = (
+    direct: (GatewayEndpointDescriptor & { route_available?: boolean; configured?: boolean }) | undefined | null,
+    surface: GatewaySurfaceReadinessMediaSurface | undefined
+  ): boolean =>
+    Boolean(
+      direct &&
+        direct.available !== false &&
+        direct.route_available !== false &&
+        direct.configured !== false &&
+        gatewayDirectMediaSurfaceAllows(surface) &&
+        descriptorEndpointAvailable(direct)
+    );
+
+  const generatedImage = (() => {
+    const image = flow?.media?.generated_image || contracts?.assistant?.media?.generated_image;
+    const surface = gatewayMediaSurface(surfaceReadiness, 'generated_image');
+    return Boolean(
+      (image?.workflow?.available === true && gatewayWorkflowMediaSurfaceAllows(surface)) ||
+        directGeneratedMediaAvailable(image?.direct_endpoint, surface)
+    );
+  })();
+  const editedImage = (() => {
+    const image = flow?.media?.edited_image || contracts?.assistant?.media?.edited_image;
+    const surface = gatewayMediaSurface(surfaceReadiness, 'edited_image');
+    return Boolean(
+      (image?.workflow?.available === true && gatewayWorkflowMediaSurfaceAllows(surface)) ||
+        directGeneratedMediaAvailable(image?.direct_endpoint, surface)
+    );
+  })();
+  const generatedVoice = (() => {
+    const voice = flow?.media?.generated_voice || contracts?.assistant?.media?.generated_voice;
+    const surface = gatewayMediaSurface(surfaceReadiness, 'generated_voice');
+    return Boolean(
+      (voice?.workflow?.available === true && gatewayWorkflowMediaSurfaceAllows(surface)) ||
+        directGeneratedMediaAvailable(voice?.direct_endpoint, surface)
+    );
+  })();
+  const generatedMusic = (() => {
+    const music = flow?.media?.generated_music || contracts?.assistant?.media?.generated_music;
+    const surface = gatewayMediaSurface(surfaceReadiness, 'generated_music');
+    return Boolean(
+      (music?.workflow?.available === true && gatewayWorkflowMediaSurfaceAllows(surface)) ||
+        directGeneratedMediaAvailable(music?.direct_endpoint, surface)
+    );
+  })();
+  const promptCacheSessionEndpoints = common?.prompt_cache?.session_endpoints;
+  const durableBlocPromptCache = common?.prompt_cache?.durable_blocs;
+  const modelResidency = common?.model_residency;
+  const modelResidencyEndpoints = modelResidency?.endpoints || {};
+  const modelResidencyRouteAvailable =
+    modelResidency?.route_available !== false &&
+    (
+      descriptorEndpointAvailable(modelResidencyEndpoints.loaded) ||
+      descriptorEndpointAvailable(modelResidencyEndpoints.load) ||
+      descriptorEndpointAvailable(modelResidencyEndpoints.unload) ||
+      descriptorEndpointAvailable(modelResidency?.loaded) ||
+      descriptorEndpointAvailable(modelResidency?.load) ||
+      descriptorEndpointAvailable(modelResidency?.unload)
+    );
+
+  return {
+    ready: save.ready && publishStatus.ready && run.ready && history.ready && artifactStatus.ready,
+    checks,
+    operations: {
+      save,
+      publish: publishStatus,
+      run,
+      history,
+      artifacts: artifactStatus,
+      commands,
+    },
+    optional: {
+      providers: stringEndpointAvailable(common?.discovery?.providers),
+      providerModels: stringEndpointAvailable(common?.discovery?.provider_models),
+      tools: stringEndpointAvailable(common?.discovery?.tools),
+      semantics: stringEndpointAvailable(common?.discovery?.semantics),
+      workspacePolicy: stringEndpointAvailable(common?.workspace?.policy_endpoint),
+      promptCacheSessions: Boolean(
+        common?.prompt_cache?.session_lifecycle === true &&
+          stringEndpointAvailable(promptCacheSessionEndpoints?.status) &&
+          stringEndpointAvailable(promptCacheSessionEndpoints?.prepare)
+      ),
+      promptCacheDurableBlocs: durableBlocPromptCacheAvailable(durableBlocPromptCache),
+      kgMemory: Boolean(common?.memory?.available === true && descriptorEndpointAvailable(common.memory)),
+      generatedImage,
+      editedImage,
+      generatedVoice,
+      generatedMusic,
+      attachmentsUpload: descriptorEndpointAvailable(common?.attachments?.upload),
+      modelResidency: Boolean(modelResidencyRouteAvailable && gatewayModelResidencySurfaceAllows(surfaceReadiness)),
+    },
+  };
+}
+
+async function gatewayErrorFromResponse(res: Response): Promise<GatewayHttpError> {
+  const text = await res.text().catch(() => '');
+  let detail: unknown = text;
+  if (text) {
+    try {
+      detail = JSON.parse(text);
+    } catch {
+      detail = text;
+    }
+  }
+  const rec = asRecord(detail);
+  const msg =
+    rec && typeof rec.detail === 'string'
+      ? rec.detail
+      : typeof detail === 'string' && detail.trim()
+        ? detail.trim()
+        : `HTTP ${res.status}`;
+  return new GatewayHttpError(msg, res.status, detail);
+}
+
+export async function gatewayFetch(path: string, init?: RequestInit & { timeoutMs?: number }): Promise<Response> {
+  const timeoutMs = typeof init?.timeoutMs === 'number' ? init.timeoutMs : 30_000;
+  const controller = typeof AbortController !== 'undefined' && timeoutMs > 0 ? new AbortController() : null;
+  const timeout = controller ? window.setTimeout(() => controller.abort(), timeoutMs) : null;
+  const { timeoutMs: _timeoutMs, signal, ...fetchInit } = init || {};
+  const mergedSignal = signal || controller?.signal;
+  let res: Response;
+  try {
+    res = await fetch(path, { ...fetchInit, signal: mergedSignal });
+  } finally {
+    if (timeout !== null) window.clearTimeout(timeout);
+  }
+  if (!res.ok) throw await gatewayErrorFromResponse(res);
+  return res;
+}
+
+export async function gatewayJson<T>(path: string, init?: RequestInit & { timeoutMs?: number }): Promise<T> {
+  const res = await gatewayFetch(path, init);
+  return (await res.json()) as T;
+}
+
+export function jsonRequest(payload: unknown, init: RequestInit = {}): RequestInit {
+  return {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(init.headers || {}),
+    },
+    body: JSON.stringify(payload),
+  };
+}
+
+export function makeGatewayRequestId(prefix = 'gw'): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
+}
+
+---
+file: web/frontend/src/utils/gatewayCatalog.ts
+---
+
+export interface GatewayCatalogMetadata {
+  contract?: string;
+  version?: number;
+  kind?: string;
+  scope?: string;
+  primary_items_field?: string;
+  [key: string]: unknown;
+}
+
+export interface GatewayCatalogItem {
+  id: string;
+  label: string;
+  provider?: string;
+  model?: string;
+  tasks?: string[];
+  parameters?: Record<string, unknown>;
+  raw?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface GatewaySelectOption {
+  value: string;
+  label: string;
+  provider?: string;
+  item?: GatewayCatalogItem;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function textValue(value: unknown): string {
+  return typeof value === 'string' && value.trim() ? value.trim() : '';
+}
+
+function arrayValue(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function normalizeKey(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function dedupeOptions(options: GatewaySelectOption[]): GatewaySelectOption[] {
+  const seen = new Set<string>();
+  const out: GatewaySelectOption[] = [];
+  for (const option of options) {
+    const value = textValue(option.value);
+    if (!value) continue;
+    const key = normalizeKey(value);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ ...option, value, label: textValue(option.label) || value });
+  }
+  return out;
+}
+
+function stringList(value: unknown): string[] {
+  if (typeof value === 'string' && value.trim()) return [value.trim()];
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of value) {
+    if (typeof item !== 'string') continue;
+    const clean = item.trim();
+    if (!clean || seen.has(clean)) continue;
+    seen.add(clean);
+    out.push(clean);
+  }
+  return out;
+}
+
+export function gatewayCatalogMetadata(payload: unknown): GatewayCatalogMetadata | null {
+  const rec = isRecord(payload) ? payload : null;
+  const catalog = rec && isRecord(rec.catalog) ? rec.catalog : null;
+  return catalog ? (catalog as GatewayCatalogMetadata) : null;
+}
+
+export function isGatewayCatalogV1(payload: unknown): boolean {
+  const catalog = gatewayCatalogMetadata(payload);
+  return catalog?.contract === 'gateway_catalog_v1' && catalog.version === 1;
+}
+
+function idFromItem(item: unknown, providerFallback = ''): string {
+  if (typeof item === 'string') return item.trim();
+  if (!isRecord(item)) return '';
+  for (const key of ['id', 'model', 'model_id', 'routed_model', 'name', 'voice_id', 'profile_id']) {
+    const value = textValue(item[key]);
+    if (value) return value;
+  }
+  return providerFallback.trim();
+}
+
+function providerFromItem(item: unknown, fallback = ''): string {
+  if (!isRecord(item)) return fallback.trim();
+  for (const key of ['provider', 'provider_id', 'provider_name', 'backend', 'owned_by']) {
+    const value = textValue(item[key]);
+    if (value) return value;
+  }
+  return fallback.trim();
+}
+
+function labelFromItem(item: unknown, fallback: string): string {
+  if (!isRecord(item)) return fallback;
+  return (
+    textValue(item.label) ||
+    textValue(item.display_name) ||
+    textValue(item.title) ||
+    textValue(item.name) ||
+    fallback
+  );
+}
+
+function itemToCatalogItem(item: unknown, providerFallback = ''): GatewayCatalogItem | null {
+  const id = idFromItem(item, providerFallback);
+  if (!id) return null;
+  const rec = isRecord(item) ? item : {};
+  const provider = providerFromItem(item, providerFallback);
+  const model = textValue(rec.model) || textValue(rec.model_id) || textValue(rec.routed_model) || id;
+  const label = labelFromItem(item, provider && model ? `${provider} / ${model}` : id);
+  const out: GatewayCatalogItem = {
+    ...rec,
+    id,
+    label,
+  };
+  if (provider) out.provider = provider;
+  if (model) out.model = model;
+  const tasks = stringList(rec.tasks || rec.capabilities);
+  if (tasks.length > 0) out.tasks = tasks;
+  if (isRecord(rec.parameters)) out.parameters = rec.parameters;
+  if (isRecord(item)) out.raw = item;
+  return out;
+}
+
+export function gatewayCatalogItems(payload: unknown, legacyKeys: string[] = []): GatewayCatalogItem[] {
+  const rec = isRecord(payload) ? payload : null;
+  if (!rec) return [];
+  const items: GatewayCatalogItem[] = [];
+  const primary = arrayValue(rec.items);
+  for (const item of primary) {
+    const normalized = itemToCatalogItem(item);
+    if (normalized) items.push(normalized);
+  }
+  if (items.length > 0) return items;
+
+  for (const key of legacyKeys) {
+    for (const item of arrayValue(rec[key])) {
+      const normalized = itemToCatalogItem(item);
+      if (normalized) items.push(normalized);
+    }
+  }
+  return items;
+}
+
+export function providerOptionsFromGatewayCatalog(
+  payload: unknown,
+  legacyArrayKeys: string[] = [],
+  legacyMapKeys: string[] = []
+): GatewaySelectOption[] {
+  const rec = isRecord(payload) ? payload : null;
+  if (!rec) return [];
+  const out: GatewaySelectOption[] = [];
+  const add = (value: unknown) => {
+    const valueRec = isRecord(value) ? value : null;
+    const provider =
+      (typeof value === 'string' ? value.trim() : '') ||
+      textValue(valueRec?.provider) ||
+      textValue(valueRec?.provider_id) ||
+      textValue(valueRec?.backend_id) ||
+      textValue(valueRec?.id) ||
+      textValue(valueRec?.name);
+    if (!provider) return;
+    const item = itemToCatalogItem(value, provider) || undefined;
+    out.push({ value: provider, label: labelFromItem(value, provider), item });
+  };
+
+  const catalogItems = gatewayCatalogItems(payload);
+  if (catalogItems.length > 0) {
+    for (const item of catalogItems) add(item);
+  } else {
+    for (const key of legacyArrayKeys) {
+      for (const item of arrayValue(rec[key])) add(item);
+    }
+  }
+
+  for (const key of legacyMapKeys) {
+    const map = isRecord(rec[key]) ? rec[key] : null;
+    if (!map) continue;
+    for (const provider of Object.keys(map)) add(provider);
+  }
+  return dedupeOptions(out);
+}
+
+export function modelOptionsFromGatewayCatalog(
+  payload: unknown,
+  provider: string,
+  legacyArrayKeys: string[] = [],
+  legacyMapKeys: string[] = []
+): GatewaySelectOption[] {
+  const rec = isRecord(payload) ? payload : null;
+  if (!rec) return [];
+  const wanted = normalizeKey(provider || '');
+  const out: GatewaySelectOption[] = [];
+  const add = (item: unknown, providerFallback = provider) => {
+    const normalized = itemToCatalogItem(item, providerFallback);
+    if (!normalized) return;
+    const itemProvider = normalizeKey(normalized.provider || providerFallback || '');
+    if (wanted && itemProvider && itemProvider !== wanted) return;
+    out.push({
+      value: normalized.model || normalized.id,
+      label: normalized.label,
+      provider: normalized.provider || providerFallback,
+      item: normalized,
+    });
+  };
+
+  const catalogItems = gatewayCatalogItems(payload);
+  if (catalogItems.length > 0) {
+    for (const item of catalogItems) add(item);
+  } else {
+    for (const key of legacyArrayKeys) {
+      for (const item of arrayValue(rec[key])) add(item);
+    }
+  }
+
+  for (const key of legacyMapKeys) {
+    const map = isRecord(rec[key]) ? rec[key] : null;
+    if (!map) continue;
+    for (const [mapProvider, values] of Object.entries(map)) {
+      for (const item of arrayValue(values)) add(item, mapProvider);
+    }
+  }
+  return dedupeOptions(out);
+}
+
+export function stringOptionsFromGatewayCatalog(payload: unknown, legacyKeys: string[] = []): string[] {
+  return modelOptionsFromGatewayCatalog(payload, '', legacyKeys).map((option) => option.value);
+}
+
+---
+file: web/frontend/src/utils/visualFlowCompat.ts
+---
+
+import type { FlowNodeData, JsonValue, Pin, VisualEdge, VisualNode } from '../types/flow';
+
+const LEGACY_MUSIC_OUTPUT_SPEC_KIND = 'abstractflow.runtime_compat.generate_music.output_spec.v1';
+const LEGACY_MUSIC_FACADE_KIND = 'abstractflow.runtime_compat.generate_music.facade.v1';
+
+const OUTPUT_FIELD_TO_INPUT_PIN: Record<string, string> = {
+  provider: 'music_provider',
+  model: 'music_model',
+  backend: 'music_provider',
+  music_backend: 'music_provider',
+  backend_music: 'music_provider',
+  format: 'format',
+  lyrics: 'lyrics',
+  duration_s: 'duration_s',
+  seed: 'seed',
+  num_inference_steps: 'num_inference_steps',
+  guidance_scale: 'guidance_scale',
+  instrumental: 'instrumental',
+  enhance_prompt: 'enhance_prompt',
+  structure_prompt: 'structure_prompt',
+  auto_lyrics: 'auto_lyrics',
+  text_planner_mode: 'text_planner_mode',
+  vocal_language: 'vocal_language',
+  negative_prompt: 'negative_prompt',
+  sample_rate: 'sample_rate',
+  bpm: 'bpm',
+  keyscale: 'keyscale',
+  timesignature: 'timesignature',
+  composition_plan: 'composition_plan',
+  positive_styles: 'positive_styles',
+  negative_styles: 'negative_styles',
+  planning: 'planning',
+  extra: 'extra',
+};
+
+const GENERATE_MUSIC_OUTPUTS: Pin[] = [
+  { id: 'exec-out', label: '', type: 'execution' },
+  { id: 'music_artifact', label: 'music_artifact', type: 'object', description: 'Artifact ref for generated music.' },
+  { id: 'audio_artifact', label: 'audio_artifact', type: 'object', description: 'Alias artifact ref for audio-compatible downstream nodes.' },
+  { id: 'artifact_ref', label: 'artifact_ref', type: 'object' },
+  { id: 'artifact_id', label: 'artifact_id', type: 'string' },
+  { id: 'content_type', label: 'content_type', type: 'string' },
+  { id: 'outputs', label: 'outputs', type: 'object' },
+  { id: 'meta', label: 'meta', type: 'object' },
+  { id: 'success', label: 'success', type: 'boolean' },
+];
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function asJsonValue(value: unknown): JsonValue | undefined {
+  if (value === null) return null;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
+  if (typeof value === 'boolean') return value;
+  if (Array.isArray(value)) return value as JsonValue;
+  if (isRecord(value)) return value as JsonValue;
+  return undefined;
+}
+
+function mergePinsById(existing: unknown, required: Pin[]): Pin[] {
+  const pins = Array.isArray(existing) ? existing.filter((pin): pin is Pin => isRecord(pin) && typeof pin.id === 'string') : [];
+  const byId = new Map(pins.map((pin) => [pin.id, pin] as const));
+  const out: Pin[] = [];
+  const used = new Set<string>();
+  for (const pin of required) {
+    const prior = byId.get(pin.id);
+    out.push(prior ? { ...pin, ...prior, type: pin.type, label: pin.label || prior.label } : pin);
+    used.add(pin.id);
+  }
+  for (const pin of pins) {
+    if (!used.has(pin.id)) out.push(pin);
+  }
+  return out;
+}
+
+function compatKind(node: Pick<VisualNode, 'data'> | null | undefined): string {
+  const meta = isRecord(node?.data) ? (node?.data as Record<string, unknown>)._abstractflowRuntimeCompat : null;
+  return isRecord(meta) && typeof meta.kind === 'string' ? meta.kind : '';
+}
+
+export function isLegacyMusicCompatNode(node: Pick<VisualNode, 'data'> | null | undefined): boolean {
+  const kind = compatKind(node);
+  return kind === LEGACY_MUSIC_OUTPUT_SPEC_KIND || kind === LEGACY_MUSIC_FACADE_KIND;
+}
+
+function legacyOutputSpecForNode(node: VisualNode): Record<string, unknown> {
+  const data = isRecord(node.data) ? (node.data as unknown as FlowNodeData) : ({} as FlowNodeData);
+  const effectConfig = isRecord(data.effectConfig) ? (data.effectConfig as Record<string, unknown>) : {};
+  const output = isRecord(effectConfig.output) ? effectConfig.output : {};
+  return output;
+}
+
+function normalizeLegacyMusicFacadeNode(node: VisualNode): VisualNode {
+  const data = isRecord(node.data) ? (node.data as unknown as FlowNodeData) : ({} as FlowNodeData);
+  const effectConfig = isRecord(data.effectConfig) ? (data.effectConfig as Record<string, unknown>) : {};
+  const output = legacyOutputSpecForNode(node);
+  const nextEffectConfig: Record<string, JsonValue> = { ...(effectConfig as Record<string, JsonValue>) };
+  delete nextEffectConfig.output;
+
+  const runtimeProvider = asJsonValue(effectConfig.provider);
+  const runtimeModel = asJsonValue(effectConfig.model);
+  delete nextEffectConfig.provider;
+  delete nextEffectConfig.model;
+  if (runtimeProvider !== undefined && nextEffectConfig.runtime_provider === undefined) {
+    nextEffectConfig.runtime_provider = runtimeProvider;
+  }
+  if (runtimeModel !== undefined && nextEffectConfig.runtime_model === undefined) {
+    nextEffectConfig.runtime_model = runtimeModel;
+  }
+
+  const legacyBackend = asJsonValue(output.backend ?? output.music_backend ?? output.backend_music);
+  if (typeof legacyBackend === 'string' && legacyBackend.trim()) {
+    nextEffectConfig.music_provider = legacyBackend;
+  }
+
+  for (const [outputField, inputPin] of Object.entries(OUTPUT_FIELD_TO_INPUT_PIN)) {
+    const value = asJsonValue(output[outputField]);
+    if (value !== undefined && nextEffectConfig[inputPin] === undefined) {
+      nextEffectConfig[inputPin] = value;
+    }
+  }
+  delete nextEffectConfig.music_backend;
+  delete nextEffectConfig.musicBackend;
+  delete nextEffectConfig.backend_music;
+  delete nextEffectConfig.backend;
+
+  const nextData: Record<string, unknown> = {
+    ...data,
+    nodeType: 'generate_music',
+    effectConfig: nextEffectConfig as FlowNodeData['effectConfig'],
+    outputs: mergePinsById(data.outputs, GENERATE_MUSIC_OUTPUTS),
+  };
+  delete nextData._abstractflowRuntimeCompat;
+
+  return {
+    ...node,
+    type: 'generate_music',
+    data: nextData as unknown as FlowNodeData,
+  };
+}
+
+export function normalizeLegacyMusicCompatVisualFlow(
+  visualNodes: VisualNode[],
+  visualEdges: VisualEdge[]
+): { nodes: VisualNode[]; edges: VisualEdge[] } {
+  const outputSpecById = new Map<string, string>();
+  const legacyFacadeIds = new Set<string>();
+
+  for (const node of visualNodes) {
+    const kind = compatKind(node);
+    if (kind === LEGACY_MUSIC_OUTPUT_SPEC_KIND) {
+      const meta = isRecord(node.data) ? (node.data as Record<string, unknown>)._abstractflowRuntimeCompat : null;
+      const forNodeId = isRecord(meta) && typeof meta.forNodeId === 'string' ? meta.forNodeId : '';
+      if (forNodeId) outputSpecById.set(node.id, forNodeId);
+    } else if (
+      kind === LEGACY_MUSIC_FACADE_KIND ||
+      (node.type === 'llm_call' &&
+        isRecord(node.data) &&
+        (node.data as unknown as FlowNodeData).nodeType === 'generate_music' &&
+        isRecord((node.data as unknown as FlowNodeData).effectConfig) &&
+        isRecord(((node.data as unknown as FlowNodeData).effectConfig as Record<string, unknown>).output))
+    ) {
+      legacyFacadeIds.add(node.id);
+    }
+  }
+
+  if (outputSpecById.size === 0 && legacyFacadeIds.size === 0) {
+    return { nodes: visualNodes, edges: visualEdges };
+  }
+
+  const nextNodes = visualNodes
+    .filter((node) => !outputSpecById.has(node.id))
+    .map((node) => (legacyFacadeIds.has(node.id) ? normalizeLegacyMusicFacadeNode(node) : node));
+
+  const nextEdges: VisualEdge[] = [];
+  const usedEdgeIds = new Set<string>();
+  const pushEdge = (edge: VisualEdge) => {
+    let id = edge.id;
+    if (usedEdgeIds.has(id)) {
+      let i = 2;
+      while (usedEdgeIds.has(`${id}_${i}`)) i += 1;
+      id = `${id}_${i}`;
+    }
+    usedEdgeIds.add(id);
+    nextEdges.push({ ...edge, id });
+  };
+
+  for (const edge of visualEdges) {
+    const specTargetNodeId = outputSpecById.get(edge.target);
+    if (specTargetNodeId) {
+      const targetHandle = OUTPUT_FIELD_TO_INPUT_PIN[String(edge.targetHandle || '')];
+      if (targetHandle) {
+        pushEdge({
+          ...edge,
+          target: specTargetNodeId,
+          targetHandle,
+        });
+      }
+      continue;
+    }
+    if (outputSpecById.has(edge.source)) {
+      continue;
+    }
+    if (legacyFacadeIds.has(edge.source) && edge.sourceHandle === 'artifact_ref') {
+      pushEdge({ ...edge, sourceHandle: 'music_artifact' });
+      continue;
+    }
+    pushEdge(edge);
+  }
+
+  return { nodes: nextNodes, edges: nextEdges };
+}
 
 ---
 file: web/backend/routes/ws.py
@@ -4492,30 +6032,32 @@ async def _execute_runner_loop(
 
         return datetime.now(timezone.utc).isoformat()
 
-    def _resolve_waiting_info(state: Any) -> Tuple[str, list, bool, Optional[str], Optional[str]]:
-        """Return (prompt, choices, allow_free_text, wait_key, reason)."""
+    def _resolve_waiting_info(state: Any) -> Tuple[str, list, bool, Optional[str], Optional[str], Dict[str, Any]]:
+        """Return (prompt, choices, allow_free_text, wait_key, reason, details)."""
         wait = getattr(state, "waiting", None)
         if wait is None:
-            return ("Please respond:", [], True, None, None)
+            return ("Please respond:", [], True, None, None, {})
 
         reason = getattr(wait, "reason", None)
         reason_value = reason.value if hasattr(reason, "value") else str(reason) if reason else None
+        raw_details = getattr(wait, "details", None)
+        details = dict(raw_details) if isinstance(raw_details, dict) else {}
 
         if reason_value != "subworkflow":
             prompt = getattr(wait, "prompt", None) or "Please respond:"
             choices = list(getattr(wait, "choices", []) or [])
             allow_free_text = bool(getattr(wait, "allow_free_text", True))
             wait_key = getattr(wait, "wait_key", None)
-            return (prompt, choices, allow_free_text, wait_key, reason_value)
+            return (prompt, choices, allow_free_text, wait_key, reason_value, details)
 
         # Bubble up the deepest waiting child so the UI can render ASK_USER prompts.
         runtime = getattr(runner, "runtime", None)
         if runtime is None:
-            return ("Waiting for subworkflow…", [], True, getattr(wait, "wait_key", None), reason_value)
+            return ("Waiting for subworkflow…", [], True, getattr(wait, "wait_key", None), reason_value, details)
 
         sub_run_id = _extract_sub_run_id(wait)
         if not sub_run_id:
-            return ("Waiting for subworkflow…", [], True, getattr(wait, "wait_key", None), reason_value)
+            return ("Waiting for subworkflow…", [], True, getattr(wait, "wait_key", None), reason_value, details)
 
         current_run_id = sub_run_id
         for _ in range(25):
@@ -4538,9 +6080,11 @@ async def _execute_runner_loop(
             choices = list(getattr(sub_wait, "choices", []) or [])
             allow_free_text = bool(getattr(sub_wait, "allow_free_text", True))
             wait_key = getattr(sub_wait, "wait_key", None)
-            return (prompt, choices, allow_free_text, wait_key, sub_reason_value)
+            sub_details_raw = getattr(sub_wait, "details", None)
+            sub_details = dict(sub_details_raw) if isinstance(sub_details_raw, dict) else {}
+            return (prompt, choices, allow_free_text, wait_key, sub_reason_value, sub_details)
 
-        return ("Waiting for subworkflow…", [], True, getattr(wait, "wait_key", None), reason_value)
+        return ("Waiting for subworkflow…", [], True, getattr(wait, "wait_key", None), reason_value, details)
 
     def _is_agent_node(node_id: str) -> bool:
         try:
@@ -4673,7 +6217,7 @@ async def _execute_runner_loop(
                     "node_id": node_before or getattr(state, "current_node", None),
                     "started_at": time.perf_counter(),
                 }
-                prompt, choices, allow_free_text, wait_key, reason = _resolve_waiting_info(state)
+                prompt, choices, allow_free_text, wait_key, reason, details = _resolve_waiting_info(state)
                 await websocket.send_json(
                     {
                         "type": "flow_waiting",
@@ -4685,6 +6229,7 @@ async def _execute_runner_loop(
                         "prompt": prompt,
                         "choices": choices,
                         "allow_free_text": allow_free_text,
+                        "details": details,
                     }
                 )
                 break
@@ -5485,7 +7030,7 @@ async def _execute_runner_loop(
             # waiting reason requires user input. A root waiting on SUBWORKFLOW completion
             # must keep running so we can tick the child and stream live trace updates.
             if is_root:
-                prompt, choices, allow_free_text, wait_key, reason = _resolve_waiting_info(state)
+                prompt, choices, allow_free_text, wait_key, reason, details = _resolve_waiting_info(state)
                 if reason != "subworkflow":
                     _waiting_runners[connection_id] = runner
                     _waiting_steps[connection_id] = {
@@ -5503,6 +7048,7 @@ async def _execute_runner_loop(
                             "prompt": prompt,
                             "choices": choices,
                             "allow_free_text": allow_free_text,
+                            "details": details,
                         }
                     )
             return state
@@ -6574,8 +8120,10 @@ async def publish_flow(flow_id: str, request: PublishFlowRequest) -> PublishFlow
                 gateway_reloaded = True
                 gateway_reload_error = None
             else:
-                gateway_reloaded = False
-                gateway_reload_error = f"upload: {upload_err}; reload: {reload_err}"
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"Gateway publish completed but bundle not loaded: upload: {upload_err}; reload: {reload_err}",
+                )
 
     return PublishFlowResponse(
         ok=True,
@@ -7075,6 +8623,16 @@ def _runtime_health() -> dict[str, object]:
         "gateway_token_source": token_source,
     }
 
+def _gateway_proxy_timeout_s(default: float = 900.0) -> float:
+    raw = os.getenv("ABSTRACTFLOW_GATEWAY_PROXY_TIMEOUT_S", "").strip()
+    try:
+        value = float(raw) if raw else float(default)
+    except Exception:
+        value = float(default)
+    if value <= 0:
+        value = float(default)
+    return max(1.0, min(value, 3600.0))
+
 @app.on_event("startup")
 async def _startup_connectivity_guard() -> None:
     if local_runtime_enabled():
@@ -7086,17 +8644,18 @@ async def _startup_connectivity_guard() -> None:
 
     try:
         gateway_url, gateway_token, _ = resolve_effective_gateway_connection()
-        require_gateway_connectivity(gateway_url=gateway_url, gateway_token=gateway_token, timeout_s=4.0)
+        require_gateway_connectivity(gateway_url=gateway_url, gateway_token=gateway_token, timeout_s=1.5)
         logging.getLogger(__name__).info(
             "Connected to AbstractGateway at %s",
             gateway_url,
         )
     except ValueError as e:
-        raise RuntimeError(
-            "AbstractFlow is running in Gateway-only mode and could not complete the startup check. "
-            "Set ABSTRACTGATEWAY_URL (or ABSTRACTFLOW_GATEWAY_URL) and ABSTRACTGATEWAY_AUTH_TOKEN, and verify the Gateway is reachable. "
-            f"Connectivity check failed: {e}"
-        ) from e
+        logging.getLogger(__name__).warning(
+            "AbstractFlow started without a verified AbstractGateway connection. "
+            "The browser connection dialog can configure gateway URL/token. "
+            "Connectivity check failed: %s",
+            e,
+        )
 
 
 @app.get("/api/health")
@@ -7132,6 +8691,50 @@ def _gateway_proxy_response_headers(headers: object) -> dict[str, str]:
     return out
 
 
+def _gateway_proxy_content_type(headers: object) -> str:
+    get = getattr(headers, "get", None)
+    if not callable(get):
+        return ""
+    return str(get("content-type", "") or get("Content-Type", "") or "")
+
+
+def _gateway_proxy_is_event_stream(headers: object) -> bool:
+    return "text/event-stream" in _gateway_proxy_content_type(headers).lower()
+
+
+def _bytes_chunk(value: object) -> bytes:
+    if isinstance(value, bytes):
+        return value
+    if isinstance(value, bytearray):
+        return bytes(value)
+    return str(value).encode("utf-8")
+
+
+def _iter_gateway_proxy_response(resp: object, *, event_stream: bool = False):
+    try:
+        if event_stream:
+            readline = getattr(resp, "readline", None)
+            if callable(readline):
+                while True:
+                    chunk = readline()
+                    if not chunk:
+                        break
+                    yield _bytes_chunk(chunk)
+                return
+
+        read = getattr(resp, "read")
+        while True:
+            chunk = read(64 * 1024)
+            if not chunk:
+                break
+            yield _bytes_chunk(chunk)
+    finally:
+        try:
+            resp.close()
+        except Exception:
+            pass
+
+
 def _gateway_proxy_request_headers(request: Request, token: str | None) -> dict[str, str]:
     out: dict[str, str] = {}
     for key, value in request.headers.items():
@@ -7164,7 +8767,7 @@ async def proxy_gateway_api(path: str, request: Request):
     )
 
     try:
-        resp = urlopen(req)
+        resp = urlopen(req, timeout=_gateway_proxy_timeout_s())
     except HTTPError as e:
         detail = e.read()
         return Response(
@@ -7180,24 +8783,18 @@ async def proxy_gateway_api(path: str, request: Request):
             media_type="application/json",
         )
 
-    def _iter_response():
-        try:
-            while True:
-                chunk = resp.read(64 * 1024)
-                if not chunk:
-                    break
-                yield chunk
-        finally:
-            try:
-                resp.close()
-            except Exception:
-                pass
+    resp_headers = getattr(resp, "headers", {})
+    event_stream = _gateway_proxy_is_event_stream(resp_headers)
+    response_headers = _gateway_proxy_response_headers(resp_headers)
+    if event_stream:
+        response_headers.setdefault("Cache-Control", "no-cache")
+        response_headers.setdefault("X-Accel-Buffering", "no")
 
     return StreamingResponse(
-        _iter_response(),
+        _iter_gateway_proxy_response(resp, event_stream=event_stream),
         status_code=int(getattr(resp, "status", 200) or 200),
-        headers=_gateway_proxy_response_headers(getattr(resp, "headers", {})),
-        media_type=getattr(resp, "headers", {}).get("content-type") if getattr(resp, "headers", None) else None,
+        headers=response_headers,
+        media_type=_gateway_proxy_content_type(resp_headers) if resp_headers else None,
     )
 
 
@@ -7275,8 +8872,7 @@ file: docs/cli.md
 AbstractFlow ships a small CLI focused on:
 - **WorkflowBundle** (`.flow`) utilities
 - running the **Visual Editor backend** (optional; requires `abstractflow[apple]` or `abstractflow[gpu]`)
-- Note: WorkflowBundle commands require `abstractflow[apple]` (or any full host profile:
-  `abstractflow[apple]`, `abstractflow[gpu]`).
+- Note: WorkflowBundle commands require `abstractflow[apple]` or `abstractflow[gpu]`.
 
 Entry point:
 - `abstractflow` (declared in `pyproject.toml` → `project.scripts`)
@@ -7379,14 +8975,13 @@ from .gateway_options import (
 
 
 def _load_workflow_bundle_tools():
-    """Import workflow bundle helpers only when the optional runtime stack is needed."""
+    """Import workflow bundle helpers only when the local execution stack is needed."""
     try:
         from abstractruntime.workflow_bundle import workflow_bundle_manifest_to_dict
     except ModuleNotFoundError as exc:
         raise RuntimeError(
-            "Workflow bundle commands require the runtime stack. "
-            'Install with: pip install "abstractflow[apple]" '
-            '(or one host profile: "abstractflow[apple]", "abstractflow[gpu]").'
+            "Workflow bundle commands require the local execution stack. "
+            'Install with: pip install "abstractflow[apple]" or "abstractflow[gpu]".'
         ) from exc
 
     from .workflow_bundle import inspect_workflow_bundle, pack_workflow_bundle, unpack_workflow_bundle
@@ -7556,7 +9151,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "abstractflow"
 dynamic = ["version"]
-description = "Diagram-based AI workflow generation built on AbstractCore"
+description = "Gateway-first visual workflow authoring for AbstractFramework"
 readme = "README.md"
 license = "MIT"
 authors = [
@@ -7567,7 +9162,7 @@ maintainers = [
 ]
 keywords = [
     "ai", "workflow", "diagram", "llm", "automation", 
-    "visual-programming", "abstractcore", "machine-learning"
+    "visual-programming", "abstractgateway", "machine-learning"
 ]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
@@ -7589,43 +9184,27 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-runtime = [
-    # Programmatic flow IR + execution helpers (`Flow`, `FlowRunner`, VisualFlow local execution).
-    "AbstractRuntime>=0.4.6",
-    "abstractcore[tools]>=2.13.10",
-]
 agent = [
     # Enables built-in Agent node creation in the VisualFlow executor.
-    "abstractagent>=0.2.0",
+    "abstractagent>=0.3.7",
 ]
 apple = [
-    # Full Gateway Apple profile + local control-plane compatibility stack.
-    "AbstractRuntime>=0.4.6",
-    "abstractcore[tools]>=2.13.10",
-    "abstractgateway[apple]>=0.2.3",
+    # Apple local control-plane + Gateway stack. This profile is intentionally
+    # the full user-facing local install, so media engine extras cascade through
+    # abstractgateway[apple] into the runtime-owned media engine extras.
+    "abstractgateway[apple]>=0.2.17",
+    "abstractagent>=0.3.7",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.23.0",
     "websockets>=11.0.0",
 ]
 gpu = [
-    # Gateway GPU profile + local control-plane compatibility stack.
-    "AbstractRuntime>=0.4.6",
-    "abstractcore[tools]>=2.13.10",
-    "abstractgateway[gpu]>=0.2.3",
+    # GPU local control-plane + Gateway stack.
+    "abstractgateway[gpu]>=0.2.17",
+    "abstractagent>=0.3.7",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.23.0",
     "websockets>=11.0.0",
-]
-dev = [
-    "pytest>=7.0.0",
-    "pytest-asyncio>=0.21.0",
-    "black>=23.0.0",
-    "isort>=5.12.0",
-    "flake8>=6.0.0",
-    "mypy>=1.0.0",
-    "pre-commit>=3.0.0",
-    "mkdocs>=1.6.0",
-    "mkdocs-material>=9.0.0",
 ]
 docs = [
     "mkdocs>=1.6.0",
@@ -7637,7 +9216,7 @@ ui = [
     "networkx>=3.1.0",
 ]
 #
-# Optional profiles intentionally remain: base, runtime, agent, apple, gpu.
+# Optional profiles intentionally remain: base, agent, apple, gpu.
 #
 
 [project.urls]
@@ -7730,7 +9309,7 @@ file: abstractflow/_version.py
 This file is the single source of truth for AbstractFlow releases.
 """
 
-__version__ = "0.3.7"
+__version__ = "0.3.13"
 
 ---
 file: mkdocs.yml
@@ -7786,7 +9365,7 @@ file: web/frontend/package.json
 
 {
   "name": "@abstractframework/flow",
-  "version": "0.1.6",
+  "version": "0.3.13",
   "description": "Visual workflow editor for AbstractFramework - drag-and-drop workflow authoring with real-time testing",
   "type": "module",
   "author": "Laurent-Philippe Albou",
@@ -7800,10 +9379,10 @@ file: web/frontend/package.json
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/lpalbou/abstractflow.git",
+    "url": "https://github.com/lpalbou/AbstractFlow.git",
     "directory": "web/frontend"
   },
-  "homepage": "https://github.com/lpalbou/abstractflow#readme",
+  "homepage": "https://github.com/lpalbou/AbstractFlow#readme",
   "publishConfig": {
     "access": "public"
   },
@@ -8730,7 +10309,76 @@ All notable changes to AbstractFlow will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.13] - 2026-05-22
+
+### Added
+- Native Generate Music authoring against the released Runtime/Gateway media contract, including Gateway music catalog selectors, music residency targeting, and advanced music controls.
+- Image edit/image-to-image node templates and controls aligned with Gateway's generated media contracts.
+- Gateway catalog v1 helpers that prefer canonical `items` envelopes while retaining legacy catalog fallbacks.
+- Artifact reference primitives for text, image, voice, music, and video references in the palette.
+
+### Changed
+- Apple/GPU Flow profiles now require Gateway `>=0.2.17`; Runtime/Core are consumed through Gateway extras instead of direct Flow dependencies.
+- Generated media readiness honors Gateway's `common.readiness` surface summary when available while remaining compatible with legacy direct endpoint descriptors.
+- Gateway proxy/model residency operations now allow long media and warmup requests without the previous short frontend/backend timeout path.
+
+### Fixed
+- Removed browser-side Generate Music lowering. Old lowered flows are normalized back to native `generate_music` when loaded or saved.
+- Python VisualFlow models now accept the new native media node types without importing Runtime/Core at package import time.
+- Warm/unload authoring is Gateway-only, allows Gateway default provider/model selection, and no longer disables all media residency controls from stale per-task support flags.
+- Music provider/model changes clear stale backend overrides so Stable Audio 3 and Stable Audio Open do not inherit the wrong backend.
+- Media previews are modality-aware and can fetch child-run/projected artifacts without using the wrong run id.
+- Run preflight now catches missing media prompts and required source artifacts before starting a run.
+
+## [0.3.12] - 2026-05-19
+
+### Fixed
+- Generate Image, Generate Voice, Transcribe Audio, and Listen Voice selectors now rely on Gateway provider catalogs instead of hardcoded media model fallbacks.
+- Supertonic voice options now come from the Gateway voice catalog, so Flow surfaces the same voices that Gateway can execute.
+- Media nodes keep image, TTS, and STT provider/model selections in media-specific fields instead of falling back to generic LLM `provider`/`model` values.
+
+### Changed
+- Apple/GPU Flow profiles now require Gateway `>=0.2.14`, Runtime `>=0.4.14`, and Core `>=2.13.15`.
+
+## [0.3.11] - 2026-05-13
+
+### Fixed
+- Media node controls keep image, TTS, and STT model selectors in media-specific fields so runtime LLM provider/model inputs no longer overwrite generated media routing.
+- Listen Voice nodes now expose the Gateway STT model selector and pass the chosen transcription model through wait metadata.
+
+### Changed
+- Apple/GPU Flow profiles now require Runtime `>=0.4.11` and Core `>=2.13.14`.
+- Frontend npm package metadata is aligned with the Python release version for the next npm publication.
+
+
+## [0.3.10] - 2026-05-12
+
+### Added
+- AbstractFlow media node properties now load Gateway voice profiles, TTS models, STT models, provider image models, and cached local vision models from Gateway catalog routes.
+- Generate Image, Generate Voice, Transcribe Audio, and Listen Voice nodes now expose simple Gateway Media controls for local/provider model selection.
+
+### Fixed
+- Image, TTS, and STT selectors now write media-specific fields (`image_provider`/`image_model`, `tts_model`, `stt_model`) instead of overloading LLM routing `provider`/`model`.
+- Apple/GPU Flow release-profile installs now include `abstractagent>=0.3.7`, so Agent-node workflow validation matches the capabilities shipped in the local host profiles.
+
+### Changed
+- Apple/GPU Flow install profiles now require Runtime `>=0.4.10` and Core `>=2.13.13` while keeping Gateway as a separately installed server dependency to avoid a Flow/Gateway release-order cycle.
+
+## [0.3.9] - 2026-05-11
+
+### Changed
+- Release/install profile guidance now consistently targets canonical install profiles: `abstractflow`, `abstractflow[apple]`, `abstractflow[gpu]`.
+- Runtime profile references and CLI error messages were updated across docs/code paths to remove `all-apple`, `all-gpu`, `runtime`, and `standalone` guidance.
+
+### Fixed
+- Release workflow manual dispatch now handles existing tags safely:
+  - existing `vX.Y.Z` tags for the same commit are reused,
+  - mismatched tag/commit state now fails with a clear remediation message.
+
+### Added
+- Release notes/packaging metadata refresh for the corrected profile taxonomy and corrected dependency/error messaging.
+
+## [0.3.8] - 2026-05-09
 
 ### Added
 - **Gateway contract strictness for run detail helpers**: AbstractFlow now requires Gateway discovery descriptors for
@@ -8738,17 +10386,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `contracts.flow_editor.runs.*`) before enabling run rehydration and run history replay in the editor UX.
   Missing helper descriptors in versioned contracts now produce explicit readiness failures instead of
   implicit path assumptions.
+- **Gateway capability readiness checks**: New `gatewayClient` helpers (`getGatewayFlowEditorReadiness`,
+  `endpointFromDescriptor`, `descriptorEndpointAvailable`) and the `useGatewayCapabilities` hook
+  (`gatewayReadinessFromCapabilities`) for frontend capability discovery.
+- **Gateway connectivity check**: New `check_gateway_connection()` and `require_gateway_connectivity()`
+  functions in `gateway_options.py` for early validation of gateway reachability.
+- **Lazy runtime exports**: `abstractflow.__init__.py` now uses `__getattr__` to lazily import runtime
+  dependencies (Flow, FlowRunner, compile_flow, etc.), enabling a true thin-client install profile.
+- **npm publish job**: Release workflow now publishes the frontend CLI (`@abstractframework/flow`) to npm
+  alongside the PyPI release.
 
 ### Changed
 - **Descriptor-driven endpoint usage in editor paths**: `RunFlowModal` and `Toolbar` now resolve
   run helper endpoints through descriptors and only use fallback canonical paths for legacy, non-versioned
   Gateway contracts.
+- **CLI workflow bundle loading**: `abstractflow bundle` commands now lazily import `abstractruntime` to
+  avoid hard dependencies on the runtime stack for thin-client users.
+- **Install profile names**: Updated all documentation and CLI error messages to use canonical profiles
+  (`abstractflow`, `abstractflow[apple]`, `abstractflow[gpu]`).
+
+### Fixed
+- **Gateway auth token resolution**: Simplified `resolve_gateway_token()` to use a single env var
+  (`ABSTRACTGATEWAY_AUTH_TOKEN`) and removed fragile comma-split fallback.
 
 ### Notable cleanup for thin-client direction
 - Documentation and install guidance now use the canonical profiles:
   - `abstractflow` (thin client)
-  - `abstractflow[apple]` (local execution stack)
-  - `abstractflow[apple]` / `abstractflow[gpu]` (Gateway-capable variants)
+  - `abstractflow[apple]` / `abstractflow[gpu]` (local execution + gateway-compatible host stack)
 
 ## [0.3.7] - 2026-05-06
 
@@ -8786,7 +10450,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Historical install profile**: `abstractflow[standalone]` was the then-current profile for the Visual Editor backend.
-  It is now replaced by the current split: `abstractflow` (thin client), `abstractflow[apple]` (local execution),
+  It is now replaced by the current split: `abstractflow` (thin client),
   `abstractflow[apple]`, and `abstractflow[gpu]`.
 
 ## [0.3.2] - 2026-02-06

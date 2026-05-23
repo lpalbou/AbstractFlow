@@ -1,12 +1,12 @@
-# Planned: Flow Durable Bloc Prompt-Cache Binding UX
+# Completed: Flow Durable Bloc Prompt-Cache Binding UX
 
 ## Metadata
 - Created: 2026-05-21
-- Status: Planned
-- Completed: N/A
+- Status: Completed
+- Completed: 2026-05-21
 
 ## ADR status
-- Governing ADRs: `../../../abstractcore/docs/adr/0007-durable-memory-bloc-cache-binding.md`
+- Governing ADRs: `../../../../abstractcore/docs/adr/0007-durable-memory-bloc-cache-binding.md`
 - ADR impact: None
 
 ## Context
@@ -185,10 +185,10 @@ For now:
 - `../proposed/2026-05-19_model_residency_flow_controls.md`
 - `../proposed/2026-05-20_flow_core_boundary_and_local_compatibility_mode.md`
 - `../completed/040_gateway_capability_schema_and_connection_contract.md`
-- Runtime completed: `../../../abstractruntime/docs/backlog/completed/027_runtime_durable_bloc_prompt_cache_facade.md`
-- Runtime completed: `../../../abstractruntime/docs/backlog/completed/028_runtime_bloc_kv_lifecycle_and_pruning.md`
-- Gateway completed: `../../../abstractgateway/docs/backlog/completed/2026-05-20_gateway_durable_bloc_prompt_cache_contract.md`
-- Core ADR: `../../../abstractcore/docs/adr/0007-durable-memory-bloc-cache-binding.md`
+- Runtime completed: `../../../../abstractruntime/docs/backlog/completed/027_runtime_durable_bloc_prompt_cache_facade.md`
+- Runtime completed: `../../../../abstractruntime/docs/backlog/completed/028_runtime_bloc_kv_lifecycle_and_pruning.md`
+- Gateway completed: `../../../../abstractgateway/docs/backlog/completed/2026-05-20_gateway_durable_bloc_prompt_cache_contract.md`
+- Core ADR: `../../../../abstractcore/docs/adr/0007-durable-memory-bloc-cache-binding.md`
 
 ## Expected outcomes
 
@@ -213,12 +213,12 @@ For now:
 
 ## Progress checklist
 
-- [ ] Add Flow-side typing for `common.prompt_cache.durable_blocs`.
-- [ ] Add readiness/optional-feature helpers for durable blocs.
-- [ ] Add a durable prompt-cache operator section in Run Flow.
-- [ ] Add explicit `prompt_cache_binding` input pins for `llm_call` and `agent`.
-- [ ] Add tests for contract parsing, unavailable states, and binding display.
-- [ ] Audit compiler/runtime lowering for explicit binding pass-through before shipping.
+- [x] Add Flow-side typing for `common.prompt_cache.durable_blocs`.
+- [x] Add readiness/optional-feature helpers for durable blocs.
+- [x] Add a durable prompt-cache operator section in Run Flow.
+- [x] Add explicit `prompt_cache_binding` input pins for `llm_call` and `agent`.
+- [x] Add tests for contract parsing, unavailable states, and binding display.
+- [x] Audit compiler/runtime lowering for explicit binding pass-through before shipping.
 
 ## Guidance for the implementing agent
 
@@ -232,3 +232,29 @@ The lower layers are finally clean enough that Flow should preserve that discipl
 - expose `prompt_cache_binding` explicitly
 - only introduce a first-class graph node for bloc preparation if Runtime later owns that work as a
   real ledgered effect
+
+## Completion report
+
+- Date: 2026-05-21
+- Original planned path: `docs/backlog/planned/0070_flow_durable_bloc_prompt_cache_binding_ux.md`
+- Final path: `docs/backlog/completed/0070_flow_durable_bloc_prompt_cache_binding_ux.md`
+- Summary: Flow now understands Gateway durable bloc prompt-cache capability, separates volatile session cache from durable exact reuse in Run Flow, exposes explicit `prompt_cache_binding` pins on `llm_call` and `agent`, and wires the binding through Runtime/Agent LLM call params.
+- Files and symbols touched:
+  - `web/frontend/src/utils/gatewayClient.ts`: `GatewayDurableBlocPromptCacheContract`, `durableBlocPromptCacheAvailable`, `optional.promptCacheDurableBlocs`.
+  - `web/frontend/src/components/RunFlowModal.tsx`: separate `Session prompt cache (volatile)` and `Durable prompt cache (exact reuse)` sections; durable bloc `record`, `kv_manifest`, `kv_list`, `kv_ensure`, and `kv_load` calls; visible run input for `prompt_cache_binding`.
+  - `web/frontend/src/types/nodes.ts`: explicit `prompt_cache_binding` pins on `llm_call` and `agent`.
+  - `../abstractruntime/src/abstractruntime/visualflow_compiler/visual/executor.py`: VisualFlow lowering forwards `prompt_cache_binding` into LLM params and Agent input values.
+  - `../abstractruntime/src/abstractruntime/visualflow_compiler/compiler.py`: Visual Agent subworkflow vars and structured-output postpass carry the binding.
+  - `../abstractagent/src/abstractagent/adapters/generation_params.py`: Agent adapters forward `_runtime.prompt_cache_binding` into generated `LLM_CALL.params`.
+  - `pyproject.toml`: `apple` / `gpu` profiles now depend on `abstractgateway[apple|gpu]>=0.2.16` instead of naming `AbstractRuntime` or `abstractcore` directly.
+  - `web/backend/__init__.py` and `web/backend/routes/__init__.py`: local Runtime/Core compatibility imports are opt-in through `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME`.
+- Behavior changes: users can inspect/load durable prompt-cache bindings through Gateway operator routes without invoking hidden in-run bloc mutations. A loaded binding is displayed and copied into a visible `prompt_cache_binding` run input only, preserving graph/run explicitness.
+- Tests and validation:
+  - `pytest -q tests/test_frontend_gateway_contract.py tests/test_visual_llm_call_structured_output_pin.py tests/test_visual_agent_structured_output_pin.py`
+  - `PYTHONPATH=../abstractagent/src pytest -q ../abstractagent/tests/test_generation_params_media_policies.py`
+  - `npm run build` from `web/frontend`
+  - `python -m py_compile web/backend/routes/__init__.py web/backend/__init__.py`
+  - `python -m py_compile ../abstractruntime/src/abstractruntime/visualflow_compiler/visual/executor.py ../abstractruntime/src/abstractruntime/visualflow_compiler/compiler.py ../abstractagent/src/abstractagent/adapters/generation_params.py`
+- Residual risks: the Run Flow durable panel has source/contract coverage and build validation, but no browser interaction test. The end-to-end binding path spans Flow, Runtime, and AbstractAgent, so coordinated package releases are required before a published Flow build can depend on the new behavior.
+- ADR impact: None. The existing durable bloc/cache-binding ADR remains the governing lower-layer policy; this work implements the Flow UX and pass-through surface without changing the policy.
+- Follow-ups: add a browser-level test for durable bloc unavailable/loaded states when the frontend test harness supports Run Flow modal interaction; consider a future first-class bloc-preparation node only if Runtime later exposes a ledgered effect for it.

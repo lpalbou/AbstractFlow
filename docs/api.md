@@ -135,7 +135,19 @@ The React editor is a thin client for AbstractGateway's versioned discovery cont
 GET /api/gateway/discovery/capabilities
 ```
 
-It reads `capabilities.contracts.flow_editor` for VisualFlow CRUD/publish, run input schema, run start, ledger stream, artifact, and prompt-cache endpoints. The browser calls same-origin `/api/gateway/*`; the Flow static server/Vite/Python host proxy those requests to Gateway and inject the configured bearer token.
+It reads `capabilities.contracts.flow_editor` plus `capabilities.contracts.common` for VisualFlow CRUD/publish, run input schema, run start, ledger stream, artifact, and prompt-cache endpoints. Session prompt cache and durable bloc exact-reuse bindings are separate contract tracks (`common.prompt_cache.session_lifecycle` and `common.prompt_cache.durable_blocs`). Gateway catalog routes may return the canonical `gateway_catalog_v1` envelope (`catalog` metadata plus `items`) or older legacy arrays/maps; the editor normalizes both.
+
+When Gateway advertises `common.readiness.contract = gateway_surface_readiness_v1`, the editor uses that surface summary as a conservative overlay for optional media/model-residency UX. Endpoint descriptors remain the authority for actual request paths.
+
+Generated media is discovered through the Gateway contracts:
+- `assistant.media.generated_image`
+- `assistant.media.edited_image`
+- `assistant.media.generated_voice`
+- `assistant.media.generated_music`
+
+Model residency is discovered through `common.model_residency` and includes `music_generation` when the Gateway/runtime stack supports music warmup/list/unload semantics.
+
+The browser calls same-origin `/api/gateway/*`; the Flow static server/Vite/Python host proxy those requests to Gateway and inject the configured bearer token.
 
 Evidence: [../web/frontend/src/hooks/useGatewayCapabilities.ts](../web/frontend/src/hooks/useGatewayCapabilities.ts), [../web/frontend/src/utils/gatewayClient.ts](../web/frontend/src/utils/gatewayClient.ts), [../web/backend/main.py](../web/backend/main.py).
 

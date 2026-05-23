@@ -222,7 +222,10 @@ def create_visual_runner(
             "llm_call",
             "model_residency",
             "generate_image",
+            "edit_image",
+            "image_to_image",
             "generate_voice",
+            "generate_music",
             "transcribe_audio",
             "listen_voice",
             "tool_calls",
@@ -335,7 +338,19 @@ def create_visual_runner(
                 needs_registry = True
             if t in {"on_event", "emit_event"}:
                 needs_registry = True
-            if t in {"memory_note", "memory_query", "memory_rehydrate", "memory_compact", "generate_image", "generate_voice", "transcribe_audio", "listen_voice"}:
+            if t in {
+                "memory_note",
+                "memory_query",
+                "memory_rehydrate",
+                "memory_compact",
+                "generate_image",
+                "edit_image",
+                "image_to_image",
+                "generate_voice",
+                "generate_music",
+                "transcribe_audio",
+                "listen_voice",
+            }:
                 needs_artifacts = True
             if t in {"memory_kg_assert", "memory_kg_query"}:
                 needs_memory_kg = True
@@ -428,7 +443,19 @@ def create_visual_runner(
             node_type = _node_type(n)
             if reachable and n.id not in reachable:
                 continue
-            if node_type in {"llm_call", "agent", "tool_calls", "memory_compact", "model_residency", "generate_image", "generate_voice", "transcribe_audio"}:
+            if node_type in {
+                "llm_call",
+                "agent",
+                "tool_calls",
+                "memory_compact",
+                "model_residency",
+                "generate_image",
+                "edit_image",
+                "image_to_image",
+                "generate_voice",
+                "generate_music",
+                "transcribe_audio",
+            }:
                 has_llm_nodes = True
                 if node_type == "model_residency":
                     needs_model_residency = True
@@ -472,30 +499,59 @@ def create_visual_runner(
                 )
                 _add_pair(provider_default, model_default)
 
-            elif node_type in {"generate_image", "generate_voice", "transcribe_audio"}:
+            elif node_type in {
+                "generate_image",
+                "edit_image",
+                "image_to_image",
+                "generate_voice",
+                "generate_music",
+                "transcribe_audio",
+            }:
                 cfg = n.data.get("effectConfig", {}) if isinstance(n.data, dict) else {}
                 cfg = cfg if isinstance(cfg, dict) else {}
-                provider = cfg.get("runtime_provider") or cfg.get("runtimeProvider")
-                model = cfg.get("runtime_model") or cfg.get("runtimeModel")
+                scoped_provider_pin = {
+                    "generate_image": "image_provider",
+                    "edit_image": "image_provider",
+                    "image_to_image": "image_provider",
+                    "generate_voice": "tts_provider",
+                    "generate_music": "music_provider",
+                    "transcribe_audio": "stt_provider",
+                }.get(node_type, "runtime_provider")
+                scoped_model_pin = {
+                    "generate_image": "image_model",
+                    "edit_image": "image_model",
+                    "image_to_image": "image_model",
+                    "generate_voice": "tts_model",
+                    "generate_music": "music_model",
+                    "transcribe_audio": "stt_model",
+                }.get(node_type, "runtime_model")
+                provider = cfg.get("runtime_provider") or cfg.get("runtimeProvider") or cfg.get(scoped_provider_pin)
+                model = cfg.get("runtime_model") or cfg.get("runtimeModel") or cfg.get(scoped_model_pin)
 
                 provider_ok = isinstance(provider, str) and provider.strip()
                 model_ok = isinstance(model, str) and model.strip()
-                provider_connected = _pin_connected(vf, node_id=n.id, pin_id="runtime_provider")
-                model_connected = _pin_connected(vf, node_id=n.id, pin_id="runtime_model")
-                provider_default = (
-                    provider
-                    if provider_ok
-                    else _infer_connected_pin_default(vf, node_id=n.id, pin_id="runtime_provider")
-                    if provider_connected
-                    else None
+                provider_connected = _pin_connected(vf, node_id=n.id, pin_id="runtime_provider") or _pin_connected(
+                    vf, node_id=n.id, pin_id=scoped_provider_pin
                 )
-                model_default = (
-                    model
-                    if model_ok
-                    else _infer_connected_pin_default(vf, node_id=n.id, pin_id="runtime_model")
-                    if model_connected
-                    else None
+                model_connected = _pin_connected(vf, node_id=n.id, pin_id="runtime_model") or _pin_connected(
+                    vf, node_id=n.id, pin_id=scoped_model_pin
                 )
+                if provider_ok:
+                    provider_default = provider
+                elif provider_connected:
+                    provider_default = _infer_connected_pin_default(
+                        vf, node_id=n.id, pin_id="runtime_provider"
+                    ) or _infer_connected_pin_default(vf, node_id=n.id, pin_id=scoped_provider_pin)
+                else:
+                    provider_default = None
+                if model_ok:
+                    model_default = model
+                elif model_connected:
+                    model_default = _infer_connected_pin_default(
+                        vf, node_id=n.id, pin_id="runtime_model"
+                    ) or _infer_connected_pin_default(vf, node_id=n.id, pin_id=scoped_model_pin)
+                else:
+                    model_default = None
                 _add_pair(provider_default, model_default)
 
             elif node_type == "model_residency":
@@ -726,7 +782,7 @@ def create_visual_runner(
                 )
             else:
                 raise RuntimeError(
-                    "This flow uses AbstractCore-backed nodes (llm_call/agent/memory_compact/model_residency/generate_image/generate_voice/transcribe_audio), but no default provider/model could be determined. "
+                    "This flow uses AbstractCore-backed nodes (llm_call/agent/memory_compact/model_residency/media), but no default provider/model could be determined. "
                     "Set provider+model on an llm_call/agent/memory_compact node, set runtime_provider+runtime_model on a generated media node, or connect the corresponding runtime pins to a node with pinDefaults "
                     "(e.g. ON_FLOW_START), or pass `input_data={'provider': ..., 'model': ...}` when creating the runner."
                 )

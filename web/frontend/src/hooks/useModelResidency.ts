@@ -161,7 +161,7 @@ export function useLoadModelResidency(contracts: GatewayContracts | null | undef
   return useMutation({
     mutationFn: async (payload: ModelResidencyLoadPayload) => {
       const endpoint = endpointFromDescriptor(requireResidencyDescriptor(contracts, 'load'), '/models/load');
-      return normalizeModelResidencyResponse(await gatewayJson<unknown>(endpoint, jsonRequest(payload, { method: 'POST' })));
+      return normalizeModelResidencyResponse(await gatewayJson<unknown>(endpoint, { ...jsonRequest(payload, { method: 'POST' }), timeoutMs: 0 }));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['gateway', 'model-residency'] });
@@ -174,7 +174,7 @@ export function useUnloadModelResidency(contracts: GatewayContracts | null | und
   return useMutation({
     mutationFn: async (payload: ModelResidencyUnloadPayload) => {
       const endpoint = endpointFromDescriptor(requireResidencyDescriptor(contracts, 'unload'), '/models/unload');
-      return normalizeModelResidencyResponse(await gatewayJson<unknown>(endpoint, jsonRequest(payload, { method: 'POST' })));
+      return normalizeModelResidencyResponse(await gatewayJson<unknown>(endpoint, { ...jsonRequest(payload, { method: 'POST' }), timeoutMs: 0 }));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['gateway', 'model-residency'] });

@@ -1,6 +1,7 @@
 import type { Edge, Node } from 'reactflow';
 import type { FlowNodeData } from '../types/flow';
 import { createNodeData, getNodeTemplate } from '../types/nodes';
+import type { GatewayContracts } from './gatewayClient';
 
 export type ModelResidencyOperation = 'load' | 'unload';
 
@@ -24,6 +25,42 @@ export interface InsertModelResidencyStepResult {
   nodeId: string;
 }
 
+export function modelResidencyTaskLabel(task: string): string {
+  if (task === 'text_generation') return 'Text generation';
+  if (task === 'image_generation') return 'Image generation';
+  if (task === 'tts') return 'Speech';
+  if (task === 'stt') return 'Transcription';
+  if (task === 'music_generation') return 'Music generation';
+  return task.replace(/_/g, ' ');
+}
+
+export function modelResidencyTaskUnsupportedReason(
+  contracts: GatewayContracts | null | undefined,
+  task: string
+): string {
+  const cleanTask = String(task || '').trim();
+  if (!cleanTask) return '';
+  const residency =
+    contracts?.common?.model_residency ||
+    ((contracts?.flow_editor as Record<string, unknown> | undefined)?.model_residency as
+      | Record<string, unknown>
+      | undefined) ||
+    ((contracts?.assistant as Record<string, unknown> | undefined)?.model_residency as
+      | Record<string, unknown>
+      | undefined);
+  if (!residency || typeof residency !== 'object') return '';
+
+  const routeAvailable = (residency as Record<string, unknown>).route_available;
+  if (routeAvailable === false) {
+    return 'Model residency controls are not available on this Gateway runtime.';
+  }
+
+  // Task support can be stale or deployment-specific; Gateway remains the control
+  // boundary, so authoring should not disable warmup for media tasks when the
+  // Gateway model-residency route itself is available.
+  return '';
+}
+
 export function insertModelResidencyStep({
   nodes,
   edges,
@@ -38,9 +75,6 @@ export function insertModelResidencyStep({
 
   const provider = target.provider.trim();
   const model = target.model.trim();
-  if (!provider || !model) {
-    throw new Error('Select a concrete provider and model before adding a residency step.');
-  }
 
   const now = Date.now();
   const id = `node-residency-${operation}-${now}-${Math.random().toString(16).slice(2, 7)}`;
@@ -49,19 +83,19 @@ export function insertModelResidencyStep({
     ...(baseData.effectConfig || {}),
     operation,
     task: target.task,
-    provider,
-    model,
     required: false,
     ...(operation === 'load' ? { pin: true } : {}),
+    ...(provider ? { provider } : {}),
+    ...(model ? { model } : {}),
   };
   const pinDefaults = {
     ...(baseData.pinDefaults || {}),
     operation,
     task: target.task,
-    provider,
-    model,
     required: false,
     ...(operation === 'load' ? { pin: true } : {}),
+    ...(provider ? { provider } : {}),
+    ...(model ? { model } : {}),
   };
 
   const newNode: Node<FlowNodeData> = {

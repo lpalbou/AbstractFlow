@@ -12,6 +12,7 @@ export function NodePalette() {
   >({
     events: true,
     core: true,
+    media: true,
   });
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -89,7 +90,7 @@ export function NodePalette() {
               {(expandedCategories[key] || searchTerm) && (
                 <div className="category-nodes">
                   {filteredNodes.map((template) => (
-                    <AfTooltip key={template.type} content={template.description} delayMs={2000} priority={0} block>
+                    <AfTooltip key={`${template.type}:${template.label}`} content={template.description} delayMs={2000} priority={0} block>
                       <div
                         className="palette-node"
                         draggable

@@ -2,7 +2,7 @@
  * Node template definitions for the visual editor.
  */
 
-import type { NodeType, FlowNodeData, Pin } from './flow';
+import type { NodeType, FlowNodeData, JsonValue, Pin } from './flow';
 import { generatePythonTransformCode, upsertPythonAvailableVariablesComments } from '../utils/codegen';
 
 // Node template used in the palette
@@ -231,6 +231,13 @@ const CORE_NODES: NodeTemplate[] = [
 	      { id: 'system', label: 'system', type: 'string', description: 'Optional system prompt for this agent instance (high priority instructions).' },
 	      { id: 'prompt', label: 'prompt', type: 'string', description: 'User prompt/task string for the agent to solve.' },
 	      { id: 'tools', label: 'tools', type: 'tools', description: 'Allowlist of tool names this agent can call (defense-in-depth; runtime still enforces allowlists).' },
+	      {
+	        id: 'prompt_cache_binding',
+	        label: 'prompt_cache_binding',
+	        type: 'any',
+	        description:
+	          'Advanced: durable exact-reuse prompt-cache binding from Gateway blocs. Accepts a binding object or binding_id string; this does not create or load blocs during the run.',
+	      },
 	      { id: 'max_iterations', label: 'max_iterations', type: 'number', description: 'Maximum internal ReAct iterations (safety cap). Higher values allow more tool-use steps.' },
 		      {
 		        id: 'max_in_tokens',
@@ -332,6 +339,13 @@ const CORE_NODES: NodeTemplate[] = [
 	      { id: 'system', label: 'system', type: 'string', description: 'Optional system prompt for this single call.' },
 	      { id: 'prompt', label: 'prompt', type: 'string', description: 'User prompt/content for this single call.' },
 	      { id: 'tools', label: 'tools', type: 'tools', description: 'Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node).' },
+	      {
+	        id: 'prompt_cache_binding',
+	        label: 'prompt_cache_binding',
+	        type: 'any',
+	        description:
+	          'Advanced: durable exact-reuse prompt-cache binding from Gateway blocs. Accepts a binding object or binding_id string; this does not create or load blocs during the run.',
+	      },
 		      {
 		        id: 'max_in_tokens',
 		        label: 'max_in_tokens',
@@ -368,7 +382,7 @@ const CORE_NODES: NodeTemplate[] = [
     type: 'model_residency',
     icon: '&#x25EB;',
     label: 'Load / Unload Model',
-    description: 'Model residency controls for listing, warming, or unloading Gateway/Core resident models. Load keeps the model warm by default; unload is explicit.',
+    description: 'Gateway model residency controls for listing, warming, or unloading resident models. Load keeps the model warm by default; unload is explicit.',
     headerColor: '#14B8A6',
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
@@ -398,7 +412,7 @@ const CORE_NODES: NodeTemplate[] = [
     type: 'generate_image',
     icon: '&#x1F5BC;',
     label: 'Generate Image',
-    description: 'Generate an image through the Gateway/Core vision capability and return an artifact reference.',
+    description: 'Generate an image through Gateway vision capability and return an artifact reference.',
     headerColor: '#0EA5A4',
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
@@ -427,10 +441,74 @@ const CORE_NODES: NodeTemplate[] = [
     category: 'media',
   },
   {
+    type: 'edit_image',
+    icon: '&#x1F58C;',
+    label: 'Edit Image',
+    description: 'Edit or transform an input image through Gateway image editing and return an image artifact.',
+    headerColor: '#0EA5A4',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'prompt', label: 'prompt', type: 'string', description: 'Instruction for the image edit.' },
+      { id: 'image_artifact', label: 'image_artifact', type: 'object', description: 'Source image artifact ref. Wire from Generate Image, or use an uploaded/selected artifact.' },
+      { id: 'mask_artifact', label: 'mask_artifact', type: 'object', description: 'Optional mask artifact ref.' },
+      { id: 'image_provider', label: 'provider', type: 'provider_image', description: 'Optional image edit provider/backend.' },
+      { id: 'image_model', label: 'model', type: 'model', description: 'Optional image edit model id for the selected provider.' },
+      { id: 'size', label: 'size', type: 'string', description: 'Optional size like 1024x1024.' },
+      { id: 'width', label: 'width', type: 'number' },
+      { id: 'height', label: 'height', type: 'number' },
+      { id: 'format', label: 'format', type: 'string', description: 'png, jpg, or webp.' },
+      { id: 'seed', label: 'seed', type: 'number' },
+      { id: 'steps', label: 'steps', type: 'number' },
+      { id: 'guidance_scale', label: 'guidance', type: 'number' },
+      { id: 'strength', label: 'strength', type: 'number', description: 'Optional edit strength for image-to-image backends.' },
+      { id: 'negative_prompt', label: 'negative', type: 'string' },
+      { id: 'extra', label: 'extra', type: 'object', description: 'Optional provider-specific image edit options.' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'image_artifact', label: 'image_artifact', type: 'object', description: 'Artifact ref for the edited image.' },
+      { id: 'artifact_ref', label: 'artifact_ref', type: 'object' },
+      { id: 'artifact_id', label: 'artifact_id', type: 'string' },
+      { id: 'content_type', label: 'content_type', type: 'string' },
+      { id: 'outputs', label: 'outputs', type: 'object' },
+      { id: 'meta', label: 'meta', type: 'object' },
+      { id: 'success', label: 'success', type: 'boolean' },
+    ],
+    category: 'media',
+  },
+  {
+    type: 'image_to_image',
+    icon: '&#x1F58C;',
+    label: 'Image To Image',
+    description: 'Compatibility alias for Edit Image.',
+    headerColor: '#0EA5A4',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'prompt', label: 'prompt', type: 'string' },
+      { id: 'source_image', label: 'source_image', type: 'object' },
+      { id: 'image_provider', label: 'provider', type: 'provider_image' },
+      { id: 'image_model', label: 'model', type: 'model' },
+      { id: 'strength', label: 'strength', type: 'number' },
+      { id: 'format', label: 'format', type: 'string' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'image_artifact', label: 'image_artifact', type: 'object' },
+      { id: 'artifact_ref', label: 'artifact_ref', type: 'object' },
+      { id: 'artifact_id', label: 'artifact_id', type: 'string' },
+      { id: 'content_type', label: 'content_type', type: 'string' },
+      { id: 'outputs', label: 'outputs', type: 'object' },
+      { id: 'meta', label: 'meta', type: 'object' },
+      { id: 'success', label: 'success', type: 'boolean' },
+    ],
+    category: 'media',
+    hiddenInPalette: true,
+  },
+  {
     type: 'generate_voice',
     icon: '&#x1F50A;',
     label: 'Generate Voice',
-    description: 'Generate speech audio through the Gateway/Core voice capability and return an audio artifact.',
+    description: 'Generate speech audio through Gateway voice capability and return an audio artifact.',
     headerColor: '#0EA5A4',
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
@@ -457,10 +535,57 @@ const CORE_NODES: NodeTemplate[] = [
     category: 'media',
   },
   {
+    type: 'generate_music',
+    icon: '&#x1F3B5;',
+    label: 'Generate Music',
+    description: 'Generate music through Gateway music capability and return an audio artifact.',
+    headerColor: '#0EA5A4',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'prompt', label: 'prompt', type: 'string', description: 'Music prompt.' },
+      { id: 'music_provider', label: 'provider', type: 'provider_music', description: 'Optional Gateway music backend/provider.' },
+      { id: 'music_model', label: 'model', type: 'model', description: 'Optional music model id for the selected music provider.' },
+      { id: 'lyrics', label: 'lyrics', type: 'string', description: 'Optional lyrics for vocal music backends.' },
+      { id: 'duration_s', label: 'duration_s', type: 'number', description: 'Optional requested duration in seconds.' },
+      { id: 'format', label: 'format', type: 'string', description: 'wav, mp3, or flac.' },
+      { id: 'seed', label: 'seed', type: 'number' },
+      { id: 'num_inference_steps', label: 'steps', type: 'number' },
+      { id: 'guidance_scale', label: 'guidance', type: 'number' },
+      { id: 'instrumental', label: 'instrumental', type: 'boolean' },
+      { id: 'enhance_prompt', label: 'enhance', type: 'boolean' },
+      { id: 'structure_prompt', label: 'structure', type: 'boolean' },
+      { id: 'auto_lyrics', label: 'auto_lyrics', type: 'boolean' },
+      { id: 'text_planner_mode', label: 'planner', type: 'string' },
+      { id: 'vocal_language', label: 'language', type: 'string' },
+      { id: 'negative_prompt', label: 'negative', type: 'string' },
+      { id: 'sample_rate', label: 'sample_rate', type: 'number' },
+      { id: 'bpm', label: 'bpm', type: 'number' },
+      { id: 'keyscale', label: 'key', type: 'string' },
+      { id: 'timesignature', label: 'time', type: 'string' },
+      { id: 'composition_plan', label: 'plan', type: 'object' },
+      { id: 'positive_styles', label: 'styles', type: 'array' },
+      { id: 'negative_styles', label: 'avoid_styles', type: 'array' },
+      { id: 'planning', label: 'planning', type: 'boolean' },
+      { id: 'extra', label: 'extra', type: 'object', description: 'Optional provider-specific music-generation options.' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'music_artifact', label: 'music_artifact', type: 'object', description: 'Artifact ref for generated music.' },
+      { id: 'audio_artifact', label: 'audio_artifact', type: 'object', description: 'Alias artifact ref for audio-compatible downstream nodes.' },
+      { id: 'artifact_ref', label: 'artifact_ref', type: 'object' },
+      { id: 'artifact_id', label: 'artifact_id', type: 'string' },
+      { id: 'content_type', label: 'content_type', type: 'string' },
+      { id: 'outputs', label: 'outputs', type: 'object' },
+      { id: 'meta', label: 'meta', type: 'object' },
+      { id: 'success', label: 'success', type: 'boolean' },
+    ],
+    category: 'media',
+  },
+  {
     type: 'transcribe_audio',
     icon: '&#x1F399;',
     label: 'Transcribe Audio',
-    description: 'Transcribe an audio artifact through Gateway/Core audio capability.',
+    description: 'Transcribe an audio artifact through Gateway audio capability.',
     headerColor: '#0EA5A4',
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
@@ -1199,6 +1324,59 @@ const LITERAL_NODES: NodeTemplate[] = [
   },
 ];
 
+const ARTIFACT_LITERAL_NODES: NodeTemplate[] = [
+  {
+    type: 'literal_json',
+    icon: '&#x1F4DD;',
+    label: 'Text Artifact',
+    description: 'Artifact reference object for a text/plain Gateway artifact. Paste an uploaded or generated artifact id into $artifact.',
+    headerColor: '#64748B',
+    inputs: [],
+    outputs: [{ id: 'value', label: 'text_artifact', type: 'object' }],
+    category: 'artifacts',
+  },
+  {
+    type: 'literal_json',
+    icon: '&#x1F5BC;',
+    label: 'Image Artifact',
+    description: 'Artifact reference object for an image Gateway artifact. Wire this into Edit Image image_artifact or mask_artifact.',
+    headerColor: '#19D3B8',
+    inputs: [],
+    outputs: [{ id: 'value', label: 'image_artifact', type: 'object' }],
+    category: 'artifacts',
+  },
+  {
+    type: 'literal_json',
+    icon: '&#x1F50A;',
+    label: 'Voice Artifact',
+    description: 'Artifact reference object for a speech/audio Gateway artifact.',
+    headerColor: '#22D3EE',
+    inputs: [],
+    outputs: [{ id: 'value', label: 'voice_artifact', type: 'object' }],
+    category: 'artifacts',
+  },
+  {
+    type: 'literal_json',
+    icon: '&#x1F3B5;',
+    label: 'Music Artifact',
+    description: 'Artifact reference object for a music/audio Gateway artifact.',
+    headerColor: '#F59E0B',
+    inputs: [],
+    outputs: [{ id: 'value', label: 'music_artifact', type: 'object' }],
+    category: 'artifacts',
+  },
+  {
+    type: 'literal_json',
+    icon: '&#x1F3AC;',
+    label: 'Video Artifact',
+    description: 'Artifact reference object for a video Gateway artifact.',
+    headerColor: '#A855F7',
+    inputs: [],
+    outputs: [{ id: 'value', label: 'video_artifact', type: 'object' }],
+    category: 'artifacts',
+  },
+];
+
 // Memory nodes - Durable memory operations + file IO.
 // These nodes have execution pins and represent side effects users conceptually associate with "Memory / IO".
 const MEMORY_NODES: NodeTemplate[] = [
@@ -1489,6 +1667,9 @@ const PALETTE_DATA_NODES: NodeTemplate[] = [
   ...DATA_NODES.map((n) => ({ ...n, category: 'data' })),
 ];
 
+const PALETTE_CORE_NODES: NodeTemplate[] = CORE_NODES.filter((n) => n.category !== 'media');
+const MEDIA_NODES: NodeTemplate[] = CORE_NODES.filter((n) => n.category === 'media');
+
 // All categories
 export const NODE_CATEGORIES: Record<string, NodeCategory> = {
   events: {
@@ -1499,7 +1680,12 @@ export const NODE_CATEGORIES: Record<string, NodeCategory> = {
   core: {
     label: 'Core',
     icon: '&#x26A1;', // Lightning
-    nodes: CORE_NODES,
+    nodes: PALETTE_CORE_NODES,
+  },
+  media: {
+    label: 'Media',
+    icon: '&#x1F3A8;', // Palette/media
+    nodes: MEDIA_NODES,
   },
   memory: {
     label: 'Memory',
@@ -1515,6 +1701,11 @@ export const NODE_CATEGORIES: Record<string, NodeCategory> = {
     label: 'Literals',
     icon: '&#x270F;', // Pencil - constants/values
     nodes: LITERAL_NODES,
+  },
+  artifacts: {
+    label: 'Artifacts',
+    icon: '&#x1F4CE;', // Paperclip
+    nodes: ARTIFACT_LITERAL_NODES,
   },
   variables: {
     label: 'Variables',
@@ -1555,6 +1746,15 @@ export function getNodeTemplate(type: NodeType): NodeTemplate | undefined {
   return NODE_TEMPLATE_BY_TYPE.get(type);
 }
 
+function artifactLiteralDefault(label: string): Record<string, JsonValue> | null {
+  if (label === 'text_artifact') return { $artifact: '', content_type: 'text/plain', modality: 'text' };
+  if (label === 'image_artifact') return { $artifact: '', content_type: 'image/png', modality: 'image' };
+  if (label === 'voice_artifact') return { $artifact: '', content_type: 'audio/wav', modality: 'voice' };
+  if (label === 'music_artifact') return { $artifact: '', content_type: 'audio/wav', modality: 'music' };
+  if (label === 'video_artifact') return { $artifact: '', content_type: 'video/mp4', modality: 'video' };
+  return null;
+}
+
 // Create default node data from template
 export function createNodeData(template: NodeTemplate): FlowNodeData {
   const defaultCodeBodyBase = 'return input';
@@ -1585,7 +1785,7 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
         required: false,
       },
     }),
-    ...(template.type === 'generate_image' && {
+    ...((template.type === 'generate_image' || template.type === 'edit_image' || template.type === 'image_to_image') && {
       pinDefaults: {
         format: 'png',
         width: 512,
@@ -1599,6 +1799,11 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
         format: 'wav',
         quality_preset: 'standard',
         speed: 1.0,
+      },
+    }),
+    ...(template.type === 'generate_music' && {
+      pinDefaults: {
+        format: 'wav',
       },
     }),
     ...(template.type === 'transcribe_audio' && {
@@ -1642,6 +1847,12 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
           kg_max_out_tokens: 0,
         },
       }),
+    ...(template.type === 'literal_json' &&
+      (() => {
+        const output = template.outputs.find((p) => artifactLiteralDefault(p.label));
+        const value = output ? artifactLiteralDefault(output.label) : null;
+        return value ? { literalValue: value } : {};
+      })()),
     ...(template.type === 'json_schema' && {
       literalValue: {
         type: 'object',

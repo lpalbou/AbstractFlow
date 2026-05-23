@@ -13,8 +13,40 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+function isNonEmptyObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length > 0);
+}
+
 function inputConnected(edges: Edge[], nodeId: string, handleId: string): boolean {
   return edges.some((e) => e.target === nodeId && e.targetHandle === handleId);
+}
+
+function configValue(node: Node<FlowNodeData>, key: string): unknown {
+  const effect = node.data.effectConfig as Record<string, unknown> | undefined;
+  const defaults = node.data.pinDefaults as Record<string, unknown> | undefined;
+  return effect?.[key] ?? defaults?.[key];
+}
+
+function stringInputPresent(edges: Edge[], node: Node<FlowNodeData>, ...handles: string[]): boolean {
+  for (const handle of handles) {
+    if (inputConnected(edges, node.id, handle)) return true;
+    if (isNonEmptyString(configValue(node, handle))) return true;
+  }
+  return false;
+}
+
+function artifactInputPresent(edges: Edge[], node: Node<FlowNodeData>, ...handles: string[]): boolean {
+  for (const handle of handles) {
+    if (inputConnected(edges, node.id, handle)) return true;
+    const value = configValue(node, handle);
+    if (isNonEmptyString(value)) return true;
+    if (isNonEmptyObject(value)) {
+      if (isNonEmptyString(value.$artifact) || isNonEmptyString(value.artifact_id) || isNonEmptyString(value.id)) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 function pinTypeOf(node: Node<FlowNodeData>, handleId: string, isInput: boolean): string | null {
@@ -95,6 +127,29 @@ export function computeRunPreflightIssues(
       if (!providerOk) push(n, 'Missing required field: provider');
       if (!modelOk) push(n, 'Missing required field: model');
     }
+
+    if (t === 'generate_image') {
+      if (!stringInputPresent(edges, n, 'prompt')) push(n, 'Missing required input: prompt');
+    }
+
+    if (t === 'edit_image' || t === 'image_to_image') {
+      if (!stringInputPresent(edges, n, 'prompt')) push(n, 'Missing required input: prompt');
+      if (!artifactInputPresent(edges, n, 'image_artifact', 'source_image')) {
+        push(n, 'Missing required input: image_artifact');
+      }
+    }
+
+    if (t === 'generate_voice') {
+      if (!stringInputPresent(edges, n, 'text')) push(n, 'Missing required input: text');
+    }
+
+    if (t === 'generate_music') {
+      if (!stringInputPresent(edges, n, 'prompt')) push(n, 'Missing required input: prompt');
+    }
+
+    if (t === 'transcribe_audio') {
+      if (!artifactInputPresent(edges, n, 'audio_artifact')) push(n, 'Missing required input: audio_artifact');
+    }
   }
 
   // Stable ordering: node label then message (keeps UX consistent).
@@ -106,7 +161,6 @@ export function computeRunPreflightIssues(
   });
   return issues;
 }
-
 
 
 

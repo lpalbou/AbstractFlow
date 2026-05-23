@@ -133,4 +133,57 @@ def test_visual_llm_call_response_schema_wrapper_is_normalized() -> None:
     assert payload.get("response_schema") == schema
 
 
+def test_visual_llm_call_prompt_cache_binding_pin_is_forwarded_to_params() -> None:
+    binding: Dict[str, Any] = {"binding_id": "bind-1", "key": "work:orbit"}
+
+    visual = VisualFlow(
+        id="vf",
+        name="vf",
+        entryNode="start",
+        nodes=[
+            VisualNode(id="start", type=NodeType.ON_FLOW_START, position=Position(x=0, y=0), data={}),
+            VisualNode(
+                id="prompt",
+                type=NodeType.LITERAL_STRING,
+                position=Position(x=0, y=0),
+                data={"literalValue": "Use the durable prefix."},
+            ),
+            VisualNode(
+                id="binding",
+                type=NodeType.LITERAL_JSON,
+                position=Position(x=0, y=0),
+                data={"literalValue": binding},
+            ),
+            VisualNode(
+                id="llm",
+                type=NodeType.LLM_CALL,
+                position=Position(x=0, y=0),
+                data={"effectConfig": {"provider": "lmstudio", "model": "unit-test-model", "temperature": 0.0}},
+            ),
+        ],
+        edges=[
+            VisualEdge(id="e1", source="start", sourceHandle="exec-out", target="llm", targetHandle="exec-in"),
+            VisualEdge(id="d1", source="prompt", sourceHandle="value", target="llm", targetHandle="prompt"),
+            VisualEdge(id="d2", source="binding", sourceHandle="value", target="llm", targetHandle="prompt_cache_binding"),
+        ],
+    )
+
+    flow = visual_to_flow(visual)
+    spec = compile_flow(flow)
+
+    run = RunState(
+        run_id="r1",
+        workflow_id=spec.workflow_id,
+        status=RunStatus.RUNNING,
+        current_node="llm",
+        vars={},
+    )
+    plan = spec.get_node("llm")(run, _dummy_ctx())
+
+    assert plan.effect is not None
+    payload = dict(plan.effect.payload or {})
+    params = payload.get("params")
+    assert isinstance(params, dict)
+    assert params.get("prompt_cache_binding") == binding
+
 

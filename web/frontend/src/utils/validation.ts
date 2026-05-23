@@ -13,14 +13,15 @@ function edgeData(edge: Edge): Record<string, unknown> {
   return edge.data && typeof edge.data === 'object' && !Array.isArray(edge.data) ? (edge.data as Record<string, unknown>) : {};
 }
 
-const PROVIDER_PIN_TYPES = new Set<PinType>(['provider', 'provider_text', 'provider_image', 'provider_voice']);
-const MODEL_PIN_TYPES = new Set<PinType>(['model', 'model_text', 'model_image', 'model_voice']);
+const PROVIDER_PIN_TYPES = new Set<PinType>(['provider', 'provider_text', 'provider_image', 'provider_voice', 'provider_music']);
+const MODEL_PIN_TYPES = new Set<PinType>(['model', 'model_text', 'model_image', 'model_voice', 'model_music']);
 
-function providerScope(type: PinType): 'text' | 'image' | 'voice' | 'legacy' | null {
+function providerScope(type: PinType): 'text' | 'image' | 'voice' | 'music' | 'legacy' | null {
   if (type === 'provider') return 'legacy';
   if (type === 'provider_text') return 'text';
   if (type === 'provider_image') return 'image';
   if (type === 'provider_voice') return 'voice';
+  if (type === 'provider_music') return 'music';
   return null;
 }
 

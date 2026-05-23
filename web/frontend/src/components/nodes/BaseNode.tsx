@@ -23,7 +23,11 @@ import { upsertPythonAvailableVariablesComments } from '../../utils/codegen';
 import AfSelect from '../inputs/AfSelect';
 import AfMultiSelect from '../inputs/AfMultiSelect';
 import { gatewayJson, gatewayPath } from '../../utils/gatewayClient';
-import { insertModelResidencyStep, type ModelResidencyOperation } from '../../utils/modelResidencyGraph';
+import {
+  insertModelResidencyStep,
+  modelResidencyTaskUnsupportedReason,
+  type ModelResidencyOperation,
+} from '../../utils/modelResidencyGraph';
 import {
   applyImagePinDefaultPatch,
   extractImageModelParameterMetadata,
@@ -47,12 +51,13 @@ import {
 type SelectOption = { value: string; label: string };
 type MediaModelOption = { provider: string; model: string; label: string; scopeModel?: string } & MediaModelParameterMetadata;
 type ProviderOptionMap = Record<string, SelectOption[]>;
-type MediaCatalogScope = 'image' | 'tts' | 'stt';
+type MediaCatalogScope = 'image' | 'tts' | 'stt' | 'music';
 type MediaCatalogRequest = {
   seq: number;
   scope: MediaCatalogScope;
   provider?: string;
   model?: string;
+  task?: string;
   providersOnly?: boolean;
   includeProviders?: boolean;
 };
@@ -66,6 +71,7 @@ const DEFAULT_TTS_QUALITY_PRESETS: SelectOption[] = [
 ];
 const OPENAI_TTS_FORMATS = ['mp3', 'opus', 'aac', 'flac', 'wav', 'pcm'];
 const DEFAULT_STT_FORMATS = ['json', 'text', 'verbose_json', 'srt', 'vtt'];
+const DEFAULT_MUSIC_FORMATS = ['wav', 'mp3', 'flac'];
 
 function formatOptionsFrom(values: unknown, fallback: string[]): SelectOption[] {
   const raw = Array.isArray(values) ? values : fallback;
@@ -340,8 +346,10 @@ const VarDeclInline = memo(function VarDeclInline({
     { value: 'provider_text', label: 'provider_text' },
     { value: 'provider_image', label: 'provider_image' },
     { value: 'provider_voice', label: 'provider_voice' },
+    { value: 'provider_music', label: 'provider_music' },
     { value: 'provider', label: 'provider (legacy)' },
     { value: 'model', label: 'model' },
+    { value: 'model_music', label: 'model_music' },
     { value: 'object', label: 'object' },
     { value: 'assertion', label: 'assertion' },
     { value: 'assertions', label: 'assertion[]' },
@@ -404,7 +412,9 @@ const VarDeclInline = memo(function VarDeclInline({
       varType === 'provider_image' ||
       varType === 'model_image' ||
       varType === 'provider_voice' ||
-      varType === 'model_voice'
+      varType === 'model_voice' ||
+      varType === 'provider_music' ||
+      varType === 'model_music'
     ) {
       return (
         <input
@@ -622,6 +632,8 @@ export const BaseNode = memo(function BaseNode({
             t === 'model_image' ||
             t === 'provider_voice' ||
             t === 'model_voice' ||
+            t === 'provider_music' ||
+            t === 'model_music' ||
             t === 'object' ||
             t === 'assertion' ||
             t === 'assertions' ||
@@ -799,8 +811,31 @@ export const BaseNode = memo(function BaseNode({
   const inputExec = isTriggerNode ? undefined : data.inputs.find((p) => p.type === 'execution');
   const outputExecs = data.outputs.filter((p) => p.type === 'execution');
   const isEmitEventNode = data.nodeType === 'emit_event';
+  const advancedMusicInputPins = new Set([
+    'seed',
+    'num_inference_steps',
+    'guidance_scale',
+    'enhance_prompt',
+    'structure_prompt',
+    'auto_lyrics',
+    'text_planner_mode',
+    'vocal_language',
+    'negative_prompt',
+    'sample_rate',
+    'bpm',
+    'keyscale',
+    'timesignature',
+    'composition_plan',
+    'positive_styles',
+    'negative_styles',
+    'planning',
+    'extra',
+  ]);
   const inputData = data.inputs.filter((p) => {
     if (p.type === 'execution') return false;
+    if (data.nodeType === 'generate_music' && advancedMusicInputPins.has(p.id) && !isPinConnected(p.id, true)) {
+      return false;
+    }
     // `profile` is still a real override pin, but showing both voice and profile
     // unconnected makes TTS look like it needs two voice selectors. Keep the
     // advanced profile override available only when a wire explicitly targets it.
@@ -850,10 +885,12 @@ export const BaseNode = memo(function BaseNode({
   const isProviderModelsNode = data.nodeType === 'provider_models';
   const isModelResidencyNode = data.nodeType === 'model_residency';
   const isGenerateImageNode = data.nodeType === 'generate_image';
+  const isEditImageNode = data.nodeType === 'edit_image' || data.nodeType === 'image_to_image';
   const isGenerateVoiceNode = data.nodeType === 'generate_voice';
+  const isGenerateMusicNode = data.nodeType === 'generate_music';
   const isTranscribeAudioNode = data.nodeType === 'transcribe_audio';
   const isListenVoiceNode = data.nodeType === 'listen_voice';
-  const isMediaNode = isGenerateImageNode || isGenerateVoiceNode || isTranscribeAudioNode || isListenVoiceNode;
+  const isMediaNode = isGenerateImageNode || isEditImageNode || isGenerateVoiceNode || isGenerateMusicNode || isTranscribeAudioNode || isListenVoiceNode;
   const isDelayNode = data.nodeType === 'wait_until';
   const isOnEventNode = data.nodeType === 'on_event';
   const isOnScheduleNode = data.nodeType === 'on_schedule';
@@ -900,29 +937,35 @@ export const BaseNode = memo(function BaseNode({
       : subflowHasModelPin
         ? pinnedModel
         : '';
+  const wantsResidencyCapabilities = isLlmNode || isAgentNode || isMediaNode || isModelResidencyNode;
+  const mediaCapabilitiesQuery = useGatewayCapabilities(wantsResidencyCapabilities);
+  const gatewayContracts = gatewayContractsFromCapabilities(mediaCapabilitiesQuery.data);
   const residencyAuthoringTarget = useMemo(() => {
     if (isLlmNode) {
       const blocked = providerConnected || modelConnected;
+      const unsupportedReason = modelResidencyTaskUnsupportedReason(gatewayContracts, 'text_generation');
       return {
         task: 'text_generation',
         provider: blocked ? '' : firstConfigString(data.effectConfig?.provider, pinDefaults.provider),
         model: blocked ? '' : firstConfigString(data.effectConfig?.model, pinDefaults.model),
-        blockedReason: blocked ? 'Dynamic provider/model is wired from pins.' : '',
+        blockedReason: blocked ? 'Dynamic provider/model is wired from pins.' : unsupportedReason,
       };
     }
     if (isAgentNode) {
       const blocked = providerConnected || modelConnected;
+      const unsupportedReason = modelResidencyTaskUnsupportedReason(gatewayContracts, 'text_generation');
       return {
         task: 'text_generation',
         provider: blocked ? '' : firstConfigString(data.agentConfig?.provider, pinDefaults.provider),
         model: blocked ? '' : firstConfigString(data.agentConfig?.model, pinDefaults.model),
-        blockedReason: blocked ? 'Dynamic provider/model is wired from pins.' : '',
+        blockedReason: blocked ? 'Dynamic provider/model is wired from pins.' : unsupportedReason,
       };
     }
-    if (isGenerateImageNode) {
+    if (isGenerateImageNode || isEditImageNode) {
       const providerBlocked = isPinConnected('image_provider', true);
       const modelBlocked = isPinConnected('image_model', true);
       const blocked = providerBlocked || modelBlocked;
+      const unsupportedReason = modelResidencyTaskUnsupportedReason(gatewayContracts, 'image_generation');
       return {
         task: 'image_generation',
         provider: blocked
@@ -931,13 +974,14 @@ export const BaseNode = memo(function BaseNode({
         model: blocked
           ? ''
           : firstConfigString(data.effectConfig?.image_model, pinDefaults.image_model, data.effectConfig?.model, pinDefaults.model),
-        blockedReason: blocked ? 'Dynamic image provider/model is wired from pins.' : '',
+        blockedReason: blocked ? 'Dynamic image provider/model is wired from pins.' : unsupportedReason,
       };
     }
     if (isGenerateVoiceNode) {
       const providerBlocked = isPinConnected('tts_provider', true);
       const modelBlocked = isPinConnected('tts_model', true);
       const blocked = providerBlocked || modelBlocked;
+      const unsupportedReason = modelResidencyTaskUnsupportedReason(gatewayContracts, 'tts');
       return {
         task: 'tts',
         provider: blocked
@@ -946,13 +990,30 @@ export const BaseNode = memo(function BaseNode({
         model: blocked
           ? ''
           : firstConfigString(data.effectConfig?.tts_model, pinDefaults.tts_model, data.effectConfig?.model, pinDefaults.model),
-        blockedReason: blocked ? 'Dynamic voice provider/model is wired from pins.' : '',
+        blockedReason: blocked ? 'Dynamic voice provider/model is wired from pins.' : unsupportedReason,
+      };
+    }
+    if (isGenerateMusicNode) {
+      const providerBlocked = isPinConnected('music_provider', true);
+      const modelBlocked = isPinConnected('music_model', true);
+      const blocked = providerBlocked || modelBlocked;
+      const unsupportedReason = modelResidencyTaskUnsupportedReason(gatewayContracts, 'music_generation');
+      return {
+        task: 'music_generation',
+        provider: blocked
+          ? ''
+          : firstConfigString(data.effectConfig?.music_provider, pinDefaults.music_provider, data.effectConfig?.provider, pinDefaults.provider),
+        model: blocked
+          ? ''
+          : firstConfigString(data.effectConfig?.music_model, pinDefaults.music_model, data.effectConfig?.model, pinDefaults.model),
+        blockedReason: blocked ? 'Dynamic music provider/model is wired from pins.' : unsupportedReason,
       };
     }
     if (isTranscribeAudioNode || isListenVoiceNode) {
       const providerBlocked = isPinConnected('stt_provider', true);
       const modelBlocked = isPinConnected('stt_model', true);
       const blocked = providerBlocked || modelBlocked;
+      const unsupportedReason = modelResidencyTaskUnsupportedReason(gatewayContracts, 'stt');
       return {
         task: 'stt',
         provider: blocked
@@ -961,7 +1022,7 @@ export const BaseNode = memo(function BaseNode({
         model: blocked
           ? ''
           : firstConfigString(data.effectConfig?.stt_model, pinDefaults.stt_model, data.effectConfig?.model, pinDefaults.model),
-        blockedReason: blocked ? 'Dynamic transcription provider/model is wired from pins.' : '',
+        blockedReason: blocked ? 'Dynamic transcription provider/model is wired from pins.' : unsupportedReason,
       };
     }
     return null;
@@ -971,13 +1032,18 @@ export const BaseNode = memo(function BaseNode({
     data.effectConfig?.image_model,
     data.effectConfig?.image_provider,
     data.effectConfig?.model,
+    data.effectConfig?.music_model,
+    data.effectConfig?.music_provider,
     data.effectConfig?.provider,
     data.effectConfig?.stt_model,
     data.effectConfig?.stt_provider,
     data.effectConfig?.tts_model,
     data.effectConfig?.tts_provider,
+    gatewayContracts,
     isAgentNode,
+    isEditImageNode,
     isGenerateImageNode,
+    isGenerateMusicNode,
     isGenerateVoiceNode,
     isListenVoiceNode,
     isLlmNode,
@@ -986,6 +1052,8 @@ export const BaseNode = memo(function BaseNode({
     pinDefaults.image_model,
     pinDefaults.image_provider,
     pinDefaults.model,
+    pinDefaults.music_model,
+    pinDefaults.music_provider,
     pinDefaults.provider,
     pinDefaults.stt_model,
     pinDefaults.stt_provider,
@@ -1001,11 +1069,12 @@ export const BaseNode = memo(function BaseNode({
       const target = residencyAuthoringTarget;
       if (!target) return;
       if (target.blockedReason) {
-        toast.error(`${target.blockedReason} Add a dedicated Model Residency node for explicit control.`);
-        return;
-      }
-      if (!target.provider || !target.model) {
-        toast.error('Select a concrete provider and model before adding a residency step.');
+        const dynamicReason = target.blockedReason.startsWith('Dynamic ');
+        toast.error(
+          dynamicReason
+            ? `${target.blockedReason} Add a dedicated Model Residency node for explicit control.`
+            : target.blockedReason
+        );
         return;
       }
       const selectedNode = allNodes.find((n) => n.id === id);
@@ -1049,6 +1118,8 @@ export const BaseNode = memo(function BaseNode({
         : 'standard';
   const selectedSttProvider = firstConfigString(data.effectConfig?.stt_provider, pinDefaults.stt_provider, pinDefaults.provider_voice);
   const selectedSttModel = firstConfigString(data.effectConfig?.stt_model, pinDefaults.stt_model, pinDefaults.model_voice);
+  const selectedMusicProvider = firstConfigString(data.effectConfig?.music_provider, pinDefaults.music_provider, pinDefaults.provider_music);
+  const selectedMusicModel = firstConfigString(data.effectConfig?.music_model, pinDefaults.music_model, pinDefaults.model_music);
   const selectedResidencyOperation = firstConfigString(data.effectConfig?.operation, pinDefaults.operation) || 'load';
   const selectedResidencyTask = firstConfigString(data.effectConfig?.task, pinDefaults.task) || 'image_generation';
   const selectedResidencyProvider = firstConfigString(data.effectConfig?.provider, pinDefaults.provider);
@@ -1066,16 +1137,37 @@ export const BaseNode = memo(function BaseNode({
         ? pinDefaults.required
         : false;
 
-  const mediaCapabilitiesQuery = useGatewayCapabilities(isMediaNode || isModelResidencyNode);
-  const gatewayContracts = gatewayContractsFromCapabilities(mediaCapabilitiesQuery.data);
   const generatedImageContract =
     gatewayContracts?.flow_editor?.media?.generated_image || gatewayContracts?.assistant?.media?.generated_image;
+  const editedImageContract =
+    gatewayContracts?.flow_editor?.media?.edited_image || gatewayContracts?.assistant?.media?.edited_image;
   const generatedVoiceContract =
     gatewayContracts?.flow_editor?.media?.generated_voice || gatewayContracts?.assistant?.media?.generated_voice;
+  const generatedMusicContract =
+    gatewayContracts?.flow_editor?.media?.generated_music || gatewayContracts?.assistant?.media?.generated_music;
   const mediaDiscovery = gatewayContracts?.common?.discovery || {};
   const voiceCatalogEndpoint = mediaDiscovery.voice_voices || '';
   const ttsModelsEndpoint = mediaDiscovery.audio_speech_models || '';
   const sttModelsEndpoint = mediaDiscovery.audio_transcription_models || '';
+  const musicProvidersEndpoint =
+    mediaDiscovery.audio_music_providers ||
+    (typeof generatedMusicContract?.direct_endpoint?.providers_endpoint === 'string' ? generatedMusicContract.direct_endpoint.providers_endpoint : '');
+  const musicModelsEndpoint =
+    mediaDiscovery.audio_music_models ||
+    (typeof generatedMusicContract?.direct_endpoint?.provider_models_endpoint === 'string' ? generatedMusicContract.direct_endpoint.provider_models_endpoint : '');
+  const musicProviderModelsTask =
+    typeof generatedMusicContract?.direct_endpoint?.provider_models_task === 'string' && generatedMusicContract.direct_endpoint.provider_models_task.trim()
+      ? generatedMusicContract.direct_endpoint.provider_models_task.trim()
+      : 'text_to_music';
+  const generatedImageProviderModelsTask =
+    typeof generatedImageContract?.direct_endpoint?.provider_models_task === 'string' && generatedImageContract.direct_endpoint.provider_models_task.trim()
+      ? generatedImageContract.direct_endpoint.provider_models_task.trim()
+      : 'text_to_image';
+  const editedImageProviderModelsTask =
+    typeof editedImageContract?.direct_endpoint?.provider_models_task === 'string' && editedImageContract.direct_endpoint.provider_models_task.trim()
+      ? editedImageContract.direct_endpoint.provider_models_task.trim()
+      : 'image_to_image';
+  const currentImageProviderModelsTask = isEditImageNode ? editedImageProviderModelsTask : generatedImageProviderModelsTask;
   const visionProviderModelsEndpoint = mediaDiscovery.vision_provider_models || '';
   const visionModelsEndpoint = mediaDiscovery.vision_models || '';
 
@@ -1087,6 +1179,8 @@ export const BaseNode = memo(function BaseNode({
   const [ttsModelOptions, setTtsModelOptions] = useState<MediaModelOption[]>([]);
   const [sttProviderOptions, setSttProviderOptions] = useState<SelectOption[]>([]);
   const [sttModelOptions, setSttModelOptions] = useState<MediaModelOption[]>([]);
+  const [musicProviderOptions, setMusicProviderOptions] = useState<SelectOption[]>([]);
+  const [musicModelOptions, setMusicModelOptions] = useState<MediaModelOption[]>([]);
   const [voiceOptions, setVoiceOptions] = useState<MediaModelOption[]>([]);
   const [profileOptions, setProfileOptions] = useState<MediaModelOption[]>([]);
   const [ttsFormatsByProvider, setTtsFormatsByProvider] = useState<ProviderOptionMap>({});
@@ -1157,11 +1251,25 @@ export const BaseNode = memo(function BaseNode({
     if (selectedResidencyTask === 'stt') {
       return sttProviderOptions.map((option) => ({ value: option.value, label: option.label }));
     }
+    if (selectedResidencyTask === 'music_generation') {
+      const seen = new Set<string>();
+      const out: SelectOption[] = [];
+      const add = (value: string, label?: string) => {
+        const clean = normalizeMediaProvider(value);
+        if (!clean || seen.has(clean)) return;
+        seen.add(clean);
+        out.push({ value: clean, label: label || clean });
+      };
+      for (const option of musicProviderOptions) add(option.value, option.label);
+      if (selectedMusicProvider) add(selectedMusicProvider);
+      if (selectedResidencyProvider) add(selectedResidencyProvider);
+      return out;
+    }
     if (selectedResidencyTask === 'text_generation') {
       return providers.map((p) => ({ value: p.name, label: p.display_name || p.name }));
     }
     return selectedResidencyProvider ? [{ value: selectedResidencyProvider, label: selectedResidencyProvider }] : [];
-  }, [imageProviderOptions, providers, selectedResidencyProvider, selectedResidencyTask, sttProviderOptions, ttsProviderOptions]);
+  }, [imageProviderOptions, musicProviderOptions, providers, selectedMusicProvider, selectedResidencyProvider, selectedResidencyTask, sttProviderOptions, ttsProviderOptions]);
   const visibleTtsModelOptions = useMemo(() => {
     const baseOptions = selectedTtsProvider
       ? ttsModelOptions.filter((option) => normalizeMediaProvider(option.provider) === normalizeMediaProvider(selectedTtsProvider))
@@ -1202,6 +1310,25 @@ export const BaseNode = memo(function BaseNode({
       : sttModelOptions;
     return options.map((option) => ({ value: option.model, label: option.label }));
   }, [selectedSttProvider, sttModelOptions]);
+  const visibleMusicModelOptions = useMemo(() => {
+    const options = selectedMusicProvider
+      ? musicModelOptions.filter((option) => normalizeMediaProvider(option.provider) === normalizeMediaProvider(selectedMusicProvider))
+      : musicModelOptions;
+    return options.map((option) => ({ value: option.model, label: option.label }));
+  }, [musicModelOptions, selectedMusicProvider]);
+  const visibleMusicProviderOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const out: SelectOption[] = [];
+    const add = (value: string, label?: string) => {
+      const clean = normalizeMediaProvider(value);
+      if (!clean || seen.has(clean)) return;
+      seen.add(clean);
+      out.push({ value: clean, label: label || clean });
+    };
+    for (const option of musicProviderOptions) add(option.value, option.label);
+    if (selectedMusicProvider) add(selectedMusicProvider);
+    return out;
+  }, [musicProviderOptions, selectedMusicProvider]);
   const residencyModelOptions = useMemo(() => {
     if (selectedResidencyTask === 'image_generation') {
       const options = !selectedResidencyProvider
@@ -1225,11 +1352,14 @@ export const BaseNode = memo(function BaseNode({
     if (selectedResidencyTask === 'stt') {
       return visibleSttModelOptions;
     }
+    if (selectedResidencyTask === 'music_generation') {
+      return visibleMusicModelOptions;
+    }
     if (selectedResidencyTask === 'text_generation') {
       return models.map((m) => ({ value: m, label: m }));
     }
     return selectedResidencyModel ? [{ value: selectedResidencyModel, label: selectedResidencyModel }] : [];
-  }, [imageModelOptions, models, selectedResidencyModel, selectedResidencyProvider, selectedResidencyTask, visibleSttModelOptions, visibleTtsModelOptions]);
+  }, [imageModelOptions, models, selectedResidencyModel, selectedResidencyProvider, selectedResidencyTask, visibleMusicModelOptions, visibleSttModelOptions, visibleTtsModelOptions]);
   const imageFormatOptions = useMemo(
     () => formatOptionsFrom(generatedImageContract?.direct_endpoint?.formats, DEFAULT_IMAGE_FORMATS),
     [generatedImageContract?.direct_endpoint?.formats]
@@ -1247,6 +1377,10 @@ export const BaseNode = memo(function BaseNode({
     [generatedVoiceContract?.direct_endpoint?.formats, selectedTtsProvider, ttsFormatsByProvider]
   );
   const sttFormatOptions = useMemo(() => formatOptionsFrom(undefined, DEFAULT_STT_FORMATS), []);
+  const musicFormatOptions = useMemo(
+    () => formatOptionsFrom(generatedMusicContract?.direct_endpoint?.formats, DEFAULT_MUSIC_FORMATS),
+    [generatedMusicContract?.direct_endpoint?.formats]
+  );
 
   useEffect(() => {
     if ((!isMediaNode && !isModelResidencyNode) || !mediaCatalogRequest) return;
@@ -1405,18 +1539,27 @@ export const BaseNode = memo(function BaseNode({
           if (providersOnly) query.providers_only = true;
           return query;
         };
+        const imageTask = request.task || generatedImageProviderModelsTask;
         const imageProviderListQuery = {
-          task: 'text_to_image',
+          task: imageTask,
           ...queryFor(undefined, undefined, true),
         };
         const imageModelQuery = {
-          task: 'text_to_image',
+          task: imageTask,
           ...queryFor(request.provider, undefined, false),
         };
         const ttsQuery = queryFor(request.provider, request.model, request.providersOnly);
         const ttsProviderListQuery = queryFor(undefined, undefined, true);
         const sttQuery = queryFor(request.provider, undefined, request.providersOnly);
         const sttProviderListQuery = queryFor(undefined, undefined, true);
+        const musicProviderListQuery = {
+          task: musicProviderModelsTask,
+          ...queryFor(undefined, undefined, true),
+        };
+        const musicModelQuery = {
+          task: musicProviderModelsTask,
+          ...queryFor(request.provider, undefined, request.providersOnly),
+        };
         const optionalCatalog = <T,>(promise: Promise<T>): Promise<T | null> =>
           promise.catch((err) => {
             console.warn('[BaseNode] optional media catalog request failed', err);
@@ -1425,10 +1568,24 @@ export const BaseNode = memo(function BaseNode({
         const shouldFetchTtsProviders = request.scope === 'tts' && voiceCatalogEndpoint && (request.providersOnly || request.includeProviders);
         const shouldFetchTtsCatalog = request.scope === 'tts' && !request.providersOnly && voiceCatalogEndpoint;
         const shouldFetchSttProviders = request.scope === 'stt' && voiceCatalogEndpoint && (request.providersOnly || request.includeProviders);
+        const shouldFetchMusicProviders =
+          request.scope === 'music' && musicProvidersEndpoint && (request.providersOnly || request.includeProviders || !request.provider);
+        const shouldFetchMusicModels = request.scope === 'music' && !request.providersOnly && musicModelsEndpoint;
         const shouldFetchImageProviders =
           request.scope === 'image' && visionProviderModelsEndpoint && (request.providersOnly || request.includeProviders || !request.provider);
         const shouldFetchImageModels = request.scope === 'image' && !request.providersOnly && request.provider && visionProviderModelsEndpoint;
-        const [voiceProvidersCatalog, voiceCatalog, speechCatalog, sttProvidersCatalog, transcriptionCatalog, visionProvidersCatalog, visionProviderCatalog, visionModelCatalog] = await Promise.all([
+        const [
+          voiceProvidersCatalog,
+          voiceCatalog,
+          speechCatalog,
+          sttProvidersCatalog,
+          transcriptionCatalog,
+          musicProvidersCatalog,
+          musicModelsCatalog,
+          visionProvidersCatalog,
+          visionProviderCatalog,
+          visionModelCatalog,
+        ] = await Promise.all([
           shouldFetchTtsProviders
             ? optionalCatalog(gatewayJson<Record<string, unknown>>(gatewayPath(voiceCatalogEndpoint, {}, ttsProviderListQuery), { timeoutMs: 5_000 }))
             : Promise.resolve(null),
@@ -1443,6 +1600,12 @@ export const BaseNode = memo(function BaseNode({
             : Promise.resolve(null),
           request.scope === 'stt' && !request.providersOnly && sttModelsEndpoint
             ? optionalCatalog(gatewayJson<Record<string, unknown>>(gatewayPath(sttModelsEndpoint, {}, sttQuery), { timeoutMs: 30_000 }))
+            : Promise.resolve(null),
+          shouldFetchMusicProviders
+            ? optionalCatalog(gatewayJson<Record<string, unknown>>(gatewayPath(musicProvidersEndpoint, {}, musicProviderListQuery), { timeoutMs: 5_000 }))
+            : Promise.resolve(null),
+          shouldFetchMusicModels
+            ? optionalCatalog(gatewayJson<Record<string, unknown>>(gatewayPath(musicModelsEndpoint, {}, musicModelQuery), { timeoutMs: 30_000 }))
             : Promise.resolve(null),
           shouldFetchImageProviders
             ? optionalCatalog(gatewayJson<Record<string, unknown>>(gatewayPath(visionProviderModelsEndpoint, {}, imageProviderListQuery), { timeoutMs: 5_000 }))
@@ -1459,16 +1622,20 @@ export const BaseNode = memo(function BaseNode({
         const nextProfileOptions: MediaModelOption[] = [];
         const nextTtsProviders: SelectOption[] = [];
         const nextSttProviders: SelectOption[] = [];
+        const nextMusicProviders: SelectOption[] = [];
         const nextTtsModels: MediaModelOption[] = [];
         const nextSttModels: MediaModelOption[] = [];
+        const nextMusicModels: MediaModelOption[] = [];
         const nextImageModels: MediaModelOption[] = [];
         const nextImageProviders: SelectOption[] = [];
         const seenVoices = new Set<string>();
         const seenProfiles = new Set<string>();
         const seenTtsProviders = new Set<string>();
         const seenSttProviders = new Set<string>();
+        const seenMusicProviders = new Set<string>();
         const seenTtsModels = new Set<string>();
         const seenSttModels = new Set<string>();
+        const seenMusicModels = new Set<string>();
         const seenImageModels = new Set<string>();
         const seenImageProviders = new Set<string>();
 
@@ -1577,6 +1744,24 @@ export const BaseNode = memo(function BaseNode({
           appendProviderValueMap(nextSttModels, seenSttModels, transcriptionRecord.models_by_provider || transcriptionRecord.stt_models_by_provider);
         }
 
+        const scanMusicPayload = (payload: unknown) => {
+          const record = asRecord(payload);
+          if (!record) return;
+          addProvidersFromArray(nextMusicProviders, seenMusicProviders, asArray(record.providers));
+          addProvidersFromArray(nextMusicProviders, seenMusicProviders, asArray(record.available_providers));
+          addProvidersFromArray(nextMusicProviders, seenMusicProviders, asArray(record.music_providers));
+          addProvidersFromArray(nextMusicProviders, seenMusicProviders, asArray(record.provider_details));
+          const rootProvider = text(record.provider, record.engine_id, record.backend, record.active_provider, record.selected_backend);
+          addProvider(nextMusicProviders, seenMusicProviders, rootProvider);
+          appendImageModels(nextMusicModels, seenMusicModels, asArray(record.models), rootProvider);
+          appendImageModels(nextMusicModels, seenMusicModels, asArray(record.available_models), rootProvider);
+          appendImageModels(nextMusicModels, seenMusicModels, asArray(record.provider_models), rootProvider);
+          appendProviderValueMap(nextMusicModels, seenMusicModels, record.models_by_provider);
+        };
+        scanMusicPayload(musicProvidersCatalog);
+        scanMusicPayload(musicModelsCatalog);
+        for (const option of nextMusicModels) addProvider(nextMusicProviders, seenMusicProviders, option.provider);
+
         scanImagePayload(nextImageModels, seenImageModels, nextImageProviders, seenImageProviders, visionProvidersCatalog);
         scanImagePayload(nextImageModels, seenImageModels, nextImageProviders, seenImageProviders, visionProviderCatalog);
         scanImagePayload(nextImageModels, seenImageModels, nextImageProviders, seenImageProviders, visionModelCatalog);
@@ -1595,6 +1780,10 @@ export const BaseNode = memo(function BaseNode({
           if (request.scope === 'stt') {
             setSttProviderOptions(nextSttProviders);
             if (!request.providersOnly) setSttModelOptions(nextSttModels);
+          }
+          if (request.scope === 'music') {
+            setMusicProviderOptions(nextMusicProviders);
+            if (!request.providersOnly) setMusicModelOptions(nextMusicModels);
           }
           if (request.scope === 'image') {
             setImageProviderCatalogOptions(nextImageProviders);
@@ -1616,6 +1805,10 @@ export const BaseNode = memo(function BaseNode({
           if (request.scope === 'stt') {
             setSttProviderOptions([]);
             if (!request.providersOnly) setSttModelOptions([]);
+          }
+          if (request.scope === 'music') {
+            setMusicProviderOptions([]);
+            if (!request.providersOnly) setMusicModelOptions([]);
           }
           if (request.scope === 'image') {
             setImageProviderCatalogOptions([]);
@@ -1639,6 +1832,10 @@ export const BaseNode = memo(function BaseNode({
     voiceCatalogEndpoint,
     ttsModelsEndpoint,
     sttModelsEndpoint,
+    musicProvidersEndpoint,
+    musicModelsEndpoint,
+    musicProviderModelsTask,
+    generatedImageProviderModelsTask,
     visionProviderModelsEndpoint,
     visionModelsEndpoint,
   ]);
@@ -1856,9 +2053,9 @@ export const BaseNode = memo(function BaseNode({
         } as FlowNodeData['effectConfig'],
         pinDefaults: nextDefaults,
       });
-      if (clean) requestMediaCatalog('image', { provider: clean });
+      if (clean) requestMediaCatalog('image', { provider: clean, task: currentImageProviderModelsTask });
     },
-    [data.effectConfig, data.pinDefaults, id, requestMediaCatalog, updateNodeData]
+    [currentImageProviderModelsTask, data.effectConfig, data.pinDefaults, id, requestMediaCatalog, updateNodeData]
   );
 
   const setImageModelSelection = useCallback(
@@ -1921,6 +2118,23 @@ export const BaseNode = memo(function BaseNode({
     [data.effectConfig, id, requestMediaCatalog, updateNodeData]
   );
 
+  const setMusicProviderSelection = useCallback(
+    (provider: string | null | undefined) => {
+      const clean = provider ? normalizeMediaProvider(provider) : '';
+      updateNodeData(id, {
+        effectConfig: {
+          ...(data.effectConfig || {}),
+          music_provider: clean || undefined,
+          provider: undefined,
+          music_model: undefined,
+          model: undefined,
+        } as FlowNodeData['effectConfig'],
+      });
+      if (clean) requestMediaCatalog('music', { provider: clean });
+    },
+    [data.effectConfig, id, requestMediaCatalog, updateNodeData]
+  );
+
   const setModelResidencyPatch = useCallback(
     (patch: Record<string, JsonValue | undefined>) => {
       const nextEffect = { ...(data.effectConfig || {}) } as Record<string, JsonValue | undefined>;
@@ -1949,6 +2163,7 @@ export const BaseNode = memo(function BaseNode({
       if (clean === 'image_generation') requestMediaCatalog('image', { providersOnly: true });
       if (clean === 'tts') requestMediaCatalog('tts', { providersOnly: true });
       if (clean === 'stt') requestMediaCatalog('stt', { providersOnly: true });
+      if (clean === 'music_generation') requestMediaCatalog('music', { providersOnly: true });
     },
     [requestMediaCatalog, setModelResidencyPatch]
   );
@@ -1960,6 +2175,7 @@ export const BaseNode = memo(function BaseNode({
       if (selectedResidencyTask === 'image_generation' && clean) requestMediaCatalog('image', { provider: clean });
       if (selectedResidencyTask === 'tts') requestMediaCatalog('tts', { provider: clean || undefined });
       if (selectedResidencyTask === 'stt') requestMediaCatalog('stt', { provider: clean || undefined });
+      if (selectedResidencyTask === 'music_generation') requestMediaCatalog('music', { provider: clean || undefined });
     },
     [requestMediaCatalog, selectedResidencyTask, setModelResidencyPatch]
   );
@@ -1973,7 +2189,7 @@ export const BaseNode = memo(function BaseNode({
   );
 
   useEffect(() => {
-    if (!isGenerateImageNode || !selectedImageProvider) return;
+    if ((!isGenerateImageNode && !isEditImageNode) || !selectedImageProvider) return;
     const normalized = normalizeMediaProvider(selectedImageProvider);
     const current = data.pinDefaults || {};
     const nextDefaults = { ...current };
@@ -1998,12 +2214,12 @@ export const BaseNode = memo(function BaseNode({
       changed = true;
     }
     if (changed) updateNodeData(id, { pinDefaults: nextDefaults });
-  }, [data.pinDefaults, id, isGenerateImageNode, selectedImageProvider, updateNodeData]);
+  }, [data.pinDefaults, id, isEditImageNode, isGenerateImageNode, selectedImageProvider, updateNodeData]);
 
   useEffect(() => {
     if (mediaLoading || mediaCapabilitiesQuery.isLoading) return;
 
-    if (isGenerateImageNode && selectedImageProvider && selectedImageModel) {
+    if ((isGenerateImageNode || isEditImageNode) && selectedImageProvider && selectedImageModel) {
       const ok = visibleImageModelOptions.some((option) => option.value === selectedImageModel);
       if (visibleImageModelOptions.length > 0 && !ok) setEffectConfigPatch({ image_model: undefined, model: undefined });
     }
@@ -2038,6 +2254,7 @@ export const BaseNode = memo(function BaseNode({
       if (visibleSttModelOptions.length > 0 && !ok) setEffectConfigPatch({ stt_model: undefined, model: undefined });
     }
   }, [
+    isEditImageNode,
     isGenerateImageNode,
     isGenerateVoiceNode,
     isListenVoiceNode,
@@ -2169,6 +2386,8 @@ export const BaseNode = memo(function BaseNode({
         t === 'model_image' ||
         t === 'provider_voice' ||
         t === 'model_voice' ||
+        t === 'provider_music' ||
+        t === 'model_music' ||
         t === 'object' ||
         t === 'assertion' ||
         t === 'assertions' ||
@@ -2851,7 +3070,7 @@ export const BaseNode = memo(function BaseNode({
               <button
                 type="button"
                 className="node-residency-button nodrag"
-                disabled={!residencyAuthoringTarget.provider || !residencyAuthoringTarget.model || Boolean(residencyAuthoringTarget.blockedReason)}
+                disabled={Boolean(residencyAuthoringTarget.blockedReason)}
                 onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -2864,7 +3083,7 @@ export const BaseNode = memo(function BaseNode({
               <button
                 type="button"
                 className="node-residency-button nodrag"
-                disabled={!residencyAuthoringTarget.provider || !residencyAuthoringTarget.model || Boolean(residencyAuthoringTarget.blockedReason)}
+                disabled={Boolean(residencyAuthoringTarget.blockedReason)}
                 onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -2876,9 +3095,11 @@ export const BaseNode = memo(function BaseNode({
               </button>
             </div>
             <div className="node-residency-target nodrag">
-              {residencyAuthoringTarget.provider && residencyAuthoringTarget.model
+              {residencyAuthoringTarget.blockedReason
+                ? residencyAuthoringTarget.blockedReason
+                : residencyAuthoringTarget.provider && residencyAuthoringTarget.model
                 ? `${residencyAuthoringTarget.provider} / ${residencyAuthoringTarget.model}`
-                : residencyAuthoringTarget.blockedReason || 'Select a concrete provider and model to preload explicitly.'}
+                : `Gateway default ${residencyAuthoringTarget.task.replace(/_/g, ' ')}`}
             </div>
           </>
         )}
@@ -2925,7 +3146,9 @@ export const BaseNode = memo(function BaseNode({
                   pin.type === 'provider_image' ||
                   pin.type === 'model_image' ||
                   pin.type === 'provider_voice' ||
-                  pin.type === 'model_voice';
+                  pin.type === 'model_voice' ||
+                  pin.type === 'provider_music' ||
+                  pin.type === 'model_music';
                 const isEmitEventName = isEmitEventNode && pin.id === 'name';
                 const isEmitEventScopePin = isEmitEventNode && pin.id === 'scope';
                 const isOnEventScopePin = isOnEventNode && pin.id === 'scope';
@@ -2952,9 +3175,9 @@ export const BaseNode = memo(function BaseNode({
 	                const isSubflowScopePin = isSubflowNode && pin.id === 'scope';
 	                const isMemoryTagsModePin = isMemoryQueryNode && pin.id === 'tags_mode';
 	                const isMemoryPlacementPin = isMemoryRehydrateNode && pin.id === 'placement';
-                  const isImageProviderPin = isGenerateImageNode && pin.id === 'image_provider';
-                  const isImageModelPin = isGenerateImageNode && pin.id === 'image_model';
-                  const isImageFormatPin = isGenerateImageNode && pin.id === 'format';
+                  const isImageProviderPin = (isGenerateImageNode || isEditImageNode) && pin.id === 'image_provider';
+                  const isImageModelPin = (isGenerateImageNode || isEditImageNode) && pin.id === 'image_model';
+                  const isImageFormatPin = (isGenerateImageNode || isEditImageNode) && pin.id === 'format';
                   const isTtsProviderPin = isGenerateVoiceNode && pin.id === 'tts_provider';
                   const isTtsModelPin = isGenerateVoiceNode && pin.id === 'tts_model';
                   const isTtsFormatPin = isGenerateVoiceNode && pin.id === 'format';
@@ -2964,6 +3187,9 @@ export const BaseNode = memo(function BaseNode({
                   const isSttProviderPin = (isListenVoiceNode || isTranscribeAudioNode) && pin.id === 'stt_provider';
                   const isSttModelPin = (isListenVoiceNode || isTranscribeAudioNode) && pin.id === 'stt_model';
                   const isSttFormatPin = isTranscribeAudioNode && pin.id === 'format';
+                  const isMusicProviderPin = isGenerateMusicNode && pin.id === 'music_provider';
+                  const isMusicModelPin = isGenerateMusicNode && pin.id === 'music_model';
+                  const isMusicFormatPin = isGenerateMusicNode && pin.id === 'format';
                   const isResidencyOperationPin = isModelResidencyNode && pin.id === 'operation';
                   const isResidencyTaskPin = isModelResidencyNode && pin.id === 'task';
                   const isResidencyProviderPin = isModelResidencyNode && pin.id === 'provider';
@@ -2991,6 +3217,9 @@ export const BaseNode = memo(function BaseNode({
                       isSttProviderPin ||
                       isSttModelPin ||
                       isSttFormatPin ||
+                      isMusicProviderPin ||
+                      isMusicModelPin ||
+                      isMusicFormatPin ||
 	                  ((isAgentNode || isLlmNode || subflowHasToolsPin) && pin.id === 'tools') ||
 	                  (isVarNode && pin.id === 'name') ||
 	                  isCompareOpPin ||
@@ -3316,6 +3545,7 @@ export const BaseNode = memo(function BaseNode({
                         { value: 'text_generation', label: 'text' },
                         { value: 'tts', label: 'speech' },
                         { value: 'stt', label: 'transcription' },
+                        { value: 'music_generation', label: 'music' },
                       ]}
                       searchable={false}
                       minPopoverWidth={180}
@@ -3347,6 +3577,7 @@ export const BaseNode = memo(function BaseNode({
                         if (selectedResidencyTask === 'image_generation') requestMediaCatalog('image', { providersOnly: true });
                         if (selectedResidencyTask === 'tts') requestMediaCatalog('tts', { providersOnly: true });
                         if (selectedResidencyTask === 'stt') requestMediaCatalog('stt', { providersOnly: true });
+                        if (selectedResidencyTask === 'music_generation') requestMediaCatalog('music', { providersOnly: true });
                       }}
                       onChange={setModelResidencyProvider}
                     />
@@ -3384,6 +3615,9 @@ export const BaseNode = memo(function BaseNode({
                         if (selectedResidencyTask === 'stt' && selectedResidencyProvider) {
                           requestMediaCatalog('stt', { provider: selectedResidencyProvider });
                         }
+                        if (selectedResidencyTask === 'music_generation' && selectedResidencyProvider) {
+                          requestMediaCatalog('music', { provider: selectedResidencyProvider });
+                        }
                       }}
                       onChange={setModelResidencyModel}
                     />
@@ -3420,7 +3654,7 @@ export const BaseNode = memo(function BaseNode({
                       key="image-provider"
                       variant="pin"
                       value={selectedImageProvider}
-                      placeholder={mediaLoading || mediaCapabilitiesQuery.isLoading ? 'Loading…' : 'Gateway default'}
+                      placeholder={mediaLoading || mediaCapabilitiesQuery.isLoading ? 'Loading…' : 'Auto (Gateway default)'}
                       options={imageProviderOptions}
                       disabled={mediaCapabilitiesQuery.isLoading}
                       loading={mediaLoading || mediaCapabilitiesQuery.isLoading}
@@ -3428,7 +3662,7 @@ export const BaseNode = memo(function BaseNode({
                       searchPlaceholder="Search image providers…"
                       clearable
                       minPopoverWidth={300}
-                      onOpen={() => requestMediaCatalog('image', { providersOnly: true })}
+                      onOpen={() => requestMediaCatalog('image', { providersOnly: true, task: currentImageProviderModelsTask })}
                       onChange={(v) => setImageProviderSelection(v)}
                     />
                   );
@@ -3440,7 +3674,7 @@ export const BaseNode = memo(function BaseNode({
                       key="image-model"
                       variant="pin"
                       value={selectedImageModel}
-                      placeholder={mediaLoading || mediaCapabilitiesQuery.isLoading ? 'Loading…' : selectedImageProvider ? 'Select…' : 'Select model…'}
+                      placeholder={mediaLoading || mediaCapabilitiesQuery.isLoading ? 'Loading…' : selectedImageProvider ? 'Select…' : 'Auto (Gateway default)'}
                       options={visibleImageModelOptions}
                       disabled={mediaCapabilitiesQuery.isLoading || !selectedImageProvider}
                       loading={mediaCapabilitiesQuery.isLoading || (mediaLoading && visibleImageModelOptions.length === 0)}
@@ -3448,6 +3682,11 @@ export const BaseNode = memo(function BaseNode({
                       searchPlaceholder="Search image models…"
                       clearable
                       minPopoverWidth={400}
+                      onOpen={() => {
+                        if (selectedImageProvider) {
+                          requestMediaCatalog('image', { provider: selectedImageProvider, task: currentImageProviderModelsTask });
+                        }
+                      }}
                       onChange={(v) => setImageModelSelection(v)}
                     />
                   );
@@ -3459,7 +3698,7 @@ export const BaseNode = memo(function BaseNode({
                       key="tts-provider"
                       variant="pin"
                       value={selectedTtsProvider}
-                      placeholder={mediaLoading || mediaCapabilitiesQuery.isLoading ? 'Loading…' : 'Gateway default'}
+                      placeholder={mediaLoading || mediaCapabilitiesQuery.isLoading ? 'Loading…' : 'Auto (Gateway default)'}
                       options={ttsProviderOptions}
                       disabled={mediaCapabilitiesQuery.isLoading}
                       loading={mediaLoading || mediaCapabilitiesQuery.isLoading}
@@ -3569,7 +3808,7 @@ export const BaseNode = memo(function BaseNode({
                       key="stt-provider"
                       variant="pin"
                       value={selectedSttProvider}
-                      placeholder={mediaLoading || mediaCapabilitiesQuery.isLoading ? 'Loading…' : 'Gateway default'}
+                      placeholder={mediaLoading || mediaCapabilitiesQuery.isLoading ? 'Loading…' : 'Auto (Gateway default)'}
                       options={sttProviderOptions}
                       disabled={mediaCapabilitiesQuery.isLoading}
                       loading={mediaLoading || mediaCapabilitiesQuery.isLoading}
@@ -3605,12 +3844,56 @@ export const BaseNode = memo(function BaseNode({
                   );
                 }
 
-                if ((isImageFormatPin || isTtsFormatPin || isSttFormatPin) && !connected) {
-                  const fallbackFormat = isImageFormatPin ? 'png' : isTtsFormatPin ? 'wav' : 'json';
+                if (isMusicProviderPin && !connected) {
+                  controls.push(
+                    <AfSelect
+                      key="music-provider"
+                      variant="pin"
+                      value={selectedMusicProvider}
+                      placeholder={mediaLoading || mediaCapabilitiesQuery.isLoading ? 'Loading…' : 'Auto (Gateway default)'}
+                      options={visibleMusicProviderOptions}
+                      disabled={mediaCapabilitiesQuery.isLoading}
+                      loading={mediaLoading || mediaCapabilitiesQuery.isLoading}
+                      searchable
+                      searchPlaceholder="Search music providers…"
+                      clearable
+                      minPopoverWidth={300}
+                      onOpen={() => requestMediaCatalog('music', { providersOnly: true })}
+                      onChange={(v) => setMusicProviderSelection(v)}
+                    />
+                  );
+                }
+
+                if (isMusicModelPin && !connected) {
+                  controls.push(
+                    <AfSelect
+                      key="music-model"
+                      variant="pin"
+                      value={selectedMusicModel}
+                      placeholder={mediaLoading || mediaCapabilitiesQuery.isLoading ? 'Loading…' : selectedMusicProvider ? 'Select…' : 'Auto (Gateway default)'}
+                      options={visibleMusicModelOptions}
+                      disabled={mediaCapabilitiesQuery.isLoading || !selectedMusicProvider}
+                      loading={mediaCapabilitiesQuery.isLoading || (mediaLoading && visibleMusicModelOptions.length === 0)}
+                      searchable
+                      searchPlaceholder="Search music models…"
+                      clearable
+                      minPopoverWidth={400}
+                      onOpen={() => {
+                        if (selectedMusicProvider) requestMediaCatalog('music', { provider: selectedMusicProvider });
+                      }}
+                      onChange={(v) => setEffectConfigPatch({ music_model: v || undefined, model: undefined })}
+                    />
+                  );
+                }
+
+                if ((isImageFormatPin || isTtsFormatPin || isSttFormatPin || isMusicFormatPin) && !connected) {
+                  const fallbackFormat = isImageFormatPin ? 'png' : isSttFormatPin ? 'json' : 'wav';
                   const options = isImageFormatPin
                     ? imageFormatOptions
                     : isTtsFormatPin
                       ? ttsFormatOptions
+                      : isMusicFormatPin
+                        ? musicFormatOptions
                       : sttFormatOptions;
                   const raw = pinDefaults.format;
                   const currentFormat = typeof raw === 'string' && raw.trim() ? raw.trim() : fallbackFormat;
@@ -3640,7 +3923,9 @@ export const BaseNode = memo(function BaseNode({
                     pin.type === 'provider_image' ||
                     pin.type === 'model_image' ||
                     pin.type === 'provider_voice' ||
-                    pin.type === 'model_voice'
+                    pin.type === 'model_voice' ||
+                    pin.type === 'provider_music' ||
+                    pin.type === 'model_music'
                   ) {
                     controls.push(
                       <input

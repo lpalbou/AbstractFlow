@@ -30,8 +30,13 @@ import {
   gatewayPath,
   jsonRequest,
   type GatewayContracts,
+  type GatewayDurableBlocPromptCacheContract,
   type GatewayEndpointDescriptor,
 } from '../utils/gatewayClient';
+import {
+  modelOptionsFromGatewayCatalog,
+  providerOptionsFromGatewayCatalog,
+} from '../utils/gatewayCatalog';
 
 type FlowGraphNode = {
   id: string;
@@ -68,6 +73,9 @@ type PromptCacheGraphTarget =
       count: number;
       multiple: true;
     };
+
+type DurableBlocOperation = 'record' | 'list' | 'kv_manifest' | 'kv_list' | 'kv_ensure' | 'kv_load';
+type PromptCacheBindingValue = string | Record<string, unknown>;
 
 interface RunFlowModalProps {
   isOpen: boolean;
@@ -142,14 +150,123 @@ function stringifyJson(value: unknown): string {
   }
 }
 
+function parsePromptCacheBindingText(raw: string): PromptCacheBindingValue | null {
+  const text = String(raw || '').trim();
+  if (!text) return null;
+  if ((text.startsWith('{') && text.endsWith('}')) || (text.startsWith('[') && text.endsWith(']'))) {
+    const parsed = parseJson<unknown>(text);
+    if (parsed.ok && isRecord(parsed.value)) return parsed.value;
+    return null;
+  }
+  return text;
+}
+
+function extractPromptCacheBinding(value: unknown): PromptCacheBindingValue | null {
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (!isRecord(value)) return null;
+
+  const direct = value.prompt_cache_binding ?? value.expected_prompt_cache_binding;
+  if (typeof direct === 'string' && direct.trim()) return direct.trim();
+  if (isRecord(direct)) return direct;
+
+  for (const key of ['artifact', 'manifest', 'result', 'data']) {
+    const nested = value[key];
+    const found = extractPromptCacheBinding(nested);
+    if (found) return found;
+  }
+  return null;
+}
+
+function summarizeDurableBlocResult(value: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  const visit = (candidate: unknown) => {
+    if (!isRecord(candidate)) return;
+    const pairs: Array<[string, string]> = [
+      ['bloc_id', 'bloc_id'],
+      ['sha256', 'sha256'],
+      ['provider', 'provider'],
+      ['model', 'model'],
+      ['artifact_path', 'artifact_path'],
+      ['artifact_id', 'artifact_id'],
+      ['binding_id', 'binding_id'],
+      ['key', 'key'],
+    ];
+    for (const [src, dst] of pairs) {
+      const raw = candidate[src];
+      if (out[dst] || raw === undefined || raw === null || raw === '') continue;
+      if (typeof raw === 'string' || typeof raw === 'number' || typeof raw === 'boolean') {
+        out[dst] = String(raw);
+      }
+    }
+  };
+
+  visit(value);
+  if (isRecord(value)) {
+    for (const key of ['record', 'artifact', 'manifest', 'result', 'data']) visit(value[key]);
+    const binding = extractPromptCacheBinding(value);
+    visit(binding);
+  }
+  return out;
+}
+
+function durableBlocEndpoint(
+  contract: GatewayDurableBlocPromptCacheContract | undefined | null,
+  key: DurableBlocOperation,
+  fallback: string
+): string {
+  const endpoint = contract?.endpoints?.[key];
+  return typeof endpoint === 'string' && endpoint.trim() ? endpoint : fallback;
+}
+
+async function copyTextToClipboard(text: string): Promise<void> {
+  const value = String(text || '');
+  if (!value) return;
+  try {
+    await navigator.clipboard.writeText(value);
+  } catch {
+    const el = document.createElement('textarea');
+    el.value = value;
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+  }
+}
+
 function isExecutionHandle(value: unknown): boolean {
   const handle = typeof value === 'string' ? value.trim().toLowerCase() : '';
   return handle.includes('exec');
 }
 
-function isResidencyNoOpResult(value: unknown): boolean {
-  if (!value || typeof value !== 'object') return false;
-  return (value as Record<string, unknown>).ok === false;
+type ResidencyResultStatusInfo = {
+  label: 'UNSUPPORTED' | 'SKIPPED';
+  className: 'waiting';
+  title: string;
+  message: string;
+};
+
+function residencyResultStatusInfo(value: unknown): ResidencyResultStatusInfo | null {
+  if (!value || typeof value !== 'object') return null;
+  const result = value as Record<string, unknown>;
+  const code = typeof result.code === 'string' ? result.code.toLowerCase() : '';
+  if (result.supported === false || result.available === false || code.includes('unsupported') || code.includes('unavailable')) {
+    return {
+      label: 'UNSUPPORTED',
+      className: 'waiting',
+      title: 'Gateway/Runtime reported this residency operation is unsupported here.',
+      message:
+        'Gateway/Runtime reported this residency operation is unsupported for the selected task, provider, or deployment.',
+    };
+  }
+  if (result.ok === false) {
+    return {
+      label: 'SKIPPED',
+      className: 'waiting',
+      title: 'Optional residency request completed without changing runtime state.',
+      message: 'This optional residency request completed without changing runtime state.',
+    };
+  }
+  return null;
 }
 
 function extractPreferredModelInfo(value: unknown): { provider?: string; model?: string } {
@@ -326,6 +443,7 @@ function inferPromptCacheGraphTarget(nodes: FlowGraphNode[], edges: FlowGraphEdg
 type GeneratedImagePreview = {
   artifactId: string;
   src: string;
+  fallbackSrcs?: string[];
   contentType?: string;
   prompt?: string;
   provider?: string;
@@ -338,6 +456,7 @@ type GeneratedImagePreview = {
 type GeneratedAudioPreview = {
   artifactId: string;
   src: string;
+  fallbackSrcs?: string[];
   contentType?: string;
   text?: string;
   provider?: string;
@@ -358,12 +477,96 @@ type RunGeneratedArtifact =
   | { kind: 'audio'; preview: GeneratedAudioPreview; stepLabel: string }
   | { kind: 'text'; preview: GeneratedTextPreview; stepLabel: string };
 
+type ArtifactRunScope = string | null | undefined | Array<string | null | undefined>;
+
+function artifactRunScopeValues(scope: ArtifactRunScope): string[] {
+  const values = Array.isArray(scope) ? scope : [scope];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const value of values) {
+    const clean = pickNonEmptyString(value);
+    if (!clean || seen.has(clean)) continue;
+    seen.add(clean);
+    out.push(clean);
+  }
+  return out;
+}
+
+function artifactRecordRunCandidates(artifactId: string, ...records: Array<Record<string, unknown> | null | undefined>): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const add = (value: unknown) => {
+    const clean = pickNonEmptyString(value);
+    if (!clean || seen.has(clean)) return;
+    seen.add(clean);
+    out.push(clean);
+  };
+
+  for (const record of records) {
+    if (!record) continue;
+    add(record.run_id);
+    add(record.artifact_run_id);
+    add(record.owner_run_id);
+    const tags = isRecord(record.tags) ? record.tags : null;
+    if (tags) {
+      add(tags.run_id);
+      add(tags.artifact_run_id);
+      add(tags.owner_run_id);
+      const projectedArtifactId = pickNonEmptyString(tags.projected_from_artifact_id);
+      if (projectedArtifactId && projectedArtifactId === artifactId) add(tags.projected_from_run_id);
+    }
+    const projectedArtifactId = pickNonEmptyString(record.projected_from_artifact_id);
+    if (projectedArtifactId && projectedArtifactId === artifactId) add(record.projected_from_run_id);
+  }
+  return out;
+}
+
+function artifactContentUrl(
+  artifactContentDescriptor: GatewayEndpointDescriptor | string | null | undefined,
+  runId: string,
+  artifactId: string
+): string {
+  return endpointFromDescriptor(
+    artifactContentDescriptor,
+    '/api/gateway/runs/{run_id}/artifacts/{artifact_id}/content',
+    {
+      run_id: runId,
+      artifact_id: artifactId,
+    }
+  );
+}
+
+function artifactContentType(record: Record<string, unknown> | null | undefined): string {
+  return pickNonEmptyString(record?.content_type || record?.contentType).toLowerCase();
+}
+
+function artifactModality(record: Record<string, unknown> | null | undefined): string {
+  return pickNonEmptyString(record?.modality || record?.type || record?.kind).toLowerCase();
+}
+
+function artifactLooksLikeImage(record: Record<string, unknown> | null | undefined): boolean {
+  const contentType = artifactContentType(record);
+  const modality = artifactModality(record);
+  return contentType.startsWith('image/') || modality === 'image';
+}
+
+function artifactLooksLikeAudio(record: Record<string, unknown> | null | undefined): boolean {
+  const contentType = artifactContentType(record);
+  const modality = artifactModality(record);
+  return (
+    contentType.startsWith('audio/') ||
+    modality === 'audio' ||
+    modality === 'voice' ||
+    modality === 'music'
+  );
+}
+
 function extractGeneratedImagePreview(
   value: unknown,
-  runId: string | null,
+  runScope: ArtifactRunScope,
   artifactContentDescriptor?: GatewayEndpointDescriptor | string | null
 ): GeneratedImagePreview | null {
-  if (!runId || !value || typeof value !== 'object' || Array.isArray(value)) return null;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const obj = value as Record<string, unknown>;
   const name = typeof obj.name === 'string' ? obj.name : '';
   const payloadRaw = obj.payload && typeof obj.payload === 'object' && !Array.isArray(obj.payload)
@@ -371,7 +574,13 @@ function extractGeneratedImagePreview(
     : obj;
   const asRecord = (item: unknown): Record<string, unknown> | null =>
     item && typeof item === 'object' && !Array.isArray(item) ? (item as Record<string, unknown>) : null;
-  const directArtifactRaw = payloadRaw.image_artifact ?? payloadRaw.artifact_ref ?? payloadRaw.image;
+  const imageEvent = name === 'abstract.media.image.generated';
+  const genericArtifactRaw = payloadRaw.artifact_ref ?? payloadRaw.artifact;
+  const genericArtifact = asRecord(genericArtifactRaw);
+  const directArtifactRaw =
+    payloadRaw.image_artifact ??
+    payloadRaw.image ??
+    (imageEvent || artifactLooksLikeImage(genericArtifact) ? genericArtifactRaw : undefined);
   const directImage = asRecord(directArtifactRaw);
   const directArtifactId =
     typeof directArtifactRaw === 'string' && directArtifactRaw.trim() ? directArtifactRaw.trim() : '';
@@ -391,16 +600,26 @@ function extractGeneratedImagePreview(
       ? generatedArtifactRaw.trim()
       : '';
   const imageRaw = directImage || generatedArtifact;
-  if (name && name !== 'abstract.media.image.generated' && !imageRaw && !directArtifactId && !generatedArtifactId) return null;
+  const payloadImageArtifactId =
+    imageEvent || artifactLooksLikeImage(payloadRaw)
+      ? (typeof payloadRaw.artifact_id === 'string' && payloadRaw.artifact_id.trim()) ||
+        (typeof payloadRaw.$artifact === 'string' && payloadRaw.$artifact.trim()) ||
+        ''
+      : '';
+  if (name && !imageEvent && !imageRaw && !directArtifactId && !generatedArtifactId && !payloadImageArtifactId) return null;
   const artifactId =
     (imageRaw && typeof imageRaw.artifact_id === 'string' && imageRaw.artifact_id.trim()) ||
     (imageRaw && typeof imageRaw.$artifact === 'string' && imageRaw.$artifact.trim()) ||
     directArtifactId ||
     generatedArtifactId ||
-    (typeof payloadRaw.artifact_id === 'string' && payloadRaw.artifact_id.trim()) ||
-    (typeof payloadRaw.$artifact === 'string' && payloadRaw.$artifact.trim()) ||
+    payloadImageArtifactId ||
     '';
   if (!artifactId) return null;
+  const runCandidates = [
+    ...artifactRecordRunCandidates(artifactId, imageRaw, generatedRecord, generatedArtifact, payloadRaw, obj),
+    ...artifactRunScopeValues(runScope),
+  ].filter((value, index, values) => value && values.indexOf(value) === index);
+  if (!runCandidates.length) return null;
   const imageProvider =
     (imageRaw && typeof imageRaw.media_provider === 'string' && imageRaw.media_provider.trim()) ||
     (typeof generatedRecord?.media_provider === 'string' && generatedRecord.media_provider.trim()) ||
@@ -421,14 +640,8 @@ function extractGeneratedImagePreview(
     undefined;
   return {
     artifactId,
-    src: endpointFromDescriptor(
-      artifactContentDescriptor,
-      '/api/gateway/runs/{run_id}/artifacts/{artifact_id}/content',
-      {
-        run_id: runId,
-        artifact_id: artifactId,
-      }
-    ),
+    src: artifactContentUrl(artifactContentDescriptor, runCandidates[0], artifactId),
+    fallbackSrcs: runCandidates.slice(1).map((candidate) => artifactContentUrl(artifactContentDescriptor, candidate, artifactId)),
     contentType: imageRaw && typeof imageRaw.content_type === 'string' ? imageRaw.content_type : typeof generatedRecord?.content_type === 'string' ? generatedRecord.content_type : undefined,
     prompt: typeof payloadRaw.prompt === 'string' ? payloadRaw.prompt : typeof generatedRecord?.prompt === 'string' ? generatedRecord.prompt : undefined,
     provider: imageProvider,
@@ -441,58 +654,89 @@ function extractGeneratedImagePreview(
 
 function extractGeneratedAudioPreview(
   value: unknown,
-  runId: string | null,
+  runScope: ArtifactRunScope,
   artifactContentDescriptor?: GatewayEndpointDescriptor | string | null
 ): GeneratedAudioPreview | null {
-  if (!runId || !value || typeof value !== 'object' || Array.isArray(value)) return null;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const obj = value as Record<string, unknown>;
   const name = typeof obj.name === 'string' ? obj.name : '';
   const payloadRaw = obj.payload && typeof obj.payload === 'object' && !Array.isArray(obj.payload)
     ? (obj.payload as Record<string, unknown>)
     : obj;
-  const allowedEventName =
-    !name ||
+  const audioEvent =
     name === 'abstract.media.voice.generated' ||
+    name === 'abstract.media.music.generated' ||
     name === 'abstract.media.audio.generated' ||
     name === 'abstract.voice.tts';
 
-  const directAudio = payloadRaw.audio_artifact && typeof payloadRaw.audio_artifact === 'object' && !Array.isArray(payloadRaw.audio_artifact)
-    ? (payloadRaw.audio_artifact as Record<string, unknown>)
+  const genericAudioRaw = payloadRaw.artifact_ref || payloadRaw.artifact;
+  const genericAudioRecord = genericAudioRaw && typeof genericAudioRaw === 'object' && !Array.isArray(genericAudioRaw)
+    ? (genericAudioRaw as Record<string, unknown>)
     : null;
+  const directAudioRaw =
+    payloadRaw.audio_artifact ||
+    payloadRaw.music_artifact ||
+    (audioEvent || artifactLooksLikeAudio(genericAudioRecord) ? genericAudioRaw : undefined);
+  const directAudio = directAudioRaw && typeof directAudioRaw === 'object' && !Array.isArray(directAudioRaw)
+    ? (directAudioRaw as Record<string, unknown>)
+    : null;
+  const directAudioId = typeof directAudioRaw === 'string' && directAudioRaw.trim() ? directAudioRaw.trim() : '';
   const outputs = payloadRaw.outputs && typeof payloadRaw.outputs === 'object' && !Array.isArray(payloadRaw.outputs)
     ? (payloadRaw.outputs as Record<string, unknown>)
     : null;
-  const voiceItems = Array.isArray(outputs?.voice) ? outputs?.voice as unknown[] : Array.isArray(outputs?.audio) ? outputs?.audio as unknown[] : [];
-  const generatedItem = voiceItems.find((item) => item && typeof item === 'object' && !Array.isArray(item)) as Record<string, unknown> | undefined;
-  const itemArtifact = generatedItem?.artifact_ref && typeof generatedItem.artifact_ref === 'object' && !Array.isArray(generatedItem.artifact_ref)
-    ? (generatedItem.artifact_ref as Record<string, unknown>)
+  const outputAudioRaw = outputs?.music ?? outputs?.voice ?? outputs?.audio;
+  const voiceItems = Array.isArray(outputAudioRaw) ? outputAudioRaw : outputAudioRaw != null ? [outputAudioRaw] : [];
+  const generatedItemRaw = voiceItems.find((item) => typeof item === 'string' || (item && typeof item === 'object' && !Array.isArray(item)));
+  const generatedItem = generatedItemRaw && typeof generatedItemRaw === 'object' && !Array.isArray(generatedItemRaw)
+    ? (generatedItemRaw as Record<string, unknown>)
+    : undefined;
+  const itemArtifactRaw =
+    generatedItem?.artifact_ref ??
+    generatedItem?.music_artifact ??
+    generatedItem?.audio_artifact ??
+    generatedItem?.artifact ??
+    generatedItemRaw;
+  const itemArtifact = itemArtifactRaw && typeof itemArtifactRaw === 'object' && !Array.isArray(itemArtifactRaw)
+    ? (itemArtifactRaw as Record<string, unknown>)
     : null;
-  const itemArtifactId = typeof generatedItem?.artifact_ref === 'string' && generatedItem.artifact_ref.trim()
-    ? generatedItem.artifact_ref.trim()
+  const itemArtifactId = typeof itemArtifactRaw === 'string' && itemArtifactRaw.trim()
+    ? itemArtifactRaw.trim()
     : '';
   const audioRaw = directAudio || itemArtifact;
   const hasAudioArtifactShape =
     Boolean(directAudio) ||
+    Boolean(directAudioId) ||
     Boolean(itemArtifact) ||
     Boolean(itemArtifactId) ||
-    (typeof payloadRaw.artifact_id === 'string' && Boolean(payloadRaw.artifact_id.trim())) ||
-    (typeof payloadRaw.$artifact === 'string' && Boolean(payloadRaw.$artifact.trim()));
-  if (!allowedEventName && !hasAudioArtifactShape) return null;
+    Boolean(audioEvent || artifactLooksLikeAudio(payloadRaw));
+  if (!audioEvent && !hasAudioArtifactShape) return null;
 
+  const payloadAudioArtifactId =
+    audioEvent || artifactLooksLikeAudio(payloadRaw)
+      ? (typeof payloadRaw.artifact_id === 'string' && payloadRaw.artifact_id.trim()) ||
+        (typeof payloadRaw.$artifact === 'string' && payloadRaw.$artifact.trim()) ||
+        ''
+      : '';
   const artifactId =
     (audioRaw && typeof audioRaw.artifact_id === 'string' && audioRaw.artifact_id.trim()) ||
     (audioRaw && typeof audioRaw.$artifact === 'string' && audioRaw.$artifact.trim()) ||
+    directAudioId ||
     itemArtifactId ||
-    (typeof payloadRaw.artifact_id === 'string' && payloadRaw.artifact_id.trim()) ||
-    (typeof payloadRaw.$artifact === 'string' && payloadRaw.$artifact.trim()) ||
+    payloadAudioArtifactId ||
     '';
   if (!artifactId) return null;
+  const runCandidates = [
+    ...artifactRecordRunCandidates(artifactId, audioRaw, generatedItem, itemArtifact, payloadRaw, obj),
+    ...artifactRunScopeValues(runScope),
+  ].filter((value, index, values) => value && values.indexOf(value) === index);
+  if (!runCandidates.length) return null;
   const audioProvider =
     (generatedItem && typeof generatedItem.media_provider === 'string' && generatedItem.media_provider.trim()) ||
     (audioRaw && typeof audioRaw.media_provider === 'string' && audioRaw.media_provider.trim()) ||
     (generatedItem && typeof generatedItem.provider === 'string' && generatedItem.provider.trim()) ||
     (audioRaw && typeof audioRaw.provider === 'string' && audioRaw.provider.trim()) ||
     (typeof payloadRaw.media_provider === 'string' && payloadRaw.media_provider.trim()) ||
+    (typeof payloadRaw.music_provider === 'string' && payloadRaw.music_provider.trim()) ||
     (typeof payloadRaw.provider === 'string' && payloadRaw.provider.trim()) ||
     undefined;
   const audioModel =
@@ -501,19 +745,14 @@ function extractGeneratedAudioPreview(
     (generatedItem && typeof generatedItem.model === 'string' && generatedItem.model.trim()) ||
     (audioRaw && typeof audioRaw.model === 'string' && audioRaw.model.trim()) ||
     (typeof payloadRaw.media_model === 'string' && payloadRaw.media_model.trim()) ||
+    (typeof payloadRaw.music_model === 'string' && payloadRaw.music_model.trim()) ||
     (typeof payloadRaw.model === 'string' && payloadRaw.model.trim()) ||
     undefined;
 
   return {
     artifactId,
-    src: endpointFromDescriptor(
-      artifactContentDescriptor,
-      '/api/gateway/runs/{run_id}/artifacts/{artifact_id}/content',
-      {
-        run_id: runId,
-        artifact_id: artifactId,
-      }
-    ),
+    src: artifactContentUrl(artifactContentDescriptor, runCandidates[0], artifactId),
+    fallbackSrcs: runCandidates.slice(1).map((candidate) => artifactContentUrl(artifactContentDescriptor, candidate, artifactId)),
     contentType: audioRaw && typeof audioRaw.content_type === 'string' ? audioRaw.content_type : typeof generatedItem?.content_type === 'string' ? generatedItem.content_type : undefined,
     text: typeof payloadRaw.text === 'string' ? payloadRaw.text : typeof payloadRaw.prompt === 'string' ? payloadRaw.prompt : undefined,
     provider: audioProvider,
@@ -569,7 +808,7 @@ function extractGeneratedTextPreview(value: unknown, step: { id: string; nodeTyp
   };
 }
 
-function useArtifactObjectUrl(src: string | null | undefined, contentType?: string) {
+function useArtifactObjectUrl(src: string | null | undefined, contentType?: string, fallbackSrcs?: string[]) {
   const [state, setState] = useState<{ objectUrl: string; loading: boolean; error: string | null }>({
     objectUrl: '',
     loading: false,
@@ -577,8 +816,15 @@ function useArtifactObjectUrl(src: string | null | undefined, contentType?: stri
   });
 
   useEffect(() => {
-    const url = typeof src === 'string' ? src.trim() : '';
-    if (!url) {
+    const seen = new Set<string>();
+    const urls = [src, ...(Array.isArray(fallbackSrcs) ? fallbackSrcs : [])]
+      .map((value) => (typeof value === 'string' ? value.trim() : ''))
+      .filter((value) => {
+        if (!value || seen.has(value)) return false;
+        seen.add(value);
+        return true;
+      });
+    if (!urls.length) {
       setState({ objectUrl: '', loading: false, error: null });
       return;
     }
@@ -587,33 +833,38 @@ function useArtifactObjectUrl(src: string | null | undefined, contentType?: stri
     let objectUrl = '';
     setState({ objectUrl: '', loading: true, error: null });
 
-    gatewayFetch(url)
-      .then(async (res) => {
-        const rawBlob = await res.blob();
-        const blob =
-          contentType && rawBlob.type !== contentType
-            ? new Blob([await rawBlob.arrayBuffer()], { type: contentType })
-            : rawBlob;
-        objectUrl = URL.createObjectURL(blob);
-        if (active) setState({ objectUrl, loading: false, error: null });
-        else URL.revokeObjectURL(objectUrl);
-      })
-      .catch((err) => {
-        const message = err instanceof Error ? err.message : 'Failed to load artifact';
-        if (active) setState({ objectUrl: '', loading: false, error: message });
-      });
+    (async () => {
+      let lastError = '';
+      for (const url of urls) {
+        try {
+          const res = await gatewayFetch(url, { timeoutMs: 0 });
+          const rawBlob = await res.blob();
+          const blob =
+            contentType && rawBlob.type !== contentType
+              ? new Blob([await rawBlob.arrayBuffer()], { type: contentType })
+              : rawBlob;
+          objectUrl = URL.createObjectURL(blob);
+          if (active) setState({ objectUrl, loading: false, error: null });
+          else URL.revokeObjectURL(objectUrl);
+          return;
+        } catch (err) {
+          lastError = err instanceof Error ? err.message : 'Failed to load artifact';
+        }
+      }
+      if (active) setState({ objectUrl: '', loading: false, error: lastError || 'Failed to load artifact' });
+    })();
 
     return () => {
       active = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [contentType, src]);
+  }, [contentType, fallbackSrcs, src]);
 
   return state;
 }
 
 function GeneratedImageCard({ preview, compact = false }: { preview: GeneratedImagePreview; compact?: boolean }) {
-  const { objectUrl, loading, error } = useArtifactObjectUrl(preview.src, preview.contentType || 'image/png');
+  const { objectUrl, loading, error } = useArtifactObjectUrl(preview.src, preview.contentType || 'image/png', preview.fallbackSrcs);
   const displayUrl = objectUrl || preview.src;
   return (
     <div className={`run-generated-image ${compact ? 'run-generated-artifact-card' : ''}`}>
@@ -639,8 +890,10 @@ function GeneratedImageCard({ preview, compact = false }: { preview: GeneratedIm
           <div>
             <span className="run-output-meta-key">Model</span>
             <span className="run-output-meta-val">
-              {preview.provider ? <span className="run-metric-badge metric-provider">{preview.provider}</span> : null}
-              {preview.model ? <span className="run-metric-badge metric-model">{preview.model}</span> : null}
+              <span className="run-output-meta-badges">
+                {preview.provider ? <span className="run-metric-badge metric-provider" title={preview.provider}>{preview.provider}</span> : null}
+                {preview.model ? <span className="run-metric-badge metric-model" title={preview.model}>{preview.model}</span> : null}
+              </span>
             </span>
           </div>
         ) : null}
@@ -662,7 +915,7 @@ function GeneratedImageCard({ preview, compact = false }: { preview: GeneratedIm
 }
 
 function GeneratedAudioCard({ preview, autoPlay = false, compact = false }: { preview: GeneratedAudioPreview; autoPlay?: boolean; compact?: boolean }) {
-  const { objectUrl, loading, error } = useArtifactObjectUrl(preview.src, preview.contentType || 'audio/wav');
+  const { objectUrl, loading, error } = useArtifactObjectUrl(preview.src, preview.contentType || 'audio/wav', preview.fallbackSrcs);
   const displayUrl = objectUrl || preview.src;
   return (
     <div className={`run-generated-audio ${compact ? 'run-generated-artifact-card' : ''}`}>
@@ -687,11 +940,13 @@ function GeneratedAudioCard({ preview, autoPlay = false, compact = false }: { pr
         ) : null}
         {(preview.provider || preview.model || preview.voice) ? (
           <div>
-            <span className="run-output-meta-key">Voice</span>
+            <span className="run-output-meta-key">Audio</span>
             <span className="run-output-meta-val">
-              {preview.provider ? <span className="run-metric-badge metric-provider">{preview.provider}</span> : null}
-              {preview.model ? <span className="run-metric-badge metric-model">{preview.model}</span> : null}
-              {preview.voice ? <span className="run-metric-badge">{preview.voice}</span> : null}
+              <span className="run-output-meta-badges">
+                {preview.provider ? <span className="run-metric-badge metric-provider" title={preview.provider}>{preview.provider}</span> : null}
+                {preview.model ? <span className="run-metric-badge metric-model" title={preview.model}>{preview.model}</span> : null}
+                {preview.voice ? <span className="run-metric-badge" title={preview.voice}>{preview.voice}</span> : null}
+              </span>
             </span>
           </div>
         ) : null}
@@ -723,8 +978,10 @@ function GeneratedTextCard({ preview, compact = false }: { preview: GeneratedTex
           <div>
             <span className="run-output-meta-key">Model</span>
             <span className="run-output-meta-val">
-              {preview.provider ? <span className="run-metric-badge metric-provider">{preview.provider}</span> : null}
-              {preview.model ? <span className="run-metric-badge metric-model">{preview.model}</span> : null}
+              <span className="run-output-meta-badges">
+                {preview.provider ? <span className="run-metric-badge metric-provider" title={preview.provider}>{preview.provider}</span> : null}
+                {preview.model ? <span className="run-metric-badge metric-model" title={preview.model}>{preview.model}</span> : null}
+              </span>
             </span>
           </div>
         ) : null}
@@ -936,18 +1193,20 @@ function getPlaceholderForPin(pin: Pin): string {
     case 'provider_text':
     case 'provider_image':
     case 'provider_voice':
+    case 'provider_music':
       return 'Select provider…';
     case 'model':
     case 'model_text':
     case 'model_image':
     case 'model_voice':
+    case 'model_music':
       return 'Select model…';
     default:
       return '';
   }
 }
 
-type ProviderScope = 'text' | 'image' | 'voice';
+type ProviderScope = 'text' | 'image' | 'voice' | 'music';
 type RunSelectOption = { value: string; label: string };
 
 function providerScopeForPin(pin: Pin): ProviderScope | null {
@@ -960,6 +1219,7 @@ function providerScopeForPin(pin: Pin): ProviderScope | null {
   ) {
     return 'voice';
   }
+  if (pin.type === 'provider_music' || pin.id === 'music_provider' || pin.id === 'provider_music') return 'music';
   if (pin.type === 'provider' || pin.type === 'provider_text' || pin.id === 'provider') return 'text';
   return null;
 }
@@ -976,6 +1236,10 @@ function isVoiceProviderInputPin(pin: Pin): boolean {
   return providerScopeForPin(pin) === 'voice';
 }
 
+function isMusicProviderInputPin(pin: Pin): boolean {
+  return providerScopeForPin(pin) === 'music';
+}
+
 function modelScopeForPin(pin: Pin, pins: Pin[]): ProviderScope {
   if (pin.type === 'model_image' || pin.id === 'image_model' || pin.id === 'model_image') return 'image';
   if (
@@ -986,6 +1250,7 @@ function modelScopeForPin(pin: Pin, pins: Pin[]): ProviderScope {
   ) {
     return 'voice';
   }
+  if (pin.type === 'model_music' || pin.id === 'music_model' || pin.id === 'model_music') return 'music';
   if (pin.type === 'model_text' || pin.id === 'model_text') return 'text';
 
   // Generic `model` is intentionally scoped by the provider pin in the same
@@ -995,25 +1260,26 @@ function modelScopeForPin(pin: Pin, pins: Pin[]): ProviderScope {
     const scopes = new Set(pins.map(providerScopeForPin).filter(Boolean) as ProviderScope[]);
     if (scopes.size === 1 && scopes.has('image')) return 'image';
     if (scopes.size === 1 && scopes.has('voice')) return 'voice';
+    if (scopes.size === 1 && scopes.has('music')) return 'music';
     return 'text';
   }
   return 'text';
 }
 
 function isModelInputPin(pin: Pin): boolean {
-  return pin.type === 'model' || pin.type === 'model_text' || pin.type === 'model_image' || pin.type === 'model_voice' || pin.id === 'model' || pin.id.endsWith('_model');
+  return (
+    pin.type === 'model' ||
+    pin.type === 'model_text' ||
+    pin.type === 'model_image' ||
+    pin.type === 'model_voice' ||
+    pin.type === 'model_music' ||
+    pin.id === 'model' ||
+    pin.id.endsWith('_model')
+  );
 }
 
 function textValue(value: unknown): string {
   return typeof value === 'string' && value.trim() ? value.trim() : '';
-}
-
-function recordValue(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
-}
-
-function arrayValue(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : [];
 }
 
 function dedupeOptions(options: RunSelectOption[]): RunSelectOption[] {
@@ -1030,67 +1296,24 @@ function dedupeOptions(options: RunSelectOption[]): RunSelectOption[] {
   return out;
 }
 
-function optionId(item: unknown): string {
-  if (typeof item === 'string') return item.trim();
-  const rec = recordValue(item);
-  if (!rec) return '';
-  for (const key of ['id', 'model', 'model_id', 'name', 'voice_id', 'profile_id']) {
-    const value = textValue(rec[key]);
-    if (value) return value;
-  }
-  return '';
-}
-
-function optionLabel(item: unknown, fallback: string): string {
-  const rec = recordValue(item);
-  if (!rec) return fallback;
-  return textValue(rec.label) || textValue(rec.display_name) || textValue(rec.name) || fallback;
-}
-
 function providerOptionsFromCatalog(payload: unknown, keys: string[]): RunSelectOption[] {
-  const rec = recordValue(payload);
-  if (!rec) return [];
-  const out: RunSelectOption[] = [];
-  const add = (value: unknown) => {
-    const id = typeof value === 'string' ? value.trim() : optionId(value);
-    if (!id) return;
-    out.push({ value: id, label: optionLabel(value, id) });
-  };
-  for (const key of keys) {
-    for (const item of arrayValue(rec[key])) add(item);
-  }
-  for (const key of ['models_by_provider', 'provider_models', 'tts_models_by_provider', 'stt_models_by_provider']) {
-    const map = recordValue(rec[key]);
-    if (!map) continue;
-    for (const provider of Object.keys(map)) add(provider);
-  }
-  return dedupeOptions(out);
+  return providerOptionsFromGatewayCatalog(payload, keys, [
+    'models_by_provider',
+    'provider_models',
+    'tts_models_by_provider',
+    'stt_models_by_provider',
+    'music_models_by_provider',
+  ]).map((option) => ({ value: option.value, label: option.label }));
 }
 
 function modelOptionsFromCatalog(payload: unknown, provider: string, keys: string[]): RunSelectOption[] {
-  const rec = recordValue(payload);
-  if (!rec) return [];
-  const out: RunSelectOption[] = [];
-  const wanted = provider.trim().toLowerCase();
-  const add = (item: unknown, itemProvider = provider) => {
-    const id = optionId(item);
-    if (!id) return;
-    const recItem = recordValue(item);
-    const p = textValue(recItem?.provider) || textValue(recItem?.provider_id) || textValue(recItem?.provider_name) || itemProvider;
-    if (wanted && p && p.trim().toLowerCase() !== wanted) return;
-    out.push({ value: id, label: optionLabel(item, p ? `${p} / ${id}` : id) });
-  };
-  for (const key of keys) {
-    for (const item of arrayValue(rec[key])) add(item);
-  }
-  for (const key of ['models_by_provider', 'provider_models', 'tts_models_by_provider', 'stt_models_by_provider']) {
-    const map = recordValue(rec[key]);
-    if (!map) continue;
-    for (const [mapProvider, values] of Object.entries(map)) {
-      for (const item of arrayValue(values)) add(item, mapProvider);
-    }
-  }
-  return dedupeOptions(out);
+  return modelOptionsFromGatewayCatalog(payload, provider, keys, [
+    'models_by_provider',
+    'provider_models',
+    'tts_models_by_provider',
+    'stt_models_by_provider',
+    'music_models_by_provider',
+  ]).map((option) => ({ value: option.value, label: option.label }));
 }
 
 export function RunFlowModal({
@@ -1263,6 +1486,7 @@ export function RunFlowModal({
   const [showIgnoredPaths, setShowIgnoredPaths] = useState(false);
   const [sessionIdOverride, setSessionIdOverride] = useState('');
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
+  const lastAutoTerminalStepIdRef = useRef<string | null>(null);
   const [rawJsonOpen, setRawJsonOpen] = useState(false);
   // Nested subflow observability: folded by default; per-step expansion keyed by the
   // parent step id (stable across this modal's event stream).
@@ -1288,6 +1512,14 @@ export function RunFlowModal({
   const [promptCacheResult, setPromptCacheResult] = useState<Record<string, unknown> | null>(null);
   const [promptCacheError, setPromptCacheError] = useState<string | null>(null);
   const [promptCacheRuntimeHint, setPromptCacheRuntimeHint] = useState<Record<string, unknown> | null>(null);
+  const [durableBlocBusy, setDurableBlocBusy] = useState(false);
+  const [durableBlocResult, setDurableBlocResult] = useState<Record<string, unknown> | null>(null);
+  const [durableBlocError, setDurableBlocError] = useState<string | null>(null);
+  const [durableBlocId, setDurableBlocId] = useState('');
+  const [durableBlocSha256, setDurableBlocSha256] = useState('');
+  const [durableBlocArtifactPath, setDurableBlocArtifactPath] = useState('');
+  const [durableBlocCacheKey, setDurableBlocCacheKey] = useState('');
+  const [durablePromptCacheBindingInput, setDurablePromptCacheBindingInput] = useState('');
 
   const sessionPinId = useMemo(() => {
     const pin = formInputPins.find((p) => p.id === 'session_id' || p.id === 'sessionId');
@@ -1335,6 +1567,15 @@ export function RunFlowModal({
 
   const voiceModelMode = voiceProviderPinId && voiceProviderPinId.toLowerCase().includes('stt') ? 'stt' : 'tts';
 
+  const musicProviderPinId = useMemo(() => {
+    const pin = formInputPins.find(isMusicProviderInputPin);
+    return pin?.id || null;
+  }, [formInputPins]);
+
+  const selectedMusicProvider = useMemo(() => {
+    return musicProviderPinId ? (formValues[musicProviderPinId] || '') : '';
+  }, [formValues, musicProviderPinId]);
+
   const modelPinId = useMemo(() => {
     const pin = formInputPins.find((p) => isModelInputPin(p) && modelScopeForPin(p, formInputPins) === 'text');
     return pin?.id || null;
@@ -1351,6 +1592,37 @@ export function RunFlowModal({
 
   const promptCacheSessionLifecycle = gatewayContracts?.common?.prompt_cache?.session_lifecycle === true;
   const promptCacheSessionEndpoints = gatewayContracts?.common?.prompt_cache?.session_endpoints || {};
+  const durableBlocPromptCacheContract = gatewayContracts?.common?.prompt_cache?.durable_blocs;
+  const durableBlocEndpoints = durableBlocPromptCacheContract?.endpoints || {};
+  const durableBlocRouteAvailable = durableBlocPromptCacheContract?.route_available !== false;
+  const durableBlocAvailable = Boolean(
+    durableBlocPromptCacheContract &&
+      durableBlocRouteAvailable &&
+      durableBlocPromptCacheContract.available !== false &&
+      durableBlocEndpoints.record &&
+      durableBlocEndpoints.kv_manifest &&
+      durableBlocEndpoints.kv_list &&
+      durableBlocEndpoints.kv_ensure &&
+      durableBlocEndpoints.kv_load
+  );
+  const durableBlocStatus = (() => {
+    if (!durableBlocPromptCacheContract) return 'not advertised';
+    if (!durableBlocRouteAvailable) return 'route unavailable';
+    if (durableBlocPromptCacheContract.available === false) return 'unavailable';
+    if (durableBlocResult) return String(durableBlocResult.operation || 'loaded');
+    return 'exact reuse';
+  })();
+  const durableBlocSelectionNote = (() => {
+    if (!durableBlocPromptCacheContract) return 'Gateway discovery did not advertise durable bloc prompt-cache support.';
+    if (!durableBlocRouteAvailable) return 'Durable bloc routes are not available on this Gateway.';
+    if (durableBlocPromptCacheContract.available === false) {
+      return durableBlocPromptCacheContract.config_hint || 'This Gateway runtime is not wired to durable bloc controls.';
+    }
+    if (!durableBlocId.trim() && !durableBlocSha256.trim()) {
+      return 'Enter a bloc_id or sha256 to inspect or load an exact-reuse binding.';
+    }
+    return '';
+  })();
   const runInputDataDescriptor = gatewayContracts?.common?.runs?.input_data || gatewayContracts?.flow_editor?.runs?.input_data;
   const strictGatewayContract = Boolean(
     gatewayContracts && typeof gatewayContracts.version === 'number' && gatewayContracts.version >= 1
@@ -1396,6 +1668,12 @@ export function RunFlowModal({
       : promptCacheResult && typeof promptCacheResult.hint === 'string' && promptCacheResult.hint.trim()
         ? promptCacheResult.hint.trim()
         : '';
+  const durableBlocSummary = useMemo(() => summarizeDurableBlocResult(durableBlocResult), [durableBlocResult]);
+  const durableBlocLoadedBinding = useMemo(() => extractPromptCacheBinding(durableBlocResult), [durableBlocResult]);
+  const durablePromptCacheBindingParsed = useMemo(
+    () => parsePromptCacheBindingText(durablePromptCacheBindingInput),
+    [durablePromptCacheBindingInput]
+  );
 
   const wantProviderDropdown = Boolean(isOpen && formInputPins.some(isTextProviderInputPin));
   const wantModelDropdown = Boolean(
@@ -1407,10 +1685,22 @@ export function RunFlowModal({
   const models = Array.isArray(modelsQuery.data) ? modelsQuery.data : [];
 
   const discovery = gatewayContracts?.common?.discovery || {};
+  const generatedMusicContract =
+    gatewayContracts?.flow_editor?.media?.generated_music || gatewayContracts?.assistant?.media?.generated_music;
   const visionProviderModelsEndpoint = discovery.vision_provider_models || '';
   const voiceCatalogEndpoint = discovery.voice_voices || '';
   const ttsModelsEndpoint = discovery.audio_speech_models || '';
   const sttModelsEndpoint = discovery.audio_transcription_models || '';
+  const musicProvidersEndpoint =
+    discovery.audio_music_providers ||
+    (typeof generatedMusicContract?.direct_endpoint?.providers_endpoint === 'string' ? generatedMusicContract.direct_endpoint.providers_endpoint : '');
+  const musicModelsEndpoint =
+    discovery.audio_music_models ||
+    (typeof generatedMusicContract?.direct_endpoint?.provider_models_endpoint === 'string' ? generatedMusicContract.direct_endpoint.provider_models_endpoint : '');
+  const musicProviderModelsTask =
+    typeof generatedMusicContract?.direct_endpoint?.provider_models_task === 'string' && generatedMusicContract.direct_endpoint.provider_models_task.trim()
+      ? generatedMusicContract.direct_endpoint.provider_models_task.trim()
+      : 'text_to_music';
 
   const wantsImageProviderDropdown = Boolean(isOpen && formInputPins.some(isImageProviderInputPin));
   const wantsImageModelDropdown = Boolean(
@@ -1504,6 +1794,37 @@ export function RunFlowModal({
   const voiceProviderOptions = Array.isArray(voiceProvidersQuery.data) ? voiceProvidersQuery.data : [];
   const voiceModelOptions = Array.isArray(voiceModelsQuery.data) ? voiceModelsQuery.data : [];
 
+  const wantsMusicProviderDropdown = Boolean(isOpen && formInputPins.some(isMusicProviderInputPin));
+  const wantsMusicModelDropdown = Boolean(
+    isOpen && formInputPins.some((p) => isModelInputPin(p) && modelScopeForPin(p, formInputPins) === 'music')
+  );
+  const musicProvidersQuery = useQuery({
+    queryKey: ['run-input', 'music-providers', musicProvidersEndpoint, musicProviderModelsTask],
+    enabled: wantsMusicProviderDropdown && Boolean(musicProvidersEndpoint),
+    staleTime: 30_000,
+    queryFn: async () => {
+      const data = await gatewayJson<Record<string, unknown>>(
+        gatewayPath(musicProvidersEndpoint, {}, { task: musicProviderModelsTask }),
+        { timeoutMs: 5_000 }
+      );
+      return providerOptionsFromCatalog(data, ['music_providers', 'providers', 'available_providers', 'provider_details']);
+    },
+  });
+  const musicModelsQuery = useQuery({
+    queryKey: ['run-input', 'music-models', musicModelsEndpoint, selectedMusicProvider, musicProviderModelsTask],
+    enabled: wantsMusicModelDropdown && Boolean(musicModelsEndpoint) && Boolean(selectedMusicProvider.trim()),
+    staleTime: 30_000,
+    queryFn: async () => {
+      const data = await gatewayJson<Record<string, unknown>>(
+        gatewayPath(musicModelsEndpoint, {}, { task: musicProviderModelsTask, provider: selectedMusicProvider }),
+        { timeoutMs: 30_000 }
+      );
+      return modelOptionsFromCatalog(data, selectedMusicProvider, ['models', 'items', 'data', 'provider_models', 'music_models']);
+    },
+  });
+  const musicProviderOptions = Array.isArray(musicProvidersQuery.data) ? musicProvidersQuery.data : [];
+  const musicModelOptions = Array.isArray(musicModelsQuery.data) ? musicModelsQuery.data : [];
+
   const wantToolsDropdown = Boolean(isOpen && formInputPins.some((p) => p.type === 'tools'));
   const toolsQuery = useTools(wantToolsDropdown);
   const toolSpecs = Array.isArray(toolsQuery.data) ? toolsQuery.data : [];
@@ -1595,6 +1916,11 @@ export function RunFlowModal({
     setPromptCacheError(null);
     setPromptCacheRuntimeHint(null);
   }, [flowId, promptCacheModel, promptCacheProvider, promptCacheSessionId]);
+
+  useEffect(() => {
+    setDurableBlocResult(null);
+    setDurableBlocError(null);
+  }, [durableBlocId, durableBlocSha256, promptCacheModel, promptCacheProvider]);
 
   // When "Random" is enabled, the gateway will generate a workspace on run start.
 
@@ -1772,6 +2098,88 @@ export function RunFlowModal({
     [buildPromptCachePayload, promptCacheEnabled, promptCacheSessionEndpoints, promptCacheSessionId]
   );
 
+  const buildDurableBlocPayload = useCallback(() => {
+    const payload: Record<string, unknown> = {};
+    const rawBlocId = durableBlocId.trim();
+    if (rawBlocId) {
+      const parsed = Number.parseInt(rawBlocId, 10);
+      payload.bloc_id = Number.isFinite(parsed) ? parsed : rawBlocId;
+    }
+    if (durableBlocSha256.trim()) payload.sha256 = durableBlocSha256.trim();
+    if (promptCacheProvider) payload.provider = promptCacheProvider;
+    if (promptCacheModel) payload.model = promptCacheModel;
+    if (durableBlocArtifactPath.trim()) payload.artifact_path = durableBlocArtifactPath.trim();
+    if (durableBlocCacheKey.trim()) payload.key = durableBlocCacheKey.trim();
+    return payload;
+  }, [durableBlocArtifactPath, durableBlocCacheKey, durableBlocId, durableBlocSha256, promptCacheModel, promptCacheProvider]);
+
+  const runDurableBlocOperation = useCallback(
+    async (operation: DurableBlocOperation) => {
+      if (!durableBlocAvailable && operation !== 'list') return;
+      const payload = buildDurableBlocPayload();
+      if (!payload.bloc_id && !payload.sha256) {
+        setDurableBlocError('Enter a bloc_id or sha256 first.');
+        return;
+      }
+
+      setDurableBlocBusy(true);
+      setDurableBlocError(null);
+      try {
+        const query = {
+          bloc_id: payload.bloc_id as string | number | undefined,
+          sha256: payload.sha256 as string | undefined,
+          provider: payload.provider as string | undefined,
+          model: payload.model as string | undefined,
+          artifact_path: payload.artifact_path as string | undefined,
+        };
+        const data =
+          operation === 'record' || operation === 'list' || operation === 'kv_manifest' || operation === 'kv_list'
+            ? await gatewayJson<Record<string, unknown>>(
+                gatewayPath(
+                  durableBlocEndpoint(
+                    durableBlocPromptCacheContract,
+                    operation,
+                    operation === 'record'
+                      ? '/api/gateway/blocs/record'
+                      : operation === 'list'
+                        ? '/api/gateway/blocs'
+                        : operation === 'kv_manifest'
+                          ? '/api/gateway/blocs/kv/manifest'
+                          : '/api/gateway/blocs/kv/list'
+                  ),
+                  {},
+                  query
+                )
+              )
+            : await gatewayJson<Record<string, unknown>>(
+                gatewayPath(
+                  durableBlocEndpoint(
+                    durableBlocPromptCacheContract,
+                    operation,
+                    operation === 'kv_ensure' ? '/api/gateway/blocs/kv/ensure' : '/api/gateway/blocs/kv/load'
+                  )
+                ),
+                jsonRequest(
+                  operation === 'kv_load'
+                    ? { ...payload, make_default: false, force_rebuild: false }
+                    : { ...payload, force_rebuild: false },
+                  { method: 'POST' }
+                )
+              );
+        setDurableBlocResult(data);
+        const binding = extractPromptCacheBinding(data);
+        if (binding) {
+          setDurablePromptCacheBindingInput(typeof binding === 'string' ? binding : stringifyJson(binding));
+        }
+      } catch (e) {
+        setDurableBlocError(e instanceof Error ? e.message : 'Durable prompt-cache request failed');
+      } finally {
+        setDurableBlocBusy(false);
+      }
+    },
+    [buildDurableBlocPayload, durableBlocAvailable, durableBlocPromptCacheContract]
+  );
+
   // Submit the form
   const handleSubmit = useCallback(() => {
     // Build input data from form values
@@ -1840,6 +2248,15 @@ export function RunFlowModal({
       Object.assign(inputData, promptCacheRuntimeHint);
     }
 
+    if (durablePromptCacheBindingInput.trim()) {
+      const binding = durablePromptCacheBindingParsed;
+      if (binding) {
+        inputData.prompt_cache_binding = binding;
+      } else {
+        console.warn('#FALLBACK: prompt_cache_binding ignored because it is not valid JSON or a binding id string');
+      }
+    }
+
     if (followUpContext?.messages?.length) {
       const existingContextRaw = inputData.context;
       const existingContext =
@@ -1867,6 +2284,8 @@ export function RunFlowModal({
     sessionPinId,
     derivedSessionId,
     promptCacheRuntimeHint,
+    durablePromptCacheBindingInput,
+    durablePromptCacheBindingParsed,
   ]);
 
   type StepStatus = 'running' | 'completed' | 'waiting' | 'failed';
@@ -2181,8 +2600,6 @@ export function RunFlowModal({
       return text;
     };
 
-    const hasExplicitFlowEnd = Array.from(nodeById.values()).some((n) => n.data?.nodeType === 'on_flow_end');
-
     for (let i = 0; i < events.length; i++) {
       const ev = events[i];
       const evRunId = getActualRunId(ev);
@@ -2190,28 +2607,49 @@ export function RunFlowModal({
       // We show only node steps in the left timeline; flow-level status is surfaced in the header / final result.
       if (ev.type === 'flow_start') continue;
       if (ev.type === 'flow_complete') {
-        if (!hasExplicitFlowEnd) {
+        const runKey = evRunId || ev.runId || '';
+        let terminalIdx = -1;
+        for (let j = all.length - 1; j >= 0; j--) {
+          const s = all[j];
+          if (s.nodeType !== 'on_flow_end') continue;
+          if ((s.runId || '') !== runKey) continue;
+          terminalIdx = j;
+          break;
+        }
+
+        const completedAt = typeof ev.ts === 'string' ? ev.ts : undefined;
+        const terminalSummary = summarize(ev.result) || 'Workflow completed';
+        if (terminalIdx >= 0) {
+          const prior = all[terminalIdx];
+          all[terminalIdx] = {
+            ...prior,
+            status: 'completed',
+            waiting: undefined,
+            output: prior.output ?? ev.result,
+            summary: prior.summary || terminalSummary,
+            metrics: mergeMetricsPreferLonger(prior.metrics ?? null, ev.meta ?? null),
+            runtimeStepId: prior.runtimeStepId ?? evStepId,
+            endedAt: completedAt || prior.endedAt,
+          };
+        } else {
           const implicitId = '__implicit_flow_end__';
           const meta = resolveNodeMeta(implicitId);
-          const runKey = evRunId || ev.runId || '';
-          const alreadyAdded = all.some((s) => s.nodeId === implicitId && (s.runId || '') === runKey);
-          if (!alreadyAdded) {
-            all.push({
-              id: `flow_complete:${runKey || 'root'}:${i}`,
-              status: 'completed',
-              runId: evRunId || ev.runId,
-              runtimeStepId: evStepId,
-              nodeId: implicitId,
-              nodeLabel: meta?.label,
-              nodeType: meta?.type,
-              nodeIcon: meta?.icon,
-              nodeColor: meta?.color,
-              summary: 'Workflow completed',
-              metrics: ev.meta,
-              startedAt: typeof ev.ts === 'string' ? ev.ts : undefined,
-              endedAt: typeof ev.ts === 'string' ? ev.ts : undefined,
-            });
-          }
+          all.push({
+            id: `flow_complete:${runKey || 'root'}:${i}`,
+            status: 'completed',
+            runId: evRunId || ev.runId,
+            runtimeStepId: evStepId,
+            nodeId: implicitId,
+            nodeLabel: meta?.label,
+            nodeType: meta?.type,
+            nodeIcon: meta?.icon,
+            nodeColor: meta?.color,
+            output: ev.result,
+            summary: terminalSummary,
+            metrics: ev.meta,
+            startedAt: completedAt,
+            endedAt: completedAt,
+          });
         }
         continue;
       }
@@ -3065,6 +3503,14 @@ export function RunFlowModal({
     });
   }, [displayStepById, displayStepTree, isOpen]);
 
+  const completedTerminalStep = useMemo(() => {
+    for (let i = steps.length - 1; i >= 0; i--) {
+      const step = steps[i];
+      if (step.nodeType === 'on_flow_end' && step.status === 'completed') return step;
+    }
+    return null;
+  }, [steps]);
+
   // Keep selection valid; default to last step.
   useEffect(() => {
     if (!isOpen) return;
@@ -3075,6 +3521,23 @@ export function RunFlowModal({
     if (selectedStepId && displayStepById.has(selectedStepId)) return;
     setSelectedStepId(steps[steps.length - 1].id);
   }, [displayStepById, isOpen, selectedStepId, steps]);
+
+  useEffect(() => {
+    lastAutoTerminalStepIdRef.current = null;
+  }, [rootRunId]);
+
+  // When a run finishes, land the details pane on the terminal On Flow End step.
+  // This is separate from live following so a user can inspect another completed
+  // step after the automatic terminal selection has happened once.
+  useEffect(() => {
+    if (!isOpen) return;
+    if (isRunning || isWaiting) return;
+    if (!completedTerminalStep) return;
+    if (!displayStepById.has(completedTerminalStep.id)) return;
+    if (lastAutoTerminalStepIdRef.current === completedTerminalStep.id) return;
+    lastAutoTerminalStepIdRef.current = completedTerminalStep.id;
+    setSelectedStepId(completedTerminalStep.id);
+  }, [completedTerminalStep, displayStepById, isOpen, isRunning, isWaiting]);
 
   // Follow the live execution: when new steps arrive during a run (or waiting),
   // auto-select the latest step so the user always sees what's happening.
@@ -3135,7 +3598,8 @@ export function RunFlowModal({
   const isToolApprovalWait = approvalMode === 'approval_required' || approvalKind === 'tool_approval';
   const showWaitingPanel = Boolean(waitingPayload) && selectedStep?.status === 'waiting';
   const isSubworkflowWait = waitingReasonRaw.trim().toLowerCase() === 'subworkflow';
-  const selectedResidencyNoOp = selectedStep?.nodeType === 'model_residency' && isResidencyNoOpResult(selectedStep.output);
+  const selectedResidencyResultStatus =
+    selectedStep?.nodeType === 'model_residency' ? residencyResultStatusInfo(selectedStep.output) : null;
   const selectedDurationLabel =
     selectedStep?.metrics && selectedStep.metrics.duration_ms != null
       ? formatDuration(selectedStep.metrics.duration_ms)
@@ -3300,11 +3764,11 @@ export function RunFlowModal({
   }, [derivedAgentOutput, selectedStep]);
 
   const generatedImagePreview = useMemo(
-    () => extractGeneratedImagePreview(resolvedStepOutput, selectedStep?.runId || rootRunId || null, artifactContentDescriptor),
+    () => extractGeneratedImagePreview(resolvedStepOutput, [selectedStep?.runId, rootRunId], artifactContentDescriptor),
     [artifactContentDescriptor, resolvedStepOutput, rootRunId, selectedStep?.runId]
   );
   const generatedAudioPreview = useMemo(
-    () => extractGeneratedAudioPreview(resolvedStepOutput, selectedStep?.runId || rootRunId || null, artifactContentDescriptor),
+    () => extractGeneratedAudioPreview(resolvedStepOutput, [selectedStep?.runId, rootRunId], artifactContentDescriptor),
     [artifactContentDescriptor, resolvedStepOutput, rootRunId, selectedStep?.runId]
   );
 
@@ -3313,13 +3777,12 @@ export function RunFlowModal({
     for (const step of steps) {
       const output = step.output;
       if (output == null) continue;
-      const runId = step.runId || rootRunId || null;
-      const image = extractGeneratedImagePreview(output, runId, artifactContentDescriptor);
+      const image = extractGeneratedImagePreview(output, [step.runId, rootRunId], artifactContentDescriptor);
       if (image) {
         map.set(step.id, { kind: 'image', artifactId: image.artifactId });
         continue;
       }
-      const audio = extractGeneratedAudioPreview(output, runId, artifactContentDescriptor);
+      const audio = extractGeneratedAudioPreview(output, [step.runId, rootRunId], artifactContentDescriptor);
       if (audio) map.set(step.id, { kind: 'audio', artifactId: audio.artifactId });
       const text = extractGeneratedTextPreview(output, step);
       if (text) map.set(step.id, { kind: 'text', artifactId: text.artifactId });
@@ -3333,9 +3796,8 @@ export function RunFlowModal({
     for (const step of steps) {
       const output = step.output;
       if (output == null) continue;
-      const runId = step.runId || rootRunId || null;
       const stepLabel = step.nodeLabel || step.nodeId || step.nodeType || step.id;
-      const image = extractGeneratedImagePreview(output, runId, artifactContentDescriptor);
+      const image = extractGeneratedImagePreview(output, [step.runId, rootRunId], artifactContentDescriptor);
       if (image) {
         const key = `image:${image.artifactId}`;
         if (!seen.has(key)) {
@@ -3343,7 +3805,7 @@ export function RunFlowModal({
           out.push({ kind: 'image', preview: image, stepLabel });
         }
       }
-      const audio = extractGeneratedAudioPreview(output, runId, artifactContentDescriptor);
+      const audio = extractGeneratedAudioPreview(output, [step.runId, rootRunId], artifactContentDescriptor);
       if (audio) {
         const key = `audio:${audio.artifactId}`;
         if (!seen.has(key)) {
@@ -4317,8 +4779,9 @@ export function RunFlowModal({
     const effect = step.effect && typeof step.effect === 'object' ? (step.effect as Record<string, unknown>) : null;
     const effectType = effect && typeof effect.type === 'string' ? effect.type : '';
     const result = step.result && typeof step.result === 'object' ? (step.result as Record<string, unknown>) : null;
-    if (status === 'completed' && effectType === 'model_residency' && isResidencyNoOpResult(result)) {
-      return { label: 'NO-OP', className: 'waiting' };
+    if (status === 'completed' && effectType === 'model_residency') {
+      const residencyStatus = residencyResultStatusInfo(result);
+      if (residencyStatus) return residencyStatus;
     }
     return { label: traceStatusLabel(status), className: status };
   };
@@ -4639,8 +5102,8 @@ export function RunFlowModal({
                           s.status === 'running'
                             ? { label: 'RUNNING', className: 'running' }
                             : s.status === 'completed'
-                              ? s.nodeType === 'model_residency' && isResidencyNoOpResult(s.output)
-                                ? { label: 'NO-OP', className: 'waiting' }
+                              ? s.nodeType === 'model_residency'
+                                ? residencyResultStatusInfo(s.output) || { label: 'OK', className: 'completed' }
                                 : { label: 'OK', className: 'completed' }
                               : s.status === 'waiting'
                                 ? isSubworkflowWait
@@ -4803,9 +5266,9 @@ export function RunFlowModal({
                         {selectedDurationLabel}
                       </span>
                     ) : null}
-                    {selectedResidencyNoOp ? (
-                      <span className="run-metric-badge metric-status" title="Optional residency request completed without changing runtime state">
-                        NO-OP
+                    {selectedResidencyResultStatus ? (
+                      <span className="run-metric-badge metric-status" title={selectedResidencyResultStatus.title}>
+                        {selectedResidencyResultStatus.label}
                       </span>
                     ) : null}
                     {parentRunId && onSelectRunId ? (
@@ -4833,10 +5296,10 @@ export function RunFlowModal({
 
 		              {selectedStep ? (
 		                <div className={detailsBodyClass}>
-                      {selectedResidencyNoOp ? (
+                      {selectedResidencyResultStatus ? (
                         <div className="run-waiting">
                           <div className="run-waiting-prompt">
-                            This residency request completed without changing runtime state.
+                            {selectedResidencyResultStatus.message}
                           </div>
                         </div>
                       ) : null}
@@ -5094,7 +5557,9 @@ export function RunFlowModal({
 
                           {generatedAudioPreview ? (
                             <div className="run-output-section">
-                              <div className="run-output-title">Generated voice</div>
+                              <div className="run-output-title">
+                                {selectedStep?.nodeType === 'generate_music' ? 'Generated music' : 'Generated audio'}
+                              </div>
                               <GeneratedAudioCard preview={generatedAudioPreview} autoPlay />
                             </div>
                           ) : null}
@@ -5654,6 +6119,35 @@ export function RunFlowModal({
                             );
                           }
 
+                          if (isMusicProviderInputPin(pin)) {
+                            return (
+                              <div key={pin.id} className="run-form-field">
+                                <label className="run-form-label">
+                                  {pin.label}
+                                  <span className="run-form-type">({pin.type})</span>
+                                </label>
+                                <AfSelect
+                                  value={value}
+                                  placeholder={musicProvidersQuery.isLoading ? 'Loading…' : 'Select…'}
+                                  options={musicProviderOptions}
+                                  disabled={musicProvidersQuery.isLoading}
+                                  loading={musicProvidersQuery.isLoading}
+                                  searchable
+                                  searchPlaceholder="Search music providers…"
+                                  onChange={(v) =>
+                                    setFormValues((prev) => {
+                                      const next = { ...prev, [pin.id]: v };
+                                      for (const candidate of formInputPins) {
+                                        if (isModelInputPin(candidate) && modelScopeForPin(candidate, formInputPins) === 'music') next[candidate.id] = '';
+                                      }
+                                      return next;
+                                    })
+                                  }
+                                />
+                              </div>
+                            );
+                          }
+
                           if (isTextProviderInputPin(pin)) {
                             return (
                               <div key={pin.id} className="run-form-field">
@@ -5686,18 +6180,28 @@ export function RunFlowModal({
                           if (isModelInputPin(pin)) {
                             const scope = modelScopeForPin(pin, formInputPins);
                             const scopeProvider =
-                              scope === 'image' ? selectedImageProvider : scope === 'voice' ? selectedVoiceProvider : selectedProvider;
+                              scope === 'image'
+                                ? selectedImageProvider
+                                : scope === 'voice'
+                                  ? selectedVoiceProvider
+                                  : scope === 'music'
+                                    ? selectedMusicProvider
+                                    : selectedProvider;
                             const scopeLoading =
                               scope === 'image'
                                 ? imageModelsQuery.isLoading
                                 : scope === 'voice'
                                   ? voiceModelsQuery.isLoading
+                                  : scope === 'music'
+                                    ? musicModelsQuery.isLoading
                                   : modelsQuery.isLoading;
                             const scopeOptions =
                               scope === 'image'
                                 ? imageModelOptions
                                 : scope === 'voice'
                                   ? voiceModelOptions
+                                  : scope === 'music'
+                                    ? musicModelOptions
                                   : models.map((m) => ({ value: m, label: m }));
                             return (
                               <div key={pin.id} className="run-form-field">
@@ -5722,9 +6226,13 @@ export function RunFlowModal({
                                         ? voiceModelMode === 'stt'
                                           ? 'Search STT models…'
                                           : 'Search TTS models…'
+                                        : scope === 'music'
+                                          ? 'Search music models…'
                                         : 'Search models…'
                                   }
-                                  onChange={(v) => handleFieldChange(pin.id, v)}
+                                  onChange={(v) => {
+                                    handleFieldChange(pin.id, v);
+                                  }}
                                 />
                               </div>
                             );
@@ -5855,12 +6363,15 @@ export function RunFlowModal({
                     {promptCacheSessionLifecycle ? (
                       <details className="run-form-section">
                         <summary className="run-form-section-summary">
-                          <span className="run-form-section-title">Prompt Cache</span>
+                          <span className="run-form-section-title">Session prompt cache (volatile)</span>
                           <span className="run-form-section-meta">
                             {promptCacheHeaderStatus}
                           </span>
                         </summary>
                         <div className="run-form-section-body">
+                          <p className="run-form-note">
+                            Session cache is a volatile convenience for this Gateway session. It is separate from durable exact reuse.
+                          </p>
                           <div className="run-form-inline run-prompt-cache-actions">
                             <button
                               type="button"
@@ -5926,6 +6437,165 @@ export function RunFlowModal({
                         </div>
                       </details>
                     ) : null}
+
+                    <details className="run-form-section">
+                      <summary className="run-form-section-summary">
+                        <span className="run-form-section-title">Durable prompt cache (exact reuse)</span>
+                        <span className="run-form-section-meta">
+                          {durableBlocStatus}
+                        </span>
+                      </summary>
+                      <div className="run-form-section-body">
+                        <p className="run-form-note">
+                          Durable blocs are operator controls for exact reusable prompt prefixes. Loading a KV artifact returns a
+                          <code> prompt_cache_binding</code>; the run uses it only when you wire or submit that binding explicitly.
+                        </p>
+                        <div className="run-form-inline">
+                          <input
+                            type="text"
+                            className="run-form-input"
+                            value={durableBlocId}
+                            onChange={(e) => setDurableBlocId(e.target.value)}
+                            placeholder="bloc_id"
+                            disabled={isRunning || durableBlocBusy || !durableBlocPromptCacheContract}
+                          />
+                          <input
+                            type="text"
+                            className="run-form-input"
+                            value={durableBlocSha256}
+                            onChange={(e) => setDurableBlocSha256(e.target.value)}
+                            placeholder="sha256"
+                            disabled={isRunning || durableBlocBusy || !durableBlocPromptCacheContract}
+                          />
+                        </div>
+                        <div className="run-form-inline">
+                          <input
+                            type="text"
+                            className="run-form-input"
+                            value={promptCacheProvider}
+                            readOnly
+                            placeholder="provider inferred from graph or run input"
+                            title="Provider is inferred from the run form or graph."
+                          />
+                          <input
+                            type="text"
+                            className="run-form-input"
+                            value={promptCacheModel}
+                            readOnly
+                            placeholder="model inferred from graph or run input"
+                            title="Model is inferred from the run form or graph."
+                          />
+                        </div>
+                        <div className="run-form-inline">
+                          <input
+                            type="text"
+                            className="run-form-input"
+                            value={durableBlocArtifactPath}
+                            onChange={(e) => setDurableBlocArtifactPath(e.target.value)}
+                            placeholder="artifact_path (optional)"
+                            disabled={isRunning || durableBlocBusy || !durableBlocAvailable}
+                          />
+                          <input
+                            type="text"
+                            className="run-form-input"
+                            value={durableBlocCacheKey}
+                            onChange={(e) => setDurableBlocCacheKey(e.target.value)}
+                            placeholder="cache key for kv_load (optional)"
+                            disabled={isRunning || durableBlocBusy || !durableBlocAvailable}
+                          />
+                        </div>
+                        <div className="run-form-inline run-prompt-cache-actions">
+                          <button
+                            type="button"
+                            className="modal-button"
+                            onClick={() => void runDurableBlocOperation('record')}
+                            disabled={!durableBlocAvailable || durableBlocBusy || isRunning}
+                          >
+                            Record
+                          </button>
+                          <button
+                            type="button"
+                            className="modal-button"
+                            onClick={() => void runDurableBlocOperation('kv_manifest')}
+                            disabled={!durableBlocAvailable || durableBlocBusy || isRunning}
+                          >
+                            Manifest
+                          </button>
+                          <button
+                            type="button"
+                            className="modal-button"
+                            onClick={() => void runDurableBlocOperation('kv_list')}
+                            disabled={!durableBlocAvailable || durableBlocBusy || isRunning}
+                          >
+                            KV list
+                          </button>
+                          <button
+                            type="button"
+                            className="modal-button"
+                            onClick={() => void runDurableBlocOperation('kv_ensure')}
+                            disabled={!durableBlocAvailable || durableBlocBusy || isRunning}
+                          >
+                            Ensure
+                          </button>
+                          <button
+                            type="button"
+                            className="modal-button"
+                            onClick={() => void runDurableBlocOperation('kv_load')}
+                            disabled={!durableBlocAvailable || durableBlocBusy || isRunning}
+                          >
+                            Load binding
+                          </button>
+                        </div>
+                        {durableBlocSelectionNote ? <p className="run-form-note">{durableBlocSelectionNote}</p> : null}
+                        {durableBlocError ? <div className="run-details-error">{durableBlocError}</div> : null}
+                        {durableBlocResult ? (
+                          <div className="run-output-meta run-prompt-cache-meta">
+                            {Object.entries(durableBlocSummary).map(([key, value]) => (
+                              <div key={key}>
+                                <span className="run-output-meta-key">{key}</span>
+                                <span className="run-output-meta-val">{value}</span>
+                              </div>
+                            ))}
+                            {durableBlocLoadedBinding ? (
+                              <div className="run-form-inline">
+                                <button
+                                  type="button"
+                                  className="modal-button"
+                                  onClick={() =>
+                                    void copyTextToClipboard(
+                                      typeof durableBlocLoadedBinding === 'string'
+                                        ? durableBlocLoadedBinding
+                                        : stringifyJson(durableBlocLoadedBinding)
+                                    )
+                                  }
+                                >
+                                  Copy binding
+                                </button>
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
+                        <div className="run-form-field">
+                          <label className="run-form-label" htmlFor="durable-prompt-cache-binding">
+                            Run input prompt_cache_binding
+                            <span className="run-form-type">(binding object or binding_id)</span>
+                          </label>
+                          <textarea
+                            id="durable-prompt-cache-binding"
+                            className="run-form-input"
+                            value={durablePromptCacheBindingInput}
+                            onChange={(e) => setDurablePromptCacheBindingInput(e.target.value)}
+                            placeholder='{"binding_id":"...","key":"..."}'
+                            rows={4}
+                            disabled={isRunning}
+                          />
+                          <p className="run-form-note">
+                            This visible run input is submitted as <code>prompt_cache_binding</code>. Wire an entry
+                            <code> prompt_cache_binding</code> output to an LLM Call or Agent pin to consume it in the graph.
+                          </p>
+                        </div>
+                      </div>
+                    </details>
 
                   </div>
                 </div>

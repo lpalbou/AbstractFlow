@@ -82,7 +82,7 @@ def _runtime_health() -> dict[str, object]:
         "gateway_token_source": token_source,
     }
 
-def _gateway_proxy_timeout_s(default: float = 30.0) -> float:
+def _gateway_proxy_timeout_s(default: float = 900.0) -> float:
     raw = os.getenv("ABSTRACTFLOW_GATEWAY_PROXY_TIMEOUT_S", "").strip()
     try:
         value = float(raw) if raw else float(default)
@@ -90,7 +90,7 @@ def _gateway_proxy_timeout_s(default: float = 30.0) -> float:
         value = float(default)
     if value <= 0:
         value = float(default)
-    return max(1.0, min(value, 120.0))
+    return max(1.0, min(value, 3600.0))
 
 @app.on_event("startup")
 async def _startup_connectivity_guard() -> None:

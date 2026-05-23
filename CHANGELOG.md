@@ -5,11 +5,32 @@ All notable changes to AbstractFlow will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.13] - 2026-05-22
+
+### Added
+- Native Generate Music authoring against the released Runtime/Gateway media contract, including Gateway music catalog selectors, music residency targeting, and advanced music controls.
+- Image edit/image-to-image node templates and controls aligned with Gateway's generated media contracts.
+- Gateway catalog v1 helpers that prefer canonical `items` envelopes while retaining legacy catalog fallbacks.
+- Artifact reference primitives for text, image, voice, music, and video references in the palette.
+
+### Changed
+- Apple/GPU Flow profiles now require Gateway `>=0.2.17`; Runtime/Core are consumed through Gateway extras instead of direct Flow dependencies.
+- Generated media readiness honors Gateway's `common.readiness` surface summary when available while remaining compatible with legacy direct endpoint descriptors.
+- Gateway proxy/model residency operations now allow long media and warmup requests without the previous short frontend/backend timeout path.
+
+### Fixed
+- Removed browser-side Generate Music lowering. Old lowered flows are normalized back to native `generate_music` when loaded or saved.
+- Python VisualFlow models now accept the new native media node types without importing Runtime/Core at package import time.
+- Warm/unload authoring is Gateway-only, allows Gateway default provider/model selection, and no longer disables all media residency controls from stale per-task support flags.
+- Music provider/model changes clear stale backend overrides so Stable Audio 3 and Stable Audio Open do not inherit the wrong backend.
+- Media previews are modality-aware and can fetch child-run/projected artifacts without using the wrong run id.
+- Run preflight now catches missing media prompts and required source artifacts before starting a run.
+
 ## [0.3.12] - 2026-05-19
 
 ### Fixed
-- Generate Image, Generate Voice, Transcribe Audio, and Listen Voice selectors now rely on Gateway/Core provider catalogs instead of hardcoded media model fallbacks.
-- Supertonic voice options now come from the Gateway voice catalog, so Flow surfaces the same voices that Gateway/Core can execute.
+- Generate Image, Generate Voice, Transcribe Audio, and Listen Voice selectors now rely on Gateway provider catalogs instead of hardcoded media model fallbacks.
+- Supertonic voice options now come from the Gateway voice catalog, so Flow surfaces the same voices that Gateway can execute.
 - Media nodes keep image, TTS, and STT provider/model selections in media-specific fields instead of falling back to generic LLM `provider`/`model` values.
 
 ### Changed

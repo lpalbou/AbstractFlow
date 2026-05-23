@@ -1,6 +1,6 @@
 # AbstractFlow documentation
 
-AbstractFlow is a Python library (plus a reference web UI) for authoring and executing **durable** AI workflows.
+AbstractFlow is a Python library plus a Gateway-first reference web UI for authoring and executing **durable** AI workflows.
 
 This doc set is intentionally:
 - **actionable** (commands and entrypoints you can run)
@@ -35,6 +35,7 @@ This doc set is intentionally:
 - Flow execution convenience: [../abstractflow/runner.py](../abstractflow/runner.py) (`FlowRunner`)
 - VisualFlow schema (portable JSON): [../abstractflow/visual/models.py](../abstractflow/visual/models.py)
 - VisualFlow host wiring + execution: [../abstractflow/visual/executor.py](../abstractflow/visual/executor.py)
+- Gateway client contracts/catalogs: [../web/frontend/src/utils/gatewayClient.ts](../web/frontend/src/utils/gatewayClient.ts), [../web/frontend/src/utils/gatewayCatalog.ts](../web/frontend/src/utils/gatewayCatalog.ts)
 - VisualFlow interface contracts: [../abstractflow/visual/interfaces.py](../abstractflow/visual/interfaces.py)
 - WorkflowBundle helpers (thin wrapper): [../abstractflow/workflow_bundle.py](../abstractflow/workflow_bundle.py)
 - CLI entrypoint: [../abstractflow/cli.py](../abstractflow/cli.py)
