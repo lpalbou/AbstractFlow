@@ -896,7 +896,11 @@ Agent-node features are included in <code>abstractflow[apple]</code> and <code>a
 - UI (React): published as the npm package <code>@abstractframework/flow</code> (run via <code>npx</code>).</p>
 <p>Evidence: <a href="../pyproject.toml">../pyproject.toml</a> (host profile extras + <code>project.scripts</code>), <a href="../abstractflow/cli.py">../abstractflow/cli.py</a>, <a href="../web/frontend/bin/cli.js">../web/frontend/bin/cli.js</a>.</p>
 <h2 id="where-does-the-web-editor-store-flows-and-run-data">Where does the web editor store flows and run data?<a class="headerlink" href="#where-does-the-web-editor-store-flows-and-run-data" title="Permanent link">&para;</a></h2>
-<p>Defaults:
+<p>In the modern Gateway-first editor path, Gateway stores VisualFlows, bundles,
+runs, ledgers, attachments, workspaces, and artifacts in its configured data
+directories.</p>
+<p>The old FastAPI local runtime routes still have compatibility defaults, but only
+when <code>ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1</code> is set:
 - Flows: <code>./flows/*.json</code> relative to the backend working directory (override with <code>ABSTRACTFLOW_FLOWS_DIR</code>).
 - Runtime persistence (runs/ledger/artifacts):
   - source checkout: <code>web/runtime/</code>

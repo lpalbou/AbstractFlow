@@ -366,6 +366,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#create-media-with-gateway-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create media with Gateway nodes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#workflow-bundles-flow" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -639,6 +650,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#create-media-with-gateway-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create media with Gateway nodes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#workflow-bundles-flow" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -694,7 +716,7 @@
 pip<span class="w"> </span>install<span class="w"> </span>abstractflow
 </code></pre></div>
 <p>Optional extras:
-- Host profile for local Python proxy stack + compatibility routes (<code>Flow</code>, <code>FlowRunner</code>, <code>abstractflow.visual</code> local execution, workflow bundles, Agent nodes): <code>pip install "abstractflow[apple]"</code> or <code>pip install "abstractflow[gpu]"</code>
+- Host profile for the Python proxy stack + matching Gateway deployment profile + compatibility routes (<code>Flow</code>, <code>FlowRunner</code>, <code>abstractflow.visual</code> local execution, workflow bundles, Agent nodes): <code>pip install "abstractflow[apple]"</code> or <code>pip install "abstractflow[gpu]"</code>
 - Agent nodes only, without the host profile: <code>pip install "abstractflow[agent]"</code>
 - Documentation site tools: <code>pip install "abstractflow[docs]"</code></p>
 <p>From source (repo root):</p>
@@ -756,12 +778,37 @@ Enable local runtime compatibility only when needed with <code>ABSTRACTFLOW_ENAB
 <p>Quick start (no repo clone needed):</p>
 <div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;abstractgateway[http]&quot;</span><span class="w"> </span>abstractflow
 <span class="nb">export</span><span class="w"> </span><span class="nv">ABSTRACTGATEWAY_AUTH_TOKEN</span><span class="o">=</span>dev-token
-abstractgateway<span class="w"> </span>--port<span class="w"> </span><span class="m">8080</span>
+abstractgateway<span class="w"> </span>serve<span class="w"> </span>--port<span class="w"> </span><span class="m">8080</span>
 
 <span class="nb">export</span><span class="w"> </span><span class="nv">ABSTRACTGATEWAY_AUTH_TOKEN</span><span class="o">=</span>dev-token
 npx<span class="w"> </span>@abstractframework/flow<span class="w"> </span>--gateway-url<span class="w"> </span>http://127.0.0.1:8080
 </code></pre></div>
 <p>Tip (from source): install Flow and Gateway editably, then run <code>npm run dev</code> from <code>web/frontend</code> with <code>ABSTRACTGATEWAY_AUTH_TOKEN</code> set so Vite can inject Gateway auth in its proxy.</p>
+<h2 id="create-media-with-gateway-nodes">Create media with Gateway nodes<a class="headerlink" href="#create-media-with-gateway-nodes" title="Permanent link">&para;</a></h2>
+<p>In the editor, add media nodes from the palette:
+- <code>Generate Image</code>: prompt to image artifact.
+- <code>Edit Image</code>: prompt plus source image artifact, optional mask, to image artifact. <code>Image-to-Image</code> is accepted as a legacy alias when loading older flows.
+- <code>Generate Voice</code>: text to voice/audio artifact.
+- <code>Generate Music</code>: prompt/lyrics/duration to music artifact.
+- <code>Transcribe Audio</code> / <code>Listen Voice</code>: audio input to text.</p>
+<p>For the simple path, leave provider/model as <code>Auto</code> and let Gateway resolve the
+configured backend. If you need reproducibility, choose explicit provider/model
+values from the Gateway catalog selectors. Music catalog data comes from
+<code>/api/gateway/audio/music/providers</code> and <code>/api/gateway/audio/music/models</code>.</p>
+<p>Generated media is returned as Gateway artifacts. The Run modal renders images
+and audio/music players first; raw ledger JSON and artifact IDs remain available
+for debugging.</p>
+<p>For image editing, wire <code>image_artifact</code> from a previous <code>Generate Image</code> node
+or use the <code>Artifacts</code> palette primitives (<code>Image Artifact</code>, <code>Voice Artifact</code>,
+<code>Music Artifact</code>, etc.) to paste an existing Gateway <code>$artifact</code> id. A richer
+browser artifact picker/upload flow is tracked separately.</p>
+<p>Example Generate Music path:
+1. Drag <code>On Flow Start</code>, <code>Generate Music</code>, and <code>On Flow End</code> onto the canvas.
+2. Wire execution <code>On Flow Start -&gt; Generate Music -&gt; On Flow End</code>.
+3. Wire or type a <code>prompt</code> such as <code>short heroic fantasy theme with brass and strings</code>.
+4. Leave provider/model as <code>Auto (Gateway default)</code> unless you need a specific backend.
+5. Save, then click <code>Run Flow</code>.
+6. Open the Generate Music result and play the returned music artifact.</p>
 <h2 id="workflow-bundles-flow">Workflow bundles (<code>.flow</code>)<a class="headerlink" href="#workflow-bundles-flow" title="Permanent link">&para;</a></h2>
 <p>To package a VisualFlow + subflows into a single file, use the CLI:
 - <a href="../cli/">cli.md</a></p>

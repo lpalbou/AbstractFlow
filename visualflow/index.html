@@ -414,6 +414,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#native-media-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Native media nodes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#subflows" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -573,6 +584,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#native-media-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Native media nodes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#subflows" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -650,6 +672,21 @@
 - The editor persists pin definitions under <code>node.data.inputs</code> / <code>node.data.outputs</code>.
 - The top-level <code>node.inputs</code> / <code>node.outputs</code> fields may be present but empty.</p>
 <p>Evidence: <a href="../abstractflow/visual/interfaces.py">../abstractflow/visual/interfaces.py</a> (<code>_pin_types</code> reads <code>node.data.*</code>) and sample flows in <a href="../web/flows/">../web/flows/</a>.</p>
+<h2 id="native-media-nodes">Native media nodes<a class="headerlink" href="#native-media-nodes" title="Permanent link">&para;</a></h2>
+<p>Current media authoring nodes are saved as native VisualFlow node types:
+- <code>generate_image</code>
+- <code>edit_image</code>
+- <code>image_to_image</code> (legacy alias normalized by the editor)
+- <code>generate_voice</code>
+- <code>generate_music</code>
+- <code>transcribe_audio</code>
+- <code>listen_voice</code></p>
+<p>Generated image, voice, and music outputs should be treated as artifacts. Gateway
+is the preferred execution host for these nodes because it owns media catalogs,
+child runs, artifact persistence, and provider/runtime configuration.</p>
+<p>Compatibility note: old saved flows that used the temporary browser-side
+Generate Music lowering are normalized back to native <code>generate_music</code> when they
+are loaded or saved by the current editor.</p>
 <h2 id="subflows">Subflows<a class="headerlink" href="#subflows" title="Permanent link">&para;</a></h2>
 <p>Subflows are regular VisualFlows referenced by id from a node of type <code>subflow</code>.</p>
 <p>Convention:

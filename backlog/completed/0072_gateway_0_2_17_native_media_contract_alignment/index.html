@@ -1,0 +1,867 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Diagram-based, durable AI workflows for Python with portable VisualFlow JSON and a reference visual editor.">
+      
+      
+      
+        <link rel="canonical" href="https://www.lpalbou.info/AbstractFlow/backlog/completed/0072_gateway_0_2_17_native_media_contract_alignment/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Completed: Gateway 0.2.17 Native Media Contract Alignment - AbstractFlow</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#completed-gateway-0217-native-media-contract-alignment" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="AbstractFlow" class="md-header__button md-logo" aria-label="AbstractFlow" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            AbstractFlow
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Completed: Gateway 0.2.17 Native Media Contract Alignment
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/lpalbou/AbstractFlow" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lpalbou/AbstractFlow
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="AbstractFlow" class="md-nav__button md-logo" aria-label="AbstractFlow" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    AbstractFlow
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/lpalbou/AbstractFlow" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lpalbou/AbstractFlow
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../visualflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VisualFlow JSON
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../web-editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web Editor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metadata
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adr-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ADR status
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#four-agent-perspectives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Four-agent perspectives
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Four-agent perspectives">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#naive-user-perspective" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Naive user perspective
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#guru-user-perspective" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guru user perspective
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gateway-contract-perspective" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gateway contract perspective
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#runtimeflow-architecture-perspective" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime/Flow architecture perspective
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#refinement-cycles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refinement cycles
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Refinement cycles">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cycle-1-feedback-applied" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cycle 1 feedback applied
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cycle-2-feedback-result" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cycle 2 feedback result
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-code-reality" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current code reality
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#residual-risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Residual risks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#follow-ups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Follow-ups
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="completed-gateway-0217-native-media-contract-alignment">Completed: Gateway 0.2.17 Native Media Contract Alignment<a class="headerlink" href="#completed-gateway-0217-native-media-contract-alignment" title="Permanent link">&para;</a></h1>
+<h2 id="metadata">Metadata<a class="headerlink" href="#metadata" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Created: 2026-05-22</li>
+<li>Status: Completed</li>
+<li>Completed: 2026-05-22</li>
+</ul>
+<h2 id="adr-status">ADR status<a class="headerlink" href="#adr-status" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Governing ADRs: None</li>
+<li>ADR impact: None</li>
+</ul>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>Gateway <code>0.2.17</code> and Runtime <code>0.4.21</code> changed the integration boundary materially:</p>
+<ul>
+<li>Gateway now exposes music catalogs and generated media contracts through versioned discovery.</li>
+<li>Gateway catalog endpoints can return the canonical <code>gateway_catalog_v1</code> envelope with <code>items</code>.</li>
+<li>Gateway now advertises <code>common.discovery.catalog_contract.primary_items_field = "items"</code> and a <code>common.readiness</code> surface summary (<code>gateway_surface_readiness_v1</code>).</li>
+<li>Runtime now accepts native <code>generate_music</code>, <code>edit_image</code>, and <code>image_to_image</code> VisualFlow node types.</li>
+<li>Flow still had temporary browser-side Generate Music lowering and partial media/residency typing.</li>
+</ul>
+<p>The product goal is to keep AbstractFlow Gateway-first, avoid direct AbstractRuntime/AbstractCore dependencies in the normal editor path, and expose generated media with a better simple-user and expert-user experience.</p>
+<h2 id="four-agent-perspectives">Four-agent perspectives<a class="headerlink" href="#four-agent-perspectives" title="Permanent link">&para;</a></h2>
+<h3 id="naive-user-perspective">Naive user perspective<a class="headerlink" href="#naive-user-perspective" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Media capabilities must be visible without search. A first-class <code>Media</code> palette category is needed.</li>
+<li>Generate Music should work as <code>prompt -&gt; music artifact</code> with <code>Auto (Gateway default)</code> provider/model.</li>
+<li>Expert knobs should not clutter the node by default; expose them as advanced pins/properties.</li>
+<li>Edit Image must explain how a normal user supplies the source image artifact.</li>
+<li>Run results should privilege previews and players over raw artifact/debug identifiers.</li>
+</ul>
+<h3 id="guru-user-perspective">Guru user perspective<a class="headerlink" href="#guru-user-perspective" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Persist native media nodes and let Gateway/Runtime own execution semantics.</li>
+<li>Remove browser-side Generate Music lowering except as an import migration path for old saved flows.</li>
+<li>Keep explicit provider/model/backend and advanced music controls available.</li>
+<li>Add <code>music_generation</code> to residency surfaces.</li>
+<li>Fail generated-media readiness closed when Gateway advertises a route but the backend is unavailable or unconfigured.</li>
+</ul>
+<h3 id="gateway-contract-perspective">Gateway contract perspective<a class="headerlink" href="#gateway-contract-perspective" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Flow should use <code>/api/gateway/discovery/capabilities</code> and endpoint descriptors as the authority.</li>
+<li>Catalog parsing should prefer <code>catalog.contract = gateway_catalog_v1</code>, <code>version = 1</code>, and canonical <code>items</code>.</li>
+<li><code>common.readiness</code> is a useful summary, but it is surface-level contract truth only; Flow should use it as an overlay, not as a replacement for endpoint descriptors.</li>
+<li>Legacy catalog arrays/maps must remain supported during rollout.</li>
+<li>Gateway extras should be bumped to <code>abstractgateway[apple|gpu]&gt;=0.2.17</code>.</li>
+</ul>
+<h3 id="runtimeflow-architecture-perspective">Runtime/Flow architecture perspective<a class="headerlink" href="#runtimeflow-architecture-perspective" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Runtime <code>0.4.21</code> has native <code>generate_music</code>; Flow's compatibility lowering is obsolete.</li>
+<li>Flow should normalize old lowered music flows back to native nodes on load/save.</li>
+<li>Python VisualFlow models should accept the new native node types without importing Runtime/Core at package import time.</li>
+<li>Local Runtime/Core compatibility remains optional and should not define normal editor behavior.</li>
+</ul>
+<h2 id="implementation-summary">Implementation summary<a class="headerlink" href="#implementation-summary" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Added Gateway catalog helpers for canonical <code>gateway_catalog_v1</code> plus legacy fallbacks.</li>
+<li>Added native <code>generate_music</code> persistence and deleted the browser-side runtime music lowering module.</li>
+<li>Added legacy import normalization for old lowered music flows, including output edge and dynamic output-spec edge rewrites.</li>
+<li>Added native <code>edit_image</code> and <code>image_to_image</code> node templates, TS node types, properties, and inline media controls.</li>
+<li>Added full music provider/model/backend controls, music catalog loading, <code>music_generation</code> residency targeting, and advanced music pins.</li>
+<li>Added a first-class expanded <code>Media</code> palette category.</li>
+<li>Hid advanced music pins on-node unless wired, while preserving expert access through saved pins/properties.</li>
+<li>Tightened generated media readiness to require <code>available=true</code>, route not false, configured not false, and an endpoint descriptor.</li>
+<li>Scoped edit-image model catalogs to Gateway's <code>image_to_image</code> task.</li>
+<li>Added typed support for Gateway's <code>common.readiness</code> contract and use it as a conservative media/model-residency readiness overlay while keeping endpoint descriptors as the call authority.</li>
+<li>Updated Python VisualFlow models and optional local runner detection for native media node types.</li>
+<li>Bumped AbstractFlow to <code>0.3.13</code> and Gateway profile floor to <code>&gt;=0.2.17</code>.</li>
+</ul>
+<h2 id="refinement-cycles">Refinement cycles<a class="headerlink" href="#refinement-cycles" title="Permanent link">&para;</a></h2>
+<h3 id="cycle-1-feedback-applied">Cycle 1 feedback applied<a class="headerlink" href="#cycle-1-feedback-applied" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Fixed legacy music load to build editor edges from normalized edges rather than stale original edges.</li>
+<li>Fixed edit-image catalog requests to use <code>image_to_image</code> instead of <code>text_to_image</code>.</li>
+<li>Tightened generated-media readiness negative cases.</li>
+<li>Filled Generate Music load normalization from the full template input list.</li>
+<li>Made <code>structure_prompt</code> boolean in Flow to match Gateway's public request contract.</li>
+<li>Added a native <code>edit_image</code> Runtime contract guard.</li>
+<li>Added a concrete Generate Music happy path to docs.</li>
+</ul>
+<h3 id="cycle-2-feedback-result">Cycle 2 feedback result<a class="headerlink" href="#cycle-2-feedback-result" title="Permanent link">&para;</a></h3>
+<p>Second-pass review found several Flow-owned release hardening fixes and one upstream provider-truth issue:</p>
+<ul>
+<li>Naive-user review: model selectors looked mandatory when Gateway defaults were valid, Edit Image needed a clearer source-artifact path, and preflight did not catch missing media inputs.</li>
+<li>Expert-user review: child-run/projected media artifacts could be fetched with the wrong run id, Gateway proxy timeouts were too short for long media/warmup requests, and the residency table mislabeled a timestamp as provider-loaded state.</li>
+<li>Code review: generic <code>artifact_ref</code> preview detection could misclassify image/audio artifacts, legacy music compatibility could leave missing output handles, artifact palette entries had duplicate React keys, media readiness was too strict for older endpoint descriptors, and local compatibility runner detection ignored scoped media provider/model fields.</li>
+<li>Integration review: music provider lists are Flow-consumed from Gateway/Runtime/AbstractMusic, not hardcoded in Flow; provider availability truth for planned/non-runnable music backends belongs upstream and is tracked separately.</li>
+</ul>
+<p>Applied Flow fixes:</p>
+<ul>
+<li>inline and properties model selectors now clearly show <code>Auto (Gateway default)</code> when provider/model are optional;</li>
+<li>run preflight catches missing media prompts and missing Edit Image/Transcribe artifact inputs before run start;</li>
+<li>artifact previews are modality/content-type aware and avoid treating arbitrary generic <code>artifact_ref</code> values as both image and audio;</li>
+<li>artifact preview fetches try artifact-owner/projected-run candidates plus selected/root run ids, preventing valid child-run artifacts from 404ing in the UI;</li>
+<li>browser artifact fetches and model load/unload mutations disable the 30-second frontend abort, and the Python Gateway proxy default timeout was raised to 900 seconds with a 3600-second cap;</li>
+<li>legacy lowered music imports now restore canonical <code>generate_music</code> output pins before remapping edges;</li>
+<li>model-residency rows show provider-loaded state instead of the <code>loaded_at</code> timestamp;</li>
+<li>media readiness accepts legacy direct endpoint descriptors with omitted <code>available</code> when the endpoint is otherwise advertised;</li>
+<li>local compatibility runner detection reads scoped media provider/model fields (<code>music_provider</code>, <code>image_provider</code>, <code>tts_provider</code>, <code>stt_provider</code>, etc.);</li>
+<li>artifact literal palette entries use distinct React keys.</li>
+</ul>
+<p>Post-update verification on 2026-05-22 confirmed the local Runtime fix for music <code>structure_prompt</code> boolean forwarding and the local Gateway contract polish for readiness/catalog compatibility. Remaining non-blocking Flow items are tracked as proposed backlog:</p>
+<ul>
+<li>progressive disclosure and preview-first media UX</li>
+<li>browser-level Gateway media E2E coverage</li>
+</ul>
+<h2 id="current-code-reality">Current code reality<a class="headerlink" href="#current-code-reality" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>web/frontend/src/utils/gatewayCatalog.ts</code>: Gateway catalog normalization helpers.</li>
+<li><code>web/frontend/src/utils/visualFlowCompat.ts</code>: legacy music compatibility importer only.</li>
+<li><code>web/frontend/src/utils/serialization.ts</code> and <code>web/frontend/src/hooks/useFlow.ts</code>: native save/load plus legacy compatibility normalization.</li>
+<li><code>web/frontend/src/types/flow.ts</code> and <code>web/frontend/src/types/nodes.ts</code>: native media node types and pins.</li>
+<li><code>web/frontend/src/components/PropertiesPanel.tsx</code>, <code>web/frontend/src/components/nodes/BaseNode.tsx</code>, <code>web/frontend/src/components/ModelResidencyPanel.tsx</code>: media catalogs, residency, and UX controls.</li>
+<li><code>web/frontend/src/utils/gatewayClient.ts</code>: typed <code>edited_image</code>, catalog contract metadata, Gateway surface readiness overlay, and strict media readiness.</li>
+<li><code>abstractflow/visual/models.py</code> and <code>abstractflow/visual/executor.py</code>: native media node parsing and optional local compatibility detection.</li>
+<li><code>README.md</code>, <code>docs/*.md</code>, <code>CHANGELOG.md</code>, <code>llms.txt</code>: Gateway-first media docs and release notes.</li>
+</ul>
+<h2 id="validation">Validation<a class="headerlink" href="#validation" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>pytest -q tests/test_frontend_gateway_contract.py tests/test_web_gateway_proxy_auth.py tests/test_visual_generate_music_native_runtime.py tests/test_visual_model_residency_node.py</code></li>
+<li><code>pytest -q tests/test_visual_model_residency_node.py tests/test_visual_generate_music_native_runtime.py</code></li>
+<li><code>npm run build</code> from <code>web/frontend</code></li>
+<li><code>git diff --check</code></li>
+</ul>
+<p>Known validation limitation: no live end-to-end media generation was run from AbstractFlow in this pass. The live Gateway process on <code>127.0.0.1:8080</code> reported older installed package versions while the local repositories contain Gateway <code>0.2.17</code> and Runtime <code>0.4.21</code>.</p>
+<h2 id="residual-risks">Residual risks<a class="headerlink" href="#residual-risks" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Runtime's local, unreleased fix for music <code>structure_prompt</code> boolean forwarding passed targeted tests; published Flow users still need the corresponding Runtime/Gateway releases installed together.</li>
+<li>Preview-first output UX is improved by existing artifact players but still not a full gallery-first redesign.</li>
+<li>Browser-level E2E tests for generated music/edit image require a live Gateway/media backend fixture and are tracked separately.</li>
+<li>Music provider availability truth is upstream-owned. Flow consumes Gateway music catalogs and does not hardcode provider allowlists; AbstractMusic/Gateway must distinguish known providers from runnable providers.</li>
+</ul>
+<h2 id="follow-ups">Follow-ups<a class="headerlink" href="#follow-ups" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>../proposed/0073_media_progressive_disclosure_preview_first_ux.md</code></li>
+<li><code>../proposed/0074_gateway_media_browser_e2e_regression_suite.md</code></li>
+<li>Runtime completed backlog: <code>../../../../abstractruntime/docs/backlog/completed/0039_runtime_music_structure_prompt_bool_contract.md</code></li>
+<li>AbstractMusic proposed backlog: <code>../../../../abstractmusic/docs/backlog/proposed/0087_truthful_music_provider_runtime_availability.md</code></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.top", "content.code.copy"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

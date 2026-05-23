@@ -1,0 +1,1030 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Diagram-based, durable AI workflows for Python with portable VisualFlow JSON and a reference visual editor.">
+      
+      
+      
+        <link rel="canonical" href="https://www.lpalbou.info/AbstractFlow/backlog/completed/0070_flow_durable_bloc_prompt_cache_binding_ux/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Completed: Flow Durable Bloc Prompt-Cache Binding UX - AbstractFlow</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#completed-flow-durable-bloc-prompt-cache-binding-ux" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="AbstractFlow" class="md-header__button md-logo" aria-label="AbstractFlow" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            AbstractFlow
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Completed: Flow Durable Bloc Prompt-Cache Binding UX
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/lpalbou/AbstractFlow" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lpalbou/AbstractFlow
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="AbstractFlow" class="md-nav__button md-logo" aria-label="AbstractFlow" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    AbstractFlow
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/lpalbou/AbstractFlow" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lpalbou/AbstractFlow
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../visualflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VisualFlow JSON
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../web-editor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web Editor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metadata
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adr-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ADR status
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-code-reality" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current code reality
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-we-want-to-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What we want to do
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#suggested-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Suggested implementation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Suggested implementation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-add-durable-bloc-contract-typing-and-readiness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Add durable-bloc contract typing and readiness
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-add-an-operator-facing-durable-prompt-cache-section-to-run-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Add an operator-facing durable prompt-cache section to Run Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-expose-prompt_cache_binding-explicitly-on-text-generation-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Expose prompt_cache_binding explicitly on text-generation nodes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-do-not-add-a-fake-durable-bloc-workflow-node-yet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Do not add a fake durable-bloc workflow node yet
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-make-the-ux-precise" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Make the UX precise
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Non-goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dependencies-and-related-tasks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dependencies and related tasks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#expected-outcomes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Expected outcomes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#progress-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Progress checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#guidance-for-the-implementing-agent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guidance for the implementing agent
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#completion-report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Completion report
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="completed-flow-durable-bloc-prompt-cache-binding-ux">Completed: Flow Durable Bloc Prompt-Cache Binding UX<a class="headerlink" href="#completed-flow-durable-bloc-prompt-cache-binding-ux" title="Permanent link">&para;</a></h1>
+<h2 id="metadata">Metadata<a class="headerlink" href="#metadata" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Created: 2026-05-21</li>
+<li>Status: Completed</li>
+<li>Completed: 2026-05-21</li>
+</ul>
+<h2 id="adr-status">ADR status<a class="headerlink" href="#adr-status" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Governing ADRs: <code>../../../../abstractcore/docs/adr/0007-durable-memory-bloc-cache-binding.md</code></li>
+<li>ADR impact: None</li>
+</ul>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>The lower layers are now in a materially better state:</p>
+<ul>
+<li><code>abstractcore</code> owns the durable exact-reuse model through blocs + KV artifacts + <code>prompt_cache_binding</code>.</li>
+<li><code>abstractruntime</code> exposes that contract through the public AbstractCore host facade and already forwards <code>prompt_cache_binding</code> during generation.</li>
+<li><code>abstractgateway</code> exposes the durable bloc contract through <code>/api/gateway/blocs/*</code> and advertises it under <code>contracts.common.prompt_cache.durable_blocs</code>.</li>
+</ul>
+<p>Flow is now the missing layer.</p>
+<p>Today the editor has a real session prompt-cache UI for volatile reuse, but it still has no clean
+surface for durable exact reuse across app restarts.</p>
+<h2 id="current-code-reality">Current code reality<a class="headerlink" href="#current-code-reality" title="Permanent link">&para;</a></h2>
+<p>Files and behavior inspected:</p>
+<ul>
+<li><code>web/frontend/src/utils/gatewayClient.ts</code></li>
+<li>types <code>common.prompt_cache.session_lifecycle</code></li>
+<li>does not type or normalize <code>common.prompt_cache.durable_blocs</code></li>
+<li>readiness only exposes <code>optional.promptCacheSessions</code>, not durable blocs</li>
+<li><code>web/frontend/src/components/RunFlowModal.tsx</code></li>
+<li>surfaces session prompt-cache controls only:
+    <code>status</code>, <code>prepare</code>, <code>clear</code>, <code>rebuild</code></li>
+<li>stores <code>runtime_hint.prompt_cache_key</code></li>
+<li>does not call any <code>/api/gateway/blocs/*</code> route</li>
+<li>does not surface <code>prompt_cache_binding</code></li>
+<li><code>web/frontend/src/types/nodes.ts</code></li>
+<li><code>llm_call</code> and <code>agent</code> nodes do not expose a <code>prompt_cache_binding</code> input pin</li>
+<li>there is no durable prompt-cache/bloc node type</li>
+<li><code>abstractflow/visual/executor.py</code></li>
+<li>already wires Gateway/Runtime-backed <code>llm_call</code> / <code>agent</code> / <code>model_residency</code></li>
+<li>needs an explicit audit before assuming a new pin is forwarded cleanly end to end</li>
+<li><code>../abstractruntime/src/abstractruntime/integrations/abstractcore/llm_client.py</code></li>
+<li>already normalizes and forwards <code>prompt_cache_binding</code></li>
+<li><code>../abstractgateway/src/abstractgateway/routes/gateway.py</code></li>
+<li>now exposes <code>/blocs/upsert_text</code>, <code>/blocs/record</code>, <code>/blocs</code>, <code>/blocs/delete</code>,
+    <code>/blocs/kv/manifest</code>, <code>/blocs/kv/list</code>, <code>/blocs/kv/ensure</code>, <code>/blocs/kv/load</code>,
+    <code>/blocs/kv/delete</code>, <code>/blocs/kv/prune</code></li>
+<li><code>saved/save/load</code> prompt-cache aliases are now routed through Runtime's public host facade
+    and no longer touch provider-private state directly</li>
+</ul>
+<p>What is true now:</p>
+<ul>
+<li>Flow can help users manage volatile session prompt-cache keys.</li>
+<li>Flow cannot yet author, inspect, load, or pass durable exact-reuse bindings in a first-class way.</li>
+<li>The clean lower-layer boundary exists, so Flow does not need to invent a bypass.</li>
+</ul>
+<h2 id="problem">Problem<a class="headerlink" href="#problem" title="Permanent link">&para;</a></h2>
+<p>Users can now get durable prompt-cache reuse through Gateway and Runtime, but Flow still lacks the
+authoring and operator UX to use it safely.</p>
+<p>That leaves two bad outcomes:</p>
+<ol>
+<li>users fall back to volatile session prompt-cache controls for a problem that actually requires
+   exact durable reuse across restarts; or</li>
+<li>Flow is tempted to invent an out-of-band shortcut that hides host operator calls inside a run,
+   which would damage ledger clarity.</li>
+</ol>
+<h2 id="what-we-want-to-do">What we want to do<a class="headerlink" href="#what-we-want-to-do" title="Permanent link">&para;</a></h2>
+<p>Add a Flow surface for durable prompt-cache reuse that is:</p>
+<ul>
+<li>explicit about the difference between volatile session cache and durable exact reuse</li>
+<li>consistent with the Gateway contract</li>
+<li>usable without teaching users provider-private cache internals</li>
+<li>careful about ledger semantics</li>
+</ul>
+<h2 id="why">Why<a class="headerlink" href="#why" title="Permanent link">&para;</a></h2>
+<p>Durable prompt caching is now a real framework capability, not just a lower-layer implementation.</p>
+<p>If Flow does not surface it clearly:</p>
+<ul>
+<li>apps running through Gateway cannot easily reuse the same exact prompt-cache blocs after restart</li>
+<li>the editor over-emphasizes the volatile session path</li>
+<li>maintainers will be pressured toward hidden workarounds instead of explicit reusable abstractions</li>
+</ul>
+<h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Treat the three prompt-cache tracks as distinct:</li>
+<li>session prompt cache = volatile convenience</li>
+<li>durable blocs + binding = app-facing exact reuse</li>
+<li>host-local export/import = operator/admin only, not the normal Flow UX</li>
+<li>Do not add a Flow node that secretly performs out-of-band Gateway host mutations during run execution.</li>
+<li>Do not require users to understand provider-native cache files or local filesystem roots.</li>
+<li>Prefer contract-driven capability gating from <code>contracts.common.prompt_cache.durable_blocs</code>.</li>
+<li>Keep any exact-reuse data path explicit in the graph or run form; do not silently inject bindings.</li>
+</ul>
+<h2 id="suggested-implementation">Suggested implementation<a class="headerlink" href="#suggested-implementation" title="Permanent link">&para;</a></h2>
+<h3 id="1-add-durable-bloc-contract-typing-and-readiness">1. Add durable-bloc contract typing and readiness<a class="headerlink" href="#1-add-durable-bloc-contract-typing-and-readiness" title="Permanent link">&para;</a></h3>
+<p>Extend Flow's Gateway contract support so it understands:</p>
+<ul>
+<li><code>contracts.common.prompt_cache.durable_blocs</code></li>
+<li>durable bloc endpoints and capability flags</li>
+<li>the fact that this is optional and separate from <code>session_lifecycle</code></li>
+</ul>
+<p>Expected result:</p>
+<ul>
+<li>Flow can tell the difference between:</li>
+<li>no durable bloc support</li>
+<li>durable bloc support available</li>
+<li>session prompt-cache only</li>
+</ul>
+<h3 id="2-add-an-operator-facing-durable-prompt-cache-section-to-run-flow">2. Add an operator-facing durable prompt-cache section to Run Flow<a class="headerlink" href="#2-add-an-operator-facing-durable-prompt-cache-section-to-run-flow" title="Permanent link">&para;</a></h3>
+<p>Add a dedicated section near the existing session prompt-cache UI, but keep it clearly separate.</p>
+<p>Minimum useful controls:</p>
+<ul>
+<li>inspect durable bloc availability / route support</li>
+<li>look up a bloc by <code>bloc_id</code> or <code>sha256</code></li>
+<li>inspect existing KV artifacts for a provider/model</li>
+<li><code>ensure</code> / <code>load</code> a KV artifact and display the returned <code>prompt_cache_binding</code></li>
+<li>show key metadata such as <code>bloc_id</code>, <code>sha256</code>, provider, model, artifact path/id, and binding id</li>
+</ul>
+<p>The UI should describe this as exact durable reuse, not as a warmed volatile cache.</p>
+<h3 id="3-expose-prompt_cache_binding-explicitly-on-text-generation-nodes">3. Expose <code>prompt_cache_binding</code> explicitly on text-generation nodes<a class="headerlink" href="#3-expose-prompt_cache_binding-explicitly-on-text-generation-nodes" title="Permanent link">&para;</a></h3>
+<p>Add an advanced optional input pin to:</p>
+<ul>
+<li><code>llm_call</code></li>
+<li><code>agent</code></li>
+</ul>
+<p>The pin should accept:</p>
+<ul>
+<li>a binding object</li>
+<li>or a binding id string if Runtime still accepts that form</li>
+</ul>
+<p>This lets Flow consume a binding cleanly once it exists, without pretending that the graph can
+produce one magically.</p>
+<h3 id="4-do-not-add-a-fake-durable-bloc-workflow-node-yet">4. Do not add a fake durable-bloc workflow node yet<a class="headerlink" href="#4-do-not-add-a-fake-durable-bloc-workflow-node-yet" title="Permanent link">&para;</a></h3>
+<p>Do <strong>not</strong> create a first-class Flow node that performs bloc <code>upsert/ensure/load</code> through Gateway
+host routes during a normal run unless Runtime later owns a real ledgered effect for that work.</p>
+<p>For now:</p>
+<ul>
+<li>the graph may consume <code>prompt_cache_binding</code></li>
+<li>Run Flow may offer operator controls to fetch/load a binding before the run</li>
+<li>a later item can add a node only if the lower layer gives Flow a real run-owned effect</li>
+</ul>
+<h3 id="5-make-the-ux-precise">5. Make the UX precise<a class="headerlink" href="#5-make-the-ux-precise" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Session prompt cache stays framed as volatile reuse.</li>
+<li>Durable bloc UX stays framed as exact reusable prefixes.</li>
+<li>Host-local export/import should not be promoted into normal Flow authoring.</li>
+<li>If a loaded binding is shown in the modal, provide copy/export affordances rather than silent
+  hidden mutation of unrelated nodes.</li>
+</ul>
+<h2 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Gateway contract typing in Flow.</li>
+<li>Run Flow modal/operator UX for durable bloc inspection and binding loading.</li>
+<li><code>llm_call</code> / <code>agent</code> node pin model updates for explicit binding consumption.</li>
+<li>Frontend and backend tests needed to prove contract parsing and authoring behavior.</li>
+</ul>
+<h2 id="non-goals">Non-goals<a class="headerlink" href="#non-goals" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Do not expose host-local prompt-cache export/import as the main Flow prompt-cache UX.</li>
+<li>Do not add provider-private cache controls to Flow.</li>
+<li>Do not hide durable bloc host calls inside ordinary run execution.</li>
+<li>Do not promise a first-class in-run durable-bloc effect unless Runtime owns it publicly.</li>
+<li>Do not collapse session prompt cache and durable blocs into one ambiguous panel.</li>
+</ul>
+<h2 id="dependencies-and-related-tasks">Dependencies and related tasks<a class="headerlink" href="#dependencies-and-related-tasks" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>../proposed/2026-05-09_abstractflow_gateway_migration_roadmap.md</code></li>
+<li><code>../proposed/2026-05-19_model_residency_flow_controls.md</code></li>
+<li><code>../proposed/2026-05-20_flow_core_boundary_and_local_compatibility_mode.md</code></li>
+<li><code>../completed/040_gateway_capability_schema_and_connection_contract.md</code></li>
+<li>Runtime completed: <code>../../../../abstractruntime/docs/backlog/completed/027_runtime_durable_bloc_prompt_cache_facade.md</code></li>
+<li>Runtime completed: <code>../../../../abstractruntime/docs/backlog/completed/028_runtime_bloc_kv_lifecycle_and_pruning.md</code></li>
+<li>Gateway completed: <code>../../../../abstractgateway/docs/backlog/completed/2026-05-20_gateway_durable_bloc_prompt_cache_contract.md</code></li>
+<li>Core ADR: <code>../../../../abstractcore/docs/adr/0007-durable-memory-bloc-cache-binding.md</code></li>
+</ul>
+<h2 id="expected-outcomes">Expected outcomes<a class="headerlink" href="#expected-outcomes" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Flow can detect durable bloc capability from the Gateway contract.</li>
+<li>Users can inspect/load durable prompt-cache bindings without reaching into provider-private logic.</li>
+<li><code>llm_call</code> and <code>agent</code> can consume explicit <code>prompt_cache_binding</code> values.</li>
+<li>Flow remains honest about what is operator-side host control versus what is actual run-owned ledgered behavior.</li>
+</ul>
+<h2 id="validation">Validation<a class="headerlink" href="#validation" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Extend <code>tests/test_frontend_gateway_contract.py</code> for <code>common.prompt_cache.durable_blocs</code>.</li>
+<li>Add frontend tests for durable-bloc route normalization and unavailable states.</li>
+<li>Add UI tests for the Run Flow modal durable prompt-cache section:</li>
+<li>available state</li>
+<li>unsupported/unavailable state</li>
+<li>binding load result rendering</li>
+<li>Add graph/node tests proving <code>llm_call</code> and <code>agent</code> surface a <code>prompt_cache_binding</code> input pin
+  without regressing existing provider/model pin UX.</li>
+<li>Add backend/compiler validation proving a supplied <code>prompt_cache_binding</code> can traverse Flow into
+  Runtime-backed execution, or explicitly document and track any remaining lower-layer blocker
+  before implementation.</li>
+</ul>
+<h2 id="progress-checklist">Progress checklist<a class="headerlink" href="#progress-checklist" title="Permanent link">&para;</a></h2>
+<ul>
+<li>[x] Add Flow-side typing for <code>common.prompt_cache.durable_blocs</code>.</li>
+<li>[x] Add readiness/optional-feature helpers for durable blocs.</li>
+<li>[x] Add a durable prompt-cache operator section in Run Flow.</li>
+<li>[x] Add explicit <code>prompt_cache_binding</code> input pins for <code>llm_call</code> and <code>agent</code>.</li>
+<li>[x] Add tests for contract parsing, unavailable states, and binding display.</li>
+<li>[x] Audit compiler/runtime lowering for explicit binding pass-through before shipping.</li>
+</ul>
+<h2 id="guidance-for-the-implementing-agent">Guidance for the implementing agent<a class="headerlink" href="#guidance-for-the-implementing-agent" title="Permanent link">&para;</a></h2>
+<p>Do not invent a fake shortcut that hides host-level Gateway bloc operations inside a normal
+workflow run.</p>
+<p>The lower layers are finally clean enough that Flow should preserve that discipline:</p>
+<ul>
+<li>use the Gateway contract</li>
+<li>keep durable exact reuse separate from volatile session cache</li>
+<li>expose <code>prompt_cache_binding</code> explicitly</li>
+<li>only introduce a first-class graph node for bloc preparation if Runtime later owns that work as a
+  real ledgered effect</li>
+</ul>
+<h2 id="completion-report">Completion report<a class="headerlink" href="#completion-report" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Date: 2026-05-21</li>
+<li>Original planned path: <code>docs/backlog/planned/0070_flow_durable_bloc_prompt_cache_binding_ux.md</code></li>
+<li>Final path: <code>docs/backlog/completed/0070_flow_durable_bloc_prompt_cache_binding_ux.md</code></li>
+<li>Summary: Flow now understands Gateway durable bloc prompt-cache capability, separates volatile session cache from durable exact reuse in Run Flow, exposes explicit <code>prompt_cache_binding</code> pins on <code>llm_call</code> and <code>agent</code>, and wires the binding through Runtime/Agent LLM call params.</li>
+<li>Files and symbols touched:</li>
+<li><code>web/frontend/src/utils/gatewayClient.ts</code>: <code>GatewayDurableBlocPromptCacheContract</code>, <code>durableBlocPromptCacheAvailable</code>, <code>optional.promptCacheDurableBlocs</code>.</li>
+<li><code>web/frontend/src/components/RunFlowModal.tsx</code>: separate <code>Session prompt cache (volatile)</code> and <code>Durable prompt cache (exact reuse)</code> sections; durable bloc <code>record</code>, <code>kv_manifest</code>, <code>kv_list</code>, <code>kv_ensure</code>, and <code>kv_load</code> calls; visible run input for <code>prompt_cache_binding</code>.</li>
+<li><code>web/frontend/src/types/nodes.ts</code>: explicit <code>prompt_cache_binding</code> pins on <code>llm_call</code> and <code>agent</code>.</li>
+<li><code>../abstractruntime/src/abstractruntime/visualflow_compiler/visual/executor.py</code>: VisualFlow lowering forwards <code>prompt_cache_binding</code> into LLM params and Agent input values.</li>
+<li><code>../abstractruntime/src/abstractruntime/visualflow_compiler/compiler.py</code>: Visual Agent subworkflow vars and structured-output postpass carry the binding.</li>
+<li><code>../abstractagent/src/abstractagent/adapters/generation_params.py</code>: Agent adapters forward <code>_runtime.prompt_cache_binding</code> into generated <code>LLM_CALL.params</code>.</li>
+<li><code>pyproject.toml</code>: <code>apple</code> / <code>gpu</code> profiles now depend on <code>abstractgateway[apple|gpu]&gt;=0.2.16</code> instead of naming <code>AbstractRuntime</code> or <code>abstractcore</code> directly.</li>
+<li><code>web/backend/__init__.py</code> and <code>web/backend/routes/__init__.py</code>: local Runtime/Core compatibility imports are opt-in through <code>ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME</code>.</li>
+<li>Behavior changes: users can inspect/load durable prompt-cache bindings through Gateway operator routes without invoking hidden in-run bloc mutations. A loaded binding is displayed and copied into a visible <code>prompt_cache_binding</code> run input only, preserving graph/run explicitness.</li>
+<li>Tests and validation:</li>
+<li><code>pytest -q tests/test_frontend_gateway_contract.py tests/test_visual_llm_call_structured_output_pin.py tests/test_visual_agent_structured_output_pin.py</code></li>
+<li><code>PYTHONPATH=../abstractagent/src pytest -q ../abstractagent/tests/test_generation_params_media_policies.py</code></li>
+<li><code>npm run build</code> from <code>web/frontend</code></li>
+<li><code>python -m py_compile web/backend/routes/__init__.py web/backend/__init__.py</code></li>
+<li><code>python -m py_compile ../abstractruntime/src/abstractruntime/visualflow_compiler/visual/executor.py ../abstractruntime/src/abstractruntime/visualflow_compiler/compiler.py ../abstractagent/src/abstractagent/adapters/generation_params.py</code></li>
+<li>Residual risks: the Run Flow durable panel has source/contract coverage and build validation, but no browser interaction test. The end-to-end binding path spans Flow, Runtime, and AbstractAgent, so coordinated package releases are required before a published Flow build can depend on the new behavior.</li>
+<li>ADR impact: None. The existing durable bloc/cache-binding ADR remains the governing lower-layer policy; this work implements the Flow UX and pass-through surface without changing the policy.</li>
+<li>Follow-ups: add a browser-level test for durable bloc unavailable/loaded states when the frontend test harness supports Run Flow modal interaction; consider a future first-class bloc-preparation node only if Runtime later exposes a ledgered effect for it.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.top", "content.code.copy"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
