@@ -12,9 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Image edit/image-to-image node templates and controls aligned with Gateway's generated media contracts.
 - Gateway catalog v1 helpers that prefer canonical `items` envelopes while retaining legacy catalog fallbacks.
 - Artifact reference primitives for text, image, voice, music, and video references in the palette.
+- Artifact literal editor and built-in artifact content previews (image/audio/video) backed by Gateway artifact content endpoints.
 
 ### Changed
-- Apple/GPU Flow profiles now require Gateway `>=0.2.17`; Runtime/Core are consumed through Gateway extras instead of direct Flow dependencies.
+- Apple/GPU Flow profiles now require Gateway `>=0.2.18`; Runtime/Core are consumed through Gateway extras instead of direct Flow dependencies.
 - Generated media readiness honors Gateway's `common.readiness` surface summary when available while remaining compatible with legacy direct endpoint descriptors.
 - Gateway proxy/model residency operations now allow long media and warmup requests without the previous short frontend/backend timeout path.
 

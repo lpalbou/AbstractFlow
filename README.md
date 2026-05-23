@@ -55,7 +55,7 @@ Optional extras (declared in `pyproject.toml`):
 - Full host profiles:
   - Apple-capable: `pip install "abstractflow[apple]"`
   - GPU-capable: `pip install "abstractflow[gpu]"`
-- `abstractflow[apple]` and `abstractflow[gpu]` pull the matching `abstractgateway[...]` host profile and Visual Agent support. Flow no longer names `AbstractRuntime` or `abstractcore` directly in these profiles; Gateway owns that deployment stack. AbstractFlow `0.3.13` expects Gateway `>=0.2.17` for the current media/catalog/residency contracts.
+- `abstractflow[apple]` and `abstractflow[gpu]` pull the matching `abstractgateway[...]` host profile and Visual Agent support. Flow no longer names `AbstractRuntime` or `abstractcore` directly in these profiles; Gateway owns that deployment stack. AbstractFlow `0.3.13` expects Gateway `>=0.2.18` for the current media/catalog/residency contracts.
 - Agent nodes only, without the host profile: `pip install "abstractflow[agent]"`
 - Documentation site tools: `pip install "abstractflow[docs]"`
 

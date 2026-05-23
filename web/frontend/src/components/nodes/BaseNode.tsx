@@ -1497,6 +1497,41 @@ export const BaseNode = memo(function BaseNode({
           }
         }
     };
+    const addImageProvidersFromCatalog = (providersList: SelectOption[], seenProviders: Set<string>, record: Record<string, unknown>) => {
+      const catalog = asRecord(record.catalog);
+      const isProviderCatalog = catalog?.kind === 'providers' || record.providers_only === true;
+      let addedRunnableProvider = false;
+      const addRunnableProvider = (provider: string, label?: string) => {
+        const before = seenProviders.size;
+        addProvider(providersList, seenProviders, provider, label);
+        if (seenProviders.size > before) addedRunnableProvider = true;
+      };
+
+      const byProvider = asRecord(record.models_by_provider);
+      if (byProvider) {
+        for (const [provider, modelsForProvider] of Object.entries(byProvider)) {
+          if (asArray(modelsForProvider).length > 0) addRunnableProvider(provider);
+        }
+      }
+      for (const item of asArray(record.provider_models)) {
+        const itemRecord = asRecord(item);
+        if (!itemRecord) continue;
+        addRunnableProvider(text(itemRecord.provider, itemRecord.provider_id, itemRecord.owned_by));
+      }
+
+      const details = asRecord(record.details);
+      for (const item of asArray(record.available_providers)) {
+        const provider = typeof item === 'string' ? item.trim() : text(asRecord(item)?.id, asRecord(item)?.provider, asRecord(item)?.name);
+        const normalized = normalizeMediaProvider(provider);
+        const detail = asRecord(details?.[normalized]) || asRecord(details?.[provider]);
+        const isRemote = normalized === 'openai' || normalized === 'openai-compatible' || detail?.remote === true;
+        if (isRemote) addRunnableProvider(provider);
+      }
+
+      if (!addedRunnableProvider && !isProviderCatalog) {
+        addProvidersFromArray(providersList, seenProviders, asArray(record.providers));
+      }
+    };
     const formatMapFrom = (payload: unknown): ProviderOptionMap => {
       const record = asRecord(payload);
       const out: ProviderOptionMap = {};
@@ -1515,7 +1550,7 @@ export const BaseNode = memo(function BaseNode({
       }
       const record = asRecord(payload);
       if (!record) return;
-      addProvidersFromArray(providersList, seenProviders, asArray(record.providers));
+      addImageProvidersFromCatalog(providersList, seenProviders, record);
       const rootProvider = text(record.provider, record.engine_id, record.backend, record.active_provider);
       appendImageModels(list, seen, asArray(record.models), rootProvider);
       appendImageModels(list, seen, asArray(record.available_models), rootProvider);

@@ -22,10 +22,10 @@ import { useExecutionWorkspace } from '../hooks/useExecutionWorkspace';
 import { RunSwitcherDropdown } from './RunSwitcherDropdown';
 import { JsonViewer } from './JsonViewer';
 import { KgActiveMemoryPanel } from './KgActiveMemoryPanel';
+import { artifactContentUrl, useArtifactObjectUrl } from './ArtifactPlayer';
 import {
   endpointFromDescriptor,
   descriptorEndpointAvailable,
-  gatewayFetch,
   gatewayJson,
   gatewayPath,
   jsonRequest,
@@ -521,21 +521,6 @@ function artifactRecordRunCandidates(artifactId: string, ...records: Array<Recor
   return out;
 }
 
-function artifactContentUrl(
-  artifactContentDescriptor: GatewayEndpointDescriptor | string | null | undefined,
-  runId: string,
-  artifactId: string
-): string {
-  return endpointFromDescriptor(
-    artifactContentDescriptor,
-    '/api/gateway/runs/{run_id}/artifacts/{artifact_id}/content',
-    {
-      run_id: runId,
-      artifact_id: artifactId,
-    }
-  );
-}
-
 function artifactContentType(record: Record<string, unknown> | null | undefined): string {
   return pickNonEmptyString(record?.content_type || record?.contentType).toLowerCase();
 }
@@ -806,61 +791,6 @@ function extractGeneratedTextPreview(value: unknown, step: { id: string; nodeTyp
     provider,
     model,
   };
-}
-
-function useArtifactObjectUrl(src: string | null | undefined, contentType?: string, fallbackSrcs?: string[]) {
-  const [state, setState] = useState<{ objectUrl: string; loading: boolean; error: string | null }>({
-    objectUrl: '',
-    loading: false,
-    error: null,
-  });
-
-  useEffect(() => {
-    const seen = new Set<string>();
-    const urls = [src, ...(Array.isArray(fallbackSrcs) ? fallbackSrcs : [])]
-      .map((value) => (typeof value === 'string' ? value.trim() : ''))
-      .filter((value) => {
-        if (!value || seen.has(value)) return false;
-        seen.add(value);
-        return true;
-      });
-    if (!urls.length) {
-      setState({ objectUrl: '', loading: false, error: null });
-      return;
-    }
-
-    let active = true;
-    let objectUrl = '';
-    setState({ objectUrl: '', loading: true, error: null });
-
-    (async () => {
-      let lastError = '';
-      for (const url of urls) {
-        try {
-          const res = await gatewayFetch(url, { timeoutMs: 0 });
-          const rawBlob = await res.blob();
-          const blob =
-            contentType && rawBlob.type !== contentType
-              ? new Blob([await rawBlob.arrayBuffer()], { type: contentType })
-              : rawBlob;
-          objectUrl = URL.createObjectURL(blob);
-          if (active) setState({ objectUrl, loading: false, error: null });
-          else URL.revokeObjectURL(objectUrl);
-          return;
-        } catch (err) {
-          lastError = err instanceof Error ? err.message : 'Failed to load artifact';
-        }
-      }
-      if (active) setState({ objectUrl: '', loading: false, error: lastError || 'Failed to load artifact' });
-    })();
-
-    return () => {
-      active = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [contentType, fallbackSrcs, src]);
-
-  return state;
 }
 
 function GeneratedImageCard({ preview, compact = false }: { preview: GeneratedImagePreview; compact?: boolean }) {

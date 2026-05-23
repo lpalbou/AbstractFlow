@@ -545,6 +545,10 @@ def test_frontend_exposes_gateway_media_node_templates() -> None:
     assert "data.effectConfig?.stt_model" in properties_panel
     assert "data.effectConfig?.music_model" in properties_panel
     assert "data.effectConfig?.music_backend" not in properties_panel
+    assert "ArtifactLiteralPanel" in properties_panel
+    assert "Select a local file to upload it into Gateway artifacts." in properties_panel
+    assert "'/api/gateway/attachments/upload'" in properties_panel
+    assert "ArtifactPlayer" in properties_panel
     assert "editedImageProviderModelsTask" in properties_panel
     assert "STT model" in properties_panel
     assert "Music model" in properties_panel
@@ -559,7 +563,17 @@ def test_frontend_exposes_gateway_media_node_templates() -> None:
     assert "payloadRaw.artifact_ref" in run_modal
     base_node = (FRONTEND / "src" / "components" / "nodes" / "BaseNode.tsx").read_text(encoding="utf-8")
     assert "currentImageProviderModelsTask" in base_node
+    assert "addImageProvidersFromCatalog" in base_node
+    assert "record.models_by_provider" in base_node
+    assert "record.available_providers" in base_node
     assert "advancedMusicInputPins" in base_node
+    artifact_player = (FRONTEND / "src" / "components" / "ArtifactPlayer.tsx").read_text(encoding="utf-8")
+    assert "export function ArtifactPlayer" in artifact_player
+    assert "export function useArtifactObjectUrl" in artifact_player
+    assert "'/api/gateway/runs/{run_id}/artifacts/{artifact_id}/content'" in artifact_player
+    palette_css = (FRONTEND / "src" / "styles" / "palette.css").read_text(encoding="utf-8")
+    assert ".artifact-literal-editor" in palette_css
+    assert ".artifact-player-image" in palette_css
 
 
 def test_gateway_catalog_helpers_accept_canonical_catalog_envelope() -> None:
@@ -875,7 +889,8 @@ def test_run_modal_media_preview_source_guards_are_modality_aware() -> None:
     assert "artifactLooksLikeImage(genericArtifact)" in run_modal
     assert "artifactLooksLikeAudio(genericAudioRecord)" in run_modal
     assert "fallbackSrcs" in run_modal
-    assert "gatewayFetch(url, { timeoutMs: 0 })" in run_modal
+    artifact_player = (FRONTEND / "src" / "components" / "ArtifactPlayer.tsx").read_text(encoding="utf-8")
+    assert "gatewayFetch(url, { timeoutMs: 0 })" in artifact_player
 
 
 def test_frontend_preflight_catches_required_media_inputs() -> None:

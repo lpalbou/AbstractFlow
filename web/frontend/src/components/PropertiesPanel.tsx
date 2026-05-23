@@ -5,7 +5,7 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
 import type { Node } from 'reactflow';
 import toast from 'react-hot-toast';
-import type { FlowNodeData, ProviderInfo, VisualFlow, Pin } from '../types/flow';
+import type { FlowNodeData, JsonValue, ProviderInfo, VisualFlow, Pin } from '../types/flow';
 import { isEntryNodeType } from '../types/flow';
 import { RECALL_LEVEL_OPTIONS } from '../types/recall';
 import { useFlowStore } from '../hooks/useFlow';
@@ -15,6 +15,7 @@ import { CodeEditorModal } from './CodeEditorModal';
 import ProviderModelsPanel from './ProviderModelsPanel';
 import { JsonSchemaNodeEditor } from './JsonSchemaNodeEditor';
 import { JsonValueEditor } from './JsonValueEditor';
+import { ArtifactPlayer, artifactContentUrl, artifactPlayerKindFromContent } from './ArtifactPlayer';
 import { AfTooltip } from './AfTooltip';
 import AfSelect, { type AfSelectOption } from './inputs/AfSelect';
 import AfMultiSelect from './inputs/AfMultiSelect';
@@ -26,7 +27,14 @@ import {
 } from '../utils/codegen';
 import { collectCustomEventNames } from '../utils/events';
 import { areTypesCompatible } from '../utils/validation';
-import { gatewayJson, gatewayPath, getGatewayFlowEditorReadiness } from '../utils/gatewayClient';
+import {
+  endpointFromDescriptor,
+  gatewayFetch,
+  gatewayJson,
+  gatewayPath,
+  getGatewayFlowEditorReadiness,
+  type GatewayContracts,
+} from '../utils/gatewayClient';
 import {
   modelOptionsFromGatewayCatalog,
   providerOptionsFromGatewayCatalog,
@@ -231,6 +239,194 @@ function jsonSchemaFromAgentFields(fields: AgentSchemaField[]): Record<string, a
   };
   if (required.length > 0) schema.required = required;
   return schema;
+}
+
+type ArtifactLiteralKind = 'text' | 'image' | 'voice' | 'music' | 'video';
+
+const ARTIFACT_LITERAL_CONFIG: Record<
+  ArtifactLiteralKind,
+  { outputLabel: string; label: string; accept: string; fallbackContentType: string; modality: string; uploadLabel: string }
+> = {
+  text: {
+    outputLabel: 'text_artifact',
+    label: 'Text artifact',
+    accept: 'text/*,.txt,.md,.json,.csv',
+    fallbackContentType: 'text/plain',
+    modality: 'text',
+    uploadLabel: 'Upload text',
+  },
+  image: {
+    outputLabel: 'image_artifact',
+    label: 'Image artifact',
+    accept: 'image/*',
+    fallbackContentType: 'image/png',
+    modality: 'image',
+    uploadLabel: 'Upload image',
+  },
+  voice: {
+    outputLabel: 'voice_artifact',
+    label: 'Voice artifact',
+    accept: 'audio/*',
+    fallbackContentType: 'audio/wav',
+    modality: 'voice',
+    uploadLabel: 'Upload audio',
+  },
+  music: {
+    outputLabel: 'music_artifact',
+    label: 'Music artifact',
+    accept: 'audio/*',
+    fallbackContentType: 'audio/wav',
+    modality: 'music',
+    uploadLabel: 'Upload audio',
+  },
+  video: {
+    outputLabel: 'video_artifact',
+    label: 'Video artifact',
+    accept: 'video/*',
+    fallbackContentType: 'video/mp4',
+    modality: 'video',
+    uploadLabel: 'Upload video',
+  },
+};
+
+function recordFrom(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+function stringFrom(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function artifactLiteralKindFromData(data: FlowNodeData): ArtifactLiteralKind | null {
+  const labels = new Set((Array.isArray(data.outputs) ? data.outputs : []).map((pin) => pin.label || pin.id));
+  for (const [kind, config] of Object.entries(ARTIFACT_LITERAL_CONFIG) as Array<[ArtifactLiteralKind, typeof ARTIFACT_LITERAL_CONFIG[ArtifactLiteralKind]]>) {
+    if (labels.has(config.outputLabel)) return kind;
+  }
+  const modality = stringFrom(recordFrom(data.literalValue).modality).toLowerCase();
+  return modality in ARTIFACT_LITERAL_CONFIG ? (modality as ArtifactLiteralKind) : null;
+}
+
+function safeArtifactSessionId(flowId: string | null | undefined, nodeId: string): string {
+  const base = stringFrom(flowId) || 'draft';
+  const raw = `abstractflow_artifacts_${base}_${nodeId}`;
+  return raw.replace(/[^a-zA-Z0-9_-]+/g, '_').slice(0, 96) || 'abstractflow_artifacts';
+}
+
+function ArtifactLiteralPanel({
+  nodeId,
+  data,
+  flowId,
+  gatewayContracts,
+  updateNodeData,
+}: {
+  nodeId: string;
+  data: FlowNodeData;
+  flowId: string | null;
+  gatewayContracts: GatewayContracts | null;
+  updateNodeData: (nodeId: string, data: Partial<FlowNodeData>) => void;
+}) {
+  const kind = artifactLiteralKindFromData(data);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!kind) return null;
+
+  const config = ARTIFACT_LITERAL_CONFIG[kind];
+  const current = recordFrom(data.literalValue);
+  const artifactId = stringFrom(current.$artifact) || stringFrom(current.artifact_id) || stringFrom(current.id);
+  const runId = stringFrom(current.run_id);
+  const contentType = stringFrom(current.content_type) || config.fallbackContentType;
+  const filename = stringFrom(current.filename) || config.outputLabel;
+  const artifactContentDescriptor =
+    gatewayContracts?.common?.artifacts?.content || gatewayContracts?.flow_editor?.artifacts?.content;
+  const previewSrc = artifactId && runId ? artifactContentUrl(artifactContentDescriptor, runId, artifactId) : '';
+  const uploadAvailable = Boolean(gatewayContracts?.common?.attachments?.upload);
+
+  const handleFile = async (file: File | null) => {
+    if (!file) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const uploadUrl = endpointFromDescriptor(
+        gatewayContracts?.common?.attachments?.upload,
+        '/api/gateway/attachments/upload'
+      );
+      const selectedContentType = stringFrom(file.type) || config.fallbackContentType;
+      const form = new FormData();
+      form.append('session_id', safeArtifactSessionId(flowId, nodeId));
+      form.append('file', file, file.name);
+      form.append('filename', file.name);
+      form.append('content_type', selectedContentType);
+      const res = await gatewayFetch(uploadUrl, { method: 'POST', body: form, timeoutMs: 0 });
+      const payload = (await res.json()) as Record<string, unknown>;
+      const attachment = recordFrom(payload.attachment);
+      const uploadedArtifactId = stringFrom(attachment.$artifact) || stringFrom(attachment.artifact_id);
+      if (!uploadedArtifactId) throw new Error('Gateway upload did not return an artifact id.');
+      const uploadedRunId = stringFrom(payload.run_id);
+      const next: Record<string, JsonValue> = {
+        ...(recordFrom(data.literalValue) as Record<string, JsonValue>),
+        $artifact: uploadedArtifactId,
+        artifact_id: uploadedArtifactId,
+        content_type: stringFrom(attachment.content_type) || selectedContentType,
+        modality: config.modality,
+        filename: stringFrom(attachment.filename) || file.name,
+      };
+      if (uploadedRunId) next.run_id = uploadedRunId;
+      const sourcePath = stringFrom(attachment.source_path);
+      if (sourcePath) next.source_path = sourcePath;
+      const sha256 = stringFrom(attachment.sha256);
+      if (sha256) next.sha256 = sha256;
+      const target = stringFrom(attachment.target);
+      if (target) next.target = target;
+      updateNodeData(nodeId, { literalValue: next });
+      toast.success(`${config.label} uploaded`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Artifact upload failed';
+      setError(message);
+      toast.error(message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="property-section artifact-literal-editor">
+      <label className="property-label">{config.label}</label>
+      <span className="property-hint">
+        Select a local file to upload it into Gateway artifacts. <code>$artifact</code> is the artifact id; bytes stay in the artifact store and are fetched by players or downstream media nodes.
+      </span>
+      <div className="artifact-literal-actions">
+        <label className={`artifact-upload-button ${uploading || !uploadAvailable ? 'disabled' : ''}`}>
+          <input
+            type="file"
+            accept={config.accept}
+            disabled={uploading || !uploadAvailable}
+            onChange={(e) => {
+              const file = e.target.files?.[0] || null;
+              e.currentTarget.value = '';
+              void handleFile(file);
+            }}
+          />
+          {uploading ? 'Uploading...' : config.uploadLabel}
+        </label>
+        {artifactId ? <span className="artifact-id-pill" title={artifactId}>{artifactId}</span> : null}
+      </div>
+      {!uploadAvailable ? (
+        <div className="property-hint warning">Gateway attachment upload is not advertised; paste an existing artifact id below.</div>
+      ) : null}
+      {error ? <div className="property-error">{error}</div> : null}
+      {previewSrc ? (
+        <ArtifactPlayer
+          src={previewSrc}
+          contentType={contentType}
+          kind={artifactPlayerKindFromContent(contentType, config.modality)}
+          label={filename}
+          downloadName={filename}
+          compact
+        />
+      ) : null}
+    </div>
+  );
 }
 
 export function PropertiesPanel({ node }: PropertiesPanelProps) {
@@ -4397,12 +4593,21 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
             Array.isArray(data.outputs) && data.outputs.some((p) => p.type === 'assertion');
           if (!isAssertionLiteral) {
             return (
-              <JsonValueEditor
-                label="Fields (Object)"
-                rootKind="object"
-                value={data.literalValue ?? {}}
-                onChange={(next) => updateNodeData(node.id, { literalValue: next })}
-              />
+              <>
+                <ArtifactLiteralPanel
+                  nodeId={node.id}
+                  data={data}
+                  flowId={flowId}
+                  gatewayContracts={gatewayContracts}
+                  updateNodeData={updateNodeData}
+                />
+                <JsonValueEditor
+                  label="Fields (Object)"
+                  rootKind="object"
+                  value={data.literalValue ?? {}}
+                  onChange={(next) => updateNodeData(node.id, { literalValue: next })}
+                />
+              </>
             );
           }
 
