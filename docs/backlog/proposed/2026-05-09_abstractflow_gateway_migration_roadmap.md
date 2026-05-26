@@ -48,19 +48,20 @@ Code inspected during this pass:
 
 ### Open work after this blocker
 
-- [ ] Finish explicit local-execution compatibility boundary for default editor mode
-  (`docs/backlog/planned/030_local_execution_compatibility_boundary.md`).
-- [ ] Add first-class draft/private authoring lifecycle for run retention and visibility
-  (`docs/backlog/planned/020_draft_run_and_publish_lifecycle.md`).
-- [ ] Add a stable Gateway regression suite to prove no default-path local-run fallback
-  (`docs/backlog/planned/050_gateway_execution_regression_suite.md`).
-- [ ] If 020 is implemented, close runtime retention/purge follow-up:
+- [x] Finish explicit local-execution compatibility boundary for default editor mode
+  (`docs/backlog/completed/030_local_execution_compatibility_boundary.md`).
+- [x] Add first-class draft/private authoring lifecycle for run retention and visibility
+  (`docs/backlog/completed/020_draft_run_and_publish_lifecycle.md`).
+- [x] Add a stable Gateway regression suite to prove no default-path local-run fallback
+  (`docs/backlog/completed/050_gateway_execution_regression_suite.md`).
+- [ ] If 020 is implemented, close the remaining cross-package retention/purge follow-ups:
   - `abstractgateway/docs/backlog/proposed/2026-05-09_abstractflow_draft_spaces_and_ephemeral_runs.md`
-  - `abstractruntime/docs/backlog/proposed/2026-05-09_runtime_retention_and_purge_contract.md`.
+  - `abstractruntime/docs/backlog/planned/025_runtime_retention_and_purge_contract.md`.
 
 ### Recommended sequencing
 
-- 030 → 020 → 050, then draft/purge follow-ups in Gateway + Runtime if 020 is green.
+- 020, 030, and 050 are complete. Promote new Flow UX work from `proposed/` only after a
+  code-first audit.
 
 ## Findings
 
@@ -76,21 +77,21 @@ The report that LLM/Agent calls "go local" is only partly accurate:
 ## Planned work created from this roadmap
 
 - `docs/backlog/completed/010_gateway_only_remote_editor_transport.md`
-- `docs/backlog/planned/020_draft_run_and_publish_lifecycle.md`
-- `docs/backlog/planned/030_local_execution_compatibility_boundary.md`
+- `docs/backlog/completed/020_draft_run_and_publish_lifecycle.md`
+- `docs/backlog/completed/030_local_execution_compatibility_boundary.md`
 - `docs/backlog/completed/040_gateway_capability_schema_and_connection_contract.md`
-- `docs/backlog/planned/050_gateway_execution_regression_suite.md`
+- `docs/backlog/completed/050_gateway_execution_regression_suite.md`
 
 Related cross-package proposed work:
 
 - `abstractgateway/docs/backlog/proposed/2026-05-09_abstractflow_draft_spaces_and_ephemeral_runs.md`
-- `abstractruntime/docs/backlog/proposed/2026-05-09_runtime_retention_and_purge_contract.md`
+- `abstractruntime/docs/backlog/planned/025_runtime_retention_and_purge_contract.md`
 
 ## Promotion criteria
 
-Keep this item as an orientation note. The concrete implementation should happen through the planned
-items above. Deprecate this proposed roadmap once those planned items are complete and the Flow docs
-clearly define Gateway-first execution as the default.
+Keep this item as an orientation note. The original planned implementation items are complete; this
+roadmap can be deprecated once the Flow docs clearly define Gateway-first execution as the default
+in the release documentation set.
 
 ## Release Gate
 
@@ -103,14 +104,12 @@ clearly define Gateway-first execution as the default.
 
 ### Next actions
 
-- Complete `docs/backlog/planned/030_local_execution_compatibility_boundary.md` so local execution is explicit dev-only behavior.
-- Complete `docs/backlog/planned/020_draft_run_and_publish_lifecycle.md` with explicit draft vs publish run modes and draft visibility controls.
-- Complete `docs/backlog/planned/050_gateway_execution_regression_suite.md` with a no-local-run-fallback chain assertion.
-- If `020` is complete, execute Gateway/Runtime cleanup follow-ups:
-  - `abstractgateway/docs/backlog/proposed/2026-05-09_abstractflow_draft_spaces_and_ephemeral_runs.md`
-  - `abstractruntime/docs/backlog/proposed/2026-05-09_runtime_retention_and_purge_contract.md`
+- Keep `docs/backlog/completed/030_local_execution_compatibility_boundary.md` as the completed local-compatibility reference.
+- Keep `docs/backlog/completed/020_draft_run_and_publish_lifecycle.md` as the completed draft/publish lifecycle reference.
+- Keep `docs/backlog/completed/050_gateway_execution_regression_suite.md` as the completed no-local-fallback regression reference.
+- Gateway run-tree purge for draft-test runs is implemented; broader Gateway draft-bundle cleanup,
+  memory-scope isolation, and the Runtime host-facing purge helper remain tracked separately.
 
 ### Ordering
 
-- 030 before 020 before 050.
-- Apply 050 retention follow-ups only after 020 is stable.
+- The original 020/030/050 ordering constraints are complete.

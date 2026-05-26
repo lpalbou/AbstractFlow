@@ -5,7 +5,7 @@
  * Shows execution progress and results.
  */
 
-import { useState, useCallback, useMemo, useEffect, useRef, type DragEvent } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef, type DragEvent, type FormEvent, type MouseEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useFlowStore } from '../hooks/useFlow';
 import type { ExecutionEvent, ExecutionMetrics, Pin, FlowRunResult, RunSummary } from '../types/flow';
@@ -81,6 +81,8 @@ interface RunFlowModalProps {
   isOpen: boolean;
   onClose: () => void;
   onRun: (inputData: Record<string, unknown>) => void;
+  runMode?: 'draft' | 'published';
+  runTargetLabel?: string;
   onFollowUpSubmit?: (payload: {
     message: string;
     attachments: File[];
@@ -98,7 +100,9 @@ interface RunFlowModalProps {
   traceEvents?: ExecutionEvent[];
   isWaiting?: boolean;
   waitingInfo?: WaitingInfo | null;
-  onResume?: (response: string | { response?: string; approved?: boolean; reason?: string; runId?: string; waitKey?: string }) => void;
+  onResume?: (
+    response: string | { response?: string; approved?: boolean; reason?: string; runId?: string; waitKey?: string }
+  ) => void | Promise<void>;
   onPause?: () => void;
   onResumeRun?: () => void;
   onCancelRun?: () => void;
@@ -323,6 +327,49 @@ function extractPreferredModelInfo(value: unknown): { provider?: string; model?:
   return { provider, model };
 }
 
+function extractScratchpadModelInfo(
+  scratchpad: unknown,
+  current: { provider?: string; model?: string } = {}
+): { provider?: string; model?: string } {
+  let provider = current.provider;
+  let model = current.model;
+  if (provider && model) return { provider, model };
+  if (!scratchpad || typeof scratchpad !== 'object') return { provider, model };
+
+  const sp = scratchpad as Record<string, unknown>;
+  const steps = Array.isArray(sp.steps) ? sp.steps : [];
+  const pick = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+
+  for (let i = steps.length - 1; i >= 0; i--) {
+    const st = steps[i];
+    if (!st || typeof st !== 'object') continue;
+    const stepObj = st as Record<string, unknown>;
+    const effect = stepObj.effect && typeof stepObj.effect === 'object' ? (stepObj.effect as Record<string, unknown>) : null;
+    const effectType = effect && typeof effect.type === 'string' ? effect.type : '';
+    if (effectType !== 'llm_call') continue;
+
+    const payload =
+      effect && effect.payload && typeof effect.payload === 'object' ? (effect.payload as Record<string, unknown>) : null;
+    provider = provider ?? pick(payload?.provider);
+    model = model ?? pick(payload?.model);
+
+    const result = stepObj.result && typeof stepObj.result === 'object' ? (stepObj.result as Record<string, unknown>) : null;
+    provider = provider ?? pick(result?.provider);
+    model = model ?? pick(result?.model);
+
+    if (provider || model) break;
+  }
+
+  return { provider, model };
+}
+
+function extractRunModelInfo(value: unknown): { provider?: string; model?: string } {
+  const base = extractPreferredModelInfo(value);
+  if (base.provider && base.model) return base;
+  if (!value || typeof value !== 'object') return base;
+  return extractScratchpadModelInfo((value as Record<string, unknown>).scratchpad, base);
+}
+
 function parseSequenceHandleIndex(value: unknown): number | null {
   const handle = typeof value === 'string' ? value.trim().toLowerCase() : '';
   const match = /^then:(\d+)$/.exec(handle);
@@ -473,9 +520,9 @@ type GeneratedTextPreview = {
 };
 
 type RunGeneratedArtifact =
-  | { kind: 'image'; preview: GeneratedImagePreview; stepLabel: string }
-  | { kind: 'audio'; preview: GeneratedAudioPreview; stepLabel: string }
-  | { kind: 'text'; preview: GeneratedTextPreview; stepLabel: string };
+  | { kind: 'image'; preview: GeneratedImagePreview; stepId: string; stepLabel: string }
+  | { kind: 'audio'; preview: GeneratedAudioPreview; stepId: string; stepLabel: string }
+  | { kind: 'text'; preview: GeneratedTextPreview; stepId: string; stepLabel: string };
 
 type ArtifactRunScope = string | null | undefined | Array<string | null | undefined>;
 
@@ -844,8 +891,23 @@ function GeneratedImageCard({ preview, compact = false }: { preview: GeneratedIm
   );
 }
 
-function GeneratedAudioCard({ preview, autoPlay = false, compact = false }: { preview: GeneratedAudioPreview; autoPlay?: boolean; compact?: boolean }) {
-  const { objectUrl, loading, error } = useArtifactObjectUrl(preview.src, preview.contentType || 'audio/wav', preview.fallbackSrcs);
+function GeneratedAudioCard({
+  preview,
+  autoPlay = false,
+  compact = false,
+  instanceKey,
+}: {
+  preview: GeneratedAudioPreview;
+  autoPlay?: boolean;
+  compact?: boolean;
+  instanceKey?: string;
+}) {
+  const { objectUrl, loading, error } = useArtifactObjectUrl(
+    preview.src,
+    preview.contentType || 'audio/wav',
+    preview.fallbackSrcs,
+    instanceKey
+  );
   const displayUrl = objectUrl || preview.src;
   return (
     <div className={`run-generated-audio ${compact ? 'run-generated-artifact-card' : ''}`}>
@@ -855,6 +917,7 @@ function GeneratedAudioCard({ preview, autoPlay = false, compact = false }: { pr
         <div className="run-details-error">{error}</div>
       ) : (
         <audio
+          key={`${preview.artifactId}:${instanceKey || ''}`}
           src={displayUrl}
           controls
           autoPlay={autoPlay}
@@ -1246,10 +1309,18 @@ function modelOptionsFromCatalog(payload: unknown, provider: string, keys: strin
   ]).map((option) => ({ value: option.value, label: option.label }));
 }
 
+function modelOptionsFromCatalogFieldsOnly(payload: unknown, provider: string, keys: string[]): RunSelectOption[] {
+  if (!isRecord(payload)) return [];
+  const { items: _items, ...withoutItems } = payload;
+  return modelOptionsFromCatalog(withoutItems, provider, keys);
+}
+
 export function RunFlowModal({
   isOpen,
   onClose,
   onRun,
+  runMode = 'draft',
+  runTargetLabel,
   onFollowUpSubmit,
   onNewRun,
   onApproveAll,
@@ -1273,6 +1344,8 @@ export function RunFlowModal({
 }: RunFlowModalProps) {
   const { nodes, edges, flowName, flowId, lastLoopProgress, loopProgressByNodeId } = useFlowStore();
   const currentWorkflowKey = useMemo(() => (typeof flowId === 'string' ? flowId.trim() : ''), [flowId]);
+  const runTitle = runMode === 'published' ? 'Published Run' : 'Run';
+  const runSubtitle = runMode === 'published' && runTargetLabel ? runTargetLabel : flowName || 'Untitled Flow';
   const runWorkflowKey = useMemo(() => {
     const raw =
       (typeof runWorkflowId === 'string' && runWorkflowId.trim()) ||
@@ -1422,6 +1495,7 @@ export function RunFlowModal({
   // parent step id (stable across this modal's event stream).
   const [expandedSubflows, setExpandedSubflows] = useState<Record<string, boolean>>({});
   const [resumeDraft, setResumeDraft] = useState('');
+  const [resumeSubmitting, setResumeSubmitting] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
   const [rehydrateArtifactMarkdown, setRehydrateArtifactMarkdown] = useState<string | null>(null);
@@ -1717,7 +1791,7 @@ export function RunFlowModal({
       ]);
       return dedupeOptions([
         ...modelOptionsFromCatalog(modelData, selectedVoiceProvider, ['models', 'items', 'data', 'tts_models', 'stt_models']),
-        ...modelOptionsFromCatalog(voiceData, selectedVoiceProvider, ['models', 'tts_models']),
+        ...modelOptionsFromCatalogFieldsOnly(voiceData, selectedVoiceProvider, ['models', 'tts_models']),
       ]);
     },
   });
@@ -1938,7 +2012,10 @@ export function RunFlowModal({
 
   // Clear resume draft when leaving waiting state
   useEffect(() => {
-    if (!isWaiting) setResumeDraft('');
+    if (!isWaiting) {
+      setResumeDraft('');
+      setResumeSubmitting(false);
+    }
   }, [isWaiting]);
 
   // Update a form field
@@ -2446,43 +2523,6 @@ export function RunFlowModal({
       return merged;
     };
 
-	    const extractModelInfo = (value: unknown): { provider?: string; model?: string } => {
-	      const { provider, model } = extractPreferredModelInfo(value);
-
-	      // Agent nodes may not expose provider/model directly; try to infer from the last llm_call
-	      // step inside the scratchpad trace.
-	      const obj = value as Record<string, unknown>;
-	      const pick = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
-	      let providerValue = provider;
-	      let modelValue = model;
-	      const scratchpad = obj.scratchpad;
-	      if ((!providerValue || !modelValue) && scratchpad && typeof scratchpad === 'object') {
-	        const sp = scratchpad as Record<string, unknown>;
-	        const steps = Array.isArray(sp.steps) ? sp.steps : [];
-	        for (let i = steps.length - 1; i >= 0; i--) {
-	          const st = steps[i];
-          if (!st || typeof st !== 'object') continue;
-          const stepObj = st as Record<string, unknown>;
-          const effect = stepObj.effect && typeof stepObj.effect === 'object' ? (stepObj.effect as Record<string, unknown>) : null;
-          const effectType = effect && typeof effect.type === 'string' ? effect.type : '';
-          if (effectType !== 'llm_call') continue;
-
-	          const payload =
-	            effect && effect.payload && typeof effect.payload === 'object' ? (effect.payload as Record<string, unknown>) : null;
-	          providerValue = providerValue ?? pick(payload?.provider);
-	          modelValue = modelValue ?? pick(payload?.model);
-
-	          const result = stepObj.result && typeof stepObj.result === 'object' ? (stepObj.result as Record<string, unknown>) : null;
-	          providerValue = providerValue ?? pick(result?.provider);
-	          modelValue = modelValue ?? pick(result?.model);
-
-	          if (providerValue || modelValue) break;
-	        }
-	      }
-
-	      return { provider: providerValue, model: modelValue };
-	    };
-
     const pickSummary = (value: unknown): string => {
       if (value == null) return '';
       if (typeof value === 'string') return value;
@@ -2608,7 +2648,7 @@ export function RunFlowModal({
         const nodeId = ev.nodeId;
         const key = `${evRunId || ''}:${nodeId || ''}`;
         const idx = nodeId ? openByNode.get(key) : undefined;
-        const mi = extractModelInfo(ev.result);
+        const mi = extractRunModelInfo(ev.result);
         const meta = resolveNodeMeta(nodeId);
         const terminalKey = meta?.type === 'on_flow_end' && nodeId ? `${evRunId || ''}:${nodeId}` : '';
         const existingTerminalIdx = terminalKey ? terminalIndexByNode.get(terminalKey) : undefined;
@@ -3516,6 +3556,7 @@ export function RunFlowModal({
   const approvalRunId = approvalWait?.runId || waitingInfo?.runId;
 
   const waitingPayload = selectedStep?.waiting || null;
+  const waitingKey = `${selectedStep?.id || ''}:${waitingPayload?.waitKey || ''}`;
   const waitingReasonRaw = typeof waitingPayload?.reason === 'string' ? waitingPayload.reason : '';
   const waitingDetails =
     waitingPayload?.details && typeof waitingPayload.details === 'object'
@@ -3729,18 +3770,18 @@ export function RunFlowModal({
       const stepLabel = step.nodeLabel || step.nodeId || step.nodeType || step.id;
       const image = extractGeneratedImagePreview(output, [step.runId, rootRunId], artifactContentDescriptor);
       if (image) {
-        const key = `image:${image.artifactId}`;
+        const key = `image:${step.id}`;
         if (!seen.has(key)) {
           seen.add(key);
-          out.push({ kind: 'image', preview: image, stepLabel });
+          out.push({ kind: 'image', preview: image, stepId: step.id, stepLabel });
         }
       }
       const audio = extractGeneratedAudioPreview(output, [step.runId, rootRunId], artifactContentDescriptor);
       if (audio) {
-        const key = `audio:${audio.artifactId}`;
+        const key = `audio:${step.id}`;
         if (!seen.has(key)) {
           seen.add(key);
-          out.push({ kind: 'audio', preview: audio, stepLabel });
+          out.push({ kind: 'audio', preview: audio, stepId: step.id, stepLabel });
         }
       }
       const text = extractGeneratedTextPreview(output, step);
@@ -3748,7 +3789,7 @@ export function RunFlowModal({
         const key = `text:${step.id}`;
         if (!seen.has(key)) {
           seen.add(key);
-          out.push({ kind: 'text', preview: text, stepLabel });
+          out.push({ kind: 'text', preview: text, stepId: step.id, stepLabel });
         }
       }
     }
@@ -3881,9 +3922,9 @@ export function RunFlowModal({
   }, [selectedStep, selectedAgentSubRunId, traceEvents]);
 
   const minibar = (
-    <div className="run-minibar" role="region" aria-label="Run Flow mini bar">
+    <div className="run-minibar" role="region" aria-label={`${runTitle} mini bar`}>
       <button type="button" className="run-minibar-main" onClick={() => setIsMinimized(false)}>
-        <span className="run-minibar-title">Run</span>
+        <span className="run-minibar-title">{runTitle}</span>
         <span
           className={[
             'run-minibar-status',
@@ -4257,18 +4298,18 @@ export function RunFlowModal({
       };
     }
 
-	    const obj = value as Record<string, unknown>;
+    const obj = value as Record<string, unknown>;
 
-		    let task: string | null = null;
-		    let previewText: string | null = null;
-		    let previewIsJson = false;
-		    let scratchpad: unknown = null;
-		    const preferredModelInfo = extractPreferredModelInfo(obj);
-		    let provider: string | null = preferredModelInfo.provider || null;
-		    let model: string | null = preferredModelInfo.model || null;
-		    let usage: unknown = null;
-		    let benchmark: Record<string, unknown> | null = null;
-		    let subRunId: string | null = null;
+    let task: string | null = null;
+    let previewText: string | null = null;
+    let previewIsJson = false;
+    let scratchpad: unknown = null;
+    const preferredModelInfo = extractRunModelInfo(obj);
+    let provider: string | null = preferredModelInfo.provider || null;
+    let model: string | null = preferredModelInfo.model || null;
+    let usage: unknown = null;
+    let benchmark: Record<string, unknown> | null = null;
+    let subRunId: string | null = null;
 
     const asRecord = (v: unknown): Record<string, unknown> | null => {
       if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
@@ -4304,18 +4345,18 @@ export function RunFlowModal({
       if (!previewText && typeof res.result === 'string' && res.result.trim()) previewText = res.result.trim();
       if (!previewText && typeof res.message === 'string' && res.message.trim()) previewText = res.message.trim();
       if (!previewText && typeof res.response === 'string' && res.response.trim()) previewText = res.response.trim();
-	      if (!provider && typeof res.media_provider === 'string' && res.media_provider.trim()) provider = res.media_provider.trim();
-	      if (!model && typeof res.media_model === 'string' && res.media_model.trim()) model = res.media_model.trim();
-	      if (!provider && typeof res.provider === 'string' && res.provider.trim()) provider = res.provider.trim();
-	      if (!model && typeof res.model === 'string' && res.model.trim()) model = res.model.trim();
-	      if ('usage' in res) usage = res.usage;
-	    }
+      if (!provider && typeof res.media_provider === 'string' && res.media_provider.trim()) provider = res.media_provider.trim();
+      if (!model && typeof res.media_model === 'string' && res.media_model.trim()) model = res.media_model.trim();
+      if (!provider && typeof res.provider === 'string' && res.provider.trim()) provider = res.provider.trim();
+      if (!model && typeof res.model === 'string' && res.model.trim()) model = res.model.trim();
+      if ('usage' in res) usage = res.usage;
+    }
 
     if (!previewText && typeof obj.content === 'string' && obj.content.trim()) previewText = obj.content.trim();
     if (!previewText && typeof obj.text === 'string' && obj.text.trim()) previewText = obj.text.trim();
     if (!previewText && typeof obj.message === 'string' && obj.message.trim()) previewText = obj.message.trim();
     if (!previewText && typeof obj.response === 'string' && obj.response.trim()) previewText = obj.response.trim();
-	    if (!previewText && typeof obj.result === 'string' && obj.result.trim()) previewText = obj.result.trim();
+    if (!previewText && typeof obj.result === 'string' && obj.result.trim()) previewText = obj.result.trim();
     if (!previewText && typeof obj.output === 'string' && obj.output.trim()) previewText = obj.output.trim();
     if (!previewText && obj.output && typeof obj.output === 'object') {
       const outObj = obj.output as Record<string, unknown>;
@@ -4326,12 +4367,12 @@ export function RunFlowModal({
       if (!previewText && typeof outObj.message === 'string' && outObj.message.trim()) previewText = outObj.message.trim();
       if (!previewText && typeof outObj.response === 'string' && outObj.response.trim()) previewText = outObj.response.trim();
     }
-		    if (!provider && typeof obj.media_provider === 'string' && obj.media_provider.trim()) provider = obj.media_provider.trim();
-		    if (!model && typeof obj.media_model === 'string' && obj.media_model.trim()) model = obj.media_model.trim();
-		    if (!provider && typeof obj.provider === 'string' && obj.provider.trim()) provider = obj.provider.trim();
-		    if (!model && typeof obj.model === 'string' && obj.model.trim()) model = obj.model.trim();
-	    if (!usage && 'usage' in obj) usage = obj.usage;
-	    if (!subRunId && typeof obj.sub_run_id === 'string' && obj.sub_run_id.trim()) subRunId = obj.sub_run_id.trim();
+    if (!provider && typeof obj.media_provider === 'string' && obj.media_provider.trim()) provider = obj.media_provider.trim();
+    if (!model && typeof obj.media_model === 'string' && obj.media_model.trim()) model = obj.media_model.trim();
+    if (!provider && typeof obj.provider === 'string' && obj.provider.trim()) provider = obj.provider.trim();
+    if (!model && typeof obj.model === 'string' && obj.model.trim()) model = obj.model.trim();
+    if (!usage && 'usage' in obj) usage = obj.usage;
+    if (!subRunId && typeof obj.sub_run_id === 'string' && obj.sub_run_id.trim()) subRunId = obj.sub_run_id.trim();
 
     // Benchmark records store provider/model under `config`.
     if ((!provider || !model) && benchmark) {
@@ -4350,37 +4391,12 @@ export function RunFlowModal({
 
     if ('scratchpad' in obj) scratchpad = obj.scratchpad;
 
-    // Agent nodes: infer provider/model from the last llm_call inside scratchpad steps if needed.
-    if ((!provider || !model) && scratchpad && typeof scratchpad === 'object') {
-      const sp = scratchpad as Record<string, unknown>;
-      const steps = Array.isArray(sp.steps) ? sp.steps : [];
-      for (let i = steps.length - 1; i >= 0; i--) {
-        const st = steps[i];
-        if (!st || typeof st !== 'object') continue;
-        const stepObj = st as Record<string, unknown>;
-        const effect = stepObj.effect && typeof stepObj.effect === 'object' ? (stepObj.effect as Record<string, unknown>) : null;
-        const effectType = effect && typeof effect.type === 'string' ? effect.type : '';
-        if (effectType !== 'llm_call') continue;
-
-        const payload =
-          effect && effect.payload && typeof effect.payload === 'object' ? (effect.payload as Record<string, unknown>) : null;
-        if (!provider && typeof payload?.provider === 'string' && payload.provider.trim()) provider = payload.provider.trim();
-        if (!model && typeof payload?.model === 'string' && payload.model.trim()) model = payload.model.trim();
-
-        const result = stepObj.result && typeof stepObj.result === 'object' ? (stepObj.result as Record<string, unknown>) : null;
-        if (!provider && typeof result?.provider === 'string' && result.provider.trim()) provider = result.provider.trim();
-        if (!model && typeof result?.model === 'string' && result.model.trim()) model = result.model.trim();
-
-        if (provider || model) break;
-      }
+    // If no previewText yet, fall back to the benchmark raw answer (often contains code fences).
+    if (!previewText && benchmark) {
+      const dbg = asRecord(benchmark.debug);
+      const rawAnswer = dbg && typeof dbg.raw_answer === 'string' ? dbg.raw_answer.trim() : '';
+      if (rawAnswer) previewText = rawAnswer;
     }
-
-	    // If no previewText yet, fall back to the benchmark raw answer (often contains code fences).
-	    if (!previewText && benchmark) {
-	      const dbg = asRecord(benchmark.debug);
-	      const rawAnswer = dbg && typeof dbg.raw_answer === 'string' ? dbg.raw_answer.trim() : '';
-	      if (rawAnswer) previewText = rawAnswer;
-	    }
 
     let cleaned: unknown = value;
     if (obj && typeof obj === 'object') {
@@ -4389,24 +4405,24 @@ export function RunFlowModal({
       cleaned = copy;
     }
 
-	    if (previewText) {
-	      const beautified = beautifyJsonText(previewText);
-	      previewText = beautified.text;
-	      previewIsJson = beautified.isJson;
-	    } else {
-	      // Ensure we always show the received output in a pretty form.
-	      try {
-	        previewText = JSON.stringify(cleaned, null, 2);
-	        previewIsJson = true;
-	      } catch {
-	        previewText = String(cleaned ?? '');
-	        previewIsJson = false;
-	      }
-	    }
+    if (previewText) {
+      const beautified = beautifyJsonText(previewText);
+      previewText = beautified.text;
+      previewIsJson = beautified.isJson;
+    } else {
+      // Ensure we always show the received output in a pretty form.
+      try {
+        previewText = JSON.stringify(cleaned, null, 2);
+        previewIsJson = true;
+      } catch {
+        previewText = String(cleaned ?? '');
+        previewIsJson = false;
+      }
+    }
 
-	    if (!task && !previewText && scratchpad == null && !provider && !model && !usage && !benchmark && !subRunId) return null;
-	    return { task, previewText, previewIsJson, scratchpad, provider, model, usage, benchmark, subRunId, raw: value, cleaned };
-	  }, [beautifyJsonText, resolvedStepOutput, selectedStep]);
+    if (!task && !previewText && scratchpad == null && !provider && !model && !usage && !benchmark && !subRunId) return null;
+    return { task, previewText, previewIsJson, scratchpad, provider, model, usage, benchmark, subRunId, raw: value, cleaned };
+  }, [beautifyJsonText, resolvedStepOutput, selectedStep]);
 
   const showGenericOutputPreview = Boolean(outputPreview?.previewText) && !(
     Boolean(generatedImagePreview || generatedAudioPreview) && Boolean(outputPreview?.previewIsJson)
@@ -4864,11 +4880,27 @@ export function RunFlowModal({
     return { title: String(effectType).toUpperCase(), meta: '', preview: '' };
   };
 
-  const submitResume = () => {
-    const response = resumeDraft.trim();
+  useEffect(() => {
+    setResumeSubmitting(false);
+  }, [waitingKey]);
+
+  const submitResumeValue = async (response: string, event?: MouseEvent<HTMLButtonElement> | FormEvent) => {
+    event?.preventDefault();
+    event?.stopPropagation();
+    if (resumeSubmitting) return;
     if (!response) return;
-    onResume?.(response);
+    setResumeSubmitting(true);
+    try {
+      await onResume?.(response);
+    } catch (error) {
+      setResumeSubmitting(false);
+      console.error('Failed to resume waiting run:', error);
+    }
   };
+
+  const submitResume = (event?: MouseEvent<HTMLButtonElement> | FormEvent) => submitResumeValue(resumeDraft.trim(), event);
+
+  const submitChoiceResume = (choice: string, event?: MouseEvent<HTMLButtonElement>) => submitResumeValue(choice, event);
 
   if (!isOpen) return null;
 
@@ -4878,8 +4910,8 @@ export function RunFlowModal({
         {/* Header */}
         <div className="run-modal-header">
           <div className="run-modal-header-left">
-            <h3>▶ Run Flow</h3>
-            <span className="run-modal-flow-name">{flowName || 'Untitled Flow'}</span>
+            <h3>▶ {runTitle}</h3>
+            <span className="run-modal-flow-name">{runSubtitle}</span>
           </div>
           <div className="run-modal-header-right">
             {flowId && onSelectRunId ? (
@@ -5273,7 +5305,8 @@ export function RunFlowModal({
                                 key={c}
                                 type="button"
                                 className="run-waiting-choice"
-                                onClick={() => onResume?.(c)}
+                                onClick={(e) => submitChoiceResume(c, e)}
+                                disabled={resumeSubmitting}
                               >
                                 {c}
                               </button>
@@ -5295,9 +5328,9 @@ export function RunFlowModal({
                                 type="button"
                                 className="modal-button primary"
                                 onClick={submitResume}
-                                disabled={!resumeDraft.trim()}
+                                disabled={!resumeDraft.trim() || resumeSubmitting}
                               >
-                                Continue
+                                {resumeSubmitting ? 'Continuing...' : 'Continue'}
                               </button>
                             </div>
                           </div>
@@ -5490,7 +5523,7 @@ export function RunFlowModal({
                               <div className="run-output-title">
                                 {selectedStep?.nodeType === 'generate_music' ? 'Generated music' : 'Generated audio'}
                               </div>
-                              <GeneratedAudioCard preview={generatedAudioPreview} autoPlay />
+                              <GeneratedAudioCard preview={generatedAudioPreview} autoPlay instanceKey={selectedStep.id} />
                             </div>
                           ) : null}
 
@@ -5753,7 +5786,7 @@ export function RunFlowModal({
                       <div className="run-output-title">Artifacts created</div>
                       <div className="run-generated-artifact-grid">
                         {runArtifactSummary.map((item) => (
-                          <div className="run-generated-artifact-item" key={`${item.kind}:${item.preview.artifactId}`}>
+                          <div className="run-generated-artifact-item" key={`${item.kind}:${item.stepId}:${item.preview.artifactId}`}>
                             <div className="run-output-meta-badges">
                               <span className="run-metric-badge">{item.kind}</span>
                               <span className="run-metric-badge metric-provider">{item.stepLabel}</span>
@@ -5773,7 +5806,7 @@ export function RunFlowModal({
                             {item.kind === 'image' ? (
                               <GeneratedImageCard preview={item.preview} compact />
                             ) : item.kind === 'audio' ? (
-                              <GeneratedAudioCard preview={item.preview} compact />
+                              <GeneratedAudioCard preview={item.preview} compact instanceKey={item.stepId} />
                             ) : (
                               <GeneratedTextCard preview={item.preview} compact />
                             )}
@@ -6631,6 +6664,7 @@ export function RunFlowModal({
             <div className="run-modal-footer-right">
               {onCancelRun && (
                 <button
+                  type="button"
                   className="modal-button cancel"
                   onClick={onCancelRun}
                   disabled={!(isRunning || isPaused || isWaiting)}
@@ -6641,6 +6675,7 @@ export function RunFlowModal({
 
               {(onPause || onResumeRun) && (
                 <button
+                  type="button"
                   className={isPaused ? 'modal-button primary' : 'modal-button cancel'}
                   onClick={() => {
                     if (isPaused) onResumeRun?.();
@@ -6653,6 +6688,7 @@ export function RunFlowModal({
               )}
 
               <button
+                type="button"
                 className="modal-button cancel"
                 onClick={onClose}
               >
@@ -6661,6 +6697,7 @@ export function RunFlowModal({
 
               {!hasRunData && !result && (
                 <button
+                  type="button"
                   className="modal-button primary"
                   onClick={handleSubmit}
                   disabled={
@@ -6675,6 +6712,7 @@ export function RunFlowModal({
 
               {(hasRunData || result) && !isRunning && !isPaused && !isWaiting && onFollowUpSubmit && activeFollowUpSeed && (
                 <button
+                  type="button"
                   className="modal-button cancel"
                   onClick={() => {
                     setFollowUpError(null);
@@ -6687,6 +6725,7 @@ export function RunFlowModal({
 
               {(hasRunData || result) && onNewRun && (
                 <button
+                  type="button"
                   className="modal-button primary"
                   onClick={() => {
                     if (workspaceRandom) {

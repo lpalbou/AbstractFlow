@@ -347,6 +347,47 @@
   text-overflow: ellipsis;
 }
 
+.pin-disclosure-row {
+  display: flex;
+  justify-content: center;
+  margin: 4px 0 8px;
+}
+
+.pin-disclosure-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 24px;
+  min-width: 86px;
+  padding: 4px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+}
+
+.pin-disclosure-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+}
+
+.pin-disclosure-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  font-size: 10px;
+  line-height: 1;
+}
+
 .node-config-row {
   display: flex;
   align-items: center;
@@ -396,6 +437,12 @@
   gap: 4px;
   padding: 2px 0;
   min-width: 0;
+  border-radius: 6px;
+  transition:
+    background 140ms ease,
+    box-shadow 140ms ease,
+    color 140ms ease,
+    opacity 140ms ease;
 }
 
 .pin-row.input .pin-label {
@@ -445,6 +492,75 @@
   position: relative;
   width: 14px;
   height: 14px;
+  border-radius: 999px;
+  transition:
+    transform 140ms ease,
+    filter 140ms ease,
+    box-shadow 140ms ease,
+    opacity 140ms ease;
+}
+
+.flow-node.connection-preview-active .pin-row.pin-feedback-valid {
+  background: rgba(94, 234, 212, 0.055);
+}
+
+.flow-node.connection-preview-active .pin-row.pin-feedback-valid .pin-label {
+  color: var(--text-primary);
+}
+
+.flow-node.connection-preview-active .pin-row.pin-feedback-valid .pin-shape {
+  transform: scale(1.18);
+  filter: drop-shadow(0 0 7px currentColor);
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 26%, transparent);
+}
+
+.flow-node.connection-preview-active .pin-row.pin-feedback-invalid {
+  opacity: 0.58;
+}
+
+.flow-node.connection-preview-active .pin-row.pin-feedback-invalid:hover,
+.flow-node.connection-preview-active .pin-row.pin-feedback-invalid:focus-within {
+  opacity: 1;
+  background: rgba(244, 63, 94, 0.10);
+}
+
+.flow-node.connection-preview-active .pin-row.pin-feedback-invalid:hover .pin-label,
+.flow-node.connection-preview-active .pin-row.pin-feedback-invalid:focus-within .pin-label {
+  color: var(--text-primary);
+}
+
+.flow-node.connection-preview-active .pin-row.pin-feedback-invalid:hover .pin-shape,
+.flow-node.connection-preview-active .pin-row.pin-feedback-invalid:focus-within .pin-shape {
+  transform: scale(1.12);
+  color: #ff4778 !important;
+  filter: drop-shadow(0 0 8px rgba(255, 71, 120, 0.72));
+  box-shadow: 0 0 0 3px rgba(255, 71, 120, 0.24);
+}
+
+.connection-feedback-hint {
+  position: absolute;
+  z-index: 80;
+  max-width: 280px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(10, 12, 22, 0.92);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  line-height: 1.35;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.34);
+  pointer-events: none;
+}
+
+.connection-feedback-hint.valid {
+  border-color: rgba(18, 211, 167, 0.45);
+  color: #bffbec;
+}
+
+.connection-feedback-hint.invalid {
+  border-color: rgba(255, 71, 120, 0.55);
+  color: #ffd3dd;
 }
 
 /* React Flow Handles (Pins) */

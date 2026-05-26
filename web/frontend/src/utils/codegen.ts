@@ -1,5 +1,13 @@
 import type { Pin } from '../types/flow';
 
+export function isPythonCodeControlPin(pin: Pin): boolean {
+  return pin.id === 'permissions';
+}
+
+export function getPythonCodeUserPins(params: Pin[]): Pin[] {
+  return params.filter((p) => p.type !== 'execution' && !isPythonCodeControlPin(p));
+}
+
 function dedent(text: string): string {
   const lines = text.replace(/\r\n/g, '\n').split('\n');
   const nonEmpty = lines.filter((l) => l.trim().length > 0);
@@ -39,7 +47,7 @@ export function getPythonTypeLabelForPin(pin: Pin): string {
 }
 
 export function buildPythonAvailableVariablesComments(params: Pin[]): string {
-  const dataPins = params.filter((p) => p.type !== 'execution');
+  const dataPins = getPythonCodeUserPins(params);
   const lines: string[] = ['# Available variables:', '# _input (dict)'];
   for (const pin of dataPins) {
     const name = getPythonVarNameForPin(pin);
@@ -90,7 +98,7 @@ export function generatePythonTransformCode(params: Pin[], body: string): string
   const lines: string[] = [];
   lines.push('def transform(_input):');
 
-  const dataPins = params.filter((p) => p.type !== 'execution');
+  const dataPins = getPythonCodeUserPins(params);
   for (const pin of dataPins) {
     const name = getPythonVarNameForPin(pin);
     lines.push(`    ${name} = _input.get(${JSON.stringify(pin.id)})`);
@@ -119,4 +127,3 @@ export function extractFunctionBody(code: string, functionName = 'transform'): s
   const stripped = bodyLines.map((l) => (l.startsWith('    ') ? l.slice(4) : l));
   return dedent(stripped.join('\n')).trimEnd();
 }
-

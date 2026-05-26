@@ -11,7 +11,7 @@ import { endpointFromDescriptor, gatewayJson, type GatewayContracts } from '../u
 async function fetchRuns(workflowId: string, gatewayContracts?: GatewayContracts | null): Promise<RunSummary[]> {
   const runsListDescriptor = gatewayContracts?.common?.runs?.list || gatewayContracts?.flow_editor?.runs?.list;
   const payload = await gatewayJson<{ items?: Record<string, unknown>[] }>(
-    endpointFromDescriptor(runsListDescriptor, '/api/gateway/runs', {}, { limit: 50 })
+    endpointFromDescriptor(runsListDescriptor, '/api/gateway/runs', {}, { limit: 500, root_only: true, include_drafts: true })
   );
   if (!Array.isArray(payload.items)) {
     console.warn('#FALLBACK: runs response missing items; treating as empty list');
@@ -223,4 +223,3 @@ export function RunSwitcherDropdown({
 }
 
 export default RunSwitcherDropdown;
-

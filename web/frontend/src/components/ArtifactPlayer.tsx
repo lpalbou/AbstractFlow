@@ -22,7 +22,12 @@ export function artifactContentUrl(
   );
 }
 
-export function useArtifactObjectUrl(src: string | null | undefined, contentType?: string, fallbackSrcs?: string[]) {
+export function useArtifactObjectUrl(
+  src: string | null | undefined,
+  contentType?: string,
+  fallbackSrcs?: string[],
+  cacheKey?: string
+) {
   const [state, setState] = useState<{ objectUrl: string; loading: boolean; error: string | null }>({
     objectUrl: '',
     loading: false,
@@ -72,7 +77,7 @@ export function useArtifactObjectUrl(src: string | null | undefined, contentType
       active = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [contentType, fallbackSrcs, src]);
+  }, [cacheKey, contentType, fallbackSrcs, src]);
 
   return state;
 }

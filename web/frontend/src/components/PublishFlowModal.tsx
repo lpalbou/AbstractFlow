@@ -8,13 +8,7 @@ import {
   jsonRequest,
   type GatewayContracts,
 } from '../utils/gatewayClient';
-
-function sanitizeBundleId(raw: string): string {
-  const trimmed = (raw || '').trim();
-  if (!trimmed) return '';
-  const replaced = trimmed.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/-{2,}/g, '-');
-  return replaced.replace(/^-+/, '').replace(/-+$/, '');
-}
+import { sanitizeBundleId } from '../utils/workflowBundles';
 
 type PublishFlowRequest = {
   bundle_id?: string;
@@ -56,12 +50,14 @@ export function PublishFlowModal({
   flowName,
   gatewayContracts,
   onClose,
+  onPublished,
 }: {
   isOpen: boolean;
   flowId: string | null;
   flowName: string;
   gatewayContracts?: GatewayContracts | null;
   onClose: () => void;
+  onPublished?: (result: PublishFlowResponse) => void;
 }) {
   const defaultBundleId = useMemo(() => sanitizeBundleId(flowName), [flowName]);
   const [bundleId, setBundleId] = useState(defaultBundleId);
@@ -165,6 +161,7 @@ export function PublishFlowModal({
 
                 const res = await publishFlow(flowId, payload, gatewayContracts);
                 setResult(res);
+                onPublished?.(res);
                 toast.success(`Published ${res.bundle_ref}`);
                 if (payload.reload_gateway && !res.gateway_reloaded) {
                   toast.error('Published, but failed to reload gateway bundles');

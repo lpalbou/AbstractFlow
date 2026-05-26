@@ -19,8 +19,8 @@ AbstractFlow’s default editor path is established as Gateway-first.
 
 - Follow-up work for stricter helper endpoint gating moved to
   `docs/backlog/completed/060_gateway_contract_helper_endpoint_strictness.md`.
-- Draft/publish isolation and other lifecycle refinements remain in
-  `docs/backlog/planned/020_draft_run_and_publish_lifecycle.md`.
+- Draft/publish isolation and lifecycle retention work was completed in
+  `docs/backlog/completed/020_draft_run_and_publish_lifecycle.md`.
 
 ## Migration Note
 

@@ -56,7 +56,7 @@ export function modelResidencyTaskUnsupportedReason(
   }
 
   // Task support can be stale or deployment-specific; Gateway remains the control
-  // boundary, so authoring should not disable warmup for media tasks when the
+  // boundary, so authoring should not disable load/unload controls when the
   // Gateway model-residency route itself is available.
   return '';
 }
@@ -83,8 +83,6 @@ export function insertModelResidencyStep({
     ...(baseData.effectConfig || {}),
     operation,
     task: target.task,
-    required: false,
-    ...(operation === 'load' ? { pin: true } : {}),
     ...(provider ? { provider } : {}),
     ...(model ? { model } : {}),
   };
@@ -92,8 +90,6 @@ export function insertModelResidencyStep({
     ...(baseData.pinDefaults || {}),
     operation,
     task: target.task,
-    required: false,
-    ...(operation === 'load' ? { pin: true } : {}),
     ...(provider ? { provider } : {}),
     ...(model ? { model } : {}),
   };
@@ -107,7 +103,7 @@ export function insertModelResidencyStep({
     },
     data: {
       ...baseData,
-      label: operation === 'load' ? 'Warm Model' : 'Unload Model',
+      label: operation === 'load' ? 'Load Model' : 'Unload Model',
       effectConfig,
       pinDefaults,
     },

@@ -2,11 +2,21 @@
  * Node palette component with categorized draggable nodes.
  */
 
-import { useState, useCallback, DragEvent } from 'react';
+import { useState, useCallback, useMemo, DragEvent } from 'react';
 import { NODE_CATEGORIES, NodeTemplate } from '../types/nodes';
+import { useGatewayCapabilities, gatewayContractsFromCapabilities } from '../hooks/useGatewayCapabilities';
+import {
+  gatewayAuthoringCapabilityStatus,
+  getGatewayFlowEditorReadiness,
+  type GatewayAuthoringCapabilityStatus,
+} from '../utils/gatewayClient';
 import { AfTooltip } from './AfTooltip';
 
 export function NodePalette() {
+  const gatewayCapabilitiesQuery = useGatewayCapabilities(true);
+  const gatewayContracts = gatewayContractsFromCapabilities(gatewayCapabilitiesQuery.data);
+  const gatewayReadiness = useMemo(() => getGatewayFlowEditorReadiness(gatewayContracts), [gatewayContracts]);
+  const gatewayCapabilityKnown = Boolean(gatewayContracts && !gatewayCapabilitiesQuery.isError);
   const [expandedCategories, setExpandedCategories] = useState<
     Record<string, boolean>
   >({
@@ -25,7 +35,12 @@ export function NodePalette() {
   }, []);
 
   const onDragStart = useCallback(
-    (event: DragEvent<HTMLDivElement>, template: NodeTemplate) => {
+    (event: DragEvent<HTMLDivElement>, template: NodeTemplate, status: GatewayAuthoringCapabilityStatus | null) => {
+      if (status && !status.available && !status.checking) {
+        event.preventDefault();
+        event.dataTransfer.effectAllowed = 'none';
+        return;
+      }
       event.dataTransfer.setData(
         'application/reactflow',
         JSON.stringify(template)
@@ -89,22 +104,40 @@ export function NodePalette() {
 
               {(expandedCategories[key] || searchTerm) && (
                 <div className="category-nodes">
-                  {filteredNodes.map((template) => (
-                    <AfTooltip key={`${template.type}:${template.label}`} content={template.description} delayMs={2000} priority={0} block>
-                      <div
-                        className="palette-node"
-                        draggable
-                        onDragStart={(e) => onDragStart(e, template)}
-                      >
-                        <span
-                          className="node-icon"
-                          style={{ color: template.headerColor }}
-                          dangerouslySetInnerHTML={{ __html: template.icon }}
-                        />
-                        <span className="node-label">{template.label}</span>
-                      </div>
-                    </AfTooltip>
-                  ))}
+                  {filteredNodes.map((template) => {
+                    const status = gatewayAuthoringCapabilityStatus(gatewayReadiness, template.gatewayCapability, {
+                      loading: gatewayCapabilitiesQuery.isLoading,
+                      known: gatewayCapabilityKnown,
+                    });
+                    const disabled = Boolean(status && !status.available && !status.checking);
+                    const tooltip = status && (disabled || status.checking) ? `${template.description}\n${status.reason}` : template.description;
+                    return (
+                      <AfTooltip key={`${template.type}:${template.label}`} content={tooltip} delayMs={2000} priority={0} block>
+                        <div
+                          className={`palette-node${disabled ? ' disabled' : ''}${status?.checking ? ' checking' : ''}`}
+                          draggable={!disabled}
+                          aria-disabled={disabled || undefined}
+                          data-gateway-capability={template.gatewayCapability || undefined}
+                          data-gateway-capability-status={
+                            status ? (status.checking ? 'checking' : status.available ? 'available' : 'unavailable') : undefined
+                          }
+                          onDragStart={(e) => onDragStart(e, template, status)}
+                        >
+                          <span
+                            className="node-icon"
+                            style={{ color: template.headerColor }}
+                            dangerouslySetInnerHTML={{ __html: template.icon }}
+                          />
+                          <span className="node-label">{template.label}</span>
+                          {status && (status.checking || disabled) ? (
+                            <span className={`palette-node-status ${status.checking ? 'checking' : 'unavailable'}`}>
+                              {status.checking ? 'checking' : 'unavailable'}
+                            </span>
+                          ) : null}
+                        </div>
+                      </AfTooltip>
+                    );
+                  })}
                 </div>
               )}
             </div>

@@ -1,9 +1,9 @@
-# Planned: Local Execution Compatibility Boundary
+# Completed: Local Execution Compatibility Boundary
 
 ## Metadata
 - Created: 2026-05-09
-- Status: Planned
-- Completed: N/A
+- Status: Completed
+- Completed: 2026-05-25
 
 ## Context
 
@@ -119,3 +119,47 @@ There should be two clean entry points:
 - [x] Audit package dependency side effects for truly thin proxy installs.
 - [x] Add tests for default Gateway-only behavior.
 - [x] Plan and implement additional dependency split with no standalone aggregate profile (`apple` / `gpu` + base/runtimes split).
+
+## Completion report
+
+### Date
+
+2026-05-25
+
+### Summary
+
+This item was closed after a code-first audit showed the compatibility boundary is already
+implemented and tested:
+
+- the default AbstractFlow backend exposes the Gateway proxy surface only;
+- local runtime routes are available only when `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1`;
+- frontend source avoids local runtime route paths in the default editor transport;
+- package dependency profiles keep local compatibility/runtime dependencies out of the thin default
+  client profile.
+
+### Evidence
+
+- `web/backend/main.py`: local runtime route registration is env-gated and emits local-mode startup
+  warnings.
+- `pyproject.toml`: `apple` / `gpu` profiles carry compatibility host dependencies while the base
+  package stays thin.
+- `tests/test_frontend_gateway_contract.py`: default route registry and frontend source checks prove
+  no default `/api/flows`, `/api/ws`, `/api/runs`, or `/api/providers` path.
+- `tests/test_frontend_gateway_contract.py`: local runtime routes are present only under explicit
+  opt-in.
+
+### Validation
+
+- `PYTHONPATH=.:../abstractruntime/src pytest -q tests/test_frontend_gateway_contract.py`
+- `npm run build` from `web/frontend`
+
+### ADR impact
+
+None. This item enforces the existing Gateway-first boundary captured by completed Flow backlog
+items and related Gateway architecture docs; it does not introduce a new durable architecture rule.
+
+### Residual risk
+
+The local compatibility stack remains intentionally available for tests and embedded development.
+Future work should continue to guard the default editor path through
+`completed/050_gateway_execution_regression_suite.md`.

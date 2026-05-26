@@ -5,6 +5,8 @@ import { clsx } from 'clsx';
 export interface AfSelectOption {
   value: string;
   label: string;
+  disabled?: boolean;
+  reason?: string;
 }
 
 export interface AfSelectProps {
@@ -20,6 +22,8 @@ export interface AfSelectProps {
   minPopoverWidth?: number;
   variant?: 'pin' | 'panel';
   onOpen?: () => void;
+  customOptionLabel?: (value: string) => string;
+  validateCustomValue?: (value: string, context: { options: AfSelectOption[] }) => string | null | undefined;
   onChange: (value: string) => void;
 }
 
@@ -36,6 +40,8 @@ export function AfSelect({
   minPopoverWidth = 240,
   variant = 'panel',
   onOpen,
+  customOptionLabel,
+  validateCustomValue,
   onChange,
 }: AfSelectProps) {
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -49,30 +55,49 @@ export function AfSelect({
   const [placement, setPlacement] = useState<'bottom' | 'top'>('bottom');
   const [pos, setPos] = useState<{ left: number; top: number; width: number }>({ left: 0, top: 0, width: 0 });
 
-  const selectedLabel = useMemo(() => {
-    const found = options.find((o) => o.value === value);
-    return found?.label || value || '';
+  const optionsWithCurrent = useMemo(() => {
+    const clean = typeof value === 'string' ? value.trim() : '';
+    if (!clean || options.some((o) => o.value === clean)) return options;
+    return [...options, { value: clean, label: clean }];
   }, [options, value]);
+
+  const selectedLabel = useMemo(() => {
+    const found = optionsWithCurrent.find((o) => o.value === value);
+    return found?.label || value || '';
+  }, [optionsWithCurrent, value]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return options;
-    return options.filter((o) => o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q));
-  }, [options, search]);
+    if (!q) return optionsWithCurrent;
+    return optionsWithCurrent.filter((o) => o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q));
+  }, [optionsWithCurrent, search]);
 
-  const customOption = useMemo(() => {
+  const customOption = useMemo<AfSelectOption | null>(() => {
     if (!allowCustom) return null;
     const q = search.trim();
     if (!q) return null;
-    const exists = options.some((o) => o.value === q);
+    const exists = optionsWithCurrent.some((o) => o.value === q);
     if (exists) return null;
-    return { value: q, label: `Use "${q}"` } satisfies AfSelectOption;
-  }, [allowCustom, options, search]);
+    const reason = validateCustomValue?.(q, { options: optionsWithCurrent }) || '';
+    return {
+      value: q,
+      label: customOptionLabel ? customOptionLabel(q) : `Use "${q}"`,
+      disabled: Boolean(reason),
+      reason,
+    };
+  }, [allowCustom, customOptionLabel, optionsWithCurrent, search, validateCustomValue]);
 
-  const visibleOptions = useMemo(() => {
+  const visibleOptions = useMemo<AfSelectOption[]>(() => {
     if (!customOption) return filtered;
     return [customOption, ...filtered];
   }, [customOption, filtered]);
+
+  const displayedOptions = useMemo<AfSelectOption[]>(() => {
+    if (visibleOptions.length > 0) return visibleOptions;
+    const clean = value.trim();
+    if (!loading || !clean) return visibleOptions;
+    return [{ value: clean, label: selectedLabel || clean }];
+  }, [loading, selectedLabel, value, visibleOptions]);
 
   const recalcPosition = useCallback(() => {
     const el = triggerRef.current;
@@ -129,16 +154,18 @@ export function AfSelect({
     if (!open) return;
     const idx = Math.max(
       0,
-      visibleOptions.findIndex((o) => o.value === value)
+      displayedOptions.findIndex((o) => o.value === value)
     );
     setHighlightIdx(idx === -1 ? 0 : idx);
     // Focus search for fast typing
     if (searchable) {
       setTimeout(() => searchRef.current?.focus(), 0);
     }
-  }, [open, searchable, value, visibleOptions]);
+  }, [displayedOptions, open, searchable, value]);
 
   const pick = (v: string) => {
+    const option = displayedOptions.find((o) => o.value === v);
+    if (option?.disabled) return;
     onChange(v);
     close();
   };
@@ -162,7 +189,7 @@ export function AfSelect({
     }
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setHighlightIdx((i) => Math.min(i + 1, Math.max(0, visibleOptions.length - 1)));
+      setHighlightIdx((i) => Math.min(i + 1, Math.max(0, displayedOptions.length - 1)));
       return;
     }
     if (e.key === 'ArrowUp') {
@@ -172,13 +199,14 @@ export function AfSelect({
     }
     if (e.key === 'Enter') {
       e.preventDefault();
-      const opt = visibleOptions[highlightIdx];
+      const opt = displayedOptions[highlightIdx];
       if (opt) pick(opt.value);
     }
   };
 
   const showValue = Boolean(value);
   const triggerText = showValue ? selectedLabel : placeholder;
+  const customError = customOption?.disabled ? customOption.reason || 'Unavailable' : '';
 
   return (
     <span className={clsx('af-select', variant === 'pin' ? 'af-select--pin' : 'af-select--panel')}>
@@ -238,6 +266,7 @@ export function AfSelect({
               }}
               onMouseDown={(e) => e.stopPropagation()}
               onClick={(e) => e.stopPropagation()}
+              onWheel={(e) => e.stopPropagation()}
               onKeyDown={onPopoverKeyDown}
               role="listbox"
               tabIndex={-1}
@@ -251,15 +280,24 @@ export function AfSelect({
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder={searchPlaceholder}
                     onKeyDown={onPopoverKeyDown}
+                    aria-invalid={Boolean(customError)}
+                    aria-describedby={customError ? 'af-select-custom-error' : undefined}
                   />
+                  {customError ? (
+                    <div id="af-select-custom-error" className="af-select-custom-error" role="alert">
+                      {customError}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
 
               <div className="af-select-options">
-                {visibleOptions.length === 0 ? (
+                {loading && displayedOptions.length === 0 ? (
+                  <div className="af-select-empty">Loading…</div>
+                ) : displayedOptions.length === 0 ? (
                   <div className="af-select-empty">No results</div>
                 ) : (
-                  visibleOptions.map((o, i) => {
+                  displayedOptions.map((o, i) => {
                     const isSelected = o.value === value;
                     const isHighlighted = i === highlightIdx;
                     return (
@@ -268,8 +306,10 @@ export function AfSelect({
                         className={clsx(
                           'af-select-option',
                           isSelected && 'af-select-option--selected',
-                          isHighlighted && 'af-select-option--highlighted'
+                          isHighlighted && 'af-select-option--highlighted',
+                          o.disabled && 'af-select-option--disabled'
                         )}
+                        title={o.disabled ? o.reason || 'Unavailable' : undefined}
                         onMouseEnter={() => setHighlightIdx(i)}
                         onMouseDown={(e) => {
                           // prevent focus loss / drag start
@@ -277,8 +317,12 @@ export function AfSelect({
                           e.stopPropagation();
                         }}
                         onClick={() => pick(o.value)}
+                        aria-disabled={o.disabled ? true : undefined}
                       >
-                        <span className="af-select-option-label">{o.label}</span>
+                        <span className="af-select-option-label">
+                          <span>{o.label}</span>
+                          {o.reason ? <small className="af-select-option-reason">{o.reason}</small> : null}
+                        </span>
                         {isSelected ? <span className="af-select-check">✓</span> : null}
                       </div>
                     );
@@ -294,4 +338,3 @@ export function AfSelect({
 }
 
 export default AfSelect;
-

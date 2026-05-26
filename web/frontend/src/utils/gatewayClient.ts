@@ -1,3 +1,5 @@
+import type { GatewayAuthoringCapability } from './nodeCapabilities';
+
 export type GatewayQueryValue = string | number | boolean | null | undefined;
 
 export interface GatewayEndpointDescriptor {
@@ -69,6 +71,7 @@ export interface GatewayCommonContract {
     input_data?: GatewayEndpointDescriptor;
     history_bundle?: GatewayEndpointDescriptor;
     commands?: GatewayEndpointDescriptor & { types?: string[] };
+    purge_drafts?: GatewayEndpointDescriptor;
   };
   ledger?: {
     replay?: GatewayEndpointDescriptor;
@@ -87,6 +90,15 @@ export interface GatewayCommonContract {
   workspace?: {
     policy_endpoint?: string;
   };
+  configuration?: {
+    capability_defaults?: GatewayEndpointDescriptor & {
+      item_endpoint?: string;
+      schema?: string;
+    };
+  };
+  execution?: {
+    code?: GatewayCodeExecutionContract;
+  };
   discovery?: {
     capabilities?: string;
     providers?: string;
@@ -97,6 +109,7 @@ export interface GatewayCommonContract {
     audio_transcription_models?: string;
     audio_music_providers?: string;
     audio_music_models?: string;
+    embedding_models?: string;
     vision_provider_models?: string;
     vision_models?: string;
     tools?: string;
@@ -216,6 +229,9 @@ export interface GatewayFlowEditorContract {
   ledger?: GatewayCommonContract['ledger'];
   artifacts?: GatewayCommonContract['artifacts'];
   media?: GatewayMediaContract;
+  execution?: {
+    code?: GatewayCodeExecutionContract;
+  };
   helpers?: Record<string, string>;
 }
 
@@ -245,6 +261,35 @@ export interface GatewayCapabilities {
 
 export interface GatewayCapabilitiesResponse {
   capabilities?: GatewayCapabilities;
+}
+
+export interface GatewayCodeExecutionMode {
+  id?: string;
+  value?: string;
+  label?: string;
+  available?: boolean;
+  default?: boolean;
+  disabled_reason?: string;
+  reason?: string;
+  config_hint?: string;
+  [key: string]: unknown;
+}
+
+export interface GatewayCodeExecutionContract {
+  contract?: string;
+  version?: number;
+  available?: boolean;
+  default_mode?: string;
+  simulate?: GatewayEndpointDescriptor;
+  modes?: GatewayCodeExecutionMode[];
+  [key: string]: unknown;
+}
+
+export interface CodePermissionOption {
+  value: string;
+  label: string;
+  disabled?: boolean;
+  reason?: string;
 }
 
 export interface GatewayCapabilityCheck {
@@ -292,6 +337,14 @@ export interface GatewayFlowEditorReadiness {
   optional: GatewayOptionalFeatureStatus;
 }
 
+export interface GatewayAuthoringCapabilityStatus {
+  capability: GatewayAuthoringCapability;
+  label: string;
+  available: boolean;
+  checking: boolean;
+  reason: string;
+}
+
 export class GatewayHttpError extends Error {
   status: number;
   detail: unknown;
@@ -302,6 +355,53 @@ export class GatewayHttpError extends Error {
     this.status = status;
     this.detail = detail;
   }
+}
+
+const AUTHORING_CAPABILITY_LABELS: Record<GatewayAuthoringCapability, string> = {
+  generated_image: 'Generate Image',
+  edited_image: 'Edit Image',
+  generated_voice: 'Generate Voice',
+  generated_music: 'Generate Music',
+  model_residency: 'Model Residency',
+  tools: 'Tool execution',
+  kg_memory: 'Knowledge graph memory',
+};
+
+const AUTHORING_CAPABILITY_OPTIONAL_KEYS: Record<GatewayAuthoringCapability, keyof GatewayOptionalFeatureStatus> = {
+  generated_image: 'generatedImage',
+  edited_image: 'editedImage',
+  generated_voice: 'generatedVoice',
+  generated_music: 'generatedMusic',
+  model_residency: 'modelResidency',
+  tools: 'tools',
+  kg_memory: 'kgMemory',
+};
+
+export function gatewayAuthoringCapabilityStatus(
+  readiness: GatewayFlowEditorReadiness | null | undefined,
+  capability: GatewayAuthoringCapability | undefined | null,
+  options: { loading?: boolean; known?: boolean } = {}
+): GatewayAuthoringCapabilityStatus | null {
+  if (!capability) return null;
+  const label = AUTHORING_CAPABILITY_LABELS[capability];
+  if (options.loading || options.known === false || !readiness) {
+    return {
+      capability,
+      label,
+      available: true,
+      checking: true,
+      reason: `Checking Gateway support for ${label}.`,
+    };
+  }
+
+  const available = Boolean(readiness.optional[AUTHORING_CAPABILITY_OPTIONAL_KEYS[capability]]);
+  return {
+    capability,
+    label,
+    available,
+    checking: false,
+    reason: available ? '' : `${label} is unavailable on this Gateway.`,
+  };
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -389,6 +489,63 @@ export function getGatewayContracts(payload: GatewayCapabilitiesResponse | Gatew
   const caps = asRecord(top.capabilities) || top;
   const contracts = asRecord(caps.contracts);
   return contracts ? (contracts as GatewayContracts) : null;
+}
+
+export function getCodeExecutionContract(
+  contracts: GatewayContracts | null | undefined
+): GatewayCodeExecutionContract | null {
+  const flowCode = contracts?.flow_editor?.execution?.code;
+  const commonCode = contracts?.common?.execution?.code;
+  const code = flowCode || commonCode;
+  if (!code || typeof code !== 'object') return null;
+  return code.contract === 'code_execution_policy_v1' ? code : null;
+}
+
+export function codePermissionOptions(
+  contracts: GatewayContracts | null | undefined,
+  currentValue = ''
+): CodePermissionOption[] {
+  const contract = getCodeExecutionContract(contracts);
+  const modes = Array.isArray(contract?.modes) ? contract.modes : [];
+  const out: CodePermissionOption[] = [];
+  const seen = new Set<string>();
+
+  const add = (value: string, label: string, disabled = false, reason = '') => {
+    const clean = value.trim();
+    if (!clean || seen.has(clean)) return;
+    seen.add(clean);
+    out.push({ value: clean, label, disabled, reason });
+  };
+
+  for (const mode of modes) {
+    const value = typeof mode.id === 'string' && mode.id.trim() ? mode.id.trim() : typeof mode.value === 'string' ? mode.value.trim() : '';
+    if (!value) continue;
+    const label = typeof mode.label === 'string' && mode.label.trim() ? mode.label.trim() : value;
+    const reason =
+      typeof mode.disabled_reason === 'string' && mode.disabled_reason.trim()
+        ? mode.disabled_reason.trim()
+        : typeof mode.reason === 'string' && mode.reason.trim()
+          ? mode.reason.trim()
+          : typeof mode.config_hint === 'string' && mode.config_hint.trim()
+            ? mode.config_hint.trim()
+            : '';
+    add(value, mode.available === false ? `${label} (unavailable)` : label, mode.available === false, reason);
+  }
+
+  if (!seen.has('sandbox')) add('sandbox', 'Sandbox');
+  const current = currentValue.trim();
+  if (current && !seen.has(current)) add(current, `${current} (not advertised by Gateway)`, true, 'Gateway did not advertise this Code execution mode.');
+  return out;
+}
+
+export function codePermissionUnavailableReason(
+  contracts: GatewayContracts | null | undefined,
+  value: string
+): string {
+  const clean = value.trim();
+  if (!clean) return '';
+  const option = codePermissionOptions(contracts, clean).find((o) => o.value === clean);
+  return option?.disabled ? option.reason || `${clean} is not available on this Gateway runtime.` : '';
 }
 
 function stringEndpointAvailable(value: unknown): boolean {
@@ -493,11 +650,19 @@ export function getGatewayFlowEditorReadiness(
     return check;
   };
 
+  const contractVersionValue = contracts?.version;
+  const contractVersionNumber =
+    typeof contractVersionValue === 'number' && Number.isFinite(contractVersionValue)
+      ? contractVersionValue
+      : null;
   const contractVersion = add({
     key: 'contracts.version',
     label: 'Gateway client contract v1',
-    ok: Boolean(contracts && typeof contracts.version === 'number' && contracts.version >= 1),
-    reason: 'Gateway discovery did not return a versioned client contract.',
+    ok: contractVersionNumber === 1,
+    reason:
+      contractVersionNumber === null
+        ? 'Gateway discovery did not return a versioned client contract.'
+        : `Gateway client contract version ${contractVersionNumber} is not supported by this editor.`,
   });
   const flowEditor = add({
     key: 'flow_editor.available',

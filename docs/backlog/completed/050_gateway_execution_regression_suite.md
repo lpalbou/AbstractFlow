@@ -1,9 +1,9 @@
-# Planned: Gateway Execution Regression Suite
+# Completed: Gateway Execution Regression Suite
 
 ## Metadata
 - Created: 2026-05-09
-- Status: In progress
-- Completed: N/A
+- Status: Completed
+- Completed: 2026-05-25
 
 ## Context
 
@@ -79,7 +79,7 @@ This prevents confusion between local compatibility behavior and production edit
 - Completed Flow item: `../completed/040_gateway_capability_schema_and_connection_contract.md`.
 - Completed Flow item: `../completed/060_gateway_contract_helper_endpoint_strictness.md`.
 - Gateway completed item:
-  `abstractgateway/docs/backlog/completed/020_abstractflow_editor_first_contract.md`.
+  `abstractgateway/docs/backlog/completed/020_abstractflow_gateway_first_editor_contract.md`.
 
 - Recommended follow-up: `../proposed/2026-05-09_abstractflow_gateway_migration_roadmap.md`.
 
@@ -149,11 +149,54 @@ Negative checks:
 ## Progress checklist
 
 - [x] Add no-local-fallback regression assertions in frontend helper + route registry tests.
-- [ ] Extract testable frontend Gateway helpers further if needed.
-- [ ] Add explicit capability-failure regression (`descriptor`/`contract-version` mismatch fail fast).
+- [x] Extract testable frontend Gateway helpers further if needed. Current `gatewayClient.ts` helper seam is sufficient.
+- [x] Add explicit capability-failure regression (`descriptor`/`contract-version` mismatch fail fast).
 - [x] Document and run operational smoke across abstractgateway + abstractflow.
 
 ## Guidance for the implementing agent
 
 Keep the suite narrow and high-value. The goal is to catch local fallback regressions,
 not to retest every VisualFlow node type.
+
+## Completion report
+
+### Date
+
+2026-05-25
+
+### Summary
+
+The regression gate is now closed around stable seams rather than broad browser automation:
+
+- frontend helper tests prove every Gateway descriptor path is normalized through `/api/gateway`;
+- readiness fails when required run helpers are missing, unavailable, wrong-transport, or advertised
+  under an unsupported client contract version;
+- default frontend source checks reject local runtime route paths;
+- backend route registry tests prove default startup exposes only the Gateway proxy and omits local
+  execution route modules;
+- explicit opt-in tests prove the preserved compatibility host still registers local routes when
+  `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1`.
+
+### Files and symbols touched
+
+- `web/frontend/src/utils/gatewayClient.ts`: `getGatewayFlowEditorReadiness(...)` now treats the
+  Gateway client contract as exact v1 rather than accepting arbitrary future major versions.
+- `tests/test_frontend_gateway_contract.py`: added readiness assertions for unsupported contract
+  versions, missing run start descriptors, unavailable run start descriptors, and existing bad
+  stream transport coverage.
+
+### Validation
+
+- `PYTHONPATH=.:../abstractruntime/src pytest -q tests/test_frontend_gateway_contract.py::test_gateway_client_path_and_readiness_helpers`
+- `PYTHONPATH=.:../abstractruntime/src pytest -q tests/test_frontend_gateway_contract.py`
+- `npm run build` from `web/frontend`
+
+### ADR impact
+
+None. The work validates and enforces the existing Gateway-first editor boundary; no new
+architecture policy was introduced.
+
+### Residual risk
+
+The operational smoke checklist remains useful before releases, but the CI-suitable regression gate
+now covers the default no-local-fallback path and the contract mismatch failure mode directly.

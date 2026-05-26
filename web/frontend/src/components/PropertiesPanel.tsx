@@ -22,6 +22,7 @@ import AfMultiSelect from './inputs/AfMultiSelect';
 import {
   extractFunctionBody,
   generatePythonTransformCode,
+  getPythonCodeUserPins,
   sanitizePythonIdentifier,
   upsertPythonAvailableVariablesComments,
 } from '../utils/codegen';
@@ -29,6 +30,8 @@ import { collectCustomEventNames } from '../utils/events';
 import { areTypesCompatible } from '../utils/validation';
 import {
   endpointFromDescriptor,
+  codePermissionOptions,
+  codePermissionUnavailableReason,
   gatewayFetch,
   gatewayJson,
   gatewayPath,
@@ -60,6 +63,36 @@ const DEFAULT_IMAGE_FORMATS = ['png', 'jpeg', 'webp'];
 const DEFAULT_TTS_FORMATS = ['wav', 'mp3'];
 const DEFAULT_STT_FORMATS = ['json', 'text', 'verbose_json', 'srt', 'vtt'];
 const DEFAULT_MUSIC_FORMATS = ['wav', 'mp3', 'flac'];
+const DEFAULT_TTS_QUALITY_PRESETS: AfSelectOption[] = [
+  { value: 'low', label: 'low latency' },
+  { value: 'standard', label: 'standard' },
+  { value: 'high', label: 'high quality' },
+];
+
+const MEDIA_NODE_TYPES = new Set([
+  'generate_image',
+  'edit_image',
+  'image_to_image',
+  'generate_voice',
+  'generate_music',
+  'transcribe_audio',
+  'listen_voice',
+]);
+
+const MEDIA_PIN_DEFAULT_IDS = new Set([
+  'image_provider',
+  'image_model',
+  'tts_provider',
+  'tts_model',
+  'voice',
+  'profile',
+  'quality_preset',
+  'stt_provider',
+  'stt_model',
+  'music_provider',
+  'music_model',
+  'format',
+]);
 
 function formatValuesFrom(values: unknown, fallback: string[]): string[] {
   const raw = Array.isArray(values) ? values : fallback;
@@ -73,6 +106,18 @@ function formatValuesFrom(values: unknown, fallback: string[]): string[] {
     out.push(value);
   }
   return out.length > 0 ? out : fallback;
+}
+
+function selectOptionsFromValues(values: string[]): AfSelectOption[] {
+  const seen = new Set<string>();
+  const out: AfSelectOption[] = [];
+  for (const item of values) {
+    const value = String(item || '').trim();
+    if (!value || seen.has(value)) continue;
+    seen.add(value);
+    out.push({ value, label: value });
+  }
+  return out;
 }
 
 interface PropertiesPanelProps {
@@ -106,6 +151,11 @@ const DATA_PIN_TYPES: DataPinType[] = [
   'number',
   'boolean',
   'object',
+  'artifact',
+  'artifact_image',
+  'artifact_audio',
+  'artifact_text',
+  'artifact_video',
   'memory',
   'assertion',
   'assertions',
@@ -555,7 +605,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const semanticsQuery = useSemanticsRegistry(wantsSemanticsRegistry);
   const modelResidencyTaskForCatalog =
     node?.data?.nodeType === 'model_residency'
-      ? String(node.data.effectConfig?.task || node.data.pinDefaults?.task || 'image_generation')
+      ? String(node.data.effectConfig?.task || node.data.pinDefaults?.task || 'text_generation')
       : '';
   const modelResidencyTaskOptions = (() => {
     const residency = gatewayContracts?.common?.model_residency;
@@ -1395,6 +1445,44 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     updateNodeData(node.id, { pinDefaults: nextDefaults as any });
   };
 
+  const patchPinDefaults = (patch: Record<string, unknown>) => {
+    const nextDefaults = { ...((data.pinDefaults || {}) as Record<string, unknown>) };
+    for (const [key, value] of Object.entries(patch)) {
+      if (value === undefined || value === '') delete nextDefaults[key];
+      else nextDefaults[key] = value;
+    }
+    updateNodeData(node.id, { pinDefaults: nextDefaults as any });
+  };
+
+  const patchMediaDefaults = (pinPatch: Record<string, unknown>, effectPatch: Record<string, unknown> = pinPatch) => {
+    const nextDefaults = { ...((data.pinDefaults || {}) as Record<string, unknown>) };
+    const nextEffect = { ...((data.effectConfig || {}) as Record<string, unknown>) };
+    for (const [key, value] of Object.entries(pinPatch)) {
+      if (value === undefined || value === '') delete nextDefaults[key];
+      else nextDefaults[key] = value;
+    }
+    for (const [key, value] of Object.entries(effectPatch)) {
+      if (value === undefined || value === '') delete nextEffect[key];
+      else nextEffect[key] = value;
+    }
+    updateNodeData(node.id, {
+      pinDefaults: nextDefaults as any,
+      effectConfig: nextEffect as FlowNodeData['effectConfig'],
+    });
+  };
+
+  const stringDefaultFor = (pinId: string, ...effectKeys: string[]) => {
+    const defaults = (data.pinDefaults || {}) as Record<string, unknown>;
+    const effect = (data.effectConfig || {}) as Record<string, unknown>;
+    const fromDefault = stringFrom(defaults[pinId]);
+    if (fromDefault) return fromDefault;
+    for (const key of [pinId, ...effectKeys]) {
+      const value = stringFrom(effect[key]);
+      if (value) return value;
+    }
+    return '';
+  };
+
   const normalizeRouteHandle = (handle: unknown): string => {
     const value = typeof handle === 'string' ? handle.trim() : '';
     return value || 'exec-out';
@@ -1602,9 +1690,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         provider: isInputPinConnected('image_provider')
           ? ''
           : first(data.effectConfig?.image_provider, data.pinDefaults?.image_provider, data.effectConfig?.provider, data.pinDefaults?.provider),
-        model: isInputPinConnected('image_model')
-          ? ''
-          : first(data.effectConfig?.image_model, data.pinDefaults?.image_model, data.effectConfig?.model, data.pinDefaults?.model),
+        model: isInputPinConnected('image_model') ? '' : first(data.effectConfig?.image_model, data.pinDefaults?.image_model),
         blockedReason: pinBlocked
           ? 'Image provider or model comes from connected pins. Add a dedicated Model Residency node for dynamic control.'
           : unsupportedReason,
@@ -1619,9 +1705,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         provider: isInputPinConnected('tts_provider')
           ? ''
           : first(data.effectConfig?.tts_provider, data.pinDefaults?.tts_provider, data.effectConfig?.provider, data.pinDefaults?.provider),
-        model: isInputPinConnected('tts_model')
-          ? ''
-          : first(data.effectConfig?.tts_model, data.pinDefaults?.tts_model, data.effectConfig?.model, data.pinDefaults?.model),
+        model: isInputPinConnected('tts_model') ? '' : first(data.effectConfig?.tts_model, data.pinDefaults?.tts_model),
         blockedReason: pinBlocked
           ? 'Voice provider or model comes from connected pins. Add a dedicated Model Residency node for dynamic control.'
           : unsupportedReason,
@@ -1636,9 +1720,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         provider: isInputPinConnected('music_provider')
           ? ''
           : first(data.effectConfig?.music_provider, data.pinDefaults?.music_provider, data.effectConfig?.provider, data.pinDefaults?.provider),
-        model: isInputPinConnected('music_model')
-          ? ''
-          : first(data.effectConfig?.music_model, data.pinDefaults?.music_model, data.effectConfig?.model, data.pinDefaults?.model),
+        model: isInputPinConnected('music_model') ? '' : first(data.effectConfig?.music_model, data.pinDefaults?.music_model),
         blockedReason: pinBlocked
           ? 'Music provider or model comes from connected pins. Add a dedicated Model Residency node for dynamic control.'
           : unsupportedReason,
@@ -1653,9 +1735,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         provider: isInputPinConnected('stt_provider')
           ? ''
           : first(data.effectConfig?.stt_provider, data.pinDefaults?.stt_provider, data.effectConfig?.provider, data.pinDefaults?.provider),
-        model: isInputPinConnected('stt_model')
-          ? ''
-          : first(data.effectConfig?.stt_model, data.pinDefaults?.stt_model, data.effectConfig?.model, data.pinDefaults?.model),
+        model: isInputPinConnected('stt_model') ? '' : first(data.effectConfig?.stt_model, data.pinDefaults?.stt_model),
         blockedReason: pinBlocked
           ? 'Transcription provider or model comes from connected pins. Add a dedicated Model Residency node for dynamic control.'
           : unsupportedReason,
@@ -1687,7 +1767,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       });
       setNodes(result.nodes);
       setEdges(result.edges);
-      toast.success(operation === 'load' ? 'Warm-up step added before this node' : 'Unload step added after this node');
+      toast.success(operation === 'load' ? 'Load step added before this node' : 'Unload step added after this node');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Could not add model residency step.');
     }
@@ -1732,7 +1812,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         <div className="property-section">
           <label className="property-label">Model Residency</label>
           <span className="property-hint">
-            Add explicit ledgered warm/unload steps for this node&apos;s selected model.
+            Add explicit ledgered load/unload steps for this node&apos;s selected model.
           </span>
           <div className="property-group">
             <label className="property-sublabel">Target</label>
@@ -1751,7 +1831,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               disabled={Boolean(residencyTarget.blockedReason)}
               onClick={() => addModelResidencyStep('load')}
             >
-              Add warm-up step before
+              Add load step before
             </button>
             <button
               type="button"
@@ -1874,8 +1954,10 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       {(() => {
         const skipIds = new Set(['provider', 'model', 'tools']); // shown in dedicated sections (agent/llm_call) for better UX
         const inputPins = data.inputs.filter((p) => p.type !== 'execution' && !skipIds.has(p.id));
+        const mediaNode = MEDIA_NODE_TYPES.has(data.nodeType);
 
         const editable = inputPins.filter((p) => {
+          if (mediaNode && MEDIA_PIN_DEFAULT_IDS.has(p.id)) return true;
           if (p.type === 'boolean' || p.type === 'number' || p.type === 'string') return true;
           // Known "string-select" pins that have inline dropdowns in the node UI.
           if (
@@ -1917,7 +1999,373 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 );
               }
 
+              if (mediaNode && pin.id === 'image_provider') {
+                const currentProvider = stringDefaultFor('image_provider', 'provider');
+                const providerOptions = selectOptionsFromValues(imageModelOptions.map((item) => item.provider));
+                const imageTask =
+                  data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
+                    ? editedImageProviderModelsTask
+                    : generatedImageProviderModelsTask;
+                return (
+                  <div key={pin.id} className="property-group">
+                    <label className="property-sublabel">{rowLabel}</label>
+                    <AfSelect
+                      value={currentProvider}
+                      options={providerOptions}
+                      placeholder={loadingMediaModels ? 'Loading…' : 'Auto (Gateway default)'}
+                      loading={loadingMediaModels && providerOptions.length === 0}
+                      searchable
+                      searchPlaceholder="Search image providers…"
+                      clearable
+                      minPopoverWidth={300}
+                      onOpen={() => requestMediaCatalog('image', { task: imageTask })}
+                      onChange={(value) => {
+                        const provider = normalizeMediaProvider(value || '');
+                        patchMediaDefaults(
+                          { image_provider: provider || undefined, image_model: undefined },
+                          { image_provider: provider || undefined, image_model: undefined, provider: undefined, model: undefined }
+                        );
+                        if (provider) requestMediaCatalog('image', { provider, task: imageTask });
+                      }}
+                    />
+                  </div>
+                );
+              }
+
+              if (mediaNode && pin.id === 'image_model') {
+                const currentProvider = stringDefaultFor('image_provider', 'provider');
+                const currentModel = stringDefaultFor('image_model');
+                const imageTask =
+                  data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
+                    ? editedImageProviderModelsTask
+                    : generatedImageProviderModelsTask;
+                const modelOptions = imageModelOptions
+                  .filter((item) => !currentProvider || normalizeMediaProvider(item.provider) === normalizeMediaProvider(currentProvider))
+                  .map((item) => ({ value: item.model, label: item.label || item.model }));
+                return (
+                  <div key={pin.id} className="property-group">
+                    <label className="property-sublabel">{rowLabel}</label>
+                    <AfSelect
+                      value={currentModel}
+                      options={modelOptions}
+                      placeholder={
+                        loadingMediaModels
+                          ? 'Loading…'
+                          : currentProvider
+                            ? 'Select image model…'
+                            : 'Pick provider first'
+                      }
+                      disabled={!currentProvider}
+                      loading={loadingMediaModels && modelOptions.length === 0}
+                      searchable
+                      searchPlaceholder="Search image models…"
+                      clearable
+                      minPopoverWidth={400}
+                      onOpen={() => {
+                        if (currentProvider) requestMediaCatalog('image', { provider: currentProvider, task: imageTask });
+                      }}
+                      onChange={(value) => {
+                        const cleanModel = value ? value.trim() : '';
+                        const picked = imageModelOptions.find(
+                          (item) =>
+                            item.model === cleanModel &&
+                            (!currentProvider || normalizeMediaProvider(item.provider) === normalizeMediaProvider(currentProvider))
+                        );
+                        const nextDefaults = applyImagePinDefaultPatch(
+                          { ...((data.pinDefaults || {}) as Record<string, JsonValue>) },
+                          picked
+                        );
+                        if (cleanModel) nextDefaults.image_model = cleanModel;
+                        else delete nextDefaults.image_model;
+                        if (picked?.provider || currentProvider) nextDefaults.image_provider = picked?.provider || currentProvider;
+                        updateNodeData(node.id, {
+                          pinDefaults: nextDefaults as any,
+                          effectConfig: {
+                            ...(data.effectConfig || {}),
+                            image_provider: picked?.provider || currentProvider || undefined,
+                            image_model: cleanModel || undefined,
+                            provider: undefined,
+                            model: undefined,
+                          },
+                        });
+                      }}
+                    />
+                  </div>
+                );
+              }
+
+              if (mediaNode && pin.id === 'tts_provider') {
+                const currentProvider = stringDefaultFor('tts_provider', 'provider');
+                return (
+                  <div key={pin.id} className="property-group">
+                    <label className="property-sublabel">{rowLabel}</label>
+                    <AfSelect
+                      value={currentProvider}
+                      options={selectOptionsFromValues(ttsProviderOptions)}
+                      placeholder={loadingMediaModels ? 'Loading…' : 'Auto (Gateway default)'}
+                      loading={loadingMediaModels && ttsProviderOptions.length === 0}
+                      searchable
+                      searchPlaceholder="Search TTS providers…"
+                      clearable
+                      minPopoverWidth={300}
+                      onOpen={() => requestMediaCatalog('tts')}
+                      onChange={(value) => {
+                        const provider = normalizeMediaProvider(value || '');
+                        patchMediaDefaults(
+                          { tts_provider: provider || undefined, tts_model: undefined, voice: undefined, profile: undefined },
+                          {
+                            tts_provider: provider || undefined,
+                            tts_model: undefined,
+                            voice: undefined,
+                            profile: undefined,
+                            provider: undefined,
+                            model: undefined,
+                          }
+                        );
+                        if (provider) requestMediaCatalog('tts', { provider });
+                      }}
+                    />
+                  </div>
+                );
+              }
+
+              if (mediaNode && pin.id === 'tts_model') {
+                const currentProvider = stringDefaultFor('tts_provider', 'provider');
+                const currentModel = stringDefaultFor('tts_model');
+                return (
+                  <div key={pin.id} className="property-group">
+                    <label className="property-sublabel">{rowLabel}</label>
+                    <AfSelect
+                      value={currentModel}
+                      options={selectOptionsFromValues(ttsModelOptions)}
+                      placeholder={loadingMediaModels ? 'Loading…' : currentProvider ? 'Select TTS model…' : 'Pick provider first'}
+                      disabled={!currentProvider}
+                      loading={loadingMediaModels && ttsModelOptions.length === 0}
+                      searchable
+                      searchPlaceholder="Search TTS models…"
+                      clearable
+                      minPopoverWidth={380}
+                      onOpen={() => {
+                        if (currentProvider) requestMediaCatalog('tts', { provider: currentProvider });
+                      }}
+                      onChange={(value) =>
+                        patchMediaDefaults(
+                          { tts_model: value || undefined, voice: undefined, profile: undefined },
+                          { tts_model: value || undefined, voice: undefined, profile: undefined, model: undefined }
+                        )
+                      }
+                    />
+                  </div>
+                );
+              }
+
+              if (mediaNode && pin.id === 'voice') {
+                const currentProvider = stringDefaultFor('tts_provider', 'provider');
+                const currentModel = stringDefaultFor('tts_model');
+                const currentVoice = stringDefaultFor('voice');
+                return (
+                  <div key={pin.id} className="property-group">
+                    <label className="property-sublabel">{rowLabel}</label>
+                    <AfSelect
+                      value={currentVoice}
+                      options={voiceOptions.map((item) => ({ value: item.value, label: item.label }))}
+                      placeholder={loadingMediaModels ? 'Loading…' : 'Select voice…'}
+                      disabled={!currentProvider}
+                      loading={loadingMediaModels && voiceOptions.length === 0}
+                      searchable
+                      searchPlaceholder="Search voices…"
+                      clearable
+                      minPopoverWidth={320}
+                      onOpen={() => {
+                        if (currentProvider) requestMediaCatalog('tts', { provider: currentProvider, model: currentModel || undefined });
+                      }}
+                      onChange={(value) => patchMediaDefaults({ voice: value || undefined }, { voice: value || undefined })}
+                    />
+                  </div>
+                );
+              }
+
+              if (mediaNode && pin.id === 'quality_preset') {
+                const current = stringDefaultFor('quality_preset') || 'standard';
+                return (
+                  <div key={pin.id} className="property-group">
+                    <label className="property-sublabel">{rowLabel}</label>
+                    <AfSelect
+                      value={current}
+                      options={DEFAULT_TTS_QUALITY_PRESETS}
+                      searchable={false}
+                      clearable={false}
+                      minPopoverWidth={180}
+                      onChange={(value) => patchMediaDefaults({ quality_preset: value || 'standard' })}
+                    />
+                  </div>
+                );
+              }
+
+              if (mediaNode && pin.id === 'stt_provider') {
+                const currentProvider = stringDefaultFor('stt_provider', 'provider');
+                return (
+                  <div key={pin.id} className="property-group">
+                    <label className="property-sublabel">{rowLabel}</label>
+                    <AfSelect
+                      value={currentProvider}
+                      options={selectOptionsFromValues(sttProviderOptions)}
+                      placeholder={loadingMediaModels ? 'Loading…' : 'Auto (Gateway default)'}
+                      loading={loadingMediaModels && sttProviderOptions.length === 0}
+                      searchable
+                      searchPlaceholder="Search STT providers…"
+                      clearable
+                      minPopoverWidth={300}
+                      onOpen={() => requestMediaCatalog('stt')}
+                      onChange={(value) => {
+                        const provider = normalizeMediaProvider(value || '');
+                        patchMediaDefaults(
+                          { stt_provider: provider || undefined, stt_model: undefined },
+                          { stt_provider: provider || undefined, stt_model: undefined, provider: undefined, model: undefined }
+                        );
+                        if (provider) requestMediaCatalog('stt', { provider });
+                      }}
+                    />
+                  </div>
+                );
+              }
+
+              if (mediaNode && pin.id === 'stt_model') {
+                const currentProvider = stringDefaultFor('stt_provider', 'provider');
+                const currentModel = stringDefaultFor('stt_model');
+                return (
+                  <div key={pin.id} className="property-group">
+                    <label className="property-sublabel">{rowLabel}</label>
+                    <AfSelect
+                      value={currentModel}
+                      options={selectOptionsFromValues(sttModelOptions)}
+                      placeholder={loadingMediaModels ? 'Loading…' : currentProvider ? 'Select STT model…' : 'Pick provider first'}
+                      disabled={!currentProvider}
+                      loading={loadingMediaModels && sttModelOptions.length === 0}
+                      searchable
+                      searchPlaceholder="Search STT models…"
+                      clearable
+                      minPopoverWidth={380}
+                      onOpen={() => {
+                        if (currentProvider) requestMediaCatalog('stt', { provider: currentProvider });
+                      }}
+                      onChange={(value) =>
+                        patchMediaDefaults({ stt_model: value || undefined }, { stt_model: value || undefined, model: undefined })
+                      }
+                    />
+                  </div>
+                );
+              }
+
+              if (mediaNode && pin.id === 'music_provider') {
+                const currentProvider = stringDefaultFor('music_provider', 'provider');
+                return (
+                  <div key={pin.id} className="property-group">
+                    <label className="property-sublabel">{rowLabel}</label>
+                    <AfSelect
+                      value={currentProvider}
+                      options={selectOptionsFromValues(musicProviderOptions)}
+                      placeholder={loadingMediaModels ? 'Loading…' : 'Auto (Gateway default)'}
+                      loading={loadingMediaModels && musicProviderOptions.length === 0}
+                      searchable
+                      searchPlaceholder="Search music providers…"
+                      clearable
+                      minPopoverWidth={300}
+                      onOpen={() => requestMediaCatalog('music')}
+                      onChange={(value) => {
+                        const provider = normalizeMediaProvider(value || '');
+                        patchMediaDefaults(
+                          { music_provider: provider || undefined, music_model: undefined },
+                          { music_provider: provider || undefined, music_model: undefined, provider: undefined, model: undefined }
+                        );
+                        if (provider) requestMediaCatalog('music', { provider });
+                      }}
+                    />
+                  </div>
+                );
+              }
+
+              if (mediaNode && pin.id === 'music_model') {
+                const currentProvider = stringDefaultFor('music_provider', 'provider');
+                const currentModel = stringDefaultFor('music_model');
+                return (
+                  <div key={pin.id} className="property-group">
+                    <label className="property-sublabel">{rowLabel}</label>
+                    <AfSelect
+                      value={currentModel}
+                      options={selectOptionsFromValues(musicModelOptions)}
+                      placeholder={loadingMediaModels ? 'Loading…' : currentProvider ? 'Select music model…' : 'Pick provider first'}
+                      disabled={!currentProvider}
+                      loading={loadingMediaModels && musicModelOptions.length === 0}
+                      searchable
+                      searchPlaceholder="Search music models…"
+                      clearable
+                      minPopoverWidth={400}
+                      onOpen={() => {
+                        if (currentProvider) requestMediaCatalog('music', { provider: currentProvider });
+                      }}
+                      onChange={(value) =>
+                        patchMediaDefaults({ music_model: value || undefined }, { music_model: value || undefined, model: undefined })
+                      }
+                    />
+                  </div>
+                );
+              }
+
+              if (mediaNode && pin.id === 'format') {
+                const fallback =
+                  data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
+                    ? 'png'
+                    : data.nodeType === 'transcribe_audio'
+                      ? 'json'
+                      : 'wav';
+                const options =
+                  data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
+                    ? imageFormatOptions
+                    : data.nodeType === 'generate_voice'
+                      ? ttsFormatOptions
+                      : data.nodeType === 'generate_music'
+                        ? musicFormatOptions
+                        : sttFormatOptions;
+                const current = stringDefaultFor('format') || fallback;
+                return (
+                  <div key={pin.id} className="property-group">
+                    <label className="property-sublabel">{rowLabel}</label>
+                    <AfSelect
+                      value={current}
+                      options={selectOptionsFromValues(options.includes(current) ? options : [current, ...options])}
+                      searchable={false}
+                      clearable={false}
+                      minPopoverWidth={180}
+                      onChange={(value) => patchPinDefaults({ format: value || fallback })}
+                    />
+                  </div>
+                );
+              }
+
               // Special dropdown pins (match node inline controls).
+              if (pin.id === 'permissions' && data.nodeType === 'code') {
+                const current = typeof raw === 'string' && raw.trim() ? raw.trim() : 'sandbox';
+                const options = codePermissionOptions(gatewayContracts, current);
+                const unavailableReason = codePermissionUnavailableReason(gatewayContracts, current);
+                return (
+                  <div key={pin.id} className="property-group">
+                    <label className="property-sublabel">{rowLabel}</label>
+                    <AfSelect
+                      value={current}
+                      options={options}
+                      searchable={false}
+                      clearable={false}
+                      minPopoverWidth={240}
+                      onChange={(value) => setPinDefault(pin.id, value || 'sandbox')}
+                    />
+                    <span className="property-hint">
+                      {unavailableReason || 'Advertised by the current Gateway execution policy.'}
+                    </span>
+                  </div>
+                );
+              }
+
               if (
                 pin.id === 'scope' &&
                 (data.nodeType === 'memory_note' ||
@@ -2102,6 +2550,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
               if (pin.type === 'number') {
                 const value = typeof raw === 'number' && Number.isFinite(raw) ? raw : '';
+                const isTtsSpeed = data.nodeType === 'generate_voice' && pin.id === 'speed';
                 return (
                   <div key={pin.id} className="property-group">
                     <label className="property-sublabel">{rowLabel}</label>
@@ -2109,6 +2558,9 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                       type="number"
                       className="property-input"
                       value={value}
+                      min={isTtsSpeed ? 0.5 : undefined}
+                      max={isTtsSpeed ? 2 : undefined}
+                      placeholder={isTtsSpeed ? '1.0' : undefined}
                       onChange={(e) => {
                         const v = e.target.value;
                         if (!v) {
@@ -2119,7 +2571,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                         if (!Number.isFinite(n)) return;
                         setPinDefault(pin.id, n);
                       }}
-                      step="any"
+                      step={isTtsSpeed ? 0.05 : 'any'}
                     />
                   </div>
                 );
@@ -3443,10 +3895,18 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       {/* Code-specific properties */}
       {data.nodeType === 'code' && (
         <div className="property-section">
-          <label className="property-label">Python Code</label>
+          <label className="property-label">Code</label>
 
           {(() => {
-            const params = data.inputs.filter((p) => p.type !== 'execution');
+            const params = getPythonCodeUserPins(data.inputs);
+            const codePermissions =
+              typeof data.pinDefaults?.permissions === 'string' && data.pinDefaults.permissions.trim()
+                ? data.pinDefaults.permissions.trim()
+                : 'sandbox';
+            const codePermissionsUnavailableReason = codePermissionUnavailableReason(gatewayContracts, codePermissions);
+            const codeTestUnavailableReason = isInputPinConnected('permissions')
+              ? 'Code permissions are wired from a runtime input. Disconnect the permissions pin or set a static default to run an editor test.'
+              : codePermissionsUnavailableReason;
             const used = new Set(data.inputs.map((p) => p.id));
 
             const currentBody =
@@ -3596,15 +4056,17 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                     ✍️ Edit Code
                   </button>
                   <span className="property-hint">
-                    Edit the body of <code>transform(_input)</code>. Generated code is executed in a sandbox (no imports).
+                    Edit the body of <code>transform(_input)</code>. Execution permissions are controlled by the node pin.
                   </span>
                 </div>
 
                 <CodeEditorModal
                   isOpen={showCodeEditor}
-                  title="Python Code"
+                  title="Code"
                   body={currentBody}
                   params={params}
+                  permissions={codePermissions}
+                  permissionsUnavailableReason={codeTestUnavailableReason}
                   onClose={() => setShowCodeEditor(false)}
                   onSave={(nextBody) => {
                     const nextWithHeader = upsertPythonAvailableVariablesComments(nextBody, params);
@@ -4199,7 +4661,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                   </button>
                 </div>
                 <span className="property-hint">
-                  Parameters become initial vars and show up in the Run Flow form.
+                  Parameters become initial vars and show up in the Run form.
                 </span>
               </>
             );
@@ -4756,20 +5218,10 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           });
         };
         const operation = data.effectConfig?.operation || data.pinDefaults?.operation || 'load';
-        const task = data.effectConfig?.task || data.pinDefaults?.task || 'image_generation';
+        const task = data.effectConfig?.task || data.pinDefaults?.task || 'text_generation';
         const provider = data.effectConfig?.provider || data.pinDefaults?.provider || '';
         const model = data.effectConfig?.model || data.pinDefaults?.model || '';
-        const pin = typeof data.effectConfig?.pin === 'boolean'
-          ? data.effectConfig.pin
-          : typeof data.pinDefaults?.pin === 'boolean'
-            ? data.pinDefaults.pin
-            : true;
-        const required = typeof data.effectConfig?.required === 'boolean'
-          ? data.effectConfig.required
-          : typeof data.pinDefaults?.required === 'boolean'
-            ? data.pinDefaults.required
-            : false;
-        const taskValue = String(task || 'image_generation');
+        const taskValue = String(task || 'text_generation');
         const providerValue = String(provider || '');
         const modelValue = String(model || '');
         const addOption = (out: AfSelectOption[], seen: Set<string>, value: string, label?: string) => {
@@ -4866,7 +5318,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 searchable={false}
                 clearable={false}
                 minPopoverWidth={220}
-                onChange={(value) => updateResidency({ task: value || 'image_generation', provider: undefined, model: undefined })}
+                onChange={(value) => updateResidency({ task: value || 'text_generation', provider: undefined, model: undefined })}
               />
             </div>
             <div className="property-group">
@@ -4927,274 +5379,12 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 />
               )}
             </div>
-            <label className="toggle-container">
-              <input
-                type="checkbox"
-                className="toggle-checkbox"
-                checked={pin}
-                onChange={(e) => updateResidency({ pin: e.target.checked })}
-              />
-              <span className="toggle-label">Keep loaded until explicit unload</span>
-            </label>
-            <label className="toggle-container">
-              <input
-                type="checkbox"
-                className="toggle-checkbox"
-                checked={required}
-                onChange={(e) => updateResidency({ required: e.target.checked })}
-              />
-              <span className="toggle-label">Fail this step if the control call fails</span>
-            </label>
             <span className="property-hint">
-              Residency controls optimize speed and memory. Historical runs use the recorded ledger result, not the current loaded-models panel.
+              Residency controls return success, affected models, warnings, and errors for downstream branching.
             </span>
           </div>
         );
       })()}
-
-      {/* Media capability properties */}
-      {['generate_image', 'edit_image', 'image_to_image', 'generate_voice', 'generate_music', 'transcribe_audio', 'listen_voice'].includes(data.nodeType) && (
-        <div className="property-section">
-          <label className="property-label">Gateway Media</label>
-
-          {(data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image') && (
-            <>
-              <div className="property-group">
-                <label className="property-sublabel">{data.nodeType === 'generate_image' ? 'Image model' : 'Image edit model'}</label>
-                <select
-                  className="property-select"
-                  value={(() => {
-                    const provider = data.effectConfig?.image_provider || '';
-                    const model = data.effectConfig?.image_model || '';
-                    return model ? `${provider}::${model}` : '';
-                  })()}
-                  onFocus={() => {
-                    const provider = data.effectConfig?.image_provider || '';
-                    if (provider) {
-                      requestMediaCatalog('image', {
-                        provider,
-                        task:
-                          data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
-                            ? editedImageProviderModelsTask
-                            : generatedImageProviderModelsTask,
-                      });
-                    }
-                  }}
-                  onChange={(e) => {
-                    const picked = imageModelOptions.find((item) => `${item.provider}::${item.model}` === e.target.value);
-                    updateNodeData(node.id, {
-                      effectConfig: {
-                        ...data.effectConfig,
-                        image_provider: picked?.provider || undefined,
-                        image_model: picked?.model || undefined,
-                        provider: undefined,
-                        model: undefined,
-                      },
-                      pinDefaults: applyImagePinDefaultPatch(data.pinDefaults || {}, picked),
-                    });
-                  }}
-                  disabled={loadingMediaModels}
-                >
-                  <option value="">{loadingMediaModels ? 'Loading...' : 'Auto (Gateway default image model)'}</option>
-                  {imageModelOptions.map((item) => (
-                    <option key={`${item.provider}:${item.model}`} value={`${item.provider}::${item.model}`}>
-                      {item.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </>
-          )}
-
-          {data.nodeType === 'generate_voice' && (
-            <>
-              <div className="property-group">
-                <label className="property-sublabel">Voice</label>
-                <select
-                  className="property-select"
-                  value={data.effectConfig?.voice || ''}
-                  onFocus={() => {
-                    const provider = data.effectConfig?.tts_provider || '';
-                    const model = data.effectConfig?.tts_model || '';
-                    if (provider) requestMediaCatalog('tts', { provider, model });
-                  }}
-                  onChange={(e) => updateNodeData(node.id, { effectConfig: { ...data.effectConfig, voice: e.target.value || undefined } })}
-                  disabled={loadingMediaModels}
-                >
-                  <option value="">{loadingMediaModels ? 'Loading...' : 'Auto (Gateway default voice)'}</option>
-                  {voiceOptions.map((item) => (
-                    <option key={`${item.mode || 'voice'}:${item.value}`} value={item.value}>
-                      {item.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="property-group">
-                <label className="property-sublabel">TTS model</label>
-                <select
-                  className="property-select"
-                  value={data.effectConfig?.tts_model || ''}
-                  onFocus={() => {
-                    const provider = data.effectConfig?.tts_provider || '';
-                    if (provider) requestMediaCatalog('tts', { provider });
-                  }}
-                  onChange={(e) =>
-                    updateNodeData(node.id, {
-                      effectConfig: { ...data.effectConfig, tts_model: e.target.value || undefined, model: undefined },
-                    })
-                  }
-                  disabled={loadingMediaModels}
-                >
-                  <option value="">{loadingMediaModels ? 'Loading...' : 'Auto (Gateway default TTS model)'}</option>
-                  {ttsModelOptions.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </>
-          )}
-
-          {data.nodeType === 'generate_music' && (
-            <>
-              <div className="property-group">
-                <label className="property-sublabel">Music provider</label>
-                <select
-                  className="property-select"
-                  value={data.effectConfig?.music_provider || ''}
-                  onFocus={() => requestMediaCatalog('music')}
-                  onChange={(e) => {
-                    const provider = e.target.value.trim();
-                    updateNodeData(node.id, {
-                      effectConfig: {
-                        ...data.effectConfig,
-                        music_provider: provider || undefined,
-                        music_model: undefined,
-                        provider: undefined,
-                        model: undefined,
-                      },
-                    });
-                    if (provider) requestMediaCatalog('music', { provider });
-                  }}
-                  disabled={loadingMediaModels}
-                >
-                  <option value="">{loadingMediaModels ? 'Loading...' : 'Auto (Gateway default music provider)'}</option>
-                  {musicProviderOptions.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="property-group">
-                <label className="property-sublabel">Music model</label>
-                <select
-                  className="property-select"
-                  value={data.effectConfig?.music_model || ''}
-                  onFocus={() => {
-                    const provider = data.effectConfig?.music_provider || '';
-                    if (provider) requestMediaCatalog('music', { provider });
-                  }}
-                  onChange={(e) =>
-                    updateNodeData(node.id, {
-                      effectConfig: {
-                        ...data.effectConfig,
-                        music_model: e.target.value || undefined,
-                        model: undefined,
-                      },
-                    })
-                  }
-                  disabled={loadingMediaModels || !data.effectConfig?.music_provider}
-                >
-                  <option value="">{loadingMediaModels ? 'Loading...' : 'Auto (Gateway default music model)'}</option>
-                  {musicModelOptions.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="property-group">
-                <label className="property-sublabel">Format</label>
-                <select
-                  className="property-select"
-                  value={String(data.pinDefaults?.format || data.effectConfig?.format || 'wav')}
-                  onChange={(e) =>
-                    updateNodeData(node.id, {
-                      pinDefaults: { ...(data.pinDefaults || {}), format: e.target.value || 'wav' },
-                    })
-                  }
-                >
-                  {musicFormatOptions.map((fmt) => (
-                    <option key={fmt} value={fmt}>
-                      {fmt}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </>
-          )}
-
-          {data.nodeType === 'transcribe_audio' && (
-            <div className="property-group">
-              <label className="property-sublabel">STT model</label>
-              <select
-                className="property-select"
-                value={data.effectConfig?.stt_model || ''}
-                onFocus={() => {
-                  const provider = data.effectConfig?.stt_provider || '';
-                  if (provider) requestMediaCatalog('stt', { provider });
-                }}
-                onChange={(e) =>
-                  updateNodeData(node.id, {
-                    effectConfig: { ...data.effectConfig, stt_model: e.target.value || undefined, model: undefined },
-                  })
-                }
-                disabled={loadingMediaModels}
-              >
-                <option value="">{loadingMediaModels ? 'Loading...' : 'Auto (Gateway default STT model)'}</option>
-                {sttModelOptions.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {data.nodeType === 'listen_voice' && (
-            <>
-              <div className="property-group">
-                <label className="property-sublabel">Transcription model</label>
-                <select
-                  className="property-select"
-                  value={data.effectConfig?.stt_model || ''}
-                  onFocus={() => {
-                    const provider = data.effectConfig?.stt_provider || '';
-                    if (provider) requestMediaCatalog('stt', { provider });
-                  }}
-                  onChange={(e) =>
-                    updateNodeData(node.id, {
-                      effectConfig: { ...data.effectConfig, stt_model: e.target.value || undefined, model: undefined },
-                    })
-                  }
-                >
-                  <option value="">Auto (Gateway default)</option>
-                  {sttModelOptions.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <span className="property-hint">
-                The run will pause with voice-input metadata. Current browser UX falls back to text resume until microphone capture is implemented.
-              </span>
-            </>
-          )}
-        </div>
-      )}
 
       {/* LLM Call effect properties */}
       {data.nodeType === 'llm_call' && (

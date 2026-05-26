@@ -1,13 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { endpointFromDescriptor, gatewayJson, jsonRequest, type GatewayContracts } from '../utils/gatewayClient';
-
-function sanitizeBundleId(raw: string): string {
-  const trimmed = (raw || '').trim();
-  if (!trimmed) return '';
-  const replaced = trimmed.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/-{2,}/g, '-');
-  return replaced.replace(/^-+/, '').replace(/-+$/, '');
-}
+import { sanitizeBundleId } from '../utils/workflowBundles';
 
 type DeprecateBundleRequest = {
   bundle_id?: string;

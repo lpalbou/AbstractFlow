@@ -207,7 +207,7 @@ Optional extras (declared in `pyproject.toml`):
 - Full host profiles:
   - Apple-capable: `pip install "abstractflow[apple]"`
   - GPU-capable: `pip install "abstractflow[gpu]"`
-- `abstractflow[apple]` and `abstractflow[gpu]` pull the matching `abstractgateway[...]` host profile and Visual Agent support. Flow no longer names `AbstractRuntime` or `abstractcore` directly in these profiles; Gateway owns that deployment stack. AbstractFlow `0.3.13` expects Gateway `>=0.2.18` for the current media/catalog/residency contracts.
+- `abstractflow[apple]` and `abstractflow[gpu]` pull the matching `abstractgateway[...]` host profile and Visual Agent support. Flow no longer names `AbstractRuntime` or `abstractcore` directly in these profiles; Gateway owns that deployment stack. AbstractFlow `0.3.14` expects Gateway `>=0.2.19` for the current media/catalog/residency contracts.
 - Agent nodes only, without the host profile: `pip install "abstractflow[agent]"`
 - Documentation site tools: `pip install "abstractflow[docs]"`
 
@@ -4339,6 +4339,8 @@ The legacy WebSocket host still exists in [../web/backend/routes/ws.py](../web/b
 file: web/frontend/src/utils/gatewayClient.ts
 ---
 
+import type { GatewayAuthoringCapability } from './nodeCapabilities';
+
 export type GatewayQueryValue = string | number | boolean | null | undefined;
 
 export interface GatewayEndpointDescriptor {
@@ -4410,6 +4412,7 @@ export interface GatewayCommonContract {
     input_data?: GatewayEndpointDescriptor;
     history_bundle?: GatewayEndpointDescriptor;
     commands?: GatewayEndpointDescriptor & { types?: string[] };
+    purge_drafts?: GatewayEndpointDescriptor;
   };
   ledger?: {
     replay?: GatewayEndpointDescriptor;
@@ -4428,6 +4431,15 @@ export interface GatewayCommonContract {
   workspace?: {
     policy_endpoint?: string;
   };
+  configuration?: {
+    capability_defaults?: GatewayEndpointDescriptor & {
+      item_endpoint?: string;
+      schema?: string;
+    };
+  };
+  execution?: {
+    code?: GatewayCodeExecutionContract;
+  };
   discovery?: {
     capabilities?: string;
     providers?: string;
@@ -4438,6 +4450,7 @@ export interface GatewayCommonContract {
     audio_transcription_models?: string;
     audio_music_providers?: string;
     audio_music_models?: string;
+    embedding_models?: string;
     vision_provider_models?: string;
     vision_models?: string;
     tools?: string;
@@ -4557,6 +4570,9 @@ export interface GatewayFlowEditorContract {
   ledger?: GatewayCommonContract['ledger'];
   artifacts?: GatewayCommonContract['artifacts'];
   media?: GatewayMediaContract;
+  execution?: {
+    code?: GatewayCodeExecutionContract;
+  };
   helpers?: Record<string, string>;
 }
 
@@ -4586,6 +4602,35 @@ export interface GatewayCapabilities {
 
 export interface GatewayCapabilitiesResponse {
   capabilities?: GatewayCapabilities;
+}
+
+export interface GatewayCodeExecutionMode {
+  id?: string;
+  value?: string;
+  label?: string;
+  available?: boolean;
+  default?: boolean;
+  disabled_reason?: string;
+  reason?: string;
+  config_hint?: string;
+  [key: string]: unknown;
+}
+
+export interface GatewayCodeExecutionContract {
+  contract?: string;
+  version?: number;
+  available?: boolean;
+  default_mode?: string;
+  simulate?: GatewayEndpointDescriptor;
+  modes?: GatewayCodeExecutionMode[];
+  [key: string]: unknown;
+}
+
+export interface CodePermissionOption {
+  value: string;
+  label: string;
+  disabled?: boolean;
+  reason?: string;
 }
 
 export interface GatewayCapabilityCheck {
@@ -4633,6 +4678,14 @@ export interface GatewayFlowEditorReadiness {
   optional: GatewayOptionalFeatureStatus;
 }
 
+export interface GatewayAuthoringCapabilityStatus {
+  capability: GatewayAuthoringCapability;
+  label: string;
+  available: boolean;
+  checking: boolean;
+  reason: string;
+}
+
 export class GatewayHttpError extends Error {
   status: number;
   detail: unknown;
@@ -4643,6 +4696,53 @@ export class GatewayHttpError extends Error {
     this.status = status;
     this.detail = detail;
   }
+}
+
+const AUTHORING_CAPABILITY_LABELS: Record<GatewayAuthoringCapability, string> = {
+  generated_image: 'Generate Image',
+  edited_image: 'Edit Image',
+  generated_voice: 'Generate Voice',
+  generated_music: 'Generate Music',
+  model_residency: 'Model Residency',
+  tools: 'Tool execution',
+  kg_memory: 'Knowledge graph memory',
+};
+
+const AUTHORING_CAPABILITY_OPTIONAL_KEYS: Record<GatewayAuthoringCapability, keyof GatewayOptionalFeatureStatus> = {
+  generated_image: 'generatedImage',
+  edited_image: 'editedImage',
+  generated_voice: 'generatedVoice',
+  generated_music: 'generatedMusic',
+  model_residency: 'modelResidency',
+  tools: 'tools',
+  kg_memory: 'kgMemory',
+};
+
+export function gatewayAuthoringCapabilityStatus(
+  readiness: GatewayFlowEditorReadiness | null | undefined,
+  capability: GatewayAuthoringCapability | undefined | null,
+  options: { loading?: boolean; known?: boolean } = {}
+): GatewayAuthoringCapabilityStatus | null {
+  if (!capability) return null;
+  const label = AUTHORING_CAPABILITY_LABELS[capability];
+  if (options.loading || options.known === false || !readiness) {
+    return {
+      capability,
+      label,
+      available: true,
+      checking: true,
+      reason: `Checking Gateway support for ${label}.`,
+    };
+  }
+
+  const available = Boolean(readiness.optional[AUTHORING_CAPABILITY_OPTIONAL_KEYS[capability]]);
+  return {
+    capability,
+    label,
+    available,
+    checking: false,
+    reason: available ? '' : `${label} is unavailable on this Gateway.`,
+  };
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -4730,6 +4830,63 @@ export function getGatewayContracts(payload: GatewayCapabilitiesResponse | Gatew
   const caps = asRecord(top.capabilities) || top;
   const contracts = asRecord(caps.contracts);
   return contracts ? (contracts as GatewayContracts) : null;
+}
+
+export function getCodeExecutionContract(
+  contracts: GatewayContracts | null | undefined
+): GatewayCodeExecutionContract | null {
+  const flowCode = contracts?.flow_editor?.execution?.code;
+  const commonCode = contracts?.common?.execution?.code;
+  const code = flowCode || commonCode;
+  if (!code || typeof code !== 'object') return null;
+  return code.contract === 'code_execution_policy_v1' ? code : null;
+}
+
+export function codePermissionOptions(
+  contracts: GatewayContracts | null | undefined,
+  currentValue = ''
+): CodePermissionOption[] {
+  const contract = getCodeExecutionContract(contracts);
+  const modes = Array.isArray(contract?.modes) ? contract.modes : [];
+  const out: CodePermissionOption[] = [];
+  const seen = new Set<string>();
+
+  const add = (value: string, label: string, disabled = false, reason = '') => {
+    const clean = value.trim();
+    if (!clean || seen.has(clean)) return;
+    seen.add(clean);
+    out.push({ value: clean, label, disabled, reason });
+  };
+
+  for (const mode of modes) {
+    const value = typeof mode.id === 'string' && mode.id.trim() ? mode.id.trim() : typeof mode.value === 'string' ? mode.value.trim() : '';
+    if (!value) continue;
+    const label = typeof mode.label === 'string' && mode.label.trim() ? mode.label.trim() : value;
+    const reason =
+      typeof mode.disabled_reason === 'string' && mode.disabled_reason.trim()
+        ? mode.disabled_reason.trim()
+        : typeof mode.reason === 'string' && mode.reason.trim()
+          ? mode.reason.trim()
+          : typeof mode.config_hint === 'string' && mode.config_hint.trim()
+            ? mode.config_hint.trim()
+            : '';
+    add(value, mode.available === false ? `${label} (unavailable)` : label, mode.available === false, reason);
+  }
+
+  if (!seen.has('sandbox')) add('sandbox', 'Sandbox');
+  const current = currentValue.trim();
+  if (current && !seen.has(current)) add(current, `${current} (not advertised by Gateway)`, true, 'Gateway did not advertise this Code execution mode.');
+  return out;
+}
+
+export function codePermissionUnavailableReason(
+  contracts: GatewayContracts | null | undefined,
+  value: string
+): string {
+  const clean = value.trim();
+  if (!clean) return '';
+  const option = codePermissionOptions(contracts, clean).find((o) => o.value === clean);
+  return option?.disabled ? option.reason || `${clean} is not available on this Gateway runtime.` : '';
 }
 
 function stringEndpointAvailable(value: unknown): boolean {
@@ -4834,11 +4991,19 @@ export function getGatewayFlowEditorReadiness(
     return check;
   };
 
+  const contractVersionValue = contracts?.version;
+  const contractVersionNumber =
+    typeof contractVersionValue === 'number' && Number.isFinite(contractVersionValue)
+      ? contractVersionValue
+      : null;
   const contractVersion = add({
     key: 'contracts.version',
     label: 'Gateway client contract v1',
-    ok: Boolean(contracts && typeof contracts.version === 'number' && contracts.version >= 1),
-    reason: 'Gateway discovery did not return a versioned client contract.',
+    ok: contractVersionNumber === 1,
+    reason:
+      contractVersionNumber === null
+        ? 'Gateway discovery did not return a versioned client contract.'
+        : `Gateway client contract version ${contractVersionNumber} is not supported by this editor.`,
   });
   const flowEditor = add({
     key: 'flow_editor.available',
@@ -5336,9 +5501,9 @@ const OUTPUT_FIELD_TO_INPUT_PIN: Record<string, string> = {
 
 const GENERATE_MUSIC_OUTPUTS: Pin[] = [
   { id: 'exec-out', label: '', type: 'execution' },
-  { id: 'music_artifact', label: 'music_artifact', type: 'object', description: 'Artifact ref for generated music.' },
-  { id: 'audio_artifact', label: 'audio_artifact', type: 'object', description: 'Alias artifact ref for audio-compatible downstream nodes.' },
-  { id: 'artifact_ref', label: 'artifact_ref', type: 'object' },
+  { id: 'music_artifact', label: 'music_artifact', type: 'artifact_audio', description: 'Artifact ref for generated music.' },
+  { id: 'audio_artifact', label: 'audio_artifact', type: 'artifact_audio', description: 'Alias artifact ref for audio-compatible downstream nodes.' },
+  { id: 'artifact_ref', label: 'artifact_ref', type: 'artifact' },
   { id: 'artifact_id', label: 'artifact_id', type: 'string' },
   { id: 'content_type', label: 'content_type', type: 'string' },
   { id: 'outputs', label: 'outputs', type: 'object' },
@@ -5542,7 +5707,12 @@ export function artifactContentUrl(
   );
 }
 
-export function useArtifactObjectUrl(src: string | null | undefined, contentType?: string, fallbackSrcs?: string[]) {
+export function useArtifactObjectUrl(
+  src: string | null | undefined,
+  contentType?: string,
+  fallbackSrcs?: string[],
+  cacheKey?: string
+) {
   const [state, setState] = useState<{ objectUrl: string; loading: boolean; error: string | null }>({
     objectUrl: '',
     loading: false,
@@ -5592,7 +5762,7 @@ export function useArtifactObjectUrl(src: string | null | undefined, contentType
       active = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [contentType, fallbackSrcs, src]);
+  }, [cacheKey, contentType, fallbackSrcs, src]);
 
   return state;
 }
@@ -9325,22 +9495,22 @@ dependencies = [
 [project.optional-dependencies]
 agent = [
     # Enables built-in Agent node creation in the VisualFlow executor.
-    "abstractagent>=0.3.7",
+    "abstractagent>=0.3.8",
 ]
 apple = [
     # Apple local control-plane + Gateway stack. This profile is intentionally
     # the full user-facing local install, so media engine extras cascade through
     # abstractgateway[apple] into the runtime-owned media engine extras.
-    "abstractgateway[apple]>=0.2.18",
-    "abstractagent>=0.3.7",
+    "abstractgateway[apple]>=0.2.19",
+    "abstractagent>=0.3.8",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.23.0",
     "websockets>=11.0.0",
 ]
 gpu = [
     # GPU local control-plane + Gateway stack.
-    "abstractgateway[gpu]>=0.2.18",
-    "abstractagent>=0.3.7",
+    "abstractgateway[gpu]>=0.2.19",
+    "abstractagent>=0.3.8",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.23.0",
     "websockets>=11.0.0",
@@ -9448,7 +9618,7 @@ file: abstractflow/_version.py
 This file is the single source of truth for AbstractFlow releases.
 """
 
-__version__ = "0.3.13"
+__version__ = "0.3.14"
 
 ---
 file: mkdocs.yml
@@ -9504,7 +9674,7 @@ file: web/frontend/package.json
 
 {
   "name": "@abstractframework/flow",
-  "version": "0.3.13",
+  "version": "0.3.14",
   "description": "Visual workflow editor for AbstractFramework - drag-and-drop workflow authoring with real-time testing",
   "type": "module",
   "author": "Laurent-Philippe Albou",
@@ -10447,6 +10617,19 @@ All notable changes to AbstractFlow will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.3.14] - 2026-05-26
+
+### Added
+- Gateway-aware palette, preflight, live connection feedback, run lifecycle, workflow bundle, variable-name, and media artifact helpers for the thin-client editor.
+- Validated code-editor execution policy and prompt-free variable selector improvements.
+
+### Changed
+- Apple/GPU Flow profiles now require Gateway `>=0.2.19` and Agent `>=0.3.8`; Runtime/Core are still consumed through Gateway extras.
+- Media defaults and advanced media pin disclosure now use one editor surface backed by Gateway discovery.
+
+### Fixed
+- Repaired code node, pin, media artifact, and run UI regressions around resumed runs, validated variables, and modality-specific source selection.
 
 ## [0.3.13] - 2026-05-22
 

@@ -9,6 +9,11 @@ export type PinType =
   | 'number'    // Green #00FF00 - Integer/Float
   | 'boolean'   // Red #FF0000 - True/False
   | 'object'    // Cyan #00FFFF - JSON objects
+  | 'artifact'  // Generic Gateway artifact reference object
+  | 'artifact_image' // Image Gateway artifact reference object
+  | 'artifact_audio' // Audio Gateway artifact reference object (voice/music/sound)
+  | 'artifact_text'  // Text/transcript Gateway artifact reference object
+  | 'artifact_video' // Video Gateway artifact reference object
   | 'memory'    // Mint - Memory configuration object (KG/span/session controls)
   | 'assertion' // Teal - KG assertion object (subject/predicate/object + metadata)
   | 'assertions' // Teal - List of KG assertion objects (assertion[])
@@ -34,6 +39,11 @@ export const PIN_COLORS: Record<PinType, string> = {
   number: '#00FF00',
   boolean: '#FF0000',
   object: '#00FFFF',
+  artifact: '#5EEAD4',
+  artifact_image: '#19D3B8',
+  artifact_audio: '#22D3EE',
+  artifact_text: '#D946EF',
+  artifact_video: '#A855F7',
   memory: '#00C49A',
   assertion: '#00B8D4',
   assertions: '#00B8D4',
@@ -64,6 +74,18 @@ export interface Pin {
    */
   description?: string;
 }
+
+export type PinConnectionFeedback = {
+  status: 'valid' | 'invalid';
+  message: string;
+};
+
+export type ConnectionPreviewState = {
+  active: true;
+  sourceType?: PinType;
+  inputs?: Record<string, PinConnectionFeedback>;
+  outputs?: Record<string, PinConnectionFeedback>;
+};
 
 // JSON-serializable values used for pin defaults and literals.
 export type JsonValue =
@@ -169,6 +191,11 @@ export interface FlowNodeData {
   inputs: Pin[];
   outputs: Pin[];
   /**
+   * Render-only connection drag feedback injected by the canvas.
+   * This is not part of the persisted VisualFlow JSON.
+   */
+  connectionPreview?: ConnectionPreviewState;
+  /**
    * Blueprint-style default values for *unconnected* input pins.
    * Keys are pin ids; values are JSON-serializable (persisted in the flow JSON).
    */
@@ -245,9 +272,9 @@ export interface FlowNodeData {
     base_url?: string;     // For model_residency disambiguation/remote provider override
     timeout_s?: number;    // For model_residency load/unload control calls
     provider_api_key?: string; // For model_residency provider-scoped control calls
-    options?: Record<string, any>; // For model_residency provider-specific load/unload options
-    pin?: boolean;         // For model_residency load: keep resident until explicit unload
-    required?: boolean;    // For model_residency: fail the step when the control call fails
+    options?: Record<string, any>; // Legacy/advanced model_residency provider-specific options
+    pin?: boolean;         // Legacy hidden model_residency input
+    required?: boolean;    // Legacy hidden model_residency input
     runtime_provider?: string; // Advanced: runtime LLM provider override for generated media orchestration
     runtime_model?: string;    // Advanced: runtime LLM model override for generated media orchestration
     temperature?: number;  // For llm_call
@@ -428,6 +455,8 @@ export interface RunSummary {
   wait_reason?: string | null;
   wait_key?: string | null;
   paused?: boolean;
+  is_draft?: boolean;
+  run_lifecycle?: Record<string, unknown> | null;
   // Present only when the run is waiting for real user input (not pause/subworkflow)
   prompt?: string | null;
   choices?: string[] | null;

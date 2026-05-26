@@ -93,11 +93,17 @@ export function AfTooltip({
     }
   }, []);
 
-  const close = useCallback(() => {
+  const hideBubble = useCallback(() => {
     clearTimer();
     setOpen(false);
     setPos(null);
   }, [clearTimer]);
+
+  const dismissHover = useCallback(() => {
+    hideBubble();
+    setHovering(false);
+    _hoverLeave(tooltipId);
+  }, [hideBubble, tooltipId]);
 
   const scheduleOpen = useCallback(() => {
     if (!show) return;
@@ -183,6 +189,40 @@ export function AfTooltip({
     };
   }, [open, computePosition]);
 
+  useEffect(() => {
+    if (!open && !hovering) return;
+
+    const onPointerDown = () => dismissHover();
+    const onCanvasInteraction = () => dismissHover();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') dismissHover();
+    };
+    const onFocusIn = (event: FocusEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (target.closest('input, textarea, select, button, [contenteditable="true"], [role="button"]')) {
+        dismissHover();
+      }
+    };
+
+    document.addEventListener('pointerdown', onPointerDown, true);
+    document.addEventListener('wheel', onCanvasInteraction, true);
+    document.addEventListener('dragstart', onCanvasInteraction, true);
+    document.addEventListener('focusin', onFocusIn, true);
+    document.addEventListener('keydown', onKeyDown, true);
+    window.addEventListener('blur', onCanvasInteraction);
+    window.addEventListener('scroll', onCanvasInteraction, true);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown, true);
+      document.removeEventListener('wheel', onCanvasInteraction, true);
+      document.removeEventListener('dragstart', onCanvasInteraction, true);
+      document.removeEventListener('focusin', onFocusIn, true);
+      document.removeEventListener('keydown', onKeyDown, true);
+      window.removeEventListener('blur', onCanvasInteraction);
+      window.removeEventListener('scroll', onCanvasInteraction, true);
+    };
+  }, [dismissHover, hovering, open]);
+
   const bubble = useMemo(() => {
     if (!show || !open) return null;
     if (typeof document === 'undefined') return null;
@@ -215,11 +255,11 @@ export function AfTooltip({
     return _subscribeTopHovered((topId) => {
       if (!topId) {
         // No active hover target.
-        close();
+        hideBubble();
         return;
       }
       if (topId !== tooltipId) {
-        close();
+        hideBubble();
         return;
       }
       // We are the top hovered tooltip.
@@ -227,28 +267,26 @@ export function AfTooltip({
         scheduleOpen();
       }
     });
-  }, [close, hovering, open, scheduleOpen, show, tooltipId]);
+  }, [hideBubble, hovering, open, scheduleOpen, show, tooltipId]);
 
   return (
     <div
       className={block ? 'af-tooltip-wrap af-tooltip-block' : 'af-tooltip-wrap'}
       ref={wrapRef}
-      onMouseEnter={() => {
+      onPointerEnter={() => {
         if (!show) return;
         setHovering(true);
         _hoverEnter(tooltipId, priority);
         // If we're already the top hovered tooltip, start the timer.
         if (_topHoveredId === tooltipId) scheduleOpen();
       }}
-      onMouseLeave={() => {
+      onPointerLeave={() => {
         if (!show) return;
-        setHovering(false);
-        _hoverLeave(tooltipId);
-        close();
+        dismissHover();
       }}
-      onMouseDown={() => {
+      onPointerDownCapture={() => {
         if (!show) return;
-        close();
+        dismissHover();
       }}
     >
       {children}
@@ -258,4 +296,3 @@ export function AfTooltip({
 }
 
 export default AfTooltip;
-

@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { RunSummary } from '../types/flow';
 import { extractFlowIdFromWorkflowId, mapGatewayRunSummary } from '../utils/gatewayRuns';
 import { endpointFromDescriptor, gatewayJson, type GatewayContracts } from '../utils/gatewayClient';
+import { sanitizeBundleId } from '../utils/workflowBundles';
 
 interface RunHistoryModalProps {
   isOpen: boolean;
@@ -17,14 +18,6 @@ interface RunHistoryModalProps {
   gatewayContracts?: GatewayContracts | null;
   onClose: () => void;
   onSelectRun: (runId: string) => void;
-}
-
-function sanitizeBundleId(raw: string): string {
-  let s = String(raw || '').trim();
-  if (!s) return '';
-  s = s.replace(/[^a-zA-Z0-9_-]+/g, '-');
-  s = s.replace(/-{2,}/g, '-').replace(/^-+|-+$/g, '');
-  return s;
 }
 
 async function fetchRuns(
@@ -41,7 +34,6 @@ async function fetchRuns(
 
   const bundleId = sanitizeBundleId(workflowName || '') || sanitizeBundleId(fid);
   if (bundleId) {
-    candidates.add(`${bundleId}@dev:${fid}`);
     candidates.add(`${bundleId}:${fid}`);
   }
 
@@ -50,7 +42,7 @@ async function fetchRuns(
   const all: RunSummary[] = [];
   for (const wid of candidates) {
     const payload = await gatewayJson<{ items?: Record<string, unknown>[] }>(
-      endpointFromDescriptor(runsListDescriptor, '/api/gateway/runs', {}, { limit: 500, root_only: true, workflow_id: wid })
+      endpointFromDescriptor(runsListDescriptor, '/api/gateway/runs', {}, { limit: 500, root_only: true, include_drafts: true, workflow_id: wid })
     ).catch(() => null);
     if (!payload) continue;
     const items = Array.isArray(payload.items) ? payload.items : [];
@@ -61,7 +53,7 @@ async function fetchRuns(
   // Fallback: fetch recent root runs and filter by flow id suffix.
   try {
     const payload = await gatewayJson<{ items?: Record<string, unknown>[] }>(
-      endpointFromDescriptor(runsListDescriptor, '/api/gateway/runs', {}, { limit: 500, root_only: true })
+      endpointFromDescriptor(runsListDescriptor, '/api/gateway/runs', {}, { limit: 500, root_only: true, include_drafts: true })
     );
     const items = Array.isArray(payload.items) ? payload.items : [];
     const mapped = items.map(mapGatewayRunSummary);
@@ -210,4 +202,3 @@ export function RunHistoryModal({ isOpen, workflowId, workflowName, gatewayContr
 }
 
 export default RunHistoryModal;
-

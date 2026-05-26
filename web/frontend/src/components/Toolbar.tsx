@@ -9,7 +9,6 @@ import { useFlowStore } from '../hooks/useFlow';
 import { useWebSocket, type WaitingInfo } from '../hooks/useWebSocket';
 import { RunFlowModal } from './RunFlowModal';
 import { RunHistoryModal } from './RunHistoryModal';
-import { UserPromptModal } from './UserPromptModal';
 import { FlowLibraryModal } from './FlowLibraryModal';
 import { PublishFlowModal } from './PublishFlowModal';
 import { WorkflowLifecycleModal } from './WorkflowLifecycleModal';
@@ -183,7 +182,7 @@ export function Toolbar({
   const gatewayCapabilitiesQuery = useGatewayCapabilities(true);
   const gatewayContracts = gatewayContractsFromCapabilities(gatewayCapabilitiesQuery.data);
   const flowEditorContract = gatewayContracts?.flow_editor;
-  const gatewayReadiness = getGatewayFlowEditorReadiness(gatewayContracts);
+  const gatewayReadiness = useMemo(() => getGatewayFlowEditorReadiness(gatewayContracts), [gatewayContracts]);
   const strictGatewayContract = Boolean(
     gatewayContracts && typeof gatewayContracts.version === 'number' && gatewayContracts.version >= 1
   );
@@ -236,7 +235,6 @@ export function Toolbar({
   const [showLifecycleModal, setShowLifecycleModal] = useState(false);
   const [showModelResidency, setShowModelResidency] = useState(false);
   const [showNewFlowModal, setShowNewFlowModal] = useState(false);
-  const [suppressUserPromptFallback, setSuppressUserPromptFallback] = useState(false);
   const [runResult, setRunResult] = useState<FlowRunResult | null>(null);
   const [executionEvents, setExecutionEvents] = useState<ExecutionEvent[]>([]);
   const [traceEvents, setTraceEvents] = useState<ExecutionEvent[]>([]);
@@ -719,13 +717,9 @@ export function Toolbar({
     onWaiting: (info) => {
       console.log('Flow waiting for user input:', info);
       toast('Flow is waiting for your response');
+      setShowRunModal(true);
     },
   });
-
-  // Handle user prompt response (legacy/fallback modal)
-  const handlePromptSubmit = useCallback((response: string) => {
-    resumeFlow(response);
-  }, [resumeFlow]);
 
   // Handle save
   const handleSave = useCallback(() => {
@@ -748,7 +742,7 @@ export function Toolbar({
     saveMutation.mutate({ flow, existingFlowId: flowId });
   }, [flowId, getFlow, hasUnsavedChanges, isEmptyFlow, saveMutation, saveUnavailableReason, visualflowCrudUnavailable]);
 
-  // Handle run - open modal
+  // Handle Run - open modal
   const handleRun = useCallback(() => {
     if (!flowId) {
       toast.error('Please save the flow first');
@@ -762,7 +756,6 @@ export function Toolbar({
     // *not* reset anything. Users should be able to hide/reopen the run modal to
     // observe progress and revisit results.
     if (isRunning || inspectedRun || runResult || executionEvents.length > 0 || traceEvents.length > 0) {
-      setSuppressUserPromptFallback(false);
       setShowRunModal(true);
       return;
     }
@@ -770,20 +763,27 @@ export function Toolbar({
       toast.error('Save the flow before running current changes');
       return;
     }
-    const issues = computeRunPreflightIssues(nodes, edges);
+    const issues = computeRunPreflightIssues(nodes, edges, {
+      gatewayReadiness,
+      gatewayCapabilitiesLoading: gatewayCapabilitiesQuery.isLoading,
+      gatewayCapabilitiesKnown: Boolean(gatewayContracts && !gatewayCapabilitiesQuery.isError),
+    });
     if (issues.length > 0) {
       setPreflightIssues(issues);
       setShowRunModal(false);
       return;
     }
     clearPreflightIssues();
-    setSuppressUserPromptFallback(false);
     setShowRunModal(true);
   }, [
     clearPreflightIssues,
     edges,
     executionEvents.length,
     flowId,
+    gatewayCapabilitiesQuery.isError,
+    gatewayCapabilitiesQuery.isLoading,
+    gatewayContracts,
+    gatewayReadiness,
     hasUnsavedChanges,
     inspectedRun,
     isRunning,
@@ -814,7 +814,6 @@ export function Toolbar({
     setExecutionEvents([]);
     setTraceEvents([]);
     setRunWorkflowId(null);
-    setSuppressUserPromptFallback(false);
     resetThreadState();
   }, [flowId, resetThreadState]);
 
@@ -829,7 +828,6 @@ export function Toolbar({
     setExecutionEvents([]);
     setTraceEvents([]);
     setRunWorkflowId(flowId);
-    setSuppressUserPromptFallback(false);
     resetThreadState();
     runFlow(inputData);
   }, [flowId, resetThreadState, runFlow, setIsRunning]);
@@ -837,7 +835,6 @@ export function Toolbar({
   // Handle modal close
   const handleRunModalClose = useCallback(() => {
     // Close = hide. Keep state so the user can reopen the modal (even after completion).
-    setSuppressUserPromptFallback(true);
     setShowRunModal(false);
   }, []);
 
@@ -1187,8 +1184,8 @@ export function Toolbar({
           className="toolbar-button icon-button primary"
           onClick={handleRun}
           disabled={!flowId || visualflowRunUnavailable}
-          title={visualflowRunUnavailable ? (visualflowRunHint || 'Gateway cannot run VisualFlows') : isRunning ? 'Open current run' : 'Run Flow'}
-          aria-label={isRunning ? 'Open current run' : 'Run Flow'}
+          title={visualflowRunUnavailable ? (visualflowRunHint || 'Gateway cannot run VisualFlows') : isRunning ? 'Open current run' : 'Run'}
+          aria-label={isRunning ? 'Open current run' : 'Run'}
         >
           {isRunning ? '⏳' : '▶'}
         </button>
@@ -1328,10 +1325,10 @@ export function Toolbar({
 
         return (
       <RunFlowModal
-        isOpen={showRunModal}
-        onClose={handleRunModalClose}
-        onRun={handleRunExecute}
-        onFollowUpSubmit={!viewing && runWorkflowId && runWorkflowId === flowId ? handleFollowUpSubmit : undefined}
+	        isOpen={showRunModal}
+	        onClose={handleRunModalClose}
+	        onRun={handleRunExecute}
+	        onFollowUpSubmit={!viewing && runWorkflowId && runWorkflowId === flowId ? handleFollowUpSubmit : undefined}
         onNewRun={handleNewRun}
         onApproveAll={handleApproveAll}
         isRunning={viewing ? runningLike : isRunning}
@@ -1341,7 +1338,7 @@ export function Toolbar({
         traceEvents={traces}
         isWaiting={viewing ? waitingLike : isWaiting}
         waitingInfo={viewing ? waitingInfo2 : waitingInfo}
-        stableSessionId={stableSessionId}
+	        stableSessionId={stableSessionId}
         threadRootRunId={viewing ? undefined : threadRootRunId || undefined}
         runWorkflowId={viewing ? inspectedRun?.workflow_id || flowId || null : runWorkflowId}
         gatewayContracts={gatewayContracts}
@@ -1399,15 +1396,6 @@ export function Toolbar({
         isOpen={showModelResidency}
         gatewayContracts={gatewayContracts}
         onClose={() => setShowModelResidency(false)}
-      />
-
-      {/* User Prompt Modal (fallback) */}
-      <UserPromptModal
-        isOpen={isWaiting && !showRunModal && !suppressUserPromptFallback}
-        prompt={waitingInfo?.prompt || 'Please respond:'}
-        choices={waitingInfo?.choices || []}
-        allowFreeText={waitingInfo?.allowFreeText ?? true}
-        onSubmit={handlePromptSubmit}
       />
     </>
   );

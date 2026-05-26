@@ -4,6 +4,7 @@
 
 import type { NodeType, FlowNodeData, JsonValue, Pin } from './flow';
 import { generatePythonTransformCode, upsertPythonAvailableVariablesComments } from '../utils/codegen';
+import { NODE_GATEWAY_CAPABILITIES, type GatewayAuthoringCapability } from '../utils/nodeCapabilities';
 
 // Node template used in the palette
 export interface NodeTemplate {
@@ -16,7 +17,11 @@ export interface NodeTemplate {
   outputs: Pin[];
   category: string;
   /**
-   * Hide this template from the Node Palette (kept for backward compatibility).
+   * Gateway surface required before this node can execute successfully.
+   */
+  gatewayCapability?: GatewayAuthoringCapability;
+  /**
+   * Hide this template from the Node Palette.
    */
   hiddenInPalette?: boolean;
   /**
@@ -381,30 +386,25 @@ const CORE_NODES: NodeTemplate[] = [
   {
     type: 'model_residency',
     icon: '&#x25EB;',
-    label: 'Load / Unload Model',
-    description: 'Gateway model residency controls for listing, warming, or unloading resident models. Load keeps the model warm by default; unload is explicit.',
+    label: 'Model Residency',
+    description: 'Gateway/Runtime model residency controls for listing, loading, and unloading resident models.',
     headerColor: '#14B8A6',
+    gatewayCapability: NODE_GATEWAY_CAPABILITIES.model_residency,
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
       { id: 'operation', label: 'operation', type: 'string', description: 'list_loaded, load, or unload.' },
       { id: 'task', label: 'task', type: 'string', description: 'text_generation, image_generation, tts, or stt.' },
       { id: 'provider', label: 'provider', type: 'provider', description: 'Provider/backend id to load or filter.' },
       { id: 'model', label: 'model', type: 'model', description: 'Model id to load or filter.' },
-      { id: 'runtime_id', label: 'runtime_id', type: 'string', description: 'Runtime id returned by loaded/list calls; preferred for unload.' },
-      { id: 'options', label: 'options', type: 'object', description: 'Optional provider-specific load/unload options.' },
-      { id: 'pin', label: 'keep_loaded', type: 'boolean', description: 'When loading, keep resident until explicit unload.' },
-      { id: 'required', label: 'required', type: 'boolean', description: 'When true, fail this step if the residency call fails.' },
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
       { id: 'success', label: 'success', type: 'boolean' },
-      { id: 'runtime', label: 'runtime', type: 'object' },
+      { id: 'affected_models', label: 'affected_models', type: 'array' },
       { id: 'models', label: 'models', type: 'array' },
-      { id: 'loaded_new', label: 'loaded_new', type: 'boolean' },
-      { id: 'unloaded', label: 'unloaded', type: 'boolean' },
-      { id: 'result', label: 'result', type: 'object' },
-      { id: 'warnings', label: 'warnings', type: 'array' },
       { id: 'error', label: 'error', type: 'string' },
+      { id: 'warnings', label: 'warnings', type: 'array' },
+      { id: 'result', label: 'result', type: 'object' },
     ],
     category: 'core',
   },
@@ -414,6 +414,7 @@ const CORE_NODES: NodeTemplate[] = [
     label: 'Generate Image',
     description: 'Generate an image through Gateway vision capability and return an artifact reference.',
     headerColor: '#0EA5A4',
+    gatewayCapability: NODE_GATEWAY_CAPABILITIES.generate_image,
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
       { id: 'prompt', label: 'prompt', type: 'string', description: 'Image prompt.' },
@@ -430,8 +431,8 @@ const CORE_NODES: NodeTemplate[] = [
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
-      { id: 'image_artifact', label: 'image_artifact', type: 'object', description: 'Artifact ref for the generated image.' },
-      { id: 'artifact_ref', label: 'artifact_ref', type: 'object' },
+      { id: 'image_artifact', label: 'image_artifact', type: 'artifact_image', description: 'Artifact ref for the generated image.' },
+      { id: 'artifact_ref', label: 'artifact_ref', type: 'artifact' },
       { id: 'artifact_id', label: 'artifact_id', type: 'string' },
       { id: 'content_type', label: 'content_type', type: 'string' },
       { id: 'outputs', label: 'outputs', type: 'object' },
@@ -446,11 +447,12 @@ const CORE_NODES: NodeTemplate[] = [
     label: 'Edit Image',
     description: 'Edit or transform an input image through Gateway image editing and return an image artifact.',
     headerColor: '#0EA5A4',
+    gatewayCapability: NODE_GATEWAY_CAPABILITIES.edit_image,
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
       { id: 'prompt', label: 'prompt', type: 'string', description: 'Instruction for the image edit.' },
-      { id: 'image_artifact', label: 'image_artifact', type: 'object', description: 'Source image artifact ref. Wire from Generate Image, or use an uploaded/selected artifact.' },
-      { id: 'mask_artifact', label: 'mask_artifact', type: 'object', description: 'Optional mask artifact ref.' },
+      { id: 'image_artifact', label: 'image_artifact', type: 'artifact_image', description: 'Source image artifact ref. Wire from Generate Image, or use an uploaded/selected artifact.' },
+      { id: 'mask_artifact', label: 'mask_artifact', type: 'artifact_image', description: 'Optional mask artifact ref.' },
       { id: 'image_provider', label: 'provider', type: 'provider_image', description: 'Optional image edit provider/backend.' },
       { id: 'image_model', label: 'model', type: 'model', description: 'Optional image edit model id for the selected provider.' },
       { id: 'size', label: 'size', type: 'string', description: 'Optional size like 1024x1024.' },
@@ -466,8 +468,8 @@ const CORE_NODES: NodeTemplate[] = [
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
-      { id: 'image_artifact', label: 'image_artifact', type: 'object', description: 'Artifact ref for the edited image.' },
-      { id: 'artifact_ref', label: 'artifact_ref', type: 'object' },
+      { id: 'image_artifact', label: 'image_artifact', type: 'artifact_image', description: 'Artifact ref for the edited image.' },
+      { id: 'artifact_ref', label: 'artifact_ref', type: 'artifact' },
       { id: 'artifact_id', label: 'artifact_id', type: 'string' },
       { id: 'content_type', label: 'content_type', type: 'string' },
       { id: 'outputs', label: 'outputs', type: 'object' },
@@ -482,10 +484,11 @@ const CORE_NODES: NodeTemplate[] = [
     label: 'Image To Image',
     description: 'Compatibility alias for Edit Image.',
     headerColor: '#0EA5A4',
+    gatewayCapability: NODE_GATEWAY_CAPABILITIES.image_to_image,
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
       { id: 'prompt', label: 'prompt', type: 'string' },
-      { id: 'source_image', label: 'source_image', type: 'object' },
+      { id: 'source_image', label: 'source_image', type: 'artifact_image' },
       { id: 'image_provider', label: 'provider', type: 'provider_image' },
       { id: 'image_model', label: 'model', type: 'model' },
       { id: 'strength', label: 'strength', type: 'number' },
@@ -493,8 +496,8 @@ const CORE_NODES: NodeTemplate[] = [
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
-      { id: 'image_artifact', label: 'image_artifact', type: 'object' },
-      { id: 'artifact_ref', label: 'artifact_ref', type: 'object' },
+      { id: 'image_artifact', label: 'image_artifact', type: 'artifact_image' },
+      { id: 'artifact_ref', label: 'artifact_ref', type: 'artifact' },
       { id: 'artifact_id', label: 'artifact_id', type: 'string' },
       { id: 'content_type', label: 'content_type', type: 'string' },
       { id: 'outputs', label: 'outputs', type: 'object' },
@@ -510,13 +513,14 @@ const CORE_NODES: NodeTemplate[] = [
     label: 'Generate Voice',
     description: 'Generate speech audio through Gateway voice capability and return an audio artifact.',
     headerColor: '#0EA5A4',
+    gatewayCapability: NODE_GATEWAY_CAPABILITIES.generate_voice,
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
       { id: 'text', label: 'text', type: 'string', description: 'Text to speak.' },
       { id: 'tts_provider', label: 'provider', type: 'provider_voice', description: 'Optional media/voice provider id.' },
       { id: 'tts_model', label: 'model', type: 'model', description: 'Optional TTS model/language/voice model for the selected provider.' },
       { id: 'voice', label: 'voice', type: 'string', description: 'Optional base or cloned voice for the selected provider.' },
-      { id: 'profile', label: 'profile', type: 'string', description: 'Advanced legacy voice profile override.' },
+      { id: 'profile', label: 'profile', type: 'string', description: 'Optional voice profile override.' },
       { id: 'quality_preset', label: 'quality', type: 'string', description: 'Optional AbstractVoice quality preset: low, standard, or high.' },
       { id: 'format', label: 'format', type: 'string', description: 'wav or mp3.' },
       { id: 'speed', label: 'speed', type: 'number' },
@@ -524,8 +528,8 @@ const CORE_NODES: NodeTemplate[] = [
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
-      { id: 'audio_artifact', label: 'audio_artifact', type: 'object', description: 'Artifact ref for generated audio.' },
-      { id: 'artifact_ref', label: 'artifact_ref', type: 'object' },
+      { id: 'audio_artifact', label: 'audio_artifact', type: 'artifact_audio', description: 'Artifact ref for generated audio.' },
+      { id: 'artifact_ref', label: 'artifact_ref', type: 'artifact' },
       { id: 'artifact_id', label: 'artifact_id', type: 'string' },
       { id: 'content_type', label: 'content_type', type: 'string' },
       { id: 'outputs', label: 'outputs', type: 'object' },
@@ -540,6 +544,7 @@ const CORE_NODES: NodeTemplate[] = [
     label: 'Generate Music',
     description: 'Generate music through Gateway music capability and return an audio artifact.',
     headerColor: '#0EA5A4',
+    gatewayCapability: NODE_GATEWAY_CAPABILITIES.generate_music,
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
       { id: 'prompt', label: 'prompt', type: 'string', description: 'Music prompt.' },
@@ -570,9 +575,9 @@ const CORE_NODES: NodeTemplate[] = [
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
-      { id: 'music_artifact', label: 'music_artifact', type: 'object', description: 'Artifact ref for generated music.' },
-      { id: 'audio_artifact', label: 'audio_artifact', type: 'object', description: 'Alias artifact ref for audio-compatible downstream nodes.' },
-      { id: 'artifact_ref', label: 'artifact_ref', type: 'object' },
+      { id: 'music_artifact', label: 'music_artifact', type: 'artifact_audio', description: 'Artifact ref for generated music.' },
+      { id: 'audio_artifact', label: 'audio_artifact', type: 'artifact_audio', description: 'Alias artifact ref for audio-compatible downstream nodes.' },
+      { id: 'artifact_ref', label: 'artifact_ref', type: 'artifact' },
       { id: 'artifact_id', label: 'artifact_id', type: 'string' },
       { id: 'content_type', label: 'content_type', type: 'string' },
       { id: 'outputs', label: 'outputs', type: 'object' },
@@ -589,7 +594,7 @@ const CORE_NODES: NodeTemplate[] = [
     headerColor: '#0EA5A4',
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
-      { id: 'audio_artifact', label: 'audio_artifact', type: 'object', description: 'Audio artifact ref.' },
+      { id: 'audio_artifact', label: 'audio_artifact', type: 'artifact_audio', description: 'Audio artifact ref.' },
       { id: 'stt_provider', label: 'provider', type: 'provider_voice', description: 'Optional audio/STT provider id.' },
       { id: 'language', label: 'language', type: 'string' },
       { id: 'stt_model', label: 'model', type: 'model', description: 'Optional STT model id for the selected voice provider.' },
@@ -600,8 +605,8 @@ const CORE_NODES: NodeTemplate[] = [
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
       { id: 'text', label: 'text', type: 'string' },
-      { id: 'transcript_artifact', label: 'transcript_artifact', type: 'object' },
-      { id: 'artifact_ref', label: 'artifact_ref', type: 'object' },
+      { id: 'transcript_artifact', label: 'transcript_artifact', type: 'artifact_text' },
+      { id: 'artifact_ref', label: 'artifact_ref', type: 'artifact' },
       { id: 'artifact_id', label: 'artifact_id', type: 'string' },
       { id: 'meta', label: 'meta', type: 'object' },
       { id: 'success', label: 'success', type: 'boolean' },
@@ -625,8 +630,8 @@ const CORE_NODES: NodeTemplate[] = [
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
-      { id: 'audio_artifact', label: 'audio_artifact', type: 'object' },
-      { id: 'artifact_ref', label: 'artifact_ref', type: 'object' },
+      { id: 'audio_artifact', label: 'audio_artifact', type: 'artifact_audio' },
+      { id: 'artifact_ref', label: 'artifact_ref', type: 'artifact' },
       { id: 'artifact_id', label: 'artifact_id', type: 'string' },
       { id: 'text', label: 'text', type: 'string' },
     ],
@@ -638,6 +643,7 @@ const CORE_NODES: NodeTemplate[] = [
     label: 'Tool Calls',
     description: 'Execute one or more tool calls via the runtime. Outputs per-call results and a success boolean.',
     headerColor: '#16A085', // Teal - IO/tools
+    gatewayCapability: NODE_GATEWAY_CAPABILITIES.tool_calls,
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
       {
@@ -715,16 +721,30 @@ const CORE_NODES: NodeTemplate[] = [
   {
     type: 'code',
     icon: '&#x1F40D;', // Python snake
-    label: 'Python Code',
-    description: 'Run a Python transform function `transform(input)` (portable only when a Python host is available).',
+    label: 'Code',
+    description: 'Run a Python transform body as `transform(_input)` in the Runtime sandbox.',
     headerColor: '#9B59B6',
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
       { id: 'input', label: 'input', type: 'any' },
+      {
+        id: 'permissions',
+        label: 'permissions',
+        type: 'string',
+        description:
+          'Execution policy for this Code node. sandbox is the protected default. full_access requires explicit Runtime/Gateway policy and otherwise fails closed.',
+      },
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
-      { id: 'output', label: 'output', type: 'any' },
+      { id: 'output', label: 'output', type: 'any', description: 'Value returned by transform(_input).' },
+      { id: 'success', label: 'success', type: 'boolean', description: 'True when the transform ran without error.' },
+      {
+        id: 'execution',
+        label: 'execution',
+        type: 'object',
+        description: 'Execution metrics such as duration_ms, cpu_time_ms, cpu_percent, memory_rss_mb, and memory_rss_delta_mb.',
+      },
     ],
     category: 'core',
   },
@@ -754,6 +774,7 @@ const CORE_NODES: NodeTemplate[] = [
     label: 'Call Tool',
     description: 'Deprecated (use Tool Calls). Execute a single tool call via the runtime.',
     headerColor: '#16A085', // Teal - IO/tools
+    gatewayCapability: NODE_GATEWAY_CAPABILITIES.call_tool,
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
       {
@@ -1332,7 +1353,7 @@ const ARTIFACT_LITERAL_NODES: NodeTemplate[] = [
     description: 'Artifact reference object for a text/plain Gateway artifact. Paste an uploaded or generated artifact id into $artifact.',
     headerColor: '#64748B',
     inputs: [],
-    outputs: [{ id: 'value', label: 'text_artifact', type: 'object' }],
+    outputs: [{ id: 'value', label: 'text_artifact', type: 'artifact_text' }],
     category: 'artifacts',
   },
   {
@@ -1342,7 +1363,7 @@ const ARTIFACT_LITERAL_NODES: NodeTemplate[] = [
     description: 'Artifact reference object for an image Gateway artifact. Wire this into Edit Image image_artifact or mask_artifact.',
     headerColor: '#19D3B8',
     inputs: [],
-    outputs: [{ id: 'value', label: 'image_artifact', type: 'object' }],
+    outputs: [{ id: 'value', label: 'image_artifact', type: 'artifact_image' }],
     category: 'artifacts',
   },
   {
@@ -1352,7 +1373,7 @@ const ARTIFACT_LITERAL_NODES: NodeTemplate[] = [
     description: 'Artifact reference object for a speech/audio Gateway artifact.',
     headerColor: '#22D3EE',
     inputs: [],
-    outputs: [{ id: 'value', label: 'voice_artifact', type: 'object' }],
+    outputs: [{ id: 'value', label: 'voice_artifact', type: 'artifact_audio' }],
     category: 'artifacts',
   },
   {
@@ -1362,7 +1383,7 @@ const ARTIFACT_LITERAL_NODES: NodeTemplate[] = [
     description: 'Artifact reference object for a music/audio Gateway artifact.',
     headerColor: '#F59E0B',
     inputs: [],
-    outputs: [{ id: 'value', label: 'music_artifact', type: 'object' }],
+    outputs: [{ id: 'value', label: 'music_artifact', type: 'artifact_audio' }],
     category: 'artifacts',
   },
   {
@@ -1372,7 +1393,7 @@ const ARTIFACT_LITERAL_NODES: NodeTemplate[] = [
     description: 'Artifact reference object for a video Gateway artifact.',
     headerColor: '#A855F7',
     inputs: [],
-    outputs: [{ id: 'value', label: 'video_artifact', type: 'object' }],
+    outputs: [{ id: 'value', label: 'video_artifact', type: 'artifact_video' }],
     category: 'artifacts',
   },
 ];
@@ -1544,6 +1565,7 @@ const MEMORY_NODES: NodeTemplate[] = [
     label: 'KG Query',
     description: 'Query the AbstractMemory triple store (pattern filters + optional semantic query_text).',
     headerColor: '#8E44AD', // Purple - semantic memory
+    gatewayCapability: NODE_GATEWAY_CAPABILITIES.memory_kg_query,
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
       { id: 'query_text', label: 'query_text', type: 'string', description: 'Optional semantic query. Requires embeddings to be configured in the host.' },
@@ -1581,6 +1603,7 @@ const MEMORY_NODES: NodeTemplate[] = [
     label: 'KG Resolve Entity',
     description: 'Resolve candidate ex:* entity ids by label (+ optional rdf:type filter), using bounded exact-match rules and optional semantic fallback.',
     headerColor: '#8E44AD', // Purple - semantic memory
+    gatewayCapability: NODE_GATEWAY_CAPABILITIES.memory_kg_resolve,
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
       { id: 'label', label: 'label', type: 'string', description: 'Entity label text to resolve (case-insensitive; whitespace collapsed).' },
@@ -1631,6 +1654,7 @@ const MEMORY_NODES: NodeTemplate[] = [
     label: 'KG Assert',
     description: 'Append triple assertions into AbstractMemory (provenance-first, no destructive updates).',
     headerColor: '#8E44AD', // Purple - semantic memory
+    gatewayCapability: NODE_GATEWAY_CAPABILITIES.memory_kg_assert,
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
       { id: 'assertions', label: 'assertions', type: 'assertions', description: 'List of {subject,predicate,object,...} assertion objects.' },
@@ -1757,7 +1781,7 @@ function artifactLiteralDefault(label: string): Record<string, JsonValue> | null
 
 // Create default node data from template
 export function createNodeData(template: NodeTemplate): FlowNodeData {
-  const defaultCodeBodyBase = 'return input';
+  const defaultCodeBodyBase = 'return _input';
   const defaultCodeBody = template.type === 'code'
     ? upsertPythonAvailableVariablesComments(defaultCodeBodyBase, template.inputs)
     : defaultCodeBodyBase;
@@ -1774,15 +1798,11 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
     ...(template.type === 'model_residency' && {
       pinDefaults: {
         operation: 'load',
-        task: 'image_generation',
-        pin: true,
-        required: false,
+        task: 'text_generation',
       },
       effectConfig: {
         operation: 'load',
-        task: 'image_generation',
-        pin: true,
-        required: false,
+        task: 'text_generation',
       },
     }),
     ...((template.type === 'generate_image' || template.type === 'edit_image' || template.type === 'image_to_image') && {
@@ -1819,6 +1839,9 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
     }),
     // Default code for code nodes
     ...(template.type === 'code' && {
+      pinDefaults: {
+        permissions: 'sandbox',
+      },
       codeBody: defaultCodeBody,
       code: generatePythonTransformCode(template.inputs, defaultCodeBody),
       functionName: 'transform',
@@ -1888,6 +1911,44 @@ export function mergePinDocsFromTemplate(
   templateData: FlowNodeData,
   nodeData: FlowNodeData
 ): FlowNodeData {
+  const normalizeCodeNode = (data: FlowNodeData): FlowNodeData => {
+    if (data.nodeType !== 'code') return data;
+    const templateInputsById = new Map(templateData.inputs.map((p) => [p.id, p] as const));
+    const templateOutputsById = new Map(templateData.outputs.map((p) => [p.id, p] as const));
+    const seenInputs = new Set<string>();
+    const existingInputs = Array.isArray(data.inputs) ? data.inputs : [];
+    const inputs = existingInputs.map((pin) => {
+      seenInputs.add(pin.id);
+      const templatePin = templateInputsById.get(pin.id);
+      return templatePin ? { ...pin, label: templatePin.label, type: templatePin.type, description: pin.description || templatePin.description } : pin;
+    });
+    for (const templatePin of templateData.inputs) {
+      if (!seenInputs.has(templatePin.id)) inputs.push(templatePin);
+    }
+    const seen = new Set<string>();
+    const existingOutputs = Array.isArray(data.outputs) ? data.outputs : [];
+    const outputs = existingOutputs.map((pin) => {
+      seen.add(pin.id);
+      const templatePin = templateOutputsById.get(pin.id);
+      return templatePin ? { ...pin, label: templatePin.label, type: templatePin.type, description: pin.description || templatePin.description } : pin;
+    });
+    for (const templatePin of templateData.outputs) {
+      if (!seen.has(templatePin.id)) outputs.push(templatePin);
+    }
+    const nextDefaults = { ...(data.pinDefaults || {}) };
+    if (typeof nextDefaults.permissions !== 'string' || !nextDefaults.permissions.trim()) {
+      nextDefaults.permissions = 'sandbox';
+    }
+    const codeBody = typeof data.codeBody === 'string' ? data.codeBody : null;
+    return {
+      ...data,
+      inputs,
+      outputs,
+      pinDefaults: nextDefaults,
+      ...(codeBody !== null ? { code: generatePythonTransformCode(inputs, codeBody) } : {}),
+    };
+  };
+
   const mergePins = (templatePins: Pin[], pins: Pin[]): Pin[] => {
     const byId = new Map(templatePins.map((p) => [p.id, p] as const));
     return pins.map((p) => {
@@ -1900,9 +1961,11 @@ export function mergePinDocsFromTemplate(
     });
   };
 
+  const normalized = normalizeCodeNode(nodeData);
+
   return {
-    ...nodeData,
-    inputs: mergePins(templateData.inputs, nodeData.inputs),
-    outputs: mergePins(templateData.outputs, nodeData.outputs),
+    ...normalized,
+    inputs: mergePins(templateData.inputs, normalized.inputs),
+    outputs: mergePins(templateData.outputs, normalized.outputs),
   };
 }

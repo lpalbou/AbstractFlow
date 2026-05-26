@@ -22,6 +22,8 @@ import {
   type GatewayContracts,
 } from '../utils/gatewayClient';
 import { normalizeRunInputData, type GatewayRunInputSchema } from '../utils/gatewayInputSchema';
+import { buildDraftRunMetadata, buildPublishedRunMetadata, draftBundleVersion } from '../utils/runLifecycle';
+import { isDraftBundleVersion, type PublishedBundleTarget } from '../utils/workflowBundles';
 import { useGatewayCapabilities, gatewayContractsFromCapabilities } from './useGatewayCapabilities';
 
 // Stable per-tab session id for run context continuity.
@@ -720,6 +722,83 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
     [applyRunSummary, commonContract?.ledger?.stream, disconnect, emitLedgerRecord, fetchRunSummary]
   );
 
+  const startBundleRun = useCallback(
+    async (args: {
+      bundleId: string;
+      bundleVersion: string;
+      flowId: string;
+      inputData: Record<string, unknown>;
+      runLifecycle: unknown;
+      sessionId?: string;
+    }) => {
+      const bundleId = String(args.bundleId || '').trim();
+      const bundleVersion = String(args.bundleVersion || '').trim();
+      const targetFlowId = String(args.flowId || '').trim();
+      if (!bundleId) throw new Error('Gateway did not return bundle_id');
+      if (!bundleVersion) throw new Error('Gateway did not return bundle_version');
+      if (!targetFlowId) throw new Error('flow_id is required');
+
+      let inputSchema: GatewayRunInputSchema | null = null;
+      const schemaDescriptor = flowEditorContract?.run_input_schema;
+      if (!capabilityUnavailable(schemaDescriptor)) {
+        try {
+          const schemaUrl = endpointFromDescriptor(
+            schemaDescriptor,
+            '/api/gateway/bundles/{bundle_id}/flows/{flow_id}/input_schema',
+            { bundle_id: bundleId, flow_id: targetFlowId },
+            { bundle_version: bundleVersion }
+          );
+          inputSchema = await gatewayJson<GatewayRunInputSchema>(schemaUrl);
+        } catch (e) {
+          const detail = e instanceof Error ? e.message : 'failed to load gateway run input schema';
+          throw new Error(`Gateway returned invalid flow for run: ${detail}`);
+        }
+      }
+
+      const normalized = normalizeRunInputData(args.inputData, inputSchema);
+      if (normalized.missingRequired.length > 0) {
+        throw new Error(`Missing required run input: ${normalized.missingRequired.join(', ')}`);
+      }
+      if (normalized.warnings.length > 0) {
+        console.warn('#FALLBACK: gateway input schema normalization warnings', normalized.warnings);
+      }
+
+      const sessionId =
+        String(args.sessionId || '').trim() ||
+        (typeof normalized.inputData.sessionId === 'string' ? normalized.inputData.sessionId.trim() : '') ||
+        (typeof normalized.inputData.session_id === 'string' ? normalized.inputData.session_id.trim() : '');
+      const startUrl = endpointFromDescriptor(commonContract?.runs?.start, '/api/gateway/runs/start');
+      const startPayload = await gatewayJson<{ run_id?: string }>(startUrl, jsonRequest({
+        bundle_id: bundleId,
+        bundle_version: bundleVersion,
+        flow_id: targetFlowId,
+        input_data: normalized.inputData,
+        run_lifecycle: args.runLifecycle,
+        session_id: sessionId || undefined,
+      }, {
+        method: 'POST',
+      }));
+      const rid = typeof startPayload.run_id === 'string' ? startPayload.run_id : '';
+      if (!rid) throw new Error('Gateway did not return run_id');
+
+      mappingStateRef.current = createLedgerMappingState();
+      streamCursorRef.current = 0;
+      closeSubrunStreams();
+      terminalEmittedRef.current.delete(rid);
+      runIdRef.current = rid;
+      setRunId(rid);
+      dispatchEvent({ type: 'flow_start', runId: rid, ts: new Date().toISOString() });
+      connectStream(rid);
+    },
+    [
+      closeSubrunStreams,
+      commonContract?.runs?.start,
+      connectStream,
+      dispatchEvent,
+      flowEditorContract?.run_input_schema,
+    ]
+  );
+
   const runFlow = useCallback(
     async (inputData: Record<string, unknown> = {}) => {
       if (!flowId) {
@@ -773,6 +852,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
           '/api/gateway/visualflows/{flow_id}/publish',
           { flow_id: flowId }
         );
+        const requestedBundleVersion = draftBundleVersion(effectiveSessionId || flowId);
         const publishPayload = await gatewayJson<{
           ok?: boolean;
           bundle_id?: string;
@@ -780,7 +860,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
           gateway_reloaded?: boolean;
           gateway_reload_error?: string | null;
           detail?: string;
-        }>(publishUrl, jsonRequest({ bundle_version: 'dev', overwrite: true, reload_gateway: true }, {
+        }>(publishUrl, jsonRequest({ bundle_version: requestedBundleVersion, overwrite: true, reload_gateway: true }, {
           method: 'POST',
         }));
         if (publishPayload.ok === false) {
@@ -792,52 +872,19 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
         if (publishPayload.gateway_reloaded === false && publishPayload.gateway_reload_error) {
           throw new Error(`Gateway publish finished but bundle is not loaded: ${publishPayload.gateway_reload_error}`);
         }
-
-        let inputSchema: GatewayRunInputSchema | null = null;
-        const schemaDescriptor = flowEditorContract?.run_input_schema;
-        if (!capabilityUnavailable(schemaDescriptor)) {
-          try {
-            const schemaUrl = endpointFromDescriptor(
-              schemaDescriptor,
-              '/api/gateway/bundles/{bundle_id}/flows/{flow_id}/input_schema',
-              { bundle_id: bundleId, flow_id: flowId },
-              { bundle_version: bundleVersion || undefined }
-            );
-            inputSchema = await gatewayJson<GatewayRunInputSchema>(schemaUrl);
-          } catch (e) {
-            const detail = e instanceof Error ? e.message : 'failed to load gateway run input schema';
-            throw new Error(`Gateway returned invalid flow for run: ${detail}`);
-          }
-        }
-        const normalized = normalizeRunInputData(mergedInputData, inputSchema);
-        if (normalized.missingRequired.length > 0) {
-          throw new Error(`Missing required run input: ${normalized.missingRequired.join(', ')}`);
-        }
-        if (normalized.warnings.length > 0) {
-          console.warn('#FALLBACK: gateway input schema normalization warnings', normalized.warnings);
-        }
-
-        const startUrl = endpointFromDescriptor(commonContract?.runs?.start, '/api/gateway/runs/start');
-        const startPayload = await gatewayJson<{ run_id?: string }>(startUrl, jsonRequest({
-          bundle_id: bundleId,
-          bundle_version: bundleVersion || undefined,
-          flow_id: flowId,
-          input_data: normalized.inputData,
-          session_id: effectiveSessionId || undefined,
-        }, {
-          method: 'POST',
-        }));
-        const rid = typeof startPayload.run_id === 'string' ? startPayload.run_id : '';
-        if (!rid) throw new Error('Gateway did not return run_id');
-
-        mappingStateRef.current = createLedgerMappingState();
-        streamCursorRef.current = 0;
-        closeSubrunStreams();
-        terminalEmittedRef.current.delete(rid);
-        runIdRef.current = rid;
-        setRunId(rid);
-        dispatchEvent({ type: 'flow_start', runId: rid, ts: new Date().toISOString() });
-        connectStream(rid);
+        const runLifecycle = buildDraftRunMetadata({
+          editorSessionId: effectiveSessionId,
+          flowId,
+          bundleVersion: bundleVersion || requestedBundleVersion,
+        });
+        await startBundleRun({
+          bundleId,
+          bundleVersion: bundleVersion || requestedBundleVersion,
+          flowId,
+          inputData: mergedInputData,
+          runLifecycle,
+          sessionId: effectiveSessionId || undefined,
+        });
       } catch (e) {
         const msg = e instanceof Error ? e.message : 'Failed to run flow';
         setError(msg);
@@ -848,15 +895,72 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
       capabilitiesQuery.error,
       capabilitiesQuery.isError,
       capabilitiesQuery.isLoading,
-      closeSubrunStreams,
-      commonContract?.runs?.start,
-      connectStream,
       dispatchEvent,
-      flowEditorContract?.run_input_schema,
       flowEditorContract?.visualflows?.publish,
       flowId,
       gatewayReadiness.operations.run.ready,
       gatewayReadiness.operations.run.reason,
+      startBundleRun,
+    ]
+  );
+
+  const runPublishedFlow = useCallback(
+    async (target: PublishedBundleTarget, inputData: Record<string, unknown> = {}) => {
+      const targetFlowId = String(target?.flowId || flowId || '').trim();
+      const bundleId = String(target?.bundleId || '').trim();
+      const bundleVersion = String(target?.bundleVersion || '').trim();
+      if (!targetFlowId) {
+        setError('flow_id is required');
+        return;
+      }
+      if (!bundleId || !bundleVersion) {
+        setError('Published bundle execution requires an exact bundle_id and bundle_version');
+        return;
+      }
+      if (isDraftBundleVersion(bundleVersion)) {
+        setError('Published bundle execution cannot use a draft bundle version');
+        return;
+      }
+
+      try {
+        setError(null);
+        if (capabilitiesQuery.isLoading) {
+          throw new Error('Gateway capability discovery is still loading');
+        }
+        if (capabilitiesQuery.isError) {
+          const detail = capabilitiesQuery.error instanceof Error ? `: ${capabilitiesQuery.error.message}` : '';
+          throw new Error(`Gateway capability discovery failed${detail}`);
+        }
+        if (!gatewayReadiness.operations.run.ready) {
+          throw new Error(gatewayReadiness.operations.run.reason || 'Gateway Flow Editor run contract is incomplete');
+        }
+        await startBundleRun({
+          bundleId,
+          bundleVersion,
+          flowId: targetFlowId,
+          inputData: { ...(inputData || {}) },
+          runLifecycle: buildPublishedRunMetadata({
+            flowId: targetFlowId,
+            bundleId,
+            bundleVersion,
+            bundleRef: target.bundleRef,
+          }),
+        });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Failed to run published flow';
+        setError(msg);
+        dispatchEvent({ type: 'flow_error', error: msg });
+      }
+    },
+    [
+      capabilitiesQuery.error,
+      capabilitiesQuery.isError,
+      capabilitiesQuery.isLoading,
+      dispatchEvent,
+      flowId,
+      gatewayReadiness.operations.run.ready,
+      gatewayReadiness.operations.run.reason,
+      startBundleRun,
     ]
   );
 
@@ -962,6 +1066,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
     connect,
     disconnect,
     runFlow,
+    runPublishedFlow,
     resumeFlow,
     pauseRun,
     resumeRun,

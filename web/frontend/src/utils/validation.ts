@@ -4,6 +4,7 @@
 
 import type { Node, Connection, Edge } from 'reactflow';
 import type { FlowNodeData, PinType } from '../types/flow';
+import { artifactPinTypesCompatible, getArtifactConnectionError } from './mediaArtifacts';
 
 function routeKey(sourceNodeId: string, sourceHandle: string): string {
   return `${sourceNodeId}::${sourceHandle || 'exec-out'}`;
@@ -41,6 +42,7 @@ export function inferRouteOverrideRouteKey(
   if (!sourcePin || !targetPin) return null;
   if (sourcePin.type === 'execution' || targetPin.type === 'execution') return null;
   if (!areTypesCompatible(sourcePin.type, targetPin.type)) return null;
+  if (getArtifactConnectionError(sourceNode.data, sourcePin, targetNode.data, targetPin)) return null;
 
   const targetAlreadyConnected = edges.some(
     (e) => e.target === connection.target && e.targetHandle === connection.targetHandle && edgeData(e).routeOverride !== true
@@ -119,7 +121,8 @@ export function validateConnection(
     if (sourceAlreadyConnected) return false;
   }
 
-  return areTypesCompatible(sourcePin.type, targetPin.type);
+  if (!areTypesCompatible(sourcePin.type, targetPin.type)) return false;
+  return !getArtifactConnectionError(sourceNode.data, sourcePin, targetNode.data, targetPin);
 }
 
 /**
@@ -152,7 +155,29 @@ export function areTypesCompatible(
     return true;
   }
 
-  // 'any' type accepts anything
+  const artifactCompatibility = artifactPinTypesCompatible(sourceType, targetType);
+  if (artifactCompatibility !== null) {
+    return artifactCompatibility;
+  }
+
+  // Providers are modality-scoped nominal values. They should only wire into
+  // provider-compatible pins, not into generic payload/string params where the
+  // graph would look like a provider variable was available but arrive as an
+  // unrelated target handle.
+  if (PROVIDER_PIN_TYPES.has(sourceType) || PROVIDER_PIN_TYPES.has(targetType)) {
+    const sourceScope = providerScope(sourceType);
+    const targetScope = providerScope(targetType);
+    return Boolean(sourceScope && targetScope && (sourceScope === targetScope || sourceScope === 'legacy' || targetScope === 'legacy'));
+  }
+
+  // Models are provider-scoped nominal values. The selected provider determines
+  // the catalog; model aliases remain compatible only with other model pins.
+  if (MODEL_PIN_TYPES.has(sourceType) || MODEL_PIN_TYPES.has(targetType)) {
+    return MODEL_PIN_TYPES.has(sourceType) && MODEL_PIN_TYPES.has(targetType);
+  }
+
+  // 'any' accepts payload values after nominal/control-like pin types had a
+  // chance to reject accidental cross-wiring above.
   if (sourceType === 'any' || targetType === 'any') {
     return true;
   }
@@ -206,24 +231,6 @@ export function areTypesCompatible(
   // Boolean can connect to string (implicit conversion)
   if (sourceType === 'boolean' && targetType === 'string') {
     return true;
-  }
-
-  // Providers are modality-scoped for UX and safety. Legacy `provider` may bridge
-  // into scoped pins for older saved flows. New scoped provider pins do not cross
-  // modalities.
-  if (PROVIDER_PIN_TYPES.has(sourceType) || PROVIDER_PIN_TYPES.has(targetType)) {
-    const sourceScope = providerScope(sourceType);
-    const targetScope = providerScope(targetType);
-    if (sourceType === 'string' || targetType === 'string') return true;
-    if (sourceScope && targetScope) return sourceScope === targetScope || sourceScope === 'legacy' || targetScope === 'legacy';
-  }
-
-  // Models are deliberately generic. The selected provider pin determines which
-  // catalog a model value comes from; model_* aliases remain accepted only for
-  // compatibility with old saved flows.
-  if (MODEL_PIN_TYPES.has(sourceType) || MODEL_PIN_TYPES.has(targetType)) {
-    if (sourceType === 'string' || targetType === 'string') return true;
-    if (MODEL_PIN_TYPES.has(sourceType) && MODEL_PIN_TYPES.has(targetType)) return true;
   }
 
   // Exact type match
@@ -292,6 +299,9 @@ export function getConnectionError(
       return `Execution output pin '${connection.sourceHandle}' already connected`;
     }
   }
+
+  const artifactError = getArtifactConnectionError(sourceNode.data, sourcePin, targetNode.data, targetPin);
+  if (artifactError) return artifactError;
 
   if (!areTypesCompatible(sourcePin.type, targetPin.type)) {
     return `Type mismatch: cannot connect ${sourcePin.type} to ${targetPin.type}`;

@@ -1501,15 +1501,32 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           const extras = existingInputs.filter((p) => !used.has(p.id) && !dropLegacyInputIds.has(p.id));
           return [...ordered, ...extras];
         };
+        const reorderOutputs = (canonical: Pin[]): Pin[] => {
+          const existingOutputs = Array.isArray(data.outputs) ? data.outputs : [];
+          const byId = new Map(existingOutputs.map((p) => [p.id, p] as const));
+          const used = new Set<string>();
+
+          const want = (pin: Pin): Pin => {
+            const prev = byId.get(pin.id);
+            used.add(pin.id);
+            if (!prev) return pin;
+            if (prev.label === pin.label && prev.type === pin.type && prev.description === pin.description) return prev;
+            return { ...prev, label: pin.label, type: pin.type, description: pin.description };
+          };
+
+          const ordered = canonical.map(want);
+          const extras = existingOutputs.filter((p) => !used.has(p.id));
+          return [...ordered, ...extras];
+        };
         const canonicalInputs =
           data.nodeType === 'generate_voice'
             ? [
                 { id: 'exec-in', label: '', type: 'execution' as const },
                 { id: 'text', label: 'text', type: 'string' as const, description: 'Text to speak.' },
-                { id: 'tts_provider', label: 'provider', type: 'provider_voice' as const, description: 'Optional media/voice provider id. Legacy provider pins are treated as a TTS provider fallback.' },
+                { id: 'tts_provider', label: 'provider', type: 'provider_voice' as const, description: 'Optional media/voice provider id.' },
                 { id: 'tts_model', label: 'model', type: 'model' as const, description: 'Optional TTS model/language/voice model for the selected provider.' },
                 { id: 'voice', label: 'voice', type: 'string' as const, description: 'Optional base or cloned voice for the selected provider.' },
-                { id: 'profile', label: 'profile', type: 'string' as const, description: 'Advanced legacy voice profile override.' },
+                { id: 'profile', label: 'profile', type: 'string' as const, description: 'Optional voice profile override.' },
                 { id: 'quality_preset', label: 'quality', type: 'string' as const, description: 'Optional AbstractVoice quality preset: low, standard, or high.' },
                 { id: 'format', label: 'format', type: 'string' as const, description: 'wav or mp3.' },
                 { id: 'speed', label: 'speed', type: 'number' as const },
@@ -1524,10 +1541,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                   {
                     id: data.nodeType === 'image_to_image' ? 'source_image' : 'image_artifact',
                     label: data.nodeType === 'image_to_image' ? 'source_image' : 'image_artifact',
-                    type: 'object' as const,
+                    type: 'artifact_image' as const,
                     description: 'Source image artifact ref. Wire from Generate Image, or use an uploaded/selected artifact.',
                   },
-                  { id: 'mask_artifact', label: 'mask_artifact', type: 'object' as const, description: 'Optional mask artifact ref.' },
+                  { id: 'mask_artifact', label: 'mask_artifact', type: 'artifact_image' as const, description: 'Optional mask artifact ref.' },
                   { id: 'image_provider', label: 'provider', type: 'provider_image' as const, description: 'Optional image edit provider/backend.' },
                   { id: 'image_model', label: 'model', type: 'model' as const, description: 'Optional image edit model id for the selected provider.' },
                   { id: 'size', label: 'size', type: 'string' as const, description: 'Optional size like 1024x1024.' },
@@ -1559,7 +1576,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
               : data.nodeType === 'transcribe_audio'
                 ? [
                     { id: 'exec-in', label: '', type: 'execution' as const },
-                    { id: 'audio_artifact', label: 'audio_artifact', type: 'object' as const, description: 'Audio artifact ref.' },
+                    { id: 'audio_artifact', label: 'audio_artifact', type: 'artifact_audio' as const, description: 'Audio artifact ref.' },
                     { id: 'stt_provider', label: 'provider', type: 'provider_voice' as const, description: 'Optional audio/STT provider id. Legacy provider pins are treated as an STT provider fallback.' },
                     { id: 'stt_model', label: 'model', type: 'model' as const, description: 'Optional STT model id for the selected voice provider.' },
                     { id: 'language', label: 'language', type: 'string' as const },
@@ -1580,6 +1597,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                   : [];
         if (canonicalInputs.length > 0) {
           data = { ...data, inputs: reorderInputs(canonicalInputs) };
+        }
+        const canonicalOutputs = getNodeTemplate(data.nodeType)?.outputs || [];
+        if (canonicalOutputs.length > 0) {
+          data = { ...data, outputs: reorderOutputs(canonicalOutputs) };
         }
         const mediaDefaults: Record<string, JsonValue> =
           data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
@@ -1735,13 +1756,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           { id: 'task', label: 'task', type: 'string', description: 'text_generation, image_generation, tts, stt, or music_generation.' },
           { id: 'provider', label: 'provider', type: 'provider', description: 'Provider/backend id to load or filter.' },
           { id: 'model', label: 'model', type: 'model', description: 'Model id to load or filter.' },
-          { id: 'runtime_id', label: 'runtime_id', type: 'string', description: 'Runtime id returned by loaded/list calls; preferred for unload.' },
-          { id: 'options', label: 'options', type: 'object', description: 'Optional provider-specific load/unload options.' },
-          { id: 'pin', label: 'keep_loaded', type: 'boolean', description: 'When loading, keep resident until explicit unload.' },
-          { id: 'required', label: 'required', type: 'boolean', description: 'When true, fail this step if the residency call fails.' },
         ];
         const canonicalInputs: Pin[] = canonicalInputSpecs.map(want);
-        const extras = existingInputs.filter((p) => !used.has(p.id));
+        const connectedIn = connectedInputHandlesByNodeId.get(vn.id) || new Set<string>();
+        const legacyAdvancedInputs = new Set(['runtime_id', 'options', 'pin', 'required']);
+        const extras = existingInputs.filter((p) => !used.has(p.id) && (!legacyAdvancedInputs.has(p.id) || connectedIn.has(p.id)));
         data = { ...data, inputs: [...canonicalInputs, ...extras] };
 
         const prevDefaults =
@@ -1763,9 +1782,13 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           }
         };
         setDefault('operation', 'load');
-        setDefault('task', 'image_generation');
-        setDefault('pin', true);
-        setDefault('required', false);
+        setDefault('task', 'text_generation');
+        for (const legacyKey of legacyAdvancedInputs) {
+          if (!connectedIn.has(legacyKey) && Object.prototype.hasOwnProperty.call(nextDefaults, legacyKey)) {
+            delete nextDefaults[legacyKey];
+            changedDefaults = true;
+          }
+        }
         if (changedDefaults) data = { ...data, pinDefaults: nextDefaults };
         if (changedEffect) data = { ...data, effectConfig: nextEffect as FlowNodeData['effectConfig'] };
       }
@@ -1956,38 +1979,38 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       animated: ve.animated ?? ve.sourceHandle === 'exec-out',
     }));
 
-	    const nodeById = new Map(nodes.map((n) => [n.id, n]));
-	    const migratedEdges = edges.map((e) => {
-	      const source = nodeById.get(e.source);
-	      const target = nodeById.get(e.target);
-	      if (!source || !target || !e.sourceHandle || !e.targetHandle) return e;
+    const nodeById = new Map(nodes.map((n) => [n.id, n]));
+    const migratedEdges = edges.map((e) => {
+      const source = nodeById.get(e.source);
+      const target = nodeById.get(e.target);
+      if (!source || !target || !e.sourceHandle || !e.targetHandle) return e;
 
-		      let nextSourceHandle = e.sourceHandle;
+      const nextSourceHandle = e.sourceHandle;
+      let nextTargetHandle = e.targetHandle;
+      const targetType = target.data.nodeType;
+      if (targetType === 'agent' || targetType === 'llm_call') {
+        const renames: Record<string, string> =
+          targetType === 'llm_call'
+            ? {
+                include_context: 'use_context',
+                max_input_tokens: 'max_in_tokens',
+                response_schema: 'resp_schema',
+              }
+            : {
+                include_context: 'use_context',
+                max_input_tokens: 'max_in_tokens',
+                response_schema: 'resp_schema',
+              };
+        nextTargetHandle = renames[nextTargetHandle] || nextTargetHandle;
+      }
 
-		      let nextTargetHandle = e.targetHandle;
-		      const targetType = target.data.nodeType;
-		      if (targetType === 'agent' || targetType === 'llm_call') {
-		        const renames: Record<string, string> =
-		          targetType === 'llm_call'
-		            ? {
-		                include_context: 'use_context',
-		                max_input_tokens: 'max_in_tokens',
-		                response_schema: 'resp_schema',
-		              }
-		            : {
-		                include_context: 'use_context',
-		                max_input_tokens: 'max_in_tokens',
-		                response_schema: 'resp_schema',
-		              };
-		        nextTargetHandle = renames[nextTargetHandle] || nextTargetHandle;
-		      }
+      if (nextSourceHandle === e.sourceHandle && nextTargetHandle === e.targetHandle) return e;
+      return { ...e, sourceHandle: nextSourceHandle, targetHandle: nextTargetHandle };
+    });
 
-	      if (nextSourceHandle === e.sourceHandle && nextTargetHandle === e.targetHandle) return e;
-	      return { ...e, sourceHandle: nextSourceHandle, targetHandle: nextTargetHandle };
-	    });
-
-    // Drop edges that reference missing pins (prevents invisible edges).
-    const validEdges = migratedEdges.filter((e) => {
+    // Drop edges that reference missing pins or violate the canonical
+    // connection contract (prevents invisible/stale invalid edges).
+    const structurallyValidEdges = migratedEdges.filter((e) => {
       const source = nodeById.get(e.source);
       const target = nodeById.get(e.target);
       if (!source || !target) return false;
@@ -1995,6 +2018,15 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       const sourceHasHandle = source.data.outputs.some((p) => p.id === e.sourceHandle);
       const targetHasHandle = target.data.inputs.some((p) => p.id === e.targetHandle);
       return sourceHasHandle && targetHasHandle;
+    });
+    const validEdges = structurallyValidEdges.filter((edge) => {
+      const connection: Connection = {
+        source: edge.source,
+        sourceHandle: edge.sourceHandle ?? null,
+        target: edge.target,
+        targetHandle: edge.targetHandle ?? null,
+      };
+      return validateConnection(nodes, structurallyValidEdges.filter((candidate) => candidate.id !== edge.id), connection);
     });
 
     // Route-specific data overrides are persisted as node.data.inputRouteOverrides,

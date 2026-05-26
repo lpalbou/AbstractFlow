@@ -5,6 +5,19 @@ All notable changes to AbstractFlow will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.14] - 2026-05-26
+
+### Added
+- Gateway-aware palette, preflight, live connection feedback, run lifecycle, workflow bundle, variable-name, and media artifact helpers for the thin-client editor.
+- Validated code-editor execution policy and prompt-free variable selector improvements.
+
+### Changed
+- Apple/GPU Flow profiles now require Gateway `>=0.2.19` and Agent `>=0.3.8`; Runtime/Core are still consumed through Gateway extras.
+- Media defaults and advanced media pin disclosure now use one editor surface backed by Gateway discovery.
+
+### Fixed
+- Repaired code node, pin, media artifact, and run UI regressions around resumed runs, validated variables, and modality-specific source selection.
+
 ## [0.3.13] - 2026-05-22
 
 ### Added

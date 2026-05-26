@@ -1,18 +1,36 @@
 # AbstractFlow Backlog Overview
 
 ## Snapshot
-- Updated: 2026-05-22
-- Planned: 3
-- Proposed: 8
-- Completed: 7
+- Updated: 2026-05-25
+- Planned: 0
+- Proposed: 11
+- Completed: 22
 - Deprecated: 0
 
 ## Current Priorities
-- `planned/020_draft_run_and_publish_lifecycle.md`: continue Gateway-first draft/run lifecycle cleanup.
-- `planned/030_local_execution_compatibility_boundary.md`: keep local Runtime/Core paths clearly compatibility-only.
-- `planned/050_gateway_execution_regression_suite.md`: add regression coverage proving the default editor path stays Gateway-only.
+- No planned items remain. Next Flow UX work should be promoted deliberately from `proposed/`
+  after a code-first audit; likely candidates are `proposed/0089_flow_connection_drop_action_menu.md`
+  for Blueprint-style edge-drop actions or the existing media preview/progressive disclosure work.
+
+## Planned Ledger
+- No planned items remain.
 
 ## Completed Ledger
+- `completed/0088_flow_pin_and_code_regression_repair.md` from `planned/0088_flow_pin_and_code_regression_repair.md`: repaired AbstractFlow graph regressions by restoring execution pin connected-state/disconnect behavior, tightening provider/model pin compatibility, pruning invalid saved edges on load, regenerating Code-node wrappers from `codeBody` plus current pins in Flow and Runtime, and simplifying visible execution wording to plain Run/Publish authoring language. Validation: Code-node pytest suite, frontend gateway contract suite, focused regression tests, and frontend build.
+- `completed/050_gateway_execution_regression_suite.md` from original planned item `050_gateway_execution_regression_suite.md`: Flow's default editor path now has a regression gate proving Gateway descriptors and exact v1 client contracts are required before publish/start, bad stream transports fail fast, frontend source avoids local runtime routes, and the default backend route registry exposes only the Gateway proxy. Validation: full frontend gateway contract pytest and frontend build.
+- `completed/030_local_execution_compatibility_boundary.md` from original planned item `030_local_execution_compatibility_boundary.md`: Local Flow runtime routes remain available only through `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1`; the default host and frontend stay Gateway-only, while compatibility dependencies live in explicit host profiles. Validation: full frontend gateway contract pytest and frontend build.
+- `completed/020_draft_run_and_publish_lifecycle.md` from original planned item `020_draft_run_and_publish_lifecycle.md`: Flow introduced internal draft-run metadata, durable publish, exact-version published-bundle execution support, and Gateway purge support for expired ephemeral run trees. Current Flow UI intentionally presents the authoring path as plain Run plus Publish. Runtime store deletion protocols and Gateway purge tests cover file and SQLite backends, command records, ledgers, artifacts, and Gateway-owned workspace cleanup.
+- `completed/0087_gateway_aware_palette_and_preflight.md` from `planned/0087_gateway_aware_palette_and_preflight.md`: Node templates now declare Gateway authoring capability requirements, the palette shows checking/unavailable states and blocks dragging known-unavailable Gateway-dependent nodes, and Run preflight reports reachable unavailable capability nodes before opening the run modal. Validation: focused gateway-authoring pytest, full frontend gateway contract pytest, frontend build, and diff check.
+- `completed/0086_live_connection_feedback.md` from `planned/0086_live_connection_feedback.md`: Flow canvas connection drags now use render-only valid/invalid pin guidance and a themed cursor hint derived from ReactFlow's active end-handle state, with colored connection lines by source pin type and no persisted preview data. Validation: focused live-connection pytest, full frontend gateway contract pytest, frontend builds, and diff check.
+- `completed/0085_media_artifact_modality_validation.md`: Media artifact authoring now has scoped image/audio/text/video/generic artifact pin types, canonical saved-flow pin normalization, modality-aware connection validation, and run preflight checks for incompatible connected or configured artifact defaults. `artifact_ref` is a generic artifact pin; media `outputs`/`meta` stay raw objects. Validation: focused frontend contract pytest and frontend build.
+- `completed/0084_media_defaults_single_editor_surface.md`: PropertiesPanel no longer has a duplicate `Gateway Media` section. Scoped media provider/model/voice/quality/format defaults are edited through the single pin-default surface with themed selectors and connected-pin guards, while BaseNode no longer rewrites image defaults from stale static providers when `image_provider` is connected. Validation: focused frontend media contract pytest, frontend build, and diff check.
+- `completed/0083_media_node_advanced_pin_disclosure.md`: Media nodes now use a shared UI-only pin disclosure helper. Unconnected advanced media tuning and diagnostic pins are hidden by default, connected advanced pins remain visible, selected media nodes can reveal the full pin set, and ReactFlow handle geometry is refreshed when the rendered pin set changes. Validation: focused frontend media contract pytest and frontend build.
+- `completed/0082_validated_variable_name_selectors.md`: Variable creation now has a shared dotted-path validation contract. `get_var`, `set_var`, `bool_var`, and `var_decl` use themed `AfSelect` custom entry instead of prompts/datalists, invalid custom names are disabled with inline reasons, and AbstractUIC's shared select supports the same opt-in validation behavior. Validation: focused frontend contract pytest plus Flow and UI-kit builds.
+- `completed/0081_code_editor_test_result_stability.md`: Code editor testing no longer lets graph tooltips cover the modal, the right-side variables/test input panel remains contained when the bottom result terminal opens, Gateway code simulation now includes `execution.permissions`, and Runtime tests cover connected `permissions` inputs without leaking that control value into user payloads. Validation: focused Runtime/Gateway/Flow tests and frontend build.
+- `completed/0080_prompt_free_variable_name_selector.md`: Variable-name pins no longer use browser-native prompts. `get_var`/`set_var` now use the shared themed `AfSelect` custom-entry flow, selector popovers stop wheel events from reaching the graph, and frontend source tests guard against native prompt/confirm/alert regressions. Validation: focused frontend contract pytest and frontend build.
+- `completed/0079_code_node_editor_execution_policy.md`: Code editor modal result output is now a deterministic full-width folded terminal with summary/raw test output, stale Code-node rendering was removed, the Code node has an explicit Gateway-policy-driven `permissions` pin, and Runtime/Gateway share sandbox plus policy-gated full-access execution semantics. Failed Runtime Code executions preserve the standard output envelope. Validation: focused Flow/Gateway pytest and frontend build.
+- `completed/0076_run_resume_and_exec_backedge_routing.md`: Run Flow is now the single Ask User resume surface; resume controls prevent browser-level default navigation, empty Ask User completion results no longer crash model metadata extraction, and execution back edges prefer a clear upper lane for looped dialogue flows. Validation: frontend build, diff check, and Flow gateway contract pytest.
+- `completed/0075_voice_residency_component_display.md`: Model Residency now distinguishes base TTS engines from cloned-voice engines and displays resolved model metadata instead of falling back to runtime ids as model names.
 - `completed/0072_gateway_0_2_17_native_media_contract_alignment.md`: Flow now targets Gateway `0.2.17` native media contracts, uses canonical Gateway catalog helpers, consumes Gateway surface readiness as a conservative overlay, persists native Generate Music/Edit Image nodes, adds music residency, and removes browser-side music lowering except for legacy import normalization. Validation: focused Flow/Runtime/Gateway contract tests and frontend build.
 - `completed/0071_flow_generate_music_runtime_compat_lowering.md`: Superseded by `0072`; historical temporary lowering item kept for audit trail.
 - `completed/0070_flow_durable_bloc_prompt_cache_binding_ux.md` from `planned/0070_flow_durable_bloc_prompt_cache_binding_ux.md`: Flow now exposes Gateway durable bloc prompt-cache capability, a separate durable exact-reuse Run Flow UX, explicit `prompt_cache_binding` pins, opt-in local Runtime/Core imports, and pass-through into Runtime/Agent LLM params. Validation: targeted Flow pytest suite, AbstractAgent generation-param tests, frontend build, and py_compile for edited Flow/Runtime/Agent modules.
@@ -22,5 +40,6 @@
 - `completed/001_run-flow-advanced-layout.md`: Run Flow advanced layout.
 
 ## Notes
+- `proposed/0078_code_node_execution_permissions.md`: Code node permission modes now have a narrow Runtime/Gateway/Flow discovery contract; remaining work is stronger host policy, audit metadata, honest average-resource sampling, and safer elevated execution isolation.
 - The repo predates the stricter four-digit backlog filename rule. `proposed/` still contains date-prefixed and unnumbered legacy files. They were not renamed during item `0070` to avoid mixing unrelated backlog hygiene with implementation work.
 - Gateway remains the primary product runtime/discovery/persistence boundary. Direct Runtime/Core usage in Flow should stay limited to local compatibility shims, compiler re-exports, and tests that explicitly exercise those shims.

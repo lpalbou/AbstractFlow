@@ -49,7 +49,6 @@ export interface ModelResidencyLoadPayload {
   provider?: string;
   model?: string;
   options?: Record<string, unknown>;
-  pin?: boolean;
   base_url?: string;
   timeout_s?: number;
 }

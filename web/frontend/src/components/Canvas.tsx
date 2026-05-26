@@ -2,7 +2,7 @@
  * Main canvas component with React Flow.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState, DragEvent, MouseEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, DragEvent, MouseEvent, type RefObject } from 'react';
 import ReactFlow, {
   Controls,
   Background,
@@ -16,6 +16,7 @@ import ReactFlow, {
   ConnectionMode,
   BaseEdge,
   EdgeProps,
+  useStore,
 } from 'reactflow';
 import toast from 'react-hot-toast';
 import { nodeTypes } from './nodes';
@@ -23,10 +24,15 @@ import { useFlowStore } from '../hooks/useFlow';
 import { getConnectionError, validateConnection } from '../utils/validation';
 import { isRouteOverrideEdge } from '../utils/multiEntryRoutes';
 import { NodeTemplate } from '../types/nodes';
-import type { FlowNodeData, PinType } from '../types/flow';
+import type { FlowNodeData, PinConnectionFeedback, PinType } from '../types/flow';
 import { PIN_COLORS } from '../types/flow';
 import { PinLegend } from './PinLegend';
 import { RunPreflightPanel } from './RunPreflightPanel';
+import {
+  buildConnectionPreviewForNode,
+  connectionHintText,
+  type ConnectionDragEndpoint,
+} from '../utils/connectionPreview';
 
 type RoutePoint = { x: number; y: number };
 type RouteRect = { x: number; y: number; width: number; height: number };
@@ -68,6 +74,35 @@ function roundedPolylinePath(pointsIn: RoutePoint[], radius = 18): string {
   const last = points[points.length - 1];
   path += ` L ${last.x},${last.y}`;
   return path;
+}
+
+function routeLength(points: RoutePoint[]): number {
+  let length = 0;
+  for (let i = 1; i < points.length; i += 1) {
+    length += Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
+  }
+  return length;
+}
+
+function routeIntersectsRects(points: RoutePoint[], rects: RouteRect[], padding = 14): boolean {
+  if (points.length < 2 || rects.length === 0) return false;
+  for (let i = 1; i < points.length; i += 1) {
+    const a = points[i - 1];
+    const b = points[i];
+    const minX = Math.min(a.x, b.x);
+    const maxX = Math.max(a.x, b.x);
+    const minY = Math.min(a.y, b.y);
+    const maxY = Math.max(a.y, b.y);
+    for (const rect of rects) {
+      const left = rect.x - padding;
+      const right = rect.x + rect.width + padding;
+      const top = rect.y - padding;
+      const bottom = rect.y + rect.height + padding;
+      if (maxX < left || minX > right || maxY < top || minY > bottom) continue;
+      return true;
+    }
+  }
+  return false;
 }
 
 function WorkflowEdge({
@@ -139,22 +174,35 @@ function WorkflowEdge({
       sourceRect ? sourceRect.y + sourceRect.height : sourceY,
       targetRect ? targetRect.y + targetRect.height : targetY
     );
-    const routeAbove = sourceY <= nodeTop + (targetY - nodeTop) / 2;
-    const laneY = routeAbove ? nodeTop - (isControl ? 54 : 78) : nodeBottom + (isControl ? 54 : 78);
     const direction = targetX >= sourceX ? 1 : -1;
     const sourceStub = sourceX + direction * 48;
     const targetStub = targetX - direction * 48;
-    path = roundedPolylinePath(
-      [
-        { x: sourceX, y: sourceY },
-        { x: sourceStub, y: sourceY },
-        { x: sourceStub, y: laneY },
-        { x: targetStub, y: laneY },
-        { x: targetStub, y: targetY },
-        { x: targetX, y: targetY },
-      ],
-      isControl ? 16 : 18
+    const laneMargin = isControl ? 54 : 78;
+    const preferredAbove = isControl && isBackEdge ? true : sourceY <= nodeTop + (targetY - nodeTop) / 2;
+    const makePoints = (laneY: number): RoutePoint[] => [
+      { x: sourceX, y: sourceY },
+      { x: sourceStub, y: sourceY },
+      { x: sourceStub, y: laneY },
+      { x: targetStub, y: laneY },
+      { x: targetStub, y: targetY },
+      { x: targetX, y: targetY },
+    ];
+    const laneCandidates: Array<{ above: boolean; points: RoutePoint[] }> = [];
+    for (let step = 0; step < 5; step += 1) {
+      const margin = laneMargin + step * 36;
+      const above = { above: true, points: makePoints(nodeTop - margin) };
+      const below = { above: false, points: makePoints(nodeBottom + margin) };
+      laneCandidates.push(preferredAbove ? above : below, preferredAbove ? below : above);
+    }
+    const clearCandidates = laneCandidates.filter((candidate) =>
+      !routeIntersectsRects(candidate.points, routeRects, isControl ? 12 : 18)
     );
+    const candidates = clearCandidates.length > 0 ? clearCandidates : laneCandidates;
+    const chosen = candidates.reduce((best, candidate) => {
+      if (isControl && isBackEdge && best.above !== candidate.above) return best.above ? best : candidate;
+      return routeLength(candidate.points) < routeLength(best.points) ? candidate : best;
+    }, candidates[0]);
+    path = roundedPolylinePath(chosen.points, isControl ? 16 : 18);
   } else if (!path && isControl) {
     const dx = targetX - sourceX;
     const direction = dx >= 0 ? 1 : -1;
@@ -184,17 +232,99 @@ function WorkflowEdge({
     path = `M ${sourceX},${sourceY} C ${c1x},${sourceY} ${c2x},${targetY} ${targetX},${targetY}`;
   }
 
-  return <BaseEdge id={id} path={path} markerEnd={markerEnd} style={style} />;
+  return <BaseEdge id={id} path={path} markerEnd={markerEnd} style={style} interactionWidth={24} />;
 }
 
 const edgeTypes = {
   workflow: WorkflowEdge,
 };
 
+type ReactFlowConnectingHandle = {
+  nodeId: string;
+  type: 'source' | 'target';
+  handleId?: string | null;
+};
+
+function connectionFromDragEndpoint(active: ConnectionDragEndpoint, end: ReactFlowConnectingHandle | null): Connection | null {
+  if (!end || !end.handleId) return null;
+  if (active.handleType === 'source' && end.type === 'target') {
+    return {
+      source: active.nodeId,
+      sourceHandle: active.handleId,
+      target: end.nodeId,
+      targetHandle: end.handleId,
+    };
+  }
+  if (active.handleType === 'target' && end.type === 'source') {
+    return {
+      source: end.nodeId,
+      sourceHandle: end.handleId,
+      target: active.nodeId,
+      targetHandle: active.handleId,
+    };
+  }
+  return null;
+}
+
+function hoveredConnectionFeedback(
+  nodes: Node<FlowNodeData>[],
+  edges: Edge[],
+  active: ConnectionDragEndpoint | null,
+  end: ReactFlowConnectingHandle | null
+): PinConnectionFeedback | null {
+  if (!active) return null;
+  const connection = connectionFromDragEndpoint(active, end);
+  if (!connection) return null;
+  const valid = validateConnection(nodes, edges, connection);
+  return valid
+    ? { status: 'valid', message: 'Compatible target' }
+    : { status: 'invalid', message: getConnectionError(nodes, edges, connection) || 'Invalid connection' };
+}
+
+function ConnectionFeedbackOverlay({
+  activeConnection,
+  nodes,
+  edges,
+  wrapperRef,
+}: {
+  activeConnection: ConnectionDragEndpoint | null;
+  nodes: Node<FlowNodeData>[];
+  edges: Edge[];
+  wrapperRef: RefObject<HTMLDivElement>;
+}) {
+  const { connectionEndHandle, connectionPosition } = useStore((state) => ({
+    connectionEndHandle: state.connectionEndHandle as ReactFlowConnectingHandle | null,
+    connectionPosition: state.connectionPosition,
+  }));
+  const hovered = useMemo(
+    () => hoveredConnectionFeedback(nodes, edges, activeConnection, connectionEndHandle),
+    [activeConnection, connectionEndHandle, nodes, edges]
+  );
+  const hint = connectionHintText(activeConnection, hovered);
+  if (!activeConnection || !hint) return null;
+
+  const bounds = wrapperRef.current?.getBoundingClientRect();
+  const maxX = Math.max(12, (bounds?.width ?? 320) - 280);
+  const maxY = Math.max(12, (bounds?.height ?? 120) - 56);
+
+  return (
+    <div
+      className={`connection-feedback-hint ${hovered?.status || 'idle'}`}
+      style={{
+        left: Math.max(12, Math.min(maxX, connectionPosition.x + 14)),
+        top: Math.max(12, Math.min(maxY, connectionPosition.y + 16)),
+      }}
+    >
+      {hint}
+    </div>
+  );
+}
+
 export function Canvas() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
   const [previewCollapsed, setPreviewCollapsed] = useState(false);
+  const [activeConnection, setActiveConnection] = useState<ConnectionDragEndpoint | null>(null);
 
   // React Flow uses a multiplicative zoom factor of 1.2 per zoom step.
   // We define our own "zoom positions" relative to max zoom:
@@ -300,6 +430,7 @@ export function Canvas() {
   // Handle connection with validation
   const handleConnect = useCallback(
     (connection: Connection) => {
+      setActiveConnection(null);
       if (!validateConnection(nodes, edges, connection)) {
         toast.error(getConnectionError(nodes, edges, connection) || 'Invalid connection');
         return;
@@ -309,10 +440,38 @@ export function Canvas() {
     [nodes, edges, onConnect]
   );
 
+  const handleConnectStart = useCallback(
+    (_event: unknown, params: { nodeId?: string | null; handleId?: string | null; handleType?: string | null }) => {
+      const nodeId = typeof params?.nodeId === 'string' ? params.nodeId : '';
+      const handleId = typeof params?.handleId === 'string' ? params.handleId : '';
+      const handleType = params?.handleType === 'target' ? 'target' : 'source';
+      if (!nodeId || !handleId) {
+        setActiveConnection(null);
+        return;
+      }
+      const pinType =
+        handleType === 'source'
+          ? pinTypesByNodeId.outputsByNode.get(nodeId)?.get(handleId)
+          : pinTypesByNodeId.inputsByNode.get(nodeId)?.get(handleId);
+      setActiveConnection({ nodeId, handleId, handleType, pinType });
+    },
+    [pinTypesByNodeId]
+  );
+
+  const handleConnectEnd = useCallback(() => {
+    setActiveConnection(null);
+  }, []);
+
+  const handleIsValidConnection = useCallback(
+    (connection: Connection): boolean => validateConnection(nodes, edges, connection),
+    [nodes, edges]
+  );
+
   // Handle node selection
   const handleNodeClick = useCallback(
     (_event: MouseEvent, node: Node<FlowNodeData>) => {
-      setSelectedNode(node);
+      const { connectionPreview: _preview, ...cleanData } = node.data;
+      setSelectedNode({ ...node, data: cleanData });
     },
     [setSelectedNode]
   );
@@ -507,6 +666,23 @@ export function Canvas() {
     });
   }, [baseStyledEdges, recentEdgeIds]);
 
+  const previewNodes = useMemo(() => {
+    if (!activeConnection) return nodes;
+    return nodes.map((node) => ({
+      ...node,
+      data: {
+        ...node.data,
+        connectionPreview: buildConnectionPreviewForNode(nodes, edges, activeConnection, node),
+      },
+    }));
+  }, [activeConnection, nodes, edges]);
+
+  const connectionLineStyle = useMemo(() => {
+    const sourceType = activeConnection?.pinType;
+    const color = sourceType && sourceType !== 'execution' ? PIN_COLORS[sourceType] : '#888';
+    return { stroke: color || '#888', strokeWidth: activeConnection ? 3 : 2 };
+  }, [activeConnection]);
+
   return (
     <ReactFlowProvider>
       <div
@@ -516,12 +692,14 @@ export function Canvas() {
         onDrop={handleDrop}
       >
         <ReactFlow
-          nodes={nodes}
+          nodes={previewNodes}
           edges={decoratedEdges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={handleConnect}
-          isValidConnection={(connection) => validateConnection(nodes, edges, connection)}
+          onConnectStart={handleConnectStart}
+          onConnectEnd={handleConnectEnd}
+          isValidConnection={handleIsValidConnection}
           connectionMode={ConnectionMode.Strict}
           onNodeClick={handleNodeClick}
           onEdgeClick={handleEdgeClick}
@@ -537,7 +715,7 @@ export function Canvas() {
             animated: false,
           }}
           elevateEdgesOnSelect
-          connectionLineStyle={{ stroke: '#888', strokeWidth: 2 }}
+          connectionLineStyle={connectionLineStyle}
           fitView
           fitViewOptions={{ maxZoom: DEFAULT_ZOOM }}
           snapToGrid
@@ -581,6 +759,12 @@ export function Canvas() {
             </>
           )}
         </ReactFlow>
+        <ConnectionFeedbackOverlay
+          activeConnection={activeConnection}
+          nodes={nodes}
+          edges={edges}
+          wrapperRef={reactFlowWrapper}
+        />
         <RunPreflightPanel onFocusNode={focusNode} />
         <PinLegend />
       </div>

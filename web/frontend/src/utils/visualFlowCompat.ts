@@ -35,9 +35,9 @@ const OUTPUT_FIELD_TO_INPUT_PIN: Record<string, string> = {
 
 const GENERATE_MUSIC_OUTPUTS: Pin[] = [
   { id: 'exec-out', label: '', type: 'execution' },
-  { id: 'music_artifact', label: 'music_artifact', type: 'object', description: 'Artifact ref for generated music.' },
-  { id: 'audio_artifact', label: 'audio_artifact', type: 'object', description: 'Alias artifact ref for audio-compatible downstream nodes.' },
-  { id: 'artifact_ref', label: 'artifact_ref', type: 'object' },
+  { id: 'music_artifact', label: 'music_artifact', type: 'artifact_audio', description: 'Artifact ref for generated music.' },
+  { id: 'audio_artifact', label: 'audio_artifact', type: 'artifact_audio', description: 'Alias artifact ref for audio-compatible downstream nodes.' },
+  { id: 'artifact_ref', label: 'artifact_ref', type: 'artifact' },
   { id: 'artifact_id', label: 'artifact_id', type: 'string' },
   { id: 'content_type', label: 'content_type', type: 'string' },
   { id: 'outputs', label: 'outputs', type: 'object' },

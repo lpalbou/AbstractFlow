@@ -20,6 +20,11 @@ const PIN_INFO: PinInfo[] = [
   { type: 'number', label: 'Number', shape: '\u25CF', description: 'Integer or float' },
   { type: 'boolean', label: 'Boolean', shape: '\u25C7', description: 'True/False' },
   { type: 'object', label: 'Object', shape: '\u25CF', description: 'JSON objects' },
+  { type: 'artifact', label: 'Artifact', shape: '\u25CF', description: 'Generic Gateway artifact reference' },
+  { type: 'artifact_image', label: 'Image Artifact', shape: '\u25CF', description: 'Image artifact reference' },
+  { type: 'artifact_audio', label: 'Audio Artifact', shape: '\u25CF', description: 'Audio, voice, or music artifact reference' },
+  { type: 'artifact_text', label: 'Text Artifact', shape: '\u25CF', description: 'Text or transcript artifact reference' },
+  { type: 'artifact_video', label: 'Video Artifact', shape: '\u25CF', description: 'Video artifact reference' },
   { type: 'assertion', label: 'Assertion', shape: '\u25CF', description: 'KG assertion object' },
   { type: 'assertions', label: 'Assertions', shape: '\u25A0', description: 'KG assertions list (assertion[])' },
   { type: 'array', label: 'Array', shape: '\u25A0', description: 'Collections' },
@@ -73,6 +78,7 @@ export function PinLegend() {
               <li>"Tools" is compatible with Array (specialized string[])</li>
               <li>"Assertions" is compatible with Array (specialized assertion[])</li>
               <li>Providers are modality-scoped; model pins stay generic and are scoped by the selected provider</li>
+              <li>Artifact pins are modality-scoped; generic Object remains the advanced escape hatch</li>
             </ul>
           </div>
         </div>

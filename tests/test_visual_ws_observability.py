@@ -96,8 +96,18 @@ def test_ws_node_events_are_in_order_and_include_outputs() -> None:
                 complete_n3 = next(m for m in msgs if m.get("type") == "node_complete" and m.get("nodeId") == "n3")
 
                 assert complete_n1.get("result") == {"message": "hello", "context": {}}
-                assert complete_n2.get("result") == {"step": "n2", "message": "hello"}
-                assert complete_n3.get("result") == {"step": "n3", "prev": {"step": "n2", "message": "hello"}}
+                result_n2 = complete_n2.get("result")
+                result_n3 = complete_n3.get("result")
+                assert isinstance(result_n2, dict)
+                assert result_n2["step"] == "n2"
+                assert result_n2["message"] == "hello"
+                assert isinstance(result_n2.get("execution"), dict)
+                assert isinstance(result_n3, dict)
+                assert result_n3["step"] == "n3"
+                prev = result_n3.get("prev")
+                assert isinstance(prev, dict)
+                assert prev["step"] == "n2"
+                assert prev["message"] == "hello"
 
                 # Metrics are best-effort but duration should always be present for node_complete.
                 for m in (complete_n1, complete_n2, complete_n3):
