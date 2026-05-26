@@ -236,7 +236,13 @@ jobs:
         working-directory: web/frontend
         run: |
           npm run build
-          npm publish --access public --provenance
+          PKG_NAME="$(node -p "require('./package.json').name")"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if npm view "${PKG_NAME}@${PKG_VERSION}" version >/dev/null 2>&1; then
+            echo "${PKG_NAME}@${PKG_VERSION} is already published; skipping."
+          else
+            npm publish --access public --provenance
+          fi
 
   github-release:
     name: Create GitHub Release
