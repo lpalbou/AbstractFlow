@@ -788,27 +788,32 @@ npx<span class="w"> </span>@abstractframework/flow<span class="w"> </span>--gate
 <p>In the editor, add media nodes from the palette:
 - <code>Generate Image</code>: prompt to image artifact.
 - <code>Edit Image</code>: prompt plus source image artifact, optional mask, to image artifact. <code>Image-to-Image</code> is accepted as a legacy alias when loading older flows.
+- <code>Generate Video</code>: prompt to video artifact.
+- <code>Image-to-Video</code>: prompt plus source image artifact to video artifact.
 - <code>Generate Voice</code>: text to voice/audio artifact.
 - <code>Generate Music</code>: prompt/lyrics/duration to music artifact.
 - <code>Transcribe Audio</code> / <code>Listen Voice</code>: audio input to text.</p>
 <p>For the simple path, leave provider/model as <code>Auto</code> and let Gateway resolve the
 configured backend. If you need reproducibility, choose explicit provider/model
-values from the Gateway catalog selectors. Music catalog data comes from
+values from the Gateway catalog selectors. Video model selectors are populated
+from Gateway vision provider-model catalogs scoped to <code>text_to_video</code> or
+<code>image_to_video</code>; music catalog data comes from
 <code>/api/gateway/audio/music/providers</code> and <code>/api/gateway/audio/music/models</code>.</p>
-<p>Generated media is returned as Gateway artifacts. The Run modal renders images
-and audio/music players first; raw ledger JSON and artifact IDs remain available
-for debugging.</p>
+<p>Generated media is returned as Gateway artifacts. The Run modal renders images,
+videos, and audio/music players first; raw ledger JSON and artifact IDs remain
+available for debugging. Long video runs surface Gateway <code>abstract.progress</code>
+ledger events as progress on the active step.</p>
 <p>For image editing, wire <code>image_artifact</code> from a previous <code>Generate Image</code> node
 or use the <code>Artifacts</code> palette primitives (<code>Image Artifact</code>, <code>Voice Artifact</code>,
 <code>Music Artifact</code>, etc.) to paste an existing Gateway <code>$artifact</code> id. A richer
 browser artifact picker/upload flow is tracked separately.</p>
-<p>Example Generate Music path:
-1. Drag <code>On Flow Start</code>, <code>Generate Music</code>, and <code>On Flow End</code> onto the canvas.
-2. Wire execution <code>On Flow Start -&gt; Generate Music -&gt; On Flow End</code>.
-3. Wire or type a <code>prompt</code> such as <code>short heroic fantasy theme with brass and strings</code>.
+<p>Example Generate Video path:
+1. Drag <code>On Flow Start</code>, <code>Generate Video</code>, and <code>On Flow End</code> onto the canvas.
+2. Wire execution <code>On Flow Start -&gt; Generate Video -&gt; On Flow End</code>.
+3. Wire or type a <code>prompt</code> such as <code>glowing data streams converging into a geometric logo</code>.
 4. Leave provider/model as <code>Auto (Gateway default)</code> unless you need a specific backend.
 5. Save, then click <code>Run Flow</code>.
-6. Open the Generate Music result and play the returned music artifact.</p>
+6. Watch progress in the Run modal and open the generated video artifact when the step completes.</p>
 <h2 id="workflow-bundles-flow">Workflow bundles (<code>.flow</code>)<a class="headerlink" href="#workflow-bundles-flow" title="Permanent link">&para;</a></h2>
 <p>To package a VisualFlow + subflows into a single file, use the CLI:
 - <a href="../cli/">cli.md</a></p>

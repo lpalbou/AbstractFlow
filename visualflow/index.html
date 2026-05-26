@@ -677,13 +677,19 @@
 - <code>generate_image</code>
 - <code>edit_image</code>
 - <code>image_to_image</code> (legacy alias normalized by the editor)
+- <code>generate_video</code>
+- <code>text_to_video</code>
+- <code>image_to_video</code>
 - <code>generate_voice</code>
 - <code>generate_music</code>
 - <code>transcribe_audio</code>
 - <code>listen_voice</code></p>
-<p>Generated image, voice, and music outputs should be treated as artifacts. Gateway
-is the preferred execution host for these nodes because it owns media catalogs,
-child runs, artifact persistence, and provider/runtime configuration.</p>
+<p>Generated image, video, voice, and music outputs should be treated as artifacts.
+Gateway is the preferred execution host for these nodes because it owns media
+catalogs, progress events, child runs, artifact persistence, and provider/runtime
+configuration. Video nodes use scoped provider/model fields (<code>video_provider</code>,
+<code>video_model</code>) and Gateway task catalogs (<code>text_to_video</code>, <code>image_to_video</code>) so
+the graph does not rely on hardcoded model names.</p>
 <p>Compatibility note: old saved flows that used the temporary browser-side
 Generate Music lowering are normalized back to native <code>generate_music</code> when they
 are loaded or saved by the current editor.</p>

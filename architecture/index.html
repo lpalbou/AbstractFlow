@@ -848,7 +848,7 @@
 
 <h1 id="abstractflow-architecture-current">AbstractFlow — Architecture (Current)<a class="headerlink" href="#abstractflow-architecture-current" title="Permanent link">&para;</a></h1>
 <blockquote>
-<p>Updated: 2026-05-22
+<p>Updated: 2026-05-26
 Scope: describes <strong>implemented behavior</strong> in this repository (no roadmap claims).</p>
 </blockquote>
 <p>AbstractFlow is a workflow authoring + orchestration layer in the <a href="https://github.com/lpalbou/AbstractFramework">AbstractFramework ecosystem</a>.
@@ -938,21 +938,28 @@ tests/                         # Test suite
 than local Runtime/Core imports:
 - <code>assistant.media.generated_image</code>
 - <code>assistant.media.edited_image</code>
+- <code>assistant.media.generated_video</code>
+- <code>assistant.media.image_to_video</code>
 - <code>assistant.media.generated_voice</code>
 - <code>assistant.media.generated_music</code></p>
 <p>Gateway catalog endpoints can return <code>gateway_catalog_v1</code> (<code>catalog</code> metadata +
 canonical <code>items</code>) or older legacy arrays/maps. The frontend adapter normalizes
-both and uses those catalogs for image, voice, transcription, and music
-provider/model selectors.</p>
+both and uses those catalogs for image, video, voice, transcription, and music
+provider/model selectors. Video selectors use Gateway's task-scoped vision
+catalogs (<code>text_to_video</code> and <code>image_to_video</code>) instead of hardcoded model lists.</p>
 <p>Gateway <code>common.readiness</code> (<code>gateway_surface_readiness_v1</code>) is consumed as a
 surface-level readiness overlay for optional media/model-residency UX. It does
 not replace endpoint descriptors, because Flow still needs those descriptors to
 construct the actual Gateway requests.</p>
 <p>Native media authoring nodes are persisted as native VisualFlow node types:
-<code>generate_image</code>, <code>edit_image</code>, <code>image_to_image</code>, <code>generate_voice</code>,
-<code>generate_music</code>, <code>transcribe_audio</code>, and <code>listen_voice</code>. Old saved music flows
-that used the temporary browser-side lowering are normalized back to native
-<code>generate_music</code> when loaded or saved.</p>
+<code>generate_image</code>, <code>edit_image</code>, <code>image_to_image</code>, <code>generate_video</code>,
+<code>text_to_video</code>, <code>image_to_video</code>, <code>generate_voice</code>, <code>generate_music</code>,
+<code>transcribe_audio</code>, and <code>listen_voice</code>. Gateway progress callbacks emitted as
+<code>abstract.progress</code> ledger events are rendered as running-node progress rather
+than terminal step output, which keeps long video generations observable without
+closing the active node. Old saved music flows that used the temporary
+browser-side lowering are normalized back to native <code>generate_music</code> when loaded
+or saved.</p>
 <h2 id="legacydev-fastapi-host">Legacy/dev FastAPI host<a class="headerlink" href="#legacydev-fastapi-host" title="Permanent link">&para;</a></h2>
 <p>The reference host in <code>web/</code> is now a Gateway proxy/static host by default. When
 <code>ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1</code> is set, it also provides compatibility routes for:

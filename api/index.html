@@ -920,9 +920,16 @@ Requires <code>abstractflow[apple]</code>.</p>
 <p>Generated media is discovered through the Gateway contracts:
 - <code>assistant.media.generated_image</code>
 - <code>assistant.media.edited_image</code>
+- <code>assistant.media.generated_video</code>
+- <code>assistant.media.image_to_video</code>
 - <code>assistant.media.generated_voice</code>
 - <code>assistant.media.generated_music</code></p>
-<p>Model residency is discovered through <code>common.model_residency</code> and includes <code>music_generation</code> when the Gateway/runtime stack supports music warmup/list/unload semantics.</p>
+<p>Gateway progress callbacks emitted as <code>abstract.progress</code> ledger events are mapped
+to running-step progress in the editor instead of being treated as terminal node
+outputs. This is especially important for long video generations.</p>
+<p>Model residency is discovered through <code>common.model_residency</code> and includes
+<code>text_to_video</code> and <code>image_to_video</code> when the Gateway/runtime stack supports
+video warmup/list/unload semantics.</p>
 <p>The browser calls same-origin <code>/api/gateway/*</code>; the Flow static server/Vite/Python host proxy those requests to Gateway and inject the configured bearer token.</p>
 <p>Evidence: <a href="../web/frontend/src/hooks/useGatewayCapabilities.ts">../web/frontend/src/hooks/useGatewayCapabilities.ts</a>, <a href="../web/frontend/src/utils/gatewayClient.ts">../web/frontend/src/utils/gatewayClient.ts</a>, <a href="../web/backend/main.py">../web/backend/main.py</a>.</p>
 <h2 id="adapters-advanced">Adapters (advanced)<a class="headerlink" href="#adapters-advanced" title="Permanent link">&para;</a></h2>
