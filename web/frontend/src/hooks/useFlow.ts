@@ -1450,7 +1450,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
       // Backward-compat: media nodes added before inline media controls had empty
       // local-friendly defaults, leaving basic settings blank in existing flows.
-      if (['generate_image', 'edit_image', 'image_to_image', 'generate_voice', 'generate_music', 'transcribe_audio', 'listen_voice'].includes(data.nodeType)) {
+      if (['generate_image', 'edit_image', 'image_to_image', 'generate_video', 'text_to_video', 'image_to_video', 'generate_voice', 'generate_music', 'transcribe_audio', 'listen_voice'].includes(data.nodeType)) {
         const prevDefaults =
           data.pinDefaults && typeof data.pinDefaults === 'object' ? (data.pinDefaults as Record<string, unknown>) : {};
         const normalizeScopedMediaValue = (value: unknown, provider: unknown = ''): string => {
@@ -1534,6 +1534,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
               ]
             : data.nodeType === 'generate_music'
               ? (getNodeTemplate('generate_music')?.inputs || [])
+            : data.nodeType === 'generate_video' || data.nodeType === 'text_to_video' || data.nodeType === 'image_to_video'
+              ? (getNodeTemplate(data.nodeType)?.inputs || [])
             : data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
               ? [
                   { id: 'exec-in', label: '', type: 'execution' as const },
@@ -1605,6 +1607,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         const mediaDefaults: Record<string, JsonValue> =
           data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
             ? { format: 'png', width: 512, height: 512, steps: 20, guidance_scale: 7.5 }
+            : data.nodeType === 'generate_video' || data.nodeType === 'text_to_video' || data.nodeType === 'image_to_video'
+              ? { format: 'mp4', width: 512, height: 512, frames: 41, fps: 24, steps: 20, guidance_scale: 5.0 }
             : data.nodeType === 'generate_voice'
               ? { format: 'wav', quality_preset: 'standard', speed: 1.0 }
               : data.nodeType === 'generate_music'
@@ -1646,6 +1650,17 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           }
           if (model && nextDefaults.image_model !== model) {
             nextDefaults.image_model = model;
+            changedDefaults = true;
+          }
+        } else if (data.nodeType === 'generate_video' || data.nodeType === 'text_to_video' || data.nodeType === 'image_to_video') {
+          const provider = normalizeScopedMediaValue(firstString(nextDefaults.video_provider, nextDefaults.videoProvider, nextDefaults.provider_video, nextDefaults.provider));
+          const model = normalizeScopedMediaValue(firstString(nextDefaults.video_model, nextDefaults.videoModel, nextDefaults.model_video, nextDefaults.model), provider);
+          if (provider && nextDefaults.video_provider !== provider) {
+            nextDefaults.video_provider = provider;
+            changedDefaults = true;
+          }
+          if (model && nextDefaults.video_model !== model) {
+            nextDefaults.video_model = model;
             changedDefaults = true;
           }
         } else if (data.nodeType === 'generate_music') {
@@ -1716,6 +1731,11 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           const model = normalizeScopedMediaValue(firstString(nextEffectConfig.image_model, nextDefaults.image_model, nextEffectConfig.model, nextDefaults.model), provider);
           setEffectIfMissing('image_provider', provider);
           setEffectIfMissing('image_model', model);
+        } else if (data.nodeType === 'generate_video' || data.nodeType === 'text_to_video' || data.nodeType === 'image_to_video') {
+          const provider = normalizeScopedMediaValue(firstString(nextEffectConfig.video_provider, nextDefaults.video_provider, nextEffectConfig.provider, nextDefaults.provider));
+          const model = normalizeScopedMediaValue(firstString(nextEffectConfig.video_model, nextDefaults.video_model, nextEffectConfig.model, nextDefaults.model), provider);
+          setEffectIfMissing('video_provider', provider);
+          setEffectIfMissing('video_model', model);
         } else if (data.nodeType === 'generate_music') {
           const legacyBackend = normalizeScopedMediaValue(firstString(nextEffectConfig.music_backend, nextEffectConfig.musicBackend, nextEffectConfig.backend_music, nextEffectConfig.backend));
           const provider = normalizeScopedMediaValue(firstString(legacyBackend, nextEffectConfig.music_provider, nextDefaults.music_provider, nextEffectConfig.provider, nextDefaults.provider));

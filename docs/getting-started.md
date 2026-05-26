@@ -121,31 +121,36 @@ Tip (from source): install Flow and Gateway editably, then run `npm run dev` fro
 In the editor, add media nodes from the palette:
 - `Generate Image`: prompt to image artifact.
 - `Edit Image`: prompt plus source image artifact, optional mask, to image artifact. `Image-to-Image` is accepted as a legacy alias when loading older flows.
+- `Generate Video`: prompt to video artifact.
+- `Image-to-Video`: prompt plus source image artifact to video artifact.
 - `Generate Voice`: text to voice/audio artifact.
 - `Generate Music`: prompt/lyrics/duration to music artifact.
 - `Transcribe Audio` / `Listen Voice`: audio input to text.
 
 For the simple path, leave provider/model as `Auto` and let Gateway resolve the
 configured backend. If you need reproducibility, choose explicit provider/model
-values from the Gateway catalog selectors. Music catalog data comes from
+values from the Gateway catalog selectors. Video model selectors are populated
+from Gateway vision provider-model catalogs scoped to `text_to_video` or
+`image_to_video`; music catalog data comes from
 `/api/gateway/audio/music/providers` and `/api/gateway/audio/music/models`.
 
-Generated media is returned as Gateway artifacts. The Run modal renders images
-and audio/music players first; raw ledger JSON and artifact IDs remain available
-for debugging.
+Generated media is returned as Gateway artifacts. The Run modal renders images,
+videos, and audio/music players first; raw ledger JSON and artifact IDs remain
+available for debugging. Long video runs surface Gateway `abstract.progress`
+ledger events as progress on the active step.
 
 For image editing, wire `image_artifact` from a previous `Generate Image` node
 or use the `Artifacts` palette primitives (`Image Artifact`, `Voice Artifact`,
 `Music Artifact`, etc.) to paste an existing Gateway `$artifact` id. A richer
 browser artifact picker/upload flow is tracked separately.
 
-Example Generate Music path:
-1. Drag `On Flow Start`, `Generate Music`, and `On Flow End` onto the canvas.
-2. Wire execution `On Flow Start -> Generate Music -> On Flow End`.
-3. Wire or type a `prompt` such as `short heroic fantasy theme with brass and strings`.
+Example Generate Video path:
+1. Drag `On Flow Start`, `Generate Video`, and `On Flow End` onto the canvas.
+2. Wire execution `On Flow Start -> Generate Video -> On Flow End`.
+3. Wire or type a `prompt` such as `glowing data streams converging into a geometric logo`.
 4. Leave provider/model as `Auto (Gateway default)` unless you need a specific backend.
 5. Save, then click `Run Flow`.
-6. Open the Generate Music result and play the returned music artifact.
+6. Watch progress in the Run modal and open the generated video artifact when the step completes.
 
 ## Workflow bundles (`.flow`)
 

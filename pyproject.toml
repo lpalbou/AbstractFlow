@@ -46,7 +46,7 @@ apple = [
     # Apple local control-plane + Gateway stack. This profile is intentionally
     # the full user-facing local install, so media engine extras cascade through
     # abstractgateway[apple] into the runtime-owned media engine extras.
-    "abstractgateway[apple]>=0.2.19",
+    "abstractgateway[apple]>=0.2.20",
     "abstractagent>=0.3.8",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.23.0",
@@ -54,7 +54,7 @@ apple = [
 ]
 gpu = [
     # GPU local control-plane + Gateway stack.
-    "abstractgateway[gpu]>=0.2.19",
+    "abstractgateway[gpu]>=0.2.20",
     "abstractagent>=0.3.8",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.23.0",

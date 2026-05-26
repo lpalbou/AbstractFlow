@@ -52,6 +52,7 @@ Agent usage tips:
 - [Gateway client contract](web/frontend/src/utils/gatewayClient.ts): versioned capabilities, `common.readiness` overlay, endpoint descriptors
 - [Gateway catalog helpers](web/frontend/src/utils/gatewayCatalog.ts): canonical `gateway_catalog_v1` + legacy catalog normalization
 - [VisualFlow legacy compatibility](web/frontend/src/utils/visualFlowCompat.ts): imports old lowered music flows as native `generate_music`
+- [Run modal](web/frontend/src/components/RunFlowModal.tsx): Gateway run replay/stream rendering, media artifact previews, and `abstract.progress` progress display
 - [Artifact player](web/frontend/src/components/ArtifactPlayer.tsx): shared artifact content URL/object URL loader for previews and media players
 - [WebSocket execution](web/backend/routes/ws.py): compatibility-only `{type:"run"|"resume"|"control"}` protocol and event stream
 - [Flow CRUD + publish](web/backend/routes/flows.py): compatibility-only flow persistence (`ABSTRACTFLOW_FLOWS_DIR`) + bundle publishing

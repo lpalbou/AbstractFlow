@@ -512,6 +512,21 @@ type GeneratedAudioPreview = {
   format?: string;
 };
 
+type GeneratedVideoPreview = {
+  artifactId: string;
+  src: string;
+  fallbackSrcs?: string[];
+  contentType?: string;
+  prompt?: string;
+  provider?: string;
+  model?: string;
+  width?: number;
+  height?: number;
+  frames?: number;
+  fps?: number;
+  format?: string;
+};
+
 type GeneratedTextPreview = {
   artifactId: string;
   text: string;
@@ -522,6 +537,7 @@ type GeneratedTextPreview = {
 type RunGeneratedArtifact =
   | { kind: 'image'; preview: GeneratedImagePreview; stepId: string; stepLabel: string }
   | { kind: 'audio'; preview: GeneratedAudioPreview; stepId: string; stepLabel: string }
+  | { kind: 'video'; preview: GeneratedVideoPreview; stepId: string; stepLabel: string }
   | { kind: 'text'; preview: GeneratedTextPreview; stepId: string; stepLabel: string };
 
 type ArtifactRunScope = string | null | undefined | Array<string | null | undefined>;
@@ -591,6 +607,12 @@ function artifactLooksLikeAudio(record: Record<string, unknown> | null | undefin
     modality === 'voice' ||
     modality === 'music'
   );
+}
+
+function artifactLooksLikeVideo(record: Record<string, unknown> | null | undefined): boolean {
+  const contentType = artifactContentType(record);
+  const modality = artifactModality(record);
+  return contentType.startsWith('video/') || modality === 'video';
 }
 
 function extractGeneratedImagePreview(
@@ -794,6 +816,115 @@ function extractGeneratedAudioPreview(
   };
 }
 
+function extractGeneratedVideoPreview(
+  value: unknown,
+  runScope: ArtifactRunScope,
+  artifactContentDescriptor?: GatewayEndpointDescriptor | string | null
+): GeneratedVideoPreview | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const obj = value as Record<string, unknown>;
+  const name = typeof obj.name === 'string' ? obj.name : '';
+  const payloadRaw = obj.payload && typeof obj.payload === 'object' && !Array.isArray(obj.payload)
+    ? (obj.payload as Record<string, unknown>)
+    : obj;
+  const asRecord = (item: unknown): Record<string, unknown> | null =>
+    item && typeof item === 'object' && !Array.isArray(item) ? (item as Record<string, unknown>) : null;
+  const videoEvent = name === 'abstract.media.video.generated';
+  const genericArtifactRaw = payloadRaw.artifact_ref ?? payloadRaw.artifact;
+  const genericArtifact = asRecord(genericArtifactRaw);
+  const directVideoRaw =
+    payloadRaw.video_artifact ??
+    payloadRaw.video ??
+    (videoEvent || artifactLooksLikeVideo(genericArtifact) ? genericArtifactRaw : undefined);
+  const directVideo = asRecord(directVideoRaw);
+  const directVideoId = typeof directVideoRaw === 'string' && directVideoRaw.trim() ? directVideoRaw.trim() : '';
+  const outputs = asRecord(payloadRaw.outputs);
+  const outputVideoRaw = outputs?.video;
+  const videoItems = Array.isArray(outputVideoRaw) ? outputVideoRaw : outputVideoRaw != null ? [outputVideoRaw] : [];
+  const generatedItemRaw = videoItems.find((item) => typeof item === 'string' || asRecord(item));
+  const generatedItem = asRecord(generatedItemRaw);
+  const itemArtifactRaw =
+    generatedItem?.artifact_ref ??
+    generatedItem?.video_artifact ??
+    generatedItem?.artifact ??
+    generatedItemRaw;
+  const itemArtifact = asRecord(itemArtifactRaw);
+  const itemArtifactId = typeof itemArtifactRaw === 'string' && itemArtifactRaw.trim()
+    ? itemArtifactRaw.trim()
+    : '';
+  const videoRaw = directVideo || itemArtifact;
+  const payloadVideoArtifactId =
+    videoEvent || artifactLooksLikeVideo(payloadRaw)
+      ? (typeof payloadRaw.artifact_id === 'string' && payloadRaw.artifact_id.trim()) ||
+        (typeof payloadRaw.$artifact === 'string' && payloadRaw.$artifact.trim()) ||
+        ''
+      : '';
+  const hasVideoArtifactShape =
+    Boolean(directVideo) ||
+    Boolean(directVideoId) ||
+    Boolean(itemArtifact) ||
+    Boolean(itemArtifactId) ||
+    Boolean(payloadVideoArtifactId);
+  if (name && !videoEvent && !hasVideoArtifactShape) return null;
+
+  const artifactId =
+    (videoRaw && typeof videoRaw.artifact_id === 'string' && videoRaw.artifact_id.trim()) ||
+    (videoRaw && typeof videoRaw.$artifact === 'string' && videoRaw.$artifact.trim()) ||
+    directVideoId ||
+    itemArtifactId ||
+    payloadVideoArtifactId ||
+    '';
+  if (!artifactId) return null;
+  const runCandidates = [
+    ...artifactRecordRunCandidates(artifactId, videoRaw, generatedItem, itemArtifact, payloadRaw, obj),
+    ...artifactRunScopeValues(runScope),
+  ].filter((value, index, values) => value && values.indexOf(value) === index);
+  if (!runCandidates.length) return null;
+
+  const videoProvider =
+    (videoRaw && typeof videoRaw.media_provider === 'string' && videoRaw.media_provider.trim()) ||
+    (generatedItem && typeof generatedItem.media_provider === 'string' && generatedItem.media_provider.trim()) ||
+    (videoRaw && typeof videoRaw.provider === 'string' && videoRaw.provider.trim()) ||
+    (generatedItem && typeof generatedItem.provider === 'string' && generatedItem.provider.trim()) ||
+    (typeof payloadRaw.video_provider === 'string' && payloadRaw.video_provider.trim()) ||
+    (typeof payloadRaw.media_provider === 'string' && payloadRaw.media_provider.trim()) ||
+    (typeof payloadRaw.provider === 'string' && payloadRaw.provider.trim()) ||
+    undefined;
+  const videoModel =
+    (videoRaw && typeof videoRaw.media_model === 'string' && videoRaw.media_model.trim()) ||
+    (generatedItem && typeof generatedItem.media_model === 'string' && generatedItem.media_model.trim()) ||
+    (videoRaw && typeof videoRaw.model === 'string' && videoRaw.model.trim()) ||
+    (generatedItem && typeof generatedItem.model === 'string' && generatedItem.model.trim()) ||
+    (typeof payloadRaw.video_model === 'string' && payloadRaw.video_model.trim()) ||
+    (typeof payloadRaw.media_model === 'string' && payloadRaw.media_model.trim()) ||
+    (typeof payloadRaw.model === 'string' && payloadRaw.model.trim()) ||
+    undefined;
+  const pickNumber = (record: Record<string, unknown> | null | undefined, key: string): number | undefined => {
+    const raw = record?.[key];
+    if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+    if (typeof raw === 'string' && raw.trim()) {
+      const n = Number(raw);
+      if (Number.isFinite(n)) return n;
+    }
+    return undefined;
+  };
+
+  return {
+    artifactId,
+    src: artifactContentUrl(artifactContentDescriptor, runCandidates[0], artifactId),
+    fallbackSrcs: runCandidates.slice(1).map((candidate) => artifactContentUrl(artifactContentDescriptor, candidate, artifactId)),
+    contentType: typeof videoRaw?.content_type === 'string' ? videoRaw.content_type : typeof generatedItem?.content_type === 'string' ? generatedItem.content_type : undefined,
+    prompt: typeof payloadRaw.prompt === 'string' ? payloadRaw.prompt : typeof generatedItem?.prompt === 'string' ? generatedItem.prompt : undefined,
+    provider: videoProvider,
+    model: videoModel,
+    width: pickNumber(payloadRaw, 'width') ?? pickNumber(generatedItem, 'width'),
+    height: pickNumber(payloadRaw, 'height') ?? pickNumber(generatedItem, 'height'),
+    frames: pickNumber(payloadRaw, 'frames') ?? pickNumber(payloadRaw, 'num_frames') ?? pickNumber(generatedItem, 'frames') ?? pickNumber(generatedItem, 'num_frames'),
+    fps: pickNumber(payloadRaw, 'fps') ?? pickNumber(generatedItem, 'fps'),
+    format: typeof payloadRaw.format === 'string' ? payloadRaw.format : typeof generatedItem?.format === 'string' ? generatedItem.format : undefined,
+  };
+}
+
 function extractGeneratedTextPreview(value: unknown, step: { id: string; nodeType?: string }): GeneratedTextPreview | null {
   const nodeType = String(step.nodeType || '').trim();
   if (!['llm_call', 'agent', 'memory_compact'].includes(nodeType)) return null;
@@ -838,6 +969,56 @@ function extractGeneratedTextPreview(value: unknown, step: { id: string; nodeTyp
     provider,
     model,
   };
+}
+
+function progressNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim()) {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+function progressPercent(value: Record<string, unknown> | null | undefined): number | null {
+  if (!value) return null;
+  const directPercent = progressNumber(value.percent);
+  if (directPercent != null) return Math.max(0, Math.min(100, directPercent > 1 ? directPercent : directPercent * 100));
+  const directProgress = progressNumber(value.progress);
+  if (directProgress != null) return Math.max(0, Math.min(100, directProgress > 1 ? directProgress : directProgress * 100));
+
+  const current = progressNumber(value.current) ?? progressNumber(value.frame) ?? progressNumber(value.step);
+  const total = progressNumber(value.total) ?? progressNumber(value.total_frames) ?? progressNumber(value.total_steps);
+  if (current != null && total != null && total > 0) return Math.max(0, Math.min(100, (current / total) * 100));
+  return null;
+}
+
+function formatProgressSummary(value: Record<string, unknown> | null | undefined): string {
+  if (!value) return '';
+  const phase =
+    (typeof value.phase === 'string' && value.phase.trim()) ||
+    (typeof value.stage === 'string' && value.stage.trim()) ||
+    (typeof value.status === 'string' && value.status.trim()) ||
+    (typeof value.message === 'string' && value.message.trim()) ||
+    'running';
+  const parts = [phase];
+  const frame = progressNumber(value.frame);
+  const totalFrames = progressNumber(value.total_frames);
+  if (frame != null && totalFrames != null) {
+    parts.push(`frame ${Math.floor(frame)}/${Math.floor(totalFrames)}`);
+  } else {
+    const current = progressNumber(value.current);
+    const total = progressNumber(value.total);
+    if (current != null && total != null) parts.push(`${Math.floor(current)}/${Math.floor(total)}`);
+  }
+  const step = progressNumber(value.step);
+  const totalSteps = progressNumber(value.total_steps);
+  if (step != null && totalSteps != null) parts.push(`step ${Math.floor(step)}/${Math.floor(totalSteps)}`);
+  const pct = progressPercent(value);
+  if (pct != null) parts.push(`${pct.toFixed(1)}%`);
+  const eta = progressNumber(value.eta_s);
+  if (eta != null && eta > 0) parts.push(`ETA ${Math.ceil(eta)}s`);
+  return parts.join(' · ');
 }
 
 function GeneratedImageCard({ preview, compact = false }: { preview: GeneratedImagePreview; compact?: boolean }) {
@@ -951,6 +1132,82 @@ function GeneratedAudioCard({
           <span className="run-output-meta-key">Open</span>
           <span className="run-output-meta-val">
             <a className="run-output-link" href={displayUrl} target="_blank" rel="noreferrer" download={`${preview.artifactId}.${preview.format || 'wav'}`}>
+              artifact content
+            </a>
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GeneratedVideoCard({
+  preview,
+  compact = false,
+  instanceKey,
+}: {
+  preview: GeneratedVideoPreview;
+  compact?: boolean;
+  instanceKey?: string;
+}) {
+  const { objectUrl, loading, error } = useArtifactObjectUrl(
+    preview.src,
+    preview.contentType || 'video/mp4',
+    preview.fallbackSrcs,
+    instanceKey
+  );
+  const displayUrl = objectUrl || preview.src;
+  return (
+    <div className={`run-generated-video ${compact ? 'run-generated-artifact-card' : ''}`}>
+      {loading ? (
+        <div className="run-details-empty">Loading video artifact...</div>
+      ) : error ? (
+        <div className="run-details-error">{error}</div>
+      ) : (
+        <video
+          key={`${preview.artifactId}:${instanceKey || ''}`}
+          src={displayUrl}
+          controls
+          playsInline
+          className="run-generated-video-player"
+        />
+      )}
+      <div className="run-output-meta">
+        {preview.prompt && !compact ? (
+          <div>
+            <span className="run-output-meta-key">Prompt</span>
+            <span className="run-output-meta-val">{preview.prompt}</span>
+          </div>
+        ) : null}
+        {(preview.provider || preview.model) ? (
+          <div>
+            <span className="run-output-meta-key">Video</span>
+            <span className="run-output-meta-val">
+              <span className="run-output-meta-badges">
+                {preview.provider ? <span className="run-metric-badge metric-provider" title={preview.provider}>{preview.provider}</span> : null}
+                {preview.model ? <span className="run-metric-badge metric-model" title={preview.model}>{preview.model}</span> : null}
+              </span>
+            </span>
+          </div>
+        ) : null}
+        {(preview.frames || preview.fps || preview.width || preview.height) ? (
+          <div>
+            <span className="run-output-meta-key">Shape</span>
+            <span className="run-output-meta-val">
+              {preview.width && preview.height ? `${preview.width}x${preview.height}` : ''}
+              {preview.frames ? `${preview.width && preview.height ? ' · ' : ''}${preview.frames} frames` : ''}
+              {preview.fps ? `${(preview.width && preview.height) || preview.frames ? ' · ' : ''}${preview.fps} fps` : ''}
+            </span>
+          </div>
+        ) : null}
+        <div>
+          <span className="run-output-meta-key">Artifact</span>
+          <span className="run-output-meta-val">{preview.artifactId}</span>
+        </div>
+        <div>
+          <span className="run-output-meta-key">Open</span>
+          <span className="run-output-meta-val">
+            <a className="run-output-link" href={displayUrl} target="_blank" rel="noreferrer" download={`${preview.artifactId}.${preview.format || 'mp4'}`}>
               artifact content
             </a>
           </span>
@@ -2310,6 +2567,7 @@ export function RunFlowModal({
     model?: string;
     summary?: string;
     output?: unknown;
+    progress?: Record<string, unknown>;
     error?: string;
     metrics?: ExecutionMetrics;
     startedAt?: string;
@@ -2641,6 +2899,45 @@ export function RunFlowModal({
         };
         all.push(step);
         if (ev.nodeId) openByNode.set(key, all.length - 1);
+        continue;
+      }
+
+      if (ev.type === 'node_progress') {
+        const nodeId = ev.nodeId;
+        const key = `${evRunId || ''}:${nodeId || ''}`;
+        const idx = nodeId ? openByNode.get(key) : undefined;
+        const meta = resolveNodeMeta(nodeId);
+        const progress = ev.progress && typeof ev.progress === 'object' && !Array.isArray(ev.progress)
+          ? ev.progress
+          : ev.result && typeof ev.result === 'object' && !Array.isArray(ev.result)
+            ? (ev.result as Record<string, unknown>)
+            : {};
+        const summary = formatProgressSummary(progress);
+        if (typeof idx === 'number') {
+          all[idx] = {
+            ...all[idx],
+            status: 'running',
+            progress,
+            summary: summary || all[idx].summary,
+            runtimeStepId: all[idx].runtimeStepId ?? evStepId,
+          };
+        } else {
+          all.push({
+            id: `node_progress:${nodeId || 'unknown'}:${i}`,
+            status: 'running',
+            runId: evRunId || ev.runId,
+            runtimeStepId: evStepId,
+            nodeId,
+            nodeLabel: meta?.label,
+            nodeType: meta?.type,
+            nodeIcon: meta?.icon,
+            nodeColor: meta?.color,
+            progress,
+            summary,
+            startedAt: typeof ev.ts === 'string' ? ev.ts : undefined,
+          });
+          if (nodeId) openByNode.set(key, all.length - 1);
+        }
         continue;
       }
 
@@ -3742,15 +4039,24 @@ export function RunFlowModal({
     () => extractGeneratedAudioPreview(resolvedStepOutput, [selectedStep?.runId, rootRunId], artifactContentDescriptor),
     [artifactContentDescriptor, resolvedStepOutput, rootRunId, selectedStep?.runId]
   );
+  const generatedVideoPreview = useMemo(
+    () => extractGeneratedVideoPreview(resolvedStepOutput, [selectedStep?.runId, rootRunId], artifactContentDescriptor),
+    [artifactContentDescriptor, resolvedStepOutput, rootRunId, selectedStep?.runId]
+  );
 
   const stepArtifactPreviewById = useMemo(() => {
-    const map = new Map<string, { kind: 'image' | 'audio' | 'text'; artifactId: string }>();
+    const map = new Map<string, { kind: 'image' | 'audio' | 'video' | 'text'; artifactId: string }>();
     for (const step of steps) {
       const output = step.output;
       if (output == null) continue;
       const image = extractGeneratedImagePreview(output, [step.runId, rootRunId], artifactContentDescriptor);
       if (image) {
         map.set(step.id, { kind: 'image', artifactId: image.artifactId });
+        continue;
+      }
+      const video = extractGeneratedVideoPreview(output, [step.runId, rootRunId], artifactContentDescriptor);
+      if (video) {
+        map.set(step.id, { kind: 'video', artifactId: video.artifactId });
         continue;
       }
       const audio = extractGeneratedAudioPreview(output, [step.runId, rootRunId], artifactContentDescriptor);
@@ -3774,6 +4080,14 @@ export function RunFlowModal({
         if (!seen.has(key)) {
           seen.add(key);
           out.push({ kind: 'image', preview: image, stepId: step.id, stepLabel });
+        }
+      }
+      const video = extractGeneratedVideoPreview(output, [step.runId, rootRunId], artifactContentDescriptor);
+      if (video) {
+        const key = `video:${step.id}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          out.push({ kind: 'video', preview: video, stepId: step.id, stepLabel });
         }
       }
       const audio = extractGeneratedAudioPreview(output, [step.runId, rootRunId], artifactContentDescriptor);
@@ -3828,11 +4142,11 @@ export function RunFlowModal({
 
   const showRunArtifactSummary = useMemo(() => {
     if (runArtifactSummary.length === 0) return false;
-    if (generatedImagePreview || generatedAudioPreview) return false;
+    if (generatedImagePreview || generatedAudioPreview || generatedVideoPreview) return false;
     if (!selectedStep) return true;
     const last = steps[steps.length - 1];
     return selectedStep.nodeType === 'on_flow_end' || selectedStep.id === last?.id;
-  }, [generatedAudioPreview, generatedImagePreview, runArtifactSummary.length, selectedStep, steps]);
+  }, [generatedAudioPreview, generatedImagePreview, generatedVideoPreview, runArtifactSummary.length, selectedStep, steps]);
 
   const runStatusLabel = useMemo(() => {
     if (isPaused) return 'PAUSED';
@@ -4425,7 +4739,7 @@ export function RunFlowModal({
   }, [beautifyJsonText, resolvedStepOutput, selectedStep]);
 
   const showGenericOutputPreview = Boolean(outputPreview?.previewText) && !(
-    Boolean(generatedImagePreview || generatedAudioPreview) && Boolean(outputPreview?.previewIsJson)
+    Boolean(generatedImagePreview || generatedAudioPreview || generatedVideoPreview) && Boolean(outputPreview?.previewIsJson)
   );
   const isImplicitFlowEndStep = selectedStep?.nodeId === '__implicit_flow_end__';
 
@@ -4671,6 +4985,7 @@ export function RunFlowModal({
       Boolean(recallIntoContextDisplay) ||
       Boolean(generatedImagePreview) ||
       Boolean(generatedAudioPreview) ||
+      Boolean(generatedVideoPreview) ||
       (selectedStep.nodeType === 'on_flow_start' && Boolean(onFlowStartParams)) ||
       Boolean(outputPreview?.task) ||
       Boolean(outputPreview?.benchmark) ||
@@ -4680,7 +4995,7 @@ export function RunFlowModal({
       Boolean(outputPreview?.model) ||
       outputPreview?.scratchpad != null;
     return !hasPreviewBlocks;
-  }, [generatedAudioPreview, generatedImagePreview, memorizeContentPreview, onFlowStartParams, outputPreview, recallIntoContextDisplay, resolvedStepOutput, selectedStep]);
+  }, [generatedAudioPreview, generatedImagePreview, generatedVideoPreview, memorizeContentPreview, onFlowStartParams, outputPreview, recallIntoContextDisplay, resolvedStepOutput, selectedStep]);
 
   const lastRawJsonStepIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -5169,7 +5484,24 @@ export function RunFlowModal({
                                     </span>
                                   ) : null}
                                 </div>
-                                {s.status === 'failed' && s.error ? (
+                                {s.status === 'running' && s.progress ? (
+                                  <div className="run-step-progress">
+                                    <div className="run-step-progress-row">
+                                      <span>{formatProgressSummary(s.progress) || 'running'}</span>
+                                      {progressPercent(s.progress) != null ? (
+                                        <span>{progressPercent(s.progress)?.toFixed(1)}%</span>
+                                      ) : null}
+                                    </div>
+                                    {progressPercent(s.progress) != null ? (
+                                      <div className="run-step-progress-track" aria-hidden="true">
+                                        <div
+                                          className="run-step-progress-fill"
+                                          style={{ width: `${progressPercent(s.progress) ?? 0}%` }}
+                                        />
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                ) : s.status === 'failed' && s.error ? (
                                   <div className="run-step-error">{s.error}</div>
                                 ) : s.waiting && isSubworkflowWait ? (
                                   <div className="run-step-waiting">
@@ -5267,13 +5599,34 @@ export function RunFlowModal({
                       ) : null}
 		                  {selectedStep.status === 'running' ? (
 		                    <>
-		                      <div className="run-working">
-	                        <span className="run-spinner" aria-label="working" />
-	                        <div>
-	                          <div className="run-working-title">{runningTitle}</div>
-	                          <div className="run-working-note">{runningNote}</div>
-	                        </div>
-	                      </div>
+	                      <div className="run-working">
+                        <span className="run-spinner" aria-label="working" />
+                        <div>
+                          <div className="run-working-title">{runningTitle}</div>
+                          <div className="run-working-note">{runningNote}</div>
+                        </div>
+                      </div>
+                      {selectedStep.progress ? (
+                        <div className="run-output-section">
+                          <div className="run-output-title">Progress</div>
+                          <div className="run-step-progress">
+                            <div className="run-step-progress-row">
+                              <span>{formatProgressSummary(selectedStep.progress) || 'running'}</span>
+                              {progressPercent(selectedStep.progress) != null ? (
+                                <span>{progressPercent(selectedStep.progress)?.toFixed(1)}%</span>
+                              ) : null}
+                            </div>
+                            {progressPercent(selectedStep.progress) != null ? (
+                              <div className="run-step-progress-track" aria-hidden="true">
+                                <div
+                                  className="run-step-progress-fill"
+                                  style={{ width: `${progressPercent(selectedStep.progress) ?? 0}%` }}
+                                />
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      ) : null}
 	                      {subflowTracePanel}
 	                      {agentTracePanel}
 	                    </>
@@ -5395,6 +5748,7 @@ export function RunFlowModal({
                         recallIntoContextDisplay ||
                         generatedImagePreview ||
                         generatedAudioPreview ||
+                        generatedVideoPreview ||
                         (selectedStep?.nodeType === 'on_flow_start' && onFlowStartParams) ||
                         (selectedStep?.nodeType === 'memory_kg_query' && selectedStep.output != null)) ? (
                         <div className="run-output-preview">
@@ -5524,6 +5878,13 @@ export function RunFlowModal({
                                 {selectedStep?.nodeType === 'generate_music' ? 'Generated music' : 'Generated audio'}
                               </div>
                               <GeneratedAudioCard preview={generatedAudioPreview} autoPlay instanceKey={selectedStep.id} />
+                            </div>
+                          ) : null}
+
+                          {generatedVideoPreview ? (
+                            <div className="run-output-section">
+                              <div className="run-output-title">Generated video</div>
+                              <GeneratedVideoCard preview={generatedVideoPreview} instanceKey={selectedStep.id} />
                             </div>
                           ) : null}
 
@@ -5805,6 +6166,8 @@ export function RunFlowModal({
                             </div>
                             {item.kind === 'image' ? (
                               <GeneratedImageCard preview={item.preview} compact />
+                            ) : item.kind === 'video' ? (
+                              <GeneratedVideoCard preview={item.preview} compact instanceKey={item.stepId} />
                             ) : item.kind === 'audio' ? (
                               <GeneratedAudioCard preview={item.preview} compact instanceKey={item.stepId} />
                             ) : (

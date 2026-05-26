@@ -3694,6 +3694,43 @@ button.primary:hover:not(:disabled) {
   overflow: hidden;
 }
 
+.run-step-progress {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.run-step-progress-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.run-step-progress-row span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.run-step-progress-track {
+  height: 4px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.run-step-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(0, 210, 255, 0.9), rgba(80, 227, 194, 0.9));
+}
+
 .run-step-error {
   color: var(--error);
 }
@@ -4069,6 +4106,21 @@ button.primary:hover:not(:disabled) {
   min-height: 42px;
 }
 
+.run-generated-video {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.run-generated-video-player {
+  width: min(100%, 720px);
+  max-height: 420px;
+  border-radius: 8px;
+  border: 1px solid var(--bg-tertiary);
+  background: rgba(0, 0, 0, 0.18);
+}
+
 .run-generated-text {
   display: flex;
   flex-direction: column;
@@ -4125,6 +4177,11 @@ button.primary:hover:not(:disabled) {
 
 .run-generated-artifact-card .run-generated-audio-player {
   width: 100%;
+}
+
+.run-generated-artifact-card .run-generated-video-player {
+  width: 100%;
+  max-height: 220px;
 }
 
 .run-trace {

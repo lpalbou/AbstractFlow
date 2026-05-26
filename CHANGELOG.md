@@ -5,6 +5,16 @@ All notable changes to AbstractFlow will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.15] - 2026-05-26
+
+### Added
+- Native Generate Video and Image-to-Video authoring in the Flow editor, including scoped video provider/model pins, Gateway readiness checks, run preflight, artifact previews, and Runtime compatibility execution.
+- Gateway `abstract.progress` ledger events now render as running-step progress in the Run modal.
+
+### Changed
+- Apple/GPU Flow profiles now require Gateway `>=0.2.20` for the video media, progress, catalog, and model-residency contracts.
+- Model residency and default routing now use task-scoped Gateway vision catalogs for `text_to_video` and `image_to_video` instead of reusing image defaults.
+
 ## [0.3.14] - 2026-05-26
 
 ### Added

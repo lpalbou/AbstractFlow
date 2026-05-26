@@ -142,10 +142,18 @@ When Gateway advertises `common.readiness.contract = gateway_surface_readiness_v
 Generated media is discovered through the Gateway contracts:
 - `assistant.media.generated_image`
 - `assistant.media.edited_image`
+- `assistant.media.generated_video`
+- `assistant.media.image_to_video`
 - `assistant.media.generated_voice`
 - `assistant.media.generated_music`
 
-Model residency is discovered through `common.model_residency` and includes `music_generation` when the Gateway/runtime stack supports music warmup/list/unload semantics.
+Gateway progress callbacks emitted as `abstract.progress` ledger events are mapped
+to running-step progress in the editor instead of being treated as terminal node
+outputs. This is especially important for long video generations.
+
+Model residency is discovered through `common.model_residency` and includes
+`text_to_video` and `image_to_video` when the Gateway/runtime stack supports
+video warmup/list/unload semantics.
 
 The browser calls same-origin `/api/gateway/*`; the Flow static server/Vite/Python host proxy those requests to Gateway and inject the configured bearer token.
 

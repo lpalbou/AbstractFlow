@@ -25,6 +25,8 @@ export type PinType =
   | 'model_text'     // Compatibility alias for old saved flows; new flows use `model`
   | 'provider_image' // Image provider/backend id (string-like)
   | 'model_image'    // Compatibility alias for old saved flows; new flows use `model`
+  | 'provider_video' // Video provider/backend id (string-like)
+  | 'model_video'    // Compatibility alias for old saved flows; new flows use `model`
   | 'provider_voice' // Voice/TTS/STT provider/backend id (string-like)
   | 'model_voice'    // Compatibility alias for old saved flows; new flows use `model`
   | 'provider_music' // Music-generation provider/backend id (string-like)
@@ -55,6 +57,8 @@ export const PIN_COLORS: Record<PinType, string> = {
   model_text: '#9D4EDD',
   provider_image: '#19D3B8',
   model_image: '#9D4EDD',
+  provider_video: '#A855F7',
+  model_video: '#9D4EDD',
   provider_voice: '#22D3EE',
   model_voice: '#9D4EDD',
   provider_music: '#F59E0B',
@@ -146,6 +150,9 @@ export type NodeType =
   | 'generate_image'
   | 'edit_image'
   | 'image_to_image'
+  | 'generate_video'
+  | 'text_to_video'
+  | 'image_to_video'
   | 'generate_voice'
   | 'generate_music'
   | 'transcribe_audio'
@@ -286,6 +293,8 @@ export interface FlowNodeData {
     image_artifact?: any;    // For image edit source artifact
     source_image?: any;      // For image edit/source-image alias
     mask_artifact?: any;     // For optional image edit mask artifact
+    video_provider?: string; // For generated video backend/catalog selection
+    video_model?: string;    // For generated video backend/catalog selection
     tts_provider?: string;   // For generated voice backend/catalog selection
     tts_model?: string;      // For generated voice backend/catalog selection
     stt_provider?: string;   // For audio transcription backend/catalog selection
@@ -296,10 +305,12 @@ export interface FlowNodeData {
     size?: string;         // For generated image
     width?: number;        // For generated image
     height?: number;       // For generated image
+    frames?: number;       // For generated video
+    fps?: number;          // For generated video
     negative_prompt?: string; // For generated image
-    steps?: number;        // For generated image
-    guidance_scale?: number; // For generated image
-    strength?: number;     // For image edit / image-to-image
+    steps?: number;        // For generated image/video
+    guidance_scale?: number; // For generated image/video
+    strength?: number;     // For image edit / image-to-image / image-to-video
     quality?: string;      // For generated image
     style?: string;        // For generated image
     voice?: string;        // For generated voice
@@ -402,6 +413,7 @@ export interface ExecutionEvent {
     | 'flow_resumed'
     | 'flow_cancelled'
     | 'trace_update'
+    | 'node_progress'
     | 'subworkflow_update';
   // ISO 8601 UTC timestamp for event emission (host-side observability).
   ts?: string;
@@ -411,6 +423,7 @@ export interface ExecutionEvent {
   stepId?: string;
   nodeId?: string;
   result?: unknown;
+  progress?: Record<string, unknown>;
   // subworkflow_update payload
   sub_run_id?: string;
   // trace_update payload (runtime-owned node traces; streamed as deltas)

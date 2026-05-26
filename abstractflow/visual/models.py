@@ -34,6 +34,8 @@ class PinType(str, Enum):
     MODEL_TEXT = "model_text"  # Text/LLM model id/name (string-like)
     PROVIDER_IMAGE = "provider_image"  # Image-generation provider/backend id (string-like)
     MODEL_IMAGE = "model_image"  # Image-generation model id/name (string-like)
+    PROVIDER_VIDEO = "provider_video"  # Video-generation provider/backend id (string-like)
+    MODEL_VIDEO = "model_video"  # Video-generation model id/name (string-like)
     PROVIDER_VOICE = "provider_voice"  # Voice/STT/TTS provider/backend id (string-like)
     MODEL_VOICE = "model_voice"  # Voice/STT/TTS model id/name (string-like)
     PROVIDER_MUSIC = "provider_music"  # Music-generation provider/backend id (string-like)
@@ -144,6 +146,9 @@ class NodeType(str, Enum):
     GENERATE_IMAGE = "generate_image"
     EDIT_IMAGE = "edit_image"
     IMAGE_TO_IMAGE = "image_to_image"
+    GENERATE_VIDEO = "generate_video"
+    TEXT_TO_VIDEO = "text_to_video"
+    IMAGE_TO_VIDEO = "image_to_video"
     GENERATE_VOICE = "generate_voice"
     GENERATE_MUSIC = "generate_music"
     TRANSCRIBE_AUDIO = "transcribe_audio"

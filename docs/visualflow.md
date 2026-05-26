@@ -49,14 +49,20 @@ Current media authoring nodes are saved as native VisualFlow node types:
 - `generate_image`
 - `edit_image`
 - `image_to_image` (legacy alias normalized by the editor)
+- `generate_video`
+- `text_to_video`
+- `image_to_video`
 - `generate_voice`
 - `generate_music`
 - `transcribe_audio`
 - `listen_voice`
 
-Generated image, voice, and music outputs should be treated as artifacts. Gateway
-is the preferred execution host for these nodes because it owns media catalogs,
-child runs, artifact persistence, and provider/runtime configuration.
+Generated image, video, voice, and music outputs should be treated as artifacts.
+Gateway is the preferred execution host for these nodes because it owns media
+catalogs, progress events, child runs, artifact persistence, and provider/runtime
+configuration. Video nodes use scoped provider/model fields (`video_provider`,
+`video_model`) and Gateway task catalogs (`text_to_video`, `image_to_video`) so
+the graph does not rely on hardcoded model names.
 
 Compatibility note: old saved flows that used the temporary browser-side
 Generate Music lowering are normalized back to native `generate_music` when they

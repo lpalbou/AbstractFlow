@@ -3,7 +3,7 @@ import type { NodeType, Pin } from '../types/flow';
 export type PinCatalogScope = 'text' | 'image' | 'tts' | 'stt' | 'music';
 
 const TEXT_NODE_TYPES = new Set<NodeType>(['agent', 'llm_call', 'provider_catalog', 'provider_models']);
-const IMAGE_NODE_TYPES = new Set<NodeType>(['generate_image', 'edit_image', 'image_to_image']);
+const IMAGE_NODE_TYPES = new Set<NodeType>(['generate_image', 'edit_image', 'image_to_image', 'generate_video', 'text_to_video', 'image_to_video']);
 const TTS_NODE_TYPES = new Set<NodeType>(['generate_voice']);
 const STT_NODE_TYPES = new Set<NodeType>(['listen_voice', 'transcribe_audio']);
 const MUSIC_NODE_TYPES = new Set<NodeType>(['generate_music']);
@@ -24,6 +24,7 @@ function prefixFromId(pinId: string, suffix: '_provider' | '_model'): string {
 
 function scopeFromPrefix(prefix: string): PinCatalogScope | null {
   if (prefix === 'image') return 'image';
+  if (prefix === 'video') return 'image';
   if (prefix === 'tts' || prefix === 'voice') return 'tts';
   if (prefix === 'stt' || prefix === 'speech' || prefix === 'transcription') return 'stt';
   if (prefix === 'music' || prefix === 'sound') return 'music';
@@ -36,6 +37,7 @@ export function isProviderPin(pin: Pin): boolean {
     pin.type === 'provider' ||
     pin.type === 'provider_text' ||
     pin.type === 'provider_image' ||
+    pin.type === 'provider_video' ||
     pin.type === 'provider_voice' ||
     pin.type === 'provider_music' ||
     pin.id === 'provider' ||
@@ -48,6 +50,7 @@ export function isModelPin(pin: Pin): boolean {
     pin.type === 'model' ||
     pin.type === 'model_text' ||
     pin.type === 'model_image' ||
+    pin.type === 'model_video' ||
     pin.type === 'model_voice' ||
     pin.type === 'model_music' ||
     pin.id === 'model' ||
@@ -58,6 +61,7 @@ export function isModelPin(pin: Pin): boolean {
 export function providerCatalogScopeForPin(pin: Pin, nodeType?: NodeType): PinCatalogScope | null {
   if (!isProviderPin(pin)) return null;
   if (pin.id === 'image_provider' || pin.id === 'provider_image' || pin.type === 'provider_image') return 'image';
+  if (pin.id === 'video_provider' || pin.id === 'provider_video' || pin.type === 'provider_video') return 'image';
   if (pin.id === 'tts_provider') return 'tts';
   if (pin.id === 'stt_provider') return 'stt';
   if (pin.id === 'music_provider' || pin.id === 'provider_music' || pin.type === 'provider_music') return 'music';
@@ -69,6 +73,7 @@ export function providerCatalogScopeForPin(pin: Pin, nodeType?: NodeType): PinCa
 export function modelCatalogScopeForPin(pin: Pin, pins: Pin[], nodeType?: NodeType): PinCatalogScope | null {
   if (!isModelPin(pin)) return null;
   if (pin.id === 'image_model' || pin.id === 'model_image' || pin.type === 'model_image') return 'image';
+  if (pin.id === 'video_model' || pin.id === 'model_video' || pin.type === 'model_video') return 'image';
   if (pin.id === 'tts_model') return 'tts';
   if (pin.id === 'stt_model') return 'stt';
   if (pin.id === 'music_model' || pin.id === 'model_music' || pin.type === 'model_music') return 'music';
@@ -105,4 +110,3 @@ export function providerPinIdForModelPin(pin: Pin, pins: Pin[], nodeType?: NodeT
   const sameScope = pins.find((candidate) => providerCatalogScopeForPin(candidate, nodeType) === scope);
   return sameScope?.id || null;
 }
-

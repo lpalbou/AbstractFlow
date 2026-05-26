@@ -36,6 +36,7 @@ This doc set is intentionally:
 - VisualFlow schema (portable JSON): [../abstractflow/visual/models.py](../abstractflow/visual/models.py)
 - VisualFlow host wiring + execution: [../abstractflow/visual/executor.py](../abstractflow/visual/executor.py)
 - Gateway client contracts/catalogs: [../web/frontend/src/utils/gatewayClient.ts](../web/frontend/src/utils/gatewayClient.ts), [../web/frontend/src/utils/gatewayCatalog.ts](../web/frontend/src/utils/gatewayCatalog.ts)
+- Run replay/progress/artifact rendering: [../web/frontend/src/components/RunFlowModal.tsx](../web/frontend/src/components/RunFlowModal.tsx)
 - VisualFlow interface contracts: [../abstractflow/visual/interfaces.py](../abstractflow/visual/interfaces.py)
 - WorkflowBundle helpers (thin wrapper): [../abstractflow/workflow_bundle.py](../abstractflow/workflow_bundle.py)
 - CLI entrypoint: [../abstractflow/cli.py](../abstractflow/cli.py)

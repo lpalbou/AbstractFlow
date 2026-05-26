@@ -60,6 +60,7 @@ import {
 } from '../schemas/known_json_schemas';
 
 const DEFAULT_IMAGE_FORMATS = ['png', 'jpeg', 'webp'];
+const DEFAULT_VIDEO_FORMATS = ['mp4', 'mov', 'gif'];
 const DEFAULT_TTS_FORMATS = ['wav', 'mp3'];
 const DEFAULT_STT_FORMATS = ['json', 'text', 'verbose_json', 'srt', 'vtt'];
 const DEFAULT_MUSIC_FORMATS = ['wav', 'mp3', 'flac'];
@@ -73,6 +74,9 @@ const MEDIA_NODE_TYPES = new Set([
   'generate_image',
   'edit_image',
   'image_to_image',
+  'generate_video',
+  'text_to_video',
+  'image_to_video',
   'generate_voice',
   'generate_music',
   'transcribe_audio',
@@ -82,6 +86,8 @@ const MEDIA_NODE_TYPES = new Set([
 const MEDIA_PIN_DEFAULT_IDS = new Set([
   'image_provider',
   'image_model',
+  'video_provider',
+  'video_model',
   'tts_provider',
   'tts_model',
   'voice',
@@ -498,11 +504,16 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     gatewayContracts?.flow_editor?.media?.generated_image || gatewayContracts?.assistant?.media?.generated_image;
   const editedImageContract =
     gatewayContracts?.flow_editor?.media?.edited_image || gatewayContracts?.assistant?.media?.edited_image;
+  const generatedVideoContract =
+    gatewayContracts?.flow_editor?.media?.generated_video || gatewayContracts?.assistant?.media?.generated_video;
+  const imageToVideoContract =
+    gatewayContracts?.flow_editor?.media?.image_to_video || gatewayContracts?.assistant?.media?.image_to_video;
   const generatedVoiceContract =
     gatewayContracts?.flow_editor?.media?.generated_voice || gatewayContracts?.assistant?.media?.generated_voice;
   const generatedMusicContract =
     gatewayContracts?.flow_editor?.media?.generated_music || gatewayContracts?.assistant?.media?.generated_music;
   const imageFormatOptions = formatValuesFrom(generatedImageContract?.direct_endpoint?.formats, DEFAULT_IMAGE_FORMATS);
+  const videoFormatOptions = formatValuesFrom(generatedVideoContract?.direct_endpoint?.formats, DEFAULT_VIDEO_FORMATS);
   const ttsFormatOptions = formatValuesFrom(generatedVoiceContract?.direct_endpoint?.formats, DEFAULT_TTS_FORMATS);
   const sttFormatOptions = formatValuesFrom(undefined, DEFAULT_STT_FORMATS);
   const musicFormatOptions = formatValuesFrom(generatedMusicContract?.direct_endpoint?.formats, DEFAULT_MUSIC_FORMATS);
@@ -530,6 +541,14 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     typeof editedImageContract?.direct_endpoint?.provider_models_task === 'string' && editedImageContract.direct_endpoint.provider_models_task.trim()
       ? editedImageContract.direct_endpoint.provider_models_task.trim()
       : 'image_to_image';
+  const generatedVideoProviderModelsTask =
+    typeof generatedVideoContract?.direct_endpoint?.provider_models_task === 'string' && generatedVideoContract.direct_endpoint.provider_models_task.trim()
+      ? generatedVideoContract.direct_endpoint.provider_models_task.trim()
+      : 'text_to_video';
+  const imageToVideoProviderModelsTask =
+    typeof imageToVideoContract?.direct_endpoint?.provider_models_task === 'string' && imageToVideoContract.direct_endpoint.provider_models_task.trim()
+      ? imageToVideoContract.direct_endpoint.provider_models_task.trim()
+      : 'image_to_video';
   const visionProviderModelsEndpoint = gatewayContracts?.common?.discovery?.vision_provider_models || '';
   const toolsDiscoveryEndpoint = gatewayContracts?.common?.discovery?.tools || '';
   const visualflowCollectionEndpoint = gatewayContracts?.flow_editor?.visualflows?.crud?.collection_endpoint || '';
@@ -612,6 +631,8 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     const rawTasks = [
       'text_generation',
       'image_generation',
+      'text_to_video',
+      'image_to_video',
       'tts',
       'stt',
       'music_generation',
@@ -622,6 +643,8 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     const labelFor = (task: string) => {
       if (task === 'text_generation') return 'Text generation';
       if (task === 'image_generation') return 'Image generation';
+      if (task === 'text_to_video') return 'Text to video';
+      if (task === 'image_to_video') return 'Image to video';
       if (task === 'tts') return 'Speech';
       if (task === 'stt') return 'Transcription';
       if (task === 'music_generation') return 'Music generation';
@@ -1697,6 +1720,22 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         eligible: true,
       };
     }
+    if (data.nodeType === 'generate_video' || data.nodeType === 'text_to_video' || data.nodeType === 'image_to_video') {
+      const pinBlocked = isInputPinConnected('video_provider') || isInputPinConnected('video_model');
+      const task = data.nodeType === 'image_to_video' ? 'image_to_video' : 'text_to_video';
+      const unsupportedReason = modelResidencyTaskUnsupportedReason(gatewayContracts, task);
+      return {
+        task,
+        provider: isInputPinConnected('video_provider')
+          ? ''
+          : first(data.effectConfig?.video_provider, data.pinDefaults?.video_provider, data.effectConfig?.provider, data.pinDefaults?.provider),
+        model: isInputPinConnected('video_model') ? '' : first(data.effectConfig?.video_model, data.pinDefaults?.video_model),
+        blockedReason: pinBlocked
+          ? 'Video provider or model comes from connected pins. Add a dedicated Model Residency node for dynamic control.'
+          : unsupportedReason,
+        eligible: true,
+      };
+    }
     if (data.nodeType === 'generate_voice') {
       const pinBlocked = isInputPinConnected('tts_provider') || isInputPinConnected('tts_model');
       const unsupportedReason = modelResidencyTaskUnsupportedReason(gatewayContracts, 'tts');
@@ -2094,6 +2133,95 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 );
               }
 
+              if (mediaNode && pin.id === 'video_provider') {
+                const currentProvider = stringDefaultFor('video_provider', 'provider');
+                const providerOptions = selectOptionsFromValues(imageModelOptions.map((item) => item.provider));
+                const videoTask = data.nodeType === 'image_to_video' ? imageToVideoProviderModelsTask : generatedVideoProviderModelsTask;
+                return (
+                  <div key={pin.id} className="property-group">
+                    <label className="property-sublabel">{rowLabel}</label>
+                    <AfSelect
+                      value={currentProvider}
+                      options={providerOptions}
+                      placeholder={loadingMediaModels ? 'Loading…' : 'Auto (Gateway default)'}
+                      loading={loadingMediaModels && providerOptions.length === 0}
+                      searchable
+                      searchPlaceholder="Search video providers…"
+                      clearable
+                      minPopoverWidth={300}
+                      onOpen={() => requestMediaCatalog('image', { task: videoTask })}
+                      onChange={(value) => {
+                        const provider = normalizeMediaProvider(value || '');
+                        patchMediaDefaults(
+                          { video_provider: provider || undefined, video_model: undefined },
+                          { video_provider: provider || undefined, video_model: undefined, provider: undefined, model: undefined }
+                        );
+                        if (provider) requestMediaCatalog('image', { provider, task: videoTask });
+                      }}
+                    />
+                  </div>
+                );
+              }
+
+              if (mediaNode && pin.id === 'video_model') {
+                const currentProvider = stringDefaultFor('video_provider', 'provider');
+                const currentModel = stringDefaultFor('video_model');
+                const videoTask = data.nodeType === 'image_to_video' ? imageToVideoProviderModelsTask : generatedVideoProviderModelsTask;
+                const modelOptions = imageModelOptions
+                  .filter((item) => !currentProvider || normalizeMediaProvider(item.provider) === normalizeMediaProvider(currentProvider))
+                  .map((item) => ({ value: item.model, label: item.label || item.model }));
+                return (
+                  <div key={pin.id} className="property-group">
+                    <label className="property-sublabel">{rowLabel}</label>
+                    <AfSelect
+                      value={currentModel}
+                      options={modelOptions}
+                      placeholder={
+                        loadingMediaModels
+                          ? 'Loading…'
+                          : currentProvider
+                            ? 'Select video model…'
+                            : 'Pick provider first'
+                      }
+                      disabled={!currentProvider}
+                      loading={loadingMediaModels && modelOptions.length === 0}
+                      searchable
+                      searchPlaceholder="Search video models…"
+                      clearable
+                      minPopoverWidth={400}
+                      onOpen={() => {
+                        if (currentProvider) requestMediaCatalog('image', { provider: currentProvider, task: videoTask });
+                      }}
+                      onChange={(value) => {
+                        const cleanModel = value ? value.trim() : '';
+                        const picked = imageModelOptions.find(
+                          (item) =>
+                            item.model === cleanModel &&
+                            (!currentProvider || normalizeMediaProvider(item.provider) === normalizeMediaProvider(currentProvider))
+                        );
+                        const nextDefaults = applyImagePinDefaultPatch(
+                          { ...((data.pinDefaults || {}) as Record<string, JsonValue>) },
+                          picked
+                        );
+                        if (cleanModel) nextDefaults.video_model = cleanModel;
+                        else delete nextDefaults.video_model;
+                        if (picked?.provider || currentProvider) nextDefaults.video_provider = picked?.provider || currentProvider;
+                        updateNodeData(node.id, {
+                          pinDefaults: nextDefaults as any,
+                          effectConfig: {
+                            ...(data.effectConfig || {}),
+                            video_provider: picked?.provider || currentProvider || undefined,
+                            video_model: cleanModel || undefined,
+                            provider: undefined,
+                            model: undefined,
+                          },
+                        });
+                      }}
+                    />
+                  </div>
+                );
+              }
+
               if (mediaNode && pin.id === 'tts_provider') {
                 const currentProvider = stringDefaultFor('tts_provider', 'provider');
                 return (
@@ -2314,16 +2442,20 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
               if (mediaNode && pin.id === 'format') {
                 const fallback =
-                  data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
-                    ? 'png'
-                    : data.nodeType === 'transcribe_audio'
-                      ? 'json'
-                      : 'wav';
-                const options =
-                  data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
-                    ? imageFormatOptions
-                    : data.nodeType === 'generate_voice'
-                      ? ttsFormatOptions
+	                  data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
+	                    ? 'png'
+	                    : data.nodeType === 'generate_video' || data.nodeType === 'text_to_video' || data.nodeType === 'image_to_video'
+	                      ? 'mp4'
+	                    : data.nodeType === 'transcribe_audio'
+	                      ? 'json'
+	                      : 'wav';
+	                const options =
+	                  data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
+	                    ? imageFormatOptions
+	                    : data.nodeType === 'generate_video' || data.nodeType === 'text_to_video' || data.nodeType === 'image_to_video'
+	                      ? videoFormatOptions
+	                    : data.nodeType === 'generate_voice'
+	                      ? ttsFormatOptions
                       : data.nodeType === 'generate_music'
                         ? musicFormatOptions
                         : sttFormatOptions;
@@ -2489,23 +2621,30 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
               if (
                 pin.id === 'format' &&
-                (data.nodeType === 'generate_image' ||
-                  data.nodeType === 'edit_image' ||
-                  data.nodeType === 'image_to_image' ||
-                  data.nodeType === 'generate_voice' ||
+	                (data.nodeType === 'generate_image' ||
+	                  data.nodeType === 'edit_image' ||
+	                  data.nodeType === 'image_to_image' ||
+	                  data.nodeType === 'generate_video' ||
+	                  data.nodeType === 'text_to_video' ||
+	                  data.nodeType === 'image_to_video' ||
+	                  data.nodeType === 'generate_voice' ||
                   data.nodeType === 'generate_music' ||
                   data.nodeType === 'transcribe_audio')
               ) {
                 const fallback =
-                  data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
-                    ? 'png'
-                    : data.nodeType === 'transcribe_audio'
-                      ? 'json'
-                      : 'wav';
-                const baseOptions =
-                  data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
-                    ? imageFormatOptions
-                    : data.nodeType === 'generate_voice'
+	                  data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
+	                    ? 'png'
+	                    : data.nodeType === 'generate_video' || data.nodeType === 'text_to_video' || data.nodeType === 'image_to_video'
+	                      ? 'mp4'
+	                    : data.nodeType === 'transcribe_audio'
+	                      ? 'json'
+	                      : 'wav';
+	                const baseOptions =
+	                  data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
+	                    ? imageFormatOptions
+	                    : data.nodeType === 'generate_video' || data.nodeType === 'text_to_video' || data.nodeType === 'image_to_video'
+	                      ? videoFormatOptions
+	                    : data.nodeType === 'generate_voice'
                       ? ttsFormatOptions
                       : data.nodeType === 'generate_music'
                         ? musicFormatOptions

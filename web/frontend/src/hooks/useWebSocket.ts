@@ -368,6 +368,20 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
             }
           }
           break;
+        case 'node_progress':
+          if (event.runId && runIdRef.current && event.runId !== runIdRef.current) break;
+          if (!runIdRef.current) break;
+          if (!event.nodeId || !nodeIdSet.has(event.nodeId)) break;
+          if (isWaiting || isPaused) {
+            setIsWaiting(false);
+            setIsPaused(false);
+            setWaitingInfo(null);
+            waitingRef.current = false;
+            pausedRef.current = false;
+            waitingInfoRef.current = null;
+          }
+          setExecutingNodeId(event.nodeId);
+          break;
         case 'flow_waiting': {
           const reason = typeof event.reason === 'string' ? event.reason : '';
           const isSubworkflowWait = reason.toLowerCase() === 'subworkflow';

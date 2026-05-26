@@ -204,9 +204,28 @@ export interface GatewayGeneratedMusicContract {
   workflow?: GatewayMediaWorkflowDescriptor;
 }
 
+export interface GatewayGeneratedVideoContract {
+  direct_endpoint?: GatewayEndpointDescriptor & {
+    route_available?: boolean;
+    configured?: boolean;
+    provider_models_endpoint?: string;
+    provider_models_task?: string;
+    progress_event_name?: string;
+    progress_scope?: string;
+    durability?: string;
+    returns_child_run_id?: boolean;
+    formats?: string[];
+    selected_backend?: string;
+    config_hint?: string;
+  };
+  workflow?: GatewayMediaWorkflowDescriptor;
+}
+
 export interface GatewayMediaContract {
   generated_image?: GatewayGeneratedImageContract;
   edited_image?: GatewayGeneratedImageContract;
+  generated_video?: GatewayGeneratedVideoContract;
+  image_to_video?: GatewayGeneratedVideoContract;
   generated_voice?: GatewayGeneratedVoiceContract;
   generated_music?: GatewayGeneratedMusicContract;
   [key: string]: unknown;
@@ -317,6 +336,8 @@ export interface GatewayOptionalFeatureStatus {
   kgMemory: boolean;
   generatedImage: boolean;
   editedImage: boolean;
+  generatedVideo: boolean;
+  imageToVideo: boolean;
   generatedVoice: boolean;
   generatedMusic: boolean;
   attachmentsUpload: boolean;
@@ -360,6 +381,8 @@ export class GatewayHttpError extends Error {
 const AUTHORING_CAPABILITY_LABELS: Record<GatewayAuthoringCapability, string> = {
   generated_image: 'Generate Image',
   edited_image: 'Edit Image',
+  generated_video: 'Generate Video',
+  image_to_video: 'Image To Video',
   generated_voice: 'Generate Voice',
   generated_music: 'Generate Music',
   model_residency: 'Model Residency',
@@ -370,6 +393,8 @@ const AUTHORING_CAPABILITY_LABELS: Record<GatewayAuthoringCapability, string> = 
 const AUTHORING_CAPABILITY_OPTIONAL_KEYS: Record<GatewayAuthoringCapability, keyof GatewayOptionalFeatureStatus> = {
   generated_image: 'generatedImage',
   edited_image: 'editedImage',
+  generated_video: 'generatedVideo',
+  image_to_video: 'imageToVideo',
   generated_voice: 'generatedVoice',
   generated_music: 'generatedMusic',
   model_residency: 'modelResidency',
@@ -752,6 +777,22 @@ export function getGatewayFlowEditorReadiness(
         directGeneratedMediaAvailable(image?.direct_endpoint, surface)
     );
   })();
+  const generatedVideo = (() => {
+    const video = flow?.media?.generated_video || contracts?.assistant?.media?.generated_video;
+    const surface = gatewayMediaSurface(surfaceReadiness, 'generated_video');
+    return Boolean(
+      (video?.workflow?.available === true && gatewayWorkflowMediaSurfaceAllows(surface)) ||
+        directGeneratedMediaAvailable(video?.direct_endpoint, surface)
+    );
+  })();
+  const imageToVideo = (() => {
+    const video = flow?.media?.image_to_video || contracts?.assistant?.media?.image_to_video;
+    const surface = gatewayMediaSurface(surfaceReadiness, 'image_to_video');
+    return Boolean(
+      (video?.workflow?.available === true && gatewayWorkflowMediaSurfaceAllows(surface)) ||
+        directGeneratedMediaAvailable(video?.direct_endpoint, surface)
+    );
+  })();
   const generatedVoice = (() => {
     const voice = flow?.media?.generated_voice || contracts?.assistant?.media?.generated_voice;
     const surface = gatewayMediaSurface(surfaceReadiness, 'generated_voice');
@@ -809,6 +850,8 @@ export function getGatewayFlowEditorReadiness(
       kgMemory: Boolean(common?.memory?.available === true && descriptorEndpointAvailable(common.memory)),
       generatedImage,
       editedImage,
+      generatedVideo,
+      imageToVideo,
       generatedVoice,
       generatedMusic,
       attachmentsUpload: descriptorEndpointAvailable(common?.attachments?.upload),

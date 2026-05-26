@@ -123,9 +123,143 @@ def test_visual_runner_accepts_ui_authored_media_provider_model_defaults() -> No
     source = (ROOT / "abstractflow" / "visual" / "executor.py").read_text(encoding="utf-8")
     assert '"generate_music": "music_provider"' in source
     assert '"generate_music": "music_model"' in source
+    assert '"generate_video": "video_provider"' in source
+    assert '"generate_video": "video_model"' in source
+    assert '"image_to_video": "video_provider"' in source
+    assert '"image_to_video": "video_model"' in source
     assert '"generate_image": "image_provider"' in source
     assert '"generate_voice": "tts_provider"' in source
     assert '"transcribe_audio": "stt_provider"' in source
+
+
+def test_generate_video_native_node_compiles_to_video_output() -> None:
+    """Guard the Runtime-side contract used by Flow's native Generate Video node."""
+
+    if LOCAL_RUNTIME_SRC.is_dir():
+        sys.path.insert(0, str(LOCAL_RUNTIME_SRC))
+
+    from abstractruntime.core.models import EffectType, RunState, RunStatus
+    from abstractruntime.visualflow_compiler import compile_visualflow
+
+    vf = {
+        "id": "vf_generate_video_native",
+        "name": "Generate Video (Native)",
+        "entryNode": "video",
+        "nodes": [
+            {
+                "id": "video",
+                "type": "generate_video",
+                "position": {"x": 0, "y": 0},
+                "data": {
+                    "nodeType": "generate_video",
+                    "effectConfig": {
+                        "prompt": "slow cinematic camera move over abstract code",
+                        "video_provider": "mlx-gen",
+                        "video_model": "Wan-AI/Wan2.2-TI2V-5B-Diffusers",
+                        "format": "mp4",
+                        "frames": 41,
+                        "fps": 24,
+                        "steps": 10,
+                        "guidance_scale": 5.0,
+                    },
+                },
+            }
+        ],
+        "edges": [],
+    }
+
+    spec = compile_visualflow(vf)
+    run = RunState(
+        run_id="run",
+        workflow_id=str(spec.workflow_id),
+        status=RunStatus.RUNNING,
+        current_node="video",
+        vars={"_temp": {}},
+    )
+
+    plan = spec.nodes["video"](run, {})
+    assert plan.effect is not None
+    assert plan.effect.type == EffectType.LLM_CALL
+
+    payload = plan.effect.payload
+    assert isinstance(payload, dict)
+    assert payload.get("prompt") == "slow cinematic camera move over abstract code"
+    output = payload.get("output")
+    assert isinstance(output, dict)
+    assert output.get("modality") == "video"
+    assert output.get("task") == "text_to_video"
+    assert output.get("provider") == "mlx-gen"
+    assert output.get("model") == "Wan-AI/Wan2.2-TI2V-5B-Diffusers"
+    assert output.get("format") == "mp4"
+    assert output.get("num_frames") == 41
+    assert output.get("fps") == 24
+    assert output.get("steps") == 10
+    assert output.get("guidance_scale") == 5.0
+
+
+def test_image_to_video_native_node_compiles_to_video_output_with_source_media() -> None:
+    """Guard the Runtime-side contract used by Flow's native Image To Video node."""
+
+    if LOCAL_RUNTIME_SRC.is_dir():
+        sys.path.insert(0, str(LOCAL_RUNTIME_SRC))
+
+    from abstractruntime.core.models import EffectType, RunState, RunStatus
+    from abstractruntime.visualflow_compiler import compile_visualflow
+
+    vf = {
+        "id": "vf_image_to_video_native",
+        "name": "Image To Video (Native)",
+        "entryNode": "video",
+        "nodes": [
+            {
+                "id": "video",
+                "type": "image_to_video",
+                "position": {"x": 0, "y": 0},
+                "data": {
+                    "nodeType": "image_to_video",
+                    "effectConfig": {
+                        "prompt": "animate the logo into a precise product reveal",
+                        "source_image": "artifact-source-image",
+                        "video_provider": "mlx-gen",
+                        "video_model": "Wan-AI/Wan2.2-TI2V-5B-Diffusers",
+                        "format": "mp4",
+                        "frames": 41,
+                        "fps": 24,
+                        "steps": 10,
+                    },
+                },
+            }
+        ],
+        "edges": [],
+    }
+
+    spec = compile_visualflow(vf)
+    run = RunState(
+        run_id="run",
+        workflow_id=str(spec.workflow_id),
+        status=RunStatus.RUNNING,
+        current_node="video",
+        vars={"_temp": {}},
+    )
+
+    plan = spec.nodes["video"](run, {})
+    assert plan.effect is not None
+    assert plan.effect.type == EffectType.LLM_CALL
+
+    payload = plan.effect.payload
+    assert isinstance(payload, dict)
+    assert payload.get("prompt") == "animate the logo into a precise product reveal"
+    output = payload.get("output")
+    assert isinstance(output, dict)
+    assert output.get("modality") == "video"
+    assert output.get("task") == "image_to_video"
+    assert output.get("provider") == "mlx-gen"
+    assert output.get("model") == "Wan-AI/Wan2.2-TI2V-5B-Diffusers"
+    assert output.get("format") == "mp4"
+    assert output.get("num_frames") == 41
+    media = payload.get("media")
+    assert isinstance(media, list)
+    assert {"type": "image", "role": "source", "$artifact": "artifact-source-image"} in media
 
 
 def test_edit_image_native_node_compiles_to_image_edit_output() -> None:

@@ -55,7 +55,7 @@ Optional extras (declared in `pyproject.toml`):
 - Full host profiles:
   - Apple-capable: `pip install "abstractflow[apple]"`
   - GPU-capable: `pip install "abstractflow[gpu]"`
-- `abstractflow[apple]` and `abstractflow[gpu]` pull the matching `abstractgateway[...]` host profile and Visual Agent support. Flow no longer names `AbstractRuntime` or `abstractcore` directly in these profiles; Gateway owns that deployment stack. AbstractFlow `0.3.14` expects Gateway `>=0.2.19` for the current media/catalog/residency contracts.
+- `abstractflow[apple]` and `abstractflow[gpu]` pull the matching `abstractgateway[...]` host profile and Visual Agent support. Flow no longer names `AbstractRuntime` or `abstractcore` directly in these profiles; Gateway owns that deployment stack. AbstractFlow `0.3.15` expects Gateway `>=0.2.20` for the current image/video media, progress, catalog, and residency contracts.
 - Agent nodes only, without the host profile: `pip install "abstractflow[agent]"`
 - Documentation site tools: `pip install "abstractflow[docs]"`
 
@@ -110,16 +110,18 @@ Open:
 - Gateway capabilities: http://localhost:8080/api/gateway/discovery/capabilities
 
 Media nodes use Gateway as the catalog and execution source. Generate Image,
-Edit Image/Image-to-Image, Generate Voice, Generate Music, Transcribe Audio, and
-Listen Voice expose Gateway Media controls populated from catalog routes such as
+Edit Image/Image-to-Image, Generate Video, Image-to-Video, Generate Voice,
+Generate Music, Transcribe Audio, and Listen Voice expose Gateway Media controls
+populated from catalog routes such as
 `/api/gateway/vision/models`, `/api/gateway/vision/provider_models`,
 `/api/gateway/voice/voices`, `/api/gateway/audio/speech/models`,
 `/api/gateway/audio/transcriptions/models`, and
 `/api/gateway/audio/music/{providers,models}`. When Gateway exposes
 `common.readiness`, Flow uses it as a conservative surface-readiness overlay
 while still resolving concrete calls from endpoint descriptors. Generated images,
-voice, and music are artifacts; the Run modal renders previews/players from
-Gateway artifact content while leaving raw ledger JSON available for debugging.
+videos, voice, and music are artifacts; the Run modal renders previews/players
+from Gateway artifact content and keeps `abstract.progress` ledger events visible
+for long media runs while leaving raw ledger JSON available for debugging.
 
 The `abstractflow serve`/FastAPI host is a Gateway proxy by default. Its old local `/api/flows`, `/api/ws`, and `/api/runs` compatibility routes are available only when `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1` is set. See [docs/web-editor.md](docs/web-editor.md) and [docs/architecture.md](docs/architecture.md).
 

@@ -186,6 +186,17 @@ export function computeRunPreflightIssues(
       if (!stringInputPresent(edges, n, 'prompt')) push(n, 'Missing required input: prompt');
     }
 
+    if (t === 'generate_video' || t === 'text_to_video') {
+      if (!stringInputPresent(edges, n, 'prompt')) push(n, 'Missing required input: prompt');
+    }
+
+    if (t === 'image_to_video') {
+      if (!stringInputPresent(edges, n, 'prompt')) push(n, 'Missing required input: prompt');
+      if (!artifactInputPresent(edges, n, 'source_image', 'image_artifact')) {
+        push(n, 'Missing required input: source_image');
+      }
+    }
+
     if (t === 'edit_image' || t === 'image_to_image') {
       if (!stringInputPresent(edges, n, 'prompt')) push(n, 'Missing required input: prompt');
       if (!artifactInputPresent(edges, n, 'image_artifact', 'source_image')) {
@@ -215,4 +226,3 @@ export function computeRunPreflightIssues(
   });
   return issues;
 }
-

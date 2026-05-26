@@ -42,6 +42,27 @@ function isAbstractStatusResult(value: unknown): boolean {
   return normalizeString(record.name) === 'abstract.status';
 }
 
+function extractAbstractProgressPayload(rec: LedgerRecord): Record<string, unknown> | null {
+  const fromResult = rec.result && typeof rec.result === 'object' ? (rec.result as Record<string, unknown>) : null;
+  if (normalizeString(fromResult?.name) === 'abstract.progress') {
+    const payload = fromResult?.payload;
+    if (payload && typeof payload === 'object' && !Array.isArray(payload)) return payload as Record<string, unknown>;
+    return {};
+  }
+
+  const effectPayload = rec.effect?.payload;
+  const fromEffect = effectPayload && typeof effectPayload === 'object' && !Array.isArray(effectPayload)
+    ? (effectPayload as Record<string, unknown>)
+    : null;
+  if (normalizeString(fromEffect?.name) === 'abstract.progress') {
+    const payload = fromEffect?.payload;
+    if (payload && typeof payload === 'object' && !Array.isArray(payload)) return payload as Record<string, unknown>;
+    return {};
+  }
+
+  return null;
+}
+
 function extractWaitInfo(rec: LedgerRecord) {
   const res = rec && typeof rec === 'object' ? rec.result : null;
   const wait = res && typeof res === 'object' ? (res as Record<string, unknown>).wait : null;
@@ -120,6 +141,22 @@ export function mapLedgerRecordToEvents(rec: LedgerRecord, state: LedgerMappingS
     if (ts) openNodes.set(nodeId, ts);
   } else if (status === 'completed') {
     if (isAbstractStatusResult(rec.result)) {
+      events.push(traceUpdateEvent(rec, nodeId, runId));
+      return events;
+    }
+
+    const progressPayload = extractAbstractProgressPayload(rec);
+    if (progressPayload) {
+      const ts = endedAt || startedAt;
+      events.push({
+        type: 'node_progress',
+        runId,
+        stepId: normalizeString(progressPayload.step_id) || stepId,
+        nodeId: normalizeString(progressPayload.node_id) || nodeId,
+        ts,
+        progress: progressPayload,
+        result: progressPayload,
+      });
       events.push(traceUpdateEvent(rec, nodeId, runId));
       return events;
     }

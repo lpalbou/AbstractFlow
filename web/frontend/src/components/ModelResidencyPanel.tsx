@@ -75,7 +75,16 @@ interface DefaultDraft {
   optionsText: string;
 }
 
-type DefaultCatalogTask = 'text_generation' | 'image_generation' | 'tts' | 'stt' | 'music_generation' | 'embedding_text' | 'custom';
+type DefaultCatalogTask =
+  | 'text_generation'
+  | 'image_generation'
+  | 'text_to_video'
+  | 'image_to_video'
+  | 'tts'
+  | 'stt'
+  | 'music_generation'
+  | 'embedding_text'
+  | 'custom';
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
@@ -190,15 +199,26 @@ function providerValuesFrom(payload: unknown, arrayKeys: string[], mapKeys: stri
 function taskLabel(task: string): string {
   if (task === 'text_generation') return 'Text';
   if (task === 'image_generation') return 'Image';
+  if (task === 'text_to_video') return 'Text to video';
+  if (task === 'image_to_video') return 'Image to video';
   if (task === 'tts') return 'Speech';
   if (task === 'stt') return 'Transcription';
   if (task === 'music_generation') return 'Music';
   return task.replace(/_/g, ' ');
 }
 
+function isVisionCatalogTask(task: string): boolean {
+  return task === 'image_generation' || task === 'text_to_video' || task === 'image_to_video';
+}
+
+function visionProviderModelsTask(task: string): string {
+  if (task === 'text_to_video' || task === 'image_to_video') return task;
+  return 'text_to_image';
+}
+
 function taskOptions(contracts: GatewayContracts | null): AfSelectOption[] {
   const residency = contracts?.common?.model_residency;
-  const canonicalTasks = ['text_generation', 'image_generation', 'tts', 'stt', 'music_generation'];
+  const canonicalTasks = ['text_generation', 'image_generation', 'text_to_video', 'image_to_video', 'tts', 'stt', 'music_generation'];
   const rawTasks = [
     ...canonicalTasks,
     ...(Array.isArray(residency?.tasks) ? residency.tasks : []),
@@ -217,10 +237,14 @@ function taskOptions(contracts: GatewayContracts | null): AfSelectOption[] {
 
 function defaultCatalogTask(row: ModelDefaultView | null): DefaultCatalogTask {
   if (!row) return 'custom';
+  const explicitTask = row.task.toLowerCase();
+  if (explicitTask === 'text_to_video' || explicitTask === 'image_to_video') return explicitTask;
+  if (explicitTask === 'text_to_image') return 'image_generation';
   const kind = row.kind.toLowerCase();
   const modality = row.modality.toLowerCase();
   if (kind === 'output') {
-    if (modality === 'image' || modality === 'video') return 'image_generation';
+    if (modality === 'image') return 'image_generation';
+    if (modality === 'video') return 'text_to_video';
     if (modality === 'voice') return 'tts';
     if (modality === 'music' || modality === 'sound') return 'music_generation';
     if (modality === 'text') return 'text_generation';
@@ -234,6 +258,8 @@ function defaultCatalogTask(row: ModelDefaultView | null): DefaultCatalogTask {
 }
 
 function defaultVisionCatalogTask(row: ModelDefaultView | null): string {
+  const explicitTask = row?.task.toLowerCase() || '';
+  if (explicitTask === 'text_to_video' || explicitTask === 'image_to_video') return explicitTask;
   const modality = row?.modality.toLowerCase() || '';
   if (modality === 'video') return 'text_to_video';
   return 'text_to_image';
@@ -241,6 +267,7 @@ function defaultVisionCatalogTask(row: ModelDefaultView | null): string {
 
 function defaultProviderPlaceholder(catalogTask: DefaultCatalogTask): string {
   if (catalogTask === 'image_generation') return 'Image provider…';
+  if (catalogTask === 'text_to_video' || catalogTask === 'image_to_video') return 'Video provider…';
   if (catalogTask === 'tts') return 'Speech provider…';
   if (catalogTask === 'stt') return 'Transcription provider…';
   if (catalogTask === 'music_generation') return 'Music provider…';
@@ -251,6 +278,7 @@ function defaultProviderPlaceholder(catalogTask: DefaultCatalogTask): string {
 function defaultModelPlaceholder(catalogTask: DefaultCatalogTask, provider: string): string {
   if (!provider) return 'Pick provider…';
   if (catalogTask === 'image_generation') return 'Image model…';
+  if (catalogTask === 'text_to_video' || catalogTask === 'image_to_video') return 'Video model…';
   if (catalogTask === 'tts') return 'Speech model…';
   if (catalogTask === 'stt') return 'Transcription model…';
   if (catalogTask === 'music_generation') return 'Music model…';
@@ -504,14 +532,15 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
   const musicProvidersEndpoint = gatewayContracts?.common?.discovery?.audio_music_providers || '';
   const musicModelsEndpoint = gatewayContracts?.common?.discovery?.audio_music_models || '';
   const embeddingModelsEndpoint = gatewayContracts?.common?.discovery?.embedding_models || '';
+  const selectedVisionTask = visionProviderModelsTask(task);
   const editingDefaultCatalogTask = defaultCatalogTask(editingDefault);
   const editingDefaultVisionTask = defaultVisionCatalogTask(editingDefault);
   const editingDefaultProvider = defaultDraft.provider.trim();
   const editingDefaultModel = defaultDraft.model.trim();
   const imageCatalogQuery = useQuery({
-    queryKey: ['gateway', 'model-residency', 'vision-provider-models', visionEndpoint],
-    queryFn: async () => parseProviderModelCatalog(await gatewayJson<unknown>(gatewayPath(visionEndpoint, {}, { task: 'text_to_image' }))),
-    enabled: isOpen && residencyControlsAvailable && task === 'image_generation' && Boolean(visionEndpoint),
+    queryKey: ['gateway', 'model-residency', 'vision-provider-models', visionEndpoint, selectedVisionTask],
+    queryFn: async () => parseProviderModelCatalog(await gatewayJson<unknown>(gatewayPath(visionEndpoint, {}, { task: selectedVisionTask }))),
+    enabled: isOpen && residencyControlsAvailable && isVisionCatalogTask(task) && Boolean(visionEndpoint),
     staleTime: 30_000,
     retry: 1,
   });
@@ -558,7 +587,7 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
   const defaultImageProviderCatalogQuery = useQuery({
     queryKey: ['gateway', 'capability-defaults', 'vision-provider-catalog', visionEndpoint, editingDefaultVisionTask],
     queryFn: async () => gatewayJson<unknown>(gatewayPath(visionEndpoint, {}, { task: editingDefaultVisionTask, providers_only: true })),
-    enabled: isOpen && Boolean(editingDefault) && editingDefaultCatalogTask === 'image_generation' && Boolean(visionEndpoint),
+    enabled: isOpen && Boolean(editingDefault) && isVisionCatalogTask(editingDefaultCatalogTask) && Boolean(visionEndpoint),
     staleTime: 30_000,
     retry: 1,
   });
@@ -570,7 +599,7 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
           gatewayPath(visionEndpoint, {}, { task: editingDefaultVisionTask, provider: editingDefaultProvider || undefined })
         )
       ),
-    enabled: isOpen && Boolean(editingDefault) && editingDefaultCatalogTask === 'image_generation' && Boolean(visionEndpoint),
+    enabled: isOpen && Boolean(editingDefault) && isVisionCatalogTask(editingDefaultCatalogTask) && Boolean(visionEndpoint),
     staleTime: 30_000,
     retry: 1,
   });
@@ -688,7 +717,7 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
       seen.add(clean);
       out.push({ value: clean, label: label || clean });
     };
-    if (task === 'image_generation') {
+    if (isVisionCatalogTask(task)) {
       for (const option of imagePairs) add(option.provider);
     } else if (task === 'tts') {
       for (const option of providerOptionsFromGatewayCatalog(ttsProviderCatalogQuery.data, ['tts_providers', 'providers', 'available_providers'], ['models_by_provider', 'tts_models_by_provider'])) add(option.value, option.label);
@@ -714,7 +743,7 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
       seen.add(clean);
       out.push({ value: clean, label: label || clean });
     };
-    if (task === 'image_generation') {
+    if (isVisionCatalogTask(task)) {
       for (const option of imagePairs) {
         if (!provider || option.provider === provider) add(option.model, option.label);
       }
@@ -740,7 +769,7 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
       seen.add(clean);
       out.push({ value: clean, label: label || clean });
     };
-    if (editingDefaultCatalogTask === 'image_generation') {
+    if (isVisionCatalogTask(editingDefaultCatalogTask)) {
       for (const option of providerOptionsFromGatewayCatalog(defaultImageProviderCatalogQuery.data, ['providers', 'available_providers'], ['models_by_provider'])) add(option.value, option.label);
       for (const option of defaultImageModelCatalogQuery.data || []) add(option.provider);
     } else if (editingDefaultCatalogTask === 'tts') {
@@ -779,7 +808,7 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
       seen.add(clean);
       out.push({ value: clean, label: label || clean });
     };
-    if (editingDefaultCatalogTask === 'image_generation') {
+    if (isVisionCatalogTask(editingDefaultCatalogTask)) {
       for (const option of defaultImageModelCatalogQuery.data || []) {
         if (!editingDefaultProvider || option.provider === editingDefaultProvider) add(option.model, option.label);
       }
@@ -865,25 +894,29 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
   const providerPlaceholder =
     task === 'image_generation'
       ? 'Image provider…'
-      : task === 'tts'
-        ? 'Speech provider…'
-        : task === 'stt'
-          ? 'Transcription provider…'
-          : task === 'music_generation'
-            ? 'Music provider…'
-          : 'Provider…';
+      : task === 'text_to_video' || task === 'image_to_video'
+        ? 'Video provider…'
+        : task === 'tts'
+          ? 'Speech provider…'
+          : task === 'stt'
+            ? 'Transcription provider…'
+            : task === 'music_generation'
+              ? 'Music provider…'
+              : 'Provider…';
   const modelPlaceholder =
     !provider
       ? 'Pick provider…'
       : task === 'image_generation'
         ? 'Image model…'
-        : task === 'tts'
-          ? 'Speech model…'
-          : task === 'stt'
-            ? 'Transcription model…'
-            : task === 'music_generation'
-              ? 'Music model…'
-            : 'Model…';
+        : task === 'text_to_video' || task === 'image_to_video'
+          ? 'Video model…'
+          : task === 'tts'
+            ? 'Speech model…'
+            : task === 'stt'
+              ? 'Transcription model…'
+              : task === 'music_generation'
+                ? 'Music model…'
+                : 'Model…';
   const providerLoading =
     providersQuery.isLoading ||
     imageCatalogQuery.isLoading ||

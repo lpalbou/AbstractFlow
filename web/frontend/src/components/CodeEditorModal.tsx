@@ -167,17 +167,14 @@ export function CodeEditorModal({
   const initialBody = useMemo(
     () => upsertPythonAvailableVariablesComments(body, params),
     // `parameterSignature` is the stable dependency; `params` array identity changes on parent rerenders.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [body, parameterSignature]
   );
   const initialSampleInput = useMemo(
     () => buildSampleInput(params),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [parameterSignature]
   );
   const variables = useMemo(
     () => variableRows(params),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [parameterSignature]
   );
   const [value, setValue] = useState(body);

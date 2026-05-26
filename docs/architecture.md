@@ -1,6 +1,6 @@
 # AbstractFlow — Architecture (Current)
 
-> Updated: 2026-05-22
+> Updated: 2026-05-26
 > Scope: describes **implemented behavior** in this repository (no roadmap claims).
 
 AbstractFlow is a workflow authoring + orchestration layer in the [AbstractFramework ecosystem](https://github.com/lpalbou/AbstractFramework).
@@ -123,13 +123,16 @@ The editor discovers generated media support from Gateway capabilities rather
 than local Runtime/Core imports:
 - `assistant.media.generated_image`
 - `assistant.media.edited_image`
+- `assistant.media.generated_video`
+- `assistant.media.image_to_video`
 - `assistant.media.generated_voice`
 - `assistant.media.generated_music`
 
 Gateway catalog endpoints can return `gateway_catalog_v1` (`catalog` metadata +
 canonical `items`) or older legacy arrays/maps. The frontend adapter normalizes
-both and uses those catalogs for image, voice, transcription, and music
-provider/model selectors.
+both and uses those catalogs for image, video, voice, transcription, and music
+provider/model selectors. Video selectors use Gateway's task-scoped vision
+catalogs (`text_to_video` and `image_to_video`) instead of hardcoded model lists.
 
 Gateway `common.readiness` (`gateway_surface_readiness_v1`) is consumed as a
 surface-level readiness overlay for optional media/model-residency UX. It does
@@ -137,10 +140,14 @@ not replace endpoint descriptors, because Flow still needs those descriptors to
 construct the actual Gateway requests.
 
 Native media authoring nodes are persisted as native VisualFlow node types:
-`generate_image`, `edit_image`, `image_to_image`, `generate_voice`,
-`generate_music`, `transcribe_audio`, and `listen_voice`. Old saved music flows
-that used the temporary browser-side lowering are normalized back to native
-`generate_music` when loaded or saved.
+`generate_image`, `edit_image`, `image_to_image`, `generate_video`,
+`text_to_video`, `image_to_video`, `generate_voice`, `generate_music`,
+`transcribe_audio`, and `listen_voice`. Gateway progress callbacks emitted as
+`abstract.progress` ledger events are rendered as running-node progress rather
+than terminal step output, which keeps long video generations observable without
+closing the active node. Old saved music flows that used the temporary
+browser-side lowering are normalized back to native `generate_music` when loaded
+or saved.
 
 ## Legacy/dev FastAPI host
 

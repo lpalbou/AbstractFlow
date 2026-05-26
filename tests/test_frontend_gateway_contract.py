@@ -133,8 +133,8 @@ const complete = {
         load: '/models/load',
         unload: '/models/unload',
       },
-      tasks: ['text_generation', 'image_generation', 'music_generation', 'tts', 'stt'],
-      supports: { text_generation: true, image_generation: true, music_generation: true, tts: true, stt: true },
+      tasks: ['text_generation', 'image_generation', 'text_to_video', 'image_to_video', 'music_generation', 'tts', 'stt'],
+      supports: { text_generation: true, image_generation: true, text_to_video: true, image_to_video: true, music_generation: true, tts: true, stt: true },
     },
     memory: { available: true, endpoint: '/kg/query' },
     execution: {
@@ -158,13 +158,15 @@ const complete = {
         media: {
           generated_image: { available: true, route_available: true, configured: true, workflow_available: false },
           edited_image: { available: true, route_available: true, configured: true, workflow_available: false },
+          generated_video: { available: true, route_available: true, configured: true, workflow_available: false },
+          image_to_video: { available: true, route_available: true, configured: true, workflow_available: false },
           generated_voice: { available: false, route_available: false, workflow_available: true },
           generated_music: { available: true, route_available: true, configured: true, workflow_available: false },
         },
         model_residency: {
           available: false,
           route_available: true,
-          supports: { text_generation: true, image_generation: true, music_generation: true, tts: true, stt: true },
+          supports: { text_generation: true, image_generation: true, text_to_video: true, image_to_video: true, music_generation: true, tts: true, stt: true },
         },
       },
     },
@@ -181,6 +183,30 @@ const complete = {
     media: {
       generated_image: { direct_endpoint: { endpoint: '/media/images', available: true } },
       edited_image: { direct_endpoint: { endpoint: '/media/images/edit', available: true } },
+      generated_video: {
+        direct_endpoint: {
+          endpoint: '/runs/{run_id}/videos/generate',
+          available: true,
+          configured: true,
+          route_available: true,
+          provider_models_endpoint: '/vision/provider_models',
+          provider_models_task: 'text_to_video',
+          progress_event_name: 'abstract.progress',
+          progress_scope: 'child_run_ledger',
+        },
+      },
+      image_to_video: {
+        direct_endpoint: {
+          endpoint: '/runs/{run_id}/videos/from_image',
+          available: true,
+          configured: true,
+          route_available: true,
+          provider_models_endpoint: '/vision/provider_models',
+          provider_models_task: 'image_to_video',
+          progress_event_name: 'abstract.progress',
+          progress_scope: 'child_run_ledger',
+        },
+      },
       generated_voice: { workflow: { available: true } },
       generated_music: {
         direct_endpoint: {
@@ -202,6 +228,8 @@ assert.equal(ready.optional.promptCacheSessions, true);
 assert.equal(ready.optional.promptCacheDurableBlocs, true);
 assert.equal(ready.optional.generatedImage, true);
 assert.equal(ready.optional.editedImage, true);
+assert.equal(ready.optional.generatedVideo, true);
+assert.equal(ready.optional.imageToVideo, true);
 assert.equal(ready.optional.generatedMusic, true);
 assert.equal(ready.optional.modelResidency, true);
 assert.equal(
@@ -324,6 +352,19 @@ assert.equal(client.getGatewayFlowEditorReadiness(musicUnconfigured).optional.ge
 const musicRouteUnavailable = JSON.parse(JSON.stringify(complete));
 musicRouteUnavailable.assistant.media.generated_music.direct_endpoint.route_available = false;
 assert.equal(client.getGatewayFlowEditorReadiness(musicRouteUnavailable).optional.generatedMusic, false);
+
+const videoRouteUnavailable = JSON.parse(JSON.stringify(complete));
+videoRouteUnavailable.assistant.media.generated_video.direct_endpoint.route_available = false;
+assert.equal(client.getGatewayFlowEditorReadiness(videoRouteUnavailable).optional.generatedVideo, false);
+
+const imageToVideoReadinessUnavailable = JSON.parse(JSON.stringify(complete));
+imageToVideoReadinessUnavailable.common.readiness.surfaces.media.image_to_video = {
+  available: false,
+  route_available: true,
+  configured: true,
+  workflow_available: false,
+};
+assert.equal(client.getGatewayFlowEditorReadiness(imageToVideoReadinessUnavailable).optional.imageToVideo, false);
 
 const musicReadinessUnavailable = JSON.parse(JSON.stringify(complete));
 musicReadinessUnavailable.common.readiness.surfaces.media.generated_music = {
@@ -467,6 +508,79 @@ main().catch((error) => {
     assert result.returncode == 0, result.stderr + result.stdout
 
 
+def test_ledger_progress_events_do_not_complete_running_nodes() -> None:
+    if not shutil.which("node"):
+        pytest.skip("node is not installed")
+    typescript = FRONTEND / "node_modules" / "typescript"
+    if not typescript.exists():
+        pytest.skip("frontend TypeScript dependency is not installed")
+
+    script = r"""
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const ts = require(path.resolve('web/frontend/node_modules/typescript'));
+
+const src = fs.readFileSync('web/frontend/src/utils/ledgerEvents.ts', 'utf8');
+const js = ts.transpileModule(src, {
+  compilerOptions: {
+    module: ts.ModuleKind.CommonJS,
+    target: ts.ScriptTarget.ES2020,
+  },
+}).outputText;
+const module = { exports: {} };
+vm.runInNewContext(js, { module, exports: module.exports, require, console });
+const ledger = module.exports;
+
+const state = ledger.createLedgerMappingState();
+const start = ledger.mapLedgerRecordToEvents({
+  run_id: 'run-1',
+  node_id: 'video-node',
+  step_id: 'step-video',
+  status: 'started',
+  started_at: '2026-05-26T00:00:00Z',
+  effect: { type: 'llm_call' },
+}, state);
+assert.equal(start[0].type, 'node_start');
+
+const progress = ledger.mapLedgerRecordToEvents({
+  run_id: 'run-1',
+  node_id: 'video-node',
+  step_id: 'progress-1',
+  status: 'completed',
+  ended_at: '2026-05-26T00:00:10Z',
+  effect: { type: 'emit_event', payload: { name: 'abstract.progress', payload: { node_id: 'video-node', step_id: 'step-video', frame: 12, total_frames: 41, progress: 0.29 } } },
+  result: { emitted: true, name: 'abstract.progress', payload: { node_id: 'video-node', step_id: 'step-video', frame: 12, total_frames: 41, progress: 0.29 } },
+}, state);
+assert.deepEqual(progress.map((event) => event.type), ['node_progress', 'trace_update']);
+assert.equal(progress[0].nodeId, 'video-node');
+assert.equal(progress[0].stepId, 'step-video');
+assert.equal(progress[0].progress.frame, 12);
+
+const complete = ledger.mapLedgerRecordToEvents({
+  run_id: 'run-1',
+  node_id: 'video-node',
+  step_id: 'step-video',
+  status: 'completed',
+  started_at: '2026-05-26T00:00:00Z',
+  ended_at: '2026-05-26T00:01:00Z',
+  effect: { type: 'llm_call' },
+  result: { video_artifact: { artifact_id: 'vid-1', content_type: 'video/mp4', modality: 'video' } },
+}, state);
+assert.equal(complete[0].type, 'node_complete');
+assert.equal(complete[0].nodeId, 'video-node');
+"""
+    result = subprocess.run(
+        ["node", "-e", script],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr + result.stdout
+
+
 def test_frontend_default_transport_avoids_local_runtime_routes() -> None:
     text_by_path = {
         path: path.read_text(encoding="utf-8")
@@ -548,6 +662,9 @@ def test_frontend_exposes_gateway_media_node_templates() -> None:
         "generate_image",
         "edit_image",
         "image_to_image",
+        "generate_video",
+        "text_to_video",
+        "image_to_video",
         "generate_voice",
         "generate_music",
         "transcribe_audio",
@@ -564,6 +681,7 @@ def test_frontend_exposes_gateway_media_node_templates() -> None:
     assert "image_artifact" in node_templates
     assert "source_image" in node_templates
     assert "mask_artifact" in node_templates
+    assert "video_artifact" in node_templates
     assert "audio_artifact" in node_templates
     assert "music_artifact" in node_templates
     assert "{ id: 'artifact_ref', label: 'artifact_ref', type: 'artifact' }" in node_templates
@@ -580,6 +698,8 @@ def test_frontend_exposes_gateway_media_node_templates() -> None:
     assert "stt_model" in flow_types
     assert "music_provider" in flow_types
     assert "music_model" in flow_types
+    assert "video_provider" in flow_types
+    assert "video_model" in flow_types
     assert "music_backend" not in flow_types
     assert "strength" in flow_types
     assert "enhance_prompt" in flow_types
@@ -592,6 +712,8 @@ def test_frontend_exposes_gateway_media_node_templates() -> None:
     assert "{ id: 'stt_model'" in node_templates
     assert "{ id: 'music_provider'" in node_templates
     assert "{ id: 'music_model'" in node_templates
+    assert "{ id: 'video_provider'" in node_templates
+    assert "{ id: 'video_model'" in node_templates
     assert "{ id: 'music_backend'" not in node_templates
     assert "{ id: 'enhance_prompt'" in node_templates
     assert "{ id: 'structure_prompt', label: 'structure', type: 'boolean' }" in node_templates
@@ -619,11 +741,18 @@ def test_frontend_exposes_gateway_media_node_templates() -> None:
     run_modal = (FRONTEND / "src" / "components" / "RunFlowModal.tsx").read_text(encoding="utf-8")
     assert "Search music providers…" in run_modal
     assert "Search music models…" in run_modal
+    assert "abstract.media.video.generated" in run_modal
+    assert "Generated video" in run_modal
+    assert "node_progress" in run_modal
     assert "abstract.media.music.generated" in run_modal
     assert "Generated music" in run_modal
     assert "payloadRaw.artifact_ref" in run_modal
     base_node = (FRONTEND / "src" / "components" / "nodes" / "BaseNode.tsx").read_text(encoding="utf-8")
     assert "currentImageProviderModelsTask" in base_node
+    assert "currentVideoProviderModelsTask" in base_node
+    assert "currentVisionProviderModelsTask" in base_node
+    assert "Search video providers…" in base_node
+    assert "Search video models…" in base_node
     assert "addImageProvidersFromCatalog" in base_node
     assert "record.models_by_provider" in base_node
     assert "record.available_providers" in base_node
@@ -662,6 +791,9 @@ def test_frontend_media_nodes_use_shared_advanced_pin_presentation() -> None:
         "generate_image",
         "edit_image",
         "image_to_image",
+        "generate_video",
+        "text_to_video",
+        "image_to_video",
         "generate_voice",
         "generate_music",
         "transcribe_audio",
@@ -688,6 +820,8 @@ def test_frontend_media_nodes_use_shared_advanced_pin_presentation() -> None:
     assert "Search TTS providers…" in properties_panel
     assert "Search STT providers…" in properties_panel
     assert "Search music providers…" in properties_panel
+    assert "Search video providers…" in properties_panel
+    assert "Search video models…" in properties_panel
     assert ".pin-disclosure-row" in nodes_css
     assert ".pin-disclosure-count" in nodes_css
     assert "backdrop-filter: blur" not in app_css
@@ -735,6 +869,29 @@ assert.deepEqual(
   ['exec-in', 'prompt', 'music_provider', 'music_model', 'duration_s', 'seed', 'guidance_scale']
 );
 assert.equal(media.countHiddenAdvancedMediaPins('generate_music', 'input', inputs, new Set(['seed']), false), 1);
+
+const videoInputs = [
+  { id: 'exec-in', type: 'execution' },
+  { id: 'prompt', type: 'string' },
+  { id: 'video_provider', type: 'provider_video' },
+  { id: 'video_model', type: 'model_video' },
+  { id: 'format', type: 'string' },
+  { id: 'frames', type: 'number' },
+  { id: 'fps', type: 'number' },
+  { id: 'seed', type: 'number' },
+  { id: 'guidance_scale', type: 'number' },
+];
+assert.equal(media.isMediaNodeType('generate_video'), true);
+assert.equal(media.isAdvancedMediaPin('generate_video', 'seed', 'input'), true);
+assert.equal(media.isAdvancedMediaPin('generate_video', 'frames', 'input'), false);
+assert.deepEqual(
+  media.getVisibleMediaPins('generate_video', 'input', videoInputs, new Set(), false).map((pin) => pin.id),
+  ['exec-in', 'prompt', 'video_provider', 'video_model', 'format', 'frames', 'fps']
+);
+assert.deepEqual(
+  media.getVisibleMediaPins('generate_video', 'input', videoInputs, new Set(), true).map((pin) => pin.id),
+  ['exec-in', 'prompt', 'video_provider', 'video_model', 'format', 'frames', 'fps', 'seed', 'guidance_scale']
+);
 
 const voiceInputs = [
   { id: 'exec-in', type: 'execution' },
@@ -1187,6 +1344,13 @@ def test_frontend_exposes_model_residency_controls() -> None:
     assert "task === 'tts'" in panel
     assert "task === 'stt'" in panel
     assert "task === 'music_generation'" in panel
+    assert "'text_to_video'" in panel
+    assert "'image_to_video'" in panel
+    assert "function isVisionCatalogTask" in panel
+    assert "function visionProviderModelsTask" in panel
+    assert "task: selectedVisionTask" in panel
+    assert "Video provider" in panel
+    assert "Video model" in panel
     assert "runtime client cached" in panel
     assert "provider not loaded" in panel
     assert "Capability route defaults are execution-host configuration" in panel
@@ -1281,6 +1445,7 @@ def test_run_modal_artifact_summary_preserves_loop_invocations() -> None:
     assert "stepId: string; stepLabel: string" in run_modal
     assert "const key = `audio:${step.id}`" in run_modal
     assert "const key = `image:${step.id}`" in run_modal
+    assert "const key = `video:${step.id}`" in run_modal
     assert "key={`${item.kind}:${item.stepId}:${item.preview.artifactId}`}" in run_modal
     assert "instanceKey={item.stepId}" in run_modal
     assert "instanceKey={selectedStep.id}" in run_modal
@@ -1360,6 +1525,12 @@ const nodes = [
 const edges = [{ id: 'e', source: 'start', sourceHandle: 'exec-out', target: 'edit', targetHandle: 'exec-in' }];
 const issues = preflight.computeRunPreflightIssues(nodes, edges);
 assert(issues.some((issue) => issue.message === 'Missing required input: image_artifact'));
+
+nodes[1].data.nodeType = 'image_to_video';
+nodes[1].data.label = 'Image To Video';
+nodes[1].data.effectConfig = { prompt: 'animate it' };
+const videoIssues = preflight.computeRunPreflightIssues(nodes, edges);
+assert(videoIssues.some((issue) => issue.message === 'Missing required input: source_image'));
 """
     result = subprocess.run(
         ["node", "-e", script],
@@ -1383,6 +1554,8 @@ def test_frontend_gateway_authoring_capabilities_gate_palette_and_preflight() ->
 
     assert "gatewayCapability?: GatewayAuthoringCapability" in node_templates
     assert "gatewayCapability: NODE_GATEWAY_CAPABILITIES.generate_voice" in node_templates
+    assert "gatewayCapability: NODE_GATEWAY_CAPABILITIES.generate_video" in node_templates
+    assert "gatewayCapability: NODE_GATEWAY_CAPABILITIES.image_to_video" in node_templates
     assert "gatewayCapability: NODE_GATEWAY_CAPABILITIES.model_residency" in node_templates
     assert "gatewayAuthoringCapabilityStatus" in node_palette
     assert "data-gateway-capability" in node_palette
@@ -1427,6 +1600,8 @@ const capabilities = loadTs('utils/nodeCapabilities.ts');
 const client = loadTs('utils/gatewayClient.ts');
 
 assert.equal(capabilities.gatewayCapabilityForNodeType('generate_voice'), 'generated_voice');
+assert.equal(capabilities.gatewayCapabilityForNodeType('generate_video'), 'generated_video');
+assert.equal(capabilities.gatewayCapabilityForNodeType('image_to_video'), 'image_to_video');
 assert.equal(capabilities.gatewayCapabilityForNodeType('model_residency'), 'model_residency');
 
 const optional = {
@@ -1440,6 +1615,8 @@ const optional = {
   kgMemory: true,
   generatedImage: true,
   editedImage: true,
+  generatedVideo: false,
+  imageToVideo: true,
   generatedVoice: false,
   generatedMusic: true,
   attachmentsUpload: true,

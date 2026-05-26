@@ -44,6 +44,8 @@ Open:
 The editor surfaces Gateway media capabilities as native graph nodes:
 - `Generate Image`
 - `Edit Image` (`Image-to-Image` is a legacy alias for old saved flows)
+- `Generate Video`
+- `Image-to-Video`
 - `Generate Voice`
 - `Generate Music`
 - `Transcribe Audio`
@@ -53,19 +55,24 @@ Provider/model selectors are populated from Gateway catalog endpoints. Current
 Gateway catalog responses may use the `gateway_catalog_v1` envelope (`catalog`
 metadata plus canonical `items`) or older legacy arrays/maps; the editor accepts
 both. Leave provider/model as `Auto` for the simple path, or choose explicit
-provider/model/backend values for reproducible runs.
+provider/model/backend values for reproducible runs. Video nodes use the same
+Gateway vision catalog route as image nodes but request task-specific catalogs:
+`text_to_video` for prompt-only generation and `image_to_video` for source-image
+generation.
 
 If Gateway advertises `common.readiness.contract = gateway_surface_readiness_v1`,
 the editor uses that surface summary to hide or disable optional media/model
 controls that Gateway says are not route/config ready. The editor still uses the
 endpoint descriptors for concrete request paths.
 
-Generated image, voice, and music results are Gateway artifacts. The Run modal
-renders images and audio/music players from artifact content and keeps child run,
-artifact metadata, ledger, and raw JSON details available for debugging.
+Generated image, video, voice, and music results are Gateway artifacts. The Run
+modal renders images, videos, and audio/music players from artifact content and
+keeps child run, artifact metadata, ledger, and raw JSON details available for
+debugging. Gateway `abstract.progress` events are surfaced as progress on the
+running step so long video generations remain observable.
 
 Model residency controls are also Gateway-driven. If the Gateway advertises
-the model-residency routes, text, image, voice, transcription, and music
+the model-residency routes, text, image, video, voice, transcription, and music
 warmup/list/unload authoring remains available through Gateway. Gateway/Runtime
 still owns the final support decision and returns skipped/unsupported results
 when a connected deployment cannot honor a specific residency operation.
