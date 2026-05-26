@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://www.lpalbou.info/AbstractFlow/backlog/proposed/2026-05-09_abstractflow_gateway_migration_roadmap/">
+        <link rel="canonical" href="https://www.lpalbou.info/AbstractFlow/backlog/completed/0085_media_artifact_modality_validation/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Proposed: AbstractFlow Gateway Migration Roadmap - AbstractFlow</title>
+        <title>Completed: Media artifact modality validation - AbstractFlow</title>
       
     
     
@@ -64,7 +64,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#proposed-abstractflow-gateway-migration-roadmap" class="md-skip">
+        <a href="#completed-media-artifact-modality-validation" class="md-skip">
           Skip to content
         </a>
       
@@ -100,7 +100,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Proposed: AbstractFlow Gateway Migration Roadmap
+              Completed: Media artifact modality validation
             
           </span>
         </div>
@@ -467,6 +467,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#adr-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ADR status
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#context" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -478,22 +489,165 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#current-status-2026-05-10" class="md-nav__link">
+  <a href="#current-code-reality" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Current status (2026-05-10)
+        Current code reality
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Current status (2026-05-10)">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-we-want-to-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What we want to do
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#suggested-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Suggested implementation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Non-goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dependencies-and-related-tasks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dependencies and related tasks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#expected-outcomes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Expected outcomes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#progress-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Progress checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#guidance-for-the-implementing-agent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guidance for the implementing agent
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#completion-report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Completion report
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Completion report">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#completed-this-pass" class="md-nav__link">
+  <a href="#date" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Completed (this pass)
+        Date
       
     </span>
   </a>
@@ -501,10 +655,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#open-work-after-this-blocker" class="md-nav__link">
+  <a href="#summary" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Open work after this blocker
+        Summary
       
     </span>
   </a>
@@ -512,71 +666,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#recommended-sequencing" class="md-nav__link">
+  <a href="#files-and-symbols-touched" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Recommended sequencing
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#findings" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Findings
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#planned-work-created-from-this-roadmap" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Planned work created from this roadmap
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#promotion-criteria" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Promotion criteria
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#release-gate" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Release Gate
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Release Gate">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#validated-this-pass" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Validated this pass
+        Files and symbols touched
       
     </span>
   </a>
@@ -584,10 +677,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#next-actions" class="md-nav__link">
+  <a href="#behavior-changes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Next actions
+        Behavior changes
       
     </span>
   </a>
@@ -595,10 +688,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#ordering" class="md-nav__link">
+  <a href="#validation_1" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Ordering
+        Validation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#residual-risks-and-follow-ups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Residual risks and follow-ups
       
     </span>
   </a>
@@ -630,114 +734,135 @@
   
 
 
-<h1 id="proposed-abstractflow-gateway-migration-roadmap">Proposed: AbstractFlow Gateway Migration Roadmap<a class="headerlink" href="#proposed-abstractflow-gateway-migration-roadmap" title="Permanent link">&para;</a></h1>
+<h1 id="completed-media-artifact-modality-validation">Completed: Media artifact modality validation<a class="headerlink" href="#completed-media-artifact-modality-validation" title="Permanent link">&para;</a></h1>
 <h2 id="metadata">Metadata<a class="headerlink" href="#metadata" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Created: 2026-05-09</li>
-<li>Status: Proposed</li>
-<li>Completed: N/A</li>
+<li>Created: 2026-05-25</li>
+<li>Status: Completed</li>
+<li>Completed: 2026-05-25</li>
+</ul>
+<h2 id="adr-status">ADR status<a class="headerlink" href="#adr-status" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Governing ADRs: None</li>
+<li>ADR impact: None</li>
 </ul>
 <h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
-<p>AbstractFlow is migrating from a standalone workflow editor/executor into a Gateway-first workflow
-authoring client. The current code already has a real Gateway-first frontend path, but local
-execution compatibility paths remain and can make the architecture look ambiguous.</p>
-<p>Code inspected during this pass:</p>
+<p>Media nodes and artifact literal nodes currently expose artifact references as generic <code>object</code> pins. That hides the most important authoring fact from the canvas: an image artifact is not a valid input for transcription, and an audio artifact is not a valid image mask.</p>
+<h2 id="current-code-reality">Current code reality<a class="headerlink" href="#current-code-reality" title="Permanent link">&para;</a></h2>
 <ul>
-<li><code>web/frontend/src/hooks/useWebSocket.ts</code>: publishes VisualFlows to Gateway, starts Gateway runs,
-  and streams Gateway ledgers.</li>
-<li><code>web/frontend/bin/cli.js</code>: serves the UI and proxies <code>/api/*</code> to a configured Gateway, injecting
-  bearer auth.</li>
-<li><code>web/backend/routes/flows.py</code> and <code>web/backend/routes/ws.py</code>: legacy local execution routes.</li>
-<li><code>abstractflow/visual/executor.py</code>: portable local runner factory used by tests, embedding, and
-  Gateway's VisualFlow compatibility host.</li>
-<li><code>abstractgateway/src/abstractgateway/routes/gateway.py</code>: VisualFlow CRUD/publish and run start.</li>
-<li><code>abstractgateway/src/abstractgateway/hosts/visualflow_host.py</code> and <code>hosts/bundle_host.py</code>:
-  Gateway-side execution wiring.</li>
+<li><code>web/frontend/src/types/flow.ts</code> has scoped artifact pin types: generic, image, audio, text, and video.</li>
+<li><code>web/frontend/src/types/nodes.ts</code> defines media artifact pins with scoped artifact types, with <code>artifact_ref</code> as a generic artifact pin and <code>outputs</code>/<code>meta</code> left as plain objects.</li>
+<li><code>web/frontend/src/utils/mediaArtifacts.ts</code> is the shared source for artifact modality detection, connection compatibility, and configured-default checks.</li>
+<li><code>web/frontend/src/utils/validation.ts</code> rejects known artifact modality mismatches with specific error messages before falling back to generic object compatibility.</li>
+<li><code>web/frontend/src/utils/preflight.ts</code> flags incompatible connected artifact edges and incompatible configured artifact defaults before a run.</li>
+<li><code>web/frontend/src/hooks/useFlow.ts</code> canonicalizes saved media node inputs and outputs so older flows regain the typed pin UX when opened.</li>
+<li>Artifact literal defaults store <code>content_type</code> and <code>modality</code>, and that metadata is used by preflight for configured defaults.</li>
+<li>Two read-only subagent audits on 2026-05-25 recommended typed artifact pins plus one small shared helper; a later two-agent critique recommended output canonicalization and clearer generic artifact typing.</li>
 </ul>
-<h2 id="current-status-2026-05-10">Current status (2026-05-10)<a class="headerlink" href="#current-status-2026-05-10" title="Permanent link">&para;</a></h2>
-<h3 id="completed-this-pass">Completed (this pass)<a class="headerlink" href="#completed-this-pass" title="Permanent link">&para;</a></h3>
+<h2 id="problem">Problem<a class="headerlink" href="#problem" title="Permanent link">&para;</a></h2>
+<p>Users can wire media artifacts incorrectly without immediate canvas feedback, and run preflight does not distinguish missing artifacts from mismatched artifact modalities.</p>
+<h2 id="what-we-want-to-do">What we want to do<a class="headerlink" href="#what-we-want-to-do" title="Permanent link">&para;</a></h2>
+<p>Make media artifact modality visible in pin types and enforce it through shared connection/preflight logic.</p>
+<h2 id="why">Why<a class="headerlink" href="#why" title="Permanent link">&para;</a></h2>
+<p>This improves the core visual editing experience: the graph should communicate whether a value is image media, audio media, text artifact output, video media, or a generic object.</p>
+<h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Gateway now advertises helper descriptors in discovery:</li>
-<li><code>capabilities.contracts.common.runs.input_data</code></li>
-<li><code>capabilities.contracts.common.runs.history_bundle</code>
-  (<code>abstractgateway/src/abstractgateway/routes/gateway.py</code>, tests in
-  <code>abstractgateway/tests/test_capabilities_endpoint_contract.py</code>).</li>
-<li>AbstractFlow now enforces helper-endpoint strictness when <code>contracts.version &gt;= 1</code>:</li>
-<li><code>RunFlowModal</code> and <code>Toolbar</code> use descriptor-based URLs for
-    <code>runs/{run_id}/input_data</code> and <code>runs/{run_id}/history_bundle</code>.</li>
-<li>Missing <code>input_data</code>/<code>history_bundle</code> descriptors block operation readiness in
-    those paths.</li>
-<li>The explicit test fixture in
-    <code>abstractflow/tests/test_frontend_gateway_contract.py</code> asserts readiness failures
-    for either missing descriptor.</li>
-<li>Plan artifact hygiene:</li>
-<li><code>docs/backlog/completed/010_gateway_only_remote_editor_transport.md</code></li>
-<li><code>docs/backlog/completed/040_gateway_capability_schema_and_connection_contract.md</code></li>
-<li><code>docs/backlog/completed/060_gateway_contract_helper_endpoint_strictness.md</code></li>
+<li>Add scoped artifact pin types for image, audio, text, video, and a generic artifact escape hatch.</li>
+<li>Update new media node templates and artifact literal nodes to emit typed artifact pins.</li>
+<li>Keep <code>artifact_ref</code>, <code>outputs</code>, and <code>meta</code> generic object pins where they are not modality-specific.</li>
+<li>Add a shared pure helper for artifact modality detection and compatibility.</li>
+<li>Use the helper in connection validation and connection error messages.</li>
+<li>Use the helper in run preflight so saved/old incompatible edges are flagged before run.</li>
+<li>Preserve generic <code>object</code> as an advanced escape hatch for code/tool/custom object workflows.</li>
+<li>Do not add runtime endpoint changes in this slice.</li>
 </ul>
-<h3 id="open-work-after-this-blocker">Open work after this blocker<a class="headerlink" href="#open-work-after-this-blocker" title="Permanent link">&para;</a></h3>
+<h2 id="suggested-implementation">Suggested implementation<a class="headerlink" href="#suggested-implementation" title="Permanent link">&para;</a></h2>
 <ul>
-<li>[x] Finish explicit local-execution compatibility boundary for default editor mode
-  (<code>docs/backlog/completed/030_local_execution_compatibility_boundary.md</code>).</li>
-<li>[x] Add first-class draft/private authoring lifecycle for run retention and visibility
-  (<code>docs/backlog/completed/020_draft_run_and_publish_lifecycle.md</code>).</li>
-<li>[x] Add a stable Gateway regression suite to prove no default-path local-run fallback
-  (<code>docs/backlog/completed/050_gateway_execution_regression_suite.md</code>).</li>
-<li>[ ] If 020 is implemented, close the remaining cross-package retention/purge follow-ups:</li>
-<li><code>abstractgateway/docs/backlog/proposed/2026-05-09_abstractflow_draft_spaces_and_ephemeral_runs.md</code></li>
-<li><code>abstractruntime/docs/backlog/planned/025_runtime_retention_and_purge_contract.md</code>.</li>
+<li>Add <code>web/frontend/src/utils/mediaArtifacts.ts</code>.</li>
+<li>Extend <code>PinType</code> and <code>PIN_COLORS</code>.</li>
+<li>Replace modality-specific artifact pins in templates/canonical media pins with typed artifact pins.</li>
+<li>Update <code>validation.ts</code> to reject known mismatches before generic object compatibility.</li>
+<li>Update <code>preflight.ts</code> to report connected/default artifact modality mismatches.</li>
 </ul>
-<h3 id="recommended-sequencing">Recommended sequencing<a class="headerlink" href="#recommended-sequencing" title="Permanent link">&para;</a></h3>
+<h2 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h2>
 <ul>
-<li>020, 030, and 050 are complete. Promote new Flow UX work from <code>proposed/</code> only after a
-  code-first audit.</li>
+<li>Frontend type definitions, node templates, visual compatibility metadata.</li>
+<li>Frontend validation/preflight helpers.</li>
+<li>Focused frontend contract tests.</li>
+<li>Backlog overview/completion trace.</li>
 </ul>
-<h2 id="findings">Findings<a class="headerlink" href="#findings" title="Permanent link">&para;</a></h2>
-<p>The report that LLM/Agent calls "go local" is only partly accurate:</p>
+<h2 id="non-goals">Non-goals<a class="headerlink" href="#non-goals" title="Permanent link">&para;</a></h2>
 <ul>
-<li>In the default React client path, Flow publishes to Gateway and starts a Gateway run. Execution is
-  not happening inside the browser or Flow static server.</li>
-<li>Gateway executes workflows in its own process via AbstractRuntime and AbstractCore integration.
-  That is expected: Gateway is the deployment composition root.</li>
-<li>The local Flow Python backend can still execute workflows locally; this must become explicit
-  local development compatibility, not the default editor path.</li>
+<li>No artifact metadata network lookup during preflight.</li>
+<li>No runtime media handler changes.</li>
+<li>No broad run-modal artifact preview rewrite.</li>
+<li>No full hover-target highlighting pass; connection drop errors and preflight messages are the first slice.</li>
 </ul>
-<h2 id="planned-work-created-from-this-roadmap">Planned work created from this roadmap<a class="headerlink" href="#planned-work-created-from-this-roadmap" title="Permanent link">&para;</a></h2>
+<h2 id="dependencies-and-related-tasks">Dependencies and related tasks<a class="headerlink" href="#dependencies-and-related-tasks" title="Permanent link">&para;</a></h2>
 <ul>
-<li><code>docs/backlog/completed/010_gateway_only_remote_editor_transport.md</code></li>
-<li><code>docs/backlog/completed/020_draft_run_and_publish_lifecycle.md</code></li>
-<li><code>docs/backlog/completed/030_local_execution_compatibility_boundary.md</code></li>
-<li><code>docs/backlog/completed/040_gateway_capability_schema_and_connection_contract.md</code></li>
-<li><code>docs/backlog/completed/050_gateway_execution_regression_suite.md</code></li>
+<li><code>completed/0083_media_node_advanced_pin_disclosure.md</code></li>
+<li><code>completed/0084_media_defaults_single_editor_surface.md</code></li>
 </ul>
-<p>Related cross-package proposed work:</p>
+<h2 id="expected-outcomes">Expected outcomes<a class="headerlink" href="#expected-outcomes" title="Permanent link">&para;</a></h2>
 <ul>
-<li><code>abstractgateway/docs/backlog/proposed/2026-05-09_abstractflow_draft_spaces_and_ephemeral_runs.md</code></li>
-<li><code>abstractruntime/docs/backlog/planned/025_runtime_retention_and_purge_contract.md</code></li>
+<li>Image artifacts connect to image artifact inputs.</li>
+<li>Audio artifacts connect to transcription/audio artifact inputs.</li>
+<li>Known image/audio/text/video mismatches are rejected with modality-specific messages.</li>
+<li>Existing generic object workflows remain possible.</li>
 </ul>
-<h2 id="promotion-criteria">Promotion criteria<a class="headerlink" href="#promotion-criteria" title="Permanent link">&para;</a></h2>
-<p>Keep this item as an orientation note. The original planned implementation items are complete; this
-roadmap can be deprecated once the Flow docs clearly define Gateway-first execution as the default
-in the release documentation set.</p>
-<h2 id="release-gate">Release Gate<a class="headerlink" href="#release-gate" title="Permanent link">&para;</a></h2>
-<h3 id="validated-this-pass">Validated this pass<a class="headerlink" href="#validated-this-pass" title="Permanent link">&para;</a></h3>
+<h2 id="validation">Validation<a class="headerlink" href="#validation" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Gateway discovery advertises <code>capabilities.contracts.common.runs.input_data</code> and <code>capabilities.contracts.common.runs.history_bundle</code>.</li>
-<li>Run rehydration and run history replay in the frontend are descriptor-gated for versioned contracts.</li>
-<li><code>test_frontend_gateway_contract.py</code> now asserts readiness failures when either helper descriptor is missing.</li>
-<li><code>test_capabilities_endpoint_contract.py</code> and gateway editor contract tests validate helper route presence and path correctness.</li>
+<li>Focused pytest/Node contract tests for <code>validateConnection</code>, <code>getConnectionError</code>, and <code>computeRunPreflightIssues</code>.</li>
+<li>Frontend build.</li>
+<li>Diff check for touched files.</li>
 </ul>
-<h3 id="next-actions">Next actions<a class="headerlink" href="#next-actions" title="Permanent link">&para;</a></h3>
+<h2 id="progress-checklist">Progress checklist<a class="headerlink" href="#progress-checklist" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Keep <code>docs/backlog/completed/030_local_execution_compatibility_boundary.md</code> as the completed local-compatibility reference.</li>
-<li>Keep <code>docs/backlog/completed/020_draft_run_and_publish_lifecycle.md</code> as the completed draft/publish lifecycle reference.</li>
-<li>Keep <code>docs/backlog/completed/050_gateway_execution_regression_suite.md</code> as the completed no-local-fallback regression reference.</li>
-<li>Gateway run-tree purge for draft-test runs is implemented; broader Gateway draft-bundle cleanup,
-  memory-scope isolation, and the Runtime host-facing purge helper remain tracked separately.</li>
+<li>[x] Add typed artifact pins.</li>
+<li>[x] Add shared helper.</li>
+<li>[x] Wire validation.</li>
+<li>[x] Wire preflight.</li>
+<li>[x] Add behavior tests.</li>
+<li>[x] Record completion evidence.</li>
 </ul>
-<h3 id="ordering">Ordering<a class="headerlink" href="#ordering" title="Permanent link">&para;</a></h3>
+<h2 id="guidance-for-the-implementing-agent">Guidance for the implementing agent<a class="headerlink" href="#guidance-for-the-implementing-agent" title="Permanent link">&para;</a></h2>
+<p>Prefer one readable helper over scattered pin-id checks. The helper should model what the user sees: image artifact, audio artifact, text artifact, video artifact, or generic object.</p>
+<h2 id="completion-report">Completion report<a class="headerlink" href="#completion-report" title="Permanent link">&para;</a></h2>
+<h3 id="date">Date<a class="headerlink" href="#date" title="Permanent link">&para;</a></h3>
 <ul>
-<li>The original 020/030/050 ordering constraints are complete.</li>
+<li>Completed: 2026-05-25</li>
+</ul>
+<h3 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">&para;</a></h3>
+<p>Media artifact authoring is now modality-aware in the Flow editor. Image, audio, text, video, and generic artifacts have distinct pin types and colors; media templates and artifact literal nodes emit typed artifact pins; saved media nodes are normalized back to the canonical typed pin contract; and connection validation/preflight now reject known mismatches with modality-specific messages.</p>
+<h3 id="files-and-symbols-touched">Files and symbols touched<a class="headerlink" href="#files-and-symbols-touched" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>web/frontend/src/types/flow.ts</code>: added artifact pin types and distinct artifact colors.</li>
+<li><code>web/frontend/src/types/nodes.ts</code>: changed media artifact pins and artifact literals to typed artifact pins; changed <code>artifact_ref</code> to the generic <code>artifact</code> pin type while keeping <code>outputs</code> and <code>meta</code> as raw objects.</li>
+<li><code>web/frontend/src/utils/mediaArtifacts.ts</code>: added shared artifact modality detection, compatibility, connection-error, and configured-default helpers.</li>
+<li><code>web/frontend/src/utils/validation.ts</code>: wired artifact compatibility into route override inference, connection validation, and connection error text.</li>
+<li><code>web/frontend/src/utils/preflight.ts</code>: added connected-edge and configured-default artifact modality checks.</li>
+<li><code>web/frontend/src/hooks/useFlow.ts</code>: canonicalizes saved media node inputs and outputs against current templates.</li>
+<li><code>web/frontend/src/utils/visualFlowCompat.ts</code>: keeps compatibility-generated music artifact outputs typed as audio/generic artifact pins.</li>
+<li><code>tests/test_frontend_gateway_contract.py</code>: added executable frontend behavior tests for validation and preflight.</li>
+</ul>
+<h3 id="behavior-changes">Behavior changes<a class="headerlink" href="#behavior-changes" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Image artifacts connect to image edit/mask/source inputs.</li>
+<li>Audio, voice, and music artifacts connect to audio transcription inputs.</li>
+<li>Known image/audio/text/video mismatches are rejected immediately by canvas validation and reported by run preflight for saved or old flows.</li>
+<li>Media node <code>outputs</code> and <code>meta</code> object payloads no longer masquerade as artifact references.</li>
+<li>Generic <code>object</code> remains available as an advanced escape hatch for Code/tool/custom object workflows.</li>
+</ul>
+<h3 id="validation_1">Validation<a class="headerlink" href="#validation_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>pytest abstractflow/tests/test_frontend_gateway_contract.py::test_frontend_exposes_gateway_media_node_templates abstractflow/tests/test_frontend_gateway_contract.py::test_frontend_media_artifact_validation_is_modality_aware abstractflow/tests/test_frontend_gateway_contract.py::test_frontend_preflight_catches_required_media_inputs -q</code></li>
+<li><code>npm --prefix abstractflow/web/frontend run build</code></li>
+</ul>
+<h3 id="residual-risks-and-follow-ups">Residual risks and follow-ups<a class="headerlink" href="#residual-risks-and-follow-ups" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Live drag-hover target highlighting is still a separate UX improvement; this item covers typed pins, drop validation, and run preflight.</li>
+<li>Artifact metadata is not fetched during preflight by design; configured string artifact ids remain unverified unless represented as typed artifact objects with metadata.</li>
+<li>Generic object-to-artifact connections remain allowed for advanced workflows and should be revisited only if a stronger typed custom-output story lands.</li>
 </ul>
 
 

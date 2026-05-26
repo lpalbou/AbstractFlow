@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://www.lpalbou.info/AbstractFlow/backlog/completed/010_gateway_only_remote_editor_transport/">
+        <link rel="canonical" href="https://www.lpalbou.info/AbstractFlow/backlog/completed/0083_media_node_advanced_pin_disclosure/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Completed: Gateway-Only Remote Editor Transport - AbstractFlow</title>
+        <title>Media Node Advanced Pin Disclosure - AbstractFlow</title>
       
     
     
@@ -64,7 +64,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#completed-gateway-only-remote-editor-transport" class="md-skip">
+        <a href="#media-node-advanced-pin-disclosure" class="md-skip">
           Skip to content
         </a>
       
@@ -100,7 +100,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Completed: Gateway-Only Remote Editor Transport
+              Media Node Advanced Pin Disclosure
             
           </span>
         </div>
@@ -456,10 +456,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#metadata" class="md-nav__link">
+  <a href="#date" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Metadata
+        Date
       
     </span>
   </a>
@@ -467,10 +467,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#outcome" class="md-nav__link">
+  <a href="#status" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Outcome
+        Status
       
     </span>
   </a>
@@ -478,10 +478,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#follow-up-and-linkage" class="md-nav__link">
+  <a href="#priority" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Follow-up and linkage
+        Priority
       
     </span>
   </a>
@@ -489,10 +489,65 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#migration-note" class="md-nav__link">
+  <a href="#context-problem-statement" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Migration Note
+        Context / Problem Statement
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decision
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Non-goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Report
       
     </span>
   </a>
@@ -519,33 +574,46 @@
   
 
 
-<h1 id="completed-gateway-only-remote-editor-transport">Completed: Gateway-Only Remote Editor Transport<a class="headerlink" href="#completed-gateway-only-remote-editor-transport" title="Permanent link">&para;</a></h1>
-<h2 id="metadata">Metadata<a class="headerlink" href="#metadata" title="Permanent link">&para;</a></h2>
+<h1 id="media-node-advanced-pin-disclosure">Media Node Advanced Pin Disclosure<a class="headerlink" href="#media-node-advanced-pin-disclosure" title="Permanent link">&para;</a></h1>
+<h2 id="date">Date<a class="headerlink" href="#date" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Created: 2026-05-09</li>
-<li>Status: Completed</li>
-<li>Completed: 2026-05-10</li>
+<li>Completed: 2026-05-25</li>
 </ul>
-<h2 id="outcome">Outcome<a class="headerlink" href="#outcome" title="Permanent link">&para;</a></h2>
-<p>AbstractFlow’s default editor path is established as Gateway-first.</p>
+<h2 id="status">Status<a class="headerlink" href="#status" title="Permanent link">&para;</a></h2>
+<p>Completed</p>
+<h2 id="priority">Priority<a class="headerlink" href="#priority" title="Permanent link">&para;</a></h2>
+<p>P1</p>
+<h2 id="context-problem-statement">Context / Problem Statement<a class="headerlink" href="#context-problem-statement" title="Permanent link">&para;</a></h2>
+<p>Backlog item <code>0073</code> calls for media authoring to become preview-first and progressively disclosed. Media nodes already expose the right Gateway-backed capabilities, but the canvas showed too many tuning, provider, artifact, and diagnostic pins at once. <code>generate_music</code> had a one-off advanced-pin filter, while other media nodes exposed every optional pin by default.</p>
+<p>This made simple workflows look harder than they are and kept the advanced-pin policy embedded in <code>BaseNode</code> instead of a reusable presentation abstraction.</p>
+<h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
+<p>Create a shared, UI-only media pin disclosure helper. The helper defines which media pins are advanced and filters canvas presentation without changing serialized VisualFlow data, node templates, Runtime execution, or Gateway contracts.</p>
+<p>Connected advanced pins always remain visible so existing flows and wired handles stay explainable. Selected media nodes expose a compact <code>Advanced</code> disclosure button to reveal optional tuning and diagnostic pins.</p>
+<h2 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Browser/editor runtime calls are expected to use <code>/api/gateway/*</code>.</li>
-<li>Local Python <code>Flow</code> runtime routes remain behind <code>ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1</code> as
-  explicit local compatibility.</li>
-<li>Static UI and proxy entrypoints are aligned to treat Gateway as the execution authority.</li>
-<li>Remote run detail/history workflows now rely on Gateway-discovered capabilities for control.</li>
+<li>Add <code>mediaPinDisclosure.ts</code> with media node coverage, advanced input/output pin maps, and pure visibility/count helpers.</li>
+<li>Replace one-off <code>generate_music</code> and <code>generate_voice.profile</code> filtering in <code>BaseNode</code> with the shared helper.</li>
+<li>Hide unconnected advanced media inputs and outputs by default.</li>
+<li>Keep connected advanced media pins visible even when the node is collapsed.</li>
+<li>Add a selected-node <code>Advanced</code> / <code>Hide advanced</code> disclosure row.</li>
+<li>Re-measure ReactFlow handles when the rendered pin set changes.</li>
+<li>Add source and helper-contract tests for media pin disclosure behavior.</li>
 </ul>
-<h2 id="follow-up-and-linkage">Follow-up and linkage<a class="headerlink" href="#follow-up-and-linkage" title="Permanent link">&para;</a></h2>
+<h2 id="non-goals">Non-goals<a class="headerlink" href="#non-goals" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Follow-up work for stricter helper endpoint gating moved to
-  <code>docs/backlog/completed/060_gateway_contract_helper_endpoint_strictness.md</code>.</li>
-<li>Draft/publish isolation and lifecycle retention work was completed in
-  <code>docs/backlog/completed/020_draft_run_and_publish_lifecycle.md</code>.</li>
+<li>Do not add <code>advanced</code> metadata to serialized pins.</li>
+<li>Do not change Runtime, Gateway, node templates, or execution semantics.</li>
+<li>Do not redesign run-result galleries or artifact pickers in this slice.</li>
+<li>Do not expose <code>runtime_provider</code> or <code>runtime_model</code> routing pins here.</li>
+<li>Do not rewrite PropertiesPanel media controls in this slice.</li>
 </ul>
-<h2 id="migration-note">Migration Note<a class="headerlink" href="#migration-note" title="Permanent link">&para;</a></h2>
-<p>After closing <code>060</code>, editor runs that require run input rehydration or run history replay must receive
-<code>common.runs.input_data</code> and <code>common.runs.history_bundle</code> from Gateway discovery in default
-Gateway-only mode.</p>
+<h2 id="validation">Validation<a class="headerlink" href="#validation" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>pytest abstractflow/tests/test_frontend_gateway_contract.py::test_frontend_media_nodes_use_shared_advanced_pin_presentation abstractflow/tests/test_frontend_gateway_contract.py::test_frontend_exposes_gateway_media_node_templates -q</code></li>
+<li><code>npm --prefix abstractflow/web/frontend run build</code></li>
+</ul>
+<h2 id="report">Report<a class="headerlink" href="#report" title="Permanent link">&para;</a></h2>
+<p>Media nodes now default to the happy-path canvas surface: prompts/source artifacts/provider/model/format stay visible, while tuning and diagnostic pins are hidden until requested. Advanced users can reveal the full pin set on selected media nodes, and any already-wired advanced handle remains visible to avoid breaking or obscuring existing flows. The disclosure policy is now a pure helper that can be tested independently and reused as media UX evolves.</p>
 
 
 

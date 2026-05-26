@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://www.lpalbou.info/AbstractFlow/backlog/planned/030_local_execution_compatibility_boundary/">
+        <link rel="canonical" href="https://www.lpalbou.info/AbstractFlow/backlog/completed/030_local_execution_compatibility_boundary/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Planned: Local Execution Compatibility Boundary - AbstractFlow</title>
+        <title>Completed: Local Execution Compatibility Boundary - AbstractFlow</title>
       
     
     
@@ -64,7 +64,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#planned-local-execution-compatibility-boundary" class="md-skip">
+        <a href="#completed-local-execution-compatibility-boundary" class="md-skip">
           Skip to content
         </a>
       
@@ -100,7 +100,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Planned: Local Execution Compatibility Boundary
+              Completed: Local Execution Compatibility Boundary
             
           </span>
         </div>
@@ -609,6 +609,89 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#completion-report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Completion report
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Completion report">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#date" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Date
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evidence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#validation_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#adr-impact" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ADR impact
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#residual-risk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Residual risk
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -629,12 +712,12 @@
   
 
 
-<h1 id="planned-local-execution-compatibility-boundary">Planned: Local Execution Compatibility Boundary<a class="headerlink" href="#planned-local-execution-compatibility-boundary" title="Permanent link">&para;</a></h1>
+<h1 id="completed-local-execution-compatibility-boundary">Completed: Local Execution Compatibility Boundary<a class="headerlink" href="#completed-local-execution-compatibility-boundary" title="Permanent link">&para;</a></h1>
 <h2 id="metadata">Metadata<a class="headerlink" href="#metadata" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Created: 2026-05-09</li>
-<li>Status: Planned</li>
-<li>Completed: N/A</li>
+<li>Status: Completed</li>
+<li>Completed: 2026-05-25</li>
 </ul>
 <h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
 <p>AbstractFlow still contains a capable local execution stack:</p>
@@ -742,6 +825,42 @@ into environments that should stay thin.</p>
 <li>[x] Add tests for default Gateway-only behavior.</li>
 <li>[x] Plan and implement additional dependency split with no standalone aggregate profile (<code>apple</code> / <code>gpu</code> + base/runtimes split).</li>
 </ul>
+<h2 id="completion-report">Completion report<a class="headerlink" href="#completion-report" title="Permanent link">&para;</a></h2>
+<h3 id="date">Date<a class="headerlink" href="#date" title="Permanent link">&para;</a></h3>
+<p>2026-05-25</p>
+<h3 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">&para;</a></h3>
+<p>This item was closed after a code-first audit showed the compatibility boundary is already
+implemented and tested:</p>
+<ul>
+<li>the default AbstractFlow backend exposes the Gateway proxy surface only;</li>
+<li>local runtime routes are available only when <code>ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1</code>;</li>
+<li>frontend source avoids local runtime route paths in the default editor transport;</li>
+<li>package dependency profiles keep local compatibility/runtime dependencies out of the thin default
+  client profile.</li>
+</ul>
+<h3 id="evidence">Evidence<a class="headerlink" href="#evidence" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>web/backend/main.py</code>: local runtime route registration is env-gated and emits local-mode startup
+  warnings.</li>
+<li><code>pyproject.toml</code>: <code>apple</code> / <code>gpu</code> profiles carry compatibility host dependencies while the base
+  package stays thin.</li>
+<li><code>tests/test_frontend_gateway_contract.py</code>: default route registry and frontend source checks prove
+  no default <code>/api/flows</code>, <code>/api/ws</code>, <code>/api/runs</code>, or <code>/api/providers</code> path.</li>
+<li><code>tests/test_frontend_gateway_contract.py</code>: local runtime routes are present only under explicit
+  opt-in.</li>
+</ul>
+<h3 id="validation_1">Validation<a class="headerlink" href="#validation_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>PYTHONPATH=.:../abstractruntime/src pytest -q tests/test_frontend_gateway_contract.py</code></li>
+<li><code>npm run build</code> from <code>web/frontend</code></li>
+</ul>
+<h3 id="adr-impact">ADR impact<a class="headerlink" href="#adr-impact" title="Permanent link">&para;</a></h3>
+<p>None. This item enforces the existing Gateway-first boundary captured by completed Flow backlog
+items and related Gateway architecture docs; it does not introduce a new durable architecture rule.</p>
+<h3 id="residual-risk">Residual risk<a class="headerlink" href="#residual-risk" title="Permanent link">&para;</a></h3>
+<p>The local compatibility stack remains intentionally available for tests and embedded development.
+Future work should continue to guard the default editor path through
+<code>completed/050_gateway_execution_regression_suite.md</code>.</p>
 
 
 

@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://www.lpalbou.info/AbstractFlow/backlog/completed/010_gateway_only_remote_editor_transport/">
+        <link rel="canonical" href="https://www.lpalbou.info/AbstractFlow/backlog/completed/0081_code_editor_test_result_stability/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Completed: Gateway-Only Remote Editor Transport - AbstractFlow</title>
+        <title>Code Editor Test Result Stability - AbstractFlow</title>
       
     
     
@@ -64,7 +64,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#completed-gateway-only-remote-editor-transport" class="md-skip">
+        <a href="#code-editor-test-result-stability" class="md-skip">
           Skip to content
         </a>
       
@@ -100,7 +100,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Completed: Gateway-Only Remote Editor Transport
+              Code Editor Test Result Stability
             
           </span>
         </div>
@@ -456,10 +456,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#metadata" class="md-nav__link">
+  <a href="#date" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Metadata
+        Date
       
     </span>
   </a>
@@ -467,10 +467,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#outcome" class="md-nav__link">
+  <a href="#status" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Outcome
+        Status
       
     </span>
   </a>
@@ -478,10 +478,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#follow-up-and-linkage" class="md-nav__link">
+  <a href="#priority" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Follow-up and linkage
+        Priority
       
     </span>
   </a>
@@ -489,10 +489,65 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#migration-note" class="md-nav__link">
+  <a href="#context-problem-statement" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Migration Note
+        Context / Problem Statement
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decision
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Non-goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Report
       
     </span>
   </a>
@@ -519,33 +574,44 @@
   
 
 
-<h1 id="completed-gateway-only-remote-editor-transport">Completed: Gateway-Only Remote Editor Transport<a class="headerlink" href="#completed-gateway-only-remote-editor-transport" title="Permanent link">&para;</a></h1>
-<h2 id="metadata">Metadata<a class="headerlink" href="#metadata" title="Permanent link">&para;</a></h2>
+<h1 id="code-editor-test-result-stability">Code Editor Test Result Stability<a class="headerlink" href="#code-editor-test-result-stability" title="Permanent link">&para;</a></h1>
+<h2 id="date">Date<a class="headerlink" href="#date" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Created: 2026-05-09</li>
-<li>Status: Completed</li>
-<li>Completed: 2026-05-10</li>
+<li>Completed: 2026-05-25</li>
 </ul>
-<h2 id="outcome">Outcome<a class="headerlink" href="#outcome" title="Permanent link">&para;</a></h2>
-<p>AbstractFlow’s default editor path is established as Gateway-first.</p>
+<h2 id="status">Status<a class="headerlink" href="#status" title="Permanent link">&para;</a></h2>
+<p>Completed</p>
+<h2 id="priority">Priority<a class="headerlink" href="#priority" title="Permanent link">&para;</a></h2>
+<p>P1</p>
+<h2 id="context-problem-statement">Context / Problem Statement<a class="headerlink" href="#context-problem-statement" title="Permanent link">&para;</a></h2>
+<p>The Code editor modal had the right overall shape after item <code>0079</code>, but testing a Code node could still make the UI feel unstable: graph tooltips could render above the editor modal because they use a high-z-index portal, and the right-side variables/test panel could compete for height when the full-width result terminal opened.</p>
+<p>Gateway code simulation also returned timing metrics without the <code>execution.permissions</code> field that normal Runtime Code-node execution already records, making editor tests slightly less faithful than real flow runs.</p>
+<h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
+<p>Keep the Code node abstraction as already designed: display name <code>Code</code>, Python <code>transform(_input)</code> body for now, <code>permissions</code> as the execution-policy input, and one extensible <code>execution</code> object output for duration, CPU, memory, and policy metadata. Do not add a separate timing-only pin.</p>
+<p>Harden the editor modal locally: keep the result as a folded full-width bottom terminal, suppress graph tooltip portals while the editor is open, and make the right panel a contained two-row grid so the variable list and test payload remain stable when results expand.</p>
+<h2 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Browser/editor runtime calls are expected to use <code>/api/gateway/*</code>.</li>
-<li>Local Python <code>Flow</code> runtime routes remain behind <code>ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1</code> as
-  explicit local compatibility.</li>
-<li>Static UI and proxy entrypoints are aligned to treat Gateway as the execution authority.</li>
-<li>Remote run detail/history workflows now rely on Gateway-discovered capabilities for control.</li>
+<li>Keep Code editor result output folded by default and expanded when tests run.</li>
+<li>Prevent graph tooltip portals from visually covering the Code editor modal.</li>
+<li>Stabilize the right-side variable and test input layout while the result terminal is open.</li>
+<li>Add <code>execution.permissions</code> to Gateway code simulation responses for parity with normal Runtime Code-node execution.</li>
+<li>Add regression coverage for connected <code>permissions</code> inputs driving normal Runtime execution while staying out of <code>_input</code>.</li>
 </ul>
-<h2 id="follow-up-and-linkage">Follow-up and linkage<a class="headerlink" href="#follow-up-and-linkage" title="Permanent link">&para;</a></h2>
+<h2 id="non-goals">Non-goals<a class="headerlink" href="#non-goals" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Follow-up work for stricter helper endpoint gating moved to
-  <code>docs/backlog/completed/060_gateway_contract_helper_endpoint_strictness.md</code>.</li>
-<li>Draft/publish isolation and lifecycle retention work was completed in
-  <code>docs/backlog/completed/020_draft_run_and_publish_lifecycle.md</code>.</li>
+<li>Do not implement multi-language Code nodes.</li>
+<li>Do not implement dependency packaging for custom code.</li>
+<li>Do not add a second <code>execution_time</code> output while the <code>execution</code> object is the canonical metrics carrier.</li>
+<li>Do not make <code>full_access</code> available without the explicit Runtime host policy.</li>
 </ul>
-<h2 id="migration-note">Migration Note<a class="headerlink" href="#migration-note" title="Permanent link">&para;</a></h2>
-<p>After closing <code>060</code>, editor runs that require run input rehydration or run history replay must receive
-<code>common.runs.input_data</code> and <code>common.runs.history_bundle</code> from Gateway discovery in default
-Gateway-only mode.</p>
+<h2 id="validation">Validation<a class="headerlink" href="#validation" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>pytest abstractflow/tests/test_python_code_node_params.py abstractgateway/tests/test_gateway_code_simulation.py -q</code></li>
+<li><code>pytest abstractflow/tests/test_frontend_gateway_contract.py::test_frontend_code_node_editor_layout_and_contract_are_explicit -q</code></li>
+<li><code>npm --prefix abstractflow/web/frontend run build</code></li>
+</ul>
+<h2 id="report">Report<a class="headerlink" href="#report" title="Permanent link">&para;</a></h2>
+<p>The editor overlay now suppresses portal-rendered graph tooltips while it is open. The Code editor side panel uses deterministic grid containment, and the test payload textarea shrinks slightly when the bottom result terminal is open instead of pushing or overlapping the variables panel. Gateway code simulation now annotates metrics with the effective permission mode just like normal Runtime Code-node execution. Runtime tests cover connected <code>permissions</code> input behavior so the execution policy can be wired without leaking that control value into user code payloads.</p>
 
 
 

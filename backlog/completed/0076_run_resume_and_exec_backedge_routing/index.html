@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://www.lpalbou.info/AbstractFlow/backlog/completed/010_gateway_only_remote_editor_transport/">
+        <link rel="canonical" href="https://www.lpalbou.info/AbstractFlow/backlog/completed/0076_run_resume_and_exec_backedge_routing/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Completed: Gateway-Only Remote Editor Transport - AbstractFlow</title>
+        <title>Run Resume And Exec Backedge Routing - AbstractFlow</title>
       
     
     
@@ -64,7 +64,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#completed-gateway-only-remote-editor-transport" class="md-skip">
+        <a href="#run-resume-and-exec-backedge-routing" class="md-skip">
           Skip to content
         </a>
       
@@ -100,7 +100,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Completed: Gateway-Only Remote Editor Transport
+              Run Resume And Exec Backedge Routing
             
           </span>
         </div>
@@ -456,10 +456,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#metadata" class="md-nav__link">
+  <a href="#date" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Metadata
+        Date
       
     </span>
   </a>
@@ -467,10 +467,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#outcome" class="md-nav__link">
+  <a href="#status" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Outcome
+        Status
       
     </span>
   </a>
@@ -478,10 +478,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#follow-up-and-linkage" class="md-nav__link">
+  <a href="#priority" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Follow-up and linkage
+        Priority
       
     </span>
   </a>
@@ -489,10 +489,65 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#migration-note" class="md-nav__link">
+  <a href="#context-problem-statement" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Migration Note
+        Context / Problem Statement
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decision
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Non-goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Report
       
     </span>
   </a>
@@ -519,33 +574,41 @@
   
 
 
-<h1 id="completed-gateway-only-remote-editor-transport">Completed: Gateway-Only Remote Editor Transport<a class="headerlink" href="#completed-gateway-only-remote-editor-transport" title="Permanent link">&para;</a></h1>
-<h2 id="metadata">Metadata<a class="headerlink" href="#metadata" title="Permanent link">&para;</a></h2>
+<h1 id="run-resume-and-exec-backedge-routing">Run Resume And Exec Backedge Routing<a class="headerlink" href="#run-resume-and-exec-backedge-routing" title="Permanent link">&para;</a></h1>
+<h2 id="date">Date<a class="headerlink" href="#date" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Created: 2026-05-09</li>
-<li>Status: Completed</li>
-<li>Completed: 2026-05-10</li>
+<li>Completed: 2026-05-24</li>
 </ul>
-<h2 id="outcome">Outcome<a class="headerlink" href="#outcome" title="Permanent link">&para;</a></h2>
-<p>AbstractFlow’s default editor path is established as Gateway-first.</p>
+<h2 id="status">Status<a class="headerlink" href="#status" title="Permanent link">&para;</a></h2>
+<p>Completed</p>
+<h2 id="priority">Priority<a class="headerlink" href="#priority" title="Permanent link">&para;</a></h2>
+<p>P1</p>
+<h2 id="context-problem-statement">Context / Problem Statement<a class="headerlink" href="#context-problem-statement" title="Permanent link">&para;</a></h2>
+<p>In the Run Flow modal, answering an <code>ask_user</code> wait with the Continue action could be followed by a full page navigation/reset or crash in the browser. Gateway logs showed the resume command itself succeeded, and the run continued through the LLM and voice nodes before looping back to <code>ask_user</code>, so the issue was in the Flow client event boundary rather than the Gateway/Runtime resume path. A second pass found the concrete crash: <code>node_complete</code> records for <code>ask_user</code> may have no result payload, and the run-step model metadata extraction read <code>result.scratchpad</code> without guarding that shape.</p>
+<p>The same dialogue flow also exposed an execution-edge readability issue: the back edge from <code>Generate Voice</code> to <code>Ask User</code> was routed below the graph, colliding visually with the node layout instead of taking the shorter clear upper lane.</p>
+<h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
+<p>Keep resume as the existing Gateway command. Make <code>RunFlowModal</code> the only Ask User resume surface, with controls that explicitly consume default browser behavior, prevent duplicate resume clicks while the command is in flight, and mark modal/footer buttons as non-submit actions. Centralize run-step model metadata extraction behind a guarded helper so empty node results and partial scratchpad entries do not crash modal rendering. Update the custom React Flow execution edge router so back edges prefer a clear lane above the source/target nodes and only fall back when that lane intersects another node.</p>
+<h2 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Browser/editor runtime calls are expected to use <code>/api/gateway/*</code>.</li>
-<li>Local Python <code>Flow</code> runtime routes remain behind <code>ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1</code> as
-  explicit local compatibility.</li>
-<li>Static UI and proxy entrypoints are aligned to treat Gateway as the execution authority.</li>
-<li>Remote run detail/history workflows now rely on Gateway-discovered capabilities for control.</li>
+<li>Harden <code>RunFlowModal</code> Ask User resume controls.</li>
+<li>Remove the separate <code>UserPromptModal</code> prompt path, its Toolbar wiring, and its unused styles.</li>
+<li>Guard and centralize model/provider extraction for run-step rows and output previews.</li>
+<li>Add obstacle-aware upper-lane selection for loop-back execution edges in <code>Canvas</code>.</li>
 </ul>
-<h2 id="follow-up-and-linkage">Follow-up and linkage<a class="headerlink" href="#follow-up-and-linkage" title="Permanent link">&para;</a></h2>
+<h2 id="non-goals">Non-goals<a class="headerlink" href="#non-goals" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Follow-up work for stricter helper endpoint gating moved to
-  <code>docs/backlog/completed/060_gateway_contract_helper_endpoint_strictness.md</code>.</li>
-<li>Draft/publish isolation and lifecycle retention work was completed in
-  <code>docs/backlog/completed/020_draft_run_and_publish_lifecycle.md</code>.</li>
+<li>Do not change Gateway command semantics.</li>
+<li>Do not change Runtime wait-key generation or the <code>ask_user</code> node contract.</li>
+<li>Do not redesign node handles or introduce a graph layout engine.</li>
 </ul>
-<h2 id="migration-note">Migration Note<a class="headerlink" href="#migration-note" title="Permanent link">&para;</a></h2>
-<p>After closing <code>060</code>, editor runs that require run input rehydration or run history replay must receive
-<code>common.runs.input_data</code> and <code>common.runs.history_bundle</code> from Gateway discovery in default
-Gateway-only mode.</p>
+<h2 id="validation">Validation<a class="headerlink" href="#validation" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>npm run build</code> in <code>abstractflow/web/frontend</code>.</li>
+<li><code>git diff --check</code> for the touched frontend files.</li>
+<li><code>python -m pytest tests/test_frontend_gateway_contract.py</code> in <code>abstractflow</code>.</li>
+</ul>
+<h2 id="report">Report<a class="headerlink" href="#report" title="Permanent link">&para;</a></h2>
+<p>The client now treats Ask User resume as an explicit in-app action inside <code>RunFlowModal</code>: the click is stopped, default navigation is prevented, the button disables while resume is being submitted, and waiting events reopen the run modal directly. The deleted prompt fallback removes the old parallel response path. Run-step model metadata extraction now tolerates undefined results and scratchpad steps without <code>effect</code> payloads. Execution back edges now choose a clear upper route first, so looped dialogue flows route back to the earlier Ask User node above the row instead of underneath it when that path is available.</p>
 
 
 

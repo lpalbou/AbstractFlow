@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://www.lpalbou.info/AbstractFlow/backlog/completed/010_gateway_only_remote_editor_transport/">
+        <link rel="canonical" href="https://www.lpalbou.info/AbstractFlow/backlog/completed/0084_media_defaults_single_editor_surface/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Completed: Gateway-Only Remote Editor Transport - AbstractFlow</title>
+        <title>Completed: Media defaults single editor surface - AbstractFlow</title>
       
     
     
@@ -64,7 +64,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#completed-gateway-only-remote-editor-transport" class="md-skip">
+        <a href="#completed-media-defaults-single-editor-surface" class="md-skip">
           Skip to content
         </a>
       
@@ -100,7 +100,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Completed: Gateway-Only Remote Editor Transport
+              Completed: Media defaults single editor surface
             
           </span>
         </div>
@@ -467,6 +467,50 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#adr-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ADR status
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-code-reality" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current code reality
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#outcome" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -478,10 +522,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#follow-up-and-linkage" class="md-nav__link">
+  <a href="#scope-completed" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Follow-up and linkage
+        Scope Completed
       
     </span>
   </a>
@@ -489,10 +533,32 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#migration-note" class="md-nav__link">
+  <a href="#non-goals-preserved" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Migration Note
+        Non-goals Preserved
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#follow-ups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Follow-ups
       
     </span>
   </a>
@@ -519,33 +585,62 @@
   
 
 
-<h1 id="completed-gateway-only-remote-editor-transport">Completed: Gateway-Only Remote Editor Transport<a class="headerlink" href="#completed-gateway-only-remote-editor-transport" title="Permanent link">&para;</a></h1>
+<h1 id="completed-media-defaults-single-editor-surface">Completed: Media defaults single editor surface<a class="headerlink" href="#completed-media-defaults-single-editor-surface" title="Permanent link">&para;</a></h1>
 <h2 id="metadata">Metadata<a class="headerlink" href="#metadata" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Created: 2026-05-09</li>
+<li>Created: 2026-05-25</li>
+<li>Completed: 2026-05-25</li>
 <li>Status: Completed</li>
-<li>Completed: 2026-05-10</li>
 </ul>
+<h2 id="adr-status">ADR status<a class="headerlink" href="#adr-status" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Governing ADRs: None</li>
+<li>ADR impact: None</li>
+</ul>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>AbstractFlow media nodes already expose scoped provider/model pins and share a canvas-side advanced pin disclosure helper. The selected-node right panel still had a separate <code>Gateway Media</code> section that edited media settings through a different path.</p>
+<h2 id="current-code-reality">Current code reality<a class="headerlink" href="#current-code-reality" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>abstractflow/web/frontend/src/components/nodes/BaseNode.tsx</code> has themed <code>AfSelect</code> controls for scoped media pins and hides connected advanced pins unless expanded.</li>
+<li><code>abstractflow/web/frontend/src/components/PropertiesPanel.tsx</code> has a generic <code>Input values</code> section for pin defaults.</li>
+<li>Before this item, <code>PropertiesPanel.tsx</code> also rendered a separate <code>Gateway Media</code> section that used native selects and wrote <code>effectConfig</code> for image, TTS, STT, and music controls.</li>
+<li>Runtime applies <code>pinDefaults</code> to unconnected input pins before handlers read payload/config, so duplicate side-panel media controls could show values that were not the actual effective input.</li>
+</ul>
+<h2 id="problem">Problem<a class="headerlink" href="#problem" title="Permanent link">&para;</a></h2>
+<p>The side panel exposed two mental models for media configuration: pin defaults and <code>Gateway Media</code> settings. This made the UI brittle, especially when provider/model pins were connected and static side-panel settings were ignored by execution.</p>
 <h2 id="outcome">Outcome<a class="headerlink" href="#outcome" title="Permanent link">&para;</a></h2>
-<p>AbstractFlow’s default editor path is established as Gateway-first.</p>
 <ul>
-<li>Browser/editor runtime calls are expected to use <code>/api/gateway/*</code>.</li>
-<li>Local Python <code>Flow</code> runtime routes remain behind <code>ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1</code> as
-  explicit local compatibility.</li>
-<li>Static UI and proxy entrypoints are aligned to treat Gateway as the execution authority.</li>
-<li>Remote run detail/history workflows now rely on Gateway-discovered capabilities for control.</li>
+<li>Removed the duplicate <code>Gateway Media</code> section from <code>PropertiesPanel</code>.</li>
+<li>Extended the existing <code>Input values</code> section so scoped media provider/model/voice/quality/format defaults use themed <code>AfSelect</code> controls.</li>
+<li>Connected media pins continue to render as read-only <code>Provided by connected pin.</code></li>
+<li>Media right-panel provider/model defaults now share the pin-default mental model instead of presenting a separate media configuration surface.</li>
+<li>BaseNode image provider-specific default normalization now returns early when <code>image_provider</code> is connected, preventing stale static providers from rewriting image sizing/sampling defaults.</li>
 </ul>
-<h2 id="follow-up-and-linkage">Follow-up and linkage<a class="headerlink" href="#follow-up-and-linkage" title="Permanent link">&para;</a></h2>
+<h2 id="scope-completed">Scope Completed<a class="headerlink" href="#scope-completed" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Follow-up work for stricter helper endpoint gating moved to
-  <code>docs/backlog/completed/060_gateway_contract_helper_endpoint_strictness.md</code>.</li>
-<li>Draft/publish isolation and lifecycle retention work was completed in
-  <code>docs/backlog/completed/020_draft_run_and_publish_lifecycle.md</code>.</li>
+<li><code>web/frontend/src/components/PropertiesPanel.tsx</code></li>
+<li><code>web/frontend/src/components/nodes/BaseNode.tsx</code></li>
+<li><code>tests/test_frontend_gateway_contract.py</code></li>
+<li>Backlog overview</li>
 </ul>
-<h2 id="migration-note">Migration Note<a class="headerlink" href="#migration-note" title="Permanent link">&para;</a></h2>
-<p>After closing <code>060</code>, editor runs that require run input rehydration or run history replay must receive
-<code>common.runs.input_data</code> and <code>common.runs.history_bundle</code> from Gateway discovery in default
-Gateway-only mode.</p>
+<h2 id="non-goals-preserved">Non-goals Preserved<a class="headerlink" href="#non-goals-preserved" title="Permanent link">&para;</a></h2>
+<ul>
+<li>No runtime media endpoint changes.</li>
+<li>No artifact modality type-system migration.</li>
+<li>No shared media catalog hook extraction.</li>
+<li>No broad <code>effectConfig</code> migration outside the media side-panel UX.</li>
+</ul>
+<h2 id="validation">Validation<a class="headerlink" href="#validation" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>pytest abstractflow/tests/test_frontend_gateway_contract.py::test_frontend_media_nodes_use_shared_advanced_pin_presentation abstractflow/tests/test_frontend_gateway_contract.py::test_frontend_exposes_gateway_media_node_templates -q</code></li>
+<li><code>npm --prefix abstractflow/web/frontend run build</code></li>
+<li><code>git -C abstractflow diff --check -- web/frontend/src/components/PropertiesPanel.tsx web/frontend/src/components/nodes/BaseNode.tsx tests/test_frontend_gateway_contract.py docs/backlog/overview.md docs/backlog/completed/0084_media_defaults_single_editor_surface.md</code></li>
+</ul>
+<h2 id="follow-ups">Follow-ups<a class="headerlink" href="#follow-ups" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Artifact pin modality should become explicit (<code>artifact_image</code>, <code>artifact_audio</code>, etc.) or receive semantic preflight validation. This remains outside this item.</li>
+<li>A future pass should extract shared media catalog selector logic between BaseNode and PropertiesPanel if more media control surfaces are added.</li>
+</ul>
 
 
 

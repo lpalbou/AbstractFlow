@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://www.lpalbou.info/AbstractFlow/backlog/completed/010_gateway_only_remote_editor_transport/">
+        <link rel="canonical" href="https://www.lpalbou.info/AbstractFlow/backlog/proposed/0077_custom_code_languages_and_dependencies/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Completed: Gateway-Only Remote Editor Transport - AbstractFlow</title>
+        <title>Custom Code Languages And Dependencies - AbstractFlow</title>
       
     
     
@@ -64,7 +64,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#completed-gateway-only-remote-editor-transport" class="md-skip">
+        <a href="#custom-code-languages-and-dependencies" class="md-skip">
           Skip to content
         </a>
       
@@ -100,7 +100,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Completed: Gateway-Only Remote Editor Transport
+              Custom Code Languages And Dependencies
             
           </span>
         </div>
@@ -456,10 +456,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#metadata" class="md-nav__link">
+  <a href="#state" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Metadata
+        State
       
     </span>
   </a>
@@ -467,10 +467,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#outcome" class="md-nav__link">
+  <a href="#context" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Outcome
+        Context
       
     </span>
   </a>
@@ -478,10 +478,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#follow-up-and-linkage" class="md-nav__link">
+  <a href="#decision-to-make" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Follow-up and linkage
+        Decision To Make
       
     </span>
   </a>
@@ -489,10 +489,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#migration-note" class="md-nav__link">
+  <a href="#acceptance-criteria" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Migration Note
+        Acceptance Criteria
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notes
       
     </span>
   </a>
@@ -519,33 +530,34 @@
   
 
 
-<h1 id="completed-gateway-only-remote-editor-transport">Completed: Gateway-Only Remote Editor Transport<a class="headerlink" href="#completed-gateway-only-remote-editor-transport" title="Permanent link">&para;</a></h1>
-<h2 id="metadata">Metadata<a class="headerlink" href="#metadata" title="Permanent link">&para;</a></h2>
+<h1 id="custom-code-languages-and-dependencies">Custom Code Languages And Dependencies<a class="headerlink" href="#custom-code-languages-and-dependencies" title="Permanent link">&para;</a></h1>
+<h2 id="state">State<a class="headerlink" href="#state" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Created: 2026-05-09</li>
-<li>Status: Completed</li>
-<li>Completed: 2026-05-10</li>
+<li>Status: proposed</li>
+<li>Created: 2026-05-25</li>
 </ul>
-<h2 id="outcome">Outcome<a class="headerlink" href="#outcome" title="Permanent link">&para;</a></h2>
-<p>AbstractFlow’s default editor path is established as Gateway-first.</p>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>Python Code nodes now use the Runtime sandbox and expose a standard <code>success</code>/<code>output</code> pin contract for ordinary flow composition. The next step is broader than an editor/UI fix: supporting additional languages and user-declared lightweight dependencies changes bundle packaging, validation, execution isolation, and reproducibility.</p>
+<h2 id="decision-to-make">Decision To Make<a class="headerlink" href="#decision-to-make" title="Permanent link">&para;</a></h2>
+<p>Define a clean custom-code execution abstraction for:
+- supported languages beyond Python, such as JavaScript/TypeScript or shell-free expression languages;
+- dependency declarations that can be included in WorkflowBundles;
+- deterministic install/lock behavior per dependency set;
+- sandbox and resource limits per language backend;
+- editor intelligence and simulation support for each language.</p>
+<h2 id="acceptance-criteria">Acceptance Criteria<a class="headerlink" href="#acceptance-criteria" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Browser/editor runtime calls are expected to use <code>/api/gateway/*</code>.</li>
-<li>Local Python <code>Flow</code> runtime routes remain behind <code>ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1</code> as
-  explicit local compatibility.</li>
-<li>Static UI and proxy entrypoints are aligned to treat Gateway as the execution authority.</li>
-<li>Remote run detail/history workflows now rely on Gateway-discovered capabilities for control.</li>
+<li>A Code node declares <code>language</code>, <code>runtime</code>, and dependency metadata explicitly.</li>
+<li>WorkflowBundle packaging includes dependency manifests without silently vendoring environment state.</li>
+<li>Gateway/Runtime validation rejects unsupported languages or missing dependency backends with actionable errors.</li>
+<li>The Flow editor offers language-specific editor services only for configured languages.</li>
+<li>Tests cover packaging, validation, simulation, and execution for at least Python plus one additional language.</li>
 </ul>
-<h2 id="follow-up-and-linkage">Follow-up and linkage<a class="headerlink" href="#follow-up-and-linkage" title="Permanent link">&para;</a></h2>
+<h2 id="notes">Notes<a class="headerlink" href="#notes" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Follow-up work for stricter helper endpoint gating moved to
-  <code>docs/backlog/completed/060_gateway_contract_helper_endpoint_strictness.md</code>.</li>
-<li>Draft/publish isolation and lifecycle retention work was completed in
-  <code>docs/backlog/completed/020_draft_run_and_publish_lifecycle.md</code>.</li>
+<li>Avoid implicit imports from the host Python environment. Dependency availability must be declared and reproducible.</li>
+<li>Keep the existing Python sandbox path as the reference implementation until a multi-language contract is accepted.</li>
 </ul>
-<h2 id="migration-note">Migration Note<a class="headerlink" href="#migration-note" title="Permanent link">&para;</a></h2>
-<p>After closing <code>060</code>, editor runs that require run input rehydration or run history replay must receive
-<code>common.runs.input_data</code> and <code>common.runs.history_bundle</code> from Gateway discovery in default
-Gateway-only mode.</p>
 
 
 

@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://www.lpalbou.info/AbstractFlow/backlog/completed/010_gateway_only_remote_editor_transport/">
+        <link rel="canonical" href="https://www.lpalbou.info/AbstractFlow/backlog/completed/0086_live_connection_feedback/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Completed: Gateway-Only Remote Editor Transport - AbstractFlow</title>
+        <title>Planned: Live connection feedback - AbstractFlow</title>
       
     
     
@@ -64,7 +64,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#completed-gateway-only-remote-editor-transport" class="md-skip">
+        <a href="#planned-live-connection-feedback" class="md-skip">
           Skip to content
         </a>
       
@@ -100,7 +100,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Completed: Gateway-Only Remote Editor Transport
+              Planned: Live connection feedback
             
           </span>
         </div>
@@ -467,10 +467,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#outcome" class="md-nav__link">
+  <a href="#adr-status" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Outcome
+        ADR status
       
     </span>
   </a>
@@ -478,10 +478,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#follow-up-and-linkage" class="md-nav__link">
+  <a href="#context" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Follow-up and linkage
+        Context
       
     </span>
   </a>
@@ -489,10 +489,153 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#migration-note" class="md-nav__link">
+  <a href="#current-code-reality" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Migration Note
+        Current code reality
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-we-want-to-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What we want to do
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#suggested-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Suggested implementation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Non-goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dependencies-and-related-tasks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dependencies and related tasks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#expected-outcomes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Expected outcomes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#progress-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Progress checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#guidance-for-the-implementing-agent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guidance for the implementing agent
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#completion-report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Completion report
       
     </span>
   </a>
@@ -519,33 +662,112 @@
   
 
 
-<h1 id="completed-gateway-only-remote-editor-transport">Completed: Gateway-Only Remote Editor Transport<a class="headerlink" href="#completed-gateway-only-remote-editor-transport" title="Permanent link">&para;</a></h1>
+<h1 id="planned-live-connection-feedback">Planned: Live connection feedback<a class="headerlink" href="#planned-live-connection-feedback" title="Permanent link">&para;</a></h1>
 <h2 id="metadata">Metadata<a class="headerlink" href="#metadata" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Created: 2026-05-09</li>
+<li>Created: 2026-05-25</li>
 <li>Status: Completed</li>
-<li>Completed: 2026-05-10</li>
+<li>Completed: 2026-05-25</li>
 </ul>
-<h2 id="outcome">Outcome<a class="headerlink" href="#outcome" title="Permanent link">&para;</a></h2>
-<p>AbstractFlow’s default editor path is established as Gateway-first.</p>
+<h2 id="adr-status">ADR status<a class="headerlink" href="#adr-status" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Browser/editor runtime calls are expected to use <code>/api/gateway/*</code>.</li>
-<li>Local Python <code>Flow</code> runtime routes remain behind <code>ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1</code> as
-  explicit local compatibility.</li>
-<li>Static UI and proxy entrypoints are aligned to treat Gateway as the execution authority.</li>
-<li>Remote run detail/history workflows now rely on Gateway-discovered capabilities for control.</li>
+<li>Governing ADRs: None</li>
+<li>ADR impact: None</li>
 </ul>
-<h2 id="follow-up-and-linkage">Follow-up and linkage<a class="headerlink" href="#follow-up-and-linkage" title="Permanent link">&para;</a></h2>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>The Flow canvas validates connections when users drop an edge, and media artifact pins are now modality-aware. However, the editor still waits until drop time to explain many invalid connections. That makes artifact wiring feel trial-and-error instead of guided.</p>
+<h2 id="current-code-reality">Current code reality<a class="headerlink" href="#current-code-reality" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Follow-up work for stricter helper endpoint gating moved to
-  <code>docs/backlog/completed/060_gateway_contract_helper_endpoint_strictness.md</code>.</li>
-<li>Draft/publish isolation and lifecycle retention work was completed in
-  <code>docs/backlog/completed/020_draft_run_and_publish_lifecycle.md</code>.</li>
+<li><code>web/frontend/src/components/Canvas.tsx</code> centralizes <code>validateConnection</code>, <code>getConnectionError</code>, edge coloring, and ReactFlow connection setup.</li>
+<li><code>web/frontend/src/components/nodes/BaseNode.tsx</code> renders input/output pin rows and can receive transient render-only data through ReactFlow node data.</li>
+<li><code>web/frontend/src/utils/validation.ts</code> already returns modality-specific connection errors.</li>
+<li><code>web/frontend/src/utils/mediaArtifacts.ts</code> identifies image/audio/text/video/generic artifact mismatches.</li>
+<li><code>web/frontend/src/styles/nodes.css</code> already styles pins, handles, edge paths, and connection lines.</li>
+<li>Two read-only subagent critiques on 2026-05-25 were requested for implementation and UX guidance.</li>
 </ul>
-<h2 id="migration-note">Migration Note<a class="headerlink" href="#migration-note" title="Permanent link">&para;</a></h2>
-<p>After closing <code>060</code>, editor runs that require run input rehydration or run history replay must receive
-<code>common.runs.input_data</code> and <code>common.runs.history_bundle</code> from Gateway discovery in default
-Gateway-only mode.</p>
+<h2 id="problem">Problem<a class="headerlink" href="#problem" title="Permanent link">&para;</a></h2>
+<p>Users should see compatible and incompatible targets while dragging a connection, especially for media artifact pins. Waiting for a failed drop makes the graph feel brittle and hides the type system until after a mistake.</p>
+<h2 id="what-we-want-to-do">What we want to do<a class="headerlink" href="#what-we-want-to-do" title="Permanent link">&para;</a></h2>
+<p>Add live canvas feedback during connection drag:
+- color the connection line by the source pin type;
+- mark compatible target pins as valid;
+- mark incompatible target pins as invalid;
+- show the current invalid reason in a small canvas hint while dragging over an invalid target.</p>
+<h2 id="why">Why<a class="headerlink" href="#why" title="Permanent link">&para;</a></h2>
+<p>This turns typed pins into active guidance instead of passive validation. The workflow editor should teach users what can connect before they make a mistake.</p>
+<h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Keep the feedback render-only; do not persist drag state into saved flow data.</li>
+<li>Reuse <code>validateConnection</code> and <code>getConnectionError</code> instead of duplicating compatibility logic.</li>
+<li>Highlight target pins only when a source connection is actively being dragged.</li>
+<li>Use concise wording for errors, including media artifact modality errors from <code>validation.ts</code>.</li>
+<li>Keep generic object escape hatches intact.</li>
+<li>Avoid brittle direct DOM mutation for compatibility state.</li>
+</ul>
+<h2 id="suggested-implementation">Suggested implementation<a class="headerlink" href="#suggested-implementation" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Track the active source <code>{ nodeId, handleId, pinType }</code> from ReactFlow connection events in <code>Canvas.tsx</code>.</li>
+<li>Decorate ReactFlow nodes with transient <code>connectionPreview</code> data derived from the active source and current graph.</li>
+<li>Let <code>BaseNode.tsx</code> add pin-row classes and <code>aria-invalid</code>/title state from <code>data.connectionPreview</code>.</li>
+<li>Add a canvas-level hint for the active invalid target if ReactFlow exposes the hovered connection object; otherwise keep the first slice to target highlighting and failed-drop toasts.</li>
+<li>Style valid/invalid pin rows and the active connection line in <code>nodes.css</code>.</li>
+</ul>
+<h2 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Frontend canvas connection drag state.</li>
+<li>Base node render classes for pin feedback.</li>
+<li>CSS for connection feedback.</li>
+<li>Focused frontend source/behavior tests.</li>
+<li>Backlog overview/completion trace.</li>
+</ul>
+<h2 id="non-goals">Non-goals<a class="headerlink" href="#non-goals" title="Permanent link">&para;</a></h2>
+<ul>
+<li>No runtime or Gateway changes.</li>
+<li>No full graph tutorial or onboarding overlay.</li>
+<li>No artifact metadata network lookup.</li>
+<li>No broad rewrite of ReactFlow node/edge architecture.</li>
+</ul>
+<h2 id="dependencies-and-related-tasks">Dependencies and related tasks<a class="headerlink" href="#dependencies-and-related-tasks" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>completed/0085_media_artifact_modality_validation.md</code></li>
+<li><code>web/frontend/src/utils/validation.ts</code></li>
+<li><code>web/frontend/src/utils/mediaArtifacts.ts</code></li>
+</ul>
+<h2 id="expected-outcomes">Expected outcomes<a class="headerlink" href="#expected-outcomes" title="Permanent link">&para;</a></h2>
+<ul>
+<li>When dragging an image artifact output, image artifact inputs visibly accept it and audio artifact inputs visibly reject it.</li>
+<li>When dragging an audio artifact output, transcription audio inputs visibly accept it and image inputs visibly reject it.</li>
+<li>The live connection line uses the source pin color.</li>
+<li>Drop-time errors remain the authoritative fallback.</li>
+</ul>
+<h2 id="validation">Validation<a class="headerlink" href="#validation" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Frontend contract/source tests proving the transient connection preview exists and reuses validation helpers.</li>
+<li>Frontend build.</li>
+<li>Diff check.</li>
+</ul>
+<h2 id="progress-checklist">Progress checklist<a class="headerlink" href="#progress-checklist" title="Permanent link">&para;</a></h2>
+<ul>
+<li>[x] Add transient connection preview model.</li>
+<li>[x] Wire Canvas connection start/end state.</li>
+<li>[x] Decorate nodes with valid/invalid target pin feedback.</li>
+<li>[x] Add CSS for valid/invalid target states and colored connection line.</li>
+<li>[x] Add tests.</li>
+<li>[x] Record completion evidence.</li>
+</ul>
+<h2 id="guidance-for-the-implementing-agent">Guidance for the implementing agent<a class="headerlink" href="#guidance-for-the-implementing-agent" title="Permanent link">&para;</a></h2>
+<p>Prefer a small render-only data path from Canvas to BaseNode. Do not add a new validation subsystem or persist ephemeral drag state into the store.</p>
+<h2 id="completion-report">Completion report<a class="headerlink" href="#completion-report" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Completed: 2026-05-25</li>
+<li>Summary: Added live typed-connection feedback on the Flow canvas. Dragging from a source pin now colors the connection line by the source pin type, decorates compatible and incompatible candidate pins with render-only state, and shows a small themed hint derived from ReactFlow's active end-handle state. The hint reuses <code>validateConnection</code> and <code>getConnectionError</code>; it is derived from current ReactFlow store state rather than side effects, avoiding stale hover messages.</li>
+<li>Files touched: <code>web/frontend/src/components/Canvas.tsx</code>, <code>web/frontend/src/components/nodes/BaseNode.tsx</code>, <code>web/frontend/src/styles/nodes.css</code>, <code>web/frontend/src/types/flow.ts</code>, <code>web/frontend/src/utils/connectionPreview.ts</code>, <code>tests/test_frontend_gateway_contract.py</code>.</li>
+<li>Behavior changes: media artifact and other typed pins now expose valid/invalid drop guidance during drag; reverse target-to-source drags are also evaluated; selected-node editing strips the transient preview payload so drag state is not persisted into the flow store.</li>
+<li>ADR impact: None. This is an editor interaction implementation using existing validation policy.</li>
+<li>Validation: <code>pytest abstractflow/tests/test_frontend_gateway_contract.py::test_frontend_live_connection_feedback_uses_validation_contract -q</code>; <code>pytest abstractflow/tests/test_frontend_gateway_contract.py -q</code>; <code>npm --prefix abstractflow/web/frontend run build</code>; <code>npm --prefix abstractflow/web/frontend run build -- --mode production</code>; <code>git -C abstractflow diff --check</code>.</li>
+<li>Residual risks: No browser-plugin visual screenshot was available in this session, so the work is validated by contract tests and TypeScript/Vite build rather than pixel inspection.</li>
+<li>Follow-ups: none from this item.</li>
+</ul>
 
 
 

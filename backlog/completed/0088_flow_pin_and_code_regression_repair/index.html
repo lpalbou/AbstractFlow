@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://www.lpalbou.info/AbstractFlow/backlog/completed/010_gateway_only_remote_editor_transport/">
+        <link rel="canonical" href="https://www.lpalbou.info/AbstractFlow/backlog/completed/0088_flow_pin_and_code_regression_repair/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Completed: Gateway-Only Remote Editor Transport - AbstractFlow</title>
+        <title>Completed: Flow Pin And Code Regression Repair - AbstractFlow</title>
       
     
     
@@ -64,7 +64,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#completed-gateway-only-remote-editor-transport" class="md-skip">
+        <a href="#completed-flow-pin-and-code-regression-repair" class="md-skip">
           Skip to content
         </a>
       
@@ -100,7 +100,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Completed: Gateway-Only Remote Editor Transport
+              Completed: Flow Pin And Code Regression Repair
             
           </span>
         </div>
@@ -467,10 +467,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#outcome" class="md-nav__link">
+  <a href="#adr-status" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Outcome
+        ADR status
       
     </span>
   </a>
@@ -478,10 +478,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#follow-up-and-linkage" class="md-nav__link">
+  <a href="#context" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Follow-up and linkage
+        Context
       
     </span>
   </a>
@@ -489,10 +489,164 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#migration-note" class="md-nav__link">
+  <a href="#current-code-reality" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Migration Note
+        Current code reality
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-we-want-to-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What we want to do
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#suggested-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Suggested implementation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Non-goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dependencies-and-related-tasks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dependencies and related tasks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#expected-outcomes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Expected outcomes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#progress-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Progress checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#guidance-for-the-implementing-agent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guidance for the implementing agent
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#completion-report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Completion report
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validation-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation evidence
       
     </span>
   </a>
@@ -519,33 +673,134 @@
   
 
 
-<h1 id="completed-gateway-only-remote-editor-transport">Completed: Gateway-Only Remote Editor Transport<a class="headerlink" href="#completed-gateway-only-remote-editor-transport" title="Permanent link">&para;</a></h1>
+<h1 id="completed-flow-pin-and-code-regression-repair">Completed: Flow Pin And Code Regression Repair<a class="headerlink" href="#completed-flow-pin-and-code-regression-repair" title="Permanent link">&para;</a></h1>
 <h2 id="metadata">Metadata<a class="headerlink" href="#metadata" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Created: 2026-05-09</li>
+<li>Created: 2026-05-25</li>
 <li>Status: Completed</li>
-<li>Completed: 2026-05-10</li>
+<li>Completed: 2026-05-25</li>
 </ul>
-<h2 id="outcome">Outcome<a class="headerlink" href="#outcome" title="Permanent link">&para;</a></h2>
-<p>AbstractFlow’s default editor path is established as Gateway-first.</p>
+<h2 id="adr-status">ADR status<a class="headerlink" href="#adr-status" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Browser/editor runtime calls are expected to use <code>/api/gateway/*</code>.</li>
-<li>Local Python <code>Flow</code> runtime routes remain behind <code>ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1</code> as
-  explicit local compatibility.</li>
-<li>Static UI and proxy entrypoints are aligned to treat Gateway as the execution authority.</li>
-<li>Remote run detail/history workflows now rely on Gateway-discovered capabilities for control.</li>
+<li>Governing ADRs: None</li>
+<li>ADR impact: None</li>
 </ul>
-<h2 id="follow-up-and-linkage">Follow-up and linkage<a class="headerlink" href="#follow-up-and-linkage" title="Permanent link">&para;</a></h2>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>Recent AbstractFlow authoring changes regressed core graph editing behavior. User reports show
+execution links that cannot be removed from their pins, execution triangles no longer indicating
+connected state, overly permissive data-pin wiring, confusing authoring-run language, and Code-node
+execution failing because visible input links are not reflected cleanly in the executed code.</p>
+<h2 id="current-code-reality">Current code reality<a class="headerlink" href="#current-code-reality" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Follow-up work for stricter helper endpoint gating moved to
-  <code>docs/backlog/completed/060_gateway_contract_helper_endpoint_strictness.md</code>.</li>
-<li>Draft/publish isolation and lifecycle retention work was completed in
-  <code>docs/backlog/completed/020_draft_run_and_publish_lifecycle.md</code>.</li>
+<li><code>web/frontend/src/components/nodes/BaseNode.tsx</code> excludes <code>exec-in</code> and <code>exec-out</code> from
+  connected pin sets even though execution triangle fill and pin disconnect use those sets.</li>
+<li><code>web/frontend/src/utils/validation.ts</code> treats <code>any</code> as accepting every type and still bridges
+  provider/model pins into <code>string</code>, which lets control-like provider/model values wire into generic
+  payload pins.</li>
+<li><code>web/frontend/src/hooks/useFlow.ts</code> drops saved edges with missing handles, but does not re-run
+  the canonical connection validator during load.</li>
+<li><code>web/frontend/src/utils/codegen.ts</code> can generate Code-node variables from pins, but stale saved
+  Code wrappers can miss variables when <code>codeBody</code> and <code>inputs</code> drift.</li>
+<li>Toolbar and run modal copy says <code>Test Draft</code> / <code>New Draft Test</code>, which over-exposes internal
+  lifecycle terminology for normal authoring tests.</li>
 </ul>
-<h2 id="migration-note">Migration Note<a class="headerlink" href="#migration-note" title="Permanent link">&para;</a></h2>
-<p>After closing <code>060</code>, editor runs that require run input rehydration or run history replay must receive
-<code>common.runs.input_data</code> and <code>common.runs.history_bundle</code> from Gateway discovery in default
-Gateway-only mode.</p>
+<h2 id="problem">Problem<a class="headerlink" href="#problem" title="Permanent link">&para;</a></h2>
+<p>The visual editor no longer enforces clear pin contracts or reliably reflects graph state. This
+makes simple authoring actions feel broken and can lead to saved flows that run with stale code or
+invalid edges.</p>
+<h2 id="what-we-want-to-do">What we want to do<a class="headerlink" href="#what-we-want-to-do" title="Permanent link">&para;</a></h2>
+<p>Repair the reported regressions at their source with minimal, maintainable changes.</p>
+<h2 id="why">Why<a class="headerlink" href="#why" title="Permanent link">&para;</a></h2>
+<p>AbstractFlow is an authoring framework. Users need pin contracts, connection state, and authoring
+test runs to be predictable before broader workflow lifecycle or palette improvements matter.</p>
+<h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Execution pins must visibly show connected state and support the existing explicit pin-disconnect
+  behavior for <code>exec-in</code> / <code>exec-out</code>.</li>
+<li>Connection validation must reject provider/model/control-like values into generic <code>any</code> or
+  accidental <code>string</code> inputs unless the receiving pin is explicitly provider/model compatible.</li>
+<li>Loading a saved flow must not keep edges that fail the canonical connection validator.</li>
+<li>Code nodes with <code>codeBody</code> must execute with a wrapper regenerated from the current Code-node
+  input pins.</li>
+<li>Authoring-run UI copy should avoid <code>draft</code> terminology in primary controls.</li>
+</ul>
+<h2 id="suggested-implementation">Suggested implementation<a class="headerlink" href="#suggested-implementation" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Include execution handles in BaseNode connected-pin state, while keeping any layout-specific
+  filtering local if needed.</li>
+<li>Tighten <code>areTypesCompatible</code> for provider/model control values before the generic <code>any</code> case.</li>
+<li>Apply <code>validateConnection</code> when filtering loaded edges, excluding the candidate edge itself.</li>
+<li>Regenerate Code-node <code>data.code</code> from <code>data.codeBody</code> and current inputs during node
+  normalization, and add a runtime-side guard if needed.</li>
+<li>Rename visible authoring-run controls to plain <code>Run</code> / <code>New Run</code>.</li>
+</ul>
+<h2 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h2>
+<ul>
+<li>AbstractFlow frontend graph editing state and validation.</li>
+<li>AbstractFlow Code-node saved-flow normalization.</li>
+<li>Focused tests for the reported regressions.</li>
+</ul>
+<h2 id="non-goals">Non-goals<a class="headerlink" href="#non-goals" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Do not redesign the full run/publish lifecycle.</li>
+<li>Do not implement broad backlog items or unrelated Flow UX features.</li>
+<li>Do not rewrite Code-node permissions or language support.</li>
+<li>Blueprint-style edge-drop action menus are a follow-up unless a small existing hook can be wired
+  without changing the connection model.</li>
+</ul>
+<h2 id="dependencies-and-related-tasks">Dependencies and related tasks<a class="headerlink" href="#dependencies-and-related-tasks" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Related completed items: <code>0079_code_node_editor_execution_policy.md</code>,
+  <code>0081_code_editor_test_result_stability.md</code>, <code>0086_live_connection_feedback.md</code>.</li>
+</ul>
+<h2 id="expected-outcomes">Expected outcomes<a class="headerlink" href="#expected-outcomes" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Existing execution links can be identified and removed from pins again.</li>
+<li>Invalid provider/model-to-generic edges are rejected immediately and pruned on load.</li>
+<li>Code-node authoring tests do not fail from stale wrapper variables after inputs change.</li>
+<li>Primary authoring controls describe tests as tests, not as draft lifecycle operations.</li>
+</ul>
+<h2 id="validation">Validation<a class="headerlink" href="#validation" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Focused frontend contract tests for BaseNode exec connected-state source, validation policy,
+  saved-flow edge filtering, and authoring-run labels.</li>
+<li>Focused runtime or frontend Code-node test proving stale wrappers are regenerated from
+  <code>codeBody</code> plus current inputs.</li>
+<li>Frontend build if the patch touches TypeScript/React code.</li>
+</ul>
+<h2 id="progress-checklist">Progress checklist<a class="headerlink" href="#progress-checklist" title="Permanent link">&para;</a></h2>
+<ul>
+<li>[x] Confirm root causes with three subagent critiques and local code inspection.</li>
+<li>[x] Patch execution pin connected-state and connection validation.</li>
+<li>[x] Patch Code-node wrapper regeneration.</li>
+<li>[x] Patch authoring-run labels.</li>
+<li>[x] Run focused tests/build and record completion evidence.</li>
+</ul>
+<h2 id="guidance-for-the-implementing-agent">Guidance for the implementing agent<a class="headerlink" href="#guidance-for-the-implementing-agent" title="Permanent link">&para;</a></h2>
+<p>Keep the patch narrow. Prefer existing validation, node normalization, and codegen helpers. Do not
+paper over invalid saved flow state with UI-only workarounds.</p>
+<h2 id="completion-report">Completion report<a class="headerlink" href="#completion-report" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Execution pin connection state now includes <code>exec-in</code> and <code>exec-out</code>, restoring filled triangles
+  and existing pin-disconnect behavior.</li>
+<li>Provider/model pins are now nominal values that only connect to provider/model-compatible pins,
+  so they no longer wire into generic <code>any</code> or accidental <code>string</code> inputs.</li>
+<li>Saved-flow loading re-runs canonical connection validation after handle migration and drops
+  invalid edges.</li>
+<li>Code nodes regenerate executable wrappers from <code>codeBody</code> plus current input pins in both
+  frontend normalization and Runtime execution, preventing stale saved <code>data.code</code> from hiding
+  missing variables.</li>
+<li>Authoring-run visible copy now says <code>Run</code> and <code>New Run</code> without exposing draft/test lifecycle
+  wording.</li>
+</ul>
+<h2 id="validation-evidence">Validation evidence<a class="headerlink" href="#validation-evidence" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>pytest abstractflow/tests/test_python_code_node_params.py</code></li>
+<li><code>pytest abstractflow/tests/test_frontend_gateway_contract.py</code></li>
+<li><code>pytest abstractflow/tests/test_python_code_node_params.py::test_python_code_node_regenerates_wrapper_from_body_and_current_inputs</code></li>
+<li><code>pytest abstractflow/tests/test_frontend_gateway_contract.py::test_frontend_pin_contract_rejects_control_values_into_generic_inputs</code></li>
+<li><code>npm run build</code> in <code>abstractflow/web/frontend</code></li>
+</ul>
 
 
 
