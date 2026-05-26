@@ -17942,6 +17942,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Apple/GPU Flow profiles now require Gateway `>=0.2.20` for the video media, progress, catalog, and model-residency contracts.
 - Model residency and default routing now use task-scoped Gateway vision catalogs for `text_to_video` and `image_to_video` instead of reusing image defaults.
+- Hosted CI/release tests now install the host-neutral Gateway HTTP stack instead of macOS-only Apple extras on Ubuntu runners.
 
 ## [0.3.14] - 2026-05-26
 
