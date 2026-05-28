@@ -39,7 +39,7 @@ jobs:
         run: |
           python -m pip install -U pip
           python -m pip install -e .
-          python -m pip install "abstractgateway[http]>=0.2.20"
+          python -m pip install "abstractgateway>=0.2.20"
           python -m pip install pytest pytest-asyncio
       - name: Pytest
         env:

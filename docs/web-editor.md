@@ -18,7 +18,7 @@ Terminal 1 (Gateway):
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install "abstractgateway[http]" abstractflow
+pip install abstractgateway abstractflow
 
 export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
 abstractgateway serve --port 8080

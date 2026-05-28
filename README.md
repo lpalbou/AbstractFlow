@@ -96,7 +96,7 @@ The visual editor talks to AbstractGateway. The Flow server keeps the Gateway be
 
 ```bash
 # Terminal 1: Gateway
-pip install "abstractgateway[http]" abstractflow
+pip install abstractgateway abstractflow
 export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
 abstractgateway serve --port 8080
 

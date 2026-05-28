@@ -9,7 +9,7 @@ It is designed to run alongside **AbstractGateway**. The package server proxies 
 Terminal 1 (Gateway):
 
 ```bash
-pip install "abstractgateway[http]" abstractflow
+pip install abstractgateway abstractflow
 export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
 abstractgateway --port 8080
 ```

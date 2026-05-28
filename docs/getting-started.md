@@ -30,7 +30,7 @@ pip install -e .
 
 Evidence: dependencies and extras are declared in [../pyproject.toml](../pyproject.toml).
 
-For thin-client gateway-first mode, `abstractflow` (without extras) is sufficient. Install `abstractgateway[http]` separately for the backend.
+For thin-client gateway-first mode, `abstractflow` (without extras) is sufficient. Install `abstractgateway` separately for the backend.
 Enable local runtime compatibility only when needed with `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1`.
 
 If you install a host profile (`apple`, `gpu`), the local execution stack is already included for compatibility.
@@ -106,7 +106,7 @@ The modern editor talks to AbstractGateway. Follow: [web-editor.md](web-editor.m
 Quick start (no repo clone needed):
 
 ```bash
-pip install "abstractgateway[http]" abstractflow
+pip install abstractgateway abstractflow
 export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
 abstractgateway serve --port 8080
 
