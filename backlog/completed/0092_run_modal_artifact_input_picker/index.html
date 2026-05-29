@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://www.lpalbou.info/AbstractFlow/backlog/proposed/0073_media_progressive_disclosure_preview_first_ux/">
+        <link rel="canonical" href="https://www.lpalbou.info/AbstractFlow/backlog/completed/0092_run_modal_artifact_input_picker/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Proposed: Media Progressive Disclosure and Preview-First UX - AbstractFlow</title>
+        <title>Planned: Run Modal Artifact Input Picker - AbstractFlow</title>
       
     
     
@@ -64,7 +64,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#proposed-media-progressive-disclosure-and-preview-first-ux" class="md-skip">
+        <a href="#planned-run-modal-artifact-input-picker" class="md-skip">
           Skip to content
         </a>
       
@@ -100,7 +100,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Proposed: Media Progressive Disclosure and Preview-First UX
+              Planned: Run Modal Artifact Input Picker
             
           </span>
         </div>
@@ -467,6 +467,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-code-reality" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current Code Reality
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#problem" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -478,10 +500,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#proposed-direction" class="md-nav__link">
+  <a href="#what-we-want" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Proposed direction
+        What We Want
       
     </span>
   </a>
@@ -489,10 +511,65 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#acceptance-criteria" class="md-nav__link">
+  <a href="#requirements" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Acceptance criteria
+        Requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#suggested-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Suggested Implementation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Non-Goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#progress-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Progress Checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#completion-report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Completion Report
       
     </span>
   </a>
@@ -519,33 +596,98 @@
   
 
 
-<h1 id="proposed-media-progressive-disclosure-and-preview-first-ux">Proposed: Media Progressive Disclosure and Preview-First UX<a class="headerlink" href="#proposed-media-progressive-disclosure-and-preview-first-ux" title="Permanent link">&para;</a></h1>
+<h1 id="planned-run-modal-artifact-input-picker">Planned: Run Modal Artifact Input Picker<a class="headerlink" href="#planned-run-modal-artifact-input-picker" title="Permanent link">&para;</a></h1>
 <h2 id="metadata">Metadata<a class="headerlink" href="#metadata" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Created: 2026-05-22</li>
-<li>Status: Proposed</li>
+<li>Created: 2026-05-28</li>
+<li>Status: Completed</li>
+<li>Completed: 2026-05-28</li>
+<li>Owner: AbstractFlow</li>
+<li>Depends On: <code>completed/0091_gateway_artifact_import_export_contract.md</code></li>
+</ul>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>Flow pins already distinguish artifact modalities: generic artifact, image, audio, text, and video. The run modal can display generated artifacts after a run, and the Properties panel has an artifact literal upload control. However, run-start inputs still render artifact pins as plain text fields.</p>
+<h2 id="current-code-reality">Current Code Reality<a class="headerlink" href="#current-code-reality" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>RunFlowModal.tsx</code> maps unknown pin types to text inputs through <code>getInputTypeForPin</code>.</li>
+<li><code>RunFlowModal.tsx</code> already has artifact preview/extraction helpers for run outputs.</li>
+<li><code>PropertiesPanel.tsx</code> has <code>ArtifactLiteralPanel</code>, which uploads browser files into Gateway artifacts and stores an artifact ref.</li>
+<li><code>ArtifactPlayer.tsx</code> can preview image/audio/video/text-ish artifacts from Gateway content URLs.</li>
 </ul>
 <h2 id="problem">Problem<a class="headerlink" href="#problem" title="Permanent link">&para;</a></h2>
-<p>Gateway-backed media nodes are now first-class, but the editor still exposes some low-level concepts too early:</p>
+<p>Users need to provide images, audio, video, documents, text, JSON, music, or voice artifacts at run start without manually pasting artifact ids. The current plain text field is error-prone and leaks storage details into normal workflow operation.</p>
+<h2 id="what-we-want">What We Want<a class="headerlink" href="#what-we-want" title="Permanent link">&para;</a></h2>
+<p>For run-start pins of type <code>artifact</code>, <code>artifact_image</code>, <code>artifact_audio</code>, <code>artifact_text</code>, and <code>artifact_video</code>, the run modal should offer a first-class artifact input control with three sources:</p>
 <ul>
-<li>provider/model/backend details are visible before the user understands the happy path</li>
-<li>artifact IDs and raw ledger payloads can dominate run results</li>
-<li>Edit Image requires artifact vocabulary before a normal user can try it</li>
+<li>upload a browser-local file</li>
+<li>import a Gateway workspace path as an artifact</li>
+<li>select an existing visible artifact from the current run/session context</li>
 </ul>
-<h2 id="proposed-direction">Proposed direction<a class="headerlink" href="#proposed-direction" title="Permanent link">&para;</a></h2>
+<p>The submitted <code>input_data</code> must contain canonical artifact ref objects, not bytes and not raw paths.</p>
+<h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Add simple media cards or presets for Generate Image, Generate Voice, and Generate Music.</li>
-<li>Keep node defaults to prompt/text, duration/size/voice, provider/model <code>Auto (Gateway default)</code>, and format.</li>
-<li>Keep seed and guidance visible on image/video generation and edit nodes because they are core reproducibility and quality controls; move steps, negative prompt, backend planner details, extra options, and raw output specs behind an explicit advanced section.</li>
-<li>Make run results open as a gallery/player first, with artifact IDs and raw JSON collapsed.</li>
-<li>Add an image artifact picker/upload affordance for Edit Image when the source pin is unconnected.</li>
+<li>Filter existing artifacts by pin modality using content type and artifact tags.</li>
+<li>Preview selected artifacts with <code>ArtifactPlayer</code> where possible.</li>
+<li>Preserve generic artifact pins for documents and other binary blobs that do not map cleanly to image/audio/video/text.</li>
+<li>Submit stable refs with <code>$artifact</code>, <code>artifact_id</code>, owner <code>run_id</code>, <code>content_type</code>, <code>filename</code>, and sha256 when available.</li>
+<li>Show clear errors when Gateway does not advertise upload/import/list/content capabilities.</li>
+<li>Keep Flow as UX only; no browser-side path policy or artifact persistence.</li>
 </ul>
-<h2 id="acceptance-criteria">Acceptance criteria<a class="headerlink" href="#acceptance-criteria" title="Permanent link">&para;</a></h2>
+<h2 id="suggested-implementation">Suggested Implementation<a class="headerlink" href="#suggested-implementation" title="Permanent link">&para;</a></h2>
 <ul>
-<li>A new user can create and run Generate Music from docs in under one minute without choosing a backend.</li>
-<li>Edit Image explains and supports the source image path without requiring manual artifact ID copy/paste.</li>
-<li>Advanced users can still wire every advanced pin and inspect raw artifacts/ledger records.</li>
-<li>Tests cover simple media node rendering and advanced pin visibility behavior.</li>
+<li>Extract a reusable <code>ArtifactInputField</code> from the upload/ref logic already used by <code>ArtifactLiteralPanel</code>.</li>
+<li>Add a Gateway client helper for artifact import and, when available, session-visible artifact listing.</li>
+<li>Extend run modal form initialization so artifact refs are stored as structured JSON instead of stringified text.</li>
+<li>Add source tabs or segmented controls: Upload, Workspace Path, Existing Artifact.</li>
+<li>Use modality-specific search placeholders such as "Search image artifacts..." and "Search audio artifacts...".</li>
+</ul>
+<h2 id="non-goals">Non-Goals<a class="headerlink" href="#non-goals" title="Permanent link">&para;</a></h2>
+<ul>
+<li>No client access to arbitrary local filesystem paths.</li>
+<li>No artifact format conversion or editing in the picker.</li>
+<li>No cross-user global artifact library until Gateway defines ownership and retention semantics.</li>
+</ul>
+<h2 id="validation">Validation<a class="headerlink" href="#validation" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Frontend tests cover artifact pin rendering as picker controls, not text inputs.</li>
+<li>Tests verify upload, workspace import, and existing artifact selection produce canonical JSON refs in <code>input_data</code>.</li>
+<li>Tests cover modality filtering for image/audio/video/text/generic artifact pins.</li>
+<li>Tests cover missing Gateway capability descriptors and disabled controls.</li>
+<li>Manual smoke: start a flow with an image artifact input and wire it into Edit Image or Image To Video.</li>
+</ul>
+<h2 id="progress-checklist">Progress Checklist<a class="headerlink" href="#progress-checklist" title="Permanent link">&para;</a></h2>
+<ul>
+<li>[x] Add reusable artifact input field component.</li>
+<li>[x] Add Gateway client helpers for import/list/content descriptors.</li>
+<li>[x] Update run modal artifact pin rendering.</li>
+<li>[x] Add modality filtering and previews.</li>
+<li>[x] Add frontend contract tests.</li>
+<li>[x] Update user docs with run-start artifact examples.</li>
+</ul>
+<h2 id="completion-report">Completion Report<a class="headerlink" href="#completion-report" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Completed: 2026-05-28</li>
+<li>Summary: Added a first-class Run modal artifact input control for generic/image/audio/text/video artifact pins. It supports existing session artifacts, browser upload, Gateway workspace import, modality filtering, previews through <code>ArtifactPlayer</code>, and canonical JSON ref submission.</li>
+<li>Code touched:</li>
+<li><code>abstractflow/web/frontend/src/components/ArtifactInputField.tsx</code></li>
+<li><code>abstractflow/web/frontend/src/components/RunFlowModal.tsx</code></li>
+<li><code>abstractflow/web/frontend/src/utils/artifactInputs.ts</code></li>
+<li><code>abstractflow/web/frontend/src/utils/gatewayClient.ts</code></li>
+<li><code>abstractflow/web/frontend/src/styles/index.css</code></li>
+<li>Tests:</li>
+<li><code>abstractflow/tests/test_frontend_gateway_contract.py</code></li>
+<li>Docs:</li>
+<li><code>abstractflow/docs/getting-started.md</code></li>
+<li><code>abstractflow/docs/web-editor.md</code></li>
+<li><code>abstractflow/docs/api.md</code></li>
+<li><code>abstractflow/docs/faq.md</code></li>
+<li><code>abstractflow/llms.txt</code></li>
+<li><code>abstractflow/llms-full.txt</code></li>
+<li>Validation:</li>
+<li><code>python -m pytest tests/test_frontend_gateway_contract.py -q</code> in <code>abstractflow</code> passed.</li>
+<li><code>npm run build</code> in <code>abstractflow/web/frontend</code> passed.</li>
+<li>ADR impact: None. The picker is a UX layer over advertised Gateway routes and does not introduce a new persistence or filesystem authority rule.</li>
+<li>Residual risks: The current test suite validates helper normalization and contract compatibility. A browser-level component test can be added later if the project adopts a React test harness for modal interactions.</li>
 </ul>
 
 

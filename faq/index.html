@@ -515,6 +515,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#why-does-image-to-video-look-stretched-or-barely-animated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why does image-to-video look stretched or barely animated?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#how-do-subflows-work" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -574,6 +585,17 @@
     <span class="md-ellipsis">
       
         How does tool / file access work (security)?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#should-flow-inputs-use-file-paths-or-artifacts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Should flow inputs use file paths or artifacts?
       
     </span>
   </a>
@@ -714,6 +736,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#why-does-image-to-video-look-stretched-or-barely-animated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why does image-to-video look stretched or barely animated?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#how-do-subflows-work" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -773,6 +806,17 @@
     <span class="md-ellipsis">
       
         How does tool / file access work (security)?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#should-flow-inputs-use-file-paths-or-artifacts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Should flow inputs use file paths or artifacts?
       
     </span>
   </a>
@@ -876,6 +920,16 @@
 This requires the runtime stack with <code>pip install "abstractflow[apple]"</code>.
 Agent-node features are included in <code>abstractflow[apple]</code> and <code>abstractflow[gpu]</code>; use <code>abstractflow[agent]</code> only when you need Agent nodes without a host profile.</p>
 <p>Evidence: <a href="../abstractflow/visual/executor.py">../abstractflow/visual/executor.py</a>.</p>
+<h2 id="why-does-image-to-video-look-stretched-or-barely-animated">Why does image-to-video look stretched or barely animated?<a class="headerlink" href="#why-does-image-to-video-look-stretched-or-barely-animated" title="Permanent link">&para;</a></h2>
+<p>Image-to-video models usually expect a specific video aspect ratio and frame geometry. For example,
+the Wan 2.2 TI2V MLX-Gen path is tuned for 1280x704 or 704x1280, 121 frames, 50 steps, and 24 fps.
+If the source image has a different aspect ratio, AbstractVision preserves it by letterboxing before
+handing it to the model, but the best results still come from generating or editing the source image
+at the same aspect ratio and approximate resolution that the video model will use.</p>
+<p>Very short clips are wiring tests, not quality tests. A 10-frame request for Wan becomes 9 frames
+internally and is less than a second at 10 fps, so the output can look almost static even when the
+prompt is passed correctly. For prompt-following and motion checks, use the model's recommended
+frame count, steps, fps, and a prompt that explicitly describes camera movement or object motion.</p>
 <h2 id="how-do-subflows-work">How do subflows work?<a class="headerlink" href="#how-do-subflows-work" title="Permanent link">&para;</a></h2>
 <p>Subflows are VisualFlows referenced by id from nodes of type <code>subflow</code>:
 - <code>node.data["subflowId"]</code> (legacy: <code>flowId</code>)</p>
@@ -912,6 +966,21 @@ when <code>ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1</code> is set:
 - Workspace base: <code>ABSTRACTFLOW_BASE_EXECUTION</code> (or <code>/tmp</code> / OS temp)
 - Workspace root is injected into <code>input_data</code> (<code>workspace_root</code>) and used to scope tools</p>
 <p>Evidence: <a href="../web/backend/services/execution_workspace.py">../web/backend/services/execution_workspace.py</a>, <a href="../abstractflow/visual/workspace_scoped_tools.py">../abstractflow/visual/workspace_scoped_tools.py</a>, <a href="../web/backend/routes/ws.py">../web/backend/routes/ws.py</a>, <a href="../web/backend/routes/flows.py">../web/backend/routes/flows.py</a>.</p>
+<h2 id="should-flow-inputs-use-file-paths-or-artifacts">Should flow inputs use file paths or artifacts?<a class="headerlink" href="#should-flow-inputs-use-file-paths-or-artifacts" title="Permanent link">&para;</a></h2>
+<p>Use artifact refs for payloads that cross Gateway, Runtime, Flow, and Core
+boundaries. A run-start image, document, audio file, video, or text file should
+enter the run as <code>{"$artifact": "...", "run_id": "..."}</code>. The Run modal can
+create that ref by uploading a browser file, importing a Gateway workspace path,
+or selecting an existing artifact through Gateway artifact search. The picker
+can search all artifacts or the current session, filters by the input pin's
+modality, and accepts metadata filters such as <code>pin_id=image</code>.</p>
+<p>Workspace paths are still useful for explicit filesystem operations, but they
+are server-side paths governed by Gateway workspace policy and <code>.abstractignore</code>.
+Browser-local paths are never treated as Gateway workspace paths. The Run modal's
+<code>artifact content</code> link opens or downloads artifact payloads. Writing artifacts
+back into workspace files should be modeled as an explicit graph operation
+through <code>Read File</code> / <code>Write File</code> or the planned artifact-aware file-node
+contract, so filesystem side effects stay visible in the workflow.</p>
 <h2 id="how-do-tools-work-how-do-i-add-more-tools">How do tools work? How do I add more tools?<a class="headerlink" href="#how-do-tools-work-how-do-i-add-more-tools" title="Permanent link">&para;</a></h2>
 <p>The editor backend exposes a <strong>conservative default tool set</strong> derived from AbstractRuntime’s AbstractCore integration.</p>
 <p>To add or customize tools, you have a few host-level options:</p>

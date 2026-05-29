@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://www.lpalbou.info/AbstractFlow/backlog/proposed/0073_media_progressive_disclosure_preview_first_ux/">
+        <link rel="canonical" href="https://www.lpalbou.info/AbstractFlow/backlog/proposed/0095_file_nodes_artifact_io_boundary_resolution/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Proposed: Media Progressive Disclosure and Preview-First UX - AbstractFlow</title>
+        <title>Proposed: File Nodes and Artifact IO Boundary Resolution - AbstractFlow</title>
       
     
     
@@ -64,7 +64,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#proposed-media-progressive-disclosure-and-preview-first-ux" class="md-skip">
+        <a href="#proposed-file-nodes-and-artifact-io-boundary-resolution" class="md-skip">
           Skip to content
         </a>
       
@@ -100,7 +100,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Proposed: Media Progressive Disclosure and Preview-First UX
+              Proposed: File Nodes and Artifact IO Boundary Resolution
             
           </span>
         </div>
@@ -467,10 +467,43 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#problem" class="md-nav__link">
+  <a href="#adr-status" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Problem
+        ADR status
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-code-reality" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current code reality
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#problem-or-opportunity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem or opportunity
       
     </span>
   </a>
@@ -489,10 +522,54 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#acceptance-criteria" class="md-nav__link">
+  <a href="#why-it-might-matter" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Acceptance criteria
+        Why it might matter
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#promotion-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Promotion criteria
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validation-ideas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation ideas
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Non-goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#guidance-for-future-agents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Guidance for future agents
       
     </span>
   </a>
@@ -519,34 +596,120 @@
   
 
 
-<h1 id="proposed-media-progressive-disclosure-and-preview-first-ux">Proposed: Media Progressive Disclosure and Preview-First UX<a class="headerlink" href="#proposed-media-progressive-disclosure-and-preview-first-ux" title="Permanent link">&para;</a></h1>
+<h1 id="proposed-file-nodes-and-artifact-io-boundary-resolution">Proposed: File Nodes and Artifact IO Boundary Resolution<a class="headerlink" href="#proposed-file-nodes-and-artifact-io-boundary-resolution" title="Permanent link">&para;</a></h1>
 <h2 id="metadata">Metadata<a class="headerlink" href="#metadata" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Created: 2026-05-22</li>
+<li>Created: 2026-05-28</li>
 <li>Status: Proposed</li>
+<li>Completed: N/A</li>
 </ul>
-<h2 id="problem">Problem<a class="headerlink" href="#problem" title="Permanent link">&para;</a></h2>
-<p>Gateway-backed media nodes are now first-class, but the editor still exposes some low-level concepts too early:</p>
+<h2 id="adr-status">ADR status<a class="headerlink" href="#adr-status" title="Permanent link">&para;</a></h2>
 <ul>
-<li>provider/model/backend details are visible before the user understands the happy path</li>
-<li>artifact IDs and raw ledger payloads can dominate run results</li>
-<li>Edit Image requires artifact vocabulary before a normal user can try it</li>
+<li>Governing ADRs: None identified after review</li>
+<li>ADR impact: May need new ADR</li>
+</ul>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>AbstractFlow now has several overlapping ways to move data between user-visible files, workflow values, and durable artifacts:</p>
+<ul>
+<li><code>Read File</code> and <code>Write File</code> nodes exist on the canvas.</li>
+<li>Run-start artifact inputs can upload browser files, import Gateway workspace files, or select existing artifacts.</li>
+<li>Generated media outputs are stored as Runtime/Gateway artifacts and can be opened or downloaded from the Run modal, but artifact-to-filesystem writes are not exposed as a modal action.</li>
+<li>JSON, document, data-dossier, and memory-system workflows need a clearer story than media-only artifact previews.</li>
+</ul>
+<p>There is a real design tension that should not be resolved by a quick implementation:</p>
+<ul>
+<li>One perspective favors keeping <code>Read File</code> / <code>Write File</code> as plain workspace text/JSON filesystem nodes and adding explicit artifact import/export nodes or artifact actions.</li>
+<li>The other perspective argues that <code>Read File</code> / <code>Write File</code> are the natural user-facing abstraction and should be able to import/export any artifact, with JSON as just another artifact type, while still supporting normal workflow-authored file trees and dossiers.</li>
+</ul>
+<h2 id="current-code-reality">Current code reality<a class="headerlink" href="#current-code-reality" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Flow frontend defines artifact pin types for generic/image/audio/text/video artifact refs, but not explicit JSON or document artifact pins: <code>web/frontend/src/types/flow.ts</code>.</li>
+<li>Flow frontend defines <code>Read File</code> and <code>Write File</code> as Memory/IO node templates with <code>file_path</code> and <code>content</code> pins: <code>web/frontend/src/types/nodes.ts</code>.</li>
+<li>Flow normalizes old file nodes by removing a deprecated <code>file_type</code> pin and keeping only <code>file_path</code>/<code>content</code>: <code>web/frontend/src/hooks/useFlow.ts</code>.</li>
+<li>Runtime's VisualFlow compiler implements <code>read_file</code> by reading UTF-8 from <code>Path.cwd()</code>-relative or absolute paths, parsing JSON for <code>.json</code> or JSON-looking content, and returning <code>content</code>: <code>../abstractruntime/src/abstractruntime/visualflow_compiler/visual/executor.py</code>.</li>
+<li>Runtime's VisualFlow compiler implements <code>write_file</code> by writing UTF-8 text, pretty-writing <code>.json</code>, creating parent directories, overwriting existing files, and returning <code>bytes</code> plus <code>file_path</code>: <code>../abstractruntime/src/abstractruntime/visualflow_compiler/visual/executor.py</code>.</li>
+<li>Gateway owns artifact import/export routes with workspace policy, allowed roots, ignored paths, overwrite, and parent-directory controls: <code>../abstractgateway/src/abstractgateway/routes/gateway.py</code>.</li>
+<li>Flow's Run modal artifact input uses Gateway upload/import/search contracts for run-start artifact refs: <code>web/frontend/src/components/ArtifactInputField.tsx</code>.</li>
+<li>Flow's Run modal shows generated media artifact content links, but intentionally does not expose artifact export as a modal control: <code>web/frontend/src/components/RunFlowModal.tsx</code>.</li>
+</ul>
+<h2 id="problem-or-opportunity">Problem or opportunity<a class="headerlink" href="#problem-or-opportunity" title="Permanent link">&para;</a></h2>
+<p>The current UX splits file and artifact operations in a way that is technically defensible but conceptually rough:</p>
+<ul>
+<li>users see <code>Read File</code> / <code>Write File</code> and reasonably expect them to handle files that become artifacts or artifacts that become files;</li>
+<li>generated artifacts can be opened/downloaded from result cards, but not written to workspace files as first-class graph steps;</li>
+<li>JSON/document artifacts are not first-class enough for data workflows;</li>
+<li>workflows that intentionally build a directory tree, memory dossier, report package, or structured data corpus need predictable file semantics in addition to Runtime's internal artifact storage;</li>
+<li>Runtime's automatic artifact storage and user-authored external file trees serve different purposes and should not be conflated.</li>
 </ul>
 <h2 id="proposed-direction">Proposed direction<a class="headerlink" href="#proposed-direction" title="Permanent link">&para;</a></h2>
+<p>Run a focused design pass that compares and prototypes at least two options:</p>
+<ol>
+<li><strong>Explicit artifact IO nodes</strong></li>
+<li>Keep <code>Read File</code> / <code>Write File</code> as workspace filesystem nodes.</li>
+<li>Add <code>Import Artifact</code> and <code>Export Artifact</code> nodes that call Gateway artifact contracts.</li>
+<li>
+<p>Add generic JSON/document/file artifact pin types and cards.</p>
+</li>
+<li>
+<p><strong>Expanded file nodes</strong></p>
+</li>
+<li>Evolve <code>Read File</code> / <code>Write File</code> into higher-level file/artifact bridge nodes.</li>
+<li>Let <code>Read File</code> optionally output both loaded runtime value and artifact ref.</li>
+<li>Let <code>Write File</code> optionally write plain content, artifact bytes, or structured JSON into workspace paths.</li>
+<li>
+<p>Make artifact import/export behavior explicit through mode pins or options, not hidden side effects.</p>
+</li>
+<li>
+<p><strong>Hybrid resolution</strong></p>
+</li>
+<li>Keep the visible node names simple (<code>Read File</code>, <code>Write File</code>) but use explicit modes such as <code>workspace</code>, <code>artifact</code>, or <code>both</code>.</li>
+<li>Preserve Gateway as the policy authority for any server filesystem access.</li>
+<li>Preserve Runtime as the artifact store/handoff authority.</li>
+</ol>
+<p>The design should decide whether <code>Read File</code> / <code>Write File</code> remain low-level text/JSON nodes, become artifact-aware, or get paired with explicit artifact nodes while keeping their labels as user-facing affordances.</p>
+<h2 id="why-it-might-matter">Why it might matter<a class="headerlink" href="#why-it-might-matter" title="Permanent link">&para;</a></h2>
+<p>This affects core mental models:</p>
 <ul>
-<li>Add simple media cards or presets for Generate Image, Generate Voice, and Generate Music.</li>
-<li>Keep node defaults to prompt/text, duration/size/voice, provider/model <code>Auto (Gateway default)</code>, and format.</li>
-<li>Keep seed and guidance visible on image/video generation and edit nodes because they are core reproducibility and quality controls; move steps, negative prompt, backend planner details, extra options, and raw output specs behind an explicit advanced section.</li>
-<li>Make run results open as a gallery/player first, with artifact IDs and raw JSON collapsed.</li>
-<li>Add an image artifact picker/upload affordance for Edit Image when the source pin is unconnected.</li>
+<li>Files are user-visible, path-addressed, and useful for dossiers, reports, datasets, and memory systems.</li>
+<li>Artifacts are durable, content-addressed/run-scoped payloads for runtime handoff, previews, downloads, model media inputs, and ledger-safe persistence.</li>
+<li>JSON should be treated as a first-class artifact/data shape, not only as text.</li>
+<li>Directories and file trees are meaningful outputs for many specialized workflows and should not disappear behind Runtime internals.</li>
 </ul>
-<h2 id="acceptance-criteria">Acceptance criteria<a class="headerlink" href="#acceptance-criteria" title="Permanent link">&para;</a></h2>
+<p>Getting this wrong will either make artifacts feel too magical or make file workflows bypass safety, provenance, and runtime durability.</p>
+<h2 id="promotion-criteria">Promotion criteria<a class="headerlink" href="#promotion-criteria" title="Permanent link">&para;</a></h2>
+<p>Promote this to <code>planned/</code> when at least one of these is true:</p>
 <ul>
-<li>A new user can create and run Generate Music from docs in under one minute without choosing a backend.</li>
-<li>Edit Image explains and supports the source image path without requiring manual artifact ID copy/paste.</li>
-<li>Advanced users can still wire every advanced pin and inspect raw artifacts/ledger records.</li>
-<li>Tests cover simple media node rendering and advanced pin visibility behavior.</li>
+<li>a concrete workflow needs to build or consume a structured file/directory dossier from Flow;</li>
+<li>users need graph-level artifact export/import instead of ad hoc Run modal actions;</li>
+<li>JSON/document artifacts become required for a Gateway/Core/Flow integration;</li>
+<li>the team agrees on whether file nodes should be artifact-aware or whether explicit artifact IO nodes are the clearer contract.</li>
 </ul>
+<h2 id="validation-ideas">Validation ideas<a class="headerlink" href="#validation-ideas" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Code audit: confirm the runtime path used by <code>Read File</code> / <code>Write File</code> under Gateway-hosted runs and whether it should be <code>workspace_root</code>, not process cwd.</li>
+<li>Prototype both designs with one workflow:</li>
+<li>import JSON from workspace into artifact;</li>
+<li>parse/load it into runtime values;</li>
+<li>transform it;</li>
+<li>write a directory tree containing JSON, text, and one copied media artifact;</li>
+<li>export the final package or key files.</li>
+<li>Tests should cover:</li>
+<li>parent directory creation;</li>
+<li>overwrite behavior;</li>
+<li><code>.json</code>, <code>application/json</code>, and <code>application/*+json</code>;</li>
+<li>text/document/image/audio/video artifact refs;</li>
+<li>ignored-path and allowed-root enforcement through Gateway;</li>
+<li>remote Gateway behavior where browser paths and server workspace paths differ.</li>
+</ul>
+<h2 id="non-goals">Non-goals<a class="headerlink" href="#non-goals" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Do not weaken Gateway workspace policy or allow browser-local paths to masquerade as server paths.</li>
+<li>Do not make Runtime artifact storage a substitute for user-requested file trees.</li>
+<li>Do not hide artifact import/export as an implicit side effect without visible mode/options.</li>
+<li>Do not implement semantic artifact search in this item.</li>
+</ul>
+<h2 id="guidance-for-future-agents">Guidance for future agents<a class="headerlink" href="#guidance-for-future-agents" title="Permanent link">&para;</a></h2>
+<p>Re-open the design with both positions intact. Avoid forcing a false choice between artifacts and files: Runtime artifacts and workflow-authored filesystem outputs are complementary. The useful resolution is probably a small set of explicit modes and pin types that make the boundary visible without making common file workflows verbose.</p>
 
 
 

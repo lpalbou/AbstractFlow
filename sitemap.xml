@@ -2,170 +2,198 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/api/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/architecture/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/cli/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/faq/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/getting-started/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/visualflow/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/web-editor/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/overview/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/completed/001_run-flow-advanced-layout/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/completed/0070_flow_durable_bloc_prompt_cache_binding_ux/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/completed/0071_flow_generate_music_runtime_compat_lowering/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/completed/0072_gateway_0_2_17_native_media_contract_alignment/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/completed/0075_voice_residency_component_display/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/completed/0076_run_resume_and_exec_backedge_routing/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/completed/0079_code_node_editor_execution_policy/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/completed/0080_prompt_free_variable_name_selector/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/completed/0081_code_editor_test_result_stability/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/completed/0082_validated_variable_name_selectors/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/completed/0083_media_node_advanced_pin_disclosure/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/completed/0084_media_defaults_single_editor_surface/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/completed/0085_media_artifact_modality_validation/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/completed/0086_live_connection_feedback/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/completed/0087_gateway_aware_palette_and_preflight/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/completed/0088_flow_pin_and_code_regression_repair/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
+    </url>
+    <url>
+         <loc>https://www.lpalbou.info/AbstractFlow/backlog/completed/0090_media_edit_reference_and_sampling_controls/</loc>
+         <lastmod>2026-05-29</lastmod>
+    </url>
+    <url>
+         <loc>https://www.lpalbou.info/AbstractFlow/backlog/completed/0091_gateway_artifact_import_export_contract/</loc>
+         <lastmod>2026-05-29</lastmod>
+    </url>
+    <url>
+         <loc>https://www.lpalbou.info/AbstractFlow/backlog/completed/0092_run_modal_artifact_input_picker/</loc>
+         <lastmod>2026-05-29</lastmod>
+    </url>
+    <url>
+         <loc>https://www.lpalbou.info/AbstractFlow/backlog/completed/0093_artifact_reference_visibility_and_runtime_handoff/</loc>
+         <lastmod>2026-05-29</lastmod>
+    </url>
+    <url>
+         <loc>https://www.lpalbou.info/AbstractFlow/backlog/completed/0094_artifact_search_export_and_kg_memory_readiness/</loc>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/completed/010_gateway_only_remote_editor_transport/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/completed/020_draft_run_and_publish_lifecycle/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/completed/030_local_execution_compatibility_boundary/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/completed/040_gateway_capability_schema_and_connection_contract/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/completed/050_gateway_execution_regression_suite/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/completed/060_gateway_contract_helper_endpoint_strictness/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/proposed/0073_media_progressive_disclosure_preview_first_ux/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/proposed/0074_gateway_media_browser_e2e_regression_suite/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/proposed/0077_custom_code_languages_and_dependencies/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/proposed/0078_code_node_execution_permissions/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/proposed/0089_flow_connection_drop_action_menu/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
+    </url>
+    <url>
+         <loc>https://www.lpalbou.info/AbstractFlow/backlog/proposed/0095_file_nodes_artifact_io_boundary_resolution/</loc>
+         <lastmod>2026-05-29</lastmod>
+    </url>
+    <url>
+         <loc>https://www.lpalbou.info/AbstractFlow/backlog/proposed/0096_github_hosted_gateway_flow_showcase/</loc>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/proposed/2026-05-08_gateway_capability_profile_alignment/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/proposed/2026-05-09_abstractflow_gateway_migration_roadmap/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/proposed/2026-05-19_model_residency_flow_controls/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/proposed/2026-05-20_flow_core_boundary_and_local_compatibility_mode/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/proposed/2026-05-20_truthful_model_residency_ux/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
     <url>
          <loc>https://www.lpalbou.info/AbstractFlow/backlog/proposed/offline_first_connection_validation/</loc>
-         <lastmod>2026-05-26</lastmod>
+         <lastmod>2026-05-29</lastmod>
     </url>
 </urlset>

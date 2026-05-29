@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://www.lpalbou.info/AbstractFlow/backlog/proposed/0073_media_progressive_disclosure_preview_first_ux/">
+        <link rel="canonical" href="https://www.lpalbou.info/AbstractFlow/backlog/completed/0090_media_edit_reference_and_sampling_controls/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Proposed: Media Progressive Disclosure and Preview-First UX - AbstractFlow</title>
+        <title>Completed: Media Edit Reference Fidelity and Sampling Controls - AbstractFlow</title>
       
     
     
@@ -64,7 +64,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#proposed-media-progressive-disclosure-and-preview-first-ux" class="md-skip">
+        <a href="#completed-media-edit-reference-fidelity-and-sampling-controls" class="md-skip">
           Skip to content
         </a>
       
@@ -100,7 +100,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Proposed: Media Progressive Disclosure and Preview-First UX
+              Completed: Media Edit Reference Fidelity and Sampling Controls
             
           </span>
         </div>
@@ -478,10 +478,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#proposed-direction" class="md-nav__link">
+  <a href="#changes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Proposed direction
+        Changes
       
     </span>
   </a>
@@ -489,10 +489,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#acceptance-criteria" class="md-nav__link">
+  <a href="#validation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Acceptance criteria
+        Validation
       
     </span>
   </a>
@@ -519,33 +519,34 @@
   
 
 
-<h1 id="proposed-media-progressive-disclosure-and-preview-first-ux">Proposed: Media Progressive Disclosure and Preview-First UX<a class="headerlink" href="#proposed-media-progressive-disclosure-and-preview-first-ux" title="Permanent link">&para;</a></h1>
+<h1 id="completed-media-edit-reference-fidelity-and-sampling-controls">Completed: Media Edit Reference Fidelity and Sampling Controls<a class="headerlink" href="#completed-media-edit-reference-fidelity-and-sampling-controls" title="Permanent link">&para;</a></h1>
 <h2 id="metadata">Metadata<a class="headerlink" href="#metadata" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Created: 2026-05-22</li>
-<li>Status: Proposed</li>
+<li>Created: 2026-05-27</li>
+<li>Completed: 2026-05-27</li>
+<li>Status: Completed</li>
 </ul>
 <h2 id="problem">Problem<a class="headerlink" href="#problem" title="Permanent link">&para;</a></h2>
-<p>Gateway-backed media nodes are now first-class, but the editor still exposes some low-level concepts too early:</p>
+<p>Run <code>e30bb129-1037-412a-ae4c-ab0c76153d57</code> showed Generate Image correctly producing a sword, then Edit Image producing an unrelated pencil sketch. The ledger proved the source artifact was wired into the edit effect, so the issue was downstream of the canvas edge. At the same time, image/video media nodes hid seed and guidance controls behind advanced disclosure, making deterministic local media runs hard to tune from the default node surface.</p>
+<h2 id="changes">Changes<a class="headerlink" href="#changes" title="Permanent link">&para;</a></h2>
 <ul>
-<li>provider/model/backend details are visible before the user understands the happy path</li>
-<li>artifact IDs and raw ledger payloads can dominate run results</li>
-<li>Edit Image requires artifact vocabulary before a normal user can try it</li>
+<li>Routed AbstractVision MLX-Gen FLUX.2 image edits through MLX-Gen's dedicated <code>Flux2KleinEdit</code> class with <code>image_paths</code> instead of reusing the text-to-image <code>Flux2Klein</code> img2img path.</li>
+<li>Ranked MLX-Gen <code>image_to_image</code> catalog results by edit suitability so dedicated edit models, especially <code>AbstractFramework/qwen-image-edit-2511-4bit</code>, are surfaced ahead of broad text/image models.</li>
+<li>Preserved artifact media <code>role</code>/<code>purpose</code>/<code>kind</code> when Runtime materializes artifact-backed media into temporary files, protecting source/mask semantics for image edits.</li>
+<li>Split image edit model residency/catalog authoring from generic image generation as <code>image_to_image</code> through Core, Runtime, Gateway, and Flow, while keeping shared backend-cache semantics.</li>
+<li>Kept <code>seed</code> and <code>guidance_scale</code> visible by default on image and video generation/edit nodes while leaving deeper tuning such as steps, negative prompt, and extra options behind advanced disclosure.</li>
+<li>Added missing <code>seed</code> and <code>guidance_scale</code> pins to hidden compatibility templates for <code>image_to_image</code> and <code>text_to_video</code>.</li>
 </ul>
-<h2 id="proposed-direction">Proposed direction<a class="headerlink" href="#proposed-direction" title="Permanent link">&para;</a></h2>
+<h2 id="validation">Validation<a class="headerlink" href="#validation" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Add simple media cards or presets for Generate Image, Generate Voice, and Generate Music.</li>
-<li>Keep node defaults to prompt/text, duration/size/voice, provider/model <code>Auto (Gateway default)</code>, and format.</li>
-<li>Keep seed and guidance visible on image/video generation and edit nodes because they are core reproducibility and quality controls; move steps, negative prompt, backend planner details, extra options, and raw output specs behind an explicit advanced section.</li>
-<li>Make run results open as a gallery/player first, with artifact IDs and raw JSON collapsed.</li>
-<li>Add an image artifact picker/upload affordance for Edit Image when the source pin is unconnected.</li>
-</ul>
-<h2 id="acceptance-criteria">Acceptance criteria<a class="headerlink" href="#acceptance-criteria" title="Permanent link">&para;</a></h2>
-<ul>
-<li>A new user can create and run Generate Music from docs in under one minute without choosing a backend.</li>
-<li>Edit Image explains and supports the source image path without requiring manual artifact ID copy/paste.</li>
-<li>Advanced users can still wire every advanced pin and inspect raw artifacts/ledger records.</li>
-<li>Tests cover simple media node rendering and advanced pin visibility behavior.</li>
+<li>Ledger audit for run <code>e30bb129-1037-412a-ae4c-ab0c76153d57</code> confirmed the edit node received the generated sword artifact as <code>role=source</code>; the failure was model/path selection, not the Flow edge.</li>
+<li>Real MLX-Gen smoke against the run's source artifact showed <code>AbstractFramework/flux.2-klein-4b-4bit</code> now uses the edit variant but is not the best structure-preserving default for pencil-sketch edits; <code>AbstractFramework/qwen-image-edit-2511-4bit</code> produced the expected sword-preserving pencil sketch.</li>
+<li>Focused AbstractVision MLX-Gen backend test covers FLUX.2 edit routing through the edit variant and source dimensions.</li>
+<li>Runtime media artifact resolution test covers role preservation for source/mask images.</li>
+<li>Core, Runtime, Gateway, and Flow tests cover <code>image_to_image</code> residency/catalog task propagation and avoid duplicate shared vision-cache records.</li>
+<li>Runtime and Flow VisualFlow media node tests cover seed/guidance pass-through for image, image edit, video, and image-to-video outputs.</li>
+<li>Frontend gateway contract test covers default visibility for image/video seed and guidance pins plus compatibility-template coverage.</li>
+<li>Flow frontend production build passes.</li>
 </ul>
 
 

@@ -915,7 +915,22 @@ Requires <code>abstractflow[apple]</code>.</p>
 <p>The React editor is a thin client for AbstractGateway's versioned discovery contract:</p>
 <div class="highlight"><pre><span></span><code>GET /api/gateway/discovery/capabilities
 </code></pre></div>
-<p>It reads <code>capabilities.contracts.flow_editor</code> plus <code>capabilities.contracts.common</code> for VisualFlow CRUD/publish, run input schema, run start, ledger stream, artifact, and prompt-cache endpoints. Session prompt cache and durable bloc exact-reuse bindings are separate contract tracks (<code>common.prompt_cache.session_lifecycle</code> and <code>common.prompt_cache.durable_blocs</code>). Gateway catalog routes may return the canonical <code>gateway_catalog_v1</code> envelope (<code>catalog</code> metadata plus <code>items</code>) or older legacy arrays/maps; the editor normalizes both.</p>
+<p>It reads <code>capabilities.contracts.flow_editor</code> plus <code>capabilities.contracts.common</code> for VisualFlow CRUD/publish, run input schema, run start, ledger stream, artifact, and prompt-cache endpoints. Artifact descriptors include run artifact listing/content, session-visible artifact listing, cross-run/session/run artifact search, workspace-path import, and artifact-to-workspace export when the Gateway supports them. Session prompt cache and durable bloc exact-reuse bindings are separate contract tracks (<code>common.prompt_cache.session_lifecycle</code> and <code>common.prompt_cache.durable_blocs</code>). Gateway catalog routes may return the canonical <code>gateway_catalog_v1</code> envelope (<code>catalog</code> metadata plus <code>items</code>) or older legacy arrays/maps; the editor normalizes both.</p>
+<p>Artifact start inputs use JSON refs, not paths:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;$artifact&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;abc123&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;artifact_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;abc123&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;run_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;session_memory_my-session&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;content_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;image/png&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;filename&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;input.png&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;sha256&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>The editor obtains those refs by uploading a browser file, importing a Gateway
+workspace path through <code>common.artifacts.import</code>, or selecting from
+<code>common.artifacts.search</code> / <code>common.artifacts.session_list</code>. Search supports
+all-artifact or session-scoped lookup, modality filtering from the pin type, and
+simple metadata filters such as <code>pin_id=image,purpose=run_input</code>.</p>
 <p>When Gateway advertises <code>common.readiness.contract = gateway_surface_readiness_v1</code>, the editor uses that surface summary as a conservative overlay for optional media/model-residency UX. Endpoint descriptors remain the authority for actual request paths.</p>
 <p>Generated media is discovered through the Gateway contracts:
 - <code>assistant.media.generated_image</code>

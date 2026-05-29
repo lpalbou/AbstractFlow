@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://www.lpalbou.info/AbstractFlow/backlog/proposed/0073_media_progressive_disclosure_preview_first_ux/">
+        <link rel="canonical" href="https://www.lpalbou.info/AbstractFlow/backlog/completed/0093_artifact_reference_visibility_and_runtime_handoff/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Proposed: Media Progressive Disclosure and Preview-First UX - AbstractFlow</title>
+        <title>Planned: Artifact Reference Visibility and Runtime Handoff - AbstractFlow</title>
       
     
     
@@ -64,7 +64,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#proposed-media-progressive-disclosure-and-preview-first-ux" class="md-skip">
+        <a href="#planned-artifact-reference-visibility-and-runtime-handoff" class="md-skip">
           Skip to content
         </a>
       
@@ -100,7 +100,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Proposed: Media Progressive Disclosure and Preview-First UX
+              Planned: Artifact Reference Visibility and Runtime Handoff
             
           </span>
         </div>
@@ -467,6 +467,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-code-reality" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current Code Reality
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#problem" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -478,10 +500,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#proposed-direction" class="md-nav__link">
+  <a href="#what-we-want" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Proposed direction
+        What We Want
       
     </span>
   </a>
@@ -489,10 +511,65 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#acceptance-criteria" class="md-nav__link">
+  <a href="#requirements" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Acceptance criteria
+        Requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#suggested-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Suggested Implementation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Non-Goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#progress-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Progress Checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#completion-report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Completion Report
       
     </span>
   </a>
@@ -519,33 +596,99 @@
   
 
 
-<h1 id="proposed-media-progressive-disclosure-and-preview-first-ux">Proposed: Media Progressive Disclosure and Preview-First UX<a class="headerlink" href="#proposed-media-progressive-disclosure-and-preview-first-ux" title="Permanent link">&para;</a></h1>
+<h1 id="planned-artifact-reference-visibility-and-runtime-handoff">Planned: Artifact Reference Visibility and Runtime Handoff<a class="headerlink" href="#planned-artifact-reference-visibility-and-runtime-handoff" title="Permanent link">&para;</a></h1>
 <h2 id="metadata">Metadata<a class="headerlink" href="#metadata" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Created: 2026-05-22</li>
-<li>Status: Proposed</li>
+<li>Created: 2026-05-28</li>
+<li>Status: Completed</li>
+<li>Completed: 2026-05-28</li>
+<li>Owner: AbstractRuntime / AbstractGateway / AbstractFlow</li>
+<li>Depends On: <code>completed/0091_gateway_artifact_import_export_contract.md</code>, <code>completed/0092_run_modal_artifact_input_picker.md</code></li>
+</ul>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>Generated media, uploaded files, and imported workspace files should all enter runs as artifact refs. Existing run-scoped artifact routes require artifact ownership by <code>run_id</code>, while user-selected input artifacts may be session-visible or owned by a prior run.</p>
+<h2 id="current-code-reality">Current Code Reality<a class="headerlink" href="#current-code-reality" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Gateway run artifact metadata/content routes currently enforce run ownership.</li>
+<li>Gateway and Runtime already have paths for session attachment ownership and artifact visibility checks.</li>
+<li>Runtime accepts <code>vars</code> at run start; it should continue receiving JSON-safe values.</li>
+<li>AbstractCore media integrations already resolve artifact-backed media for model calls in several paths.</li>
 </ul>
 <h2 id="problem">Problem<a class="headerlink" href="#problem" title="Permanent link">&para;</a></h2>
-<p>Gateway-backed media nodes are now first-class, but the editor still exposes some low-level concepts too early:</p>
+<p>Artifact refs can move between runs, sessions, and flow inputs, but the visibility model is not advertised clearly enough for Flow to safely list and select prior artifacts. Without a canonical handoff rule, Flow may either under-list useful artifacts or overexpose artifacts by guessing run ids.</p>
+<h2 id="what-we-want">What We Want<a class="headerlink" href="#what-we-want" title="Permanent link">&para;</a></h2>
+<p>Define and implement a consistent artifact reference and visibility contract:</p>
 <ul>
-<li>provider/model/backend details are visible before the user understands the happy path</li>
-<li>artifact IDs and raw ledger payloads can dominate run results</li>
-<li>Edit Image requires artifact vocabulary before a normal user can try it</li>
+<li>artifact refs are the only cross-boundary representation for media/file payloads</li>
+<li>Gateway validates whether a run may read an artifact before start/resume</li>
+<li>Runtime receives refs as JSON and resolves/materializes them only through existing artifact-aware paths</li>
+<li>Flow can list current-run and session-visible artifacts through advertised Gateway routes</li>
 </ul>
-<h2 id="proposed-direction">Proposed direction<a class="headerlink" href="#proposed-direction" title="Permanent link">&para;</a></h2>
+<h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Add simple media cards or presets for Generate Image, Generate Voice, and Generate Music.</li>
-<li>Keep node defaults to prompt/text, duration/size/voice, provider/model <code>Auto (Gateway default)</code>, and format.</li>
-<li>Keep seed and guidance visible on image/video generation and edit nodes because they are core reproducibility and quality controls; move steps, negative prompt, backend planner details, extra options, and raw output specs behind an explicit advanced section.</li>
-<li>Make run results open as a gallery/player first, with artifact IDs and raw JSON collapsed.</li>
-<li>Add an image artifact picker/upload affordance for Edit Image when the source pin is unconnected.</li>
+<li>Add or standardize a session-visible artifact listing route, for example <code>GET /api/gateway/sessions/{session_id}/artifacts</code>.</li>
+<li>Apply the same visibility decision to list, metadata, content, import-produced refs, and run-start validation.</li>
+<li>Avoid leaking absolute server paths in artifact refs or list responses.</li>
+<li>Preserve artifact modality via content type and tags: image, audio, video, text, document, music, voice.</li>
+<li>Treat voice/music as audio artifacts with semantic tags, not separate storage systems.</li>
+<li>Keep stale/missing artifacts actionable: the run modal should reject invalid refs before starting where Gateway can validate them.</li>
 </ul>
-<h2 id="acceptance-criteria">Acceptance criteria<a class="headerlink" href="#acceptance-criteria" title="Permanent link">&para;</a></h2>
+<h2 id="suggested-implementation">Suggested Implementation<a class="headerlink" href="#suggested-implementation" title="Permanent link">&para;</a></h2>
 <ul>
-<li>A new user can create and run Generate Music from docs in under one minute without choosing a backend.</li>
-<li>Edit Image explains and supports the source image path without requiring manual artifact ID copy/paste.</li>
-<li>Advanced users can still wire every advanced pin and inspect raw artifacts/ledger records.</li>
-<li>Tests cover simple media node rendering and advanced pin visibility behavior.</li>
+<li>Factor Gateway visibility checks into a reusable helper shared by list, metadata, content, run-start validation, and artifact picker support.</li>
+<li>Add a session artifact listing descriptor to Gateway discovery.</li>
+<li>Normalize artifact refs on run start so downstream Runtime nodes receive one shape.</li>
+<li>Add a small Runtime-side helper for artifact-ref shape validation and materialization hints, without granting Runtime arbitrary path read/write authority.</li>
+<li>Document the durable rule: filesystem paths are local workspace inputs/outputs; artifacts are the cross-package payload representation.</li>
+</ul>
+<h2 id="non-goals">Non-Goals<a class="headerlink" href="#non-goals" title="Permanent link">&para;</a></h2>
+<ul>
+<li>No global artifact search across unrelated sessions.</li>
+<li>No artifact retention policy changes.</li>
+<li>No direct Flow access to Runtime stores.</li>
+</ul>
+<h2 id="validation">Validation<a class="headerlink" href="#validation" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Gateway tests cover current-run artifacts, session-visible artifacts, denied cross-session artifacts, missing artifacts, and stale refs.</li>
+<li>Runtime tests cover JSON-safe artifact refs entering run vars unchanged and media nodes resolving refs through existing artifact paths.</li>
+<li>Flow tests cover artifact picker lists from the advertised session artifact route and rejects invalid selections.</li>
+<li>End-to-end smoke: upload/import an image as a run input, edit it, export the edited artifact to a workspace file.</li>
+</ul>
+<h2 id="progress-checklist">Progress Checklist<a class="headerlink" href="#progress-checklist" title="Permanent link">&para;</a></h2>
+<ul>
+<li>[x] Define canonical artifact ref fields.</li>
+<li>[x] Add session-visible artifact listing contract.</li>
+<li>[x] Share Gateway artifact visibility helper.</li>
+<li>[x] Validate run-start artifact refs.</li>
+<li>[x] Add Runtime artifact-ref validation helper if needed.</li>
+<li>[x] Update Flow docs and FAQ with artifact vs filesystem path rules.</li>
+</ul>
+<h2 id="completion-report">Completion Report<a class="headerlink" href="#completion-report" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Completed: 2026-05-28</li>
+<li>Summary: Standardized artifact refs at the Gateway/Flow boundary, added session-visible artifact listing, allowed run artifact metadata/content access for same-session artifacts, and validated run-start artifact refs before Runtime handoff. Runtime continues to receive JSON-safe refs unchanged; filesystem IO stays in Gateway.</li>
+<li>Code touched:</li>
+<li><code>abstractgateway/src/abstractgateway/routes/gateway.py</code></li>
+<li><code>abstractflow/web/frontend/src/components/ArtifactInputField.tsx</code></li>
+<li><code>abstractflow/web/frontend/src/components/RunFlowModal.tsx</code></li>
+<li><code>abstractflow/web/frontend/src/utils/artifactInputs.ts</code></li>
+<li><code>abstractruntime/src/abstractruntime/storage/artifacts.py</code></li>
+<li>Tests:</li>
+<li><code>abstractgateway/tests/test_gateway_artifacts_endpoint.py</code></li>
+<li><code>abstractflow/tests/test_frontend_gateway_contract.py</code></li>
+<li><code>abstractruntime/tests/test_artifacts.py</code></li>
+<li>Docs:</li>
+<li><code>abstractflow/docs/faq.md</code></li>
+<li><code>abstractflow/docs/api.md</code></li>
+<li><code>abstractflow/docs/web-editor.md</code></li>
+<li><code>abstractgateway/docs/api.md</code></li>
+<li>Validation:</li>
+<li><code>PYTHONPATH=/Users/albou/tmp/abstractframework/abstractruntime/src:/Users/albou/tmp/abstractframework/abstractcore/src:$PYTHONPATH python -m pytest tests/test_gateway_artifacts_endpoint.py tests/test_capabilities_endpoint_contract.py -q</code> in <code>abstractgateway</code> passed.</li>
+<li><code>python -m pytest tests/test_frontend_gateway_contract.py -q</code> in <code>abstractflow</code> passed.</li>
+<li><code>npm run build</code> in <code>abstractflow/web/frontend</code> passed.</li>
+<li><code>python -m pytest tests/test_artifacts.py::TestFileArtifactStore::test_content_path_is_public_for_file_backed_store -q</code> in <code>abstractruntime</code> passed.</li>
+<li>ADR impact: None. The completed work follows the existing artifact-first handoff rule rather than changing it.</li>
+<li>Residual risks: Resume-time artifact ref validation remains a possible future hardening pass if new wait/resume payloads start carrying user-selected artifact refs.</li>
 </ul>
 
 

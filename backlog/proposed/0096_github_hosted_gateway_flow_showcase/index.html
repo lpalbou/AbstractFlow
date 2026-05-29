@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://www.lpalbou.info/AbstractFlow/backlog/proposed/0073_media_progressive_disclosure_preview_first_ux/">
+        <link rel="canonical" href="https://www.lpalbou.info/AbstractFlow/backlog/proposed/0096_github_hosted_gateway_flow_showcase/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Proposed: Media Progressive Disclosure and Preview-First UX - AbstractFlow</title>
+        <title>Proposed: GitHub-Hosted Gateway + Flow Showcase - AbstractFlow</title>
       
     
     
@@ -64,7 +64,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#proposed-media-progressive-disclosure-and-preview-first-ux" class="md-skip">
+        <a href="#proposed-github-hosted-gateway-flow-showcase" class="md-skip">
           Skip to content
         </a>
       
@@ -100,7 +100,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Proposed: Media Progressive Disclosure and Preview-First UX
+              Proposed: GitHub-Hosted Gateway + Flow Showcase
             
           </span>
         </div>
@@ -467,6 +467,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#adr-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ADR status
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#problem" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -481,7 +503,29 @@
   <a href="#proposed-direction" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Proposed direction
+        Proposed Direction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#proposed-ux" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Proposed UX
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Non-Goals
       
     </span>
   </a>
@@ -492,7 +536,18 @@
   <a href="#acceptance-criteria" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Acceptance criteria
+        Acceptance Criteria
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validation-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation Plan
       
     </span>
   </a>
@@ -519,33 +574,107 @@
   
 
 
-<h1 id="proposed-media-progressive-disclosure-and-preview-first-ux">Proposed: Media Progressive Disclosure and Preview-First UX<a class="headerlink" href="#proposed-media-progressive-disclosure-and-preview-first-ux" title="Permanent link">&para;</a></h1>
+<h1 id="proposed-github-hosted-gateway-flow-showcase">Proposed: GitHub-Hosted Gateway + Flow Showcase<a class="headerlink" href="#proposed-github-hosted-gateway-flow-showcase" title="Permanent link">&para;</a></h1>
 <h2 id="metadata">Metadata<a class="headerlink" href="#metadata" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Created: 2026-05-22</li>
+<li>Created: 2026-05-29</li>
 <li>Status: Proposed</li>
+<li>Completed: N/A</li>
 </ul>
+<h2 id="adr-status">ADR status<a class="headerlink" href="#adr-status" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Governing ADRs: None identified after review.</li>
+<li>ADR impact: This may need an ADR if we introduce a public-demo credential broker or a new browser-to-gateway authentication mode.</li>
+</ul>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>We need a travel-friendly AbstractFlow demonstration that can be shown without a local laptop running the full stack. The desired experience is a light Gateway + Flow deployment that can execute remote-provider workflows after the user supplies OpenAI credentials.</p>
+<p>The current architecture already supports the remote-light path:</p>
+<ul>
+<li><code>abstractflow</code> without Apple/GPU extras is a thin client package.</li>
+<li>The Flow Node CLI serves the static editor and proxies <code>/api/*</code> to Gateway while injecting <code>ABSTRACTGATEWAY_AUTH_TOKEN</code> server-side.</li>
+<li>The Python Flow backend does the same proxying for <code>/api/gateway/*</code>.</li>
+<li>Base <code>abstractgateway</code> includes HTTP/SSE dependencies and the remote-light runtime path; <code>abstractgateway[http]</code> is not required.</li>
+<li>Gateway already separates Gateway API auth from provider credentials such as <code>OPENAI_API_KEY</code>.</li>
+<li>Gateway refuses unsafe public binds without a stronger auth token and origin policy.</li>
+</ul>
+<p>GitHub Pages alone cannot run Gateway because Gateway is a Python/FastAPI runtime service with durable run state, SSE, workflow execution, and provider calls. GitHub Actions are also not appropriate for an interactive long-running demo server. A GitHub-only temporary demo is possible through Codespaces, while a stable public showcase needs a small backend host for Gateway.</p>
 <h2 id="problem">Problem<a class="headerlink" href="#problem" title="Permanent link">&para;</a></h2>
-<p>Gateway-backed media nodes are now first-class, but the editor still exposes some low-level concepts too early:</p>
+<p>We need a simple, secure showcase path that:</p>
 <ul>
-<li>provider/model/backend details are visible before the user understands the happy path</li>
-<li>artifact IDs and raw ledger payloads can dominate run results</li>
-<li>Edit Image requires artifact vocabulary before a normal user can try it</li>
+<li>hosts the Flow UI in a way that is easy to share,</li>
+<li>runs a light remote-inference Gateway,</li>
+<li>lets a viewer provide OpenAI credentials for execution,</li>
+<li>does not leak Gateway bearer tokens or provider API keys into a public static bundle,</li>
+<li>can load curated demo flows such as deep-research examples,</li>
+<li>stays clear that GPU/local inference is out of scope for the hosted demo.</li>
 </ul>
-<h2 id="proposed-direction">Proposed direction<a class="headerlink" href="#proposed-direction" title="Permanent link">&para;</a></h2>
+<h2 id="proposed-direction">Proposed Direction<a class="headerlink" href="#proposed-direction" title="Permanent link">&para;</a></h2>
+<p>Evaluate and implement one or both deployment tracks.</p>
+<p>Track A: GitHub Codespaces Demo</p>
 <ul>
-<li>Add simple media cards or presets for Generate Image, Generate Voice, and Generate Music.</li>
-<li>Keep node defaults to prompt/text, duration/size/voice, provider/model <code>Auto (Gateway default)</code>, and format.</li>
-<li>Keep seed and guidance visible on image/video generation and edit nodes because they are core reproducibility and quality controls; move steps, negative prompt, backend planner details, extra options, and raw output specs behind an explicit advanced section.</li>
-<li>Make run results open as a gallery/player first, with artifact IDs and raw JSON collapsed.</li>
-<li>Add an image artifact picker/upload affordance for Edit Image when the source pin is unconnected.</li>
+<li>Add a devcontainer or one-command script that installs <code>abstractgateway</code> and <code>abstractflow</code>.</li>
+<li>Start Gateway on one forwarded port and Flow on another forwarded port.</li>
+<li>Use remote OpenAI-compatible inference only.</li>
+<li>Keep the Gateway token in the Codespace environment, not in the client bundle.</li>
+<li>Allow the operator to paste a temporary OpenAI key into the Codespace secret/env flow for demos.</li>
+<li>Treat this as the simplest GitHub-native option, but document that it is operator-started and not a permanent public site.</li>
 </ul>
-<h2 id="acceptance-criteria">Acceptance criteria<a class="headerlink" href="#acceptance-criteria" title="Permanent link">&para;</a></h2>
+<p>Track B: Public Static UI + Remote-Light Gateway</p>
 <ul>
-<li>A new user can create and run Generate Music from docs in under one minute without choosing a backend.</li>
-<li>Edit Image explains and supports the source image path without requiring manual artifact ID copy/paste.</li>
-<li>Advanced users can still wire every advanced pin and inspect raw artifacts/ledger records.</li>
-<li>Tests cover simple media node rendering and advanced pin visibility behavior.</li>
+<li>Publish the Flow static UI through GitHub Pages or the existing npm package.</li>
+<li>Deploy a light Gateway to a small free or low-cost backend host that supports long-running HTTP/SSE.</li>
+<li>Configure Gateway with a strict <code>ABSTRACTGATEWAY_AUTH_TOKEN</code>, allowed origins, and demo workspace retention rules.</li>
+<li>Add a first-run credential prompt for OpenAI credentials, scoped to the session or run.</li>
+<li>Avoid persisting provider keys unless the user explicitly opts in.</li>
+<li>Never bake <code>OPENAI_API_KEY</code> or a reusable Gateway bearer token into the frontend build.</li>
+</ul>
+<p>The hard part is authentication when a fully static public UI talks directly to Gateway. A public static page cannot hide a Gateway bearer token. Clean options are:</p>
+<ul>
+<li>keep a server-side Flow proxy/BFF next to Gateway and inject Gateway auth there,</li>
+<li>issue short-lived per-session demo tokens from a small backend endpoint,</li>
+<li>require the operator to provide the Gateway URL/token for private demonstrations,</li>
+<li>run through Codespaces where the operator controls the forwarded ports.</li>
+</ul>
+<h2 id="proposed-ux">Proposed UX<a class="headerlink" href="#proposed-ux" title="Permanent link">&para;</a></h2>
+<p>For the public demo:</p>
+<ol>
+<li>User opens the showcase URL.</li>
+<li>Flow loads with curated demo workflows, for example a small deep-research flow.</li>
+<li>User clicks Run.</li>
+<li>If no provider credential is available, the modal asks for an OpenAI API key for this session/run.</li>
+<li>Gateway executes with remote inference only.</li>
+<li>Generated artifacts remain in the demo workspace for the run and follow the configured cleanup policy.</li>
+</ol>
+<p>For Codespaces:</p>
+<ol>
+<li>Operator opens the repository in Codespaces.</li>
+<li>The setup command starts Gateway + Flow.</li>
+<li>The forwarded Flow URL is shared for the live demonstration.</li>
+<li>Provider credentials are supplied as Codespaces secrets or environment variables.</li>
+</ol>
+<h2 id="non-goals">Non-Goals<a class="headerlink" href="#non-goals" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Do not run local Apple/GPU inference in the hosted showcase.</li>
+<li>Do not use GitHub Actions as an interactive execution server.</li>
+<li>Do not ship a public Flow bundle containing provider keys or reusable Gateway bearer tokens.</li>
+<li>Do not make the public Gateway unauthenticated.</li>
+</ul>
+<h2 id="acceptance-criteria">Acceptance Criteria<a class="headerlink" href="#acceptance-criteria" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Documentation explains the GitHub Pages limitation and the Codespaces/backend-host alternatives.</li>
+<li>A demo deployment path can run at least one text-only remote-provider workflow end-to-end.</li>
+<li>Demo flows can be preloaded or imported without manual JSON editing.</li>
+<li>Provider credentials are request-scoped, session-scoped, or server-env scoped with explicit documentation.</li>
+<li>Gateway auth and provider auth remain separate.</li>
+<li>The smoke test covers Flow UI startup, Gateway connection, provider credential handoff, run streaming, and final artifact display.</li>
+</ul>
+<h2 id="validation-plan">Validation Plan<a class="headerlink" href="#validation-plan" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Start the light stack with only base Gateway + Flow dependencies.</li>
+<li>Run a small OpenAI-backed workflow using a temporary key.</li>
+<li>Confirm the frontend bundle does not contain <code>OPENAI_API_KEY</code> or the Gateway bearer token.</li>
+<li>Confirm CORS/origin restrictions reject an unapproved origin.</li>
+<li>Confirm the same demo can be launched from Codespaces or documented backend-host deployment steps.</li>
 </ul>
 
 

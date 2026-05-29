@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://www.lpalbou.info/AbstractFlow/backlog/proposed/0073_media_progressive_disclosure_preview_first_ux/">
+        <link rel="canonical" href="https://www.lpalbou.info/AbstractFlow/backlog/completed/0091_gateway_artifact_import_export_contract/">
       
       
       
@@ -23,7 +23,7 @@
     
     
       
-        <title>Proposed: Media Progressive Disclosure and Preview-First UX - AbstractFlow</title>
+        <title>Planned: Gateway Artifact Import and Export Contract - AbstractFlow</title>
       
     
     
@@ -64,7 +64,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#proposed-media-progressive-disclosure-and-preview-first-ux" class="md-skip">
+        <a href="#planned-gateway-artifact-import-and-export-contract" class="md-skip">
           Skip to content
         </a>
       
@@ -100,7 +100,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Proposed: Media Progressive Disclosure and Preview-First UX
+              Planned: Gateway Artifact Import and Export Contract
             
           </span>
         </div>
@@ -467,6 +467,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-code-reality" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current Code Reality
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#problem" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -478,10 +500,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#proposed-direction" class="md-nav__link">
+  <a href="#what-we-want" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Proposed direction
+        What We Want
       
     </span>
   </a>
@@ -489,10 +511,65 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#acceptance-criteria" class="md-nav__link">
+  <a href="#requirements" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Acceptance criteria
+        Requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#suggested-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Suggested Implementation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Non-Goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#progress-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Progress Checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#completion-report" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Completion Report
       
     </span>
   </a>
@@ -519,33 +596,114 @@
   
 
 
-<h1 id="proposed-media-progressive-disclosure-and-preview-first-ux">Proposed: Media Progressive Disclosure and Preview-First UX<a class="headerlink" href="#proposed-media-progressive-disclosure-and-preview-first-ux" title="Permanent link">&para;</a></h1>
+<h1 id="planned-gateway-artifact-import-and-export-contract">Planned: Gateway Artifact Import and Export Contract<a class="headerlink" href="#planned-gateway-artifact-import-and-export-contract" title="Permanent link">&para;</a></h1>
 <h2 id="metadata">Metadata<a class="headerlink" href="#metadata" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Created: 2026-05-22</li>
-<li>Status: Proposed</li>
+<li>Created: 2026-05-28</li>
+<li>Status: Completed</li>
+<li>Completed: 2026-05-28</li>
+<li>Owner: AbstractGateway / AbstractRuntime integration</li>
+<li>Related ADRs: Runtime owns run-scoped artifact storage; Gateway owns workspace policy and remote client boundaries.</li>
+</ul>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>AbstractFlow now treats media as Gateway artifacts, but filesystem handoff is incomplete. Browser uploads can create artifacts, and Gateway can ingest some workspace files as attachments, but there is no advertised, symmetric contract for:</p>
+<ul>
+<li>importing a server workspace path into a typed artifact ref before a run starts</li>
+<li>exporting an existing artifact back to a server workspace path</li>
+<li>applying the same workspace policy, ignored-path, size, and ownership checks in both directions</li>
+</ul>
+<h2 id="current-code-reality">Current Code Reality<a class="headerlink" href="#current-code-reality" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Runtime has the correct storage primitive in <code>abstractruntime/src/abstractruntime/storage/artifacts.py</code>: <code>ArtifactStore.store/load/get_metadata/list_by_run</code>.</li>
+<li>Gateway exposes run-scoped artifact list, metadata, and content routes in <code>abstractgateway/src/abstractgateway/routes/gateway.py</code>.</li>
+<li>Gateway already has <code>/attachments/ingest</code> and <code>/attachments/upload</code>, but discovery only advertises attachment upload and artifact read routes.</li>
+<li>VisualFlow <code>read_file</code>/<code>write_file</code> handlers currently resolve paths from <code>Path.cwd()</code> in Runtime-local execution. That path should not become the general media/document artifact IO contract.</li>
 </ul>
 <h2 id="problem">Problem<a class="headerlink" href="#problem" title="Permanent link">&para;</a></h2>
-<p>Gateway-backed media nodes are now first-class, but the editor still exposes some low-level concepts too early:</p>
+<p>If Flow starts accepting raw file paths as ordinary pin values, path safety, workspace scope, <code>.abstractignore</code>, upload size limits, symlink handling, overwrite behavior, and artifact ownership will drift between UI, Gateway, and Runtime. That would also make remote Flow clients ambiguous: a browser path and a Gateway workspace path are not the same thing.</p>
+<h2 id="what-we-want">What We Want<a class="headerlink" href="#what-we-want" title="Permanent link">&para;</a></h2>
+<p>Add explicit Gateway-managed artifact IO APIs:</p>
 <ul>
-<li>provider/model/backend details are visible before the user understands the happy path</li>
-<li>artifact IDs and raw ledger payloads can dominate run results</li>
-<li>Edit Image requires artifact vocabulary before a normal user can try it</li>
+<li><code>POST /api/gateway/artifacts/import</code> for workspace-path-to-artifact.</li>
+<li><code>POST /api/gateway/runs/{run_id}/artifacts/{artifact_id}/export</code> for artifact-to-workspace-path.</li>
+<li>Discovery descriptors under <code>common.artifacts.import</code> and <code>common.artifacts.export</code>.</li>
 </ul>
-<h2 id="proposed-direction">Proposed direction<a class="headerlink" href="#proposed-direction" title="Permanent link">&para;</a></h2>
+<p>Both routes must return canonical artifact refs and policy metadata, not raw absolute paths.</p>
+<h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Add simple media cards or presets for Generate Image, Generate Voice, and Generate Music.</li>
-<li>Keep node defaults to prompt/text, duration/size/voice, provider/model <code>Auto (Gateway default)</code>, and format.</li>
-<li>Keep seed and guidance visible on image/video generation and edit nodes because they are core reproducibility and quality controls; move steps, negative prompt, backend planner details, extra options, and raw output specs behind an explicit advanced section.</li>
-<li>Make run results open as a gallery/player first, with artifact IDs and raw JSON collapsed.</li>
-<li>Add an image artifact picker/upload affordance for Edit Image when the source pin is unconnected.</li>
+<li>Import accepts workspace-relative or mounted paths only under the effective Gateway workspace policy, unless the policy explicitly allows broader access.</li>
+<li>Import rejects path escape, ignored files, directories, missing files, oversized files, and unsafe symlink resolution.</li>
+<li>Import stores bytes in <code>ArtifactStore</code> with content type, size, sha256, filename, source path, session id, and purpose tags.</li>
+<li>Export writes raw artifact bytes atomically under the effective workspace policy.</li>
+<li>Export refuses overwrite by default, supports explicit <code>overwrite=true</code>, and can create parent directories only when explicitly requested.</li>
+<li>Export responses include relative/virtual destination, content type, bytes written, sha256, and artifact id.</li>
+<li>Gateway capabilities advertise import/export support so Flow does not guess endpoints.</li>
 </ul>
-<h2 id="acceptance-criteria">Acceptance criteria<a class="headerlink" href="#acceptance-criteria" title="Permanent link">&para;</a></h2>
+<h2 id="suggested-implementation">Suggested Implementation<a class="headerlink" href="#suggested-implementation" title="Permanent link">&para;</a></h2>
 <ul>
-<li>A new user can create and run Generate Music from docs in under one minute without choosing a backend.</li>
-<li>Edit Image explains and supports the source image path without requiring manual artifact ID copy/paste.</li>
-<li>Advanced users can still wire every advanced pin and inspect raw artifacts/ledger records.</li>
-<li>Tests cover simple media node rendering and advanced pin visibility behavior.</li>
+<li>Reuse Gateway workspace scope resolution helpers and <code>.abstractignore</code> checks from the existing attachment ingest path.</li>
+<li>Factor shared artifact ref construction so upload, ingest, import, and generated media produce the same shape:</li>
+</ul>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;$artifact&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;artifact_id&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;artifact_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;artifact_id&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;run_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;owner_run_id&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;content_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;image/png&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;filename&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;input.png&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;sha256&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;source_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;inputs/input.png&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+<ul>
+<li>Keep Runtime as storage owner; do not add arbitrary filesystem authority to Runtime start vars.</li>
+<li>Add a public Runtime/Gateway artifact content read helper if export currently depends on private store internals.</li>
+</ul>
+<h2 id="non-goals">Non-Goals<a class="headerlink" href="#non-goals" title="Permanent link">&para;</a></h2>
+<ul>
+<li>No image resizing, video transcoding, audio normalization, document conversion, or archive export.</li>
+<li>No automatic conversion of any string that looks like a file path into an artifact.</li>
+<li>No browser-client local path access; browser-local files continue through upload.</li>
+</ul>
+<h2 id="validation">Validation<a class="headerlink" href="#validation" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Gateway tests cover import success for text, JSON, image, audio, video, and document bytes.</li>
+<li>Gateway tests reject <code>../</code> traversal, absolute paths outside policy, blocked ignored paths, symlink escape, directories, missing files, and oversized files.</li>
+<li>Export tests cover atomic write, overwrite refusal, explicit overwrite, create-dirs behavior, and denied destinations.</li>
+<li>Discovery contract tests assert <code>common.artifacts.import</code> and <code>common.artifacts.export</code> are advertised.</li>
+</ul>
+<h2 id="progress-checklist">Progress Checklist<a class="headerlink" href="#progress-checklist" title="Permanent link">&para;</a></h2>
+<ul>
+<li>[x] Design request/response models.</li>
+<li>[x] Add import route and discovery descriptor.</li>
+<li>[x] Add export route and discovery descriptor.</li>
+<li>[x] Share canonical artifact ref construction.</li>
+<li>[x] Add Gateway policy/security tests.</li>
+<li>[x] Update Flow docs once the route contract exists.</li>
+</ul>
+<h2 id="completion-report">Completion Report<a class="headerlink" href="#completion-report" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Completed: 2026-05-28</li>
+<li>Summary: Added Gateway-owned artifact import/export and session listing routes. Import turns a server workspace path into a session-scoped artifact ref; export writes artifact bytes atomically back to a Gateway workspace path. Runtime exposes a public <code>ArtifactStore.content_path()</code> hook so Gateway export no longer needs to depend on private file-store internals.</li>
+<li>Code touched:</li>
+<li><code>abstractgateway/src/abstractgateway/routes/gateway.py</code></li>
+<li><code>abstractruntime/src/abstractruntime/storage/artifacts.py</code></li>
+<li>Tests:</li>
+<li><code>abstractgateway/tests/test_gateway_artifacts_endpoint.py</code></li>
+<li><code>abstractgateway/tests/test_capabilities_endpoint_contract.py</code></li>
+<li><code>abstractruntime/tests/test_artifacts.py</code></li>
+<li>Docs:</li>
+<li><code>abstractgateway/docs/api.md</code></li>
+<li><code>abstractgateway/llms.txt</code></li>
+<li><code>abstractgateway/llms-full.txt</code></li>
+<li><code>abstractflow/docs/api.md</code></li>
+<li><code>abstractflow/docs/web-editor.md</code></li>
+<li><code>abstractflow/llms.txt</code></li>
+<li><code>abstractflow/llms-full.txt</code></li>
+<li>Validation:</li>
+<li><code>PYTHONPATH=/Users/albou/tmp/abstractframework/abstractruntime/src:/Users/albou/tmp/abstractframework/abstractcore/src:$PYTHONPATH python -m pytest tests/test_gateway_artifacts_endpoint.py tests/test_capabilities_endpoint_contract.py -q</code> in <code>abstractgateway</code> passed.</li>
+<li><code>python -m pytest tests/test_artifacts.py::TestFileArtifactStore::test_content_path_is_public_for_file_backed_store -q</code> in <code>abstractruntime</code> passed.</li>
+<li>ADR impact: None. This implements the existing package boundary: Gateway owns filesystem policy and remote client contracts; Runtime owns artifact storage.</li>
+<li>Residual risks: The Gateway import/export tests cover the main policy path, ownership, overwrite behavior, and discovery. Broader file-type matrix coverage can be added if new content-type-specific behavior appears.</li>
 </ul>
 
 

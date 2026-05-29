@@ -723,7 +723,7 @@ pip<span class="w"> </span>install<span class="w"> </span>abstractflow
 <div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
 </code></pre></div>
 <p>Evidence: dependencies and extras are declared in <a href="../pyproject.toml">../pyproject.toml</a>.</p>
-<p>For thin-client gateway-first mode, <code>abstractflow</code> (without extras) is sufficient. Install <code>abstractgateway[http]</code> separately for the backend.
+<p>For thin-client gateway-first mode, <code>abstractflow</code> (without extras) is sufficient. Install the base <code>abstractgateway</code> package for the backend; HTTP/SSE is part of that remote-light install.
 Enable local runtime compatibility only when needed with <code>ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1</code>.</p>
 <p>If you install a host profile (<code>apple</code>, <code>gpu</code>), the local execution stack is already included for compatibility.</p>
 <p>Programmatic and local VisualFlow execution examples below require a host profile:</p>
@@ -776,7 +776,7 @@ Enable local runtime compatibility only when needed with <code>ABSTRACTFLOW_ENAB
 <h2 id="run-the-visual-editor-local">Run the visual editor (local)<a class="headerlink" href="#run-the-visual-editor-local" title="Permanent link">&para;</a></h2>
 <p>The modern editor talks to AbstractGateway. Follow: <a href="../web-editor/">web-editor.md</a>.</p>
 <p>Quick start (no repo clone needed):</p>
-<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;abstractgateway[http]&quot;</span><span class="w"> </span>abstractflow
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>abstractgateway<span class="w"> </span>abstractflow
 <span class="nb">export</span><span class="w"> </span><span class="nv">ABSTRACTGATEWAY_AUTH_TOKEN</span><span class="o">=</span>dev-token
 abstractgateway<span class="w"> </span>serve<span class="w"> </span>--port<span class="w"> </span><span class="m">8080</span>
 
@@ -801,12 +801,19 @@ from Gateway vision provider-model catalogs scoped to <code>text_to_video</code>
 <code>/api/gateway/audio/music/providers</code> and <code>/api/gateway/audio/music/models</code>.</p>
 <p>Generated media is returned as Gateway artifacts. The Run modal renders images,
 videos, and audio/music players first; raw ledger JSON and artifact IDs remain
-available for debugging. Long video runs surface Gateway <code>abstract.progress</code>
-ledger events as progress on the active step.</p>
+available for debugging, and the <code>artifact content</code> link opens or downloads the
+artifact payload. Filesystem export is intentionally graph-level work: use file
+nodes or the forthcoming artifact-aware file-node design rather than a Run modal
+button. Long video runs surface Gateway <code>abstract.progress</code> ledger events as
+progress on the active step.</p>
 <p>For image editing, wire <code>image_artifact</code> from a previous <code>Generate Image</code> node
-or use the <code>Artifacts</code> palette primitives (<code>Image Artifact</code>, <code>Voice Artifact</code>,
-<code>Music Artifact</code>, etc.) to paste an existing Gateway <code>$artifact</code> id. A richer
-browser artifact picker/upload flow is tracked separately.</p>
+or use an artifact input pin on <code>On Flow Start</code>. The Run modal renders artifact
+inputs with three sources: upload a browser-local file, import a Gateway
+workspace path, or select an existing artifact. When Gateway advertises artifact
+search, the Existing tab can search all artifacts or the current session by
+modality and simple metadata filters such as <code>pin_id=image</code>. Flow submits a JSON
+artifact ref such as <code>{"$artifact":"...","run_id":"..."}</code>; it does not submit
+raw file bytes or browser-local paths.</p>
 <p>Example Generate Video path:
 1. Drag <code>On Flow Start</code>, <code>Generate Video</code>, and <code>On Flow End</code> onto the canvas.
 2. Wire execution <code>On Flow Start -&gt; Generate Video -&gt; On Flow End</code>.

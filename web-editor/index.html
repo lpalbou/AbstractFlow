@@ -708,14 +708,15 @@
 - Gateway proxy/static server: <code>@abstractframework/flow</code>
 - Legacy/dev FastAPI host: <code>web/backend/</code></p>
 <p>The primary runtime host is now AbstractGateway. The editor saves VisualFlow JSON through Gateway, publishes <code>.flow</code> bundles there, starts runs through Gateway, and renders Gateway ledger/artifact/history streams.
-Install a host profile (<code>abstractflow[apple]</code> or <code>abstractflow[gpu]</code>)
-to run the local Python host/proxy stack.</p>
+Install base <code>abstractgateway</code> for the remote-light HTTP/SSE host. Use
+<code>abstractflow[apple]</code> or <code>abstractflow[gpu]</code> only when you also need the local
+Python compatibility host/profile.</p>
 <p>See also: <a href="../README.md">../README.md</a>, <a href="../getting-started/">getting-started.md</a>, <a href="../faq/">faq.md</a>, <a href="../visualflow/">visualflow.md</a>, <a href="../architecture/">architecture.md</a>.</p>
 <h2 id="run-recommended-abstractgateway-npx">Run (recommended: AbstractGateway + npx)<a class="headerlink" href="#run-recommended-abstractgateway-npx" title="Permanent link">&para;</a></h2>
 <p>Terminal 1 (Gateway):</p>
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>.venv
 <span class="nb">source</span><span class="w"> </span>.venv/bin/activate
-pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;abstractgateway[http]&quot;</span><span class="w"> </span>abstractflow
+pip<span class="w"> </span>install<span class="w"> </span>abstractgateway<span class="w"> </span>abstractflow
 
 <span class="nb">export</span><span class="w"> </span><span class="nv">ABSTRACTGATEWAY_AUTH_TOKEN</span><span class="o">=</span>dev-token
 abstractgateway<span class="w"> </span>serve<span class="w"> </span>--port<span class="w"> </span><span class="m">8080</span>
@@ -755,13 +756,19 @@ endpoint descriptors for concrete request paths.</p>
 <p>Generated image, video, voice, and music results are Gateway artifacts. The Run
 modal renders images, videos, and audio/music players from artifact content and
 keeps child run, artifact metadata, ledger, and raw JSON details available for
-debugging. Gateway <code>abstract.progress</code> events are surfaced as progress on the
-running step so long video generations remain observable.</p>
+debugging. The <code>artifact content</code> link opens or downloads the payload; writing
+artifacts to workspace files belongs in graph-level file/artifact IO nodes, not
+in the Run modal. Gateway <code>abstract.progress</code> events are surfaced as progress on
+the running step so long video generations remain observable.</p>
 <p>Model residency controls are also Gateway-driven. If the Gateway advertises
 the model-residency routes, text, image, video, voice, transcription, and music
 warmup/list/unload authoring remains available through Gateway. Gateway/Runtime
 still owns the final support decision and returns skipped/unsupported results
 when a connected deployment cannot honor a specific residency operation.</p>
+<p>KG memory nodes are gated by Gateway's <code>common.memory</code> contract. A correctly
+installed Gateway with AbstractMemory and a resolvable backend should expose
+those nodes even before the persistent store has been created; empty KG queries
+return empty results until a flow asserts triples.</p>
 <h2 id="run-from-source-dev-mode">Run (from source / dev mode)<a class="headerlink" href="#run-from-source-dev-mode" title="Permanent link">&para;</a></h2>
 <p>Terminal 1 (Gateway):</p>
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>.venv
@@ -826,7 +833,18 @@ python<span class="w"> </span>-m<span class="w"> </span>backend<span class="w"> 
 - start: <code>POST /api/gateway/runs/start</code>
 - commands: <code>POST /api/gateway/commands</code>
 - stream: <code>GET /api/gateway/runs/{run_id}/ledger/stream</code>
-- artifacts: <code>GET /api/gateway/runs/{run_id}/artifacts/{artifact_id}/content</code></p>
+- artifact content: <code>GET /api/gateway/runs/{run_id}/artifacts/{artifact_id}/content</code>
+- session artifacts: <code>GET /api/gateway/sessions/{session_id}/artifacts</code>
+- artifact search: <code>GET /api/gateway/artifacts/search</code>
+- artifact import: <code>POST /api/gateway/artifacts/import</code>
+- artifact export: <code>POST /api/gateway/runs/{run_id}/artifacts/{artifact_id}/export</code></p>
+<p>When a start pin is typed as <code>artifact</code>, <code>artifact_image</code>, <code>artifact_audio</code>,
+<code>artifact_text</code>, or <code>artifact_video</code>, the Run modal submits a structured artifact
+ref. Browser files are uploaded through Gateway; server workspace files are
+imported through Gateway's workspace policy; existing choices come from Gateway
+artifact search when advertised, with a session-list fallback for older
+gateways. The search UI can scope to all artifacts or the current session,
+filters by the pin's modality, and accepts simple metadata filters.</p>
 <p>The legacy WebSocket host still exists in <a href="../web/backend/routes/ws.py">../web/backend/routes/ws.py</a> for development/reference use and is mounted only when <code>ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1</code>.</p>
 
 
