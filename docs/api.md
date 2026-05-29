@@ -135,7 +135,26 @@ The React editor is a thin client for AbstractGateway's versioned discovery cont
 GET /api/gateway/discovery/capabilities
 ```
 
-It reads `capabilities.contracts.flow_editor` plus `capabilities.contracts.common` for VisualFlow CRUD/publish, run input schema, run start, ledger stream, artifact, and prompt-cache endpoints. Session prompt cache and durable bloc exact-reuse bindings are separate contract tracks (`common.prompt_cache.session_lifecycle` and `common.prompt_cache.durable_blocs`). Gateway catalog routes may return the canonical `gateway_catalog_v1` envelope (`catalog` metadata plus `items`) or older legacy arrays/maps; the editor normalizes both.
+It reads `capabilities.contracts.flow_editor` plus `capabilities.contracts.common` for VisualFlow CRUD/publish, run input schema, run start, ledger stream, artifact, and prompt-cache endpoints. Artifact descriptors include run artifact listing/content, session-visible artifact listing, cross-run/session/run artifact search, workspace-path import, and artifact-to-workspace export when the Gateway supports them. Session prompt cache and durable bloc exact-reuse bindings are separate contract tracks (`common.prompt_cache.session_lifecycle` and `common.prompt_cache.durable_blocs`). Gateway catalog routes may return the canonical `gateway_catalog_v1` envelope (`catalog` metadata plus `items`) or older legacy arrays/maps; the editor normalizes both.
+
+Artifact start inputs use JSON refs, not paths:
+
+```json
+{
+  "$artifact": "abc123",
+  "artifact_id": "abc123",
+  "run_id": "session_memory_my-session",
+  "content_type": "image/png",
+  "filename": "input.png",
+  "sha256": "..."
+}
+```
+
+The editor obtains those refs by uploading a browser file, importing a Gateway
+workspace path through `common.artifacts.import`, or selecting from
+`common.artifacts.search` / `common.artifacts.session_list`. Search supports
+all-artifact or session-scoped lookup, modality filtering from the pin type, and
+simple metadata filters such as `pin_id=image,purpose=run_input`.
 
 When Gateway advertises `common.readiness.contract = gateway_surface_readiness_v1`, the editor uses that surface summary as a conservative overlay for optional media/model-residency UX. Endpoint descriptors remain the authority for actual request paths.
 

@@ -160,6 +160,7 @@ def test_generate_video_native_node_compiles_to_video_output() -> None:
                         "frames": 41,
                         "fps": 24,
                         "steps": 10,
+                        "seed": 4321,
                         "guidance_scale": 5.0,
                     },
                 },
@@ -194,6 +195,7 @@ def test_generate_video_native_node_compiles_to_video_output() -> None:
     assert output.get("num_frames") == 41
     assert output.get("fps") == 24
     assert output.get("steps") == 10
+    assert output.get("seed") == 4321
     assert output.get("guidance_scale") == 5.0
 
 
@@ -226,6 +228,8 @@ def test_image_to_video_native_node_compiles_to_video_output_with_source_media()
                         "frames": 41,
                         "fps": 24,
                         "steps": 10,
+                        "seed": 4321,
+                        "guidance_scale": 5.0,
                     },
                 },
             }
@@ -257,6 +261,8 @@ def test_image_to_video_native_node_compiles_to_video_output_with_source_media()
     assert output.get("model") == "Wan-AI/Wan2.2-TI2V-5B-Diffusers"
     assert output.get("format") == "mp4"
     assert output.get("num_frames") == 41
+    assert output.get("seed") == 4321
+    assert output.get("guidance_scale") == 5.0
     media = payload.get("media")
     assert isinstance(media, list)
     assert {"type": "image", "role": "source", "$artifact": "artifact-source-image"} in media
@@ -290,6 +296,8 @@ def test_edit_image_native_node_compiles_to_image_edit_output() -> None:
                         "image_model": "stabilityai/stable-image-edit",
                         "format": "png",
                         "strength": 0.65,
+                        "seed": 1234,
+                        "guidance_scale": 6.5,
                     },
                 },
             }
@@ -322,6 +330,8 @@ def test_edit_image_native_node_compiles_to_image_edit_output() -> None:
     assert output.get("model") == "stabilityai/stable-image-edit"
     assert output.get("format") == "png"
     assert output.get("strength") == 0.65
+    assert output.get("seed") == 1234
+    assert output.get("guidance_scale") == 6.5
 
     media = payload.get("media")
     assert isinstance(media, list)

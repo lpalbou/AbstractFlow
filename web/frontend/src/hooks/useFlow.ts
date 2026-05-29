@@ -1485,7 +1485,17 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         };
         const reorderInputs = (canonical: Pin[]): Pin[] => {
           const existingInputs = Array.isArray(data.inputs) ? data.inputs : [];
-          const dropLegacyInputIds = data.nodeType === 'generate_music' ? new Set(legacyMusicBackendKeys) : new Set<string>();
+          const dropLegacyInputIds = new Set<string>();
+          if (data.nodeType === 'generate_music') {
+            for (const key of legacyMusicBackendKeys) dropLegacyInputIds.add(key);
+          }
+          if (data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image') {
+            dropLegacyInputIds.add('size');
+          }
+          if (data.nodeType === 'edit_image' || data.nodeType === 'image_to_image') {
+            dropLegacyInputIds.add('width');
+            dropLegacyInputIds.add('height');
+          }
           const byId = new Map(existingInputs.map((p) => [p.id, p] as const));
           const used = new Set<string>();
 
@@ -1549,9 +1559,6 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                   { id: 'mask_artifact', label: 'mask_artifact', type: 'artifact_image' as const, description: 'Optional mask artifact ref.' },
                   { id: 'image_provider', label: 'provider', type: 'provider_image' as const, description: 'Optional image edit provider/backend.' },
                   { id: 'image_model', label: 'model', type: 'model' as const, description: 'Optional image edit model id for the selected provider.' },
-                  { id: 'size', label: 'size', type: 'string' as const, description: 'Optional size like 1024x1024.' },
-                  { id: 'width', label: 'width', type: 'number' as const },
-                  { id: 'height', label: 'height', type: 'number' as const },
                   { id: 'format', label: 'format', type: 'string' as const, description: 'png, jpg, or webp.' },
                   { id: 'seed', label: 'seed', type: 'number' as const },
                   { id: 'steps', label: 'steps', type: 'number' as const },
@@ -1566,7 +1573,6 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                   { id: 'prompt', label: 'prompt', type: 'string' as const, description: 'Image prompt.' },
                   { id: 'image_provider', label: 'provider', type: 'provider_image' as const, description: 'Optional image provider/backend. Legacy provider pins are treated as an image provider fallback.' },
                   { id: 'image_model', label: 'model', type: 'model' as const, description: 'Optional image model id for the selected image provider.' },
-                  { id: 'size', label: 'size', type: 'string' as const, description: 'Optional size like 1024x1024.' },
                   { id: 'width', label: 'width', type: 'number' as const },
                   { id: 'height', label: 'height', type: 'number' as const },
                   { id: 'format', label: 'format', type: 'string' as const, description: 'png, jpg, or webp.' },
@@ -1605,8 +1611,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
           data = { ...data, outputs: reorderOutputs(canonicalOutputs) };
         }
         const mediaDefaults: Record<string, JsonValue> =
-          data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
-            ? { format: 'png', width: 512, height: 512, steps: 20, guidance_scale: 7.5 }
+          data.nodeType === 'generate_image'
+            ? { format: 'png', width: 512, height: 512, steps: 20 }
+            : data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
+              ? { format: 'png', steps: 20 }
             : data.nodeType === 'generate_video' || data.nodeType === 'text_to_video' || data.nodeType === 'image_to_video'
               ? { format: 'mp4', width: 512, height: 512, frames: 41, fps: 24, steps: 20, guidance_scale: 5.0 }
             : data.nodeType === 'generate_voice'
@@ -1644,6 +1652,22 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         } else if (data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image') {
           const provider = normalizeScopedMediaValue(firstString(nextDefaults.image_provider, nextDefaults.imageProvider, nextDefaults.provider));
           const model = normalizeScopedMediaValue(firstString(nextDefaults.image_model, nextDefaults.imageModel, nextDefaults.model), provider);
+          if (nextDefaults.size !== undefined) {
+            delete nextDefaults.size;
+            changedDefaults = true;
+          }
+          if (nextDefaults.guidance_scale === 7.5) {
+            delete nextDefaults.guidance_scale;
+            changedDefaults = true;
+          }
+          if (data.nodeType === 'edit_image' || data.nodeType === 'image_to_image') {
+            for (const key of ['width', 'height'] as const) {
+              if (nextDefaults[key] !== undefined) {
+                delete nextDefaults[key];
+                changedDefaults = true;
+              }
+            }
+          }
           if (provider && nextDefaults.image_provider !== provider) {
             nextDefaults.image_provider = provider;
             changedDefaults = true;
@@ -1773,7 +1797,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         const canonicalInputSpecs: Pin[] = [
           { id: 'exec-in', label: '', type: 'execution' },
           { id: 'operation', label: 'operation', type: 'string', description: 'list_loaded, load, or unload.' },
-          { id: 'task', label: 'task', type: 'string', description: 'text_generation, image_generation, tts, stt, or music_generation.' },
+          { id: 'task', label: 'task', type: 'string', description: 'text_generation, image_generation, image_to_image, text_to_video, image_to_video, tts, stt, or music_generation.' },
           { id: 'provider', label: 'provider', type: 'provider', description: 'Provider/backend id to load or filter.' },
           { id: 'model', label: 'model', type: 'model', description: 'Model id to load or filter.' },
         ];

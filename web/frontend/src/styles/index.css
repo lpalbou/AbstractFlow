@@ -1457,6 +1457,10 @@ button.primary:hover:not(:disabled) {
   display: flex;
   flex-direction: column;
   position: relative;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(64, 153, 255, 0.28);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
 }
 
 .run-modal.run-modal-maximized {
@@ -1473,12 +1477,12 @@ button.primary:hover:not(:disabled) {
   flex-direction: column;
   gap: 16px;
   overflow-y: auto;
-  padding-right: 6px; /* keeps content readable when the scrollbar appears */
+  padding: 16px 18px 0 24px;
 }
 
 .run-modal-footer {
   flex: 0 0 auto;
-  padding-top: 14px;
+  padding: 14px 24px 18px;
   border-top: 1px solid var(--bg-tertiary);
 }
 
@@ -1697,59 +1701,96 @@ button.primary:hover:not(:disabled) {
   color: var(--text-secondary);
 }
 
-.run-modal-header {
-  display: flex;
+.run-modal-titlebar {
+  flex: 0 0 auto;
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
+  gap: 16px;
+  padding: 8px 14px;
+  border-bottom: 1px solid rgba(64, 153, 255, 0.28);
+  background:
+    linear-gradient(180deg, rgba(30, 42, 74, 0.98), rgba(23, 31, 56, 0.98)),
+    var(--bg-secondary);
+  user-select: none;
 }
 
-.run-modal-header-left {
+.run-window-controls {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  min-width: 0;
+  gap: 8px;
+  min-width: 70px;
 }
 
-.run-modal-header-right {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.run-minimize-btn,
-.run-maximize-btn {
-  width: 30px;
-  height: 30px;
+.run-window-control {
+  width: 16px;
+  height: 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   line-height: 0;
   padding: 0;
-  border-radius: 8px;
-  border: 1px solid var(--bg-tertiary);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text-secondary);
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.28);
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, transform 0.05s;
+  color: rgba(24, 28, 36, 0.78);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  transition: filter 0.15s, transform 0.05s, box-shadow 0.15s;
 }
 
-.run-minimize-btn svg,
-.run-maximize-btn svg {
+.run-window-control.close {
+  background: #ff5f57;
+}
+
+.run-window-control.reduce {
+  background: #ffbd2e;
+}
+
+.run-window-control.maximize {
+  background: #28c840;
+}
+
+.run-window-control svg {
   display: block;
   flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.12s;
 }
 
-.run-minimize-btn:hover,
-.run-maximize-btn:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.18);
-  color: var(--text-primary);
+.run-window-controls:hover .run-window-control svg,
+.run-window-control:focus-visible svg {
+  opacity: 1;
 }
 
-.run-minimize-btn:active,
-.run-maximize-btn:active {
+.run-window-control:hover {
+  filter: brightness(1.08);
+}
+
+.run-window-control:active {
   transform: translateY(1px);
+}
+
+.run-window-control:focus-visible {
+  outline: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 0 0 2px rgba(255, 255, 255, 0.22);
+}
+
+.run-modal-titlebar-title {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  gap: 10px;
+}
+
+.run-modal-titlebar-right {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
 }
 
 .run-minibar {
@@ -1925,8 +1966,11 @@ button.primary:hover:not(:disabled) {
   background: rgba(231, 76, 60, 0.16);
 }
 
-.run-modal-header h3 {
+.run-modal-titlebar h3 {
   margin: 0;
+  font-size: var(--font-size-lg);
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .run-modal-flow-name {
@@ -2288,6 +2332,75 @@ button.primary:hover:not(:disabled) {
 .run-form-action:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.artifact-input-field {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.artifact-input-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.artifact-input-tabs button {
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  padding: 6px 10px;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.artifact-input-tabs button.active {
+  color: var(--text-primary);
+  border-color: rgba(25, 211, 184, 0.45);
+  background: rgba(25, 211, 184, 0.14);
+}
+
+.artifact-input-file {
+  display: none;
+}
+
+.artifact-input-tabs button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.artifact-input-error {
+  color: var(--error);
+  font-size: var(--font-size-sm);
+}
+
+.artifact-input-selected {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.artifact-input-existing {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.artifact-input-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(92px, 120px);
+  gap: 8px;
+  min-width: 0;
+}
+
+.artifact-input-scope {
+  min-width: 92px;
 }
 
 .run-form-required {
@@ -3715,6 +3828,27 @@ button.primary:hover:not(:disabled) {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.run-step-progress-timing {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.run-step-progress-timing span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(80, 227, 194, 0.24);
+  background: rgba(80, 227, 194, 0.08);
+  color: rgba(226, 244, 241, 0.86);
+  font-size: var(--font-size-xs);
+  line-height: 1.1;
   white-space: nowrap;
 }
 

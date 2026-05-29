@@ -393,7 +393,7 @@ const CORE_NODES: NodeTemplate[] = [
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
       { id: 'operation', label: 'operation', type: 'string', description: 'list_loaded, load, or unload.' },
-      { id: 'task', label: 'task', type: 'string', description: 'text_generation, image_generation, tts, or stt.' },
+      { id: 'task', label: 'task', type: 'string', description: 'text_generation, image_generation, image_to_image, text_to_video, image_to_video, tts, stt, or music_generation.' },
       { id: 'provider', label: 'provider', type: 'provider', description: 'Provider/backend id to load or filter.' },
       { id: 'model', label: 'model', type: 'model', description: 'Model id to load or filter.' },
     ],
@@ -420,7 +420,6 @@ const CORE_NODES: NodeTemplate[] = [
       { id: 'prompt', label: 'prompt', type: 'string', description: 'Image prompt.' },
       { id: 'image_provider', label: 'provider', type: 'provider_image', description: 'Optional image provider/backend.' },
       { id: 'image_model', label: 'model', type: 'model', description: 'Optional image model id for the selected image provider.' },
-      { id: 'size', label: 'size', type: 'string', description: 'Optional size like 1024x1024.' },
       { id: 'width', label: 'width', type: 'number' },
       { id: 'height', label: 'height', type: 'number' },
       { id: 'format', label: 'format', type: 'string', description: 'png, jpg, or webp.' },
@@ -455,9 +454,6 @@ const CORE_NODES: NodeTemplate[] = [
       { id: 'mask_artifact', label: 'mask_artifact', type: 'artifact_image', description: 'Optional mask artifact ref.' },
       { id: 'image_provider', label: 'provider', type: 'provider_image', description: 'Optional image edit provider/backend.' },
       { id: 'image_model', label: 'model', type: 'model', description: 'Optional image edit model id for the selected provider.' },
-      { id: 'size', label: 'size', type: 'string', description: 'Optional size like 1024x1024.' },
-      { id: 'width', label: 'width', type: 'number' },
-      { id: 'height', label: 'height', type: 'number' },
       { id: 'format', label: 'format', type: 'string', description: 'png, jpg, or webp.' },
       { id: 'seed', label: 'seed', type: 'number' },
       { id: 'steps', label: 'steps', type: 'number' },
@@ -493,6 +489,9 @@ const CORE_NODES: NodeTemplate[] = [
       { id: 'image_model', label: 'model', type: 'model' },
       { id: 'strength', label: 'strength', type: 'number' },
       { id: 'format', label: 'format', type: 'string' },
+      { id: 'seed', label: 'seed', type: 'number' },
+      { id: 'steps', label: 'steps', type: 'number' },
+      { id: 'guidance_scale', label: 'guidance', type: 'number' },
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
@@ -557,6 +556,9 @@ const CORE_NODES: NodeTemplate[] = [
       { id: 'frames', label: 'frames', type: 'number' },
       { id: 'fps', label: 'fps', type: 'number' },
       { id: 'format', label: 'format', type: 'string' },
+      { id: 'seed', label: 'seed', type: 'number' },
+      { id: 'steps', label: 'steps', type: 'number' },
+      { id: 'guidance_scale', label: 'guidance', type: 'number' },
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
@@ -1906,13 +1908,18 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
         task: 'text_generation',
       },
     }),
-    ...((template.type === 'generate_image' || template.type === 'edit_image' || template.type === 'image_to_image') && {
+    ...(template.type === 'generate_image' && {
       pinDefaults: {
         format: 'png',
         width: 512,
         height: 512,
         steps: 20,
-        guidance_scale: 7.5,
+      },
+    }),
+    ...((template.type === 'edit_image' || template.type === 'image_to_image') && {
+      pinDefaults: {
+        format: 'png',
+        steps: 20,
       },
     }),
     ...((template.type === 'generate_video' || template.type === 'text_to_video' || template.type === 'image_to_video') && {
@@ -2008,11 +2015,78 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
   };
 }
 
+const CANONICAL_TEMPLATE_PIN_NODE_TYPES = new Set<string>([
+  'generate_image',
+  'edit_image',
+  'image_to_image',
+  'generate_video',
+  'text_to_video',
+  'image_to_video',
+  'generate_voice',
+  'generate_music',
+  'transcribe_audio',
+  'listen_voice',
+]);
+
+const RETIRED_TEMPLATE_INPUT_PIN_IDS: Record<string, Set<string>> = {
+  generate_image: new Set(['size']),
+  edit_image: new Set(['size', 'width', 'height']),
+  image_to_image: new Set(['size', 'width', 'height']),
+};
+
+function upsertTemplatePins(templatePins: Pin[], pins: Pin[]): Pin[] {
+  const next = [...pins];
+  const templateById = new Map(templatePins.map((pin) => [pin.id, pin] as const));
+
+  const mergeExisting = (pin: Pin, templatePin: Pin): Pin => {
+    const hasOwnDescription = typeof pin.description === 'string' && pin.description.trim().length > 0;
+    return {
+      ...pin,
+      label: templatePin.label,
+      type: templatePin.type,
+      description: hasOwnDescription ? pin.description : templatePin.description,
+    };
+  };
+
+  for (let i = 0; i < next.length; i += 1) {
+    const templatePin = templateById.get(next[i].id);
+    if (templatePin) next[i] = mergeExisting(next[i], templatePin);
+  }
+
+  for (let i = 0; i < templatePins.length; i += 1) {
+    const templatePin = templatePins[i];
+    if (next.some((pin) => pin.id === templatePin.id)) continue;
+
+    let insertAt = next.length;
+    for (let prev = i - 1; prev >= 0; prev -= 1) {
+      const idx = next.findIndex((pin) => pin.id === templatePins[prev].id);
+      if (idx >= 0) {
+        insertAt = idx + 1;
+        break;
+      }
+    }
+    if (insertAt === next.length) {
+      for (let later = i + 1; later < templatePins.length; later += 1) {
+        const idx = next.findIndex((pin) => pin.id === templatePins[later].id);
+        if (idx >= 0) {
+          insertAt = idx;
+          break;
+        }
+      }
+    }
+    next.splice(insertAt, 0, templatePin);
+  }
+
+  return next;
+}
+
 /**
- * Best-effort: merge template pin documentation into a node's pins.
+ * Best-effort: merge template pin metadata into a node's pins.
  *
  * Why:
  * - Older saved flows may have `inputs/outputs` persisted without `description`.
+ * - Media nodes are a stable capability surface; older saved flows should pick up
+ *   newly supported controls like seed/guidance without recreating the node.
  * - We want tooltips to appear reliably even for legacy flows, without forcing migrations.
  *
  * Rules:
@@ -2073,7 +2147,47 @@ export function mergePinDocsFromTemplate(
     });
   };
 
-  const normalized = normalizeCodeNode(nodeData);
+  const upsertCanonicalTemplatePins = (data: FlowNodeData): FlowNodeData => {
+    if (!CANONICAL_TEMPLATE_PIN_NODE_TYPES.has(data.nodeType)) return data;
+    const retiredInputIds = RETIRED_TEMPLATE_INPUT_PIN_IDS[data.nodeType];
+    const inputs = retiredInputIds
+      ? (Array.isArray(data.inputs) ? data.inputs : []).filter((pin) => !retiredInputIds.has(pin.id))
+      : Array.isArray(data.inputs)
+        ? data.inputs
+        : [];
+    return {
+      ...data,
+      inputs: upsertTemplatePins(templateData.inputs, inputs),
+      outputs: upsertTemplatePins(templateData.outputs, Array.isArray(data.outputs) ? data.outputs : []),
+    };
+  };
+
+  const normalizeRetiredMediaDefaults = (data: FlowNodeData): FlowNodeData => {
+    if (!(data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image')) {
+      return data;
+    }
+    const pinDefaults = { ...(data.pinDefaults || {}) };
+    let changed = false;
+    if (pinDefaults.size !== undefined) {
+      delete pinDefaults.size;
+      changed = true;
+    }
+    if (pinDefaults.guidance_scale === 7.5) {
+      delete pinDefaults.guidance_scale;
+      changed = true;
+    }
+    if (data.nodeType === 'edit_image' || data.nodeType === 'image_to_image') {
+      for (const key of ['width', 'height'] as const) {
+        if (pinDefaults[key] !== undefined) {
+          delete pinDefaults[key];
+          changed = true;
+        }
+      }
+    }
+    return changed ? { ...data, pinDefaults } : data;
+  };
+
+  const normalized = normalizeRetiredMediaDefaults(upsertCanonicalTemplatePins(normalizeCodeNode(nodeData)));
 
   return {
     ...normalized,

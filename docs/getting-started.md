@@ -30,7 +30,7 @@ pip install -e .
 
 Evidence: dependencies and extras are declared in [../pyproject.toml](../pyproject.toml).
 
-For thin-client gateway-first mode, `abstractflow` (without extras) is sufficient. Install `abstractgateway` separately for the backend.
+For thin-client gateway-first mode, `abstractflow` (without extras) is sufficient. Install the base `abstractgateway` package for the backend; HTTP/SSE is part of that remote-light install.
 Enable local runtime compatibility only when needed with `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1`.
 
 If you install a host profile (`apple`, `gpu`), the local execution stack is already included for compatibility.
@@ -136,13 +136,20 @@ from Gateway vision provider-model catalogs scoped to `text_to_video` or
 
 Generated media is returned as Gateway artifacts. The Run modal renders images,
 videos, and audio/music players first; raw ledger JSON and artifact IDs remain
-available for debugging. Long video runs surface Gateway `abstract.progress`
-ledger events as progress on the active step.
+available for debugging, and the `artifact content` link opens or downloads the
+artifact payload. Filesystem export is intentionally graph-level work: use file
+nodes or the forthcoming artifact-aware file-node design rather than a Run modal
+button. Long video runs surface Gateway `abstract.progress` ledger events as
+progress on the active step.
 
 For image editing, wire `image_artifact` from a previous `Generate Image` node
-or use the `Artifacts` palette primitives (`Image Artifact`, `Voice Artifact`,
-`Music Artifact`, etc.) to paste an existing Gateway `$artifact` id. A richer
-browser artifact picker/upload flow is tracked separately.
+or use an artifact input pin on `On Flow Start`. The Run modal renders artifact
+inputs with three sources: upload a browser-local file, import a Gateway
+workspace path, or select an existing artifact. When Gateway advertises artifact
+search, the Existing tab can search all artifacts or the current session by
+modality and simple metadata filters such as `pin_id=image`. Flow submits a JSON
+artifact ref such as `{"$artifact":"...","run_id":"..."}`; it does not submit
+raw file bytes or browser-local paths.
 
 Example Generate Video path:
 1. Drag `On Flow Start`, `Generate Video`, and `On Flow End` onto the canvas.

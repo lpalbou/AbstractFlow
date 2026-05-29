@@ -16,7 +16,7 @@ Gateway-backed media nodes are now first-class, but the editor still exposes som
 
 - Add simple media cards or presets for Generate Image, Generate Voice, and Generate Music.
 - Keep node defaults to prompt/text, duration/size/voice, provider/model `Auto (Gateway default)`, and format.
-- Move seed, steps, guidance, negative prompt, backend, planner, extra options, and raw output specs behind an explicit advanced section.
+- Keep seed and guidance visible on image/video generation and edit nodes because they are core reproducibility and quality controls; move steps, negative prompt, backend planner details, extra options, and raw output specs behind an explicit advanced section.
 - Make run results open as a gallery/player first, with artifact IDs and raw JSON collapsed.
 - Add an image artifact picker/upload affordance for Edit Image when the source pin is unconnected.
 

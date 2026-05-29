@@ -32,6 +32,19 @@ Agent-node features are included in `abstractflow[apple]` and `abstractflow[gpu]
 
 Evidence: [../abstractflow/visual/executor.py](../abstractflow/visual/executor.py).
 
+## Why does image-to-video look stretched or barely animated?
+
+Image-to-video models usually expect a specific video aspect ratio and frame geometry. For example,
+the Wan 2.2 TI2V MLX-Gen path is tuned for 1280x704 or 704x1280, 121 frames, 50 steps, and 24 fps.
+If the source image has a different aspect ratio, AbstractVision preserves it by letterboxing before
+handing it to the model, but the best results still come from generating or editing the source image
+at the same aspect ratio and approximate resolution that the video model will use.
+
+Very short clips are wiring tests, not quality tests. A 10-frame request for Wan becomes 9 frames
+internally and is less than a second at 10 fps, so the output can look almost static even when the
+prompt is passed correctly. For prompt-following and motion checks, use the model's recommended
+frame count, steps, fps, and a prompt that explicitly describes camera movement or object motion.
+
 ## How do subflows work?
 
 Subflows are VisualFlows referenced by id from nodes of type `subflow`:
@@ -87,6 +100,24 @@ The web backend creates a per-run workspace directory and wraps tool execution w
 - Workspace root is injected into `input_data` (`workspace_root`) and used to scope tools
 
 Evidence: [../web/backend/services/execution_workspace.py](../web/backend/services/execution_workspace.py), [../abstractflow/visual/workspace_scoped_tools.py](../abstractflow/visual/workspace_scoped_tools.py), [../web/backend/routes/ws.py](../web/backend/routes/ws.py), [../web/backend/routes/flows.py](../web/backend/routes/flows.py).
+
+## Should flow inputs use file paths or artifacts?
+
+Use artifact refs for payloads that cross Gateway, Runtime, Flow, and Core
+boundaries. A run-start image, document, audio file, video, or text file should
+enter the run as `{"$artifact": "...", "run_id": "..."}`. The Run modal can
+create that ref by uploading a browser file, importing a Gateway workspace path,
+or selecting an existing artifact through Gateway artifact search. The picker
+can search all artifacts or the current session, filters by the input pin's
+modality, and accepts metadata filters such as `pin_id=image`.
+
+Workspace paths are still useful for explicit filesystem operations, but they
+are server-side paths governed by Gateway workspace policy and `.abstractignore`.
+Browser-local paths are never treated as Gateway workspace paths. The Run modal's
+`artifact content` link opens or downloads artifact payloads. Writing artifacts
+back into workspace files should be modeled as an explicit graph operation
+through `Read File` / `Write File` or the planned artifact-aware file-node
+contract, so filesystem side effects stay visible in the workflow.
 
 ## How do tools work? How do I add more tools?
 

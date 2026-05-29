@@ -81,8 +81,12 @@ const complete = {
     },
     artifacts: {
       list: { endpoint: '/runs/{run_id}/artifacts' },
+      search: { endpoint: '/artifacts/search' },
+      session_list: { endpoint: '/sessions/{session_id}/artifacts' },
       metadata: { endpoint: '/runs/{run_id}/artifacts/{artifact_id}' },
       content: { endpoint: '/runs/{run_id}/artifacts/{artifact_id}/content' },
+      import: { endpoint: '/artifacts/import' },
+      export: { endpoint: '/runs/{run_id}/artifacts/{artifact_id}/export' },
     },
     attachments: { upload: { endpoint: '/attachments/upload' } },
     workspace: { policy_endpoint: '/workspace/policy' },
@@ -133,8 +137,8 @@ const complete = {
         load: '/models/load',
         unload: '/models/unload',
       },
-      tasks: ['text_generation', 'image_generation', 'text_to_video', 'image_to_video', 'music_generation', 'tts', 'stt'],
-      supports: { text_generation: true, image_generation: true, text_to_video: true, image_to_video: true, music_generation: true, tts: true, stt: true },
+      tasks: ['text_generation', 'image_generation', 'image_to_image', 'text_to_video', 'image_to_video', 'music_generation', 'tts', 'stt'],
+      supports: { text_generation: true, image_generation: true, image_to_image: true, text_to_video: true, image_to_video: true, music_generation: true, tts: true, stt: true },
     },
     memory: { available: true, endpoint: '/kg/query' },
     execution: {
@@ -166,7 +170,7 @@ const complete = {
         model_residency: {
           available: false,
           route_available: true,
-          supports: { text_generation: true, image_generation: true, text_to_video: true, image_to_video: true, music_generation: true, tts: true, stt: true },
+          supports: { text_generation: true, image_generation: true, image_to_image: true, text_to_video: true, image_to_video: true, music_generation: true, tts: true, stt: true },
         },
       },
     },
@@ -248,6 +252,22 @@ assert.equal(client.getCodeExecutionContract(complete).contract, 'code_execution
 assert.equal(
   client.endpointFromDescriptor(complete.common.runs.purge_drafts, '/fallback'),
   '/api/gateway/runs/purge_drafts'
+);
+assert.equal(
+  client.endpointFromDescriptor(complete.common.artifacts.search, '/fallback', {}, { scope: 'all', modality: 'image' }),
+  '/api/gateway/artifacts/search?scope=all&modality=image'
+);
+assert.equal(
+  client.endpointFromDescriptor(complete.common.artifacts.session_list, '/fallback', { session_id: 's1' }),
+  '/api/gateway/sessions/s1/artifacts'
+);
+assert.equal(
+  client.endpointFromDescriptor(complete.common.artifacts.import, '/fallback'),
+  '/api/gateway/artifacts/import'
+);
+assert.equal(
+  client.endpointFromDescriptor(complete.common.artifacts.export, '/fallback', { run_id: 'r1', artifact_id: 'a1' }),
+  '/api/gateway/runs/r1/artifacts/a1/export'
 );
 assert.deepEqual(
   client.codePermissionOptions(complete, 'full_access').map((o) => [o.value, o.disabled === true]),
@@ -339,6 +359,11 @@ assert.equal(
   client.gatewayPath(complete.common.prompt_cache.durable_blocs.endpoints.kv_load),
   '/api/gateway/blocs/kv/load'
 );
+
+const emptyKgStore = JSON.parse(JSON.stringify(complete));
+emptyKgStore.common.memory.available = false;
+emptyKgStore.common.memory.structured_query = true;
+assert.equal(client.getGatewayFlowEditorReadiness(emptyKgStore).optional.kgMemory, true);
 
 const musicUnavailable = JSON.parse(JSON.stringify(complete));
 musicUnavailable.assistant.media.generated_music.direct_endpoint.available = false;
@@ -506,6 +531,83 @@ main().catch((error) => {
         check=False,
     )
     assert result.returncode == 0, result.stderr + result.stdout
+
+
+def test_artifact_input_helpers_normalize_refs_and_filter_modalities() -> None:
+    if not shutil.which("node"):
+        pytest.skip("node is not installed")
+    typescript = FRONTEND / "node_modules" / "typescript"
+    if not typescript.exists():
+        pytest.skip("frontend TypeScript dependency is not installed")
+
+    script = r"""
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const ts = require(path.resolve('web/frontend/node_modules/typescript'));
+
+const src = fs.readFileSync('web/frontend/src/utils/artifactInputs.ts', 'utf8');
+const js = ts.transpileModule(src, {
+  compilerOptions: {
+    module: ts.ModuleKind.CommonJS,
+    target: ts.ScriptTarget.ES2020,
+  },
+}).outputText;
+const module = { exports: {} };
+vm.runInNewContext(js, { module, exports: module.exports, require, console });
+const helpers = module.exports;
+
+const uploaded = helpers.artifactRefFromUploadResponse({
+  run_id: 'session_memory_s1',
+  artifact: {
+    $artifact: 'a1',
+    content_type: 'image/png',
+    filename: 'input.png',
+  },
+});
+assert.equal(uploaded.$artifact, 'a1');
+assert.equal(uploaded.artifact_id, 'a1');
+assert.equal(uploaded.run_id, 'session_memory_s1');
+assert.equal(uploaded.modality, 'image');
+assert.equal(helpers.artifactMatchesPin(uploaded, { type: 'artifact_image' }), true);
+assert.equal(helpers.artifactMatchesPin(uploaded, { type: 'artifact_audio' }), false);
+
+const listed = helpers.artifactRefFromMetadata({
+  artifact_id: 'txt1',
+  run_id: 'session_memory_s1',
+  content_type: 'text/plain',
+  tags: { filename: 'notes.txt', path: 'notes.txt' },
+});
+assert.equal(listed.$artifact, 'txt1');
+assert.equal(listed.filename, 'notes.txt');
+assert.equal(helpers.artifactMatchesPin(listed, { type: 'artifact_text' }), true);
+assert.deepEqual(helpers.parseArtifactRefText(JSON.stringify(listed)).artifact_id, 'txt1');
+assert.equal(helpers.parseArtifactRefText('bare-id').$artifact, 'bare-id');
+"""
+    result = subprocess.run(
+        ["node", "-e", script],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr + result.stdout
+
+
+def test_artifact_search_ui_uses_gateway_contracts_without_run_modal_export() -> None:
+    artifact_input = (FRONTEND / "src" / "components" / "ArtifactInputField.tsx").read_text(encoding="utf-8")
+    run_modal = (FRONTEND / "src" / "components" / "RunFlowModal.tsx").read_text(encoding="utf-8")
+
+    assert "artifacts?.search" in artifact_input
+    assert "/api/gateway/artifacts/search" in artifact_input
+    assert "modality" in artifact_input
+    assert "Metadata filters" in artifact_input
+    assert "artifact content" in run_modal
+    assert "ArtifactExportControl" not in run_modal
+    assert "/api/gateway/runs/{run_id}/artifacts/{artifact_id}/export" not in run_modal
+    assert "create_parent_dirs" not in run_modal
+    assert "window.prompt" not in run_modal
 
 
 def test_ledger_progress_events_do_not_complete_running_nodes() -> None:
@@ -744,6 +846,9 @@ def test_frontend_exposes_gateway_media_node_templates() -> None:
     assert "abstract.media.video.generated" in run_modal
     assert "Generated video" in run_modal
     assert "node_progress" in run_modal
+    assert "progressTimingParts" in run_modal
+    assert "run-step-progress-timing" in run_modal
+    assert "Estimated from elapsed time and current progress" in run_modal
     assert "abstract.media.music.generated" in run_modal
     assert "Generated music" in run_modal
     assert "payloadRaw.artifact_ref" in run_modal
@@ -784,6 +889,7 @@ def test_frontend_media_nodes_use_shared_advanced_pin_presentation() -> None:
     helper = (FRONTEND / "src" / "utils" / "mediaPinDisclosure.ts").read_text(encoding="utf-8")
     base_node = (FRONTEND / "src" / "components" / "nodes" / "BaseNode.tsx").read_text(encoding="utf-8")
     properties_panel = (FRONTEND / "src" / "components" / "PropertiesPanel.tsx").read_text(encoding="utf-8")
+    node_templates = (FRONTEND / "src" / "types" / "nodes.ts").read_text(encoding="utf-8")
     nodes_css = (FRONTEND / "src" / "styles" / "nodes.css").read_text(encoding="utf-8")
     app_css = (FRONTEND / "src" / "styles" / "index.css").read_text(encoding="utf-8")
 
@@ -803,6 +909,8 @@ def test_frontend_media_nodes_use_shared_advanced_pin_presentation() -> None:
 
     assert "advancedMusicInputPins" not in base_node
     assert "getVisibleMediaPins" in base_node
+    assert "mergePinDocsFromTemplate" in base_node
+    assert "pinListSignature" in base_node
     assert "countHiddenAdvancedMediaPins" in base_node
     assert "connectedOutputPinIds" in base_node
     assert "renderedPinKey" in base_node
@@ -825,6 +933,16 @@ def test_frontend_media_nodes_use_shared_advanced_pin_presentation() -> None:
     assert ".pin-disclosure-row" in nodes_css
     assert ".pin-disclosure-count" in nodes_css
     assert "backdrop-filter: blur" not in app_css
+    image_to_image_block = re.search(r"type: 'image_to_image'.*?hiddenInPalette: true", node_templates, re.S)
+    assert image_to_image_block is not None
+    assert "{ id: 'seed', label: 'seed', type: 'number' }" in image_to_image_block.group(0)
+    assert "{ id: 'steps', label: 'steps', type: 'number' }" in image_to_image_block.group(0)
+    assert "{ id: 'guidance_scale', label: 'guidance', type: 'number' }" in image_to_image_block.group(0)
+    text_to_video_block = re.search(r"type: 'text_to_video'.*?hiddenInPalette: true", node_templates, re.S)
+    assert text_to_video_block is not None
+    assert "{ id: 'seed', label: 'seed', type: 'number' }" in text_to_video_block.group(0)
+    assert "{ id: 'steps', label: 'steps', type: 'number' }" in text_to_video_block.group(0)
+    assert "{ id: 'guidance_scale', label: 'guidance', type: 'number' }" in text_to_video_block.group(0)
 
     script = r"""
 const assert = require('assert');
@@ -870,6 +988,48 @@ assert.deepEqual(
 );
 assert.equal(media.countHiddenAdvancedMediaPins('generate_music', 'input', inputs, new Set(['seed']), false), 1);
 
+const imageInputs = [
+  { id: 'exec-in', type: 'execution' },
+  { id: 'prompt', type: 'string' },
+  { id: 'image_provider', type: 'provider_image' },
+  { id: 'image_model', type: 'model' },
+  { id: 'format', type: 'string' },
+  { id: 'seed', type: 'number' },
+  { id: 'steps', type: 'number' },
+  { id: 'guidance_scale', type: 'number' },
+  { id: 'negative_prompt', type: 'string' },
+];
+assert.equal(media.isAdvancedMediaPin('generate_image', 'seed', 'input'), false);
+assert.equal(media.isAdvancedMediaPin('generate_image', 'guidance_scale', 'input'), false);
+assert.equal(media.isAdvancedMediaPin('generate_image', 'steps', 'input'), false);
+assert.deepEqual(
+  media.getVisibleMediaPins('generate_image', 'input', imageInputs, new Set(), false).map((pin) => pin.id),
+  ['exec-in', 'prompt', 'image_provider', 'image_model', 'format', 'seed', 'steps', 'guidance_scale']
+);
+assert.deepEqual(
+  media.getVisibleMediaPins('generate_image', 'input', imageInputs, new Set(), true).map((pin) => pin.id),
+  ['exec-in', 'prompt', 'image_provider', 'image_model', 'format', 'seed', 'steps', 'guidance_scale', 'negative_prompt']
+);
+
+const editInputs = [
+  { id: 'exec-in', type: 'execution' },
+  { id: 'prompt', type: 'string' },
+  { id: 'image_artifact', type: 'artifact_image' },
+  { id: 'image_provider', type: 'provider_image' },
+  { id: 'image_model', type: 'model' },
+  { id: 'format', type: 'string' },
+  { id: 'seed', type: 'number' },
+  { id: 'steps', type: 'number' },
+  { id: 'guidance_scale', type: 'number' },
+];
+assert.equal(media.isAdvancedMediaPin('edit_image', 'seed', 'input'), false);
+assert.equal(media.isAdvancedMediaPin('edit_image', 'guidance_scale', 'input'), false);
+assert.equal(media.isAdvancedMediaPin('edit_image', 'steps', 'input'), false);
+assert.deepEqual(
+  media.getVisibleMediaPins('edit_image', 'input', editInputs, new Set(), false).map((pin) => pin.id),
+  ['exec-in', 'prompt', 'image_artifact', 'image_provider', 'image_model', 'format', 'seed', 'steps', 'guidance_scale']
+);
+
 const videoInputs = [
   { id: 'exec-in', type: 'execution' },
   { id: 'prompt', type: 'string' },
@@ -879,18 +1039,41 @@ const videoInputs = [
   { id: 'frames', type: 'number' },
   { id: 'fps', type: 'number' },
   { id: 'seed', type: 'number' },
+  { id: 'steps', type: 'number' },
   { id: 'guidance_scale', type: 'number' },
 ];
 assert.equal(media.isMediaNodeType('generate_video'), true);
-assert.equal(media.isAdvancedMediaPin('generate_video', 'seed', 'input'), true);
+assert.equal(media.isAdvancedMediaPin('generate_video', 'seed', 'input'), false);
+assert.equal(media.isAdvancedMediaPin('generate_video', 'guidance_scale', 'input'), false);
+assert.equal(media.isAdvancedMediaPin('generate_video', 'steps', 'input'), false);
 assert.equal(media.isAdvancedMediaPin('generate_video', 'frames', 'input'), false);
 assert.deepEqual(
   media.getVisibleMediaPins('generate_video', 'input', videoInputs, new Set(), false).map((pin) => pin.id),
-  ['exec-in', 'prompt', 'video_provider', 'video_model', 'format', 'frames', 'fps']
+  ['exec-in', 'prompt', 'video_provider', 'video_model', 'format', 'frames', 'fps', 'seed', 'steps', 'guidance_scale']
 );
 assert.deepEqual(
   media.getVisibleMediaPins('generate_video', 'input', videoInputs, new Set(), true).map((pin) => pin.id),
-  ['exec-in', 'prompt', 'video_provider', 'video_model', 'format', 'frames', 'fps', 'seed', 'guidance_scale']
+  ['exec-in', 'prompt', 'video_provider', 'video_model', 'format', 'frames', 'fps', 'seed', 'steps', 'guidance_scale']
+);
+
+const i2vInputs = [
+  { id: 'exec-in', type: 'execution' },
+  { id: 'prompt', type: 'string' },
+  { id: 'source_image', type: 'artifact_image' },
+  { id: 'video_provider', type: 'provider_video' },
+  { id: 'video_model', type: 'model_video' },
+  { id: 'frames', type: 'number' },
+  { id: 'fps', type: 'number' },
+  { id: 'seed', type: 'number' },
+  { id: 'steps', type: 'number' },
+  { id: 'guidance_scale', type: 'number' },
+];
+assert.equal(media.isAdvancedMediaPin('image_to_video', 'seed', 'input'), false);
+assert.equal(media.isAdvancedMediaPin('image_to_video', 'guidance_scale', 'input'), false);
+assert.equal(media.isAdvancedMediaPin('image_to_video', 'steps', 'input'), false);
+assert.deepEqual(
+  media.getVisibleMediaPins('image_to_video', 'input', i2vInputs, new Set(), false).map((pin) => pin.id),
+  ['exec-in', 'prompt', 'source_image', 'video_provider', 'video_model', 'frames', 'fps', 'seed', 'steps', 'guidance_scale']
 );
 
 const voiceInputs = [
@@ -928,6 +1111,88 @@ assert.deepEqual(
   ['exec-out', 'music_artifact', 'artifact_id', 'success']
 );
 assert.deepEqual(inputs.map((pin) => pin.id), ['exec-in', 'prompt', 'music_provider', 'music_model', 'duration_s', 'seed', 'guidance_scale']);
+
+function loadTsModule(relPath, mocks = {}) {
+  const abs = path.resolve(relPath);
+  const src = fs.readFileSync(abs, 'utf8');
+  const js = ts.transpileModule(src, {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2020,
+    },
+  }).outputText;
+  const loaded = { exports: {} };
+  function localRequire(spec) {
+    if (Object.prototype.hasOwnProperty.call(mocks, spec)) return mocks[spec];
+    if (spec.startsWith('.')) {
+      const candidate = path.resolve(path.dirname(abs), spec);
+      const tsPath = fs.existsSync(`${candidate}.ts`) ? `${candidate}.ts` : candidate;
+      return loadTsModule(tsPath, mocks);
+    }
+    return require(spec);
+  }
+  vm.runInNewContext(js, { module: loaded, exports: loaded.exports, require: localRequire, console });
+  return loaded.exports;
+}
+
+const nodes = loadTsModule('web/frontend/src/types/nodes.ts', {
+  '../utils/codegen': {
+    generatePythonTransformCode: (_inputs, body) => body,
+    upsertPythonAvailableVariablesComments: (body) => body,
+  },
+  '../utils/nodeCapabilities': {
+    NODE_GATEWAY_CAPABILITIES: {},
+  },
+});
+const ids = (pins) => pins.map((pin) => pin.id);
+
+const generateTemplate = nodes.getNodeTemplate('generate_image');
+const generateDefaults = nodes.createNodeData(generateTemplate);
+assert.equal(ids(generateTemplate.inputs).includes('size'), false);
+assert.equal(generateDefaults.pinDefaults.width, 512);
+assert.equal(generateDefaults.pinDefaults.height, 512);
+assert.equal(generateDefaults.pinDefaults.size, undefined);
+assert.equal(generateDefaults.pinDefaults.guidance_scale, undefined);
+
+const editTemplate = nodes.getNodeTemplate('edit_image');
+const editDefaults = nodes.createNodeData(editTemplate);
+assert.equal(ids(editTemplate.inputs).includes('size'), false);
+assert.equal(editDefaults.pinDefaults.width, undefined);
+assert.equal(editDefaults.pinDefaults.height, undefined);
+assert.equal(editDefaults.pinDefaults.size, undefined);
+assert.equal(editDefaults.pinDefaults.guidance_scale, undefined);
+const staleEdit = {
+  ...nodes.createNodeData(editTemplate),
+  pinDefaults: { format: 'png', size: '1024x1024', width: 512, height: 512, steps: 20, guidance_scale: 7.5 },
+  inputs: editTemplate.inputs.filter((pin) => !['seed', 'steps', 'guidance_scale', 'negative_prompt', 'extra'].includes(pin.id)),
+};
+const normalizedEdit = nodes.mergePinDocsFromTemplate(nodes.createNodeData(editTemplate), staleEdit);
+assert.deepEqual(
+  ids(media.getVisibleMediaPins('edit_image', 'input', normalizedEdit.inputs, new Set(), false)),
+  ['exec-in', 'prompt', 'image_artifact', 'mask_artifact', 'image_provider', 'image_model', 'format', 'seed', 'steps', 'guidance_scale', 'strength']
+);
+assert.equal(ids(normalizedEdit.inputs).includes('size'), false);
+assert.equal(ids(normalizedEdit.inputs).includes('width'), false);
+assert.equal(ids(normalizedEdit.inputs).includes('height'), false);
+assert.equal(normalizedEdit.pinDefaults.size, undefined);
+assert.equal(normalizedEdit.pinDefaults.width, undefined);
+assert.equal(normalizedEdit.pinDefaults.height, undefined);
+assert.equal(normalizedEdit.pinDefaults.guidance_scale, undefined);
+assert.equal(ids(normalizedEdit.inputs).includes('steps'), true);
+assert.equal(ids(normalizedEdit.inputs).includes('negative_prompt'), true);
+
+const i2vTemplate = nodes.getNodeTemplate('image_to_video');
+const staleI2v = {
+  ...nodes.createNodeData(i2vTemplate),
+  inputs: i2vTemplate.inputs.filter((pin) => !['seed', 'steps', 'guidance_scale', 'strength', 'negative_prompt', 'extra'].includes(pin.id)),
+};
+const normalizedI2v = nodes.mergePinDocsFromTemplate(nodes.createNodeData(i2vTemplate), staleI2v);
+assert.deepEqual(
+  ids(media.getVisibleMediaPins('image_to_video', 'input', normalizedI2v.inputs, new Set(), false)),
+  ['exec-in', 'prompt', 'source_image', 'video_provider', 'video_model', 'width', 'height', 'frames', 'fps', 'format', 'seed', 'steps', 'guidance_scale']
+);
+assert.equal(ids(normalizedI2v.inputs).includes('steps'), true);
+assert.equal(ids(normalizedI2v.inputs).includes('strength'), true);
 """
     result = subprocess.run(
         ["node", "-e", script],
@@ -1414,7 +1679,8 @@ def test_frontend_exposes_model_residency_controls() -> None:
     assert "Load Model" in graph_util
     assert "Unload Model" in graph_util
     assert "modelResidencyTaskUnsupportedReason" in graph_util
-    assert "modelResidencyTaskUnsupportedReason(gatewayContracts, 'image_generation')" in base_node
+    assert "const task = isEditImageNode ? 'image_to_image' : 'image_generation';" in base_node
+    assert "modelResidencyTaskUnsupportedReason(gatewayContracts, task)" in base_node
     assert "Gateway default ${residencyAuthoringTarget.task.replace(/_/g, ' ')}" in base_node
     assert "supports[clean] === false" not in properties_panel
     assert "supports[t] === false" not in panel
@@ -1717,12 +1983,26 @@ def test_frontend_draft_run_lifecycle_is_explicit_and_testable() -> None:
     assert "buildPublishedRunMetadata" in use_websocket
     assert "startBundleRun" in use_websocket
     assert "Gateway cannot run VisualFlows" in toolbar
+    assert "run-modal-titlebar" in run_modal
+    assert "run-window-controls" in run_modal
+    assert 'aria-label="Close run modal"' in run_modal
+    assert 'aria-label="Reduce run modal"' in run_modal
+    assert "aria-label={isMaximized ? 'Restore run modal size' : 'Maximize run modal'}" in run_modal
     assert "▶ {runTitle}" in run_modal
     assert "Test Run" not in run_modal
     assert "Run Published" not in run_modal
     assert "New Run" in run_modal
     assert "New Test Run" not in run_modal
     assert "New Published Run" not in run_modal
+    assert "const isActiveRun = Boolean(isRunning || isPaused || isWaiting);" in run_modal
+    assert "const isBeforeRun = !hasRunData && !isActiveRun;" in run_modal
+    assert "const hasCompletedRun = hasRunData && !isActiveRun;" in run_modal
+    assert "{isBeforeRun && (" in run_modal
+    assert "{isActiveRun && !isWaiting && (onPause || onResumeRun) && (" in run_modal
+    assert "{isActiveRun && onCancelRun && (" in run_modal
+    assert "{hasCompletedRun && onFollowUpSubmit && activeFollowUpSeed && (" in run_modal
+    assert "{hasCompletedRun && onNewRun && (" in run_modal
+    assert "{(isRunning || isPaused || isWaiting) ? 'Hide' : (hasRunData || result ? 'Close' : 'Cancel')}" not in run_modal
     assert "Run Flow mini bar" not in run_modal
     assert "Show authoring tests" not in run_history
     assert "runs.filter((r) => !isDraftRunSummary(r))" not in run_history
@@ -2049,6 +2329,11 @@ def test_frontend_live_connection_feedback_uses_validation_contract() -> None:
     assert "connection-feedback-hint" in canvas
     assert "connectionLineStyle={connectionLineStyle}" in canvas
     assert "setSelectedNode({ ...node, data: cleanData })" in canvas
+    assert "function CanvasBody()" in canvas
+    assert "const reactFlowStore = useStoreApi();" in canvas
+    assert "const nextZIndex = isExecEdge ? 2 : isRouteOverride ? 1 : 0;" in canvas
+    assert "elevateEdgesOnSelect" not in canvas
+    assert re.search(r"export function Canvas\(\).*?<ReactFlowProvider>\s*<CanvasBody />", canvas, re.S)
     assert "connectionHoverKeyRef" not in canvas
     assert "connectionPreview?.inputs?.[pin.id]" in base_node
     assert "connectionPreview?.outputs?.[pin.id]" in base_node
@@ -2057,6 +2342,8 @@ def test_frontend_live_connection_feedback_uses_validation_contract() -> None:
     assert ".pin-row.pin-feedback-valid" in nodes_css
     assert ".pin-row.pin-feedback-invalid" in nodes_css
     assert ".connection-feedback-hint" in nodes_css
+    assert ".react-flow__nodes" in nodes_css
+    assert "z-index: 3;" in nodes_css
     assert "validateConnection" in helper
     assert "getConnectionError" in helper
 
@@ -2208,6 +2495,7 @@ def test_frontend_node_pin_widgets_are_catalog_scoped() -> None:
 
     base_node = (FRONTEND / "src" / "components" / "nodes" / "BaseNode.tsx").read_text(encoding="utf-8")
     pin_catalog = (FRONTEND / "src" / "utils" / "pinCatalog.ts").read_text(encoding="utf-8")
+    properties_panel = (FRONTEND / "src" / "components" / "PropertiesPanel.tsx").read_text(encoding="utf-8")
 
     assert "providerCatalogScopeForPin" in base_node
     assert "modelCatalogScopeForPin" in base_node
@@ -2219,6 +2507,10 @@ def test_frontend_node_pin_widgets_are_catalog_scoped() -> None:
     assert "pin.type === 'model'" not in primitive_fallback
     assert "pin.id.endsWith('_provider')" in pin_catalog
     assert "providerPinIdForModelPin" in pin_catalog
+    assert "providerCatalogScopeForPin(pin, data.nodeType)" in properties_panel
+    assert "providerOptionsForScope(providerScope)" in properties_panel
+    assert "requestProviderOptionsForScope(providerScope)" in properties_panel
+    assert "Search image providers…" in properties_panel
 
     script = r"""
 const assert = require('assert');
@@ -2239,6 +2531,7 @@ vm.runInNewContext(js, { module, exports: module.exports, require, console });
 const catalog = module.exports;
 
 assert.equal(catalog.providerCatalogScopeForPin({ id: 'provider', type: 'provider_text' }, 'llm_call'), 'text');
+assert.equal(catalog.providerCatalogScopeForPin({ id: 'provider', type: 'provider_image' }, 'on_flow_start'), 'image');
 assert.equal(catalog.providerCatalogScopeForPin({ id: 'image_provider', type: 'provider_image' }, 'code'), 'image');
 assert.equal(catalog.providerCatalogScopeForPin({ id: 'tts_provider', type: 'provider_voice' }, 'code'), 'tts');
 assert.equal(catalog.providerCatalogScopeForPin({ id: 'stt_provider', type: 'provider_voice' }, 'code'), 'stt');
@@ -2249,6 +2542,13 @@ const imagePins = [
   { id: 'model', type: 'model' },
 ];
 assert.equal(catalog.modelCatalogScopeForPin(imagePins[1], imagePins, 'code'), 'image');
+
+const customImagePins = [
+  { id: 'provider', type: 'provider_image' },
+  { id: 'model', type: 'model' },
+];
+assert.equal(catalog.modelCatalogScopeForPin(customImagePins[1], customImagePins, 'on_flow_start'), 'image');
+assert.equal(catalog.providerPinIdForModelPin(customImagePins[1], customImagePins, 'on_flow_start'), 'provider');
 
 const textPins = [
   { id: 'provider', type: 'provider_text' },

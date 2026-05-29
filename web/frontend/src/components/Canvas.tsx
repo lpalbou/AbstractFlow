@@ -2,7 +2,7 @@
  * Main canvas component with React Flow.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState, DragEvent, MouseEvent, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, DragEvent, MouseEvent, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 import ReactFlow, {
   Controls,
   Background,
@@ -17,6 +17,7 @@ import ReactFlow, {
   BaseEdge,
   EdgeProps,
   useStore,
+  useStoreApi,
 } from 'reactflow';
 import toast from 'react-hot-toast';
 import { nodeTypes } from './nodes';
@@ -320,9 +321,11 @@ function ConnectionFeedbackOverlay({
   );
 }
 
-export function Canvas() {
+function CanvasBody() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
+  const reactFlowStore = useStoreApi();
+  const activeCanvasPointerIds = useRef<Set<number>>(new Set());
   const [previewCollapsed, setPreviewCollapsed] = useState(false);
   const [activeConnection, setActiveConnection] = useState<ConnectionDragEndpoint | null>(null);
 
@@ -352,6 +355,67 @@ export function Canvas() {
     pasteClipboard,
     duplicateSelection,
   } = useFlowStore();
+
+  const releasePointerCapture = useCallback((pointerId: number) => {
+    const root = reactFlowWrapper.current;
+    if (!root) return;
+    const elements = [root, ...Array.from(root.querySelectorAll<HTMLElement>('*'))];
+    for (const element of elements) {
+      try {
+        if (element.hasPointerCapture?.(pointerId)) element.releasePointerCapture(pointerId);
+      } catch {
+        // Best-effort cleanup for browser/React Flow drag state.
+      }
+    }
+  }, []);
+
+  const resetCanvasInteraction = useCallback(
+    (pointerId?: number) => {
+      if (typeof pointerId === 'number') {
+        activeCanvasPointerIds.current.delete(pointerId);
+        releasePointerCapture(pointerId);
+      } else {
+        for (const id of activeCanvasPointerIds.current) releasePointerCapture(id);
+        activeCanvasPointerIds.current.clear();
+      }
+      setActiveConnection(null);
+
+      // React Flow's d3 drag handlers can miss release/cancel on trackpads or
+      // window focus changes. Clear only transient interaction flags; persisted
+      // graph state remains owned by the store/actions above.
+      window.setTimeout(() => {
+        const store = reactFlowStore.getState() as any;
+        store.cancelConnection?.();
+        (reactFlowStore as any).setState?.({
+          paneDragging: false,
+          userSelectionActive: false,
+          nodesSelectionActive: false,
+          userSelectionRect: null,
+        });
+      }, 0);
+    },
+    [reactFlowStore, releasePointerCapture]
+  );
+
+  const handleCanvasPointerDownCapture = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    activeCanvasPointerIds.current.add(event.pointerId);
+  }, []);
+
+  const handleCanvasPointerReleaseCapture = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      resetCanvasInteraction(event.pointerId);
+    },
+    [resetCanvasInteraction]
+  );
+
+  const handleCanvasPointerMoveCapture = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (event.buttons === 0 && activeCanvasPointerIds.current.size > 0) {
+        resetCanvasInteraction(event.pointerId);
+      }
+    },
+    [resetCanvasInteraction]
+  );
 
   // Map pin handle ids → pin types so we can color data edges by their data type.
   const pinTypesByNodeId = useMemo(() => {
@@ -426,6 +490,52 @@ export function Canvas() {
       window.removeEventListener('keydown', onKeyDown, opts);
     };
   }, [copySelectionToClipboard, pasteClipboard, duplicateSelection]);
+
+  useEffect(() => {
+    const opts = { capture: true } as const;
+    const isInsideCanvas = (target: EventTarget | null): boolean => {
+      const DomNode = globalThis.Node;
+      return Boolean(typeof DomNode !== 'undefined' && target instanceof DomNode && reactFlowWrapper.current?.contains(target));
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      if (isInsideCanvas(event.target)) activeCanvasPointerIds.current.add(event.pointerId);
+    };
+    const onPointerRelease = (event: PointerEvent) => {
+      if (activeCanvasPointerIds.current.size > 0 || activeConnection) {
+        resetCanvasInteraction(event.pointerId);
+      }
+    };
+    const onPointerMove = (event: PointerEvent) => {
+      if (event.buttons === 0 && activeCanvasPointerIds.current.size > 0) {
+        resetCanvasInteraction(event.pointerId);
+      }
+    };
+    const onMouseRelease = () => {
+      if (activeCanvasPointerIds.current.size > 0 || activeConnection) resetCanvasInteraction();
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') resetCanvasInteraction();
+    };
+
+    window.addEventListener('pointerdown', onPointerDown, opts);
+    window.addEventListener('pointerup', onPointerRelease, opts);
+    window.addEventListener('pointercancel', onPointerRelease, opts);
+    window.addEventListener('pointermove', onPointerMove, opts);
+    window.addEventListener('mouseup', onMouseRelease, opts);
+    window.addEventListener('blur', onMouseRelease, opts);
+    window.addEventListener('contextmenu', onMouseRelease, opts);
+    document.addEventListener('visibilitychange', onVisibilityChange, opts);
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown, opts);
+      window.removeEventListener('pointerup', onPointerRelease, opts);
+      window.removeEventListener('pointercancel', onPointerRelease, opts);
+      window.removeEventListener('pointermove', onPointerMove, opts);
+      window.removeEventListener('mouseup', onMouseRelease, opts);
+      window.removeEventListener('blur', onMouseRelease, opts);
+      window.removeEventListener('contextmenu', onMouseRelease, opts);
+      document.removeEventListener('visibilitychange', onVisibilityChange, opts);
+    };
+  }, [activeConnection, resetCanvasInteraction]);
 
   // Handle connection with validation
   const handleConnect = useCallback(
@@ -603,7 +713,7 @@ export function Canvas() {
       const nextStyle = isRouteOverride
         ? ({ ...(nextStyleBase || {}), strokeDasharray: '7 5' } as Edge['style'])
         : nextStyleBase;
-      const nextZIndex = isExecEdge ? 30 : isRouteOverride ? 20 : 5;
+      const nextZIndex = isExecEdge ? 2 : isRouteOverride ? 1 : 0;
       const nextType = 'workflow';
       const sourceRect = nodeRectsById.get(e.source);
       const targetRect = nodeRectsById.get(e.target);
@@ -684,13 +794,18 @@ export function Canvas() {
   }, [activeConnection]);
 
   return (
-    <ReactFlowProvider>
-      <div
-        ref={reactFlowWrapper}
-        className="canvas-wrapper"
-        onDragOver={handleDragOver}
-        onDrop={handleDrop}
-      >
+    <div
+      ref={reactFlowWrapper}
+      className="canvas-wrapper"
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+      onPointerDownCapture={handleCanvasPointerDownCapture}
+      onPointerMoveCapture={handleCanvasPointerMoveCapture}
+      onPointerUpCapture={handleCanvasPointerReleaseCapture}
+      onPointerCancelCapture={handleCanvasPointerReleaseCapture}
+      onLostPointerCapture={handleCanvasPointerReleaseCapture}
+      onContextMenuCapture={() => resetCanvasInteraction()}
+    >
         <ReactFlow
           nodes={previewNodes}
           edges={decoratedEdges}
@@ -714,7 +829,6 @@ export function Canvas() {
             type: 'smoothstep',
             animated: false,
           }}
-          elevateEdgesOnSelect
           connectionLineStyle={connectionLineStyle}
           fitView
           fitViewOptions={{ maxZoom: DEFAULT_ZOOM }}
@@ -767,7 +881,14 @@ export function Canvas() {
         />
         <RunPreflightPanel onFocusNode={focusNode} />
         <PinLegend />
-      </div>
+    </div>
+  );
+}
+
+export function Canvas() {
+  return (
+    <ReactFlowProvider>
+      <CanvasBody />
     </ReactFlowProvider>
   );
 }

@@ -19,12 +19,12 @@ const MEDIA_NODE_TYPES = [
 ];
 
 const ADVANCED_INPUT_PINS: Record<string, string[]> = {
-  generate_image: ['seed', 'steps', 'guidance_scale', 'negative_prompt'],
-  edit_image: ['seed', 'steps', 'guidance_scale', 'negative_prompt', 'extra'],
-  image_to_image: ['mask_artifact', 'seed', 'steps', 'guidance_scale', 'negative_prompt', 'extra'],
-  generate_video: ['seed', 'steps', 'guidance_scale', 'negative_prompt', 'extra'],
-  text_to_video: ['seed', 'steps', 'guidance_scale', 'negative_prompt', 'extra'],
-  image_to_video: ['seed', 'steps', 'guidance_scale', 'strength', 'negative_prompt', 'extra'],
+  generate_image: ['negative_prompt'],
+  edit_image: ['negative_prompt', 'extra'],
+  image_to_image: ['mask_artifact', 'negative_prompt', 'extra'],
+  generate_video: ['negative_prompt', 'extra'],
+  text_to_video: ['negative_prompt', 'extra'],
+  image_to_video: ['strength', 'negative_prompt', 'extra'],
   generate_voice: ['profile', 'instructions'],
   generate_music: [
     'seed',

@@ -27,7 +27,9 @@ Included local files (repo-root relative, in order):
 - web/frontend/src/utils/gatewayCatalog.ts
 - web/frontend/src/utils/visualFlowCompat.ts
 - web/frontend/src/components/RunFlowModal.tsx
+- web/frontend/src/components/ArtifactInputField.tsx
 - web/frontend/src/components/ArtifactPlayer.tsx
+- web/frontend/src/utils/artifactInputs.ts
 - web/backend/routes/ws.py
 - web/backend/routes/flows.py
 - web/backend/routes/tools.py
@@ -108,8 +110,10 @@ Agent usage tips:
 - [Gateway client contract](web/frontend/src/utils/gatewayClient.ts): versioned capabilities, `common.readiness` overlay, endpoint descriptors
 - [Gateway catalog helpers](web/frontend/src/utils/gatewayCatalog.ts): canonical `gateway_catalog_v1` + legacy catalog normalization
 - [VisualFlow legacy compatibility](web/frontend/src/utils/visualFlowCompat.ts): imports old lowered music flows as native `generate_music`
-- [Run modal](web/frontend/src/components/RunFlowModal.tsx): Gateway run replay/stream rendering, media artifact previews, and `abstract.progress` progress display
+- [Run modal](web/frontend/src/components/RunFlowModal.tsx): Gateway run replay/stream rendering, artifact start inputs, media artifact previews/open-download links, and `abstract.progress` progress display
+- [Artifact input field](web/frontend/src/components/ArtifactInputField.tsx): run-start artifact upload, workspace import, Gateway artifact search/session selection, metadata filters, and preview control
 - [Artifact player](web/frontend/src/components/ArtifactPlayer.tsx): shared artifact content URL/object URL loader for previews and media players
+- [Artifact input helpers](web/frontend/src/utils/artifactInputs.ts): canonical artifact ref normalization and modality filtering
 - [WebSocket execution](web/backend/routes/ws.py): compatibility-only `{type:"run"|"resume"|"control"}` protocol and event stream
 - [Flow CRUD + publish](web/backend/routes/flows.py): compatibility-only flow persistence (`ABSTRACTFLOW_FLOWS_DIR`) + bundle publishing
 - [Tool discovery](web/backend/routes/tools.py): compatibility-only `GET /api/tools`
@@ -209,7 +213,7 @@ Optional extras (declared in `pyproject.toml`):
 - Full host profiles:
   - Apple-capable: `pip install "abstractflow[apple]"`
   - GPU-capable: `pip install "abstractflow[gpu]"`
-- `abstractflow[apple]` and `abstractflow[gpu]` pull the matching `abstractgateway[...]` host profile and Visual Agent support. Flow no longer names `AbstractRuntime` or `abstractcore` directly in these profiles; Gateway owns that deployment stack. AbstractFlow `0.3.15` expects Gateway `>=0.2.20` for the current image/video media, progress, catalog, and residency contracts.
+- `abstractflow[apple]` and `abstractflow[gpu]` pull the matching `abstractgateway[...]` host profile and Visual Agent support. Flow no longer names `AbstractRuntime` or `abstractcore` directly in these profiles; Gateway owns that deployment stack. AbstractFlow `0.3.16` expects Gateway `>=0.2.21` for the current image/video media, progress, catalog, and residency contracts.
 - Agent nodes only, without the host profile: `pip install "abstractflow[agent]"`
 - Documentation site tools: `pip install "abstractflow[docs]"`
 
@@ -276,6 +280,10 @@ while still resolving concrete calls from endpoint descriptors. Generated images
 videos, voice, and music are artifacts; the Run modal renders previews/players
 from Gateway artifact content and keeps `abstract.progress` ledger events visible
 for long media runs while leaving raw ledger JSON available for debugging.
+Artifact inputs can search Gateway artifacts by modality/scope/metadata when
+the Gateway advertises search. Generated artifact cards keep a direct `artifact
+content` open/download link; workspace file export is reserved for explicit
+graph-level file/artifact IO nodes.
 
 The `abstractflow serve`/FastAPI host is a Gateway proxy by default. Its old local `/api/flows`, `/api/ws`, and `/api/runs` compatibility routes are available only when `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1` is set. See [docs/web-editor.md](docs/web-editor.md) and [docs/architecture.md](docs/architecture.md).
 
@@ -389,7 +397,7 @@ pip install -e .
 
 Evidence: dependencies and extras are declared in [../pyproject.toml](../pyproject.toml).
 
-For thin-client gateway-first mode, `abstractflow` (without extras) is sufficient. Install `abstractgateway` separately for the backend.
+For thin-client gateway-first mode, `abstractflow` (without extras) is sufficient. Install the base `abstractgateway` package for the backend; HTTP/SSE is part of that remote-light install.
 Enable local runtime compatibility only when needed with `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1`.
 
 If you install a host profile (`apple`, `gpu`), the local execution stack is already included for compatibility.
@@ -495,13 +503,20 @@ from Gateway vision provider-model catalogs scoped to `text_to_video` or
 
 Generated media is returned as Gateway artifacts. The Run modal renders images,
 videos, and audio/music players first; raw ledger JSON and artifact IDs remain
-available for debugging. Long video runs surface Gateway `abstract.progress`
-ledger events as progress on the active step.
+available for debugging, and the `artifact content` link opens or downloads the
+artifact payload. Filesystem export is intentionally graph-level work: use file
+nodes or the forthcoming artifact-aware file-node design rather than a Run modal
+button. Long video runs surface Gateway `abstract.progress` ledger events as
+progress on the active step.
 
 For image editing, wire `image_artifact` from a previous `Generate Image` node
-or use the `Artifacts` palette primitives (`Image Artifact`, `Voice Artifact`,
-`Music Artifact`, etc.) to paste an existing Gateway `$artifact` id. A richer
-browser artifact picker/upload flow is tracked separately.
+or use an artifact input pin on `On Flow Start`. The Run modal renders artifact
+inputs with three sources: upload a browser-local file, import a Gateway
+workspace path, or select an existing artifact. When Gateway advertises artifact
+search, the Existing tab can search all artifacts or the current session by
+modality and simple metadata filters such as `pin_id=image`. Flow submits a JSON
+artifact ref such as `{"$artifact":"...","run_id":"..."}`; it does not submit
+raw file bytes or browser-local paths.
 
 Example Generate Video path:
 1. Drag `On Flow Start`, `Generate Video`, and `On Flow End` onto the canvas.
@@ -667,7 +682,26 @@ The React editor is a thin client for AbstractGateway's versioned discovery cont
 GET /api/gateway/discovery/capabilities
 ```
 
-It reads `capabilities.contracts.flow_editor` plus `capabilities.contracts.common` for VisualFlow CRUD/publish, run input schema, run start, ledger stream, artifact, and prompt-cache endpoints. Session prompt cache and durable bloc exact-reuse bindings are separate contract tracks (`common.prompt_cache.session_lifecycle` and `common.prompt_cache.durable_blocs`). Gateway catalog routes may return the canonical `gateway_catalog_v1` envelope (`catalog` metadata plus `items`) or older legacy arrays/maps; the editor normalizes both.
+It reads `capabilities.contracts.flow_editor` plus `capabilities.contracts.common` for VisualFlow CRUD/publish, run input schema, run start, ledger stream, artifact, and prompt-cache endpoints. Artifact descriptors include run artifact listing/content, session-visible artifact listing, cross-run/session/run artifact search, workspace-path import, and artifact-to-workspace export when the Gateway supports them. Session prompt cache and durable bloc exact-reuse bindings are separate contract tracks (`common.prompt_cache.session_lifecycle` and `common.prompt_cache.durable_blocs`). Gateway catalog routes may return the canonical `gateway_catalog_v1` envelope (`catalog` metadata plus `items`) or older legacy arrays/maps; the editor normalizes both.
+
+Artifact start inputs use JSON refs, not paths:
+
+```json
+{
+  "$artifact": "abc123",
+  "artifact_id": "abc123",
+  "run_id": "session_memory_my-session",
+  "content_type": "image/png",
+  "filename": "input.png",
+  "sha256": "..."
+}
+```
+
+The editor obtains those refs by uploading a browser file, importing a Gateway
+workspace path through `common.artifacts.import`, or selecting from
+`common.artifacts.search` / `common.artifacts.session_list`. Search supports
+all-artifact or session-scoped lookup, modality filtering from the pin type, and
+simple metadata filters such as `pin_id=image,purpose=run_input`.
 
 When Gateway advertises `common.readiness.contract = gateway_surface_readiness_v1`, the editor uses that surface summary as a conservative overlay for optional media/model-residency UX. Endpoint descriptors remain the authority for actual request paths.
 
@@ -948,6 +982,19 @@ Agent-node features are included in `abstractflow[apple]` and `abstractflow[gpu]
 
 Evidence: [../abstractflow/visual/executor.py](../abstractflow/visual/executor.py).
 
+## Why does image-to-video look stretched or barely animated?
+
+Image-to-video models usually expect a specific video aspect ratio and frame geometry. For example,
+the Wan 2.2 TI2V MLX-Gen path is tuned for 1280x704 or 704x1280, 121 frames, 50 steps, and 24 fps.
+If the source image has a different aspect ratio, AbstractVision preserves it by letterboxing before
+handing it to the model, but the best results still come from generating or editing the source image
+at the same aspect ratio and approximate resolution that the video model will use.
+
+Very short clips are wiring tests, not quality tests. A 10-frame request for Wan becomes 9 frames
+internally and is less than a second at 10 fps, so the output can look almost static even when the
+prompt is passed correctly. For prompt-following and motion checks, use the model's recommended
+frame count, steps, fps, and a prompt that explicitly describes camera movement or object motion.
+
 ## How do subflows work?
 
 Subflows are VisualFlows referenced by id from nodes of type `subflow`:
@@ -1003,6 +1050,24 @@ The web backend creates a per-run workspace directory and wraps tool execution w
 - Workspace root is injected into `input_data` (`workspace_root`) and used to scope tools
 
 Evidence: [../web/backend/services/execution_workspace.py](../web/backend/services/execution_workspace.py), [../abstractflow/visual/workspace_scoped_tools.py](../abstractflow/visual/workspace_scoped_tools.py), [../web/backend/routes/ws.py](../web/backend/routes/ws.py), [../web/backend/routes/flows.py](../web/backend/routes/flows.py).
+
+## Should flow inputs use file paths or artifacts?
+
+Use artifact refs for payloads that cross Gateway, Runtime, Flow, and Core
+boundaries. A run-start image, document, audio file, video, or text file should
+enter the run as `{"$artifact": "...", "run_id": "..."}`. The Run modal can
+create that ref by uploading a browser file, importing a Gateway workspace path,
+or selecting an existing artifact through Gateway artifact search. The picker
+can search all artifacts or the current session, filters by the input pin's
+modality, and accepts metadata filters such as `pin_id=image`.
+
+Workspace paths are still useful for explicit filesystem operations, but they
+are server-side paths governed by Gateway workspace policy and `.abstractignore`.
+Browser-local paths are never treated as Gateway workspace paths. The Run modal's
+`artifact content` link opens or downloads artifact payloads. Writing artifacts
+back into workspace files should be modeled as an explicit graph operation
+through `Read File` / `Write File` or the planned artifact-aware file-node
+contract, so filesystem side effects stay visible in the workflow.
 
 ## How do tools work? How do I add more tools?
 
@@ -4231,8 +4296,9 @@ This repository includes a reference visual editor:
 - Legacy/dev FastAPI host: `web/backend/`
 
 The primary runtime host is now AbstractGateway. The editor saves VisualFlow JSON through Gateway, publishes `.flow` bundles there, starts runs through Gateway, and renders Gateway ledger/artifact/history streams.
-Install a host profile (`abstractflow[apple]` or `abstractflow[gpu]`)
-to run the local Python host/proxy stack.
+Install base `abstractgateway` for the remote-light HTTP/SSE host. Use
+`abstractflow[apple]` or `abstractflow[gpu]` only when you also need the local
+Python compatibility host/profile.
 
 See also: [../README.md](../README.md), [getting-started.md](getting-started.md), [faq.md](faq.md), [visualflow.md](visualflow.md), [architecture.md](architecture.md).
 
@@ -4293,14 +4359,21 @@ endpoint descriptors for concrete request paths.
 Generated image, video, voice, and music results are Gateway artifacts. The Run
 modal renders images, videos, and audio/music players from artifact content and
 keeps child run, artifact metadata, ledger, and raw JSON details available for
-debugging. Gateway `abstract.progress` events are surfaced as progress on the
-running step so long video generations remain observable.
+debugging. The `artifact content` link opens or downloads the payload; writing
+artifacts to workspace files belongs in graph-level file/artifact IO nodes, not
+in the Run modal. Gateway `abstract.progress` events are surfaced as progress on
+the running step so long video generations remain observable.
 
 Model residency controls are also Gateway-driven. If the Gateway advertises
 the model-residency routes, text, image, video, voice, transcription, and music
 warmup/list/unload authoring remains available through Gateway. Gateway/Runtime
 still owns the final support decision and returns skipped/unsupported results
 when a connected deployment cannot honor a specific residency operation.
+
+KG memory nodes are gated by Gateway's `common.memory` contract. A correctly
+installed Gateway with AbstractMemory and a resolvable backend should expose
+those nodes even before the persistent store has been created; empty KG queries
+return empty results until a flow asserts triples.
 
 ## Run (from source / dev mode)
 
@@ -4392,7 +4465,19 @@ The Run UI uses Gateway's replay-first HTTP/SSE contract:
 - start: `POST /api/gateway/runs/start`
 - commands: `POST /api/gateway/commands`
 - stream: `GET /api/gateway/runs/{run_id}/ledger/stream`
-- artifacts: `GET /api/gateway/runs/{run_id}/artifacts/{artifact_id}/content`
+- artifact content: `GET /api/gateway/runs/{run_id}/artifacts/{artifact_id}/content`
+- session artifacts: `GET /api/gateway/sessions/{session_id}/artifacts`
+- artifact search: `GET /api/gateway/artifacts/search`
+- artifact import: `POST /api/gateway/artifacts/import`
+- artifact export: `POST /api/gateway/runs/{run_id}/artifacts/{artifact_id}/export`
+
+When a start pin is typed as `artifact`, `artifact_image`, `artifact_audio`,
+`artifact_text`, or `artifact_video`, the Run modal submits a structured artifact
+ref. Browser files are uploaded through Gateway; server workspace files are
+imported through Gateway's workspace policy; existing choices come from Gateway
+artifact search when advertised, with a session-list fallback for older
+gateways. The search UI can scope to all artifacts or the current session,
+filters by the pin's modality, and accepts simple metadata filters.
 
 The legacy WebSocket host still exists in [../web/backend/routes/ws.py](../web/backend/routes/ws.py) for development/reference use and is mounted only when `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1`.
 
@@ -4482,8 +4567,12 @@ export interface GatewayCommonContract {
   };
   artifacts?: {
     list?: GatewayEndpointDescriptor;
+    search?: GatewayEndpointDescriptor;
+    session_list?: GatewayEndpointDescriptor;
     metadata?: GatewayEndpointDescriptor;
     content?: GatewayEndpointDescriptor;
+    import?: GatewayEndpointDescriptor;
+    export?: GatewayEndpointDescriptor;
   };
   attachments?: {
     upload?: GatewayEndpointDescriptor;
@@ -5130,6 +5219,7 @@ export function getGatewayFlowEditorReadiness(
   })();
   add(streamTransport);
   const artifactsList = add(endpointCheck('common.artifacts.list', 'Artifact listing', pickDescriptor(artifacts?.list, flow?.artifacts?.list)));
+  add(endpointCheck('common.artifacts.search', 'Artifact search', pickDescriptor(artifacts?.search, flow?.artifacts?.search)));
   const artifactsMetadata = add(endpointCheck('common.artifacts.metadata', 'Artifact metadata', pickDescriptor(artifacts?.metadata, flow?.artifacts?.metadata)));
   const artifactsContent = add(endpointCheck('common.artifacts.content', 'Artifact content', pickDescriptor(artifacts?.content, flow?.artifacts?.content)));
 
@@ -5249,7 +5339,11 @@ export function getGatewayFlowEditorReadiness(
           stringEndpointAvailable(promptCacheSessionEndpoints?.prepare)
       ),
       promptCacheDurableBlocs: durableBlocPromptCacheAvailable(durableBlocPromptCache),
-      kgMemory: Boolean(common?.memory?.available === true && descriptorEndpointAvailable(common.memory)),
+      kgMemory: Boolean(
+        endpointTemplateFromDescriptor(common?.memory) &&
+          common?.memory?.route_available !== false &&
+          (common?.memory?.available === true || common?.memory?.structured_query === true)
+      ),
       generatedImage,
       editedImage,
       generatedVideo,
@@ -5811,6 +5905,7 @@ import { useExecutionWorkspace } from '../hooks/useExecutionWorkspace';
 import { RunSwitcherDropdown } from './RunSwitcherDropdown';
 import { JsonViewer } from './JsonViewer';
 import { KgActiveMemoryPanel } from './KgActiveMemoryPanel';
+import { ArtifactInputField } from './ArtifactInputField';
 import { artifactContentUrl, useArtifactObjectUrl } from './ArtifactPlayer';
 import {
   endpointFromDescriptor,
@@ -5826,6 +5921,11 @@ import {
   modelOptionsFromGatewayCatalog,
   providerOptionsFromGatewayCatalog,
 } from '../utils/gatewayCatalog';
+import {
+  isArtifactPinType,
+  parseArtifactRefText,
+  type CanonicalArtifactRef,
+} from '../utils/artifactInputs';
 
 type FlowGraphNode = {
   id: string;
@@ -6278,6 +6378,7 @@ function inferPromptCacheGraphTarget(nodes: FlowGraphNode[], edges: FlowGraphEdg
 
 type GeneratedImagePreview = {
   artifactId: string;
+  runId: string;
   src: string;
   fallbackSrcs?: string[];
   contentType?: string;
@@ -6291,6 +6392,7 @@ type GeneratedImagePreview = {
 
 type GeneratedAudioPreview = {
   artifactId: string;
+  runId: string;
   src: string;
   fallbackSrcs?: string[];
   contentType?: string;
@@ -6303,6 +6405,7 @@ type GeneratedAudioPreview = {
 
 type GeneratedVideoPreview = {
   artifactId: string;
+  runId: string;
   src: string;
   fallbackSrcs?: string[];
   contentType?: string;
@@ -6483,6 +6586,7 @@ function extractGeneratedImagePreview(
     undefined;
   return {
     artifactId,
+    runId: runCandidates[0],
     src: artifactContentUrl(artifactContentDescriptor, runCandidates[0], artifactId),
     fallbackSrcs: runCandidates.slice(1).map((candidate) => artifactContentUrl(artifactContentDescriptor, candidate, artifactId)),
     contentType: imageRaw && typeof imageRaw.content_type === 'string' ? imageRaw.content_type : typeof generatedRecord?.content_type === 'string' ? generatedRecord.content_type : undefined,
@@ -6594,6 +6698,7 @@ function extractGeneratedAudioPreview(
 
   return {
     artifactId,
+    runId: runCandidates[0],
     src: artifactContentUrl(artifactContentDescriptor, runCandidates[0], artifactId),
     fallbackSrcs: runCandidates.slice(1).map((candidate) => artifactContentUrl(artifactContentDescriptor, candidate, artifactId)),
     contentType: audioRaw && typeof audioRaw.content_type === 'string' ? audioRaw.content_type : typeof generatedItem?.content_type === 'string' ? generatedItem.content_type : undefined,
@@ -6700,6 +6805,7 @@ function extractGeneratedVideoPreview(
 
   return {
     artifactId,
+    runId: runCandidates[0],
     src: artifactContentUrl(artifactContentDescriptor, runCandidates[0], artifactId),
     fallbackSrcs: runCandidates.slice(1).map((candidate) => artifactContentUrl(artifactContentDescriptor, candidate, artifactId)),
     contentType: typeof videoRaw?.content_type === 'string' ? videoRaw.content_type : typeof generatedItem?.content_type === 'string' ? generatedItem.content_type : undefined,
@@ -6782,6 +6888,76 @@ function progressPercent(value: Record<string, unknown> | null | undefined): num
   return null;
 }
 
+function progressDurationMs(
+  value: Record<string, unknown> | null | undefined,
+  secondKeys: string[],
+  msKeys: string[] = []
+): number | null {
+  if (!value) return null;
+  for (const key of msKeys) {
+    const raw = progressNumber(value[key]);
+    if (raw != null && raw >= 0) return raw;
+  }
+  for (const key of secondKeys) {
+    const raw = progressNumber(value[key]);
+    if (raw != null && raw >= 0) return raw * 1000;
+  }
+  return null;
+}
+
+function parseTimeMs(value: unknown): number | null {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const ms = new Date(value).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function formatProgressDurationMs(rawMs: unknown): string {
+  const ms = typeof rawMs === 'number' ? rawMs : rawMs == null ? NaN : Number(rawMs);
+  if (!Number.isFinite(ms) || ms < 0) return '';
+  if (ms < 1000) return '<1s';
+  const totalSeconds = Math.max(1, Math.round(ms / 1000));
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (totalMinutes < 60) return `${totalMinutes}m ${seconds.toString().padStart(2, '0')}s`;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${hours}h ${minutes.toString().padStart(2, '0')}m`;
+}
+
+function progressTimingParts(
+  value: Record<string, unknown> | null | undefined,
+  startedAt: string | undefined,
+  nowMs: number
+): { elapsedLabel?: string; remainingLabel?: string; remainingApproximate?: boolean } | null {
+  if (!value) return null;
+  const directElapsedMs = progressDurationMs(
+    value,
+    ['elapsed_s', 'elapsed_seconds', 'elapsed'],
+    ['elapsed_ms']
+  );
+  const startedMs = parseTimeMs(startedAt);
+  const elapsedMs = directElapsedMs ?? (startedMs != null ? Math.max(0, nowMs - startedMs) : null);
+
+  let remainingMs = progressDurationMs(
+    value,
+    ['remaining_s', 'remaining_seconds', 'eta_s', 'eta_seconds', 'eta'],
+    ['remaining_ms', 'eta_ms']
+  );
+  let remainingApproximate = false;
+  const pct = progressPercent(value);
+  if (remainingMs == null && elapsedMs != null && pct != null && pct >= 1 && pct < 99.9) {
+    remainingMs = (elapsedMs * (100 - pct)) / pct;
+    remainingApproximate = true;
+  }
+
+  const elapsedLabel = elapsedMs != null ? `Elapsed ${formatProgressDurationMs(elapsedMs)}` : undefined;
+  const remainingLabel = remainingMs != null
+    ? `Remaining ${remainingApproximate ? '~' : ''}${formatProgressDurationMs(remainingMs)}`
+    : undefined;
+  return elapsedLabel || remainingLabel ? { elapsedLabel, remainingLabel, remainingApproximate } : null;
+}
+
 function formatProgressSummary(value: Record<string, unknown> | null | undefined): string {
   if (!value) return '';
   const phase =
@@ -6803,14 +6979,16 @@ function formatProgressSummary(value: Record<string, unknown> | null | undefined
   const step = progressNumber(value.step);
   const totalSteps = progressNumber(value.total_steps);
   if (step != null && totalSteps != null) parts.push(`step ${Math.floor(step)}/${Math.floor(totalSteps)}`);
-  const pct = progressPercent(value);
-  if (pct != null) parts.push(`${pct.toFixed(1)}%`);
-  const eta = progressNumber(value.eta_s);
-  if (eta != null && eta > 0) parts.push(`ETA ${Math.ceil(eta)}s`);
   return parts.join(' · ');
 }
 
-function GeneratedImageCard({ preview, compact = false }: { preview: GeneratedImagePreview; compact?: boolean }) {
+function GeneratedImageCard({
+  preview,
+  compact = false,
+}: {
+  preview: GeneratedImagePreview;
+  compact?: boolean;
+}) {
   const { objectUrl, loading, error } = useArtifactObjectUrl(preview.src, preview.contentType || 'image/png', preview.fallbackSrcs);
   const displayUrl = objectUrl || preview.src;
   return (
@@ -7035,7 +7213,7 @@ function GeneratedTextCard({ preview, compact = false }: { preview: GeneratedTex
   );
 }
 
-function MinimizeWindowIcon({ size = 18 }: { size?: number }) {
+function CloseWindowIcon({ size = 10 }: { size?: number }) {
   return (
     <svg
       aria-hidden="true"
@@ -7045,8 +7223,22 @@ function MinimizeWindowIcon({ size = 18 }: { size?: number }) {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <path d="M7 9l5 5 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M5 17h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ReduceWindowIcon({ size = 10 }: { size?: number }) {
+  return (
+    <svg
+      aria-hidden="true"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d="M5 12h14" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
     </svg>
   );
 }
@@ -7210,6 +7402,11 @@ function getInputTypeForPin(pinType: string): 'text' | 'number' | 'checkbox' | '
     case 'object':
     case 'memory':
     case 'array':
+    case 'artifact':
+    case 'artifact_image':
+    case 'artifact_audio':
+    case 'artifact_text':
+    case 'artifact_video':
       return 'textarea';
     default:
       return 'text';
@@ -7228,6 +7425,12 @@ function getPlaceholderForPin(pin: Pin): string {
       return '{ }';
     case 'array':
       return '[ ]';
+    case 'artifact':
+    case 'artifact_image':
+    case 'artifact_audio':
+    case 'artifact_text':
+    case 'artifact_video':
+      return '{"$artifact":"...","run_id":"..."}';
     case 'provider':
     case 'provider_text':
     case 'provider_image':
@@ -7535,6 +7738,7 @@ export function RunFlowModal({
   const [showIgnoredPaths, setShowIgnoredPaths] = useState(false);
   const [sessionIdOverride, setSessionIdOverride] = useState('');
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
+  const [progressClockMs, setProgressClockMs] = useState(() => Date.now());
   const lastAutoTerminalStepIdRef = useRef<string | null>(null);
   const [rawJsonOpen, setRawJsonOpen] = useState(false);
   // Nested subflow observability: folded by default; per-step expansion keyed by the
@@ -7693,6 +7897,15 @@ export function RunFlowModal({
   const promptCacheGraphAmbiguous = Boolean(promptCacheGraphTarget?.multiple);
   const promptCacheSessionIdRaw = sessionPinId ? formValues[sessionPinId] : sessionIdOverride;
   const promptCacheSessionId = String(promptCacheSessionIdRaw || '').trim() || derivedSessionId;
+  const artifactSessionId = String(promptCacheSessionIdRaw || '').trim() || derivedSessionId || stableSessionId || '';
+  const workspaceIgnoredPaths = useMemo(
+    () =>
+      String(workspaceIgnoredPathsText || '')
+        .split('\n')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0),
+    [workspaceIgnoredPathsText]
+  );
   const promptCacheEnabled = Boolean(promptCacheSessionLifecycle && promptCacheProvider && promptCacheModel && promptCacheSessionId);
   const promptCacheResultUnavailable = Boolean(
     promptCacheResult && (promptCacheResult.ok === false || promptCacheResult.supported === false)
@@ -8018,6 +8231,15 @@ export function RunFlowModal({
           initialValues[pin.id] = raw;
           return;
         }
+        if (isArtifactPinType(pin.type)) {
+          try {
+            initialValues[pin.id] = JSON.stringify(raw, null, 2);
+            return;
+          } catch {
+            initialValues[pin.id] = '';
+            return;
+          }
+        }
         // Objects/arrays/assertions/memory (render as JSON in textarea pins).
         if (
           pin.type === 'object' ||
@@ -8245,6 +8467,12 @@ export function RunFlowModal({
       }
       const value = formValues[pin.id] || '';
 
+      if (isArtifactPinType(pin.type)) {
+        const ref = parseArtifactRefText(value);
+        if (ref) inputData[pin.id] = ref;
+        return;
+      }
+
       // Parse based on type
       switch (pin.type) {
         case 'number':
@@ -8282,12 +8510,8 @@ export function RunFlowModal({
       }
     }
     inputData.workspace_access_mode = workspaceAccessMode;
-    const ignored = String(workspaceIgnoredPathsText || '')
-      .split('\n')
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
-    if (ignored.length > 0) {
-      inputData.workspace_ignored_paths = ignored;
+    if (workspaceIgnoredPaths.length > 0) {
+      inputData.workspace_ignored_paths = workspaceIgnoredPaths;
     }
 
     const sessionValue = sessionPinId ? formValues[sessionPinId] : sessionIdOverride;
@@ -8329,7 +8553,7 @@ export function RunFlowModal({
     onRun,
     toolsValues,
     workspaceAccessMode,
-    workspaceIgnoredPathsText,
+    workspaceIgnoredPaths,
     workspaceInputEnabled,
     workspaceRoot,
     followUpContext,
@@ -8392,6 +8616,15 @@ export function RunFlowModal({
     const rem = s - m * 60;
     return `${m}m ${rem.toFixed(0)}s`;
   };
+
+  useEffect(() => {
+    if (!(isRunning || isPaused || isWaiting)) {
+      setProgressClockMs(Date.now());
+      return;
+    }
+    const timer = window.setInterval(() => setProgressClockMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [isPaused, isRunning, isWaiting]);
 
   const formatTokenBadge = (m?: ExecutionMetrics | null): string => {
     if (!m) return '';
@@ -9661,6 +9894,10 @@ export function RunFlowModal({
     selectedStep?.metrics && selectedStep.metrics.duration_ms != null
       ? formatDuration(selectedStep.metrics.duration_ms)
       : '';
+  const selectedProgressPct = selectedStep?.progress ? progressPercent(selectedStep.progress) : null;
+  const selectedProgressTiming = selectedStep?.progress
+    ? progressTimingParts(selectedStep.progress, selectedStep.startedAt, progressClockMs)
+    : null;
   const detailsBodyClass =
     selectedStep?.nodeType === 'agent' ? 'run-details-body run-details-body--agent' : 'run-details-body';
   const tokenBadge = selectedStep?.metrics ? formatTokenBadge(selectedStep.metrics) : '';
@@ -9916,6 +10153,9 @@ export function RunFlowModal({
   }, [computedFinalResult, result]);
 
   const hasRunData = isRunning || effectiveResult != null || events.length > 0;
+  const isActiveRun = Boolean(isRunning || isPaused || isWaiting);
+  const isBeforeRun = !hasRunData && !isActiveRun;
+  const hasCompletedRun = hasRunData && !isActiveRun;
 
   const showFinalResult = useMemo(() => {
     if (!effectiveResult || isRunning) return false;
@@ -11011,13 +11251,41 @@ export function RunFlowModal({
   return isMinimized ? minibar : (
     <div className="modal-overlay" onClick={onClose}>
       <div className={`modal run-modal${isMaximized ? ' run-modal-maximized' : ''}`} onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
-        <div className="run-modal-header">
-          <div className="run-modal-header-left">
+        <div className="run-modal-titlebar">
+          <div className="run-window-controls" aria-label="Run window controls">
+            <button
+              type="button"
+              className="run-window-control close"
+              onClick={onClose}
+              title="Close"
+              aria-label="Close run modal"
+            >
+              <CloseWindowIcon />
+            </button>
+            <button
+              type="button"
+              className="run-window-control reduce"
+              onClick={() => setIsMinimized(true)}
+              title="Reduce"
+              aria-label="Reduce run modal"
+            >
+              <ReduceWindowIcon />
+            </button>
+            <button
+              type="button"
+              className="run-window-control maximize"
+              onClick={() => setIsMaximized((v) => !v)}
+              title={isMaximized ? 'Restore' : 'Maximize'}
+              aria-label={isMaximized ? 'Restore run modal size' : 'Maximize run modal'}
+            >
+              {isMaximized ? <RestoreWindowIcon size={10} /> : <MaximizeWindowIcon size={10} />}
+            </button>
+          </div>
+          <div className="run-modal-titlebar-title">
             <h3>▶ {runTitle}</h3>
             <span className="run-modal-flow-name">{runSubtitle}</span>
           </div>
-          <div className="run-modal-header-right">
+          <div className="run-modal-titlebar-right">
             {flowId && onSelectRunId ? (
               <RunSwitcherDropdown
                 workflowId={flowId}
@@ -11026,24 +11294,6 @@ export function RunFlowModal({
                 onSelectRun={onSelectRunId}
               />
             ) : null}
-            <button
-              type="button"
-              className="run-minimize-btn"
-              onClick={() => setIsMinimized(true)}
-              title="Minimize"
-              aria-label="Minimize run modal"
-            >
-              <MinimizeWindowIcon />
-            </button>
-            <button
-              type="button"
-              className="run-maximize-btn"
-              onClick={() => setIsMaximized((v) => !v)}
-              title={isMaximized ? 'Restore' : 'Maximize'}
-              aria-label={isMaximized ? 'Restore run modal size' : 'Maximize run modal'}
-            >
-              {isMaximized ? <RestoreWindowIcon /> : <MaximizeWindowIcon />}
-            </button>
           </div>
         </div>
 
@@ -11181,6 +11431,10 @@ export function RunFlowModal({
                           s.status === 'completed' && s.metrics && s.metrics.duration_ms != null
                             ? formatDuration(s.metrics.duration_ms)
                             : '';
+                        const progressPct = s.progress ? progressPercent(s.progress) : null;
+                        const progressTiming = s.status === 'running' && s.progress
+                          ? progressTimingParts(s.progress, s.startedAt, progressClockMs)
+                          : null;
 
                         const hasChildren = Array.isArray(n.children) && n.children.length > 0;
                         const hasSequenceBranches = Array.isArray(n.sequenceBranches) && n.sequenceBranches.length > 0;
@@ -11277,15 +11531,25 @@ export function RunFlowModal({
                                   <div className="run-step-progress">
                                     <div className="run-step-progress-row">
                                       <span>{formatProgressSummary(s.progress) || 'running'}</span>
-                                      {progressPercent(s.progress) != null ? (
-                                        <span>{progressPercent(s.progress)?.toFixed(1)}%</span>
+                                      {progressPct != null ? (
+                                        <span>{progressPct.toFixed(1)}%</span>
                                       ) : null}
                                     </div>
-                                    {progressPercent(s.progress) != null ? (
+                                    {progressTiming ? (
+                                      <div className="run-step-progress-timing" aria-label="Progress timing">
+                                        {progressTiming.elapsedLabel ? <span>{progressTiming.elapsedLabel}</span> : null}
+                                        {progressTiming.remainingLabel ? (
+                                          <span title={progressTiming.remainingApproximate ? 'Estimated from elapsed time and current progress' : 'Reported by the backend'}>
+                                            {progressTiming.remainingLabel}
+                                          </span>
+                                        ) : null}
+                                      </div>
+                                    ) : null}
+                                    {progressPct != null ? (
                                       <div className="run-step-progress-track" aria-hidden="true">
                                         <div
                                           className="run-step-progress-fill"
-                                          style={{ width: `${progressPercent(s.progress) ?? 0}%` }}
+                                          style={{ width: `${progressPct}%` }}
                                         />
                                       </div>
                                     ) : null}
@@ -11401,15 +11665,25 @@ export function RunFlowModal({
                           <div className="run-step-progress">
                             <div className="run-step-progress-row">
                               <span>{formatProgressSummary(selectedStep.progress) || 'running'}</span>
-                              {progressPercent(selectedStep.progress) != null ? (
-                                <span>{progressPercent(selectedStep.progress)?.toFixed(1)}%</span>
+                              {selectedProgressPct != null ? (
+                                <span>{selectedProgressPct.toFixed(1)}%</span>
                               ) : null}
                             </div>
-                            {progressPercent(selectedStep.progress) != null ? (
+                            {selectedProgressTiming ? (
+                              <div className="run-step-progress-timing" aria-label="Progress timing">
+                                {selectedProgressTiming.elapsedLabel ? <span>{selectedProgressTiming.elapsedLabel}</span> : null}
+                                {selectedProgressTiming.remainingLabel ? (
+                                  <span title={selectedProgressTiming.remainingApproximate ? 'Estimated from elapsed time and current progress' : 'Reported by the backend'}>
+                                    {selectedProgressTiming.remainingLabel}
+                                  </span>
+                                ) : null}
+                              </div>
+                            ) : null}
+                            {selectedProgressPct != null ? (
                               <div className="run-step-progress-track" aria-hidden="true">
                                 <div
                                   className="run-step-progress-fill"
-                                  style={{ width: `${progressPercent(selectedStep.progress) ?? 0}%` }}
+                                  style={{ width: `${selectedProgressPct}%` }}
                                 />
                               </div>
                             ) : null}
@@ -12176,6 +12450,31 @@ export function RunFlowModal({
                           const inputType = getInputTypeForPin(pin.type);
                           const value = formValues[pin.id] || '';
 
+                          if (isArtifactPinType(pin.type)) {
+                            const artifactValue = parseArtifactRefText(value);
+                            return (
+                              <div key={pin.id} className="run-form-field">
+                                <label className="run-form-label">
+                                  {pin.label}
+                                  <span className="run-form-type">({pin.type})</span>
+                                </label>
+                                <ArtifactInputField
+                                  pin={pin}
+                                  value={artifactValue}
+                                  sessionId={artifactSessionId}
+                                  gatewayContracts={gatewayContracts}
+                                  disabled={isRunning}
+                                  workspaceRoot={workspaceRoot}
+                                  workspaceAccessMode={workspaceAccessMode}
+                                  workspaceIgnoredPaths={workspaceIgnoredPaths}
+                                  onChange={(ref: CanonicalArtifactRef | null) =>
+                                    handleFieldChange(pin.id, ref ? JSON.stringify(ref, null, 2) : '')
+                                  }
+                                />
+                              </div>
+                            );
+                          }
+
                           if (isImageProviderInputPin(pin)) {
                             return (
                               <div key={pin.id} className="run-form-field">
@@ -12814,18 +13113,7 @@ export function RunFlowModal({
             </div>
 
             <div className="run-modal-footer-right">
-              {onCancelRun && (
-                <button
-                  type="button"
-                  className="modal-button cancel"
-                  onClick={onCancelRun}
-                  disabled={!(isRunning || isPaused || isWaiting)}
-                >
-                  Cancel Run
-                </button>
-              )}
-
-              {(onPause || onResumeRun) && (
+              {isActiveRun && !isWaiting && (onPause || onResumeRun) && (
                 <button
                   type="button"
                   className={isPaused ? 'modal-button primary' : 'modal-button cancel'}
@@ -12839,30 +13127,40 @@ export function RunFlowModal({
                 </button>
               )}
 
-              <button
-                type="button"
-                className="modal-button cancel"
-                onClick={onClose}
-              >
-                {(isRunning || isPaused || isWaiting) ? 'Hide' : (hasRunData || result ? 'Close' : 'Cancel')}
-              </button>
-
-              {!hasRunData && !result && (
+              {isActiveRun && onCancelRun && (
                 <button
                   type="button"
-                  className="modal-button primary"
-                  onClick={handleSubmit}
-                  disabled={
-                    isRunning ||
-                    !entryNode ||
-                    (workspaceRootRequired && !workspaceRoot.trim() && !(workspaceRandom && executionWorkspaceQuery.isError))
-                  }
+                  className="modal-button cancel"
+                  onClick={onCancelRun}
                 >
-                  {isRunning ? 'Running...' : 'Run'}
+                  Cancel
                 </button>
               )}
 
-              {(hasRunData || result) && !isRunning && !isPaused && !isWaiting && onFollowUpSubmit && activeFollowUpSeed && (
+              {isBeforeRun && (
+                <>
+                  <button
+                    type="button"
+                    className="modal-button cancel"
+                    onClick={onClose}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="modal-button primary"
+                    onClick={handleSubmit}
+                    disabled={
+                      !entryNode ||
+                      (workspaceRootRequired && !workspaceRoot.trim() && !(workspaceRandom && executionWorkspaceQuery.isError))
+                    }
+                  >
+                    Run
+                  </button>
+                </>
+              )}
+
+              {hasCompletedRun && onFollowUpSubmit && activeFollowUpSeed && (
                 <button
                   type="button"
                   className="modal-button cancel"
@@ -12875,7 +13173,7 @@ export function RunFlowModal({
                 </button>
               )}
 
-              {(hasRunData || result) && onNewRun && (
+              {hasCompletedRun && onNewRun && (
                 <button
                   type="button"
                   className="modal-button primary"
@@ -12892,7 +13190,6 @@ export function RunFlowModal({
                     }
                     onNewRun();
                   }}
-                  disabled={isRunning || Boolean(isPaused) || Boolean(isWaiting)}
                 >
                   New Run
                 </button>
@@ -12993,6 +13290,413 @@ export function RunFlowModal({
 }
 
 export default RunFlowModal;
+
+---
+file: web/frontend/src/components/ArtifactInputField.tsx
+---
+
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import type { Pin } from '../types/flow';
+import {
+  descriptorEndpointAvailable,
+  endpointFromDescriptor,
+  gatewayFetch,
+  gatewayJson,
+  jsonRequest,
+  type GatewayContracts,
+} from '../utils/gatewayClient';
+import {
+  artifactAcceptForPin,
+  artifactIdFromRef,
+  artifactMatchesPin,
+  artifactModalityForPinType,
+  artifactOwnerRunId,
+  artifactRefFromMetadata,
+  artifactRefFromUploadResponse,
+  type CanonicalArtifactRef,
+} from '../utils/artifactInputs';
+import { ArtifactPlayer, artifactContentUrl, artifactPlayerKindFromContent } from './ArtifactPlayer';
+
+type ArtifactInputFieldProps = {
+  pin: Pin;
+  value: CanonicalArtifactRef | null;
+  onChange: (value: CanonicalArtifactRef | null) => void;
+  sessionId: string;
+  gatewayContracts: GatewayContracts | null | undefined;
+  disabled?: boolean;
+  workspaceRoot?: string;
+  workspaceAccessMode?: string;
+  workspaceIgnoredPaths?: string[];
+};
+
+type SourceMode = 'upload' | 'workspace' | 'existing';
+type SearchScope = 'all' | 'session';
+
+function refLabel(ref: CanonicalArtifactRef): string {
+  return ref.filename || ref.source_path || artifactIdFromRef(ref);
+}
+
+function parseTagFilterText(raw: string): Record<string, string> | null {
+  const text = String(raw || '').trim();
+  if (!text) return {};
+  if (text.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(text) as unknown;
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+      const out: Record<string, string> = {};
+      for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+        const k = String(key || '').trim();
+        const v = String(value ?? '').trim();
+        if (k && v) out[k] = v;
+      }
+      return out;
+    } catch {
+      return null;
+    }
+  }
+  const out: Record<string, string> = {};
+  for (const part of text.split(/[,\n]+/)) {
+    const piece = part.trim();
+    if (!piece) continue;
+    const sep = piece.includes('=') ? '=' : piece.includes(':') ? ':' : '';
+    if (!sep) return null;
+    const [key, ...rest] = piece.split(sep);
+    const k = String(key || '').trim();
+    const v = rest.join(sep).trim();
+    if (k && v) out[k] = v;
+  }
+  return out;
+}
+
+export function ArtifactInputField({
+  pin,
+  value,
+  onChange,
+  sessionId,
+  gatewayContracts,
+  disabled = false,
+  workspaceRoot = '',
+  workspaceAccessMode = '',
+  workspaceIgnoredPaths = [],
+}: ArtifactInputFieldProps) {
+  const [mode, setMode] = useState<SourceMode>('existing');
+  const [workspacePath, setWorkspacePath] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [items, setItems] = useState<CanonicalArtifactRef[]>([]);
+  const [loadingItems, setLoadingItems] = useState(false);
+  const [searchText, setSearchText] = useState('');
+  const [tagFilter, setTagFilter] = useState('');
+  const [searchScope, setSearchScope] = useState<SearchScope>('all');
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const artifacts = gatewayContracts?.common?.artifacts || gatewayContracts?.flow_editor?.artifacts;
+  const attachments = gatewayContracts?.common?.attachments;
+  const uploadDescriptor = attachments?.upload;
+  const importDescriptor = artifacts?.import;
+  const searchDescriptor = artifacts?.search;
+  const sessionListDescriptor = artifacts?.session_list;
+  const contentDescriptor = artifacts?.content;
+  const uploadAvailable = descriptorEndpointAvailable(uploadDescriptor);
+  const importAvailable = descriptorEndpointAvailable(importDescriptor);
+  const searchAvailable = descriptorEndpointAvailable(searchDescriptor);
+  const sessionListAvailable = descriptorEndpointAvailable(sessionListDescriptor);
+  const contentAvailable = descriptorEndpointAvailable(contentDescriptor);
+  const selectedArtifactId = value ? artifactIdFromRef(value) : '';
+  const selectedRunId = value ? artifactOwnerRunId(value) : '';
+
+  const filteredItems = useMemo(
+    () => items.filter((item) => artifactMatchesPin(item, pin)),
+    [items, pin]
+  );
+
+  useEffect(() => {
+    if (mode !== 'existing') return;
+    const sid = sessionId.trim();
+    const parsedTags = parseTagFilterText(tagFilter);
+    if (parsedTags === null) {
+      setItems([]);
+      setError('Metadata filters must use JSON or key=value pairs.');
+      return;
+    }
+    if (searchAvailable) {
+      if (searchScope === 'session' && !sid) {
+        setItems([]);
+        setError(null);
+        setLoadingItems(false);
+        return;
+      }
+      let active = true;
+      const timer = window.setTimeout(() => {
+        setLoadingItems(true);
+        setError(null);
+        const modality = artifactModalityForPinType(pin.type);
+        const query: Record<string, string | number> = {
+          scope: searchScope,
+          limit: 250,
+        };
+        if (searchScope === 'session') query.session_id = sid;
+        if (modality !== 'artifact') query.modality = modality;
+        if (searchText.trim()) query.query = searchText.trim();
+        if (Object.keys(parsedTags).length > 0) query.tags = JSON.stringify(parsedTags);
+        const url = endpointFromDescriptor(searchDescriptor, '/api/gateway/artifacts/search', {}, query);
+        gatewayJson<{ items?: unknown[] }>(url)
+          .then((payload) => {
+            if (!active) return;
+            const next = (Array.isArray(payload.items) ? payload.items : [])
+              .map((item) => artifactRefFromMetadata(item))
+              .filter((item): item is CanonicalArtifactRef => Boolean(item));
+            setItems(next);
+          })
+          .catch((err) => {
+            if (!active) return;
+            setItems([]);
+            setError(err instanceof Error ? err.message : 'Failed to search artifacts');
+          })
+          .finally(() => {
+            if (active) setLoadingItems(false);
+          });
+      }, 250);
+      return () => {
+        active = false;
+        window.clearTimeout(timer);
+      };
+    }
+
+    if (!sessionListAvailable || !sid) {
+      setItems([]);
+      return;
+    }
+    let active = true;
+    setLoadingItems(true);
+    setError(null);
+    const url = endpointFromDescriptor(
+      sessionListDescriptor,
+      '/api/gateway/sessions/{session_id}/artifacts',
+      { session_id: sid },
+      { limit: 500 }
+    );
+    gatewayJson<{ items?: unknown[] }>(url)
+      .then((payload) => {
+        if (!active) return;
+        const next = (Array.isArray(payload.items) ? payload.items : [])
+          .map((item) => artifactRefFromMetadata(item))
+          .filter((item): item is CanonicalArtifactRef => Boolean(item));
+        setItems(next);
+      })
+      .catch((err) => {
+        if (!active) return;
+        setItems([]);
+        setError(err instanceof Error ? err.message : 'Failed to list session artifacts');
+      })
+      .finally(() => {
+        if (active) setLoadingItems(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [mode, pin.type, searchAvailable, searchDescriptor, searchScope, searchText, sessionId, sessionListAvailable, sessionListDescriptor, tagFilter]);
+
+  const handleUpload = async (file: File | null) => {
+    if (!file || disabled || !sessionId.trim() || !uploadAvailable) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const form = new FormData();
+      form.append('session_id', sessionId.trim());
+      form.append('file', file, file.name);
+      form.append('filename', file.name);
+      if (file.type) form.append('content_type', file.type);
+      const url = endpointFromDescriptor(uploadDescriptor, '/api/gateway/attachments/upload');
+      const res = await gatewayFetch(url, { method: 'POST', body: form, timeoutMs: 0 });
+      const payload = (await res.json()) as Record<string, unknown>;
+      const ref = artifactRefFromUploadResponse(payload);
+      if (!ref) throw new Error('Gateway upload did not return an artifact reference');
+      onChange(ref);
+      setItems((prev) => [ref, ...prev.filter((item) => artifactIdFromRef(item) !== artifactIdFromRef(ref))]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Artifact upload failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleImport = async () => {
+    const path = workspacePath.trim();
+    if (!path || disabled || !sessionId.trim() || !importAvailable) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const payload: Record<string, unknown> = {
+        session_id: sessionId.trim(),
+        source: { kind: 'workspace_path', path },
+        pin_id: pin.id,
+      };
+      if (workspaceRoot.trim()) payload.workspace_root = workspaceRoot.trim();
+      if (workspaceAccessMode.trim()) payload.workspace_access_mode = workspaceAccessMode.trim();
+      if (workspaceIgnoredPaths.length > 0) payload.workspace_ignored_paths = workspaceIgnoredPaths.join('\n');
+      const url = endpointFromDescriptor(importDescriptor, '/api/gateway/artifacts/import');
+      const ref = artifactRefFromUploadResponse(
+        await gatewayJson<Record<string, unknown>>(url, { ...jsonRequest(payload, { method: 'POST' }), timeoutMs: 0 })
+      );
+      if (!ref) throw new Error('Gateway import did not return an artifact reference');
+      onChange(ref);
+      setItems((prev) => [ref, ...prev.filter((item) => artifactIdFromRef(item) !== artifactIdFromRef(ref))]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Artifact import failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const previewSrc =
+    contentAvailable && selectedArtifactId && selectedRunId
+      ? artifactContentUrl(contentDescriptor, selectedRunId, selectedArtifactId)
+      : '';
+  const selectedContentType = value?.content_type || undefined;
+  const selectedModality = value?.modality || artifactModalityForPinType(pin.type);
+
+  return (
+    <div className="artifact-input-field">
+      <div className="artifact-input-tabs" role="tablist" aria-label={`${pin.label} artifact source`}>
+        <button type="button" className={mode === 'existing' ? 'active' : ''} onClick={() => setMode('existing')} disabled={disabled}>
+          Existing
+        </button>
+        <button type="button" className={mode === 'upload' ? 'active' : ''} onClick={() => setMode('upload')} disabled={disabled}>
+          Upload
+        </button>
+        <button type="button" className={mode === 'workspace' ? 'active' : ''} onClick={() => setMode('workspace')} disabled={disabled}>
+          Workspace
+        </button>
+      </div>
+
+      {mode === 'existing' ? (
+        <div className="artifact-input-existing">
+          {searchAvailable ? (
+            <div className="artifact-input-search-row">
+              <input
+                type="search"
+                className="run-form-input"
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+                placeholder={`Search ${artifactModalityForPinType(pin.type) === 'artifact' ? '' : `${artifactModalityForPinType(pin.type)} `}artifacts...`}
+                disabled={disabled}
+              />
+              <select
+                className="run-form-input artifact-input-scope"
+                value={searchScope}
+                disabled={disabled}
+                onChange={(event) => setSearchScope(event.target.value === 'session' ? 'session' : 'all')}
+              >
+                <option value="all">All</option>
+                <option value="session">Session</option>
+              </select>
+            </div>
+          ) : null}
+          {searchAvailable ? (
+            <input
+              type="text"
+              className="run-form-input"
+              value={tagFilter}
+              onChange={(event) => setTagFilter(event.target.value)}
+              placeholder="Metadata filters: key=value, purpose=run_input"
+              disabled={disabled}
+            />
+          ) : null}
+          <select
+            className="run-form-input"
+            value={selectedArtifactId}
+            disabled={disabled || loadingItems || (!searchAvailable && (!sessionId.trim() || !sessionListAvailable))}
+            onChange={(event) => {
+              const next = filteredItems.find((item) => artifactIdFromRef(item) === event.target.value) || null;
+              onChange(next);
+            }}
+          >
+            <option value="">{loadingItems ? 'Loading artifacts...' : 'Select artifact...'}</option>
+            {filteredItems.map((item) => (
+              <option key={`${artifactOwnerRunId(item)}:${artifactIdFromRef(item)}`} value={artifactIdFromRef(item)}>
+                {refLabel(item)}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : mode === 'upload' ? (
+        <div className="run-form-inline">
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="artifact-input-file"
+            accept={artifactAcceptForPin(pin.type)}
+            disabled={disabled || busy || !uploadAvailable || !sessionId.trim()}
+            onChange={(event: ChangeEvent<HTMLInputElement>) => {
+              const file = event.target.files?.[0] || null;
+              event.currentTarget.value = '';
+              void handleUpload(file);
+            }}
+          />
+          <button
+            type="button"
+            className="run-form-action"
+            disabled={disabled || busy || !uploadAvailable || !sessionId.trim()}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {busy ? 'Working...' : 'Choose file'}
+          </button>
+        </div>
+      ) : (
+        <div className="run-form-inline">
+          <input
+            type="text"
+            className="run-form-input"
+            value={workspacePath}
+            onChange={(event) => setWorkspacePath(event.target.value)}
+            placeholder="workspace/path.ext"
+            disabled={disabled || busy || !importAvailable || !sessionId.trim()}
+          />
+          <button
+            type="button"
+            className="run-form-action"
+            disabled={disabled || busy || !workspacePath.trim() || !importAvailable || !sessionId.trim()}
+            onClick={() => void handleImport()}
+          >
+            {busy ? 'Working...' : 'Import'}
+          </button>
+        </div>
+      )}
+
+      {!sessionId.trim() ? <div className="run-form-note">Set a session id to select artifacts.</div> : null}
+      {mode === 'existing' && !searchAvailable && !sessionListAvailable ? <div className="run-form-note">Artifact listing is unavailable.</div> : null}
+      {mode === 'existing' && searchAvailable && searchScope === 'session' && !sessionId.trim() ? (
+        <div className="run-form-note">Set a session id to search session artifacts.</div>
+      ) : null}
+      {mode === 'upload' && !uploadAvailable ? <div className="run-form-note">Artifact upload is unavailable.</div> : null}
+      {mode === 'workspace' && !importAvailable ? <div className="run-form-note">Workspace import is unavailable.</div> : null}
+      {error ? <div className="artifact-input-error">{error}</div> : null}
+
+      {value ? (
+        <div className="artifact-input-selected">
+          <span className="artifact-id-pill" title={selectedArtifactId}>
+            {refLabel(value)}
+          </span>
+          <button type="button" className="run-form-action" disabled={disabled} onClick={() => onChange(null)}>
+            Clear
+          </button>
+        </div>
+      ) : null}
+
+      {previewSrc ? (
+        <ArtifactPlayer
+          src={previewSrc}
+          contentType={selectedContentType}
+          kind={artifactPlayerKindFromContent(selectedContentType, selectedModality)}
+          label={value?.filename || selectedArtifactId}
+          downloadName={value?.filename || selectedArtifactId}
+          compact
+        />
+      ) : null}
+    </div>
+  );
+}
 
 ---
 file: web/frontend/src/components/ArtifactPlayer.tsx
@@ -13134,6 +13838,158 @@ export function ArtifactPlayer({
       )}
     </div>
   );
+}
+
+---
+file: web/frontend/src/utils/artifactInputs.ts
+---
+
+import type { Pin } from '../types/flow';
+
+export type ArtifactModality = 'artifact' | 'image' | 'audio' | 'text' | 'video';
+
+export type CanonicalArtifactRef = {
+  $artifact: string;
+  artifact_id?: string;
+  run_id?: string;
+  artifact_run_id?: string;
+  content_type?: string;
+  filename?: string;
+  source_path?: string;
+  sha256?: string;
+  modality?: string;
+  target?: string;
+  [key: string]: unknown;
+};
+
+function recordFrom(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+function stringFrom(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+export function isArtifactPinType(pinType: string | undefined | null): boolean {
+  return ['artifact', 'artifact_image', 'artifact_audio', 'artifact_text', 'artifact_video'].includes(String(pinType || ''));
+}
+
+export function artifactModalityForPinType(pinType: string | undefined | null): ArtifactModality {
+  switch (String(pinType || '')) {
+    case 'artifact_image':
+      return 'image';
+    case 'artifact_audio':
+      return 'audio';
+    case 'artifact_text':
+      return 'text';
+    case 'artifact_video':
+      return 'video';
+    default:
+      return 'artifact';
+  }
+}
+
+export function artifactAcceptForPin(pinType: string | undefined | null): string | undefined {
+  switch (artifactModalityForPinType(pinType)) {
+    case 'image':
+      return 'image/*';
+    case 'audio':
+      return 'audio/*';
+    case 'video':
+      return 'video/*';
+    case 'text':
+      return 'text/*,.txt,.md,.markdown,.json,.jsonl,.csv,.tsv,.yaml,.yml,.xml';
+    default:
+      return undefined;
+  }
+}
+
+export function artifactIdFromRef(value: unknown): string {
+  const record = recordFrom(value);
+  return stringFrom(record.$artifact) || stringFrom(record.artifact_id);
+}
+
+export function artifactOwnerRunId(value: unknown): string {
+  const record = recordFrom(value);
+  return stringFrom(record.run_id) || stringFrom(record.artifact_run_id);
+}
+
+export function artifactRefFromRecord(value: unknown): CanonicalArtifactRef | null {
+  const record = recordFrom(value);
+  const artifactId = artifactIdFromRef(record);
+  if (!artifactId) return null;
+  return {
+    ...record,
+    $artifact: artifactId,
+    artifact_id: artifactId,
+  } as CanonicalArtifactRef;
+}
+
+export function artifactRefFromUploadResponse(value: unknown): CanonicalArtifactRef | null {
+  const record = recordFrom(value);
+  const attachment = artifactRefFromRecord(record.attachment);
+  const artifact = artifactRefFromRecord(record.artifact);
+  const metadata = recordFrom(record.metadata);
+  const selected = artifact || attachment || artifactRefFromRecord(metadata);
+  if (!selected) return null;
+  const runId = stringFrom(record.run_id) || artifactOwnerRunId(selected) || stringFrom(metadata.run_id);
+  const ref: CanonicalArtifactRef = { ...selected };
+  if (runId) ref.run_id = runId;
+  if (!ref.content_type) ref.content_type = stringFrom(metadata.content_type);
+  if (!ref.filename) {
+    const tags = recordFrom(metadata.tags);
+    const filename = stringFrom(tags.filename);
+    if (filename) ref.filename = filename;
+  }
+  if (!ref.modality && ref.content_type) ref.modality = artifactModalityFromContentType(ref.content_type);
+  return ref;
+}
+
+export function artifactRefFromMetadata(value: unknown): CanonicalArtifactRef | null {
+  const record = recordFrom(value);
+  const ref = artifactRefFromRecord(record.ref) || artifactRefFromRecord(record);
+  if (!ref) return null;
+  const tags = recordFrom(record.tags);
+  if (!ref.run_id) ref.run_id = stringFrom(record.run_id);
+  if (!ref.content_type) ref.content_type = stringFrom(record.content_type);
+  if (!ref.filename) ref.filename = stringFrom(record.filename) || stringFrom(tags.filename);
+  if (!ref.source_path) ref.source_path = stringFrom(record.source_path) || stringFrom(tags.path);
+  if (!ref.sha256) ref.sha256 = stringFrom(record.sha256) || stringFrom(tags.sha256);
+  if (!ref.modality) {
+    ref.modality = stringFrom(record.modality) || stringFrom(tags.modality) || artifactModalityFromContentType(ref.content_type);
+  }
+  return ref;
+}
+
+export function parseArtifactRefText(raw: string | undefined | null): CanonicalArtifactRef | null {
+  const text = String(raw || '').trim();
+  if (!text) return null;
+  if (text.startsWith('{')) {
+    try {
+      return artifactRefFromRecord(JSON.parse(text));
+    } catch {
+      return null;
+    }
+  }
+  return { $artifact: text, artifact_id: text };
+}
+
+export function artifactModalityFromContentType(contentType: unknown): string {
+  const type = stringFrom(contentType).toLowerCase();
+  if (type.startsWith('image/')) return 'image';
+  if (type.startsWith('audio/')) return 'audio';
+  if (type.startsWith('video/')) return 'video';
+  if (type.startsWith('text/') || ['application/json', 'application/xml', 'application/x-yaml'].includes(type)) return 'text';
+  return 'file';
+}
+
+export function artifactMatchesPin(ref: unknown, pin: Pick<Pin, 'type'>): boolean {
+  const expected = artifactModalityForPinType(pin.type);
+  if (expected === 'artifact') return true;
+  const record = recordFrom(ref);
+  const modality = stringFrom(record.modality).toLowerCase() || artifactModalityFromContentType(record.content_type);
+  if (expected === 'audio') return ['audio', 'voice', 'music', 'sound'].includes(modality);
+  return modality === expected;
 }
 
 ---
@@ -16810,22 +17666,22 @@ dependencies = [
 [project.optional-dependencies]
 agent = [
     # Enables built-in Agent node creation in the VisualFlow executor.
-    "abstractagent>=0.3.8",
+    "abstractagent>=0.3.9",
 ]
 apple = [
     # Apple local control-plane + Gateway stack. This profile is intentionally
     # the full user-facing local install, so media engine extras cascade through
     # abstractgateway[apple] into the runtime-owned media engine extras.
-    "abstractgateway[apple]>=0.2.20",
-    "abstractagent>=0.3.8",
+    "abstractgateway[apple]>=0.2.21",
+    "abstractagent>=0.3.9",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.23.0",
     "websockets>=11.0.0",
 ]
 gpu = [
     # GPU local control-plane + Gateway stack.
-    "abstractgateway[gpu]>=0.2.20",
-    "abstractagent>=0.3.8",
+    "abstractgateway[gpu]>=0.2.21",
+    "abstractagent>=0.3.9",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.23.0",
     "websockets>=11.0.0",
@@ -16933,7 +17789,7 @@ file: abstractflow/_version.py
 This file is the single source of truth for AbstractFlow releases.
 """
 
-__version__ = "0.3.15"
+__version__ = "0.3.16"
 
 ---
 file: mkdocs.yml
@@ -16989,7 +17845,7 @@ file: web/frontend/package.json
 
 {
   "name": "@abstractframework/flow",
-  "version": "0.3.15",
+  "version": "0.3.16",
   "description": "Visual workflow editor for AbstractFramework - drag-and-drop workflow authoring with real-time testing",
   "type": "module",
   "author": "Laurent-Philippe Albou",
@@ -17932,6 +18788,24 @@ All notable changes to AbstractFlow will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.3.16] - 2026-05-29
+
+### Added
+- Artifact input selection in the Run modal, including Gateway-backed search/filtering for reusable text, document, image, video, voice, audio, and music artifacts.
+- Artifact search/import/export contract support in the Gateway client layer, while keeping file read/write behavior as graph-level nodes rather than modal-only actions.
+- Staged Deep Research demo workflow for authoring demonstrations.
+
+### Changed
+- Media nodes now surface the critical sampling controls (`steps`, `seed`, and `guidance`) consistently for image and video generation/editing, with model defaults used when fields are left empty.
+- Run progress rendering now includes elapsed/estimated remaining time when Gateway progress events provide enough timing data.
+- The Run modal now uses a window-style top bar and only shows lifecycle actions that match the current run state.
+- Apple/GPU Flow profiles now require Gateway `>=0.2.21` and Agent `>=0.3.9`; hosted CI/release tests install the base Gateway package because HTTP/SSE is part of the light install.
+
+### Fixed
+- Media provider selectors now keep image/video provider defaults scoped to media providers instead of showing text-only providers.
+- Canvas interactions avoid stale pointer-capture state after trackpad/mouse release events.
+- Generated media cards no longer expose a modal-level export button; artifact-to-file workflows should use graph nodes.
 
 ## [0.3.15] - 2026-05-26
 

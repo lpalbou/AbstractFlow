@@ -80,8 +80,12 @@ export interface GatewayCommonContract {
   };
   artifacts?: {
     list?: GatewayEndpointDescriptor;
+    search?: GatewayEndpointDescriptor;
+    session_list?: GatewayEndpointDescriptor;
     metadata?: GatewayEndpointDescriptor;
     content?: GatewayEndpointDescriptor;
+    import?: GatewayEndpointDescriptor;
+    export?: GatewayEndpointDescriptor;
   };
   attachments?: {
     upload?: GatewayEndpointDescriptor;
@@ -728,6 +732,7 @@ export function getGatewayFlowEditorReadiness(
   })();
   add(streamTransport);
   const artifactsList = add(endpointCheck('common.artifacts.list', 'Artifact listing', pickDescriptor(artifacts?.list, flow?.artifacts?.list)));
+  add(endpointCheck('common.artifacts.search', 'Artifact search', pickDescriptor(artifacts?.search, flow?.artifacts?.search)));
   const artifactsMetadata = add(endpointCheck('common.artifacts.metadata', 'Artifact metadata', pickDescriptor(artifacts?.metadata, flow?.artifacts?.metadata)));
   const artifactsContent = add(endpointCheck('common.artifacts.content', 'Artifact content', pickDescriptor(artifacts?.content, flow?.artifacts?.content)));
 
@@ -847,7 +852,11 @@ export function getGatewayFlowEditorReadiness(
           stringEndpointAvailable(promptCacheSessionEndpoints?.prepare)
       ),
       promptCacheDurableBlocs: durableBlocPromptCacheAvailable(durableBlocPromptCache),
-      kgMemory: Boolean(common?.memory?.available === true && descriptorEndpointAvailable(common.memory)),
+      kgMemory: Boolean(
+        endpointTemplateFromDescriptor(common?.memory) &&
+          common?.memory?.route_available !== false &&
+          (common?.memory?.available === true || common?.memory?.structured_query === true)
+      ),
       generatedImage,
       editedImage,
       generatedVideo,

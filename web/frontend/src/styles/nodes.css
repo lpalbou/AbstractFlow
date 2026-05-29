@@ -615,6 +615,10 @@
 }
 
 /* Edge Styles */
+.react-flow__nodes {
+  z-index: 3;
+}
+
 .react-flow__edge-path {
   stroke-width: 2;
   stroke-linecap: round;

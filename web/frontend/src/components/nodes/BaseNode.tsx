@@ -10,7 +10,7 @@ import { Fragment, memo, type MouseEvent, type ReactNode, useCallback, useEffect
 import { Handle, Position, NodeProps, useEdges, useReactFlow, useUpdateNodeInternals } from 'reactflow';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
-import type { FlowNodeData, JsonValue, PinType } from '../../types/flow';
+import type { FlowNodeData, JsonValue, Pin, PinType } from '../../types/flow';
 import { PIN_COLORS, isEntryNodeType } from '../../types/flow';
 import { PinShape } from '../pins/PinShape';
 import { useFlowStore } from '../../hooks/useFlow';
@@ -51,7 +51,7 @@ import {
   type PinCatalogScope,
 } from '../../utils/pinCatalog';
 import { normalizeVariableName, validateVariableName, variableNameCustomOptionLabel } from '../../utils/variableNames';
-import { getNodeTemplate } from '../../types/nodes';
+import { createNodeData, getNodeTemplate, mergePinDocsFromTemplate } from '../../types/nodes';
 import { AfTooltip } from '../AfTooltip';
 import { CodeEditorModal } from '../CodeEditorModal';
 import {
@@ -222,11 +222,11 @@ function canonicalImageModelForProvider(provider: string, model: string): string
   return clean;
 }
 
-function imageDefaultsForProvider(provider: string): Record<string, JsonValue | undefined> {
+function imageDefaultsForProvider(provider: string, nodeType?: string): Record<string, JsonValue | undefined> {
   const normalized = normalizeMediaProvider(provider);
+  const isEditImage = nodeType === 'edit_image' || nodeType === 'image_to_image';
   if (normalized === 'openai' || normalized === 'openai-compatible') {
     return {
-      size: 'auto',
       width: undefined,
       height: undefined,
       steps: undefined,
@@ -234,12 +234,15 @@ function imageDefaultsForProvider(provider: string): Record<string, JsonValue | 
     };
   }
   return {
-    size: undefined,
-    width: 512,
-    height: 512,
+    width: isEditImage ? undefined : 512,
+    height: isEditImage ? undefined : 512,
     steps: 20,
-    guidance_scale: 7.5,
+    guidance_scale: undefined,
   };
+}
+
+function pinListSignature(pins: readonly Pin[]): string {
+  return pins.map((pin) => `${pin.id}:${pin.label}:${pin.type}:${pin.description || ''}`).join('\n');
 }
 
 const OnEventNameInline = memo(function OnEventNameInline({
@@ -898,14 +901,43 @@ export const BaseNode = memo(function BaseNode({
     return inferSchemaForOutput(sourceNode, sourceHandle, 0);
   }, [allNodes, data.nodeType, edges, getSchemaByPath, id]);
 
-  // Separate execution pins from data pins
-  const inputExec = isTriggerNode ? undefined : data.inputs.find((p) => p.type === 'execution');
-  const outputExecs = data.outputs.filter((p) => p.type === 'execution');
   const isEmitEventNode = data.nodeType === 'emit_event';
   const mediaPresentationNode = isMediaNodeType(data.nodeType);
+
+  const normalizedMediaPins = useMemo(() => {
+    if (!mediaPresentationNode) return null;
+    const template = getNodeTemplate(data.nodeType);
+    if (!template) return null;
+    const normalized = mergePinDocsFromTemplate(createNodeData(template), data);
+    return {
+      inputs: normalized.inputs,
+      outputs: normalized.outputs,
+    };
+  }, [data, mediaPresentationNode]);
+
+  useEffect(() => {
+    if (!normalizedMediaPins) return;
+    const currentInputs = Array.isArray(data.inputs) ? data.inputs : [];
+    const currentOutputs = Array.isArray(data.outputs) ? data.outputs : [];
+    if (
+      pinListSignature(currentInputs) === pinListSignature(normalizedMediaPins.inputs) &&
+      pinListSignature(currentOutputs) === pinListSignature(normalizedMediaPins.outputs)
+    ) {
+      return;
+    }
+    updateNodeData(id, { inputs: normalizedMediaPins.inputs, outputs: normalizedMediaPins.outputs });
+    updateNodeInternals(id);
+  }, [data.inputs, data.outputs, id, normalizedMediaPins, updateNodeData, updateNodeInternals]);
+
+  const nodeInputs = normalizedMediaPins?.inputs || data.inputs;
+  const nodeOutputs = normalizedMediaPins?.outputs || data.outputs;
+
+  // Separate execution pins from data pins
+  const inputExec = isTriggerNode ? undefined : nodeInputs.find((p) => p.type === 'execution');
+  const outputExecs = nodeOutputs.filter((p) => p.type === 'execution');
   const mediaInputPins = mediaPresentationNode
-    ? getVisibleMediaPins(data.nodeType, 'input', data.inputs, connectedInputPinIds, showAdvancedMediaPins)
-    : data.inputs;
+    ? getVisibleMediaPins(data.nodeType, 'input', nodeInputs, connectedInputPinIds, showAdvancedMediaPins)
+    : nodeInputs;
   const inputData = mediaInputPins.filter((p) => {
     if (p.type === 'execution') return false;
     // Keep emit_event "session_id" as an advanced pin: hide it unless connected.
@@ -915,8 +947,8 @@ export const BaseNode = memo(function BaseNode({
     return true;
   });
   const mediaOutputPins = mediaPresentationNode
-    ? getVisibleMediaPins(data.nodeType, 'output', data.outputs, connectedOutputPinIds, showAdvancedMediaPins)
-    : data.outputs;
+    ? getVisibleMediaPins(data.nodeType, 'output', nodeOutputs, connectedOutputPinIds, showAdvancedMediaPins)
+    : nodeOutputs;
 	  const outputData = mediaOutputPins.filter((p) => {
 	    if (p.type === 'execution') return false;
 	    // Keep legacy Agent pins hidden unless explicitly wired (cleaner UI without breaking old flows).
@@ -1122,9 +1154,10 @@ export const BaseNode = memo(function BaseNode({
       const providerBlocked = isPinConnected('image_provider', true);
       const modelBlocked = isPinConnected('image_model', true);
       const blocked = providerBlocked || modelBlocked;
-      const unsupportedReason = modelResidencyTaskUnsupportedReason(gatewayContracts, 'image_generation');
+      const task = isEditImageNode ? 'image_to_image' : 'image_generation';
+      const unsupportedReason = modelResidencyTaskUnsupportedReason(gatewayContracts, task);
       return {
-        task: 'image_generation',
+        task,
         provider: blocked
           ? ''
           : firstConfigString(data.effectConfig?.image_provider, pinDefaults.image_provider, data.effectConfig?.provider, pinDefaults.provider),
@@ -1532,7 +1565,12 @@ export const BaseNode = memo(function BaseNode({
       .map((option) => ({ value: option.model, label: option.label }));
   }, [imageModelOptions, selectedVideoProvider]);
   const residencyProviderOptions = useMemo(() => {
-    if (selectedResidencyTask === 'image_generation' || selectedResidencyTask === 'text_to_video' || selectedResidencyTask === 'image_to_video') {
+    if (
+      selectedResidencyTask === 'image_generation' ||
+      selectedResidencyTask === 'image_to_image' ||
+      selectedResidencyTask === 'text_to_video' ||
+      selectedResidencyTask === 'image_to_video'
+    ) {
       const seen = new Set<string>();
       const out: SelectOption[] = [];
       const add = (value: string, label?: string) => {
@@ -1659,7 +1697,12 @@ export const BaseNode = memo(function BaseNode({
     return out;
   }, [musicProviderOptions, selectedMusicProvider]);
   const residencyModelOptions = useMemo(() => {
-    if (selectedResidencyTask === 'image_generation' || selectedResidencyTask === 'text_to_video' || selectedResidencyTask === 'image_to_video') {
+    if (
+      selectedResidencyTask === 'image_generation' ||
+      selectedResidencyTask === 'image_to_image' ||
+      selectedResidencyTask === 'text_to_video' ||
+      selectedResidencyTask === 'image_to_video'
+    ) {
       const options = !selectedResidencyProvider
         ? imageModelOptions
         : imageModelOptions.filter((option) => normalizeMediaProvider(option.provider) === normalizeMediaProvider(selectedResidencyProvider));
@@ -2628,7 +2671,7 @@ export const BaseNode = memo(function BaseNode({
     (provider: string | null | undefined) => {
       const clean = provider ? normalizeMediaProvider(provider) : '';
       const nextDefaults = { ...(data.pinDefaults || {}) };
-      for (const [key, value] of Object.entries(imageDefaultsForProvider(clean))) {
+      for (const [key, value] of Object.entries(imageDefaultsForProvider(clean, data.nodeType))) {
         if (value === undefined) delete nextDefaults[key];
         else nextDefaults[key] = value;
       }
@@ -2644,7 +2687,7 @@ export const BaseNode = memo(function BaseNode({
       });
       if (clean) requestMediaCatalog('image', { provider: clean, task: currentImageProviderModelsTask });
     },
-    [currentImageProviderModelsTask, data.effectConfig, data.pinDefaults, id, requestMediaCatalog, updateNodeData]
+    [currentImageProviderModelsTask, data.effectConfig, data.nodeType, data.pinDefaults, id, requestMediaCatalog, updateNodeData]
   );
 
   const setImageModelSelection = useCallback(
@@ -2661,10 +2704,12 @@ export const BaseNode = memo(function BaseNode({
           provider: undefined,
           model: undefined,
         } as FlowNodeData['effectConfig'],
-        pinDefaults: applyImagePinDefaultPatch(data.pinDefaults || {}, match),
+        pinDefaults: applyImagePinDefaultPatch(data.pinDefaults || {}, match, {
+          excludeKeys: isEditImageNode ? ['width', 'height'] : undefined,
+        }),
       });
     },
-    [data.effectConfig, data.pinDefaults, id, imageModelOptions, selectedImageProvider, updateNodeData]
+    [data.effectConfig, data.pinDefaults, id, imageModelOptions, isEditImageNode, selectedImageProvider, updateNodeData]
   );
 
   const setVideoProviderSelection = useCallback(
@@ -2695,7 +2740,7 @@ export const BaseNode = memo(function BaseNode({
       const match = imageModelOptions.find(
         (option) => option.model === cleanModel && (!selectedVideoProvider || option.provider === selectedVideoProvider)
       );
-      const nextDefaults = applyImagePinDefaultPatch(data.pinDefaults || {}, match);
+      const nextDefaults = applyImagePinDefaultPatch(data.pinDefaults || {}, match, { includeGuidanceScale: true });
       if (cleanModel) nextDefaults.video_model = cleanModel;
       else delete nextDefaults.video_model;
       if (match?.provider || selectedVideoProvider) nextDefaults.video_provider = match?.provider || selectedVideoProvider;
@@ -2796,13 +2841,14 @@ export const BaseNode = memo(function BaseNode({
 	      const clean = task || 'text_generation';
 	      setModelResidencyPatch({ task: clean, provider: undefined, model: undefined });
 	      if (clean === 'image_generation') requestMediaCatalog('image', { providersOnly: true });
+	      if (clean === 'image_to_image') requestMediaCatalog('image', { providersOnly: true, task: editedImageProviderModelsTask });
 	      if (clean === 'text_to_video') requestMediaCatalog('image', { providersOnly: true, task: generatedVideoProviderModelsTask });
 	      if (clean === 'image_to_video') requestMediaCatalog('image', { providersOnly: true, task: imageToVideoProviderModelsTask });
 	      if (clean === 'tts') requestMediaCatalog('tts', { providersOnly: true });
       if (clean === 'stt') requestMediaCatalog('stt', { providersOnly: true });
       if (clean === 'music_generation') requestMediaCatalog('music', { providersOnly: true });
     },
-	    [generatedVideoProviderModelsTask, imageToVideoProviderModelsTask, requestMediaCatalog, setModelResidencyPatch]
+	    [editedImageProviderModelsTask, generatedVideoProviderModelsTask, imageToVideoProviderModelsTask, requestMediaCatalog, setModelResidencyPatch]
   );
 
   const setModelResidencyProvider = useCallback(
@@ -2810,13 +2856,14 @@ export const BaseNode = memo(function BaseNode({
 	      const clean = provider ? provider.trim() : '';
 	      setModelResidencyPatch({ provider: clean || undefined, model: undefined });
 	      if (selectedResidencyTask === 'image_generation' && clean) requestMediaCatalog('image', { provider: clean });
+	      if (selectedResidencyTask === 'image_to_image' && clean) requestMediaCatalog('image', { provider: clean, task: editedImageProviderModelsTask });
 	      if (selectedResidencyTask === 'text_to_video' && clean) requestMediaCatalog('image', { provider: clean, task: generatedVideoProviderModelsTask });
 	      if (selectedResidencyTask === 'image_to_video' && clean) requestMediaCatalog('image', { provider: clean, task: imageToVideoProviderModelsTask });
 	      if (selectedResidencyTask === 'tts') requestMediaCatalog('tts', { provider: clean || undefined, includeVoices: false });
       if (selectedResidencyTask === 'stt') requestMediaCatalog('stt', { provider: clean || undefined });
       if (selectedResidencyTask === 'music_generation') requestMediaCatalog('music', { provider: clean || undefined });
     },
-	    [generatedVideoProviderModelsTask, imageToVideoProviderModelsTask, requestMediaCatalog, selectedResidencyTask, setModelResidencyPatch]
+	    [editedImageProviderModelsTask, generatedVideoProviderModelsTask, imageToVideoProviderModelsTask, requestMediaCatalog, selectedResidencyTask, setModelResidencyPatch]
   );
 
   const setModelResidencyModel = useCallback(
@@ -2833,24 +2880,42 @@ export const BaseNode = memo(function BaseNode({
     const current = data.pinDefaults || {};
     const nextDefaults = { ...current };
     let changed = false;
+    if (nextDefaults.size !== undefined) {
+      delete nextDefaults.size;
+      changed = true;
+    }
     if (normalized === 'openai' || normalized === 'openai-compatible') {
-      if (nextDefaults.size !== 'auto') {
-        nextDefaults.size = 'auto';
-        changed = true;
-      }
       for (const key of ['width', 'height', 'steps', 'guidance_scale'] as const) {
         if (nextDefaults[key] !== undefined) {
           delete nextDefaults[key];
           changed = true;
         }
       }
-    } else if (nextDefaults.size === 'auto') {
-      delete nextDefaults.size;
-      if (nextDefaults.width === undefined) nextDefaults.width = 512;
-      if (nextDefaults.height === undefined) nextDefaults.height = 512;
-      if (nextDefaults.steps === undefined) nextDefaults.steps = 20;
-      if (nextDefaults.guidance_scale === undefined) nextDefaults.guidance_scale = 7.5;
+    } else {
+      if (isGenerateImageNode && nextDefaults.width === undefined) {
+        nextDefaults.width = 512;
+        changed = true;
+      }
+      if (isGenerateImageNode && nextDefaults.height === undefined) {
+        nextDefaults.height = 512;
+        changed = true;
+      }
+      if (nextDefaults.steps === undefined) {
+        nextDefaults.steps = 20;
+        changed = true;
+      }
+    }
+    if (nextDefaults.guidance_scale === 7.5) {
+      delete nextDefaults.guidance_scale;
       changed = true;
+    }
+    if (isEditImageNode) {
+      for (const key of ['width', 'height'] as const) {
+        if (nextDefaults[key] !== undefined) {
+          delete nextDefaults[key];
+          changed = true;
+        }
+      }
     }
     if (changed) updateNodeData(id, { pinDefaults: nextDefaults });
   }, [data.pinDefaults, id, imageProviderPinConnected, isEditImageNode, isGenerateImageNode, selectedImageProvider, updateNodeData]);
@@ -4248,6 +4313,7 @@ export const BaseNode = memo(function BaseNode({
                       options={[
                         { value: 'text_generation', label: 'text' },
                         { value: 'image_generation', label: 'image' },
+                        { value: 'image_to_image', label: 'image edit' },
                         { value: 'text_to_video', label: 'text to video' },
                         { value: 'image_to_video', label: 'image to video' },
                         { value: 'tts', label: 'speech' },
@@ -4282,6 +4348,7 @@ export const BaseNode = memo(function BaseNode({
                       minPopoverWidth={300}
 	                      onOpen={() => {
 	                        if (selectedResidencyTask === 'image_generation') requestMediaCatalog('image', { providersOnly: true });
+	                        if (selectedResidencyTask === 'image_to_image') requestMediaCatalog('image', { providersOnly: true, task: editedImageProviderModelsTask });
 	                        if (selectedResidencyTask === 'text_to_video') requestMediaCatalog('image', { providersOnly: true, task: generatedVideoProviderModelsTask });
 	                        if (selectedResidencyTask === 'image_to_video') requestMediaCatalog('image', { providersOnly: true, task: imageToVideoProviderModelsTask });
 	                        if (selectedResidencyTask === 'tts') requestMediaCatalog('tts', { providersOnly: true });
@@ -4317,6 +4384,9 @@ export const BaseNode = memo(function BaseNode({
                       onOpen={() => {
 	                        if (selectedResidencyTask === 'image_generation' && selectedResidencyProvider) {
 	                          requestMediaCatalog('image', { provider: selectedResidencyProvider });
+	                        }
+	                        if (selectedResidencyTask === 'image_to_image' && selectedResidencyProvider) {
+	                          requestMediaCatalog('image', { provider: selectedResidencyProvider, task: editedImageProviderModelsTask });
 	                        }
 	                        if (selectedResidencyTask === 'text_to_video' && selectedResidencyProvider) {
 	                          requestMediaCatalog('image', { provider: selectedResidencyProvider, task: generatedVideoProviderModelsTask });

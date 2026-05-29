@@ -1,21 +1,36 @@
 # AbstractFlow Backlog Overview
 
 ## Snapshot
-- Updated: 2026-05-25
+- Updated: 2026-05-29
 - Planned: 0
-- Proposed: 11
-- Completed: 22
+- Proposed: 13
+- Completed: 27
 - Deprecated: 0
 
 ## Current Priorities
-- No planned items remain. Next Flow UX work should be promoted deliberately from `proposed/`
-  after a code-first audit; likely candidates are `proposed/0089_flow_connection_drop_action_menu.md`
-  for Blueprint-style edge-drop actions or the existing media preview/progressive disclosure work.
+- No planned items are currently open. The next artifact/file-system design pass
+  should resolve `proposed/0095_file_nodes_artifact_io_boundary_resolution.md`:
+  `Read File` / `Write File` may need to become artifact-aware, or be paired
+  with explicit artifact IO nodes, while keeping Gateway as filesystem policy
+  authority and Runtime as artifact storage/handoff authority.
+- The online showcase design pass should resolve
+  `proposed/0096_github_hosted_gateway_flow_showcase.md`: GitHub Pages can host
+  the Flow UI, but Gateway still needs a live backend or operator-started
+  Codespace; provider credentials and Gateway auth must remain separated.
 
 ## Planned Ledger
-- No planned items remain.
+- None.
+
+## Proposed Ledger
+- `proposed/0096_github_hosted_gateway_flow_showcase.md`: captures the travel/demo deployment path for light Gateway + Flow, including GitHub Pages limitations, Codespaces as the simplest GitHub-native temporary option, a static UI plus remote-light Gateway option for stable demos, and the credential/auth constraints for user-supplied OpenAI keys.
+- `proposed/0095_file_nodes_artifact_io_boundary_resolution.md`: preserves the unresolved design tension around whether `Read File` / `Write File` should import/export artifacts directly, whether explicit artifact IO nodes are clearer, and how JSON/document/file artifacts should become first-class without conflating Runtime artifact storage with user-authored file trees.
 
 ## Completed Ledger
+- `completed/0094_artifact_search_export_and_kg_memory_readiness.md` from `planned/0094_artifact_search_export_and_kg_memory_readiness.md`: added Gateway artifact search with all/session/run scope, modality/content-type/query/tag filters, Flow artifact picker search with session-list fallback, and KG memory readiness that stays available on fresh resolved stores. An initial Run modal export control was removed in favor of the graph-level file/artifact IO design tracked by `proposed/0095_file_nodes_artifact_io_boundary_resolution.md`. Validation: focused Gateway artifact/capability/default-scan tests, Flow frontend contract tests, and frontend build.
+- `completed/0093_artifact_reference_visibility_and_runtime_handoff.md` from `planned/0093_artifact_reference_visibility_and_runtime_handoff.md`: standardized artifact refs at the Gateway/Flow boundary, added session-visible artifact listing, allowed same-session artifact metadata/content access, and validated run-start refs before Runtime handoff. Validation: focused Gateway, Flow frontend contract/build, and Runtime artifact-store tests.
+- `completed/0092_run_modal_artifact_input_picker.md` from `planned/0092_run_modal_artifact_input_picker.md`: added a Run modal artifact input field for generic/image/audio/text/video pins with existing session artifact selection, browser upload, Gateway workspace import, modality filtering, previews, and canonical JSON ref submission. Validation: Flow frontend gateway contract tests and frontend build.
+- `completed/0091_gateway_artifact_import_export_contract.md` from `planned/0091_gateway_artifact_import_export_contract.md`: added advertised Gateway artifact import/export/session-list APIs, shared canonical artifact ref construction, and a public Runtime file-backed artifact content path hook for export. Validation: focused Gateway capabilities/artifact endpoint tests and Runtime artifact-store test.
+- `completed/0090_media_edit_reference_and_sampling_controls.md`: investigated run `e30bb129-1037-412a-ae4c-ab0c76153d57`, confirmed the edit source artifact was wired correctly, routed FLUX.2 MLX-Gen image edits through the dedicated edit variant, ranked dedicated edit models first for MLX-Gen image edits, preserved materialized media roles for source/mask artifacts, split image edit residency/catalog authoring to `image_to_image`, and surfaced seed/guidance controls by default on image/video media nodes. Validation: focused AbstractVision, Core, Runtime, Gateway, Flow VisualFlow, frontend gateway contract tests, and Flow frontend build.
 - `completed/0088_flow_pin_and_code_regression_repair.md` from `planned/0088_flow_pin_and_code_regression_repair.md`: repaired AbstractFlow graph regressions by restoring execution pin connected-state/disconnect behavior, tightening provider/model pin compatibility, pruning invalid saved edges on load, regenerating Code-node wrappers from `codeBody` plus current pins in Flow and Runtime, and simplifying visible execution wording to plain Run/Publish authoring language. Validation: Code-node pytest suite, frontend gateway contract suite, focused regression tests, and frontend build.
 - `completed/050_gateway_execution_regression_suite.md` from original planned item `050_gateway_execution_regression_suite.md`: Flow's default editor path now has a regression gate proving Gateway descriptors and exact v1 client contracts are required before publish/start, bad stream transports fail fast, frontend source avoids local runtime routes, and the default backend route registry exposes only the Gateway proxy. Validation: full frontend gateway contract pytest and frontend build.
 - `completed/030_local_execution_compatibility_boundary.md` from original planned item `030_local_execution_compatibility_boundary.md`: Local Flow runtime routes remain available only through `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1`; the default host and frontend stay Gateway-only, while compatibility dependencies live in explicit host profiles. Validation: full frontend gateway contract pytest and frontend build.

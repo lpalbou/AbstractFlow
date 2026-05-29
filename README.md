@@ -55,7 +55,7 @@ Optional extras (declared in `pyproject.toml`):
 - Full host profiles:
   - Apple-capable: `pip install "abstractflow[apple]"`
   - GPU-capable: `pip install "abstractflow[gpu]"`
-- `abstractflow[apple]` and `abstractflow[gpu]` pull the matching `abstractgateway[...]` host profile and Visual Agent support. Flow no longer names `AbstractRuntime` or `abstractcore` directly in these profiles; Gateway owns that deployment stack. AbstractFlow `0.3.15` expects Gateway `>=0.2.20` for the current image/video media, progress, catalog, and residency contracts.
+- `abstractflow[apple]` and `abstractflow[gpu]` pull the matching `abstractgateway[...]` host profile and Visual Agent support. Flow no longer names `AbstractRuntime` or `abstractcore` directly in these profiles; Gateway owns that deployment stack. AbstractFlow `0.3.16` expects Gateway `>=0.2.21` for the current image/video media, progress, catalog, and residency contracts.
 - Agent nodes only, without the host profile: `pip install "abstractflow[agent]"`
 - Documentation site tools: `pip install "abstractflow[docs]"`
 
@@ -122,6 +122,10 @@ while still resolving concrete calls from endpoint descriptors. Generated images
 videos, voice, and music are artifacts; the Run modal renders previews/players
 from Gateway artifact content and keeps `abstract.progress` ledger events visible
 for long media runs while leaving raw ledger JSON available for debugging.
+Artifact inputs can search Gateway artifacts by modality/scope/metadata when
+the Gateway advertises search. Generated artifact cards keep a direct `artifact
+content` open/download link; workspace file export is reserved for explicit
+graph-level file/artifact IO nodes.
 
 The `abstractflow serve`/FastAPI host is a Gateway proxy by default. Its old local `/api/flows`, `/api/ws`, and `/api/runs` compatibility routes are available only when `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1` is set. See [docs/web-editor.md](docs/web-editor.md) and [docs/architecture.md](docs/architecture.md).
 

@@ -78,6 +78,7 @@ interface DefaultDraft {
 type DefaultCatalogTask =
   | 'text_generation'
   | 'image_generation'
+  | 'image_to_image'
   | 'text_to_video'
   | 'image_to_video'
   | 'tts'
@@ -199,6 +200,7 @@ function providerValuesFrom(payload: unknown, arrayKeys: string[], mapKeys: stri
 function taskLabel(task: string): string {
   if (task === 'text_generation') return 'Text';
   if (task === 'image_generation') return 'Image';
+  if (task === 'image_to_image') return 'Image edit';
   if (task === 'text_to_video') return 'Text to video';
   if (task === 'image_to_video') return 'Image to video';
   if (task === 'tts') return 'Speech';
@@ -208,17 +210,18 @@ function taskLabel(task: string): string {
 }
 
 function isVisionCatalogTask(task: string): boolean {
-  return task === 'image_generation' || task === 'text_to_video' || task === 'image_to_video';
+  return task === 'image_generation' || task === 'image_to_image' || task === 'text_to_video' || task === 'image_to_video';
 }
 
 function visionProviderModelsTask(task: string): string {
+  if (task === 'image_to_image') return 'image_to_image';
   if (task === 'text_to_video' || task === 'image_to_video') return task;
   return 'text_to_image';
 }
 
 function taskOptions(contracts: GatewayContracts | null): AfSelectOption[] {
   const residency = contracts?.common?.model_residency;
-  const canonicalTasks = ['text_generation', 'image_generation', 'text_to_video', 'image_to_video', 'tts', 'stt', 'music_generation'];
+  const canonicalTasks = ['text_generation', 'image_generation', 'image_to_image', 'text_to_video', 'image_to_video', 'tts', 'stt', 'music_generation'];
   const rawTasks = [
     ...canonicalTasks,
     ...(Array.isArray(residency?.tasks) ? residency.tasks : []),
@@ -238,6 +241,7 @@ function taskOptions(contracts: GatewayContracts | null): AfSelectOption[] {
 function defaultCatalogTask(row: ModelDefaultView | null): DefaultCatalogTask {
   if (!row) return 'custom';
   const explicitTask = row.task.toLowerCase();
+  if (explicitTask === 'image_to_image' || explicitTask === 'image_edit' || explicitTask === 'edit_image' || explicitTask === 'i2i') return 'image_to_image';
   if (explicitTask === 'text_to_video' || explicitTask === 'image_to_video') return explicitTask;
   if (explicitTask === 'text_to_image') return 'image_generation';
   const kind = row.kind.toLowerCase();
@@ -259,6 +263,7 @@ function defaultCatalogTask(row: ModelDefaultView | null): DefaultCatalogTask {
 
 function defaultVisionCatalogTask(row: ModelDefaultView | null): string {
   const explicitTask = row?.task.toLowerCase() || '';
+  if (explicitTask === 'image_to_image' || explicitTask === 'image_edit' || explicitTask === 'edit_image' || explicitTask === 'i2i') return 'image_to_image';
   if (explicitTask === 'text_to_video' || explicitTask === 'image_to_video') return explicitTask;
   const modality = row?.modality.toLowerCase() || '';
   if (modality === 'video') return 'text_to_video';
@@ -267,6 +272,7 @@ function defaultVisionCatalogTask(row: ModelDefaultView | null): string {
 
 function defaultProviderPlaceholder(catalogTask: DefaultCatalogTask): string {
   if (catalogTask === 'image_generation') return 'Image provider…';
+  if (catalogTask === 'image_to_image') return 'Image edit provider…';
   if (catalogTask === 'text_to_video' || catalogTask === 'image_to_video') return 'Video provider…';
   if (catalogTask === 'tts') return 'Speech provider…';
   if (catalogTask === 'stt') return 'Transcription provider…';
@@ -278,6 +284,7 @@ function defaultProviderPlaceholder(catalogTask: DefaultCatalogTask): string {
 function defaultModelPlaceholder(catalogTask: DefaultCatalogTask, provider: string): string {
   if (!provider) return 'Pick provider…';
   if (catalogTask === 'image_generation') return 'Image model…';
+  if (catalogTask === 'image_to_image') return 'Image edit model…';
   if (catalogTask === 'text_to_video' || catalogTask === 'image_to_video') return 'Video model…';
   if (catalogTask === 'tts') return 'Speech model…';
   if (catalogTask === 'stt') return 'Transcription model…';
@@ -894,6 +901,8 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
   const providerPlaceholder =
     task === 'image_generation'
       ? 'Image provider…'
+      : task === 'image_to_image'
+        ? 'Image edit provider…'
       : task === 'text_to_video' || task === 'image_to_video'
         ? 'Video provider…'
         : task === 'tts'
@@ -908,6 +917,8 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
       ? 'Pick provider…'
       : task === 'image_generation'
         ? 'Image model…'
+        : task === 'image_to_image'
+          ? 'Image edit model…'
         : task === 'text_to_video' || task === 'image_to_video'
           ? 'Video model…'
           : task === 'tts'

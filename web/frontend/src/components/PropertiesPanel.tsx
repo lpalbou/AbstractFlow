@@ -42,6 +42,12 @@ import {
   modelOptionsFromGatewayCatalog,
   providerOptionsFromGatewayCatalog,
 } from '../utils/gatewayCatalog';
+import {
+  modelCatalogScopeForPin,
+  providerCatalogScopeForPin,
+  providerPinIdForModelPin,
+  type PinCatalogScope,
+} from '../utils/pinCatalog';
 import { insertModelResidencyStep, modelResidencyTaskUnsupportedReason } from '../utils/modelResidencyGraph';
 import {
   applyImagePinDefaultPatch,
@@ -178,18 +184,7 @@ const DATA_PIN_TYPES: DataPinType[] = [
 ];
 
 function isTextProviderPin(pin: Pin): boolean {
-  return pin.type === 'provider' || pin.type === 'provider_text' || pin.id === 'provider';
-}
-
-function isTextModelPin(pin: Pin): boolean {
-  return (
-    pin.type === 'model' ||
-    pin.type === 'model_text' ||
-    pin.type === 'model_image' ||
-    pin.type === 'model_voice' ||
-    pin.type === 'model_music' ||
-    pin.id === 'model'
-  );
+  return providerCatalogScopeForPin(pin) === 'text';
 }
 
 function normalizeMediaProvider(value: string): string {
@@ -566,6 +561,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const [sttModelOptions, setSttModelOptions] = useState<string[]>([]);
   const [musicProviderOptions, setMusicProviderOptions] = useState<string[]>([]);
   const [musicModelOptions, setMusicModelOptions] = useState<string[]>([]);
+  const [imageProviderOptions, setImageProviderOptions] = useState<string[]>([]);
   const [imageModelOptions, setImageModelOptions] = useState<Array<{ provider: string; model: string; label: string } & MediaModelParameterMetadata>>([]);
   const [loadingMediaModels, setLoadingMediaModels] = useState(false);
   const [mediaCatalogRequest, setMediaCatalogRequest] = useState<{
@@ -574,16 +570,21 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     provider?: string;
     model?: string;
     task?: string;
+    providersOnly?: boolean;
   } | null>(null);
 
   const requestMediaCatalog = useCallback(
-    (scope: 'image' | 'tts' | 'stt' | 'music', options: { provider?: string; model?: string; task?: string } = {}) => {
+    (
+      scope: 'image' | 'tts' | 'stt' | 'music',
+      options: { provider?: string; model?: string; task?: string; providersOnly?: boolean } = {}
+    ) => {
       setMediaCatalogRequest((prev) => ({
         seq: (prev?.seq || 0) + 1,
         scope,
         provider: options.provider,
         model: options.model,
         task: options.task,
+        providersOnly: options.providersOnly,
       }));
     },
     []
@@ -631,6 +632,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     const rawTasks = [
       'text_generation',
       'image_generation',
+      'image_to_image',
       'text_to_video',
       'image_to_video',
       'tts',
@@ -643,6 +645,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     const labelFor = (task: string) => {
       if (task === 'text_generation') return 'Text generation';
       if (task === 'image_generation') return 'Image generation';
+      if (task === 'image_to_image') return 'Image edit';
       if (task === 'text_to_video') return 'Text to video';
       if (task === 'image_to_video') return 'Image to video';
       if (task === 'tts') return 'Speech';
@@ -665,9 +668,14 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         node.data.nodeType === 'llm_call' ||
         (node.data.nodeType === 'model_residency' && modelResidencyTaskForCatalog === 'text_generation') ||
         ((node.data.nodeType === 'on_flow_start' || node.data.nodeType === 'on_flow_end') &&
-          (node.data.nodeType === 'on_flow_start' ? node.data.outputs : node.data.inputs).some(
-            (p) => isTextProviderPin(p) || isTextModelPin(p)
-          )))
+          (() => {
+            const pins = node.data.nodeType === 'on_flow_start' ? node.data.outputs : node.data.inputs;
+            return pins.some(
+              (pin) =>
+                providerCatalogScopeForPin(pin, node.data.nodeType) === 'text' ||
+                modelCatalogScopeForPin(pin, pins, node.data.nodeType) === 'text'
+            );
+          })()))
   );
 
   useEffect(() => {
@@ -860,8 +868,10 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     const providersFrom = (data: any, arrayKeys: string[], mapKeys: string[] = []) => {
       return providerOptionsFromGatewayCatalog(data, arrayKeys, mapKeys).map((option) => option.value);
     };
-    const query = (extra: Record<string, string | undefined>) =>
-      Object.fromEntries(Object.entries(extra).filter(([, v]) => typeof v === 'string' && v.trim()));
+    const query = (extra: Record<string, string | boolean | undefined>) =>
+      Object.fromEntries(
+        Object.entries(extra).filter(([, v]) => (typeof v === 'string' && v.trim()) || typeof v === 'boolean')
+      );
 
     setLoadingMediaModels(true);
 
@@ -872,12 +882,22 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         return;
       }
       const task = request.task || generatedImageProviderModelsTask;
-      gatewayJson<any>(gatewayPath(visionProviderModelsEndpoint, {}, query({ task, provider: request.provider })), {
-        timeoutMs: 30_000,
-      })
+      gatewayJson<any>(
+        gatewayPath(
+          visionProviderModelsEndpoint,
+          {},
+          query({ task, provider: request.provider, providers_only: request.providersOnly })
+        ),
+        { timeoutMs: request.providersOnly ? 5_000 : 30_000 }
+      )
         .then((imageProviderCatalog) => {
           const imageOptions: Array<{ provider: string; model: string; label: string } & MediaModelParameterMetadata> = [];
           const seenImages = new Set<string>();
+          const providerValues = providersFrom(
+            imageProviderCatalog,
+            ['providers', 'available_providers', 'image_providers'],
+            ['models_by_provider', 'provider_models']
+          );
           const values = Array.isArray(imageProviderCatalog?.models) ? imageProviderCatalog.models : [];
           for (const item of values) {
             if (typeof item === 'string') {
@@ -908,9 +928,13 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               ...extractImageModelParameterMetadata(rec),
             });
           }
-          setImageModelOptions(imageOptions);
+          setImageProviderOptions(uniq([...providerValues, ...imageOptions.map((item) => item.provider)]));
+          if (!request.providersOnly) setImageModelOptions(imageOptions);
         })
-        .catch(() => setImageModelOptions([]))
+        .catch(() => {
+          if (!request.providersOnly) setImageModelOptions([]);
+          setImageProviderOptions([]);
+        })
         .finally(() => setLoadingMediaModels(false));
       return;
     }
@@ -1506,6 +1530,80 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     return '';
   };
 
+  const providerOptionsForScope = (scope: PinCatalogScope): AfSelectOption[] => {
+    if (scope === 'text') {
+      return providers
+        .filter((p) => p && typeof p.name === 'string' && p.name.trim())
+        .map((p) => ({ value: p.name, label: (p as any).display_name || p.name }))
+        .sort((a, b) => a.label.localeCompare(b.label));
+    }
+    if (scope === 'image') return selectOptionsFromValues([...imageProviderOptions, ...imageModelOptions.map((item) => item.provider)]);
+    if (scope === 'tts') return selectOptionsFromValues(ttsProviderOptions);
+    if (scope === 'stt') return selectOptionsFromValues(sttProviderOptions);
+    if (scope === 'music') return selectOptionsFromValues(musicProviderOptions);
+    return [];
+  };
+
+  const modelOptionsForScope = (scope: PinCatalogScope, provider: string): AfSelectOption[] => {
+    if (scope === 'text') {
+      return (models || [])
+        .filter((m): m is string => typeof m === 'string' && m.trim().length > 0)
+        .map((m) => ({ value: m, label: m }));
+    }
+    if (scope === 'image') {
+      const normalizedProvider = normalizeMediaProvider(provider);
+      return imageModelOptions
+        .filter((item) => !normalizedProvider || normalizeMediaProvider(item.provider) === normalizedProvider)
+        .map((item) => ({ value: item.model, label: item.label || item.model }));
+    }
+    if (scope === 'tts') return selectOptionsFromValues(ttsModelOptions);
+    if (scope === 'stt') return selectOptionsFromValues(sttModelOptions);
+    if (scope === 'music') return selectOptionsFromValues(musicModelOptions);
+    return [];
+  };
+
+  const catalogLoadingForScope = (scope: PinCatalogScope, options: AfSelectOption[]) => {
+    if (scope === 'text') return loadingProviders || loadingModels;
+    return loadingMediaModels && options.length === 0;
+  };
+
+  const providerSearchPlaceholderForScope = (scope: PinCatalogScope) => {
+    if (scope === 'image') return 'Search image providers…';
+    if (scope === 'tts') return 'Search TTS providers…';
+    if (scope === 'stt') return 'Search STT providers…';
+    if (scope === 'music') return 'Search music providers…';
+    return 'Search providers…';
+  };
+
+  const modelSearchPlaceholderForScope = (scope: PinCatalogScope) => {
+    if (scope === 'image') return 'Search image models…';
+    if (scope === 'tts') return 'Search TTS models…';
+    if (scope === 'stt') return 'Search STT models…';
+    if (scope === 'music') return 'Search music models…';
+    return 'Search models…';
+  };
+
+  const requestProviderOptionsForScope = (scope: PinCatalogScope) => {
+    if (scope === 'image') requestMediaCatalog('image', { task: generatedImageProviderModelsTask, providersOnly: true });
+    if (scope === 'tts') requestMediaCatalog('tts');
+    if (scope === 'stt') requestMediaCatalog('stt');
+    if (scope === 'music') requestMediaCatalog('music');
+  };
+
+  const requestModelOptionsForScope = (scope: PinCatalogScope, provider: string) => {
+    if (scope === 'image') requestMediaCatalog('image', { provider, task: generatedImageProviderModelsTask });
+    if (scope === 'tts') requestMediaCatalog('tts', { provider });
+    if (scope === 'stt') requestMediaCatalog('stt', { provider });
+    if (scope === 'music') requestMediaCatalog('music', { provider });
+  };
+
+  const providerDefaultForModelPin = (pin: Pin, pins: Pin[]) => {
+    const providerPinId = providerPinIdForModelPin(pin, pins, data.nodeType);
+    if (!providerPinId) return '';
+    const raw = data.pinDefaults ? (data.pinDefaults as any)[providerPinId] : undefined;
+    return typeof raw === 'string' ? raw : '';
+  };
+
   const normalizeRouteHandle = (handle: unknown): string => {
     const value = typeof handle === 'string' ? handle.trim() : '';
     return value || 'exec-out';
@@ -1707,9 +1805,10 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     }
     if (data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image') {
       const pinBlocked = isInputPinConnected('image_provider') || isInputPinConnected('image_model');
-      const unsupportedReason = modelResidencyTaskUnsupportedReason(gatewayContracts, 'image_generation');
+      const task = data.nodeType === 'edit_image' || data.nodeType === 'image_to_image' ? 'image_to_image' : 'image_generation';
+      const unsupportedReason = modelResidencyTaskUnsupportedReason(gatewayContracts, task);
       return {
-        task: 'image_generation',
+        task,
         provider: isInputPinConnected('image_provider')
           ? ''
           : first(data.effectConfig?.image_provider, data.pinDefaults?.image_provider, data.effectConfig?.provider, data.pinDefaults?.provider),
@@ -2040,7 +2139,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
               if (mediaNode && pin.id === 'image_provider') {
                 const currentProvider = stringDefaultFor('image_provider', 'provider');
-                const providerOptions = selectOptionsFromValues(imageModelOptions.map((item) => item.provider));
+                const providerOptions = selectOptionsFromValues([...imageProviderOptions, ...imageModelOptions.map((item) => item.provider)]);
                 const imageTask =
                   data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
                     ? editedImageProviderModelsTask
@@ -2057,7 +2156,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                       searchPlaceholder="Search image providers…"
                       clearable
                       minPopoverWidth={300}
-                      onOpen={() => requestMediaCatalog('image', { task: imageTask })}
+                      onOpen={() => requestMediaCatalog('image', { task: imageTask, providersOnly: true })}
                       onChange={(value) => {
                         const provider = normalizeMediaProvider(value || '');
                         patchMediaDefaults(
@@ -2112,7 +2211,8 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                         );
                         const nextDefaults = applyImagePinDefaultPatch(
                           { ...((data.pinDefaults || {}) as Record<string, JsonValue>) },
-                          picked
+                          picked,
+                          { excludeKeys: imageTask === 'image_to_image' ? ['width', 'height'] : undefined }
                         );
                         if (cleanModel) nextDefaults.image_model = cleanModel;
                         else delete nextDefaults.image_model;
@@ -2135,7 +2235,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
               if (mediaNode && pin.id === 'video_provider') {
                 const currentProvider = stringDefaultFor('video_provider', 'provider');
-                const providerOptions = selectOptionsFromValues(imageModelOptions.map((item) => item.provider));
+                const providerOptions = selectOptionsFromValues([...imageProviderOptions, ...imageModelOptions.map((item) => item.provider)]);
                 const videoTask = data.nodeType === 'image_to_video' ? imageToVideoProviderModelsTask : generatedVideoProviderModelsTask;
                 return (
                   <div key={pin.id} className="property-group">
@@ -2149,7 +2249,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                       searchPlaceholder="Search video providers…"
                       clearable
                       minPopoverWidth={300}
-                      onOpen={() => requestMediaCatalog('image', { task: videoTask })}
+                      onOpen={() => requestMediaCatalog('image', { task: videoTask, providersOnly: true })}
                       onChange={(value) => {
                         const provider = normalizeMediaProvider(value || '');
                         patchMediaDefaults(
@@ -2201,7 +2301,8 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                         );
                         const nextDefaults = applyImagePinDefaultPatch(
                           { ...((data.pinDefaults || {}) as Record<string, JsonValue>) },
-                          picked
+                          picked,
+                          { includeGuidanceScale: true }
                         );
                         if (cleanModel) nextDefaults.video_model = cleanModel;
                         else delete nextDefaults.video_model;
@@ -4448,55 +4549,54 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
             const used = new Set(data.outputs.map((p) => p.id));
 
-            const providerOptions = providers
-              .filter((p) => p && typeof p.name === 'string' && p.name.trim())
-              .map((p) => ({ value: p.name, label: (p as any).display_name || p.name }));
-            providerOptions.sort((a, b) => a.label.localeCompare(b.label));
-
-            const modelOptions = (models || [])
-              .filter((m): m is string => typeof m === 'string' && m.trim().length > 0)
-              .map((m) => ({ value: m, label: m }));
-
             const toolOptions = toolSpecs
               .filter((t) => t && typeof t.name === 'string' && t.name.trim())
               .map((t) => ({ value: t.name.trim(), label: t.name.trim() }))
               .sort((a, b) => a.label.localeCompare(b.label));
 
-            const providerParam = params.find(isTextProviderPin);
-            const providerDefault =
-              providerParam && data.pinDefaults && typeof (data.pinDefaults as any)[providerParam.id] === 'string'
-                ? String((data.pinDefaults as any)[providerParam.id] || '')
-                : '';
-
             const renderDefaultEditor = (pin: Pin) => {
               const raw = data.pinDefaults ? (data.pinDefaults as any)[pin.id] : undefined;
               const defaultHint = `Default value for ${pin.id}`;
+              const providerScope = providerCatalogScopeForPin(pin, data.nodeType);
 
-              if (isTextProviderPin(pin)) {
+              if (providerScope) {
                 const value = typeof raw === 'string' ? raw : '';
+                const scopedOptions = providerOptionsForScope(providerScope);
                 return (
                   <AfSelect
                     value={value}
-                    options={providerOptions}
+                    options={scopedOptions}
                     placeholder={defaultHint}
-                    loading={loadingProviders}
+                    loading={providerScope === 'text' ? loadingProviders : catalogLoadingForScope(providerScope, scopedOptions)}
+                    searchable
+                    searchPlaceholder={providerSearchPlaceholderForScope(providerScope)}
                     clearable
+                    onOpen={() => requestProviderOptionsForScope(providerScope)}
                     onChange={(v) => setPinDefault(pin.id, v)}
                   />
                 );
               }
 
-              if (isTextModelPin(pin)) {
+              const modelScope = modelCatalogScopeForPin(pin, params, data.nodeType);
+              if (modelScope) {
                 const value = typeof raw === 'string' ? raw : '';
-                const disabled = !providerDefault;
+                const providerPinId = providerPinIdForModelPin(pin, params, data.nodeType);
+                const providerDefault = providerDefaultForModelPin(pin, params);
+                const disabled = Boolean(providerPinId) && !providerDefault;
+                const scopedOptions = modelOptionsForScope(modelScope, providerDefault);
                 return (
                   <AfSelect
                     value={value}
-                    options={modelOptions}
+                    options={scopedOptions}
                     placeholder={providerDefault ? defaultHint : `${defaultHint} (set provider first)`}
-                    loading={loadingModels}
+                    loading={modelScope === 'text' ? loadingModels : catalogLoadingForScope(modelScope, scopedOptions)}
                     disabled={disabled}
+                    searchable
+                    searchPlaceholder={modelSearchPlaceholderForScope(modelScope)}
                     clearable
+                    onOpen={() => {
+                      if (!disabled) requestModelOptionsForScope(modelScope, providerDefault);
+                    }}
                     onChange={(v) => setPinDefault(pin.id, v)}
                   />
                 );
@@ -4817,53 +4917,54 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
             const outs = data.inputs.filter((p) => p.type !== 'execution');
             const used = new Set(data.inputs.map((p) => p.id));
 
-            const providerOptions = providers
-              .filter((p) => p && typeof p.name === 'string' && p.name.trim())
-              .map((p) => ({ value: p.name, label: (p as any).display_name || p.name }));
-            providerOptions.sort((a, b) => a.label.localeCompare(b.label));
-            const modelOptions = (models || [])
-              .filter((m): m is string => typeof m === 'string' && m.trim().length > 0)
-              .map((m) => ({ value: m, label: m }));
             const toolOptions = toolSpecs
               .filter((t) => t && typeof t.name === 'string' && t.name.trim())
               .map((t) => ({ value: t.name.trim(), label: t.name.trim() }))
               .sort((a, b) => a.label.localeCompare(b.label));
 
-            const providerOut = outs.find(isTextProviderPin);
-            const providerDefault =
-              providerOut && data.pinDefaults && typeof (data.pinDefaults as any)[providerOut.id] === 'string'
-                ? String((data.pinDefaults as any)[providerOut.id] || '')
-                : '';
-
             const renderDefaultEditor = (pin: Pin) => {
               const raw = data.pinDefaults ? (data.pinDefaults as any)[pin.id] : undefined;
               const defaultHint = `Default value for ${pin.id}`;
+              const providerScope = providerCatalogScopeForPin(pin, data.nodeType);
 
-              if (isTextProviderPin(pin)) {
+              if (providerScope) {
                 const value = typeof raw === 'string' ? raw : '';
+                const scopedOptions = providerOptionsForScope(providerScope);
                 return (
                   <AfSelect
                     value={value}
-                    options={providerOptions}
+                    options={scopedOptions}
                     placeholder={defaultHint}
-                    loading={loadingProviders}
+                    loading={providerScope === 'text' ? loadingProviders : catalogLoadingForScope(providerScope, scopedOptions)}
+                    searchable
+                    searchPlaceholder={providerSearchPlaceholderForScope(providerScope)}
                     clearable
+                    onOpen={() => requestProviderOptionsForScope(providerScope)}
                     onChange={(v) => setPinDefault(pin.id, v)}
                   />
                 );
               }
 
-              if (isTextModelPin(pin)) {
+              const modelScope = modelCatalogScopeForPin(pin, outs, data.nodeType);
+              if (modelScope) {
                 const value = typeof raw === 'string' ? raw : '';
-                const disabled = !providerDefault;
+                const providerPinId = providerPinIdForModelPin(pin, outs, data.nodeType);
+                const providerDefault = providerDefaultForModelPin(pin, outs);
+                const disabled = Boolean(providerPinId) && !providerDefault;
+                const scopedOptions = modelOptionsForScope(modelScope, providerDefault);
                 return (
                   <AfSelect
                     value={value}
-                    options={modelOptions}
+                    options={scopedOptions}
                     placeholder={providerDefault ? defaultHint : `${defaultHint} (set provider first)`}
-                    loading={loadingModels}
+                    loading={modelScope === 'text' ? loadingModels : catalogLoadingForScope(modelScope, scopedOptions)}
                     disabled={disabled}
+                    searchable
+                    searchPlaceholder={modelSearchPlaceholderForScope(modelScope)}
                     clearable
+                    onOpen={() => {
+                      if (!disabled) requestModelOptionsForScope(modelScope, providerDefault);
+                    }}
                     onChange={(v) => setPinDefault(pin.id, v)}
                   />
                 );
@@ -5373,7 +5474,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         const seenProviders = new Set<string>();
         if (taskValue === 'text_generation') {
           for (const item of providers) addOption(residencyProviderOptions, seenProviders, item.name, item.display_name || item.name);
-        } else if (taskValue === 'image_generation') {
+        } else if (taskValue === 'image_generation' || taskValue === 'image_to_image') {
           for (const item of imageModelOptions) addOption(residencyProviderOptions, seenProviders, item.provider);
         } else if (taskValue === 'tts') {
           for (const item of ttsProviderOptions) addOption(residencyProviderOptions, seenProviders, item);
@@ -5388,7 +5489,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         const seenModels = new Set<string>();
         if (taskValue === 'text_generation') {
           for (const item of models) addOption(residencyModelOptions, seenModels, item);
-        } else if (taskValue === 'image_generation') {
+        } else if (taskValue === 'image_generation' || taskValue === 'image_to_image') {
           const normalizedProvider = normalizeMediaProvider(providerValue);
           for (const item of imageModelOptions) {
             if (normalizedProvider && normalizeMediaProvider(item.provider) !== normalizedProvider) continue;
@@ -5408,6 +5509,8 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         const taskPlaceholder =
           taskValue === 'image_generation'
             ? 'Image generation'
+            : taskValue === 'image_to_image'
+              ? 'Image edit'
             : taskValue === 'tts'
               ? 'Speech'
               : taskValue === 'stt'
@@ -5418,6 +5521,8 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         const providerPlaceholder =
           taskValue === 'image_generation'
             ? 'Image provider…'
+            : taskValue === 'image_to_image'
+              ? 'Image edit provider…'
             : taskValue === 'tts'
               ? 'Speech provider…'
               : taskValue === 'stt'
@@ -5426,13 +5531,17 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                   ? 'Music provider…'
                   : 'Provider…';
         const modelPlaceholder =
-          taskValue === 'tts'
-            ? 'Speech model…'
-            : taskValue === 'stt'
-              ? 'Transcription model…'
-              : taskValue === 'music_generation'
-                ? 'Music model…'
-                : 'Model…';
+          taskValue === 'image_generation'
+            ? 'Image model…'
+            : taskValue === 'image_to_image'
+              ? 'Image edit model…'
+            : taskValue === 'tts'
+              ? 'Speech model…'
+              : taskValue === 'stt'
+                ? 'Transcription model…'
+                : taskValue === 'music_generation'
+                  ? 'Music model…'
+                  : 'Model…';
         return (
           <div className="property-section">
             <label className="property-label">Model Residency</label>
@@ -5457,7 +5566,15 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 searchable={false}
                 clearable={false}
                 minPopoverWidth={220}
-                onChange={(value) => updateResidency({ task: value || 'text_generation', provider: undefined, model: undefined })}
+                onChange={(value) => {
+                  const nextTask = value || 'text_generation';
+                  updateResidency({ task: nextTask, provider: undefined, model: undefined });
+                  if (nextTask === 'image_generation') requestMediaCatalog('image');
+                  if (nextTask === 'image_to_image') requestMediaCatalog('image', { task: editedImageProviderModelsTask });
+                  if (nextTask === 'tts') requestMediaCatalog('tts');
+                  if (nextTask === 'stt') requestMediaCatalog('stt');
+                  if (nextTask === 'music_generation') requestMediaCatalog('music');
+                }}
               />
             </div>
             <div className="property-group">
@@ -5477,6 +5594,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                   searchPlaceholder="Search providers…"
                   onOpen={() => {
                     if (taskValue === 'image_generation') requestMediaCatalog('image');
+                    if (taskValue === 'image_to_image') requestMediaCatalog('image', { task: editedImageProviderModelsTask });
                     if (taskValue === 'tts') requestMediaCatalog('tts');
                     if (taskValue === 'stt') requestMediaCatalog('stt');
                     if (taskValue === 'music_generation') requestMediaCatalog('music');
@@ -5485,6 +5603,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                     const nextProvider = value.trim();
                     updateResidency({ provider: nextProvider || undefined, model: undefined });
                     if (taskValue === 'image_generation' && nextProvider) requestMediaCatalog('image', { provider: nextProvider });
+                    if (taskValue === 'image_to_image' && nextProvider) requestMediaCatalog('image', { provider: nextProvider, task: editedImageProviderModelsTask });
                     if (taskValue === 'tts') requestMediaCatalog('tts', { provider: nextProvider || undefined });
                     if (taskValue === 'stt') requestMediaCatalog('stt', { provider: nextProvider || undefined });
                     if (taskValue === 'music_generation') requestMediaCatalog('music', { provider: nextProvider || undefined });
@@ -5510,6 +5629,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                   searchPlaceholder="Search models…"
                   onOpen={() => {
                     if (taskValue === 'image_generation') requestMediaCatalog('image', providerValue ? { provider: providerValue } : {});
+                    if (taskValue === 'image_to_image') requestMediaCatalog('image', providerValue ? { provider: providerValue, task: editedImageProviderModelsTask } : { task: editedImageProviderModelsTask });
                     if (taskValue === 'tts') requestMediaCatalog('tts', providerValue ? { provider: providerValue } : {});
                     if (taskValue === 'stt') requestMediaCatalog('stt', providerValue ? { provider: providerValue } : {});
                     if (taskValue === 'music_generation') requestMediaCatalog('music', providerValue ? { provider: providerValue } : {});

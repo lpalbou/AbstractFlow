@@ -22,6 +22,7 @@ import { useExecutionWorkspace } from '../hooks/useExecutionWorkspace';
 import { RunSwitcherDropdown } from './RunSwitcherDropdown';
 import { JsonViewer } from './JsonViewer';
 import { KgActiveMemoryPanel } from './KgActiveMemoryPanel';
+import { ArtifactInputField } from './ArtifactInputField';
 import { artifactContentUrl, useArtifactObjectUrl } from './ArtifactPlayer';
 import {
   endpointFromDescriptor,
@@ -37,6 +38,11 @@ import {
   modelOptionsFromGatewayCatalog,
   providerOptionsFromGatewayCatalog,
 } from '../utils/gatewayCatalog';
+import {
+  isArtifactPinType,
+  parseArtifactRefText,
+  type CanonicalArtifactRef,
+} from '../utils/artifactInputs';
 
 type FlowGraphNode = {
   id: string;
@@ -489,6 +495,7 @@ function inferPromptCacheGraphTarget(nodes: FlowGraphNode[], edges: FlowGraphEdg
 
 type GeneratedImagePreview = {
   artifactId: string;
+  runId: string;
   src: string;
   fallbackSrcs?: string[];
   contentType?: string;
@@ -502,6 +509,7 @@ type GeneratedImagePreview = {
 
 type GeneratedAudioPreview = {
   artifactId: string;
+  runId: string;
   src: string;
   fallbackSrcs?: string[];
   contentType?: string;
@@ -514,6 +522,7 @@ type GeneratedAudioPreview = {
 
 type GeneratedVideoPreview = {
   artifactId: string;
+  runId: string;
   src: string;
   fallbackSrcs?: string[];
   contentType?: string;
@@ -694,6 +703,7 @@ function extractGeneratedImagePreview(
     undefined;
   return {
     artifactId,
+    runId: runCandidates[0],
     src: artifactContentUrl(artifactContentDescriptor, runCandidates[0], artifactId),
     fallbackSrcs: runCandidates.slice(1).map((candidate) => artifactContentUrl(artifactContentDescriptor, candidate, artifactId)),
     contentType: imageRaw && typeof imageRaw.content_type === 'string' ? imageRaw.content_type : typeof generatedRecord?.content_type === 'string' ? generatedRecord.content_type : undefined,
@@ -805,6 +815,7 @@ function extractGeneratedAudioPreview(
 
   return {
     artifactId,
+    runId: runCandidates[0],
     src: artifactContentUrl(artifactContentDescriptor, runCandidates[0], artifactId),
     fallbackSrcs: runCandidates.slice(1).map((candidate) => artifactContentUrl(artifactContentDescriptor, candidate, artifactId)),
     contentType: audioRaw && typeof audioRaw.content_type === 'string' ? audioRaw.content_type : typeof generatedItem?.content_type === 'string' ? generatedItem.content_type : undefined,
@@ -911,6 +922,7 @@ function extractGeneratedVideoPreview(
 
   return {
     artifactId,
+    runId: runCandidates[0],
     src: artifactContentUrl(artifactContentDescriptor, runCandidates[0], artifactId),
     fallbackSrcs: runCandidates.slice(1).map((candidate) => artifactContentUrl(artifactContentDescriptor, candidate, artifactId)),
     contentType: typeof videoRaw?.content_type === 'string' ? videoRaw.content_type : typeof generatedItem?.content_type === 'string' ? generatedItem.content_type : undefined,
@@ -993,6 +1005,76 @@ function progressPercent(value: Record<string, unknown> | null | undefined): num
   return null;
 }
 
+function progressDurationMs(
+  value: Record<string, unknown> | null | undefined,
+  secondKeys: string[],
+  msKeys: string[] = []
+): number | null {
+  if (!value) return null;
+  for (const key of msKeys) {
+    const raw = progressNumber(value[key]);
+    if (raw != null && raw >= 0) return raw;
+  }
+  for (const key of secondKeys) {
+    const raw = progressNumber(value[key]);
+    if (raw != null && raw >= 0) return raw * 1000;
+  }
+  return null;
+}
+
+function parseTimeMs(value: unknown): number | null {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const ms = new Date(value).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function formatProgressDurationMs(rawMs: unknown): string {
+  const ms = typeof rawMs === 'number' ? rawMs : rawMs == null ? NaN : Number(rawMs);
+  if (!Number.isFinite(ms) || ms < 0) return '';
+  if (ms < 1000) return '<1s';
+  const totalSeconds = Math.max(1, Math.round(ms / 1000));
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (totalMinutes < 60) return `${totalMinutes}m ${seconds.toString().padStart(2, '0')}s`;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${hours}h ${minutes.toString().padStart(2, '0')}m`;
+}
+
+function progressTimingParts(
+  value: Record<string, unknown> | null | undefined,
+  startedAt: string | undefined,
+  nowMs: number
+): { elapsedLabel?: string; remainingLabel?: string; remainingApproximate?: boolean } | null {
+  if (!value) return null;
+  const directElapsedMs = progressDurationMs(
+    value,
+    ['elapsed_s', 'elapsed_seconds', 'elapsed'],
+    ['elapsed_ms']
+  );
+  const startedMs = parseTimeMs(startedAt);
+  const elapsedMs = directElapsedMs ?? (startedMs != null ? Math.max(0, nowMs - startedMs) : null);
+
+  let remainingMs = progressDurationMs(
+    value,
+    ['remaining_s', 'remaining_seconds', 'eta_s', 'eta_seconds', 'eta'],
+    ['remaining_ms', 'eta_ms']
+  );
+  let remainingApproximate = false;
+  const pct = progressPercent(value);
+  if (remainingMs == null && elapsedMs != null && pct != null && pct >= 1 && pct < 99.9) {
+    remainingMs = (elapsedMs * (100 - pct)) / pct;
+    remainingApproximate = true;
+  }
+
+  const elapsedLabel = elapsedMs != null ? `Elapsed ${formatProgressDurationMs(elapsedMs)}` : undefined;
+  const remainingLabel = remainingMs != null
+    ? `Remaining ${remainingApproximate ? '~' : ''}${formatProgressDurationMs(remainingMs)}`
+    : undefined;
+  return elapsedLabel || remainingLabel ? { elapsedLabel, remainingLabel, remainingApproximate } : null;
+}
+
 function formatProgressSummary(value: Record<string, unknown> | null | undefined): string {
   if (!value) return '';
   const phase =
@@ -1014,14 +1096,16 @@ function formatProgressSummary(value: Record<string, unknown> | null | undefined
   const step = progressNumber(value.step);
   const totalSteps = progressNumber(value.total_steps);
   if (step != null && totalSteps != null) parts.push(`step ${Math.floor(step)}/${Math.floor(totalSteps)}`);
-  const pct = progressPercent(value);
-  if (pct != null) parts.push(`${pct.toFixed(1)}%`);
-  const eta = progressNumber(value.eta_s);
-  if (eta != null && eta > 0) parts.push(`ETA ${Math.ceil(eta)}s`);
   return parts.join(' · ');
 }
 
-function GeneratedImageCard({ preview, compact = false }: { preview: GeneratedImagePreview; compact?: boolean }) {
+function GeneratedImageCard({
+  preview,
+  compact = false,
+}: {
+  preview: GeneratedImagePreview;
+  compact?: boolean;
+}) {
   const { objectUrl, loading, error } = useArtifactObjectUrl(preview.src, preview.contentType || 'image/png', preview.fallbackSrcs);
   const displayUrl = objectUrl || preview.src;
   return (
@@ -1246,7 +1330,7 @@ function GeneratedTextCard({ preview, compact = false }: { preview: GeneratedTex
   );
 }
 
-function MinimizeWindowIcon({ size = 18 }: { size?: number }) {
+function CloseWindowIcon({ size = 10 }: { size?: number }) {
   return (
     <svg
       aria-hidden="true"
@@ -1256,8 +1340,22 @@ function MinimizeWindowIcon({ size = 18 }: { size?: number }) {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <path d="M7 9l5 5 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M5 17h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ReduceWindowIcon({ size = 10 }: { size?: number }) {
+  return (
+    <svg
+      aria-hidden="true"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d="M5 12h14" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
     </svg>
   );
 }
@@ -1421,6 +1519,11 @@ function getInputTypeForPin(pinType: string): 'text' | 'number' | 'checkbox' | '
     case 'object':
     case 'memory':
     case 'array':
+    case 'artifact':
+    case 'artifact_image':
+    case 'artifact_audio':
+    case 'artifact_text':
+    case 'artifact_video':
       return 'textarea';
     default:
       return 'text';
@@ -1439,6 +1542,12 @@ function getPlaceholderForPin(pin: Pin): string {
       return '{ }';
     case 'array':
       return '[ ]';
+    case 'artifact':
+    case 'artifact_image':
+    case 'artifact_audio':
+    case 'artifact_text':
+    case 'artifact_video':
+      return '{"$artifact":"...","run_id":"..."}';
     case 'provider':
     case 'provider_text':
     case 'provider_image':
@@ -1746,6 +1855,7 @@ export function RunFlowModal({
   const [showIgnoredPaths, setShowIgnoredPaths] = useState(false);
   const [sessionIdOverride, setSessionIdOverride] = useState('');
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
+  const [progressClockMs, setProgressClockMs] = useState(() => Date.now());
   const lastAutoTerminalStepIdRef = useRef<string | null>(null);
   const [rawJsonOpen, setRawJsonOpen] = useState(false);
   // Nested subflow observability: folded by default; per-step expansion keyed by the
@@ -1904,6 +2014,15 @@ export function RunFlowModal({
   const promptCacheGraphAmbiguous = Boolean(promptCacheGraphTarget?.multiple);
   const promptCacheSessionIdRaw = sessionPinId ? formValues[sessionPinId] : sessionIdOverride;
   const promptCacheSessionId = String(promptCacheSessionIdRaw || '').trim() || derivedSessionId;
+  const artifactSessionId = String(promptCacheSessionIdRaw || '').trim() || derivedSessionId || stableSessionId || '';
+  const workspaceIgnoredPaths = useMemo(
+    () =>
+      String(workspaceIgnoredPathsText || '')
+        .split('\n')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0),
+    [workspaceIgnoredPathsText]
+  );
   const promptCacheEnabled = Boolean(promptCacheSessionLifecycle && promptCacheProvider && promptCacheModel && promptCacheSessionId);
   const promptCacheResultUnavailable = Boolean(
     promptCacheResult && (promptCacheResult.ok === false || promptCacheResult.supported === false)
@@ -2229,6 +2348,15 @@ export function RunFlowModal({
           initialValues[pin.id] = raw;
           return;
         }
+        if (isArtifactPinType(pin.type)) {
+          try {
+            initialValues[pin.id] = JSON.stringify(raw, null, 2);
+            return;
+          } catch {
+            initialValues[pin.id] = '';
+            return;
+          }
+        }
         // Objects/arrays/assertions/memory (render as JSON in textarea pins).
         if (
           pin.type === 'object' ||
@@ -2456,6 +2584,12 @@ export function RunFlowModal({
       }
       const value = formValues[pin.id] || '';
 
+      if (isArtifactPinType(pin.type)) {
+        const ref = parseArtifactRefText(value);
+        if (ref) inputData[pin.id] = ref;
+        return;
+      }
+
       // Parse based on type
       switch (pin.type) {
         case 'number':
@@ -2493,12 +2627,8 @@ export function RunFlowModal({
       }
     }
     inputData.workspace_access_mode = workspaceAccessMode;
-    const ignored = String(workspaceIgnoredPathsText || '')
-      .split('\n')
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
-    if (ignored.length > 0) {
-      inputData.workspace_ignored_paths = ignored;
+    if (workspaceIgnoredPaths.length > 0) {
+      inputData.workspace_ignored_paths = workspaceIgnoredPaths;
     }
 
     const sessionValue = sessionPinId ? formValues[sessionPinId] : sessionIdOverride;
@@ -2540,7 +2670,7 @@ export function RunFlowModal({
     onRun,
     toolsValues,
     workspaceAccessMode,
-    workspaceIgnoredPathsText,
+    workspaceIgnoredPaths,
     workspaceInputEnabled,
     workspaceRoot,
     followUpContext,
@@ -2603,6 +2733,15 @@ export function RunFlowModal({
     const rem = s - m * 60;
     return `${m}m ${rem.toFixed(0)}s`;
   };
+
+  useEffect(() => {
+    if (!(isRunning || isPaused || isWaiting)) {
+      setProgressClockMs(Date.now());
+      return;
+    }
+    const timer = window.setInterval(() => setProgressClockMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [isPaused, isRunning, isWaiting]);
 
   const formatTokenBadge = (m?: ExecutionMetrics | null): string => {
     if (!m) return '';
@@ -3872,6 +4011,10 @@ export function RunFlowModal({
     selectedStep?.metrics && selectedStep.metrics.duration_ms != null
       ? formatDuration(selectedStep.metrics.duration_ms)
       : '';
+  const selectedProgressPct = selectedStep?.progress ? progressPercent(selectedStep.progress) : null;
+  const selectedProgressTiming = selectedStep?.progress
+    ? progressTimingParts(selectedStep.progress, selectedStep.startedAt, progressClockMs)
+    : null;
   const detailsBodyClass =
     selectedStep?.nodeType === 'agent' ? 'run-details-body run-details-body--agent' : 'run-details-body';
   const tokenBadge = selectedStep?.metrics ? formatTokenBadge(selectedStep.metrics) : '';
@@ -4127,6 +4270,9 @@ export function RunFlowModal({
   }, [computedFinalResult, result]);
 
   const hasRunData = isRunning || effectiveResult != null || events.length > 0;
+  const isActiveRun = Boolean(isRunning || isPaused || isWaiting);
+  const isBeforeRun = !hasRunData && !isActiveRun;
+  const hasCompletedRun = hasRunData && !isActiveRun;
 
   const showFinalResult = useMemo(() => {
     if (!effectiveResult || isRunning) return false;
@@ -5222,13 +5368,41 @@ export function RunFlowModal({
   return isMinimized ? minibar : (
     <div className="modal-overlay" onClick={onClose}>
       <div className={`modal run-modal${isMaximized ? ' run-modal-maximized' : ''}`} onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
-        <div className="run-modal-header">
-          <div className="run-modal-header-left">
+        <div className="run-modal-titlebar">
+          <div className="run-window-controls" aria-label="Run window controls">
+            <button
+              type="button"
+              className="run-window-control close"
+              onClick={onClose}
+              title="Close"
+              aria-label="Close run modal"
+            >
+              <CloseWindowIcon />
+            </button>
+            <button
+              type="button"
+              className="run-window-control reduce"
+              onClick={() => setIsMinimized(true)}
+              title="Reduce"
+              aria-label="Reduce run modal"
+            >
+              <ReduceWindowIcon />
+            </button>
+            <button
+              type="button"
+              className="run-window-control maximize"
+              onClick={() => setIsMaximized((v) => !v)}
+              title={isMaximized ? 'Restore' : 'Maximize'}
+              aria-label={isMaximized ? 'Restore run modal size' : 'Maximize run modal'}
+            >
+              {isMaximized ? <RestoreWindowIcon size={10} /> : <MaximizeWindowIcon size={10} />}
+            </button>
+          </div>
+          <div className="run-modal-titlebar-title">
             <h3>▶ {runTitle}</h3>
             <span className="run-modal-flow-name">{runSubtitle}</span>
           </div>
-          <div className="run-modal-header-right">
+          <div className="run-modal-titlebar-right">
             {flowId && onSelectRunId ? (
               <RunSwitcherDropdown
                 workflowId={flowId}
@@ -5237,24 +5411,6 @@ export function RunFlowModal({
                 onSelectRun={onSelectRunId}
               />
             ) : null}
-            <button
-              type="button"
-              className="run-minimize-btn"
-              onClick={() => setIsMinimized(true)}
-              title="Minimize"
-              aria-label="Minimize run modal"
-            >
-              <MinimizeWindowIcon />
-            </button>
-            <button
-              type="button"
-              className="run-maximize-btn"
-              onClick={() => setIsMaximized((v) => !v)}
-              title={isMaximized ? 'Restore' : 'Maximize'}
-              aria-label={isMaximized ? 'Restore run modal size' : 'Maximize run modal'}
-            >
-              {isMaximized ? <RestoreWindowIcon /> : <MaximizeWindowIcon />}
-            </button>
           </div>
         </div>
 
@@ -5392,6 +5548,10 @@ export function RunFlowModal({
                           s.status === 'completed' && s.metrics && s.metrics.duration_ms != null
                             ? formatDuration(s.metrics.duration_ms)
                             : '';
+                        const progressPct = s.progress ? progressPercent(s.progress) : null;
+                        const progressTiming = s.status === 'running' && s.progress
+                          ? progressTimingParts(s.progress, s.startedAt, progressClockMs)
+                          : null;
 
                         const hasChildren = Array.isArray(n.children) && n.children.length > 0;
                         const hasSequenceBranches = Array.isArray(n.sequenceBranches) && n.sequenceBranches.length > 0;
@@ -5488,15 +5648,25 @@ export function RunFlowModal({
                                   <div className="run-step-progress">
                                     <div className="run-step-progress-row">
                                       <span>{formatProgressSummary(s.progress) || 'running'}</span>
-                                      {progressPercent(s.progress) != null ? (
-                                        <span>{progressPercent(s.progress)?.toFixed(1)}%</span>
+                                      {progressPct != null ? (
+                                        <span>{progressPct.toFixed(1)}%</span>
                                       ) : null}
                                     </div>
-                                    {progressPercent(s.progress) != null ? (
+                                    {progressTiming ? (
+                                      <div className="run-step-progress-timing" aria-label="Progress timing">
+                                        {progressTiming.elapsedLabel ? <span>{progressTiming.elapsedLabel}</span> : null}
+                                        {progressTiming.remainingLabel ? (
+                                          <span title={progressTiming.remainingApproximate ? 'Estimated from elapsed time and current progress' : 'Reported by the backend'}>
+                                            {progressTiming.remainingLabel}
+                                          </span>
+                                        ) : null}
+                                      </div>
+                                    ) : null}
+                                    {progressPct != null ? (
                                       <div className="run-step-progress-track" aria-hidden="true">
                                         <div
                                           className="run-step-progress-fill"
-                                          style={{ width: `${progressPercent(s.progress) ?? 0}%` }}
+                                          style={{ width: `${progressPct}%` }}
                                         />
                                       </div>
                                     ) : null}
@@ -5612,15 +5782,25 @@ export function RunFlowModal({
                           <div className="run-step-progress">
                             <div className="run-step-progress-row">
                               <span>{formatProgressSummary(selectedStep.progress) || 'running'}</span>
-                              {progressPercent(selectedStep.progress) != null ? (
-                                <span>{progressPercent(selectedStep.progress)?.toFixed(1)}%</span>
+                              {selectedProgressPct != null ? (
+                                <span>{selectedProgressPct.toFixed(1)}%</span>
                               ) : null}
                             </div>
-                            {progressPercent(selectedStep.progress) != null ? (
+                            {selectedProgressTiming ? (
+                              <div className="run-step-progress-timing" aria-label="Progress timing">
+                                {selectedProgressTiming.elapsedLabel ? <span>{selectedProgressTiming.elapsedLabel}</span> : null}
+                                {selectedProgressTiming.remainingLabel ? (
+                                  <span title={selectedProgressTiming.remainingApproximate ? 'Estimated from elapsed time and current progress' : 'Reported by the backend'}>
+                                    {selectedProgressTiming.remainingLabel}
+                                  </span>
+                                ) : null}
+                              </div>
+                            ) : null}
+                            {selectedProgressPct != null ? (
                               <div className="run-step-progress-track" aria-hidden="true">
                                 <div
                                   className="run-step-progress-fill"
-                                  style={{ width: `${progressPercent(selectedStep.progress) ?? 0}%` }}
+                                  style={{ width: `${selectedProgressPct}%` }}
                                 />
                               </div>
                             ) : null}
@@ -6387,6 +6567,31 @@ export function RunFlowModal({
                           const inputType = getInputTypeForPin(pin.type);
                           const value = formValues[pin.id] || '';
 
+                          if (isArtifactPinType(pin.type)) {
+                            const artifactValue = parseArtifactRefText(value);
+                            return (
+                              <div key={pin.id} className="run-form-field">
+                                <label className="run-form-label">
+                                  {pin.label}
+                                  <span className="run-form-type">({pin.type})</span>
+                                </label>
+                                <ArtifactInputField
+                                  pin={pin}
+                                  value={artifactValue}
+                                  sessionId={artifactSessionId}
+                                  gatewayContracts={gatewayContracts}
+                                  disabled={isRunning}
+                                  workspaceRoot={workspaceRoot}
+                                  workspaceAccessMode={workspaceAccessMode}
+                                  workspaceIgnoredPaths={workspaceIgnoredPaths}
+                                  onChange={(ref: CanonicalArtifactRef | null) =>
+                                    handleFieldChange(pin.id, ref ? JSON.stringify(ref, null, 2) : '')
+                                  }
+                                />
+                              </div>
+                            );
+                          }
+
                           if (isImageProviderInputPin(pin)) {
                             return (
                               <div key={pin.id} className="run-form-field">
@@ -7025,18 +7230,7 @@ export function RunFlowModal({
             </div>
 
             <div className="run-modal-footer-right">
-              {onCancelRun && (
-                <button
-                  type="button"
-                  className="modal-button cancel"
-                  onClick={onCancelRun}
-                  disabled={!(isRunning || isPaused || isWaiting)}
-                >
-                  Cancel Run
-                </button>
-              )}
-
-              {(onPause || onResumeRun) && (
+              {isActiveRun && !isWaiting && (onPause || onResumeRun) && (
                 <button
                   type="button"
                   className={isPaused ? 'modal-button primary' : 'modal-button cancel'}
@@ -7050,30 +7244,40 @@ export function RunFlowModal({
                 </button>
               )}
 
-              <button
-                type="button"
-                className="modal-button cancel"
-                onClick={onClose}
-              >
-                {(isRunning || isPaused || isWaiting) ? 'Hide' : (hasRunData || result ? 'Close' : 'Cancel')}
-              </button>
-
-              {!hasRunData && !result && (
+              {isActiveRun && onCancelRun && (
                 <button
                   type="button"
-                  className="modal-button primary"
-                  onClick={handleSubmit}
-                  disabled={
-                    isRunning ||
-                    !entryNode ||
-                    (workspaceRootRequired && !workspaceRoot.trim() && !(workspaceRandom && executionWorkspaceQuery.isError))
-                  }
+                  className="modal-button cancel"
+                  onClick={onCancelRun}
                 >
-                  {isRunning ? 'Running...' : 'Run'}
+                  Cancel
                 </button>
               )}
 
-              {(hasRunData || result) && !isRunning && !isPaused && !isWaiting && onFollowUpSubmit && activeFollowUpSeed && (
+              {isBeforeRun && (
+                <>
+                  <button
+                    type="button"
+                    className="modal-button cancel"
+                    onClick={onClose}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="modal-button primary"
+                    onClick={handleSubmit}
+                    disabled={
+                      !entryNode ||
+                      (workspaceRootRequired && !workspaceRoot.trim() && !(workspaceRandom && executionWorkspaceQuery.isError))
+                    }
+                  >
+                    Run
+                  </button>
+                </>
+              )}
+
+              {hasCompletedRun && onFollowUpSubmit && activeFollowUpSeed && (
                 <button
                   type="button"
                   className="modal-button cancel"
@@ -7086,7 +7290,7 @@ export function RunFlowModal({
                 </button>
               )}
 
-              {(hasRunData || result) && onNewRun && (
+              {hasCompletedRun && onNewRun && (
                 <button
                   type="button"
                   className="modal-button primary"
@@ -7103,7 +7307,6 @@ export function RunFlowModal({
                     }
                     onNewRun();
                   }}
-                  disabled={isRunning || Boolean(isPaused) || Boolean(isWaiting)}
                 >
                   New Run
                 </button>

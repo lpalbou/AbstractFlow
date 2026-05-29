@@ -274,7 +274,7 @@ export interface FlowNodeData {
     provider?: string;     // For llm_call
     model?: string;        // For llm_call
     operation?: string;    // For model_residency: list_loaded, load, unload
-    task?: string;         // For model_residency: text_generation, image_generation, tts, stt, music_generation
+    task?: string;         // For model_residency: text_generation, image_generation, image_to_image, text_to_video, image_to_video, tts, stt, music_generation
     runtime_id?: string;   // For model_residency unload
     base_url?: string;     // For model_residency disambiguation/remote provider override
     timeout_s?: number;    // For model_residency load/unload control calls
@@ -302,7 +302,7 @@ export interface FlowNodeData {
     music_provider?: string; // For generated music backend/catalog selection
     music_model?: string;    // For generated music backend/catalog selection
     format?: string;       // For generated media nodes
-    size?: string;         // For generated image
+    size?: string;         // Legacy OpenAI-compatible image size selector; Flow UI uses width/height.
     width?: number;        // For generated image
     height?: number;       // For generated image
     frames?: number;       // For generated video

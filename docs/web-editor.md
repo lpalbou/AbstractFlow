@@ -6,8 +6,9 @@ This repository includes a reference visual editor:
 - Legacy/dev FastAPI host: `web/backend/`
 
 The primary runtime host is now AbstractGateway. The editor saves VisualFlow JSON through Gateway, publishes `.flow` bundles there, starts runs through Gateway, and renders Gateway ledger/artifact/history streams.
-Install a host profile (`abstractflow[apple]` or `abstractflow[gpu]`)
-to run the local Python host/proxy stack.
+Install base `abstractgateway` for the remote-light HTTP/SSE host. Use
+`abstractflow[apple]` or `abstractflow[gpu]` only when you also need the local
+Python compatibility host/profile.
 
 See also: [../README.md](../README.md), [getting-started.md](getting-started.md), [faq.md](faq.md), [visualflow.md](visualflow.md), [architecture.md](architecture.md).
 
@@ -68,14 +69,21 @@ endpoint descriptors for concrete request paths.
 Generated image, video, voice, and music results are Gateway artifacts. The Run
 modal renders images, videos, and audio/music players from artifact content and
 keeps child run, artifact metadata, ledger, and raw JSON details available for
-debugging. Gateway `abstract.progress` events are surfaced as progress on the
-running step so long video generations remain observable.
+debugging. The `artifact content` link opens or downloads the payload; writing
+artifacts to workspace files belongs in graph-level file/artifact IO nodes, not
+in the Run modal. Gateway `abstract.progress` events are surfaced as progress on
+the running step so long video generations remain observable.
 
 Model residency controls are also Gateway-driven. If the Gateway advertises
 the model-residency routes, text, image, video, voice, transcription, and music
 warmup/list/unload authoring remains available through Gateway. Gateway/Runtime
 still owns the final support decision and returns skipped/unsupported results
 when a connected deployment cannot honor a specific residency operation.
+
+KG memory nodes are gated by Gateway's `common.memory` contract. A correctly
+installed Gateway with AbstractMemory and a resolvable backend should expose
+those nodes even before the persistent store has been created; empty KG queries
+return empty results until a flow asserts triples.
 
 ## Run (from source / dev mode)
 
@@ -167,6 +175,18 @@ The Run UI uses Gateway's replay-first HTTP/SSE contract:
 - start: `POST /api/gateway/runs/start`
 - commands: `POST /api/gateway/commands`
 - stream: `GET /api/gateway/runs/{run_id}/ledger/stream`
-- artifacts: `GET /api/gateway/runs/{run_id}/artifacts/{artifact_id}/content`
+- artifact content: `GET /api/gateway/runs/{run_id}/artifacts/{artifact_id}/content`
+- session artifacts: `GET /api/gateway/sessions/{session_id}/artifacts`
+- artifact search: `GET /api/gateway/artifacts/search`
+- artifact import: `POST /api/gateway/artifacts/import`
+- artifact export: `POST /api/gateway/runs/{run_id}/artifacts/{artifact_id}/export`
+
+When a start pin is typed as `artifact`, `artifact_image`, `artifact_audio`,
+`artifact_text`, or `artifact_video`, the Run modal submits a structured artifact
+ref. Browser files are uploaded through Gateway; server workspace files are
+imported through Gateway's workspace policy; existing choices come from Gateway
+artifact search when advertised, with a session-list fallback for older
+gateways. The search UI can scope to all artifacts or the current session,
+filters by the pin's modality, and accepts simple metadata filters.
 
 The legacy WebSocket host still exists in [../web/backend/routes/ws.py](../web/backend/routes/ws.py) for development/reference use and is mounted only when `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1`.

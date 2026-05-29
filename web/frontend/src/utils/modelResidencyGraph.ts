@@ -28,6 +28,7 @@ export interface InsertModelResidencyStepResult {
 export function modelResidencyTaskLabel(task: string): string {
   if (task === 'text_generation') return 'Text generation';
   if (task === 'image_generation') return 'Image generation';
+  if (task === 'image_to_image') return 'Image edit';
   if (task === 'tts') return 'Speech';
   if (task === 'stt') return 'Transcription';
   if (task === 'music_generation') return 'Music generation';

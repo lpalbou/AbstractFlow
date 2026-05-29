@@ -5,6 +5,24 @@ All notable changes to AbstractFlow will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.16] - 2026-05-29
+
+### Added
+- Artifact input selection in the Run modal, including Gateway-backed search/filtering for reusable text, document, image, video, voice, audio, and music artifacts.
+- Artifact search/import/export contract support in the Gateway client layer, while keeping file read/write behavior as graph-level nodes rather than modal-only actions.
+- Staged Deep Research demo workflow for authoring demonstrations.
+
+### Changed
+- Media nodes now surface the critical sampling controls (`steps`, `seed`, and `guidance`) consistently for image and video generation/editing, with model defaults used when fields are left empty.
+- Run progress rendering now includes elapsed/estimated remaining time when Gateway progress events provide enough timing data.
+- The Run modal now uses a window-style top bar and only shows lifecycle actions that match the current run state.
+- Apple/GPU Flow profiles now require Gateway `>=0.2.21` and Agent `>=0.3.9`; hosted CI/release tests install the base Gateway package because HTTP/SSE is part of the light install.
+
+### Fixed
+- Media provider selectors now keep image/video provider defaults scoped to media providers instead of showing text-only providers.
+- Canvas interactions avoid stale pointer-capture state after trackpad/mouse release events.
+- Generated media cards no longer expose a modal-level export button; artifact-to-file workflows should use graph nodes.
+
 ## [0.3.15] - 2026-05-26
 
 ### Added

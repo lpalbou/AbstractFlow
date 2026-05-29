@@ -1,0 +1,347 @@
+{
+  "id": "demo_deep_research_staged",
+  "name": "Demo - Deep Research Staged",
+  "description": "Small staged demonstration workflow: scope the question, gather evidence with web tools, summarize the trace, then synthesize a final deep research report. Defaults to lmstudio:qwen/qwen3.6-35b-a3b.",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": { "x": -1040.0, "y": 32.0 },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Research Request",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "prompt", "label": "question", "type": "string" },
+          { "id": "provider", "label": "provider", "type": "provider" },
+          { "id": "model", "label": "model", "type": "model" },
+          { "id": "max_web_search", "label": "max_search", "type": "number" },
+          { "id": "max_fetch_url", "label": "max_fetch", "type": "number" },
+          { "id": "max_iterations", "label": "max_iterations", "type": "number" }
+        ],
+        "pinDefaults": {
+          "prompt": "Research whether open-source local LLM tooling is mature enough for a privacy-sensitive internal analyst assistant in 2026.",
+          "provider": "lmstudio",
+          "model": "qwen/qwen3.6-35b-a3b",
+          "max_web_search": 5,
+          "max_fetch_url": 4,
+          "max_iterations": 22
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "scope",
+      "type": "llm_call",
+      "position": { "x": -704.0, "y": 32.0 },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Scope & Plan",
+        "icon": "&#x1F9E0;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "use_context", "label": "use_context", "type": "boolean" },
+          { "id": "context", "label": "context", "type": "object" },
+          { "id": "provider", "label": "provider", "type": "provider" },
+          { "id": "model", "label": "model", "type": "model" },
+          { "id": "system", "label": "system", "type": "string" },
+          { "id": "prompt", "label": "question", "type": "string" },
+          { "id": "tools", "label": "tools", "type": "array" },
+          { "id": "max_in_tokens", "label": "max_in_tokens", "type": "number" },
+          { "id": "temperature", "label": "temperature", "type": "number" },
+          { "id": "seed", "label": "seed", "type": "number" },
+          { "id": "resp_schema", "label": "resp_schema", "type": "object" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "response", "label": "research_plan", "type": "string" },
+          { "id": "success", "label": "success", "type": "boolean" },
+          { "id": "meta", "label": "meta", "type": "object" },
+          { "id": "tool_calls", "label": "tool_calls", "type": "array" }
+        ],
+        "pinDefaults": {
+          "use_context": false,
+          "system": "You scope deep research tasks. Produce a short Markdown research plan: key questions, likely evidence sources, comparison axes, and success criteria.",
+          "temperature": 0.2
+        },
+        "effectConfig": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3.6-35b-a3b",
+          "temperature": 0.2
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "tools",
+      "type": "tools_allowlist",
+      "position": { "x": -704.0, "y": 376.0 },
+      "data": {
+        "nodeType": "tools_allowlist",
+        "label": "Web Research Tools",
+        "icon": "&#x1F9F0;",
+        "headerColor": "#FF8800",
+        "inputs": [],
+        "outputs": [
+          { "id": "tools", "label": "tools", "type": "array" }
+        ],
+        "literalValue": ["web_search", "fetch_url"]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "evidence_task",
+      "type": "concat",
+      "position": { "x": -368.0, "y": 32.0 },
+      "data": {
+        "nodeType": "concat",
+        "label": "Build Evidence Task",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          { "id": "a", "label": "prefix", "type": "string" },
+          { "id": "b", "label": "plan", "type": "string" },
+          { "id": "c", "label": "search_label", "type": "string" },
+          { "id": "d", "label": "max_search", "type": "number" },
+          { "id": "e", "label": "fetch_label", "type": "string" },
+          { "id": "f", "label": "max_fetch", "type": "number" },
+          { "id": "g", "label": "question_label", "type": "string" },
+          { "id": "h", "label": "question", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "result", "label": "evidence_task", "type": "string" }
+        ],
+        "concatConfig": { "separator": "" },
+        "pinDefaults": {
+          "a": "You are gathering evidence for a deep research report. Follow this research plan:\n\n",
+          "c": "\n\nTool budget:\n- web_search calls: ",
+          "e": "\n- fetch_url calls: ",
+          "g": "\n\nOriginal user question:\n"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "evidence",
+      "type": "agent",
+      "position": { "x": -24.0, "y": 32.0 },
+      "data": {
+        "nodeType": "agent",
+        "label": "Gather Evidence",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "include_context", "label": "use_context", "type": "boolean" },
+          { "id": "provider", "label": "provider", "type": "provider" },
+          { "id": "model", "label": "model", "type": "model" },
+          { "id": "max_iterations", "label": "max_iterations", "type": "number" },
+          { "id": "system", "label": "system", "type": "string" },
+          { "id": "prompt", "label": "evidence_task", "type": "string" },
+          { "id": "tools", "label": "tools", "type": "array" },
+          { "id": "context", "label": "context", "type": "object" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "response", "label": "evidence_dossier", "type": "string" },
+          { "id": "success", "label": "success", "type": "boolean" },
+          { "id": "meta", "label": "meta", "type": "object" },
+          { "id": "scratchpad", "label": "scratchpad", "type": "object" }
+        ],
+        "pinDefaults": {
+          "include_context": false,
+          "system": "You are the evidence-gathering phase of a deep research workflow. Use tools to find and fetch sources. Return a Markdown evidence dossier with citations, claims, counterpoints, and uncertainty."
+        },
+        "agentConfig": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3.6-35b-a3b",
+          "tools": ["web_search", "fetch_url"],
+          "system": "You gather evidence for deep research. Use web tools when available, cite URLs, and avoid unsupported claims.",
+          "max_iterations": 22
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "trace",
+      "type": "agent_trace_report",
+      "position": { "x": 304.0, "y": 376.0 },
+      "data": {
+        "nodeType": "agent_trace_report",
+        "label": "Audit Research Trace",
+        "icon": "&#x1F4CB;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "scratchpad", "label": "scratchpad", "type": "object" }
+        ],
+        "outputs": [
+          { "id": "result", "label": "trace", "type": "string" }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "report_task",
+      "type": "concat",
+      "position": { "x": 304.0, "y": 32.0 },
+      "data": {
+        "nodeType": "concat",
+        "label": "Build Report Task",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          { "id": "a", "label": "instructions", "type": "string" },
+          { "id": "b", "label": "dossier", "type": "string" },
+          { "id": "c", "label": "request_label", "type": "string" },
+          { "id": "d", "label": "question", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "result", "label": "report_task", "type": "string" }
+        ],
+        "concatConfig": { "separator": "" },
+        "pinDefaults": {
+          "a": "Transform the evidence dossier into a final deep research report for the user. Preserve citations, separate facts from judgment, and include:\n1) Executive summary\n2) Key findings\n3) Evidence table\n4) Risks and unknowns\n5) Recommended next steps\n\nEvidence dossier:\n",
+          "c": "\n\nOriginal user question:\n"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "report",
+      "type": "llm_call",
+      "position": { "x": 640.0, "y": 32.0 },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Write Final Report",
+        "icon": "&#x1F9E0;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "use_context", "label": "use_context", "type": "boolean" },
+          { "id": "context", "label": "context", "type": "object" },
+          { "id": "provider", "label": "provider", "type": "provider" },
+          { "id": "model", "label": "model", "type": "model" },
+          { "id": "system", "label": "system", "type": "string" },
+          { "id": "prompt", "label": "report_task", "type": "string" },
+          { "id": "tools", "label": "tools", "type": "array" },
+          { "id": "max_in_tokens", "label": "max_in_tokens", "type": "number" },
+          { "id": "temperature", "label": "temperature", "type": "number" },
+          { "id": "seed", "label": "seed", "type": "number" },
+          { "id": "resp_schema", "label": "resp_schema", "type": "object" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "response", "label": "report", "type": "string" },
+          { "id": "success", "label": "success", "type": "boolean" },
+          { "id": "meta", "label": "meta", "type": "object" },
+          { "id": "tool_calls", "label": "tool_calls", "type": "array" }
+        ],
+        "pinDefaults": {
+          "use_context": false,
+          "system": "You are a senior research editor. Produce a clear final Markdown report. Do not invent citations; preserve the source URLs already present in the dossier.",
+          "temperature": 0.2
+        },
+        "effectConfig": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3.6-35b-a3b",
+          "temperature": 0.2
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": { "x": 984.0, "y": 32.0 },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Deep Research Report",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "response", "label": "report", "type": "string" },
+          { "id": "research_plan", "label": "research_plan", "type": "string" },
+          { "id": "evidence_dossier", "label": "evidence_dossier", "type": "string" },
+          { "id": "research_trace", "label": "research_trace", "type": "string" },
+          { "id": "meta", "label": "meta", "type": "object" }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    { "id": "e-start-scope", "source": "start", "sourceHandle": "exec-out", "target": "scope", "targetHandle": "exec-in", "animated": true },
+    { "id": "e-prompt-scope", "source": "start", "sourceHandle": "prompt", "target": "scope", "targetHandle": "prompt", "animated": false },
+    { "id": "e-provider-scope", "source": "start", "sourceHandle": "provider", "target": "scope", "targetHandle": "provider", "animated": false },
+    { "id": "e-model-scope", "source": "start", "sourceHandle": "model", "target": "scope", "targetHandle": "model", "animated": false },
+    { "id": "e-scope-evidence", "source": "scope", "sourceHandle": "exec-out", "target": "evidence", "targetHandle": "exec-in", "animated": true },
+    { "id": "e-plan-task", "source": "scope", "sourceHandle": "response", "target": "evidence_task", "targetHandle": "b", "animated": false },
+    { "id": "e-search-task", "source": "start", "sourceHandle": "max_web_search", "target": "evidence_task", "targetHandle": "d", "animated": false },
+    { "id": "e-fetch-task", "source": "start", "sourceHandle": "max_fetch_url", "target": "evidence_task", "targetHandle": "f", "animated": false },
+    { "id": "e-question-task", "source": "start", "sourceHandle": "prompt", "target": "evidence_task", "targetHandle": "h", "animated": false },
+    { "id": "e-task-evidence", "source": "evidence_task", "sourceHandle": "result", "target": "evidence", "targetHandle": "prompt", "animated": false },
+    { "id": "e-tools-evidence", "source": "tools", "sourceHandle": "tools", "target": "evidence", "targetHandle": "tools", "animated": false },
+    { "id": "e-provider-evidence", "source": "start", "sourceHandle": "provider", "target": "evidence", "targetHandle": "provider", "animated": false },
+    { "id": "e-model-evidence", "source": "start", "sourceHandle": "model", "target": "evidence", "targetHandle": "model", "animated": false },
+    { "id": "e-iterations-evidence", "source": "start", "sourceHandle": "max_iterations", "target": "evidence", "targetHandle": "max_iterations", "animated": false },
+    { "id": "e-evidence-report", "source": "evidence", "sourceHandle": "exec-out", "target": "report", "targetHandle": "exec-in", "animated": true },
+    { "id": "e-dossier-report-task", "source": "evidence", "sourceHandle": "response", "target": "report_task", "targetHandle": "b", "animated": false },
+    { "id": "e-question-report-task", "source": "start", "sourceHandle": "prompt", "target": "report_task", "targetHandle": "d", "animated": false },
+    { "id": "e-report-task", "source": "report_task", "sourceHandle": "result", "target": "report", "targetHandle": "prompt", "animated": false },
+    { "id": "e-provider-report", "source": "start", "sourceHandle": "provider", "target": "report", "targetHandle": "provider", "animated": false },
+    { "id": "e-model-report", "source": "start", "sourceHandle": "model", "target": "report", "targetHandle": "model", "animated": false },
+    { "id": "e-scratchpad-trace", "source": "evidence", "sourceHandle": "scratchpad", "target": "trace", "targetHandle": "scratchpad", "animated": false },
+    { "id": "e-report-end", "source": "report", "sourceHandle": "exec-out", "target": "end", "targetHandle": "exec-in", "animated": true },
+    { "id": "e-response-end", "source": "report", "sourceHandle": "response", "target": "end", "targetHandle": "response", "animated": false },
+    { "id": "e-plan-end", "source": "scope", "sourceHandle": "response", "target": "end", "targetHandle": "research_plan", "animated": false },
+    { "id": "e-dossier-end", "source": "evidence", "sourceHandle": "response", "target": "end", "targetHandle": "evidence_dossier", "animated": false },
+    { "id": "e-trace-end", "source": "trace", "sourceHandle": "result", "target": "end", "targetHandle": "research_trace", "animated": false },
+    { "id": "e-meta-end", "source": "report", "sourceHandle": "meta", "target": "end", "targetHandle": "meta", "animated": false }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-05-29T00:00:00Z",
+  "updated_at": "2026-05-29T00:00:00Z"
+}

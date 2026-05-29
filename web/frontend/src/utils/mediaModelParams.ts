@@ -5,12 +5,16 @@ export type MediaModelParameterMetadata = {
   parameterConstraints?: Record<string, unknown>;
 };
 
+export type ImagePinDefaultPatchOptions = {
+  includeGuidanceScale?: boolean;
+  excludeKeys?: Iterable<string>;
+};
+
 const IMAGE_PARAMETER_PIN_KEYS = new Set([
-  'size',
   'width',
   'height',
+  'seed',
   'steps',
-  'guidance_scale',
   'negative_prompt',
 ]);
 
@@ -74,15 +78,25 @@ export function extractImageModelParameterMetadata(record: Record<string, unknow
   };
 }
 
-export function imagePinDefaultPatchForModel(metadata: MediaModelParameterMetadata | null | undefined): Record<string, JsonValue | undefined> {
+function shouldPatchImageParameter(key: string, options: ImagePinDefaultPatchOptions, excluded: ReadonlySet<string>): boolean {
+  if (excluded.has(key)) return false;
+  if (key === 'guidance_scale') return options.includeGuidanceScale === true;
+  return IMAGE_PARAMETER_PIN_KEYS.has(key);
+}
+
+export function imagePinDefaultPatchForModel(
+  metadata: MediaModelParameterMetadata | null | undefined,
+  options: ImagePinDefaultPatchOptions = {}
+): Record<string, JsonValue | undefined> {
   const patch: Record<string, JsonValue | undefined> = {};
+  const excluded = new Set(options.excludeKeys || []);
   const defaults = metadata?.parameterDefaults || {};
   for (const [key, value] of Object.entries(defaults)) {
-    if (IMAGE_PARAMETER_PIN_KEYS.has(key)) patch[key] = value;
+    if (shouldPatchImageParameter(key, options, excluded)) patch[key] = value;
   }
   const constraints = metadata?.parameterConstraints || {};
   for (const [key, rawConstraint] of Object.entries(constraints)) {
-    if (!IMAGE_PARAMETER_PIN_KEYS.has(key)) continue;
+    if (!shouldPatchImageParameter(key, options, excluded)) continue;
     const constraint = asRecord(rawConstraint);
     if (!constraint) continue;
     if (Object.prototype.hasOwnProperty.call(constraint, 'const')) {
@@ -97,10 +111,11 @@ export function imagePinDefaultPatchForModel(metadata: MediaModelParameterMetada
 
 export function applyImagePinDefaultPatch(
   current: Record<string, JsonValue | undefined>,
-  metadata: MediaModelParameterMetadata | null | undefined
+  metadata: MediaModelParameterMetadata | null | undefined,
+  options: ImagePinDefaultPatchOptions = {}
 ): Record<string, JsonValue> {
   const next = { ...current };
-  const patch = imagePinDefaultPatchForModel(metadata);
+  const patch = imagePinDefaultPatchForModel(metadata, options);
   for (const [key, value] of Object.entries(patch)) {
     if (value === undefined) delete next[key];
     else next[key] = value;
