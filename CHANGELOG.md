@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Remote browser connection updates may provide a token for the server-configured Gateway URL without mutating Flow server environment state. Remote browsers still cannot change the Gateway URL unless `ABSTRACTFLOW_ALLOW_REMOTE_BROWSER_GATEWAY_CONFIG=1` is enabled.
-- Apple/GPU Flow profiles now require Gateway `>=0.2.22` and Agent `>=0.3.10`.
+- Apple/GPU Flow profiles now require Gateway `>=0.2.23` and Agent `>=0.3.10`.
 
 ### Fixed
 - Flow's Gateway proxy now strips browser-supplied `Authorization`, `Cookie`, forwarded, and other unapproved request headers before proxying, then injects only the resolved opaque Gateway browser session and CSRF token where required.
