@@ -785,7 +785,7 @@ def create_visual_runner(
                     raise RuntimeError(
                         "This flow uses model_residency nodes, but the installed AbstractRuntime "
                         "does not provide the AbstractCore residency effect handler. "
-                        "Install `abstractruntime[abstractcore]`."
+                        "Install or upgrade `abstractruntime`."
                     ) from e
                 control = _UnavailableModelResidencyControl()
 

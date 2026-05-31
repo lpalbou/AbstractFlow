@@ -174,7 +174,10 @@ Model residency is discovered through `common.model_residency` and includes
 `text_to_video` and `image_to_video` when the Gateway/runtime stack supports
 video warmup/list/unload semantics.
 
-The browser calls same-origin `/api/gateway/*`; the Flow static server/Vite/Python host proxy those requests to Gateway and inject the configured bearer token.
+The browser calls same-origin `/api/gateway/*`; the Flow static server, Vite
+dev proxy, and Python host proxy those requests to Gateway and inject the
+Gateway user token from the browser's HTTP-only sign-in cookie. Requests without
+that browser session receive `401`.
 
 Evidence: [../web/frontend/src/hooks/useGatewayCapabilities.ts](../web/frontend/src/hooks/useGatewayCapabilities.ts), [../web/frontend/src/utils/gatewayClient.ts](../web/frontend/src/utils/gatewayClient.ts), [../web/backend/main.py](../web/backend/main.py).
 

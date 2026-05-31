@@ -115,7 +115,23 @@ The modern editor is a thin Gateway client:
 - Replay/stream: `GET /api/gateway/runs/{run_id}/ledger`, `GET /api/gateway/runs/{run_id}/ledger/stream`
 - Artifacts: `GET /api/gateway/runs/{run_id}/artifacts/...`
 
-The static `@abstractframework/flow` server, Vite dev proxy, and Python FastAPI host all proxy `/api/gateway/*` and inject the configured Gateway bearer token server-side. This is required because browser `EventSource` cannot send custom auth headers.
+The static `@abstractframework/flow` server, Vite dev proxy, and Python FastAPI
+host all proxy `/api/gateway/*` and inject Gateway auth server-side because
+browser `EventSource` cannot send custom auth headers. Flow injects the opaque
+Gateway browser session from an HTTP-only Flow cookie; server/admin Gateway
+tokens do not create browser login state. The Flow connection form asks for
+Gateway user id and token, then validates that the token resolves to that user
+before accepting the login. The raw token is exchanged for Gateway session
+cookies server-side, and the connection response does not return Gateway session
+ids or CSRF tokens to browser JavaScript. Gateway owns the user's runtime
+mapping and returns it as read-only principal metadata. Different browsers can
+connect to the shared Gateway as different principals. Remote browsers may
+provide a token for the server-configured Gateway URL, but may not change the
+Gateway URL unless
+`ABSTRACTFLOW_ALLOW_REMOTE_BROWSER_GATEWAY_CONFIG=1` is enabled. Flow uses the
+request `Host` header for that check by default; set
+`ABSTRACTFLOW_TRUST_PROXY_HEADERS=1` only behind a reverse proxy that strips
+client-supplied forwarded headers.
 
 ## Gateway media and catalog contracts
 

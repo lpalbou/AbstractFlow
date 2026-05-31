@@ -110,11 +110,12 @@ pip install abstractgateway abstractflow
 export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
 abstractgateway serve --port 8080
 
-export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
 npx @abstractframework/flow --gateway-url http://127.0.0.1:8080
 ```
 
-Tip (from source): install Flow and Gateway editably, then run `npm run dev` from `web/frontend` with `ABSTRACTGATEWAY_AUTH_TOKEN` set so Vite can inject Gateway auth in its proxy.
+Open the editor and sign in with a Gateway user id and that user's token. From
+source, install Flow and Gateway editably, then run `npm run dev` from
+`web/frontend`; the Vite proxy uses the same browser-session sign-in flow.
 
 ## Create media with Gateway nodes
 

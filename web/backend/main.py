@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import os
 import logging
+import hmac
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request as UrlRequest, urlopen
 
-from abstractflow.gateway_options import local_runtime_enabled, require_gateway_connectivity
-from fastapi import FastAPI, Request
+from abstractflow.gateway_options import local_runtime_enabled
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse, Response, StreamingResponse
@@ -18,9 +19,18 @@ from fastapi.responses import FileResponse, HTMLResponse, Response, StreamingRes
 from .routes.connection import router as connection_router
 from .routes.gateway_metrics import router as gateway_metrics_router
 from .routes.ui_config import router as ui_config_router
-from .services.gateway_connection import bootstrap_gateway_connection_env, resolve_effective_gateway_connection
+from .services.gateway_connection import (
+    GATEWAY_CSRF_HEADER,
+    GATEWAY_SESSION_CSRF_COOKIE,
+    GATEWAY_SESSION_HEADER,
+    bootstrap_gateway_connection_env,
+    resolve_effective_gateway_connection_for_request,
+    resolve_gateway_csrf_for_request,
+    resolve_gateway_url_from_server_config,
+)
 
-# Best-effort bootstrap so the backend can call the gateway without requiring a restart after UI config.
+# Best-effort bootstrap of the server-configured Gateway URL. Browser auth is
+# resolved per request from HTTP-only session cookies.
 bootstrap_gateway_connection_env()
 
 
@@ -73,13 +83,14 @@ def local_runtime_routes_enabled() -> bool:
 
 def _runtime_health() -> dict[str, object]:
     local_enabled = local_runtime_enabled()
-    gateway_url, gateway_token, token_source = resolve_effective_gateway_connection()
+    gateway_url = resolve_gateway_url_from_server_config()
     return {
         "runtime_mode": _runtime_mode(),
         "local_runtime_enabled": local_enabled,
         "gateway_url": gateway_url,
-        "gateway_token_configured": bool(gateway_token),
-        "gateway_token_source": token_source,
+        "gateway_token_configured": False,
+        "gateway_token_source": "browser-session",
+        "browser_sign_in_required": True,
     }
 
 def _gateway_proxy_timeout_s(default: float = 900.0) -> float:
@@ -101,30 +112,17 @@ async def _startup_connectivity_guard() -> None:
         )
         return
 
-    try:
-        gateway_url, gateway_token, _ = resolve_effective_gateway_connection()
-        require_gateway_connectivity(gateway_url=gateway_url, gateway_token=gateway_token, timeout_s=1.5)
-        logging.getLogger(__name__).info(
-            "Connected to AbstractGateway at %s",
-            gateway_url,
-        )
-    except ValueError as e:
-        logging.getLogger(__name__).warning(
-            "AbstractFlow started without a verified AbstractGateway connection. "
-            "The browser connection dialog can configure gateway URL/token. "
-            "Connectivity check failed: %s",
-            e,
-        )
+    logging.getLogger(__name__).info(
+        "AbstractFlow using AbstractGateway at %s. Browser users must sign in with their Gateway user token.",
+        resolve_gateway_url_from_server_config(),
+    )
 
 
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint."""
     runtime = _runtime_health()
-    status = "healthy"
-    if not runtime["local_runtime_enabled"] and not runtime["gateway_token_configured"]:
-        status = "error"
-    return {"status": status, "service": "abstractflow-visual-editor", **runtime}
+    return {"status": "healthy", "service": "abstractflow-visual-editor", **runtime}
 
 
 _HOP_BY_HOP_HEADERS = {
@@ -194,22 +192,52 @@ def _iter_gateway_proxy_response(resp: object, *, event_stream: bool = False):
             pass
 
 
-def _gateway_proxy_request_headers(request: Request, token: str | None) -> dict[str, str]:
+def _mutating_method(method: str) -> bool:
+    return str(method or "").upper() in {"POST", "PUT", "PATCH", "DELETE"}
+
+
+def _require_flow_proxy_csrf(request: Request) -> None:
+    if not _mutating_method(request.method):
+        return
+    expected = str(request.cookies.get(GATEWAY_SESSION_CSRF_COOKIE) or "").strip()
+    presented = str(request.headers.get("x-abstractflow-csrf") or "").strip()
+    if not expected or not presented or not hmac.compare_digest(expected, presented):
+        raise HTTPException(status_code=403, detail="Flow browser session CSRF token missing or invalid")
+
+
+def _gateway_proxy_request_headers(request: Request, session_id: str | None, csrf_token: str | None) -> dict[str, str]:
+    allowed_headers = {
+        "accept",
+        "accept-language",
+        "cache-control",
+        "content-type",
+        "last-event-id",
+        "pragma",
+        "x-client-id",
+        "x-client-version",
+        "x-request-id",
+    }
     out: dict[str, str] = {}
     for key, value in request.headers.items():
         k = key.lower()
-        if k in _HOP_BY_HOP_HEADERS or k in {"host", "content-length"}:
+        if k in _HOP_BY_HOP_HEADERS or k not in allowed_headers:
             continue
         out[key] = value
-    if token and not any(k.lower() == "authorization" for k in out):
-        out["Authorization"] = f"Bearer {token}"
+    if session_id:
+        out[GATEWAY_SESSION_HEADER] = session_id
+    if csrf_token and _mutating_method(request.method):
+        out[GATEWAY_CSRF_HEADER] = csrf_token
     return out
 
 
 @app.api_route("/api/gateway/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"])
 async def proxy_gateway_api(path: str, request: Request):
-    """Proxy Gateway API calls and inject server-held auth for the browser UI."""
-    gateway_url, token, _source = resolve_effective_gateway_connection()
+    """Proxy Gateway API calls and inject browser-session auth for the UI."""
+    gateway_url, session_id, _source = resolve_effective_gateway_connection_for_request(request)
+    if not session_id:
+        raise HTTPException(status_code=401, detail="Gateway sign-in required")
+    _require_flow_proxy_csrf(request)
+    csrf_token = resolve_gateway_csrf_for_request(request)
     base = str(gateway_url or "").strip().rstrip("/")
     safe_path = "/".join(quote(part, safe="") for part in str(path or "").split("/"))
     target = f"{base}/api/gateway/{safe_path}"
@@ -222,7 +250,7 @@ async def proxy_gateway_api(path: str, request: Request):
         url=target,
         data=data,
         method=request.method.upper(),
-        headers=_gateway_proxy_request_headers(request, token),
+        headers=_gateway_proxy_request_headers(request, session_id, csrf_token),
     )
 
     try:

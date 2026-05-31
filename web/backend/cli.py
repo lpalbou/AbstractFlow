@@ -14,8 +14,6 @@ import sys
 import uvicorn
 from abstractflow.gateway_options import (
     local_runtime_enabled,
-    require_gateway_connectivity,
-    resolve_gateway_token,
     resolve_gateway_url,
 )
 
@@ -28,7 +26,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--log-level", default=os.getenv("LOG_LEVEL", "info"))
     p.add_argument("--monitor-gpu", action="store_true", help="Show the small GPU widget in the UI")
     p.add_argument("--gateway-url", default=None)
-    p.add_argument("--gateway-token", default=None)
+    p.add_argument("--gateway-token", default=None, help=argparse.SUPPRESS)
     return p.parse_args(argv)
 
 
@@ -44,24 +42,23 @@ def main(argv: list[str] | None = None) -> None:
             print("Running in local runtime compatibility mode (ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1).")
         else:
             gateway_url = resolve_gateway_url(args.gateway_url)
-            gateway_token = resolve_gateway_token(args.gateway_token)
             os.environ["ABSTRACTGATEWAY_URL"] = gateway_url
             os.environ["ABSTRACTFLOW_GATEWAY_URL"] = gateway_url
-            if gateway_token:
-                require_gateway_connectivity(gateway_url=gateway_url, gateway_token=gateway_token)
-                os.environ["ABSTRACTGATEWAY_AUTH_TOKEN"] = gateway_token
+            if str(args.gateway_token or "").strip():
+                print(
+                    "--gateway-token is ignored by AbstractFlow multi-user auth. "
+                    "Browser users must sign in with their Gateway user token.",
+                    file=sys.stderr,
+                )
             else:
                 print(
-                    "AbstractFlow started without a gateway token. "
-                    "Use the browser connection dialog to configure AbstractGateway.",
+                    "Browser users must sign in with their Gateway user token.",
                     file=sys.stderr,
                 )
 
         if args.gateway_url:
             os.environ["ABSTRACTGATEWAY_URL"] = resolve_gateway_url(args.gateway_url)
             os.environ["ABSTRACTFLOW_GATEWAY_URL"] = resolve_gateway_url(args.gateway_url)
-        if args.gateway_token:
-            os.environ["ABSTRACTGATEWAY_AUTH_TOKEN"] = resolve_gateway_token(args.gateway_token)
 
         uvicorn.run(
             "backend.main:app",

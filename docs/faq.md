@@ -146,7 +146,10 @@ Evidence: [../abstractflow/cli.py](../abstractflow/cli.py), [../abstractflow/wor
 
 ## Do I need an AbstractGateway?
 
-For the modern browser editor, yes: Gateway is the runtime, persistence, discovery, ledger, and artifact authority. The editor calls same-origin `/api/gateway/*` through a Flow proxy so bearer auth stays server-side.
+For the modern browser editor, yes: Gateway is the runtime, persistence,
+discovery, ledger, and artifact authority. The editor calls same-origin
+`/api/gateway/*` through a Flow proxy; the proxy injects the signed-in
+browser session's Gateway user token.
 
 For local runtime use, install `abstractflow[apple]` and run with `abstractflow.visual.execute_visual_flow(...)` or
 `create_visual_runner(...)`. The old FastAPI local runtime routes are compatibility-only and are gated by

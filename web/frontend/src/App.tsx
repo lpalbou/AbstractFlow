@@ -34,6 +34,18 @@ function monitor_gpu_enabled(): boolean {
   }
 }
 
+function has_browser_gateway_session(status: GatewayConnectionStatus | null): boolean {
+  const gateway = status?.gateway || status?.embeddings;
+  const principal = gateway?.principal;
+  if (!(status?.token_source === 'browser-session' && status.has_token && status.embeddings?.ok === true && principal?.user_id)) {
+    return false;
+  }
+  const auth = gateway?.auth;
+  if (auth?.mode === 'legacy-token' || auth?.user_auth_enabled === false) return false;
+  if (principal.source === 'legacy-token') return false;
+  return true;
+}
+
 const UI_SETTINGS_KEY = 'abstractflow_ui_settings_v1';
 
 function load_appearance_settings(): AppearanceSettings {
@@ -70,7 +82,7 @@ function App() {
   const [connection_checked, set_connection_checked] = useState(false);
   const [connection_status, set_connection_status] = useState<GatewayConnectionStatus | null>(null);
   const [connection_required, set_connection_required] = useState(false);
-  const gateway_connected = Boolean(connection_status?.has_token && connection_status?.embeddings?.ok === true);
+  const gateway_connected = has_browser_gateway_session(connection_status);
   const properties_open = Boolean(selectedNode);
 
   useEffect(() => {
@@ -96,7 +108,7 @@ function App() {
       .then((status) => {
         if (cancelled) return;
         set_connection_status(status);
-        const needs_connection = !status.has_token || status.embeddings?.ok !== true;
+        const needs_connection = !has_browser_gateway_session(status);
         set_connection_required(needs_connection);
         if (needs_connection) set_show_connection(true);
         set_connection_checked(true);
@@ -115,7 +127,7 @@ function App() {
 
   const handle_connection_saved = (status: GatewayConnectionStatus) => {
     set_connection_status(status);
-    const needs_connection = !status.has_token || status.embeddings?.ok !== true;
+    const needs_connection = !has_browser_gateway_session(status);
     set_connection_required(needs_connection);
     if (!needs_connection) set_show_connection(false);
     queryClient.invalidateQueries({ queryKey: ['gateway'] });
@@ -142,8 +154,8 @@ function App() {
         {!connection_checked ? (
           <div className="connection-check-card">
             <div className="gateway-connection-kicker">AbstractFlow connection</div>
-            <h3>Checking AbstractGateway</h3>
-            <p>Validating the configured gateway before loading the editor.</p>
+            <h3>Checking browser session</h3>
+            <p>Loading the saved Gateway sign-in for this browser.</p>
           </div>
         ) : null}
         <GatewayConnectionModal

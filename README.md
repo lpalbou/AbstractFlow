@@ -55,7 +55,7 @@ Optional extras (declared in `pyproject.toml`):
 - Full host profiles:
   - Apple-capable: `pip install "abstractflow[apple]"`
   - GPU-capable: `pip install "abstractflow[gpu]"`
-- `abstractflow[apple]` and `abstractflow[gpu]` pull the matching `abstractgateway[...]` host profile and Visual Agent support. Flow no longer names `AbstractRuntime` or `abstractcore` directly in these profiles; Gateway owns that deployment stack. AbstractFlow `0.3.16` expects Gateway `>=0.2.21` for the current image/video media, progress, catalog, and residency contracts.
+- `abstractflow[apple]` and `abstractflow[gpu]` pull the matching `abstractgateway[...]` host profile and Visual Agent support. Flow no longer names `AbstractRuntime` or `abstractcore` directly in these profiles; Gateway owns that deployment stack. AbstractFlow `0.3.17` expects Gateway `>=0.2.22` for the current image/video media, progress, catalog, and residency contracts.
 - Agent nodes only, without the host profile: `pip install "abstractflow[agent]"`
 - Documentation site tools: `pip install "abstractflow[docs]"`
 
@@ -92,16 +92,35 @@ If your flow uses subflows, load all referenced `*.json` into the `flows={...}` 
 
 ## Visual editor (Gateway-first)
 
-The visual editor talks to AbstractGateway. The Flow server keeps the Gateway bearer token server-side while proxying browser requests.
+The visual editor talks to AbstractGateway through the Flow proxy. Browser
+sessions sign in with a Gateway URL, Gateway user id, and that user's Gateway
+token. Flow validates the token, exchanges it through Gateway
+`/api/gateway/session/login`, stores only the opaque Gateway browser session in
+an HTTP-only Flow cookie, and forwards that session server-side to Gateway. Flow
+reads Gateway `Set-Cookie` headers server-side and does not return the Gateway
+session id or CSRF token in the connection response body. The raw user token is
+not retained after sign-in. Mutating Gateway proxy calls also carry a CSRF
+token. A server/admin Gateway token does not sign in browsers, so a distinct
+browser must provide its own user token. Gateway owns the user's
+runtime mapping and returns it as read-only principal metadata. Remote browsers
+may provide a token for the server-configured Gateway URL, but they cannot
+change that URL unless
+`ABSTRACTFLOW_ALLOW_REMOTE_BROWSER_GATEWAY_CONFIG=1` is set.
 
 ```bash
 # Terminal 1: Gateway
 pip install abstractgateway abstractflow
 export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
+export ABSTRACTGATEWAY_USER_AUTH=1
 abstractgateway serve --port 8080
 
+# In another shell, create the browser sign-in user and keep the returned token.
+curl -sS -X POST http://127.0.0.1:8080/api/gateway/admin/users \
+  -H "Authorization: Bearer dev-token" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"admin","roles":["admin","user"],"runtime_id":"default"}'
+
 # Terminal 2: editor UI (static server + /api/gateway proxy)
-export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
 npx @abstractframework/flow --gateway-url http://127.0.0.1:8080
 ```
 

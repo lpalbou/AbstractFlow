@@ -5,6 +5,21 @@ All notable changes to AbstractFlow will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.3.17] - 2026-05-31
+
+### Added
+- Hosted Flow sessions can sign in with Gateway URL, user id, and token. Flow validates that the token resolves to the requested Gateway user, exchanges it for an opaque Gateway browser session, and stores only that session id in an HTTP-only browser-session cookie; the `/api/gateway/*` proxy resolves that request session before any server-wide Gateway token so different browsers can connect as different Gateway principals.
+- Flow provider/model discovery now includes Gateway provider endpoint profiles as virtual providers, including OpenAI-compatible endpoints configured in the Gateway Console.
+
+### Changed
+- Remote browser connection updates may provide a token for the server-configured Gateway URL without mutating Flow server environment state. Remote browsers still cannot change the Gateway URL unless `ABSTRACTFLOW_ALLOW_REMOTE_BROWSER_GATEWAY_CONFIG=1` is enabled.
+- Apple/GPU Flow profiles now require Gateway `>=0.2.22` and Agent `>=0.3.10`.
+
+### Fixed
+- Flow's Gateway proxy now strips browser-supplied `Authorization`, `Cookie`, forwarded, and other unapproved request headers before proxying, then injects only the resolved opaque Gateway browser session and CSRF token where required.
+
 ## [0.3.16] - 2026-05-29
 
 ### Added

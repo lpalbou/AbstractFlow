@@ -75,6 +75,7 @@ Agent usage tips:
 - If you need the smallest useful context, read **Start Here** and skip **Optional**.
 - Prefer `docs/` for stable, user-facing behavior; treat the linked code files as source of truth.
 - This project is **Pre-alpha** (APIs may change); use tests as executable behavior specs.
+- Flow browser sessions sign in with Gateway URL, user id, and that user's token. Flow validates Gateway `/me`, exchanges the token for `/api/gateway/session/login`, reads Gateway `Set-Cookie` headers server-side, keeps only the opaque Gateway session id in an HTTP-only Flow cookie, and forwards that session plus CSRF for mutating proxied Gateway calls. Session ids and CSRF tokens are not returned to browser JavaScript in the connection response body. A server/admin Gateway token does not sign in browsers.
 - To validate changes locally, run: `pytest -q`.
 - `llms-full.txt` is generated from this file and intended for offline/RAG use. It may exceed a single context window; chunk it if needed.
 - After updating docs or linked files, regenerate: `python scripts/generate_llms_full.py`.
@@ -106,7 +107,7 @@ Agent usage tips:
 
 ## Web Editor Host (FastAPI)
 
-- [Web editor guide](docs/web-editor.md): Run backend/frontend, storage locations, gateway env vars
+- [Web editor guide](docs/web-editor.md): Run backend/frontend, storage locations, gateway URL config, and browser-session Gateway user auth
 - [Gateway client contract](web/frontend/src/utils/gatewayClient.ts): versioned capabilities, `common.readiness` overlay, endpoint descriptors
 - [Gateway catalog helpers](web/frontend/src/utils/gatewayCatalog.ts): canonical `gateway_catalog_v1` + legacy catalog normalization
 - [VisualFlow legacy compatibility](web/frontend/src/utils/visualFlowCompat.ts): imports old lowered music flows as native `generate_music`
@@ -213,7 +214,7 @@ Optional extras (declared in `pyproject.toml`):
 - Full host profiles:
   - Apple-capable: `pip install "abstractflow[apple]"`
   - GPU-capable: `pip install "abstractflow[gpu]"`
-- `abstractflow[apple]` and `abstractflow[gpu]` pull the matching `abstractgateway[...]` host profile and Visual Agent support. Flow no longer names `AbstractRuntime` or `abstractcore` directly in these profiles; Gateway owns that deployment stack. AbstractFlow `0.3.16` expects Gateway `>=0.2.21` for the current image/video media, progress, catalog, and residency contracts.
+- `abstractflow[apple]` and `abstractflow[gpu]` pull the matching `abstractgateway[...]` host profile and Visual Agent support. Flow no longer names `AbstractRuntime` or `abstractcore` directly in these profiles; Gateway owns that deployment stack. AbstractFlow `0.3.17` expects Gateway `>=0.2.22` for the current image/video media, progress, catalog, and residency contracts.
 - Agent nodes only, without the host profile: `pip install "abstractflow[agent]"`
 - Documentation site tools: `pip install "abstractflow[docs]"`
 
@@ -250,16 +251,35 @@ If your flow uses subflows, load all referenced `*.json` into the `flows={...}` 
 
 ## Visual editor (Gateway-first)
 
-The visual editor talks to AbstractGateway. The Flow server keeps the Gateway bearer token server-side while proxying browser requests.
+The visual editor talks to AbstractGateway through the Flow proxy. Browser
+sessions sign in with a Gateway URL, Gateway user id, and that user's Gateway
+token. Flow validates the token, exchanges it through Gateway
+`/api/gateway/session/login`, stores only the opaque Gateway browser session in
+an HTTP-only Flow cookie, and forwards that session server-side to Gateway. Flow
+reads Gateway `Set-Cookie` headers server-side and does not return the Gateway
+session id or CSRF token in the connection response body. The raw user token is
+not retained after sign-in. Mutating Gateway proxy calls also carry a CSRF
+token. A server/admin Gateway token does not sign in browsers, so a distinct
+browser must provide its own user token. Gateway owns the user's
+runtime mapping and returns it as read-only principal metadata. Remote browsers
+may provide a token for the server-configured Gateway URL, but they cannot
+change that URL unless
+`ABSTRACTFLOW_ALLOW_REMOTE_BROWSER_GATEWAY_CONFIG=1` is set.
 
 ```bash
 # Terminal 1: Gateway
 pip install abstractgateway abstractflow
 export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
+export ABSTRACTGATEWAY_USER_AUTH=1
 abstractgateway serve --port 8080
 
+# In another shell, create the browser sign-in user and keep the returned token.
+curl -sS -X POST http://127.0.0.1:8080/api/gateway/admin/users \
+  -H "Authorization: Bearer dev-token" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"admin","roles":["admin","user"],"runtime_id":"default"}'
+
 # Terminal 2: editor UI (static server + /api/gateway proxy)
-export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
 npx @abstractframework/flow --gateway-url http://127.0.0.1:8080
 ```
 
@@ -477,11 +497,12 @@ pip install abstractgateway abstractflow
 export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
 abstractgateway serve --port 8080
 
-export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
 npx @abstractframework/flow --gateway-url http://127.0.0.1:8080
 ```
 
-Tip (from source): install Flow and Gateway editably, then run `npm run dev` from `web/frontend` with `ABSTRACTGATEWAY_AUTH_TOKEN` set so Vite can inject Gateway auth in its proxy.
+Open the editor and sign in with a Gateway user id and that user's token. From
+source, install Flow and Gateway editably, then run `npm run dev` from
+`web/frontend`; the Vite proxy uses the same browser-session sign-in flow.
 
 ## Create media with Gateway nodes
 
@@ -721,7 +742,10 @@ Model residency is discovered through `common.model_residency` and includes
 `text_to_video` and `image_to_video` when the Gateway/runtime stack supports
 video warmup/list/unload semantics.
 
-The browser calls same-origin `/api/gateway/*`; the Flow static server/Vite/Python host proxy those requests to Gateway and inject the configured bearer token.
+The browser calls same-origin `/api/gateway/*`; the Flow static server, Vite
+dev proxy, and Python host proxy those requests to Gateway and inject the
+Gateway user token from the browser's HTTP-only sign-in cookie. Requests without
+that browser session receive `401`.
 
 Evidence: [../web/frontend/src/hooks/useGatewayCapabilities.ts](../web/frontend/src/hooks/useGatewayCapabilities.ts), [../web/frontend/src/utils/gatewayClient.ts](../web/frontend/src/utils/gatewayClient.ts), [../web/backend/main.py](../web/backend/main.py).
 
@@ -871,7 +895,23 @@ The modern editor is a thin Gateway client:
 - Replay/stream: `GET /api/gateway/runs/{run_id}/ledger`, `GET /api/gateway/runs/{run_id}/ledger/stream`
 - Artifacts: `GET /api/gateway/runs/{run_id}/artifacts/...`
 
-The static `@abstractframework/flow` server, Vite dev proxy, and Python FastAPI host all proxy `/api/gateway/*` and inject the configured Gateway bearer token server-side. This is required because browser `EventSource` cannot send custom auth headers.
+The static `@abstractframework/flow` server, Vite dev proxy, and Python FastAPI
+host all proxy `/api/gateway/*` and inject Gateway auth server-side because
+browser `EventSource` cannot send custom auth headers. Flow injects the opaque
+Gateway browser session from an HTTP-only Flow cookie; server/admin Gateway
+tokens do not create browser login state. The Flow connection form asks for
+Gateway user id and token, then validates that the token resolves to that user
+before accepting the login. The raw token is exchanged for Gateway session
+cookies server-side, and the connection response does not return Gateway session
+ids or CSRF tokens to browser JavaScript. Gateway owns the user's runtime
+mapping and returns it as read-only principal metadata. Different browsers can
+connect to the shared Gateway as different principals. Remote browsers may
+provide a token for the server-configured Gateway URL, but may not change the
+Gateway URL unless
+`ABSTRACTFLOW_ALLOW_REMOTE_BROWSER_GATEWAY_CONFIG=1` is enabled. Flow uses the
+request `Host` header for that check by default; set
+`ABSTRACTFLOW_TRUST_PROXY_HEADERS=1` only behind a reverse proxy that strips
+client-supplied forwarded headers.
 
 ## Gateway media and catalog contracts
 
@@ -1096,7 +1136,10 @@ Evidence: [../abstractflow/cli.py](../abstractflow/cli.py), [../abstractflow/wor
 
 ## Do I need an AbstractGateway?
 
-For the modern browser editor, yes: Gateway is the runtime, persistence, discovery, ledger, and artifact authority. The editor calls same-origin `/api/gateway/*` through a Flow proxy so bearer auth stays server-side.
+For the modern browser editor, yes: Gateway is the runtime, persistence,
+discovery, ledger, and artifact authority. The editor calls same-origin
+`/api/gateway/*` through a Flow proxy; the proxy injects the signed-in
+browser session's Gateway user token.
 
 For local runtime use, install `abstractflow[apple]` and run with `abstractflow.visual.execute_visual_flow(...)` or
 `create_visual_runner(...)`. The old FastAPI local runtime routes are compatibility-only and are gated by
@@ -3278,7 +3321,7 @@ def create_visual_runner(
                     raise RuntimeError(
                         "This flow uses model_residency nodes, but the installed AbstractRuntime "
                         "does not provide the AbstractCore residency effect handler. "
-                        "Install `abstractruntime[abstractcore]`."
+                        "Install or upgrade `abstractruntime`."
                     ) from e
                 control = _UnavailableModelResidencyControl()
 
@@ -4312,18 +4355,32 @@ source .venv/bin/activate
 pip install abstractgateway abstractflow
 
 export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
+export ABSTRACTGATEWAY_USER_AUTH=1
 abstractgateway serve --port 8080
+```
+
+Create a Gateway user for browser sign-in and use the returned token in the
+Flow connection modal:
+
+```bash
+curl -sS -X POST http://127.0.0.1:8080/api/gateway/admin/users \
+  -H "Authorization: Bearer dev-token" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"admin","roles":["admin","user"],"runtime_id":"default"}'
 ```
 
 Terminal 2 (UI):
 
 ```bash
-export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
 npx @abstractframework/flow --gateway-url http://127.0.0.1:8080
 ```
 
 Notes:
-- The browser never needs the bearer token directly. The Flow static server injects `Authorization: Bearer ...` while proxying `/api/*` to Gateway.
+- The browser signs in with a Gateway user id and that user's token. Flow
+  exchanges the token for a Gateway browser session, stores only the opaque
+  session id in an HTTP-only Flow cookie, and proxies `/api/*` to Gateway with
+  that session. The Flow connection response does not return the Gateway
+  session id or CSRF token to browser JavaScript.
 - Use `ABSTRACTGATEWAY_URL` or `ABSTRACTFLOW_GATEWAY_URL` (or `--gateway-url`) to point at a non-default Gateway.
 
 Open:
@@ -4386,15 +4443,18 @@ pip install -e .
 pip install -e ../abstractgateway
 
 export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
+export ABSTRACTGATEWAY_USER_AUTH=1
 abstractgateway serve --port 8080
 ```
+
+Create the browser sign-in user with `/api/gateway/admin/users` as shown in the
+recommended run path before opening the dev UI.
 
 Terminal 2 (frontend):
 
 ```bash
 cd web/frontend
 npm install
-export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
 npm run dev
 ```
 
@@ -4404,7 +4464,8 @@ Open:
 
 ## Run (FastAPI Gateway proxy host)
 
-The Python host still serves the built UI and now proxies `/api/gateway/*` to AbstractGateway with server-side auth injection:
+The Python host serves the built UI and proxies `/api/gateway/*` to
+AbstractGateway with browser-session auth injection:
 
 ```bash
 cd web/frontend
@@ -4412,7 +4473,6 @@ npm install
 npm run build
 
 cd ../
-export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
 python -m backend --port 3003 --gateway-url http://127.0.0.1:8080
 ```
 
@@ -4435,15 +4495,29 @@ Gateway connectivity is required for the modern editor path.
 
 Common env vars / flags:
 - `ABSTRACTGATEWAY_URL` (default `http://127.0.0.1:8080`)
-- `ABSTRACTGATEWAY_AUTH_TOKEN`
-- UI CLI flags: `npx @abstractframework/flow --gateway-url ... --gateway-token ...`
-- Python host flags: `abstractflow serve --gateway-url ... --gateway-token ...` (or `python -m backend ...`)
+- UI CLI flags: `npx @abstractframework/flow --gateway-url ...`
+- Python host flags: `abstractflow serve --gateway-url ...` (or `python -m backend ...`)
 
-For the modern editor path, if no gateway token is available the static Flow server and Python host fail fast with a clear error telling you to export `ABSTRACTGATEWAY_AUTH_TOKEN` or pass `--gateway-token`.
+For the modern editor path, the Flow server starts with only a Gateway URL.
+Each browser signs in with a Gateway URL, Gateway user id, and that user's
+Gateway token. Flow validates the token through Gateway `/me`, exchanges it for
+a Gateway browser session through `/api/gateway/session/login`, and rejects the
+connection if the token resolves to another user or to an admin/server token.
+Gateway owns the user's tenant/runtime mapping and returns it as read-only
+principal metadata. Flow keeps only the opaque Gateway session id in an
+HTTP-only cookie and keeps the CSRF token in a separate browser cookie for
+mutating proxy calls. Flow reads those values from Gateway `Set-Cookie` headers
+server-side and removes them from the response body; a second browser must sign
+in separately. Remote browsers may provide a token for the server-configured
+Gateway URL, but may not change the Gateway URL unless
+`ABSTRACTFLOW_ALLOW_REMOTE_BROWSER_GATEWAY_CONFIG=1` is set after adding your
+own access control. Flow uses the request `Host` header for that check by
+default; set `ABSTRACTFLOW_TRUST_PROXY_HEADERS=1` only behind a reverse proxy
+that strips client-supplied forwarded headers.
 
 Evidence:
 - UI modal: [../web/frontend/src/components/GatewayConnectionModal.tsx](../web/frontend/src/components/GatewayConnectionModal.tsx)
-- Backend persistence + env bootstrap: [../web/backend/services/gateway_connection.py](../web/backend/services/gateway_connection.py)
+- Backend URL persistence + browser session resolution: [../web/backend/services/gateway_connection.py](../web/backend/services/gateway_connection.py)
 - Embeddings config check + KG embedder wiring: [../web/backend/routes/connection.py](../web/backend/routes/connection.py), [../web/backend/routes/memory_kg.py](../web/backend/routes/memory_kg.py)
 - Gateway proxy auth injection: [../web/frontend/bin/cli.js](../web/frontend/bin/cli.js), [../web/frontend/vite.config.ts](../web/frontend/vite.config.ts), [../web/backend/main.py](../web/backend/main.py)
 
@@ -4924,6 +4998,93 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
 
+function formatHttpErrorMessage(status: number, statusText: string, message = ''): string {
+  const prefix = `HTTP ${status}${statusText.trim() ? ` ${statusText.trim()}` : ''}`;
+  const clean = message.trim();
+  return clean ? `${prefix}: ${clean}` : prefix;
+}
+
+function decodeBasicHtmlEntities(value: string): string {
+  const entities: Record<string, string> = {
+    amp: '&',
+    apos: "'",
+    gt: '>',
+    lt: '<',
+    nbsp: ' ',
+    quot: '"',
+  };
+  return value.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (match, raw: string) => {
+    const key = raw.toLowerCase();
+    if (key.startsWith('#x')) {
+      const code = Number.parseInt(key.slice(2), 16);
+      return Number.isFinite(code) && code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : match;
+    }
+    if (key.startsWith('#')) {
+      const code = Number.parseInt(key.slice(1), 10);
+      return Number.isFinite(code) && code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : match;
+    }
+    return entities[key] || match;
+  });
+}
+
+function normalizeErrorText(value: string): string {
+  return decodeBasicHtmlEntities(value)
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function htmlTagText(html: string, tag: string): string {
+  const match = new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i').exec(html);
+  if (!match) return '';
+  return normalizeErrorText(match[1].replace(/<[^>]*>/g, ' '));
+}
+
+function looksLikeHtml(value: string): boolean {
+  return /^\s*<!doctype\s+html\b/i.test(value) || /<html\b/i.test(value) || /<\/?[a-z][\s\S]*>/i.test(value);
+}
+
+function messageFromHtmlError(html: string): string {
+  const messageParagraph = /<p\b[^>]*>\s*Message:\s*([\s\S]*?)<\/p>/i.exec(html);
+  if (messageParagraph) {
+    const message = normalizeErrorText(messageParagraph[1].replace(/<[^>]*>/g, ' '));
+    if (message) return message;
+  }
+
+  const stripped = normalizeErrorText(
+    html
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<[^>]*>/g, ' ')
+  );
+  const inlineMessage = /Message:\s*(.+?)(?: Error code explanation:|$)/i.exec(stripped);
+  if (inlineMessage) {
+    const message = normalizeErrorText(inlineMessage[1]);
+    if (message) return message;
+  }
+
+  return htmlTagText(html, 'title') || htmlTagText(html, 'h1') || '';
+}
+
+function messageFromJsonError(detail: unknown): string {
+  if (typeof detail === 'string') return detail.trim();
+  const rec = asRecord(detail);
+  if (!rec) return '';
+  if (typeof rec.detail === 'string') return rec.detail.trim();
+  if (typeof rec.message === 'string') return rec.message.trim();
+  if (typeof rec.error === 'string') return rec.error.trim();
+  const detailRecord = asRecord(rec.detail);
+  if (detailRecord) {
+    if (typeof detailRecord.message === 'string') return detailRecord.message.trim();
+    if (typeof detailRecord.error === 'string') return detailRecord.error.trim();
+  }
+  const errorRecord = asRecord(rec.error);
+  if (errorRecord) {
+    if (typeof errorRecord.message === 'string') return errorRecord.message.trim();
+    if (typeof errorRecord.detail === 'string') return errorRecord.detail.trim();
+  }
+  return '';
+}
+
 export function gatewayPath(
   template: string,
   params: Record<string, string | number | boolean | null | undefined> = {},
@@ -5359,20 +5520,23 @@ export function getGatewayFlowEditorReadiness(
 async function gatewayErrorFromResponse(res: Response): Promise<GatewayHttpError> {
   const text = await res.text().catch(() => '');
   let detail: unknown = text;
+  let parsedJson = false;
   if (text) {
     try {
       detail = JSON.parse(text);
+      parsedJson = true;
     } catch {
       detail = text;
     }
   }
-  const rec = asRecord(detail);
-  const msg =
-    rec && typeof rec.detail === 'string'
-      ? rec.detail
-      : typeof detail === 'string' && detail.trim()
+  const rawMessage = parsedJson
+    ? messageFromJsonError(detail)
+    : typeof detail === 'string' && looksLikeHtml(detail)
+      ? messageFromHtmlError(detail)
+      : typeof detail === 'string'
         ? detail.trim()
-        : `HTTP ${res.status}`;
+        : messageFromJsonError(detail);
+  const msg = formatHttpErrorMessage(res.status, res.statusText || '', rawMessage);
   return new GatewayHttpError(msg, res.status, detail);
 }
 
@@ -5381,10 +5545,24 @@ export async function gatewayFetch(path: string, init?: RequestInit & { timeoutM
   const controller = typeof AbortController !== 'undefined' && timeoutMs > 0 ? new AbortController() : null;
   const timeout = controller ? window.setTimeout(() => controller.abort(), timeoutMs) : null;
   const { timeoutMs: _timeoutMs, signal, ...fetchInit } = init || {};
+  const method = String(fetchInit.method || 'GET').toUpperCase();
+  const headers = new Headers(fetchInit.headers || {});
+  if (
+    path.startsWith('/api/gateway/') &&
+    ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) &&
+    !headers.has('X-AbstractFlow-CSRF')
+  ) {
+    const csrf = document.cookie
+      .split(';')
+      .map((part) => part.trim())
+      .find((part) => part.startsWith('abstractflow_gateway_csrf='))
+      ?.slice('abstractflow_gateway_csrf='.length);
+    if (csrf) headers.set('X-AbstractFlow-CSRF', decodeURIComponent(csrf));
+  }
   const mergedSignal = signal || controller?.signal;
   let res: Response;
   try {
-    res = await fetch(path, { ...fetchInit, signal: mergedSignal });
+    res = await fetch(path, { ...fetchInit, headers, signal: mergedSignal });
   } finally {
     if (timeout !== null) window.clearTimeout(timeout);
   }
@@ -17025,13 +17203,14 @@ from __future__ import annotations
 
 import os
 import logging
+import hmac
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request as UrlRequest, urlopen
 
-from abstractflow.gateway_options import local_runtime_enabled, require_gateway_connectivity
-from fastapi import FastAPI, Request
+from abstractflow.gateway_options import local_runtime_enabled
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse, Response, StreamingResponse
@@ -17039,9 +17218,18 @@ from fastapi.responses import FileResponse, HTMLResponse, Response, StreamingRes
 from .routes.connection import router as connection_router
 from .routes.gateway_metrics import router as gateway_metrics_router
 from .routes.ui_config import router as ui_config_router
-from .services.gateway_connection import bootstrap_gateway_connection_env, resolve_effective_gateway_connection
+from .services.gateway_connection import (
+    GATEWAY_CSRF_HEADER,
+    GATEWAY_SESSION_CSRF_COOKIE,
+    GATEWAY_SESSION_HEADER,
+    bootstrap_gateway_connection_env,
+    resolve_effective_gateway_connection_for_request,
+    resolve_gateway_csrf_for_request,
+    resolve_gateway_url_from_server_config,
+)
 
-# Best-effort bootstrap so the backend can call the gateway without requiring a restart after UI config.
+# Best-effort bootstrap of the server-configured Gateway URL. Browser auth is
+# resolved per request from HTTP-only session cookies.
 bootstrap_gateway_connection_env()
 
 
@@ -17094,13 +17282,14 @@ def local_runtime_routes_enabled() -> bool:
 
 def _runtime_health() -> dict[str, object]:
     local_enabled = local_runtime_enabled()
-    gateway_url, gateway_token, token_source = resolve_effective_gateway_connection()
+    gateway_url = resolve_gateway_url_from_server_config()
     return {
         "runtime_mode": _runtime_mode(),
         "local_runtime_enabled": local_enabled,
         "gateway_url": gateway_url,
-        "gateway_token_configured": bool(gateway_token),
-        "gateway_token_source": token_source,
+        "gateway_token_configured": False,
+        "gateway_token_source": "browser-session",
+        "browser_sign_in_required": True,
     }
 
 def _gateway_proxy_timeout_s(default: float = 900.0) -> float:
@@ -17122,30 +17311,17 @@ async def _startup_connectivity_guard() -> None:
         )
         return
 
-    try:
-        gateway_url, gateway_token, _ = resolve_effective_gateway_connection()
-        require_gateway_connectivity(gateway_url=gateway_url, gateway_token=gateway_token, timeout_s=1.5)
-        logging.getLogger(__name__).info(
-            "Connected to AbstractGateway at %s",
-            gateway_url,
-        )
-    except ValueError as e:
-        logging.getLogger(__name__).warning(
-            "AbstractFlow started without a verified AbstractGateway connection. "
-            "The browser connection dialog can configure gateway URL/token. "
-            "Connectivity check failed: %s",
-            e,
-        )
+    logging.getLogger(__name__).info(
+        "AbstractFlow using AbstractGateway at %s. Browser users must sign in with their Gateway user token.",
+        resolve_gateway_url_from_server_config(),
+    )
 
 
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint."""
     runtime = _runtime_health()
-    status = "healthy"
-    if not runtime["local_runtime_enabled"] and not runtime["gateway_token_configured"]:
-        status = "error"
-    return {"status": status, "service": "abstractflow-visual-editor", **runtime}
+    return {"status": "healthy", "service": "abstractflow-visual-editor", **runtime}
 
 
 _HOP_BY_HOP_HEADERS = {
@@ -17215,22 +17391,52 @@ def _iter_gateway_proxy_response(resp: object, *, event_stream: bool = False):
             pass
 
 
-def _gateway_proxy_request_headers(request: Request, token: str | None) -> dict[str, str]:
+def _mutating_method(method: str) -> bool:
+    return str(method or "").upper() in {"POST", "PUT", "PATCH", "DELETE"}
+
+
+def _require_flow_proxy_csrf(request: Request) -> None:
+    if not _mutating_method(request.method):
+        return
+    expected = str(request.cookies.get(GATEWAY_SESSION_CSRF_COOKIE) or "").strip()
+    presented = str(request.headers.get("x-abstractflow-csrf") or "").strip()
+    if not expected or not presented or not hmac.compare_digest(expected, presented):
+        raise HTTPException(status_code=403, detail="Flow browser session CSRF token missing or invalid")
+
+
+def _gateway_proxy_request_headers(request: Request, session_id: str | None, csrf_token: str | None) -> dict[str, str]:
+    allowed_headers = {
+        "accept",
+        "accept-language",
+        "cache-control",
+        "content-type",
+        "last-event-id",
+        "pragma",
+        "x-client-id",
+        "x-client-version",
+        "x-request-id",
+    }
     out: dict[str, str] = {}
     for key, value in request.headers.items():
         k = key.lower()
-        if k in _HOP_BY_HOP_HEADERS or k in {"host", "content-length"}:
+        if k in _HOP_BY_HOP_HEADERS or k not in allowed_headers:
             continue
         out[key] = value
-    if token and not any(k.lower() == "authorization" for k in out):
-        out["Authorization"] = f"Bearer {token}"
+    if session_id:
+        out[GATEWAY_SESSION_HEADER] = session_id
+    if csrf_token and _mutating_method(request.method):
+        out[GATEWAY_CSRF_HEADER] = csrf_token
     return out
 
 
 @app.api_route("/api/gateway/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"])
 async def proxy_gateway_api(path: str, request: Request):
-    """Proxy Gateway API calls and inject server-held auth for the browser UI."""
-    gateway_url, token, _source = resolve_effective_gateway_connection()
+    """Proxy Gateway API calls and inject browser-session auth for the UI."""
+    gateway_url, session_id, _source = resolve_effective_gateway_connection_for_request(request)
+    if not session_id:
+        raise HTTPException(status_code=401, detail="Gateway sign-in required")
+    _require_flow_proxy_csrf(request)
+    csrf_token = resolve_gateway_csrf_for_request(request)
     base = str(gateway_url or "").strip().rstrip("/")
     safe_path = "/".join(quote(part, safe="") for part in str(path or "").split("/"))
     target = f"{base}/api/gateway/{safe_path}"
@@ -17243,7 +17449,7 @@ async def proxy_gateway_api(path: str, request: Request):
         url=target,
         data=data,
         method=request.method.upper(),
-        headers=_gateway_proxy_request_headers(request, token),
+        headers=_gateway_proxy_request_headers(request, session_id, csrf_token),
     )
 
     try:
@@ -17415,13 +17621,15 @@ Notes:
 
 Gateway-related flags (optional):
 - `--gateway-url http://127.0.0.1:8080`
-- `--gateway-token <token>`
 
 Gateway resolution:
 - `--gateway-url` falls back to `ABSTRACTGATEWAY_URL` and defaults to `http://127.0.0.1:8080`
-- `--gateway-token` falls back to `ABSTRACTGATEWAY_AUTH_TOKEN`
-- by default, startup now validates that AbstractGateway is reachable before binding the server
-- set `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1` to opt into compatibility-only local-host mode and skip the gateway reachability guard
+- Browser users sign in with their Gateway user id and token; Flow exchanges
+  the token for a Gateway browser session and stores only the opaque session id
+  in an HTTP-only browser cookie.
+- `--gateway-token` is accepted as a deprecated no-op for older scripts and no
+  longer authenticates browsers.
+- set `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1` to opt into compatibility-only local-host mode
 
 Evidence: [../abstractflow/cli.py](../abstractflow/cli.py), [../web/backend/cli.py](../web/backend/cli.py), [../web/backend/main.py](../web/backend/main.py).
 
@@ -17447,9 +17655,6 @@ from typing import List, Optional
 
 from .gateway_options import (
     local_runtime_enabled,
-    require_gateway_connection,
-    require_gateway_connectivity,
-    resolve_gateway_token,
     resolve_gateway_url,
 )
 
@@ -17509,6 +17714,7 @@ def _build_parser() -> argparse.ArgumentParser:
     serve.add_argument(
         "--gateway-token",
         default=None,
+        help=argparse.SUPPRESS,
     )
 
     return p
@@ -17583,23 +17789,20 @@ def main(args: Optional[List[str]] = None) -> int:
             if local_mode:
                 print("Running in local runtime compatibility mode (ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1).")
             else:
-                gateway_url, gateway_token = require_gateway_connection(
-                    gateway_url=getattr(ns, "gateway_url", None),
-                    gateway_token=getattr(ns, "gateway_token", None),
-                )
-                require_gateway_connectivity(
-                    gateway_url=gateway_url,
-                    gateway_token=gateway_token,
-                )
+                gateway_url = resolve_gateway_url(getattr(ns, "gateway_url", None))
                 os.environ["ABSTRACTGATEWAY_URL"] = resolve_gateway_url(gateway_url)
                 os.environ["ABSTRACTFLOW_GATEWAY_URL"] = resolve_gateway_url(gateway_url)
-                os.environ["ABSTRACTGATEWAY_AUTH_TOKEN"] = resolve_gateway_token(gateway_token)
+                if str(getattr(ns, "gateway_token", None) or "").strip():
+                    sys.stderr.write(
+                        "--gateway-token is ignored by AbstractFlow multi-user auth. "
+                        "Browser users must sign in with their Gateway user token.\n"
+                    )
+                else:
+                    sys.stderr.write("Browser users must sign in with their Gateway user token.\n")
 
             if getattr(ns, "gateway_url", None):
                 os.environ["ABSTRACTGATEWAY_URL"] = resolve_gateway_url(getattr(ns, "gateway_url", None))
                 os.environ["ABSTRACTFLOW_GATEWAY_URL"] = resolve_gateway_url(getattr(ns, "gateway_url", None))
-            if getattr(ns, "gateway_token", None):
-                os.environ["ABSTRACTGATEWAY_AUTH_TOKEN"] = resolve_gateway_token(getattr(ns, "gateway_token", None))
 
             uvicorn.run(
                 "backend.main:app",
@@ -17666,22 +17869,22 @@ dependencies = [
 [project.optional-dependencies]
 agent = [
     # Enables built-in Agent node creation in the VisualFlow executor.
-    "abstractagent>=0.3.9",
+    "abstractagent>=0.3.10",
 ]
 apple = [
     # Apple local control-plane + Gateway stack. This profile is intentionally
     # the full user-facing local install, so media engine extras cascade through
     # abstractgateway[apple] into the runtime-owned media engine extras.
-    "abstractgateway[apple]>=0.2.21",
-    "abstractagent>=0.3.9",
+    "abstractgateway[apple]>=0.2.22",
+    "abstractagent>=0.3.10",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.23.0",
     "websockets>=11.0.0",
 ]
 gpu = [
     # GPU local control-plane + Gateway stack.
-    "abstractgateway[gpu]>=0.2.21",
-    "abstractagent>=0.3.9",
+    "abstractgateway[gpu]>=0.2.22",
+    "abstractagent>=0.3.10",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.23.0",
     "websockets>=11.0.0",
@@ -17789,7 +17992,7 @@ file: abstractflow/_version.py
 This file is the single source of truth for AbstractFlow releases.
 """
 
-__version__ = "0.3.16"
+__version__ = "0.3.17"
 
 ---
 file: mkdocs.yml
@@ -17845,7 +18048,7 @@ file: web/frontend/package.json
 
 {
   "name": "@abstractframework/flow",
-  "version": "0.3.16",
+  "version": "0.3.17",
   "description": "Visual workflow editor for AbstractFramework - drag-and-drop workflow authoring with real-time testing",
   "type": "module",
   "author": "Laurent-Philippe Albou",
@@ -18788,6 +18991,21 @@ All notable changes to AbstractFlow will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [0.3.17] - 2026-05-31
+
+### Added
+- Hosted Flow sessions can sign in with Gateway URL, user id, and token. Flow validates that the token resolves to the requested Gateway user, exchanges it for an opaque Gateway browser session, and stores only that session id in an HTTP-only browser-session cookie; the `/api/gateway/*` proxy resolves that request session before any server-wide Gateway token so different browsers can connect as different Gateway principals.
+- Flow provider/model discovery now includes Gateway provider endpoint profiles as virtual providers, including OpenAI-compatible endpoints configured in the Gateway Console.
+
+### Changed
+- Remote browser connection updates may provide a token for the server-configured Gateway URL without mutating Flow server environment state. Remote browsers still cannot change the Gateway URL unless `ABSTRACTFLOW_ALLOW_REMOTE_BROWSER_GATEWAY_CONFIG=1` is enabled.
+- Apple/GPU Flow profiles now require Gateway `>=0.2.22` and Agent `>=0.3.10`.
+
+### Fixed
+- Flow's Gateway proxy now strips browser-supplied `Authorization`, `Cookie`, forwarded, and other unapproved request headers before proxying, then injects only the resolved opaque Gateway browser session and CSRF token where required.
 
 ## [0.3.16] - 2026-05-29
 

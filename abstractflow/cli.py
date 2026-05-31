@@ -16,9 +16,6 @@ from typing import List, Optional
 
 from .gateway_options import (
     local_runtime_enabled,
-    require_gateway_connection,
-    require_gateway_connectivity,
-    resolve_gateway_token,
     resolve_gateway_url,
 )
 
@@ -78,6 +75,7 @@ def _build_parser() -> argparse.ArgumentParser:
     serve.add_argument(
         "--gateway-token",
         default=None,
+        help=argparse.SUPPRESS,
     )
 
     return p
@@ -152,23 +150,20 @@ def main(args: Optional[List[str]] = None) -> int:
             if local_mode:
                 print("Running in local runtime compatibility mode (ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1).")
             else:
-                gateway_url, gateway_token = require_gateway_connection(
-                    gateway_url=getattr(ns, "gateway_url", None),
-                    gateway_token=getattr(ns, "gateway_token", None),
-                )
-                require_gateway_connectivity(
-                    gateway_url=gateway_url,
-                    gateway_token=gateway_token,
-                )
+                gateway_url = resolve_gateway_url(getattr(ns, "gateway_url", None))
                 os.environ["ABSTRACTGATEWAY_URL"] = resolve_gateway_url(gateway_url)
                 os.environ["ABSTRACTFLOW_GATEWAY_URL"] = resolve_gateway_url(gateway_url)
-                os.environ["ABSTRACTGATEWAY_AUTH_TOKEN"] = resolve_gateway_token(gateway_token)
+                if str(getattr(ns, "gateway_token", None) or "").strip():
+                    sys.stderr.write(
+                        "--gateway-token is ignored by AbstractFlow multi-user auth. "
+                        "Browser users must sign in with their Gateway user token.\n"
+                    )
+                else:
+                    sys.stderr.write("Browser users must sign in with their Gateway user token.\n")
 
             if getattr(ns, "gateway_url", None):
                 os.environ["ABSTRACTGATEWAY_URL"] = resolve_gateway_url(getattr(ns, "gateway_url", None))
                 os.environ["ABSTRACTFLOW_GATEWAY_URL"] = resolve_gateway_url(getattr(ns, "gateway_url", None))
-            if getattr(ns, "gateway_token", None):
-                os.environ["ABSTRACTGATEWAY_AUTH_TOKEN"] = resolve_gateway_token(getattr(ns, "gateway_token", None))
 
             uvicorn.run(
                 "backend.main:app",

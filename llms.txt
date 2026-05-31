@@ -17,6 +17,7 @@ Agent usage tips:
 - If you need the smallest useful context, read **Start Here** and skip **Optional**.
 - Prefer `docs/` for stable, user-facing behavior; treat the linked code files as source of truth.
 - This project is **Pre-alpha** (APIs may change); use tests as executable behavior specs.
+- Flow browser sessions sign in with Gateway URL, user id, and that user's token. Flow validates Gateway `/me`, exchanges the token for `/api/gateway/session/login`, reads Gateway `Set-Cookie` headers server-side, keeps only the opaque Gateway session id in an HTTP-only Flow cookie, and forwards that session plus CSRF for mutating proxied Gateway calls. Session ids and CSRF tokens are not returned to browser JavaScript in the connection response body. A server/admin Gateway token does not sign in browsers.
 - To validate changes locally, run: `pytest -q`.
 - `llms-full.txt` is generated from this file and intended for offline/RAG use. It may exceed a single context window; chunk it if needed.
 - After updating docs or linked files, regenerate: `python scripts/generate_llms_full.py`.
@@ -48,7 +49,7 @@ Agent usage tips:
 
 ## Web Editor Host (FastAPI)
 
-- [Web editor guide](docs/web-editor.md): Run backend/frontend, storage locations, gateway env vars
+- [Web editor guide](docs/web-editor.md): Run backend/frontend, storage locations, gateway URL config, and browser-session Gateway user auth
 - [Gateway client contract](web/frontend/src/utils/gatewayClient.ts): versioned capabilities, `common.readiness` overlay, endpoint descriptors
 - [Gateway catalog helpers](web/frontend/src/utils/gatewayCatalog.ts): canonical `gateway_catalog_v1` + legacy catalog normalization
 - [VisualFlow legacy compatibility](web/frontend/src/utils/visualFlowCompat.ts): imports old lowered music flows as native `generate_music`

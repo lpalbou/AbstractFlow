@@ -437,6 +437,93 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
 
+function formatHttpErrorMessage(status: number, statusText: string, message = ''): string {
+  const prefix = `HTTP ${status}${statusText.trim() ? ` ${statusText.trim()}` : ''}`;
+  const clean = message.trim();
+  return clean ? `${prefix}: ${clean}` : prefix;
+}
+
+function decodeBasicHtmlEntities(value: string): string {
+  const entities: Record<string, string> = {
+    amp: '&',
+    apos: "'",
+    gt: '>',
+    lt: '<',
+    nbsp: ' ',
+    quot: '"',
+  };
+  return value.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (match, raw: string) => {
+    const key = raw.toLowerCase();
+    if (key.startsWith('#x')) {
+      const code = Number.parseInt(key.slice(2), 16);
+      return Number.isFinite(code) && code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : match;
+    }
+    if (key.startsWith('#')) {
+      const code = Number.parseInt(key.slice(1), 10);
+      return Number.isFinite(code) && code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : match;
+    }
+    return entities[key] || match;
+  });
+}
+
+function normalizeErrorText(value: string): string {
+  return decodeBasicHtmlEntities(value)
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function htmlTagText(html: string, tag: string): string {
+  const match = new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i').exec(html);
+  if (!match) return '';
+  return normalizeErrorText(match[1].replace(/<[^>]*>/g, ' '));
+}
+
+function looksLikeHtml(value: string): boolean {
+  return /^\s*<!doctype\s+html\b/i.test(value) || /<html\b/i.test(value) || /<\/?[a-z][\s\S]*>/i.test(value);
+}
+
+function messageFromHtmlError(html: string): string {
+  const messageParagraph = /<p\b[^>]*>\s*Message:\s*([\s\S]*?)<\/p>/i.exec(html);
+  if (messageParagraph) {
+    const message = normalizeErrorText(messageParagraph[1].replace(/<[^>]*>/g, ' '));
+    if (message) return message;
+  }
+
+  const stripped = normalizeErrorText(
+    html
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<[^>]*>/g, ' ')
+  );
+  const inlineMessage = /Message:\s*(.+?)(?: Error code explanation:|$)/i.exec(stripped);
+  if (inlineMessage) {
+    const message = normalizeErrorText(inlineMessage[1]);
+    if (message) return message;
+  }
+
+  return htmlTagText(html, 'title') || htmlTagText(html, 'h1') || '';
+}
+
+function messageFromJsonError(detail: unknown): string {
+  if (typeof detail === 'string') return detail.trim();
+  const rec = asRecord(detail);
+  if (!rec) return '';
+  if (typeof rec.detail === 'string') return rec.detail.trim();
+  if (typeof rec.message === 'string') return rec.message.trim();
+  if (typeof rec.error === 'string') return rec.error.trim();
+  const detailRecord = asRecord(rec.detail);
+  if (detailRecord) {
+    if (typeof detailRecord.message === 'string') return detailRecord.message.trim();
+    if (typeof detailRecord.error === 'string') return detailRecord.error.trim();
+  }
+  const errorRecord = asRecord(rec.error);
+  if (errorRecord) {
+    if (typeof errorRecord.message === 'string') return errorRecord.message.trim();
+    if (typeof errorRecord.detail === 'string') return errorRecord.detail.trim();
+  }
+  return '';
+}
+
 export function gatewayPath(
   template: string,
   params: Record<string, string | number | boolean | null | undefined> = {},
@@ -872,20 +959,23 @@ export function getGatewayFlowEditorReadiness(
 async function gatewayErrorFromResponse(res: Response): Promise<GatewayHttpError> {
   const text = await res.text().catch(() => '');
   let detail: unknown = text;
+  let parsedJson = false;
   if (text) {
     try {
       detail = JSON.parse(text);
+      parsedJson = true;
     } catch {
       detail = text;
     }
   }
-  const rec = asRecord(detail);
-  const msg =
-    rec && typeof rec.detail === 'string'
-      ? rec.detail
-      : typeof detail === 'string' && detail.trim()
+  const rawMessage = parsedJson
+    ? messageFromJsonError(detail)
+    : typeof detail === 'string' && looksLikeHtml(detail)
+      ? messageFromHtmlError(detail)
+      : typeof detail === 'string'
         ? detail.trim()
-        : `HTTP ${res.status}`;
+        : messageFromJsonError(detail);
+  const msg = formatHttpErrorMessage(res.status, res.statusText || '', rawMessage);
   return new GatewayHttpError(msg, res.status, detail);
 }
 
@@ -894,10 +984,24 @@ export async function gatewayFetch(path: string, init?: RequestInit & { timeoutM
   const controller = typeof AbortController !== 'undefined' && timeoutMs > 0 ? new AbortController() : null;
   const timeout = controller ? window.setTimeout(() => controller.abort(), timeoutMs) : null;
   const { timeoutMs: _timeoutMs, signal, ...fetchInit } = init || {};
+  const method = String(fetchInit.method || 'GET').toUpperCase();
+  const headers = new Headers(fetchInit.headers || {});
+  if (
+    path.startsWith('/api/gateway/') &&
+    ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) &&
+    !headers.has('X-AbstractFlow-CSRF')
+  ) {
+    const csrf = document.cookie
+      .split(';')
+      .map((part) => part.trim())
+      .find((part) => part.startsWith('abstractflow_gateway_csrf='))
+      ?.slice('abstractflow_gateway_csrf='.length);
+    if (csrf) headers.set('X-AbstractFlow-CSRF', decodeURIComponent(csrf));
+  }
   const mergedSignal = signal || controller?.signal;
   let res: Response;
   try {
-    res = await fetch(path, { ...fetchInit, signal: mergedSignal });
+    res = await fetch(path, { ...fetchInit, headers, signal: mergedSignal });
   } finally {
     if (timeout !== null) window.clearTimeout(timeout);
   }

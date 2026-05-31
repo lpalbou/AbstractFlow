@@ -29,16 +29,29 @@ class _FakeGatewayResponse:
         pass
 
 
-def test_python_web_gateway_proxy_injects_gateway_auth(monkeypatch, tmp_path) -> None:
+def test_python_web_gateway_proxy_requires_browser_session(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("ABSTRACTFLOW_RUNTIME_DIR", str(tmp_path))
     monkeypatch.setenv("ABSTRACTGATEWAY_URL", "http://gateway.local:8080")
     monkeypatch.setenv("ABSTRACTGATEWAY_AUTH_TOKEN", "secret-token")
+
+    import backend.main as main
+
+    with TestClient(main.app) as client:
+        res = client.get("/api/gateway/discovery/capabilities")
+
+    assert res.status_code == 401
+    assert res.json()["detail"] == "Gateway sign-in required"
+
+
+def test_python_web_gateway_proxy_injects_browser_session_auth(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("ABSTRACTFLOW_RUNTIME_DIR", str(tmp_path))
+    monkeypatch.setenv("ABSTRACTGATEWAY_URL", "http://gateway.local:8080")
 
     captured = {}
 
     def fake_urlopen(req, timeout=None):
         captured["url"] = req.full_url
-        captured["authorization"] = req.headers.get("Authorization")
+        captured["headers"] = {str(k).lower(): v for k, v in req.header_items()}
         captured["timeout"] = timeout
         return _FakeGatewayResponse({"ok": True})
 
@@ -47,19 +60,19 @@ def test_python_web_gateway_proxy_injects_gateway_auth(monkeypatch, tmp_path) ->
     monkeypatch.setattr(main, "urlopen", fake_urlopen)
 
     with TestClient(main.app) as client:
+        client.cookies.set("abstractflow_gateway_session", "session-token")
         res = client.get("/api/gateway/discovery/capabilities")
 
     assert res.status_code == 200
     assert res.json() == {"ok": True}
     assert captured["url"] == "http://gateway.local:8080/api/gateway/discovery/capabilities"
-    assert captured["authorization"] == "Bearer secret-token"
+    assert captured["headers"]["x-abstractgateway-session"] == "session-token"
     assert captured["timeout"] == 900.0
 
 
 def test_python_web_gateway_proxy_timeout_is_configurable_and_capped(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("ABSTRACTFLOW_RUNTIME_DIR", str(tmp_path))
     monkeypatch.setenv("ABSTRACTGATEWAY_URL", "http://gateway.local:8080")
-    monkeypatch.setenv("ABSTRACTGATEWAY_AUTH_TOKEN", "secret-token")
     monkeypatch.setenv("ABSTRACTFLOW_GATEWAY_PROXY_TIMEOUT_S", "9999")
 
     captured = {}
@@ -73,7 +86,35 @@ def test_python_web_gateway_proxy_timeout_is_configurable_and_capped(monkeypatch
     monkeypatch.setattr(main, "urlopen", fake_urlopen)
 
     with TestClient(main.app) as client:
+        client.cookies.set("abstractflow_gateway_session", "session-token")
         res = client.get("/api/gateway/runs/run-1/artifacts/artifact-1/content")
 
     assert res.status_code == 200
     assert captured["timeout"] == 3600.0
+
+
+def test_python_web_gateway_proxy_requires_csrf_for_browser_session_writes(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("ABSTRACTFLOW_RUNTIME_DIR", str(tmp_path))
+    monkeypatch.setenv("ABSTRACTGATEWAY_URL", "http://gateway.local:8080")
+
+    captured = {}
+
+    def fake_urlopen(req, timeout=None):
+        captured["headers"] = {str(k).lower(): v for k, v in req.header_items()}
+        return _FakeGatewayResponse({"ok": True})
+
+    import backend.main as main
+
+    monkeypatch.setattr(main, "urlopen", fake_urlopen)
+
+    with TestClient(main.app) as client:
+        client.cookies.set("abstractflow_gateway_session", "session-token")
+        client.cookies.set("abstractflow_gateway_csrf", "csrf-token")
+        rejected = client.post("/api/gateway/commands", json={"x": 1})
+        accepted = client.post("/api/gateway/commands", json={"x": 1}, headers={"X-AbstractFlow-CSRF": "csrf-token"})
+
+    assert rejected.status_code == 403
+    assert "CSRF" in rejected.json()["detail"]
+    assert accepted.status_code == 200
+    assert captured["headers"]["x-abstractgateway-session"] == "session-token"
+    assert captured["headers"]["x-abstractgateway-csrf"] == "csrf-token"

@@ -66,12 +66,14 @@ Notes:
 
 Gateway-related flags (optional):
 - `--gateway-url http://127.0.0.1:8080`
-- `--gateway-token <token>`
 
 Gateway resolution:
 - `--gateway-url` falls back to `ABSTRACTGATEWAY_URL` and defaults to `http://127.0.0.1:8080`
-- `--gateway-token` falls back to `ABSTRACTGATEWAY_AUTH_TOKEN`
-- by default, startup now validates that AbstractGateway is reachable before binding the server
-- set `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1` to opt into compatibility-only local-host mode and skip the gateway reachability guard
+- Browser users sign in with their Gateway user id and token; Flow exchanges
+  the token for a Gateway browser session and stores only the opaque session id
+  in an HTTP-only browser cookie.
+- `--gateway-token` is accepted as a deprecated no-op for older scripts and no
+  longer authenticates browsers.
+- set `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1` to opt into compatibility-only local-host mode
 
 Evidence: [../abstractflow/cli.py](../abstractflow/cli.py), [../web/backend/cli.py](../web/backend/cli.py), [../web/backend/main.py](../web/backend/main.py).

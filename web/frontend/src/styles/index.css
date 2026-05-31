@@ -849,11 +849,14 @@ button.primary:hover:not(:disabled) {
 .gateway-connection-modal {
   width: min(760px, calc(100vw - 32px));
   max-width: 760px;
-  border: 1px solid rgba(0, 210, 255, 0.20);
-  background:
-    linear-gradient(135deg, rgba(18, 31, 61, 0.98), rgba(22, 20, 42, 0.98)),
-    var(--bg-secondary);
-  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.45);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.gateway-connection-modal .af-gateway-signin {
+  width: 100%;
 }
 
 .gateway-connection-hero {

@@ -22,18 +22,32 @@ source .venv/bin/activate
 pip install abstractgateway abstractflow
 
 export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
+export ABSTRACTGATEWAY_USER_AUTH=1
 abstractgateway serve --port 8080
+```
+
+Create a Gateway user for browser sign-in and use the returned token in the
+Flow connection modal:
+
+```bash
+curl -sS -X POST http://127.0.0.1:8080/api/gateway/admin/users \
+  -H "Authorization: Bearer dev-token" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"admin","roles":["admin","user"],"runtime_id":"default"}'
 ```
 
 Terminal 2 (UI):
 
 ```bash
-export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
 npx @abstractframework/flow --gateway-url http://127.0.0.1:8080
 ```
 
 Notes:
-- The browser never needs the bearer token directly. The Flow static server injects `Authorization: Bearer ...` while proxying `/api/*` to Gateway.
+- The browser signs in with a Gateway user id and that user's token. Flow
+  exchanges the token for a Gateway browser session, stores only the opaque
+  session id in an HTTP-only Flow cookie, and proxies `/api/*` to Gateway with
+  that session. The Flow connection response does not return the Gateway
+  session id or CSRF token to browser JavaScript.
 - Use `ABSTRACTGATEWAY_URL` or `ABSTRACTFLOW_GATEWAY_URL` (or `--gateway-url`) to point at a non-default Gateway.
 
 Open:
@@ -96,15 +110,18 @@ pip install -e .
 pip install -e ../abstractgateway
 
 export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
+export ABSTRACTGATEWAY_USER_AUTH=1
 abstractgateway serve --port 8080
 ```
+
+Create the browser sign-in user with `/api/gateway/admin/users` as shown in the
+recommended run path before opening the dev UI.
 
 Terminal 2 (frontend):
 
 ```bash
 cd web/frontend
 npm install
-export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
 npm run dev
 ```
 
@@ -114,7 +131,8 @@ Open:
 
 ## Run (FastAPI Gateway proxy host)
 
-The Python host still serves the built UI and now proxies `/api/gateway/*` to AbstractGateway with server-side auth injection:
+The Python host serves the built UI and proxies `/api/gateway/*` to
+AbstractGateway with browser-session auth injection:
 
 ```bash
 cd web/frontend
@@ -122,7 +140,6 @@ npm install
 npm run build
 
 cd ../
-export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
 python -m backend --port 3003 --gateway-url http://127.0.0.1:8080
 ```
 
@@ -145,15 +162,29 @@ Gateway connectivity is required for the modern editor path.
 
 Common env vars / flags:
 - `ABSTRACTGATEWAY_URL` (default `http://127.0.0.1:8080`)
-- `ABSTRACTGATEWAY_AUTH_TOKEN`
-- UI CLI flags: `npx @abstractframework/flow --gateway-url ... --gateway-token ...`
-- Python host flags: `abstractflow serve --gateway-url ... --gateway-token ...` (or `python -m backend ...`)
+- UI CLI flags: `npx @abstractframework/flow --gateway-url ...`
+- Python host flags: `abstractflow serve --gateway-url ...` (or `python -m backend ...`)
 
-For the modern editor path, if no gateway token is available the static Flow server and Python host fail fast with a clear error telling you to export `ABSTRACTGATEWAY_AUTH_TOKEN` or pass `--gateway-token`.
+For the modern editor path, the Flow server starts with only a Gateway URL.
+Each browser signs in with a Gateway URL, Gateway user id, and that user's
+Gateway token. Flow validates the token through Gateway `/me`, exchanges it for
+a Gateway browser session through `/api/gateway/session/login`, and rejects the
+connection if the token resolves to another user or to an admin/server token.
+Gateway owns the user's tenant/runtime mapping and returns it as read-only
+principal metadata. Flow keeps only the opaque Gateway session id in an
+HTTP-only cookie and keeps the CSRF token in a separate browser cookie for
+mutating proxy calls. Flow reads those values from Gateway `Set-Cookie` headers
+server-side and removes them from the response body; a second browser must sign
+in separately. Remote browsers may provide a token for the server-configured
+Gateway URL, but may not change the Gateway URL unless
+`ABSTRACTFLOW_ALLOW_REMOTE_BROWSER_GATEWAY_CONFIG=1` is set after adding your
+own access control. Flow uses the request `Host` header for that check by
+default; set `ABSTRACTFLOW_TRUST_PROXY_HEADERS=1` only behind a reverse proxy
+that strips client-supplied forwarded headers.
 
 Evidence:
 - UI modal: [../web/frontend/src/components/GatewayConnectionModal.tsx](../web/frontend/src/components/GatewayConnectionModal.tsx)
-- Backend persistence + env bootstrap: [../web/backend/services/gateway_connection.py](../web/backend/services/gateway_connection.py)
+- Backend URL persistence + browser session resolution: [../web/backend/services/gateway_connection.py](../web/backend/services/gateway_connection.py)
 - Embeddings config check + KG embedder wiring: [../web/backend/routes/connection.py](../web/backend/routes/connection.py), [../web/backend/routes/memory_kg.py](../web/backend/routes/memory_kg.py)
 - Gateway proxy auth injection: [../web/frontend/bin/cli.js](../web/frontend/bin/cli.js), [../web/frontend/vite.config.ts](../web/frontend/vite.config.ts), [../web/backend/main.py](../web/backend/main.py)
 

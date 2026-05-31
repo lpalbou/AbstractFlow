@@ -40,22 +40,22 @@ dependencies = [
 [project.optional-dependencies]
 agent = [
     # Enables built-in Agent node creation in the VisualFlow executor.
-    "abstractagent>=0.3.9",
+    "abstractagent>=0.3.10",
 ]
 apple = [
     # Apple local control-plane + Gateway stack. This profile is intentionally
     # the full user-facing local install, so media engine extras cascade through
     # abstractgateway[apple] into the runtime-owned media engine extras.
-    "abstractgateway[apple]>=0.2.21",
-    "abstractagent>=0.3.9",
+    "abstractgateway[apple]>=0.2.22",
+    "abstractagent>=0.3.10",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.23.0",
     "websockets>=11.0.0",
 ]
 gpu = [
     # GPU local control-plane + Gateway stack.
-    "abstractgateway[gpu]>=0.2.21",
-    "abstractagent>=0.3.9",
+    "abstractgateway[gpu]>=0.2.22",
+    "abstractagent>=0.3.10",
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.23.0",
     "websockets>=11.0.0",
