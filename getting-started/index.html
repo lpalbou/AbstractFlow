@@ -780,10 +780,11 @@ Enable local runtime compatibility only when needed with <code>ABSTRACTFLOW_ENAB
 <span class="nb">export</span><span class="w"> </span><span class="nv">ABSTRACTGATEWAY_AUTH_TOKEN</span><span class="o">=</span>dev-token
 abstractgateway<span class="w"> </span>serve<span class="w"> </span>--port<span class="w"> </span><span class="m">8080</span>
 
-<span class="nb">export</span><span class="w"> </span><span class="nv">ABSTRACTGATEWAY_AUTH_TOKEN</span><span class="o">=</span>dev-token
 npx<span class="w"> </span>@abstractframework/flow<span class="w"> </span>--gateway-url<span class="w"> </span>http://127.0.0.1:8080
 </code></pre></div>
-<p>Tip (from source): install Flow and Gateway editably, then run <code>npm run dev</code> from <code>web/frontend</code> with <code>ABSTRACTGATEWAY_AUTH_TOKEN</code> set so Vite can inject Gateway auth in its proxy.</p>
+<p>Open the editor and sign in with a Gateway user id and that user's token. From
+source, install Flow and Gateway editably, then run <code>npm run dev</code> from
+<code>web/frontend</code>; the Vite proxy uses the same browser-session sign-in flow.</p>
 <h2 id="create-media-with-gateway-nodes">Create media with Gateway nodes<a class="headerlink" href="#create-media-with-gateway-nodes" title="Permanent link">&para;</a></h2>
 <p>In the editor, add media nodes from the palette:
 - <code>Generate Image</code>: prompt to image artifact.

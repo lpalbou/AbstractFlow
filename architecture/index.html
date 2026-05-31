@@ -932,7 +932,23 @@ tests/                         # Test suite
 - Runs/commands: <code>POST /api/gateway/runs/start</code>, <code>POST /api/gateway/commands</code>
 - Replay/stream: <code>GET /api/gateway/runs/{run_id}/ledger</code>, <code>GET /api/gateway/runs/{run_id}/ledger/stream</code>
 - Artifacts: <code>GET /api/gateway/runs/{run_id}/artifacts/...</code></p>
-<p>The static <code>@abstractframework/flow</code> server, Vite dev proxy, and Python FastAPI host all proxy <code>/api/gateway/*</code> and inject the configured Gateway bearer token server-side. This is required because browser <code>EventSource</code> cannot send custom auth headers.</p>
+<p>The static <code>@abstractframework/flow</code> server, Vite dev proxy, and Python FastAPI
+host all proxy <code>/api/gateway/*</code> and inject Gateway auth server-side because
+browser <code>EventSource</code> cannot send custom auth headers. Flow injects the opaque
+Gateway browser session from an HTTP-only Flow cookie; server/admin Gateway
+tokens do not create browser login state. The Flow connection form asks for
+Gateway user id and token, then validates that the token resolves to that user
+before accepting the login. The raw token is exchanged for Gateway session
+cookies server-side, and the connection response does not return Gateway session
+ids or CSRF tokens to browser JavaScript. Gateway owns the user's runtime
+mapping and returns it as read-only principal metadata. Different browsers can
+connect to the shared Gateway as different principals. Remote browsers may
+provide a token for the server-configured Gateway URL, but may not change the
+Gateway URL unless
+<code>ABSTRACTFLOW_ALLOW_REMOTE_BROWSER_GATEWAY_CONFIG=1</code> is enabled. Flow uses the
+request <code>Host</code> header for that check by default; set
+<code>ABSTRACTFLOW_TRUST_PROXY_HEADERS=1</code> only behind a reverse proxy that strips
+client-supplied forwarded headers.</p>
 <h2 id="gateway-media-and-catalog-contracts">Gateway media and catalog contracts<a class="headerlink" href="#gateway-media-and-catalog-contracts" title="Permanent link">&para;</a></h2>
 <p>The editor discovers generated media support from Gateway capabilities rather
 than local Runtime/Core imports:

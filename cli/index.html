@@ -635,13 +635,15 @@ abstractflow<span class="w"> </span>serve<span class="w"> </span>--reload<span c
 - This starts the backend API on <code>/api/*</code> (health: <code>/api/health</code>).
 - The UI can be served via <code>npx @abstractframework/flow</code> (see <a href="../web-editor/">web-editor.md</a>).</p>
 <p>Gateway-related flags (optional):
-- <code>--gateway-url http://127.0.0.1:8080</code>
-- <code>--gateway-token &lt;token&gt;</code></p>
+- <code>--gateway-url http://127.0.0.1:8080</code></p>
 <p>Gateway resolution:
 - <code>--gateway-url</code> falls back to <code>ABSTRACTGATEWAY_URL</code> and defaults to <code>http://127.0.0.1:8080</code>
-- <code>--gateway-token</code> falls back to <code>ABSTRACTGATEWAY_AUTH_TOKEN</code>
-- by default, startup now validates that AbstractGateway is reachable before binding the server
-- set <code>ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1</code> to opt into compatibility-only local-host mode and skip the gateway reachability guard</p>
+- Browser users sign in with their Gateway user id and token; Flow exchanges
+  the token for a Gateway browser session and stores only the opaque session id
+  in an HTTP-only browser cookie.
+- <code>--gateway-token</code> is accepted as a deprecated no-op for older scripts and no
+  longer authenticates browsers.
+- set <code>ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1</code> to opt into compatibility-only local-host mode</p>
 <p>Evidence: <a href="../abstractflow/cli.py">../abstractflow/cli.py</a>, <a href="../web/backend/cli.py">../web/backend/cli.py</a>, <a href="../web/backend/main.py">../web/backend/main.py</a>.</p>
 
 

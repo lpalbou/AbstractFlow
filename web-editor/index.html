@@ -719,14 +719,25 @@ Python compatibility host/profile.</p>
 pip<span class="w"> </span>install<span class="w"> </span>abstractgateway<span class="w"> </span>abstractflow
 
 <span class="nb">export</span><span class="w"> </span><span class="nv">ABSTRACTGATEWAY_AUTH_TOKEN</span><span class="o">=</span>dev-token
+<span class="nb">export</span><span class="w"> </span><span class="nv">ABSTRACTGATEWAY_USER_AUTH</span><span class="o">=</span><span class="m">1</span>
 abstractgateway<span class="w"> </span>serve<span class="w"> </span>--port<span class="w"> </span><span class="m">8080</span>
 </code></pre></div>
+<p>Create a Gateway user for browser sign-in and use the returned token in the
+Flow connection modal:</p>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-sS<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://127.0.0.1:8080/api/gateway/admin/users<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer dev-token&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;user_id&quot;:&quot;admin&quot;,&quot;roles&quot;:[&quot;admin&quot;,&quot;user&quot;],&quot;runtime_id&quot;:&quot;default&quot;}&#39;</span>
+</code></pre></div>
 <p>Terminal 2 (UI):</p>
-<div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">ABSTRACTGATEWAY_AUTH_TOKEN</span><span class="o">=</span>dev-token
-npx<span class="w"> </span>@abstractframework/flow<span class="w"> </span>--gateway-url<span class="w"> </span>http://127.0.0.1:8080
+<div class="highlight"><pre><span></span><code>npx<span class="w"> </span>@abstractframework/flow<span class="w"> </span>--gateway-url<span class="w"> </span>http://127.0.0.1:8080
 </code></pre></div>
 <p>Notes:
-- The browser never needs the bearer token directly. The Flow static server injects <code>Authorization: Bearer ...</code> while proxying <code>/api/*</code> to Gateway.
+- The browser signs in with a Gateway user id and that user's token. Flow
+  exchanges the token for a Gateway browser session, stores only the opaque
+  session id in an HTTP-only Flow cookie, and proxies <code>/api/*</code> to Gateway with
+  that session. The Flow connection response does not return the Gateway
+  session id or CSRF token to browser JavaScript.
 - Use <code>ABSTRACTGATEWAY_URL</code> or <code>ABSTRACTFLOW_GATEWAY_URL</code> (or <code>--gateway-url</code>) to point at a non-default Gateway.</p>
 <p>Open:
 - UI: http://localhost:3003
@@ -777,25 +788,27 @@ pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </s
 pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>../abstractgateway
 
 <span class="nb">export</span><span class="w"> </span><span class="nv">ABSTRACTGATEWAY_AUTH_TOKEN</span><span class="o">=</span>dev-token
+<span class="nb">export</span><span class="w"> </span><span class="nv">ABSTRACTGATEWAY_USER_AUTH</span><span class="o">=</span><span class="m">1</span>
 abstractgateway<span class="w"> </span>serve<span class="w"> </span>--port<span class="w"> </span><span class="m">8080</span>
 </code></pre></div>
+<p>Create the browser sign-in user with <code>/api/gateway/admin/users</code> as shown in the
+recommended run path before opening the dev UI.</p>
 <p>Terminal 2 (frontend):</p>
 <div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>web/frontend
 npm<span class="w"> </span>install
-<span class="nb">export</span><span class="w"> </span><span class="nv">ABSTRACTGATEWAY_AUTH_TOKEN</span><span class="o">=</span>dev-token
 npm<span class="w"> </span>run<span class="w"> </span>dev
 </code></pre></div>
 <p>Open:
 - Frontend: http://localhost:3003 or Vite's printed port
 - Gateway: http://localhost:8080/api/gateway/discovery/capabilities</p>
 <h2 id="run-fastapi-gateway-proxy-host">Run (FastAPI Gateway proxy host)<a class="headerlink" href="#run-fastapi-gateway-proxy-host" title="Permanent link">&para;</a></h2>
-<p>The Python host still serves the built UI and now proxies <code>/api/gateway/*</code> to AbstractGateway with server-side auth injection:</p>
+<p>The Python host serves the built UI and proxies <code>/api/gateway/*</code> to
+AbstractGateway with browser-session auth injection:</p>
 <div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>web/frontend
 npm<span class="w"> </span>install
 npm<span class="w"> </span>run<span class="w"> </span>build
 
 <span class="nb">cd</span><span class="w"> </span>../
-<span class="nb">export</span><span class="w"> </span><span class="nv">ABSTRACTGATEWAY_AUTH_TOKEN</span><span class="o">=</span>dev-token
 python<span class="w"> </span>-m<span class="w"> </span>backend<span class="w"> </span>--port<span class="w"> </span><span class="m">3003</span><span class="w"> </span>--gateway-url<span class="w"> </span>http://127.0.0.1:8080
 </code></pre></div>
 <p>By default, this host mounts only the Gateway proxy, connection/config, UI config, and host metrics routes. To expose the old local <code>/api/flows</code>, <code>/api/ws</code>, <code>/api/runs</code>, <code>/api/providers</code>, <code>/api/tools</code>, <code>/api/semantics</code>, and <code>/api/memory/kg</code> compatibility routes, set:</p>
@@ -811,13 +824,27 @@ python<span class="w"> </span>-m<span class="w"> </span>backend<span class="w"> 
 <p>Gateway connectivity is required for the modern editor path.</p>
 <p>Common env vars / flags:
 - <code>ABSTRACTGATEWAY_URL</code> (default <code>http://127.0.0.1:8080</code>)
-- <code>ABSTRACTGATEWAY_AUTH_TOKEN</code>
-- UI CLI flags: <code>npx @abstractframework/flow --gateway-url ... --gateway-token ...</code>
-- Python host flags: <code>abstractflow serve --gateway-url ... --gateway-token ...</code> (or <code>python -m backend ...</code>)</p>
-<p>For the modern editor path, if no gateway token is available the static Flow server and Python host fail fast with a clear error telling you to export <code>ABSTRACTGATEWAY_AUTH_TOKEN</code> or pass <code>--gateway-token</code>.</p>
+- UI CLI flags: <code>npx @abstractframework/flow --gateway-url ...</code>
+- Python host flags: <code>abstractflow serve --gateway-url ...</code> (or <code>python -m backend ...</code>)</p>
+<p>For the modern editor path, the Flow server starts with only a Gateway URL.
+Each browser signs in with a Gateway URL, Gateway user id, and that user's
+Gateway token. Flow validates the token through Gateway <code>/me</code>, exchanges it for
+a Gateway browser session through <code>/api/gateway/session/login</code>, and rejects the
+connection if the token resolves to another user or to an admin/server token.
+Gateway owns the user's tenant/runtime mapping and returns it as read-only
+principal metadata. Flow keeps only the opaque Gateway session id in an
+HTTP-only cookie and keeps the CSRF token in a separate browser cookie for
+mutating proxy calls. Flow reads those values from Gateway <code>Set-Cookie</code> headers
+server-side and removes them from the response body; a second browser must sign
+in separately. Remote browsers may provide a token for the server-configured
+Gateway URL, but may not change the Gateway URL unless
+<code>ABSTRACTFLOW_ALLOW_REMOTE_BROWSER_GATEWAY_CONFIG=1</code> is set after adding your
+own access control. Flow uses the request <code>Host</code> header for that check by
+default; set <code>ABSTRACTFLOW_TRUST_PROXY_HEADERS=1</code> only behind a reverse proxy
+that strips client-supplied forwarded headers.</p>
 <p>Evidence:
 - UI modal: <a href="../web/frontend/src/components/GatewayConnectionModal.tsx">../web/frontend/src/components/GatewayConnectionModal.tsx</a>
-- Backend persistence + env bootstrap: <a href="../web/backend/services/gateway_connection.py">../web/backend/services/gateway_connection.py</a>
+- Backend URL persistence + browser session resolution: <a href="../web/backend/services/gateway_connection.py">../web/backend/services/gateway_connection.py</a>
 - Embeddings config check + KG embedder wiring: <a href="../web/backend/routes/connection.py">../web/backend/routes/connection.py</a>, <a href="../web/backend/routes/memory_kg.py">../web/backend/routes/memory_kg.py</a>
 - Gateway proxy auth injection: <a href="../web/frontend/bin/cli.js">../web/frontend/bin/cli.js</a>, <a href="../web/frontend/vite.config.ts">../web/frontend/vite.config.ts</a>, <a href="../web/backend/main.py">../web/backend/main.py</a></p>
 <h2 id="tools-abstractcore">Tools (AbstractCore)<a class="headerlink" href="#tools-abstractcore" title="Permanent link">&para;</a></h2>

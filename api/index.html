@@ -945,7 +945,10 @@ outputs. This is especially important for long video generations.</p>
 <p>Model residency is discovered through <code>common.model_residency</code> and includes
 <code>text_to_video</code> and <code>image_to_video</code> when the Gateway/runtime stack supports
 video warmup/list/unload semantics.</p>
-<p>The browser calls same-origin <code>/api/gateway/*</code>; the Flow static server/Vite/Python host proxy those requests to Gateway and inject the configured bearer token.</p>
+<p>The browser calls same-origin <code>/api/gateway/*</code>; the Flow static server, Vite
+dev proxy, and Python host proxy those requests to Gateway and inject the
+Gateway user token from the browser's HTTP-only sign-in cookie. Requests without
+that browser session receive <code>401</code>.</p>
 <p>Evidence: <a href="../web/frontend/src/hooks/useGatewayCapabilities.ts">../web/frontend/src/hooks/useGatewayCapabilities.ts</a>, <a href="../web/frontend/src/utils/gatewayClient.ts">../web/frontend/src/utils/gatewayClient.ts</a>, <a href="../web/backend/main.py">../web/backend/main.py</a>.</p>
 <h2 id="adapters-advanced">Adapters (advanced)<a class="headerlink" href="#adapters-advanced" title="Permanent link">&para;</a></h2>
 <p>If you build custom hosts or want direct control over node handler construction, adapters are re-exported:</p>

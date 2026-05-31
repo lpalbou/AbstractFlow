@@ -1001,7 +1001,10 @@ contract, so filesystem side effects stay visible in the workflow.</p>
 - The bundle format and packer are owned by AbstractRuntime; AbstractFlow provides a thin wrapper.</p>
 <p>Evidence: <a href="../abstractflow/cli.py">../abstractflow/cli.py</a>, <a href="../abstractflow/workflow_bundle.py">../abstractflow/workflow_bundle.py</a>, tests in <a href="../tests/test_workflow_bundle_pack.py">../tests/test_workflow_bundle_pack.py</a>.</p>
 <h2 id="do-i-need-an-abstractgateway">Do I need an AbstractGateway?<a class="headerlink" href="#do-i-need-an-abstractgateway" title="Permanent link">&para;</a></h2>
-<p>For the modern browser editor, yes: Gateway is the runtime, persistence, discovery, ledger, and artifact authority. The editor calls same-origin <code>/api/gateway/*</code> through a Flow proxy so bearer auth stays server-side.</p>
+<p>For the modern browser editor, yes: Gateway is the runtime, persistence,
+discovery, ledger, and artifact authority. The editor calls same-origin
+<code>/api/gateway/*</code> through a Flow proxy; the proxy injects the signed-in
+browser session's Gateway user token.</p>
 <p>For local runtime use, install <code>abstractflow[apple]</code> and run with <code>abstractflow.visual.execute_visual_flow(...)</code> or
 <code>create_visual_runner(...)</code>. The old FastAPI local runtime routes are compatibility-only and are gated by
 <code>ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1</code>.</p>
