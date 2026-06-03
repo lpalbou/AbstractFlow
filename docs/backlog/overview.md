@@ -1,10 +1,10 @@
 # AbstractFlow Backlog Overview
 
 ## Snapshot
-- Updated: 2026-05-29
+- Updated: 2026-06-02
 - Planned: 0
 - Proposed: 13
-- Completed: 27
+- Completed: 28
 - Deprecated: 0
 
 ## Current Priorities
@@ -26,6 +26,7 @@
 - `proposed/0095_file_nodes_artifact_io_boundary_resolution.md`: preserves the unresolved design tension around whether `Read File` / `Write File` should import/export artifacts directly, whether explicit artifact IO nodes are clearer, and how JSON/document/file artifacts should become first-class without conflating Runtime artifact storage with user-authored file trees.
 
 ## Completed Ledger
+- `completed/0097_artifact_pin_upload_voice_wait_and_media_progress.md`: added node-level artifact uploads for unconnected artifact input pins, browser capture/upload/resume for `Listen Voice` waits, stricter execution-pin preview inference, and image/image-edit child-run `abstract.progress` parity. Validation: Flow frontend build, focused Runtime media-node tests, focused Gateway generated-media/voice contract tests, and Core vision endpoint tests.
 - `completed/0094_artifact_search_export_and_kg_memory_readiness.md` from `planned/0094_artifact_search_export_and_kg_memory_readiness.md`: added Gateway artifact search with all/session/run scope, modality/content-type/query/tag filters, Flow artifact picker search with session-list fallback, and KG memory readiness that stays available on fresh resolved stores. An initial Run modal export control was removed in favor of the graph-level file/artifact IO design tracked by `proposed/0095_file_nodes_artifact_io_boundary_resolution.md`. Validation: focused Gateway artifact/capability/default-scan tests, Flow frontend contract tests, and frontend build.
 - `completed/0093_artifact_reference_visibility_and_runtime_handoff.md` from `planned/0093_artifact_reference_visibility_and_runtime_handoff.md`: standardized artifact refs at the Gateway/Flow boundary, added session-visible artifact listing, allowed same-session artifact metadata/content access, and validated run-start refs before Runtime handoff. Validation: focused Gateway, Flow frontend contract/build, and Runtime artifact-store tests.
 - `completed/0092_run_modal_artifact_input_picker.md` from `planned/0092_run_modal_artifact_input_picker.md`: added a Run modal artifact input field for generic/image/audio/text/video pins with existing session artifact selection, browser upload, Gateway workspace import, modality filtering, previews, and canonical JSON ref submission. Validation: Flow frontend gateway contract tests and frontend build.

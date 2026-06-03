@@ -1,0 +1,207 @@
+{
+  "id": "demo_deep_research_minimal",
+  "name": "Demo - Deep Research Minimal",
+  "description": "Small demonstration workflow: build a research brief, run one tool-using research agent, then return the final report plus an audit trace. Defaults to lmstudio:qwen/qwen3.6-35b-a3b.",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": { "x": -720.0, "y": 40.0 },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Research Request",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "prompt", "label": "question", "type": "string" },
+          { "id": "provider", "label": "provider", "type": "provider" },
+          { "id": "model", "label": "model", "type": "model" },
+          { "id": "max_web_search", "label": "max_search", "type": "number" },
+          { "id": "max_fetch_url", "label": "max_fetch", "type": "number" },
+          { "id": "max_iterations", "label": "max_iterations", "type": "number" }
+        ],
+        "pinDefaults": {
+          "prompt": "What are the practical tradeoffs of running local multimodal models on Apple Silicon versus using remote APIs for a small product team?",
+          "provider": "lmstudio",
+          "model": "qwen/qwen3.6-35b-a3b",
+          "max_web_search": 4,
+          "max_fetch_url": 3,
+          "max_iterations": 18
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "tools",
+      "type": "tools_allowlist",
+      "position": { "x": -720.0, "y": 360.0 },
+      "data": {
+        "nodeType": "tools_allowlist",
+        "label": "Web Research Tools",
+        "icon": "&#x1F9F0;",
+        "headerColor": "#FF8800",
+        "inputs": [],
+        "outputs": [
+          { "id": "tools", "label": "tools", "type": "array" }
+        ],
+        "literalValue": ["web_search", "fetch_url"]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "brief",
+      "type": "concat",
+      "position": { "x": -392.0, "y": 40.0 },
+      "data": {
+        "nodeType": "concat",
+        "label": "Build Research Brief",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          { "id": "a", "label": "instructions", "type": "string" },
+          { "id": "b", "label": "max_search", "type": "number" },
+          { "id": "c", "label": "fetch_text", "type": "string" },
+          { "id": "d", "label": "max_fetch", "type": "number" },
+          { "id": "e", "label": "question_label", "type": "string" },
+          { "id": "f", "label": "question", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "result", "label": "brief", "type": "string" }
+        ],
+        "concatConfig": { "separator": "" },
+        "pinDefaults": {
+          "a": "You are demonstrating DEEP RESEARCH. Show the sequence: understand the question, search for evidence, fetch important sources, compare claims, and write a cited report.\n\nBudgets:\n- web_search calls: ",
+          "c": "\n- fetch_url calls: ",
+          "e": "\n\nUser question:\n"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "research",
+      "type": "agent",
+      "position": { "x": -40.0, "y": 40.0 },
+      "data": {
+        "nodeType": "agent",
+        "label": "Investigate Evidence",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "include_context", "label": "use_context", "type": "boolean" },
+          { "id": "provider", "label": "provider", "type": "provider" },
+          { "id": "model", "label": "model", "type": "model" },
+          { "id": "max_iterations", "label": "max_iterations", "type": "number" },
+          { "id": "system", "label": "system", "type": "string" },
+          { "id": "prompt", "label": "brief", "type": "string" },
+          { "id": "tools", "label": "tools", "type": "array" },
+          { "id": "context", "label": "context", "type": "object" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "response", "label": "report", "type": "string" },
+          { "id": "success", "label": "success", "type": "boolean" },
+          { "id": "meta", "label": "meta", "type": "object" },
+          { "id": "scratchpad", "label": "scratchpad", "type": "object" }
+        ],
+        "pinDefaults": {
+          "include_context": false,
+          "system": "You are a careful deep researcher. Use web tools when available. Cite URLs. Separate evidence from interpretation. Return a concise Markdown report with sections: Findings, Evidence, Uncertainties, Recommendation."
+        },
+        "agentConfig": {
+          "provider": "lmstudio",
+          "model": "qwen/qwen3.6-35b-a3b",
+          "tools": ["web_search", "fetch_url"],
+          "system": "You are a careful deep researcher. Use web tools when available. Cite URLs. Separate evidence from interpretation.",
+          "max_iterations": 18
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "trace",
+      "type": "agent_trace_report",
+      "position": { "x": 304.0, "y": 288.0 },
+      "data": {
+        "nodeType": "agent_trace_report",
+        "label": "Summarize Research Trace",
+        "icon": "&#x1F4CB;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "scratchpad", "label": "scratchpad", "type": "object" }
+        ],
+        "outputs": [
+          { "id": "result", "label": "trace", "type": "string" }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": { "x": 648.0, "y": 40.0 },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Research Report",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "response", "label": "report", "type": "string" },
+          { "id": "research_trace", "label": "research_trace", "type": "string" },
+          { "id": "meta", "label": "meta", "type": "object" },
+          { "id": "scratchpad", "label": "scratchpad", "type": "object" }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    { "id": "e-start-research", "source": "start", "sourceHandle": "exec-out", "target": "research", "targetHandle": "exec-in", "animated": true },
+    { "id": "e-provider-research", "source": "start", "sourceHandle": "provider", "target": "research", "targetHandle": "provider", "animated": false },
+    { "id": "e-model-research", "source": "start", "sourceHandle": "model", "target": "research", "targetHandle": "model", "animated": false },
+    { "id": "e-iterations-research", "source": "start", "sourceHandle": "max_iterations", "target": "research", "targetHandle": "max_iterations", "animated": false },
+    { "id": "e-tools-research", "source": "tools", "sourceHandle": "tools", "target": "research", "targetHandle": "tools", "animated": false },
+    { "id": "e-search-brief", "source": "start", "sourceHandle": "max_web_search", "target": "brief", "targetHandle": "b", "animated": false },
+    { "id": "e-fetch-brief", "source": "start", "sourceHandle": "max_fetch_url", "target": "brief", "targetHandle": "d", "animated": false },
+    { "id": "e-prompt-brief", "source": "start", "sourceHandle": "prompt", "target": "brief", "targetHandle": "f", "animated": false },
+    { "id": "e-brief-research", "source": "brief", "sourceHandle": "result", "target": "research", "targetHandle": "prompt", "animated": false },
+    { "id": "e-research-trace", "source": "research", "sourceHandle": "scratchpad", "target": "trace", "targetHandle": "scratchpad", "animated": false },
+    { "id": "e-research-end", "source": "research", "sourceHandle": "exec-out", "target": "end", "targetHandle": "exec-in", "animated": true },
+    { "id": "e-response-end", "source": "research", "sourceHandle": "response", "target": "end", "targetHandle": "response", "animated": false },
+    { "id": "e-trace-end", "source": "trace", "sourceHandle": "result", "target": "end", "targetHandle": "research_trace", "animated": false },
+    { "id": "e-meta-end", "source": "research", "sourceHandle": "meta", "target": "end", "targetHandle": "meta", "animated": false },
+    { "id": "e-scratchpad-end", "source": "research", "sourceHandle": "scratchpad", "target": "end", "targetHandle": "scratchpad", "animated": false }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-05-29T00:00:00Z",
+  "updated_at": "2026-05-29T00:00:00Z"
+}

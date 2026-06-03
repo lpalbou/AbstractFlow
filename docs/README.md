@@ -1,44 +1,32 @@
-# AbstractFlow documentation
+# AbstractFlow Documentation
 
-AbstractFlow is a Python library plus a Gateway-first reference web UI for authoring and executing **durable** AI workflows.
+AbstractFlow is the AbstractFramework visual workflow editor. It is distributed as the npm package `@abstractframework/flow`.
 
-This doc set is intentionally:
-- **actionable** (commands and entrypoints you can run)
-- **evidence-based** (each page points to the code that implements the described behavior)
+Normal operation:
 
-## Start here
+1. AbstractGateway runs on a server or local machine.
+2. AbstractFlow serves the browser editor.
+3. The browser signs in with a Gateway user token.
+4. Flow proxies authoring, discovery, run, ledger, and artifact calls to Gateway.
 
-- Published documentation site: https://www.lpalbou.info/AbstractFlow/
-- Project overview + install: [../README.md](../README.md)
-- Getting started (quickstarts + “waiting” runs): [getting-started.md](getting-started.md)
+AbstractFlow does not own runtime execution or provider secrets. Gateway and Runtime do.
 
-## Find what you need
+## Pages
 
-- API reference (high-level): [api.md](api.md)
-- Architecture (how the pieces fit): [architecture.md](architecture.md)
-- FAQ (common questions): [faq.md](faq.md)
-- VisualFlow JSON format: [visualflow.md](visualflow.md)
-- Visual editor (run the reference UI): [web-editor.md](web-editor.md)
-- CLI (`bundle`, `serve`): [cli.md](cli.md)
+- [Getting started](getting-started.md)
+- [Web editor](web-editor.md)
+- [Architecture](architecture.md)
+- [API and contracts](api.md)
+- [VisualFlow JSON](visualflow.md)
+- [CLI](cli.md)
+- [FAQ](faq.md)
 
-## Repo policies
+## Maintainer Notes
 
-- Changelog: [../CHANGELOG.md](../CHANGELOG.md)
-- Contributing: [../CONTRIBUTING.md](../CONTRIBUTING.md)
-- Security reporting: [../SECURITY.md](../SECURITY.md)
-- Acknowledgments: [../ACKNOWLEDGMENTS.md](../ACKNOWLEDGMENTS.md)
+- Keep docs written around the web package layout: `src/`, `bin/`, `examples/flows/`, `docs/`.
+- Do not add Python package or local server launch instructions; those surfaces were removed from this repository.
+- Regenerate the LLM context after doc changes:
 
-## Code map (evidence)
-
-- Public Python API exports: [../abstractflow/__init__.py](../abstractflow/__init__.py)
-- Programmatic flows (IR re-export from AbstractRuntime): [../abstractflow/core/flow.py](../abstractflow/core/flow.py)
-- Flow execution convenience: [../abstractflow/runner.py](../abstractflow/runner.py) (`FlowRunner`)
-- VisualFlow schema (portable JSON): [../abstractflow/visual/models.py](../abstractflow/visual/models.py)
-- VisualFlow host wiring + execution: [../abstractflow/visual/executor.py](../abstractflow/visual/executor.py)
-- Gateway client contracts/catalogs: [../web/frontend/src/utils/gatewayClient.ts](../web/frontend/src/utils/gatewayClient.ts), [../web/frontend/src/utils/gatewayCatalog.ts](../web/frontend/src/utils/gatewayCatalog.ts)
-- Run replay/progress/artifact rendering: [../web/frontend/src/components/RunFlowModal.tsx](../web/frontend/src/components/RunFlowModal.tsx)
-- VisualFlow interface contracts: [../abstractflow/visual/interfaces.py](../abstractflow/visual/interfaces.py)
-- WorkflowBundle helpers (thin wrapper): [../abstractflow/workflow_bundle.py](../abstractflow/workflow_bundle.py)
-- CLI entrypoint: [../abstractflow/cli.py](../abstractflow/cli.py)
-- Web backend (FastAPI): [../web/backend/main.py](../web/backend/main.py), [../web/backend/routes/](../web/backend/routes/)
-- Web frontend (React): [../web/frontend/src/](../web/frontend/src/)
+```bash
+npm run docs:llms
+```

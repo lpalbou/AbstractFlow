@@ -1,79 +1,34 @@
-# CLI (`abstractflow`)
+# CLI
 
-AbstractFlow ships a small CLI focused on:
-- **WorkflowBundle** (`.flow`) utilities
-- running the **Visual Editor backend** (optional; requires `abstractflow[apple]` or `abstractflow[gpu]`)
-- Note: WorkflowBundle commands require `abstractflow[apple]` or `abstractflow[gpu]`.
-
-Entry point:
-- `abstractflow` (declared in `pyproject.toml` → `project.scripts`)
-- implementation: `abstractflow/cli.py`
-
-See also: [../README.md](../README.md), [getting-started.md](getting-started.md), [faq.md](faq.md), [visualflow.md](visualflow.md), [architecture.md](architecture.md).
-
-## WorkflowBundle (.flow)
-
-A `.flow` file is a zip bundle containing:
-- `manifest.json`
-- `flows/<flow_id>.json` (one or more VisualFlow JSON documents)
-
-Bundling semantics are shared with AbstractRuntime:
-- AbstractFlow CLI uses `abstractruntime.workflow_bundle` under the hood.
-- Evidence: [../abstractflow/workflow_bundle.py](../abstractflow/workflow_bundle.py), [../abstractflow/cli.py](../abstractflow/cli.py).
-
-## Commands
-
-Pack a bundle from a root VisualFlow JSON (includes referenced subflows as determined by the AbstractRuntime packer):
+AbstractFlow ships one CLI through npm:
 
 ```bash
-abstractflow bundle pack web/flows/ac-echo.json --out /tmp/ac-echo.flow
+npx @abstractframework/flow
 ```
 
-Common options (see `abstractflow bundle pack --help`):
-- `--flows-dir <dir>`: where to find `<flow_id>.json` files (defaults to the root file’s directory)
-- `--bundle-id <id>`, `--bundle-version <x.y.z>`
-- `--entrypoint <flow_id>` (repeatable)
+It serves the built editor and proxies `/api/*` to AbstractGateway.
 
-Inspect a bundle manifest:
+## Usage
 
 ```bash
-abstractflow bundle inspect /tmp/ac-echo.flow
+npx @abstractframework/flow \
+  --host 0.0.0.0 \
+  --port 3003 \
+  --gateway-url http://127.0.0.1:8080
 ```
 
-Unpack to a directory:
+Equivalent installed command:
 
 ```bash
-abstractflow bundle unpack /tmp/ac-echo.flow --dir /tmp/ac-echo
+npm install -g @abstractframework/flow
+abstractflow-editor --gateway-url http://127.0.0.1:8080
 ```
 
-Evidence:
-- Delegation to AbstractRuntime: [../abstractflow/workflow_bundle.py](../abstractflow/workflow_bundle.py)
-- CLI implementation: [../abstractflow/cli.py](../abstractflow/cli.py)
-- Tests: [../tests/test_workflow_bundle_pack.py](../tests/test_workflow_bundle_pack.py)
+## What The CLI Does
 
-## Serve (Visual Editor backend)
+- Serves `dist/` static assets.
+- Proxies Gateway HTTP and SSE routes.
+- Handles browser-session cookie forwarding and CSRF headers.
+- Rejects unsafe hosted Gateway URL changes by default.
 
-Run the FastAPI backend used by the visual editor UI:
-
-```bash
-pip install "abstractflow[apple]"  # or abstractflow[gpu]
-abstractflow serve --reload --port 8080
-```
-
-Notes:
-- This starts the backend API on `/api/*` (health: `/api/health`).
-- The UI can be served via `npx @abstractframework/flow` (see [web-editor.md](web-editor.md)).
-
-Gateway-related flags (optional):
-- `--gateway-url http://127.0.0.1:8080`
-
-Gateway resolution:
-- `--gateway-url` falls back to `ABSTRACTGATEWAY_URL` and defaults to `http://127.0.0.1:8080`
-- Browser users sign in with their Gateway user id and token; Flow exchanges
-  the token for a Gateway browser session and stores only the opaque session id
-  in an HTTP-only browser cookie.
-- `--gateway-token` is accepted as a deprecated no-op for older scripts and no
-  longer authenticates browsers.
-- set `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1` to opt into compatibility-only local-host mode
-
-Evidence: [../abstractflow/cli.py](../abstractflow/cli.py), [../web/backend/cli.py](../web/backend/cli.py), [../web/backend/main.py](../web/backend/main.py).
+It does not execute workflows locally. Workflow execution is a Gateway/Runtime responsibility.

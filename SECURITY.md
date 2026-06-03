@@ -1,39 +1,26 @@
-# Security policy
+# Security Policy
 
-We take security reports seriously and appreciate responsible disclosure.
+Please do not open a public GitHub issue for security-sensitive reports.
 
-## Reporting a vulnerability
+Report vulnerabilities by email:
 
-Please **do not** open a public GitHub issue for security-sensitive reports.
-
-Instead, report vulnerabilities by email:
 - `contact@abstractflow.ai`
 
-Include as much of the following as possible:
-- A clear description of the issue and potential impact
-- Steps to reproduce (or a minimal proof-of-concept)
-- Affected component(s) (e.g. `abstractflow` library vs the `web/` editor backend)
-- Version information (`abstractflow.__version__`, Python version, OS)
-- Any relevant logs/config (please redact secrets)
-- If applicable: the smallest `VisualFlow` JSON that reproduces the issue
+Include:
 
-We will respond as quickly as we can and coordinate a fix and disclosure timeline with you.
+- impact and reproduction steps
+- affected package version (`@abstractframework/flow`)
+- browser/server deployment details
+- Gateway URL topology when relevant
+- logs with secrets redacted
+- minimal VisualFlow JSON when relevant
 
-## Scope (what to report here)
+## Scope
 
-This policy covers:
-- The published Python package (`abstractflow/`)
-- The reference visual editor app shipped in this repository (`web/`)
-- Packaging/release issues affecting published artifacts (PyPI / npm), when applicable
+This repository covers the AbstractFlow web editor, npm CLI/static server, and Gateway proxy behavior.
 
-## Coordinated disclosure
+Gateway authentication, provider secrets, runtime isolation, workflow execution, artifacts, and user management are owned by AbstractGateway/AbstractRuntime. Security reports for those surfaces should still be reported; they may be fixed in the owning package.
 
-- Please avoid testing on systems you don’t own or have permission to test.
-- If you’d like public credit for your report, tell us what name/handle to use.
-- If you need encrypted communication, email us and we’ll coordinate a safe channel.
+## Supported Versions
 
-## Supported versions
-
-AbstractFlow is currently **Pre-alpha**. We recommend staying on the latest patch release.
-
-Evidence: `pyproject.toml` (`Development Status :: 2 - Pre-Alpha`).
+AbstractFlow is pre-1.0. Use the latest released version.

@@ -1,82 +1,57 @@
 # Contributing
 
-Thanks for your interest in contributing to AbstractFlow.
+Thanks for contributing to AbstractFlow.
 
-Quick links:
-- Docs index: `docs/README.md`
-- Getting started: `docs/getting-started.md`
-- Architecture: `docs/architecture.md`
-- Web editor run guide: `docs/web-editor.md`
-- Security reporting: `SECURITY.md` (please use for vulnerability reports)
-
-## Ways to contribute
-
-- Bug reports with minimal repros (include flow JSON when relevant)
-- Documentation improvements (especially accuracy + cross-links)
-- Focused fixes and small features via pull requests
-
-Security issues: please follow `SECURITY.md` and avoid public disclosure.
-
-## Development setup
+## Development Setup
 
 Requirements:
-- Python **3.10+**
-- Node.js **18+** (only if you work on the visual editor in `web/frontend/`)
 
-Create a virtual environment and install the package in editable mode:
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev,server,agent]"
-```
-
-Run tests:
+- Node.js 18+
+- npm
+- a reachable AbstractGateway for integration testing
 
 ```bash
-pytest -q
+npm install
+npm run dev
 ```
 
-## Working on the visual editor
-
-The visual editor is a reference/dev app under `web/`:
-- Backend: FastAPI (`web/backend/`)
-- Frontend: React/Vite (`web/frontend/`)
-
-Run instructions: `docs/web-editor.md`.
-
-## Style and quality
-
-- Keep changes focused and well-scoped.
-- Prefer adding/adjusting tests when changing behavior (`tests/`).
-- Keep docs concise and accurate; update cross-references when adding new docs (`docs/README.md` is the index).
-- If you change docs, regenerate the full agentic pack: `python scripts/generate_llms_full.py` (updates `llms-full.txt`).
-
-Optional local tooling (if you use it):
+Run quality checks:
 
 ```bash
-python -m black .
-python -m isort .
-python -m flake8
-python -m mypy abstractflow
-pre-commit run -a
+npm run build
+npm run lint
 ```
 
-## Docs and releases
+## Repository Shape
 
-Build the documentation site locally:
+- `src/`: React/Vite editor.
+- `bin/cli.js`: static server and Gateway proxy.
+- `examples/flows/`: sample VisualFlow JSON files.
+- `docs/`: user and maintainer docs.
+
+Do not add local Python execution/server code to this repository. Runtime execution belongs to AbstractGateway and AbstractRuntime.
+
+## Docs
+
+After doc changes:
 
 ```bash
-pip install -e ".[docs]"
-mkdocs build -q
+npm run docs:llms
 ```
 
-Release version source of truth: `abstractflow/_version.py`.
+## Releases
 
-For a release, update `abstractflow/_version.py`, add the matching `CHANGELOG.md` entry (`## [X.Y.Z] - YYYY-MM-DD`), then push tag `vX.Y.Z`. The release workflow validates tests, frontend build, docs build, package metadata, and changelog before publishing to PyPI and deploying the MkDocs site to the `gh-pages` branch.
+Release version source of truth is `package.json`.
 
-## Pull request checklist
+For a release:
 
-- Tests pass (`pytest -q`)
-- Docs updated (when behavior changes) and `docs/README.md` stays a good entrypoint
-- `CHANGELOG.md` updated for user-visible changes
+1. Update `package.json`.
+2. Add the matching `CHANGELOG.md` entry.
+3. Run `npm run build` and `npm run lint`.
+4. Publish through the GitHub release workflow to npm.
+
+## Pull Request Checklist
+
+- `npm run build` passes.
+- `npm run lint` passes or any failures are explicitly documented.
+- User-facing behavior changes are reflected in docs and changelog.

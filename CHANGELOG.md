@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.18] - 2026-06-03
+
+### Changed
+- Reorganized AbstractFlow as the web editor package `@abstractframework/flow` at the repository root.
+- Moved sample VisualFlow JSON files from `web/flows/` to `examples/flows/`.
+- Rewrote current docs around the web package, Gateway connection flow, and Gateway/Runtime ownership boundaries.
+
+### Removed
+- Removed the Python package, Python packaging metadata, Python tests, FastAPI compatibility backend, generated Python docs site, and local runtime artifacts from the AbstractFlow repository.
+
 ## [0.3.17] - 2026-05-31
 
 ### Added

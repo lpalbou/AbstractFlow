@@ -1,91 +1,59 @@
-# VisualFlow (portable JSON workflow format)
+# VisualFlow JSON
 
-`VisualFlow` is the portable workflow document produced by the visual editor in `web/frontend/` and persisted by the backend in `web/backend/`.
+VisualFlow is the portable workflow document produced by the AbstractFlow editor and persisted by AbstractGateway.
 
-The schema lives in [../abstractflow/visual/models.py](../abstractflow/visual/models.py) (Pydantic models). Any host can:
-- load/validate the JSON into `VisualFlow`
-- execute it using `abstractflow.visual` helpers
+Execution semantics are owned by AbstractRuntime. Flow's job is to author and serialize the graph.
 
-See also: [../README.md](../README.md), [getting-started.md](getting-started.md), [faq.md](faq.md), [web-editor.md](web-editor.md), [architecture.md](architecture.md).
+## Shape
 
-## Minimal schema (what to expect)
+```json
+{
+  "id": "workflow-id",
+  "name": "Workflow Name",
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "llm_call",
+      "position": { "x": 100, "y": 80 },
+      "data": {
+        "nodeType": "llm_call",
+        "pinDefaults": {}
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-2",
+      "targetHandle": "exec-in"
+    }
+  ],
+  "entryNode": "node-1"
+}
+```
 
-- `VisualFlow`
-  - `id: str`
-  - `name: str`, `description: str`
-  - `interfaces: list[str]` (optional host contracts)
-  - `nodes: list[VisualNode]`, `edges: list[VisualEdge]`
-  - `entryNode: str | null` (optional, Blueprint-style execution root)
-- `VisualNode`
-  - `id: str`, `type: NodeType`, `position: {x,y}`
-  - `data: dict` (node config + pin metadata)
-- `VisualEdge`
-  - `source`, `sourceHandle`, `target`, `targetHandle`
+## Authoring Rules
 
-Evidence: [../abstractflow/visual/models.py](../abstractflow/visual/models.py).
+- Nodes contain editor data and runtime-facing pin defaults.
+- Execution edges connect `exec-out` to `exec-in`.
+- Data edges connect typed pins.
+- Provider/model pins should use Gateway-discovered provider ids and models.
+- Secrets must not be embedded in VisualFlow JSON.
+- Reusable endpoint credentials belong in Gateway provider endpoint profiles.
 
-## Node types and pins
+## Sharing Workflows
 
-- The full list of node types is `NodeType` in [../abstractflow/visual/models.py](../abstractflow/visual/models.py).
-- Pin types are `PinType` in [../abstractflow/visual/models.py](../abstractflow/visual/models.py) (and mirrored for UI concerns in [../web/frontend/src/types/flow.ts](../web/frontend/src/types/flow.ts)).
+For portable workflows, prefer exposing environment-specific values as start inputs or Gateway defaults:
 
-Two edge “kinds” are used by convention:
-- **Execution edges**: connect to the target handle `exec-in` (Blueprint-style control flow).
-- **Data edges**: connect non-exec handles and carry values between pins.
+- provider id
+- model id
+- optional base URL override when the workflow intentionally targets an OpenAI-compatible route
+- non-secret parameters such as temperature, max tokens, dimensions, steps, and seed
 
-Evidence:
-- VisualFlow runner wiring uses execution-graph reachability (`targetHandle == "exec-in"`) in [../abstractflow/visual/executor.py](../abstractflow/visual/executor.py).
-- UI colors data edges by pin type in [../web/frontend/src/components/Canvas.tsx](../web/frontend/src/components/Canvas.tsx).
+API keys and user credentials should be configured by the receiving Gateway, not exported with the workflow.
 
-Note on pins in saved JSON:
-- The editor persists pin definitions under `node.data.inputs` / `node.data.outputs`.
-- The top-level `node.inputs` / `node.outputs` fields may be present but empty.
+## Examples
 
-Evidence: [../abstractflow/visual/interfaces.py](../abstractflow/visual/interfaces.py) (`_pin_types` reads `node.data.*`) and sample flows in [../web/flows/](../web/flows/).
-
-## Native media nodes
-
-Current media authoring nodes are saved as native VisualFlow node types:
-- `generate_image`
-- `edit_image`
-- `image_to_image` (legacy alias normalized by the editor)
-- `generate_video`
-- `text_to_video`
-- `image_to_video`
-- `generate_voice`
-- `generate_music`
-- `transcribe_audio`
-- `listen_voice`
-
-Generated image, video, voice, and music outputs should be treated as artifacts.
-Gateway is the preferred execution host for these nodes because it owns media
-catalogs, progress events, child runs, artifact persistence, and provider/runtime
-configuration. Video nodes use scoped provider/model fields (`video_provider`,
-`video_model`) and Gateway task catalogs (`text_to_video`, `image_to_video`) so
-the graph does not rely on hardcoded model names.
-
-Compatibility note: old saved flows that used the temporary browser-side
-Generate Music lowering are normalized back to native `generate_music` when they
-are loaded or saved by the current editor.
-
-## Subflows
-
-Subflows are regular VisualFlows referenced by id from a node of type `subflow`.
-
-Convention:
-- `node.type == "subflow"`
-- `node.data["subflowId"]` holds the referenced flow id (legacy key `flowId` is tolerated).
-
-Evidence:
-- Runner wiring resolves subflows in [../abstractflow/visual/executor.py](../abstractflow/visual/executor.py) (`subflowId` / legacy `flowId`)
-- Bundle packing is delegated to AbstractRuntime via [../abstractflow/workflow_bundle.py](../abstractflow/workflow_bundle.py) (see [../tests/test_workflow_bundle_pack.py](../tests/test_workflow_bundle_pack.py)).
-- Tests: [../tests/test_visual_subflow_registry_reachability.py](../tests/test_visual_subflow_registry_reachability.py), [../tests/test_visual_subflow_recursion.py](../tests/test_visual_subflow_recursion.py)
-
-## Interfaces (optional host contracts)
-
-`VisualFlow.interfaces` is a list of interface markers a host can interpret as “this workflow supports a known IO contract”.
-
-AbstractFlow ships:
-- `abstractcode.agent.v1` (`ABSTRACTCODE_AGENT_V1`) with validators and scaffolding helpers
-
-Evidence: [../abstractflow/visual/interfaces.py](../abstractflow/visual/interfaces.py).
+Sample JSON files live in `examples/flows/`.

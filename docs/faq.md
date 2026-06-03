@@ -1,172 +1,36 @@
 # FAQ
 
-See also: [../README.md](../README.md), [getting-started.md](getting-started.md), [api.md](api.md), [architecture.md](architecture.md).
+## Does AbstractFlow Need Python?
 
-## What is AbstractFlow?
+No. AbstractFlow is the web editor package `@abstractframework/flow`.
 
-AbstractFlow is a Python library for defining and executing **durable** AI workflows:
-- Programmatic graphs (`Flow` + `FlowRunner`)
-- Portable visual workflows (`VisualFlow` JSON) that can run outside the editor
+Python services are used by other framework packages such as AbstractGateway, AbstractRuntime, AbstractCore, and capability plugins. Flow itself does not ship a Python package or local execution host.
 
-Evidence: [../abstractflow/runner.py](../abstractflow/runner.py), [../abstractflow/visual/models.py](../abstractflow/visual/models.py), [../abstractflow/visual/executor.py](../abstractflow/visual/executor.py).
+## Why Do I Need A Gateway Token?
 
-## Is AbstractFlow production-ready?
+Flow is only the editor. Gateway owns user authentication and runtime isolation. Each browser must sign in with a Gateway user token so Gateway can route requests to the right user/runtime.
 
-Not yet. The package is marked **Pre-alpha** and may introduce breaking changes.
+## Can Flow Store Provider API Keys?
 
-Evidence: [../pyproject.toml](../pyproject.toml) (`Development Status :: 2 - Pre-Alpha`).
+No. Configure provider credentials, OpenAI-compatible endpoint profiles, and model defaults in the Gateway console. Flow discovers those providers and models from Gateway.
 
-## What’s the difference between `Flow` and `VisualFlow`?
+## Where Are Workflows Stored?
 
-- `Flow`: programmatic flow IR (re-exported from AbstractRuntime) used by `FlowRunner`.
-- `Flow` requires `abstractflow[apple]`.
-- `VisualFlow`: portable JSON authoring format (Pydantic models) produced by the web editor and runnable from any host.
+Gateway stores VisualFlow drafts, published workflow bundles, run ledgers, and artifacts. Flow may import/export JSON in the browser, but persistent state belongs to Gateway.
 
-Evidence: [../abstractflow/core/flow.py](../abstractflow/core/flow.py), [../abstractflow/visual/models.py](../abstractflow/visual/models.py), [../abstractflow/runner.py](../abstractflow/runner.py).
+## How Do I Use A Custom OpenAI-Compatible Endpoint?
 
-## Can I execute a VisualFlow JSON without running the web editor?
+Create a provider endpoint profile in Gateway with its base URL, API key, description, and discovered models. It will surface in Flow as a virtual provider.
 
-Yes. Load the JSON into `VisualFlow` and run it with `abstractflow.visual.execute_visual_flow(...)` (or build a runner with `create_visual_runner(...)` if you need access to the runtime/run state).
-This requires the runtime stack with `pip install "abstractflow[apple]"`.
-Agent-node features are included in `abstractflow[apple]` and `abstractflow[gpu]`; use `abstractflow[agent]` only when you need Agent nodes without a host profile.
+## What Happens If Gateway Is Down?
 
-Evidence: [../abstractflow/visual/executor.py](../abstractflow/visual/executor.py).
+The editor can load its static UI, but discovery, save, publish, run, artifact, and history features require Gateway.
 
-## Why does image-to-video look stretched or barely animated?
+## Where Did The Python `abstractflow` Package Go?
 
-Image-to-video models usually expect a specific video aspect ratio and frame geometry. For example,
-the Wan 2.2 TI2V MLX-Gen path is tuned for 1280x704 or 704x1280, 121 frames, 50 steps, and 24 fps.
-If the source image has a different aspect ratio, AbstractVision preserves it by letterboxing before
-handing it to the model, but the best results still come from generating or editing the source image
-at the same aspect ratio and approximate resolution that the video model will use.
+Its responsibilities were moved to their owners:
 
-Very short clips are wiring tests, not quality tests. A 10-frame request for Wan becomes 9 frames
-internally and is less than a second at 10 fps, so the output can look almost static even when the
-prompt is passed correctly. For prompt-following and motion checks, use the model's recommended
-frame count, steps, fps, and a prompt that explicitly describes camera movement or object motion.
-
-## How do subflows work?
-
-Subflows are VisualFlows referenced by id from nodes of type `subflow`:
-- `node.data["subflowId"]` (legacy: `flowId`)
-
-When executing, you must provide a mapping of all flows by id: `flows={flow_id: VisualFlow, ...}`.
-
-Evidence: [../abstractflow/visual/executor.py](../abstractflow/visual/executor.py), [visualflow.md](visualflow.md).
-
-## How do “waiting” runs work? How do I resume?
-
-Some nodes intentionally block on external input (e.g. user/event/schedule waits).
-- `FlowRunner.run()` returns `{"waiting": True, ...}` when blocked.
-- The web editor resumes blocked runs over WebSocket (`type:"resume"`).
-
-Evidence: [../abstractflow/runner.py](../abstractflow/runner.py), [../web/backend/routes/ws.py](../web/backend/routes/ws.py), [web-editor.md](web-editor.md).
-
-## How do custom events work in VisualFlow?
-
-For VisualFlows, `VisualSessionRunner` starts `on_event` listeners as **child runs** in the same session and ticks them so `emit_event` branches progress.
-
-Evidence: [../abstractflow/visual/session_runner.py](../abstractflow/visual/session_runner.py), wiring in [../abstractflow/visual/executor.py](../abstractflow/visual/executor.py).
-
-## Does `pip install abstractflow` include the web editor UI?
-
-Not the UI. The visual editor has two parts:
-- Backend (FastAPI): included when you install a host profile (`abstractflow[apple]`
-  or `abstractflow[gpu]`) and runnable via `abstractflow serve`.
-- UI (React): published as the npm package `@abstractframework/flow` (run via `npx`).
-
-Evidence: [../pyproject.toml](../pyproject.toml) (host profile extras + `project.scripts`), [../abstractflow/cli.py](../abstractflow/cli.py), [../web/frontend/bin/cli.js](../web/frontend/bin/cli.js).
-
-## Where does the web editor store flows and run data?
-
-In the modern Gateway-first editor path, Gateway stores VisualFlows, bundles,
-runs, ledgers, attachments, workspaces, and artifacts in its configured data
-directories.
-
-The old FastAPI local runtime routes still have compatibility defaults, but only
-when `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1` is set:
-- Flows: `./flows/*.json` relative to the backend working directory (override with `ABSTRACTFLOW_FLOWS_DIR`).
-- Runtime persistence (runs/ledger/artifacts):
-  - source checkout: `web/runtime/`
-  - installed package: `~/.abstractflow/runtime`
-  - override with `ABSTRACTFLOW_RUNTIME_DIR`.
-
-Evidence: [../web/backend/routes/flows.py](../web/backend/routes/flows.py) (`FLOWS_DIR`, `ABSTRACTFLOW_FLOWS_DIR`), [../web/backend/services/paths.py](../web/backend/services/paths.py).
-
-## How does tool / file access work (security)?
-
-The web backend creates a per-run workspace directory and wraps tool execution with workspace scoping:
-- Workspace base: `ABSTRACTFLOW_BASE_EXECUTION` (or `/tmp` / OS temp)
-- Workspace root is injected into `input_data` (`workspace_root`) and used to scope tools
-
-Evidence: [../web/backend/services/execution_workspace.py](../web/backend/services/execution_workspace.py), [../abstractflow/visual/workspace_scoped_tools.py](../abstractflow/visual/workspace_scoped_tools.py), [../web/backend/routes/ws.py](../web/backend/routes/ws.py), [../web/backend/routes/flows.py](../web/backend/routes/flows.py).
-
-## Should flow inputs use file paths or artifacts?
-
-Use artifact refs for payloads that cross Gateway, Runtime, Flow, and Core
-boundaries. A run-start image, document, audio file, video, or text file should
-enter the run as `{"$artifact": "...", "run_id": "..."}`. The Run modal can
-create that ref by uploading a browser file, importing a Gateway workspace path,
-or selecting an existing artifact through Gateway artifact search. The picker
-can search all artifacts or the current session, filters by the input pin's
-modality, and accepts metadata filters such as `pin_id=image`.
-
-Workspace paths are still useful for explicit filesystem operations, but they
-are server-side paths governed by Gateway workspace policy and `.abstractignore`.
-Browser-local paths are never treated as Gateway workspace paths. The Run modal's
-`artifact content` link opens or downloads artifact payloads. Writing artifacts
-back into workspace files should be modeled as an explicit graph operation
-through `Read File` / `Write File` or the planned artifact-aware file-node
-contract, so filesystem side effects stay visible in the workflow.
-
-## How do tools work? How do I add more tools?
-
-The editor backend exposes a **conservative default tool set** derived from AbstractRuntime’s AbstractCore integration.
-
-To add or customize tools, you have a few host-level options:
-
-- **Custom host (Python)**: build your own tool executor and pass it to `create_visual_runner(...)`.
-- **Gateway-backed editor**: extend Gateway tool discovery and the Gateway/Runtime tool executor.
-- **Compatibility FastAPI host**: set `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1`, then extend the old tool discovery route (`GET /api/tools`) and the host tool executor used for local runs.
-- **Upstream defaults**: depending on your deployment, you may choose to replace/extend AbstractRuntime’s “default tools” selection.
-
-Evidence:
-- Compatibility tool discovery endpoint: [../web/backend/routes/tools.py](../web/backend/routes/tools.py) (`GET /api/tools`, only when `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1`)
-- Default tool executor wiring: [../abstractflow/visual/workspace_scoped_tools.py](../abstractflow/visual/workspace_scoped_tools.py)
-- Editor backend wiring: [../web/backend/routes/flows.py](../web/backend/routes/flows.py), [../web/backend/routes/ws.py](../web/backend/routes/ws.py)
-- Run guide: [web-editor.md](web-editor.md)
-
-## How do I package and share workflows?
-
-Use WorkflowBundle (`.flow`):
-- CLI: `abstractflow bundle pack|inspect|unpack`
-- The bundle format and packer are owned by AbstractRuntime; AbstractFlow provides a thin wrapper.
-
-Evidence: [../abstractflow/cli.py](../abstractflow/cli.py), [../abstractflow/workflow_bundle.py](../abstractflow/workflow_bundle.py), tests in [../tests/test_workflow_bundle_pack.py](../tests/test_workflow_bundle_pack.py).
-
-## Do I need an AbstractGateway?
-
-For the modern browser editor, yes: Gateway is the runtime, persistence,
-discovery, ledger, and artifact authority. The editor calls same-origin
-`/api/gateway/*` through a Flow proxy; the proxy injects the signed-in
-browser session's Gateway user token.
-
-For local runtime use, install `abstractflow[apple]` and run with `abstractflow.visual.execute_visual_flow(...)` or
-`create_visual_runner(...)`. The old FastAPI local runtime routes are compatibility-only and are gated by
-`ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1`.
-
-Evidence: [../web/frontend/src/utils/gatewayClient.ts](../web/frontend/src/utils/gatewayClient.ts), [../web/backend/main.py](../web/backend/main.py), [../abstractflow/visual/executor.py](../abstractflow/visual/executor.py).
-
-## Why do I see pins in `node.data.inputs/outputs` instead of `node.inputs/outputs`?
-
-Saved flows from the editor store pin metadata under `node.data.inputs` / `node.data.outputs`. The top-level `inputs` / `outputs` fields may exist but are often empty.
-
-Evidence: [../abstractflow/visual/interfaces.py](../abstractflow/visual/interfaces.py) (`_pin_types` reads `node.data.*`), sample flows in [../web/flows/](../web/flows/).
-
-## Where is the “compiler” implemented?
-
-Compilation semantics live in AbstractRuntime’s VisualFlow compiler. This package delegates and re-exports:
-- `abstractflow/compiler.py` (compile functions)
-- `abstractflow/adapters/*` and `abstractflow/visual/builtins.py` (node adapters/builtins)
-
-Evidence: [../abstractflow/compiler.py](../abstractflow/compiler.py), [../abstractflow/adapters/](../abstractflow/adapters/), [../abstractflow/visual/builtins.py](../abstractflow/visual/builtins.py).
+- visual execution and bundle semantics: AbstractRuntime
+- users, auth, runtime routing, workflow registry, runs, artifacts: AbstractGateway
+- provider calls and capability plugins: AbstractCore
+- visual authoring UI: `@abstractframework/flow`

@@ -1,174 +1,86 @@
 # AbstractFlow
 
-Diagram-based, **durable** AI workflows for Python.
+AbstractFlow is the visual workflow editor for AbstractFramework.
 
-AbstractFlow is part of the [AbstractFramework ecosystem](https://github.com/lpalbou/AbstractFramework).
-The editor is Gateway-first: AbstractFlow talks to AbstractGateway for discovery, persistence,
-runs, ledgers, artifacts, and media. Gateway owns the Runtime/Core deployment stack.
+It is a web package (`@abstractframework/flow`). It runs a browser editor and a small Node server that serves the built UI and proxies `/api/*` to AbstractGateway. AbstractGateway owns users, sessions, runtime routing, provider configuration, workflow storage, run execution, ledgers, artifacts, and media catalogs.
 
-It provides:
-- A small programmatic API (`Flow`, `FlowRunner`) for building and running flows in Python.
-- A portable workflow format (`VisualFlow` JSON) + helpers to execute it from any host (`abstractflow.visual`).
-- A Gateway-first visual editor app in `web/` (React frontend + `/api/gateway/*` proxy).
-
-Project status: **Pre-alpha** (`pyproject.toml`: `Development Status :: 2 - Pre-Alpha`). Expect breaking changes.
-
-Evidence (code): [abstractflow/runner.py](abstractflow/runner.py), [abstractflow/visual/executor.py](abstractflow/visual/executor.py), [abstractflow/cli.py](abstractflow/cli.py), [web/backend/routes/ws.py](web/backend/routes/ws.py).
-
-## Diagram (how it fits together)
-
-```mermaid
-flowchart LR
-  UI[Visual editor UI<br/>npx @abstractframework/flow] <-->|/api/gateway/*| GW[AbstractGateway<br/>discovery/runs/ledger/artifacts/bundles/media]
-  GW --> RT[AbstractRuntime Runtime]
-  RT --> AC[AbstractCore providers/models/tools]
-
-  HOST[Any host process<br/>CLI / server / notebook] --> VF[VisualFlow models<br/>abstractflow/visual/models.py]
-  HOST --> RUN[create_visual_runner / execute_visual_flow<br/>abstractflow/visual/executor.py]
-  RUN -. optional local compatibility .-> RT
-  RT --> STORES[(Run/Ledger/Artifacts stores)]
-```
-
-## Docs
-
-Published documentation: https://www.lpalbou.info/AbstractFlow/
-
-- Getting started: [docs/getting-started.md](docs/getting-started.md)
-- API (high-level): [docs/api.md](docs/api.md)
-- Architecture: [docs/architecture.md](docs/architecture.md)
-- FAQ: [docs/faq.md](docs/faq.md)
-- VisualFlow JSON format: [docs/visualflow.md](docs/visualflow.md)
-- CLI: [docs/cli.md](docs/cli.md)
-- Visual editor: [docs/web-editor.md](docs/web-editor.md)
-- Docs index: [docs/README.md](docs/README.md)
-
-## Installation
+## Install
 
 ```bash
-pip install abstractflow
-```
-
-Requirements: Python **3.10+** (`pyproject.toml`: `requires-python`).
-
-Optional extras (declared in `pyproject.toml`):
-- Host profiles for local programmatic/VisualFlow execution compatibility (`Flow`, `FlowRunner`, `execute_visual_flow`, workflow bundles): `pip install "abstractflow[apple]"` or `pip install "abstractflow[gpu]"`
-- Full host profiles:
-  - Apple-capable: `pip install "abstractflow[apple]"`
-  - GPU-capable: `pip install "abstractflow[gpu]"`
-- `abstractflow[apple]` and `abstractflow[gpu]` pull the matching `abstractgateway[...]` host profile and Visual Agent support. Flow no longer names `AbstractRuntime` or `abstractcore` directly in these profiles; Gateway owns that deployment stack. AbstractFlow `0.3.17` expects Gateway `>=0.2.23` for the current image/video media, progress, catalog, and residency contracts.
-- Agent nodes only, without the host profile: `pip install "abstractflow[agent]"`
-- Documentation site tools: `pip install "abstractflow[docs]"`
-
-## Quickstart (programmatic)
-
-```python
-# Requires: `abstractflow[apple]` or `abstractflow[gpu]`
-from abstractflow import Flow, FlowRunner
-
-flow = Flow("linear")
-flow.add_node("double", lambda x: x * 2, input_key="value", output_key="doubled")
-flow.add_node("add_ten", lambda x: x + 10, input_key="doubled", output_key="final")
-flow.add_edge("double", "add_ten")
-flow.set_entry("double")
-
-print(FlowRunner(flow).run({"value": 5}))
-# {"success": True, "result": 20}
-```
-
-## Quickstart (execute a VisualFlow JSON)
-
-```python
-import json
-from abstractflow.visual import VisualFlow, execute_visual_flow
-
-# Requires: `abstractflow[apple]` or `abstractflow[gpu]`
-with open("my-flow.json", "r", encoding="utf-8") as f:
-    vf = VisualFlow.model_validate(json.load(f))
-
-print(execute_visual_flow(vf, {"prompt": "Hello"}, flows={vf.id: vf}))
-```
-
-If your flow uses subflows, load all referenced `*.json` into the `flows={...}` mapping (see [docs/getting-started.md](docs/getting-started.md)).
-
-## Visual editor (Gateway-first)
-
-The visual editor talks to AbstractGateway through the Flow proxy. Browser
-sessions sign in with a Gateway URL, Gateway user id, and that user's Gateway
-token. Flow validates the token, exchanges it through Gateway
-`/api/gateway/session/login`, stores only the opaque Gateway browser session in
-an HTTP-only Flow cookie, and forwards that session server-side to Gateway. Flow
-reads Gateway `Set-Cookie` headers server-side and does not return the Gateway
-session id or CSRF token in the connection response body. The raw user token is
-not retained after sign-in. Mutating Gateway proxy calls also carry a CSRF
-token. A server/admin Gateway token does not sign in browsers, so a distinct
-browser must provide its own user token. Gateway owns the user's
-runtime mapping and returns it as read-only principal metadata. Remote browsers
-may provide a token for the server-configured Gateway URL, but they cannot
-change that URL unless
-`ABSTRACTFLOW_ALLOW_REMOTE_BROWSER_GATEWAY_CONFIG=1` is set.
-
-```bash
-# Terminal 1: Gateway
-pip install abstractgateway abstractflow
-export ABSTRACTGATEWAY_AUTH_TOKEN=dev-token
-export ABSTRACTGATEWAY_USER_AUTH=1
-abstractgateway serve --port 8080
-
-# In another shell, create the browser sign-in user and keep the returned token.
-curl -sS -X POST http://127.0.0.1:8080/api/gateway/admin/users \
-  -H "Authorization: Bearer dev-token" \
-  -H "Content-Type: application/json" \
-  -d '{"user_id":"admin","roles":["admin","user"],"runtime_id":"default"}'
-
-# Terminal 2: editor UI (static server + /api/gateway proxy)
 npx @abstractframework/flow --gateway-url http://127.0.0.1:8080
 ```
 
-Open:
-- UI: http://localhost:3003
-- Gateway capabilities: http://localhost:8080/api/gateway/discovery/capabilities
-
-Media nodes use Gateway as the catalog and execution source. Generate Image,
-Edit Image/Image-to-Image, Generate Video, Image-to-Video, Generate Voice,
-Generate Music, Transcribe Audio, and Listen Voice expose Gateway Media controls
-populated from catalog routes such as
-`/api/gateway/vision/models`, `/api/gateway/vision/provider_models`,
-`/api/gateway/voice/voices`, `/api/gateway/audio/speech/models`,
-`/api/gateway/audio/transcriptions/models`, and
-`/api/gateway/audio/music/{providers,models}`. When Gateway exposes
-`common.readiness`, Flow uses it as a conservative surface-readiness overlay
-while still resolving concrete calls from endpoint descriptors. Generated images,
-videos, voice, and music are artifacts; the Run modal renders previews/players
-from Gateway artifact content and keeps `abstract.progress` ledger events visible
-for long media runs while leaving raw ledger JSON available for debugging.
-Artifact inputs can search Gateway artifacts by modality/scope/metadata when
-the Gateway advertises search. Generated artifact cards keep a direct `artifact
-content` open/download link; workspace file export is reserved for explicit
-graph-level file/artifact IO nodes.
-
-The `abstractflow serve`/FastAPI host is a Gateway proxy by default. Its old local `/api/flows`, `/api/ws`, and `/api/runs` compatibility routes are available only when `ABSTRACTFLOW_ENABLE_LOCAL_RUNTIME=1` is set. See [docs/web-editor.md](docs/web-editor.md) and [docs/architecture.md](docs/architecture.md).
-
-## CLI (WorkflowBundle `.flow`)
+For a local checkout:
 
 ```bash
-abstractflow bundle pack web/flows/ac-echo.json --out /tmp/ac-echo.flow
-abstractflow bundle inspect /tmp/ac-echo.flow
-abstractflow bundle unpack /tmp/ac-echo.flow --dir /tmp/ac-echo
+npm install
+npm run dev -- --host 0.0.0.0 --port 3003
 ```
 
-See [docs/cli.md](docs/cli.md) and `abstractflow/cli.py`.
+Open http://localhost:3003 and sign in with the Gateway user and token created by AbstractGateway.
+Leave provider/model selectors on `Auto (Gateway default)` for portable
+workflows. Gateway/Core capability defaults choose the actual provider/model at
+run time for the current user/runtime.
 
-## Related projects
+Media artifact inputs can be wired from another node or uploaded directly on
+the node when the artifact pin is unconnected. Uploaded browser files are stored
+as Gateway artifacts. During `Listen Voice` waits, Flow records in the browser,
+uploads the captured audio artifact, and resumes the Gateway run; Flow does not
+execute local audio or transcription logic itself.
+
+## Gateway Setup
+
+```bash
+export ABSTRACTGATEWAY_USER_AUTH=1
+export ABSTRACTGATEWAY_DATA_DIR="$PWD/runtime/gateway"
+abstractgateway serve --host 127.0.0.1 --port 8080
+cat "$ABSTRACTGATEWAY_DATA_DIR/auth/bootstrap-admin-token"
+```
+
+Use:
+
+- Gateway URL: `http://127.0.0.1:8080`
+- User: `admin`
+- Token: the `agw_...` token printed by Gateway or stored in `auth/bootstrap-admin-token`
+
+## What Lives Here
+
+- `src/` - React/Vite visual editor.
+- `bin/cli.js` - npm CLI/static server and Gateway proxy.
+- `examples/flows/` - sample VisualFlow JSON files kept for reference/import tests.
+- `docs/` - external documentation for users and maintainers.
+
+AbstractFlow does not ship a Python package or local execution host. VisualFlow compilation, bundle execution, runtime state, and provider calls are handled by AbstractGateway and AbstractRuntime.
+
+## Scripts
+
+```bash
+npm run dev
+npm run build
+npm run lint
+npm run docs:llms
+```
+
+## Documentation
+
+- [Getting started](docs/getting-started.md)
+- [Web editor](docs/web-editor.md)
+- [Architecture](docs/architecture.md)
+- [API and contracts](docs/api.md)
+- [VisualFlow JSON](docs/visualflow.md)
+- [CLI](docs/cli.md)
+- [FAQ](docs/faq.md)
+
+## Related Projects
 
 - AbstractFramework: https://github.com/lpalbou/AbstractFramework
-- AbstractRuntime: https://github.com/lpalbou/abstractruntime
-- AbstractCore: https://github.com/lpalbou/abstractcore
-- AbstractAgent (optional): https://github.com/lpalbou/AbstractAgent
+- AbstractGateway: https://github.com/lpalbou/AbstractGateway
+- AbstractRuntime: https://github.com/lpalbou/AbstractRuntime
+- AbstractCore: https://github.com/lpalbou/AbstractCore
 
-## Repo policies
+## Policies
 
 - Changelog: [CHANGELOG.md](CHANGELOG.md)
 - Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
 - Security: [SECURITY.md](SECURITY.md)
-- Acknowledgments: [ACKNOWLEDGMENTS.md](ACKNOWLEDGMENTS.md)
 - License: [LICENSE](LICENSE)
