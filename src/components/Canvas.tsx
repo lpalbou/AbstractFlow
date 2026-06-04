@@ -233,7 +233,12 @@ function WorkflowEdge({
     path = `M ${sourceX},${sourceY} C ${c1x},${sourceY} ${c2x},${targetY} ${targetX},${targetY}`;
   }
 
-  return <BaseEdge id={id} path={path} markerEnd={markerEnd} style={style} interactionWidth={24} />;
+  return (
+    <>
+      <path className="react-flow__edge-underlay" d={path} />
+      <BaseEdge id={id} path={path} markerEnd={markerEnd} style={style} interactionWidth={24} />
+    </>
+  );
 }
 
 const edgeTypes = {
@@ -344,6 +349,9 @@ function CanvasBody() {
   const {
     nodes,
     edges,
+    selectedNode,
+    executingNodeId,
+    recentNodeIds,
     recentEdgeIds,
     onNodesChange,
     onEdgesChange,
@@ -658,6 +666,32 @@ function CanvasBody() {
     [nodes, DEFAULT_ZOOM]
   );
 
+  const minimapNodeColor = useCallback((node: Node<FlowNodeData>): string => {
+    const data = node.data as FlowNodeData;
+    return data?.headerColor || '#71819a';
+  }, []);
+
+  const minimapNodeStrokeColor = useCallback(
+    (node: Node<FlowNodeData>): string => {
+      if (executingNodeId === node.id) return '#31f08a';
+      if (recentNodeIds && recentNodeIds[node.id]) return '#67b8ff';
+      if (node.selected || selectedNode?.id === node.id) return '#f8fbff';
+      return 'rgba(212, 224, 245, 0.48)';
+    },
+    [executingNodeId, recentNodeIds, selectedNode]
+  );
+
+  const minimapNodeClassName = useCallback(
+    (node: Node<FlowNodeData>): string => {
+      const classes = ['canvas-preview-node'];
+      if (executingNodeId === node.id) classes.push('is-executing');
+      else if (recentNodeIds && recentNodeIds[node.id]) classes.push('is-recent');
+      if (node.selected || selectedNode?.id === node.id) classes.push('is-selected');
+      return classes.join(' ');
+    },
+    [executingNodeId, recentNodeIds, selectedNode]
+  );
+
   // Get edge style based on source handle type
   const getEdgeStyleColor = (edge: Edge): string | null => {
     const sourceHandle = edge.sourceHandle || '';
@@ -838,40 +872,54 @@ function CanvasBody() {
           snapToGrid
           snapGrid={[16, 16]}
           deleteKeyCode={['Backspace', 'Delete']}
+          attributionPosition="top-right"
         >
           <Controls />
           <Background
             variant={BackgroundVariant.Dots}
             gap={16}
-            size={1}
-            color="#444"
+            size={1.15}
+            color="rgba(124, 149, 188, 0.28)"
           />
           {previewCollapsed ? (
             <button
               type="button"
-              className="canvas-preview-toggle collapsed"
+              className="canvas-preview-toggle canvas-preview-toggle--expand collapsed"
               onClick={() => setPreviewCollapsed(false)}
+              aria-label="Show canvas preview"
               title="Show canvas preview"
             >
-              Preview
+              <span className="canvas-preview-toggle-icon" aria-hidden="true" />
             </button>
           ) : (
             <>
               <MiniMap
-                nodeColor={(node) => {
-                  const data = node.data as FlowNodeData;
-                  return data?.headerColor || '#888';
+                nodeColor={minimapNodeColor}
+                nodeStrokeColor={minimapNodeStrokeColor}
+                nodeClassName={minimapNodeClassName}
+                nodeBorderRadius={4}
+                nodeStrokeWidth={3}
+                maskColor="rgba(5, 8, 18, 0.66)"
+                maskStrokeColor="rgba(132, 177, 255, 0.32)"
+                maskStrokeWidth={2}
+                pannable
+                zoomable
+                zoomStep={8}
+                offsetScale={7}
+                ariaLabel="Canvas preview"
+                onNodeClick={(event, node) => {
+                  event.stopPropagation();
+                  focusNode(node.id);
                 }}
-                maskColor="rgba(0, 0, 0, 0.7)"
-                onClick={() => setPreviewCollapsed(true)}
               />
               <button
                 type="button"
-                className="canvas-preview-toggle"
+                className="canvas-preview-toggle canvas-preview-toggle--collapse"
                 onClick={() => setPreviewCollapsed(true)}
+                aria-label="Collapse canvas preview"
                 title="Collapse canvas preview"
               >
-                ×
+                <span className="canvas-preview-toggle-icon" aria-hidden="true" />
               </button>
             </>
           )}

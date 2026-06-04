@@ -13,12 +13,18 @@
   min-width: 180px;
   display: inline-flex;
   flex-direction: column;
-  background: #2a2a3e;
-  border: 2px solid #444;
+  background:
+    linear-gradient(180deg, rgba(48, 50, 73, 0.98), rgba(36, 37, 55, 0.98));
+  border: 2px solid rgba(132, 149, 180, 0.34);
   border-radius: 6px;
   font-family: var(--font-sans);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  transition: border-color 0.2s, box-shadow 0.2s;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 12px 28px rgba(0, 0, 0, 0.34);
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
 }
 
 /* Slightly wider nodes for common “agentic” steps so inline toggles and pin labels don’t truncate. */
@@ -35,9 +41,21 @@
   z-index: 9999 !important;
 }
 
+.react-flow__node:hover .flow-node:not(.selected):not(.executing):not(.recent) {
+  border-color: rgba(192, 211, 242, 0.48);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 14px 32px rgba(0, 0, 0, 0.42),
+    0 0 0 1px rgba(95, 139, 206, 0.18);
+}
+
 .flow-node.selected {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent), 0 4px 12px rgba(0, 0, 0, 0.4);
+  border-color: rgba(192, 226, 255, 0.92);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 0 1px rgba(255, 255, 255, 0.2),
+    0 0 0 4px rgba(47, 140, 255, 0.25),
+    0 18px 38px rgba(0, 0, 0, 0.46);
 }
 
 .flow-node.executing {
@@ -81,8 +99,10 @@
   }
   100% {
     /* Match `.flow-node` base visuals to avoid a visible “snap” when the class is removed. */
-    border-color: #444;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    border-color: rgba(132, 149, 180, 0.34);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 12px 28px rgba(0, 0, 0, 0.34);
   }
 }
 
@@ -96,10 +116,14 @@
   font-weight: 600;
   font-size: var(--font-size-sm);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0;
   color: #fff;
   position: relative;
   min-width: 0;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.22);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.28);
 }
 
 /* Cyan headers (object pins) need dark text for contrast. */
@@ -626,6 +650,15 @@
   z-index: 3;
 }
 
+.react-flow__edge-underlay {
+  fill: none;
+  stroke: rgba(3, 7, 18, 0.82);
+  stroke-width: 8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
 .react-flow__edge-path {
   stroke-width: 2;
   stroke-linecap: round;
@@ -635,6 +668,19 @@
     stroke-width 180ms ease,
     opacity 180ms ease,
     filter 180ms ease;
+}
+
+.react-flow__edge:hover .react-flow__edge-underlay,
+.react-flow__edge.selected .react-flow__edge-underlay {
+  stroke-width: 10;
+  stroke: rgba(5, 10, 24, 0.92);
+}
+
+.react-flow__edge:hover .react-flow__edge-path,
+.react-flow__edge.selected .react-flow__edge-path {
+  opacity: 1;
+  stroke-width: 3;
+  filter: drop-shadow(0 0 6px rgba(139, 181, 255, 0.28));
 }
 
 .react-flow__edge.animated .react-flow__edge-path {
@@ -659,6 +705,19 @@
   opacity: 0.85;
 }
 
+.react-flow__edge.route-override .react-flow__edge-path {
+  opacity: 0.72;
+}
+
+.react-flow__edge.route-override .react-flow__edge-underlay {
+  stroke-dasharray: 7 5;
+}
+
+.react-flow__edge.exec-base:hover .react-flow__edge-path,
+.react-flow__edge.exec-base.selected .react-flow__edge-path {
+  stroke-width: 4;
+}
+
 /* Afterglow for recently executed exec edges (helps visualize fast flows). */
 .react-flow__edge.exec-recent .react-flow__edge-path {
   stroke-width: 4;
@@ -674,7 +733,7 @@
     filter: drop-shadow(0 0 10px rgba(52, 152, 219, 0.5));
   }
   100% {
-    stroke-width: 2;
+    stroke-width: 3;
     opacity: 1;
     filter: none;
   }
@@ -694,65 +753,159 @@
 
 /* MiniMap */
 .react-flow__minimap {
-  background: var(--bg-secondary);
-  border: 1px solid var(--bg-tertiary);
-  border-radius: 4px;
-  cursor: pointer;
-  transition: opacity 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+  background:
+    linear-gradient(180deg, rgba(23, 35, 61, 0.96), rgba(13, 19, 34, 0.96));
+  border: 1px solid rgba(104, 139, 196, 0.42);
+  border-radius: 6px;
+  cursor: grab;
+  overflow: hidden;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 16px 36px rgba(0, 0, 0, 0.36);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease;
 }
 
 .react-flow__minimap:hover {
-  opacity: 0.92;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
+  border-color: rgba(145, 184, 248, 0.58);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 18px 42px rgba(0, 0, 0, 0.44);
+}
+
+.react-flow__minimap:active {
+  cursor: grabbing;
+}
+
+.react-flow__minimap svg {
+  display: block;
+}
+
+.react-flow__minimap-node {
+  opacity: 0.88;
+}
+
+.react-flow__minimap-node.canvas-preview-node.is-selected,
+.react-flow__minimap-node.canvas-preview-node.is-executing {
+  opacity: 1;
+  filter: drop-shadow(0 0 7px rgba(147, 197, 253, 0.42));
+}
+
+.react-flow__minimap-node.canvas-preview-node.is-recent {
+  opacity: 0.96;
+}
+
+.react-flow__attribution {
+  background: transparent;
+  color: rgba(184, 199, 224, 0.42);
+  font-size: 9px;
+  padding: 0;
+  pointer-events: auto;
+}
+
+.react-flow__attribution a {
+  color: inherit;
 }
 
 .canvas-preview-toggle {
   position: absolute;
-  right: 16px;
-  bottom: 16px;
+  right: 18px;
+  bottom: 142px;
   z-index: 12;
-  min-width: 28px;
-  height: 28px;
-  padding: 0 8px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
-  background: rgba(18, 18, 35, 0.82);
-  color: rgba(255, 255, 255, 0.86);
-  font-size: var(--font-size-sm);
-  font-weight: 800;
-  line-height: 1;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+  min-width: 26px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(211, 226, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(9, 15, 27, 0.82);
+  color: rgba(220, 232, 255, 0.82);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 10px 22px rgba(0, 0, 0, 0.34);
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    opacity 160ms ease;
 }
 
 .canvas-preview-toggle:not(.collapsed) {
-  transform: translate(-8px, -8px);
+  opacity: 0.76;
 }
 
 .canvas-preview-toggle.collapsed {
   right: 16px;
   bottom: 16px;
-  height: 30px;
-  padding: 0 12px;
-  letter-spacing: 0.02em;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  border-color: rgba(147, 197, 253, 0.32);
 }
 
 .canvas-preview-toggle:hover:not(:disabled) {
-  background: var(--accent);
+  opacity: 1;
+  color: #fff;
+  border-color: rgba(147, 197, 253, 0.72);
+  background: rgba(35, 102, 180, 0.94);
+}
+
+.canvas-preview-toggle-icon {
+  position: relative;
+  width: 13px;
+  height: 10px;
+}
+
+.canvas-preview-toggle-icon::before,
+.canvas-preview-toggle-icon::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  width: 8px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.canvas-preview-toggle-icon::before {
+  left: 0;
+  transform: rotate(45deg);
+}
+
+.canvas-preview-toggle-icon::after {
+  right: 0;
+  transform: rotate(-45deg);
+}
+
+.canvas-preview-toggle--expand .canvas-preview-toggle-icon::before {
+  transform: rotate(-45deg);
+}
+
+.canvas-preview-toggle--expand .canvas-preview-toggle-icon::after {
+  transform: rotate(45deg);
 }
 
 /* Controls */
 .react-flow__controls {
-  background: var(--bg-secondary);
-  border: 1px solid var(--bg-tertiary);
-  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(14, 22, 39, 0.92);
+  border: 1px solid rgba(104, 139, 196, 0.35);
+  border-radius: 6px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32);
 }
 
 .react-flow__controls-button {
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--bg-tertiary);
+  background: transparent;
+  border-bottom: 1px solid rgba(104, 139, 196, 0.24);
   fill: var(--text-primary);
 }
 
 .react-flow__controls-button:hover {
-  background: var(--bg-tertiary);
+  background: rgba(71, 104, 160, 0.36);
 }
