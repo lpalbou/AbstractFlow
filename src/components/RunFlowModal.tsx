@@ -17,6 +17,7 @@ import { AgentSubrunTracePanel } from './AgentSubrunTracePanel';
 import AfSelect from './inputs/AfSelect';
 import AfMultiSelect from './inputs/AfMultiSelect';
 import { useProviders, useModels } from '../hooks/useProviders';
+import { TEXT_OUTPUT_CAPABILITY_ROUTE } from '../utils/capabilityRoutes';
 import { useTools } from '../hooks/useTools';
 import { useExecutionWorkspace } from '../hooks/useExecutionWorkspace';
 import { RunSwitcherDropdown } from './RunSwitcherDropdown';
@@ -2070,7 +2071,7 @@ export function RunFlowModal({
     isOpen && formInputPins.some((p) => isModelInputPin(p) && modelScopeForPin(p, formInputPins) === 'text')
   );
   const providersQuery = useProviders(wantProviderDropdown);
-  const modelsQuery = useModels(selectedProvider || undefined, wantModelDropdown);
+  const modelsQuery = useModels(selectedProvider || undefined, wantModelDropdown, TEXT_OUTPUT_CAPABILITY_ROUTE);
   const providers = Array.isArray(providersQuery.data) ? providersQuery.data : [];
   const models = Array.isArray(modelsQuery.data) ? modelsQuery.data : [];
 

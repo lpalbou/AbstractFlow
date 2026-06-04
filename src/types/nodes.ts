@@ -253,6 +253,7 @@ const CORE_NODES: NodeTemplate[] = [
 		      },
 		      { id: 'temperature', label: 'temperature', type: 'number', description: 'Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature.' },
 		      { id: 'seed', label: 'seed', type: 'number', description: 'Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed.' },
+		      { id: 'thinking', label: 'thinking', type: 'string', description: 'Reasoning/thinking control for supported models. If unset, uses the Gateway/runtime default.' },
 		      { id: 'resp_schema', label: 'resp_schema', type: 'object', description: 'Optional JSON Schema object (type=object) the final answer must conform to.' },
 		    ],
 	    outputs: [
@@ -360,6 +361,7 @@ const CORE_NODES: NodeTemplate[] = [
 		      },
 		      { id: 'temperature', label: 'temperature', type: 'number', description: 'Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature.' },
 		      { id: 'seed', label: 'seed', type: 'number', description: 'Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed.' },
+		      { id: 'thinking', label: 'thinking', type: 'string', description: 'Reasoning/thinking control for supported models. If unset, uses the Gateway/runtime default.' },
 		      { id: 'resp_schema', label: 'resp_schema', type: 'object', description: 'Optional JSON Schema object (type=object) the assistant content must conform to.' },
 		    ],
 	    outputs: [
@@ -1398,7 +1400,7 @@ const LITERAL_NODES: NodeTemplate[] = [
     type: 'provider_models',
     icon: '&#x1F4DA;', // Books
     label: 'Models Catalog',
-    description: 'List models for a provider. Optionally restrict the list by selecting allowed models in the node config.',
+    description: 'List models for a provider. Optionally restrict the list by capability route and selected allowed models.',
     headerColor: '#3498DB',
     inputs: [
       {
@@ -1406,6 +1408,12 @@ const LITERAL_NODES: NodeTemplate[] = [
         label: 'provider',
         type: 'provider_text',
         description: 'Provider id to list models for. If this pin is not connected, the node’s selected provider is used.',
+      },
+      {
+        id: 'capability_route',
+        label: 'capability_route',
+        type: 'string',
+        description: 'Optional comma-separated route filter such as output.text or input.image,output.text.',
       },
     ],
     outputs: [
@@ -2008,7 +2016,7 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
     ...(template.type === 'on_event' && { eventConfig: { name: 'my_event', scope: 'session' } }),
     ...(template.type === 'on_schedule' && { eventConfig: { schedule: '15s', recurrent: true } }),
     ...(template.type === 'model_catalog' && { modelCatalogConfig: { allowedProviders: [], allowedModels: [], index: 0 } }),
-    ...(template.type === 'provider_models' && { providerModelsConfig: { provider: '', allowedModels: [] } }),
+    ...(template.type === 'provider_models' && { providerModelsConfig: { provider: '', capabilityRoute: 'output.text', allowedModels: [] } }),
     ...(template.type === 'emit_event' && { effectConfig: { name: 'my_event', scope: 'session', sessionId: '' } }),
   };
 }

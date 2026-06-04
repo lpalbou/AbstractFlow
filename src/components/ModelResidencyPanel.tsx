@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { useModels, useProviders } from '../hooks/useProviders';
+import { TEXT_OUTPUT_CAPABILITY_ROUTE } from '../utils/capabilityRoutes';
 import {
   modelResidencyAvailable,
   useLoadedModels,
@@ -342,7 +343,7 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
   const unloadMutation = useUnloadModelResidency(gatewayContracts);
 
   const providersQuery = useProviders(isOpen && residencyControlsAvailable && task === 'text_generation');
-  const modelsQuery = useModels(provider, isOpen && residencyControlsAvailable && task === 'text_generation' && Boolean(provider));
+  const modelsQuery = useModels(provider, isOpen && residencyControlsAvailable && task === 'text_generation' && Boolean(provider), TEXT_OUTPUT_CAPABILITY_ROUTE);
   const visionEndpoint = gatewayContracts?.common?.discovery?.vision_provider_models || '';
   const ttsModelsEndpoint = gatewayContracts?.common?.discovery?.audio_speech_models || '';
   const sttModelsEndpoint = gatewayContracts?.common?.discovery?.audio_transcription_models || '';

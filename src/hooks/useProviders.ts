@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { ProviderInfo } from '../types/flow';
 import { useGatewayCapabilities, gatewayContractsFromCapabilities } from './useGatewayCapabilities';
 import { gatewayJson, gatewayPath } from '../utils/gatewayClient';
+import { capabilityRouteQueryValue, type CapabilityRouteFilter } from '../utils/capabilityRoutes';
 
 export function useProviders(enabled: boolean) {
   const capabilitiesQuery = useGatewayCapabilities(enabled);
@@ -23,16 +24,19 @@ export function useProviders(enabled: boolean) {
   });
 }
 
-export function useModels(provider: string | undefined, enabled: boolean) {
+export function useModels(provider: string | undefined, enabled: boolean, capabilityRoute?: CapabilityRouteFilter) {
   const p = (provider || '').trim();
+  const routeValue = capabilityRouteQueryValue(capabilityRoute);
   const capabilitiesQuery = useGatewayCapabilities(enabled && Boolean(p));
   const contracts = gatewayContractsFromCapabilities(capabilitiesQuery.data);
   const endpoint = contracts?.common?.discovery?.provider_models || '';
 
   return useQuery({
-    queryKey: ['providers', p, 'models', endpoint],
+    queryKey: ['providers', p, 'models', endpoint, routeValue || ''],
     queryFn: async () => {
-      const res = await gatewayJson<{ items?: string[]; models?: string[] }>(gatewayPath(endpoint, { provider_name: p }));
+      const res = await gatewayJson<{ items?: string[]; models?: string[] }>(
+        gatewayPath(endpoint, { provider_name: p }, { capability_route: routeValue })
+      );
       const models = Array.isArray(res.models)
         ? res.models
         : Array.isArray(res.items)
@@ -47,6 +51,5 @@ export function useModels(provider: string | undefined, enabled: boolean) {
     staleTime: 30_000,
   });
 }
-
 
 

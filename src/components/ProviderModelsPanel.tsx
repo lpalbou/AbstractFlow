@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { Edge, Node } from 'reactflow';
 import type { FlowNodeData } from '../types/flow';
 import { useModels, useProviders } from '../hooks/useProviders';
+import { MODEL_CAPABILITY_ROUTE_OPTIONS, TEXT_OUTPUT_CAPABILITY_ROUTE } from '../utils/capabilityRoutes';
 
 export interface ProviderModelsPanelProps {
   node: Node<FlowNodeData>;
@@ -13,6 +14,7 @@ export function ProviderModelsPanel({ node, edges, updateNodeData }: ProviderMod
   const data = node.data;
   const cfg = data.providerModelsConfig || {};
   const provider = (cfg.provider || '').trim();
+  const capabilityRoute = (cfg.capabilityRoute || TEXT_OUTPUT_CAPABILITY_ROUTE).trim() || TEXT_OUTPUT_CAPABILITY_ROUTE;
   const allowedModels = Array.isArray(cfg.allowedModels) ? cfg.allowedModels : [];
 
   const providerConnected = useMemo(
@@ -21,7 +23,7 @@ export function ProviderModelsPanel({ node, edges, updateNodeData }: ProviderMod
   );
 
   const providersQuery = useProviders(!providerConnected);
-  const modelsQuery = useModels(provider, Boolean(provider) && !providerConnected);
+  const modelsQuery = useModels(provider, Boolean(provider) && !providerConnected, capabilityRoute);
 
   const providers = Array.isArray(providersQuery.data) ? providersQuery.data : [];
   const models = Array.isArray(modelsQuery.data) ? modelsQuery.data : [];
@@ -39,6 +41,16 @@ export function ProviderModelsPanel({ node, edges, updateNodeData }: ProviderMod
         ...cfg,
         provider: next || undefined,
         // Reset selection when provider changes (avoids stale names from another provider).
+        allowedModels: [],
+      },
+    });
+  };
+
+  const setCapabilityRoute = (next: string) => {
+    updateNodeData(node.id, {
+      providerModelsConfig: {
+        ...cfg,
+        capabilityRoute: next || TEXT_OUTPUT_CAPABILITY_ROUTE,
         allowedModels: [],
       },
     });
@@ -91,6 +103,17 @@ export function ProviderModelsPanel({ node, edges, updateNodeData }: ProviderMod
             ))}
           </select>
         )}
+      </div>
+
+      <div className="property-group">
+        <label className="property-sublabel">Capability route</label>
+        <select className="property-select" value={capabilityRoute} onChange={(e) => setCapabilityRoute(e.target.value)}>
+          {MODEL_CAPABILITY_ROUTE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="property-group">
@@ -150,6 +173,5 @@ export function ProviderModelsPanel({ node, edges, updateNodeData }: ProviderMod
 }
 
 export default ProviderModelsPanel;
-
 
 

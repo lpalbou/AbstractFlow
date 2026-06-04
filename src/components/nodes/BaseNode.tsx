@@ -7,6 +7,7 @@
  */
 
 import { Fragment, memo, type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Handle, Position, NodeProps, useEdges, useReactFlow, useUpdateNodeInternals } from 'reactflow';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
@@ -15,6 +16,7 @@ import { PIN_COLORS, isEntryNodeType } from '../../types/flow';
 import { PinShape } from '../pins/PinShape';
 import { useFlowStore } from '../../hooks/useFlow';
 import { useModels, useProviders } from '../../hooks/useProviders';
+import { TEXT_OUTPUT_CAPABILITY_ROUTE } from '../../utils/capabilityRoutes';
 import { useGatewayCapabilities, gatewayContractsFromCapabilities } from '../../hooks/useGatewayCapabilities';
 import { useTools } from '../../hooks/useTools';
 import { collectCustomEventNames } from '../../utils/events';
@@ -46,12 +48,7 @@ import {
   modelResidencyTaskUnsupportedReason,
   type ModelResidencyOperation,
 } from '../../utils/modelResidencyGraph';
-import {
-  countAdvancedMediaPins,
-  countHiddenAdvancedMediaPins,
-  getVisibleMediaPins,
-  isMediaNodeType,
-} from '../../utils/mediaPinDisclosure';
+import { getNodePinDisclosure, isMediaPresentationNode } from '../../utils/nodePinDisclosure';
 import {
   applyImagePinDefaultPatch,
   extractImageModelParameterMetadata,
@@ -115,6 +112,19 @@ const DEFAULT_TTS_QUALITY_PRESETS: SelectOption[] = [
 const OPENAI_TTS_FORMATS = ['mp3', 'opus', 'aac', 'flac', 'wav', 'pcm'];
 const DEFAULT_STT_FORMATS = ['json', 'text', 'verbose_json', 'srt', 'vtt'];
 const DEFAULT_MUSIC_FORMATS = ['wav', 'mp3', 'flac'];
+const DEFAULT_THINKING_OPTIONS: SelectOption[] = [
+  { value: '', label: 'Auto (Gateway default)' },
+  { value: 'off', label: 'off' },
+  { value: 'low', label: 'low' },
+  { value: 'medium', label: 'medium' },
+  { value: 'high', label: 'high' },
+  { value: 'xhigh', label: 'xhigh' },
+];
+const ANSWER_USER_LEVEL_OPTIONS: SelectOption[] = [
+  { value: 'message', label: 'message' },
+  { value: 'warning', label: 'warning' },
+  { value: 'error', label: 'error' },
+];
 
 function formatOptionsFrom(values: unknown, fallback: string[]): SelectOption[] {
   const raw = Array.isArray(values) ? values : fallback;
@@ -192,6 +202,61 @@ function withGatewayDefaultOption(options: SelectOption[]): SelectOption[] {
     GATEWAY_DEFAULT_SELECT_OPTION,
     ...options.filter((option) => option.value.trim() !== ''),
   ];
+}
+
+function stringListFrom(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of value) {
+    const text = typeof item === 'string' ? item.trim() : '';
+    if (!text || seen.has(text)) continue;
+    seen.add(text);
+    out.push(text);
+  }
+  return out;
+}
+
+function recordFrom(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+function modelNameLooksThinkingCapable(modelName: string): boolean {
+  const clean = String(modelName || '').trim();
+  if (!clean) return false;
+  return [
+    /\bo[134](?:[-.]|$)/i,
+    /\bgpt[-_.]?5/i,
+    /\bgpt[-_.]?oss/i,
+    /\bclaude.*(?:4|opus|sonnet|haiku)/i,
+    /\bdeepseek.*(?:r1|v4)/i,
+    /\bqwen3\b/i,
+    /\bqwen3[.-]/i,
+    /\bthinking\b/i,
+    /\breasoning\b/i,
+    /\bseed[-_.]?oss\b/i,
+  ].some((pattern) => pattern.test(clean));
+}
+
+function thinkingOptionsFromModelCapabilities(payload: unknown, modelName: string): SelectOption[] {
+  const response = recordFrom(payload);
+  const caps = recordFrom(response?.capabilities) || response;
+  const levels = stringListFrom(caps?.reasoning_levels || caps?.thinking_levels);
+  const support =
+    caps?.thinking_support === true ||
+    caps?.thinking_budget === true ||
+    typeof caps?.thinking_control_mode === 'string' ||
+    levels.length > 0;
+
+  if (levels.length > 0) {
+    return [
+      { value: '', label: 'Auto (Gateway default)' },
+      ...levels.map((value) => ({ value, label: value })),
+    ];
+  }
+
+  if (support || modelNameLooksThinkingCapable(modelName)) return DEFAULT_THINKING_OPTIONS;
+  return [];
 }
 
 function mergeSelectOptions(current: SelectOption[], incoming: SelectOption[]): SelectOption[] {
@@ -677,10 +742,45 @@ export const BaseNode = memo(function BaseNode({
 
   const isTriggerNode = isEntryNodeType(data.nodeType);
   const pinDefaults = data.pinDefaults || {};
+  const isLlmNode = data.nodeType === 'llm_call';
+  const isAgentNode = data.nodeType === 'agent';
   const isVarNode = data.nodeType === 'get_var' || data.nodeType === 'set_var';
   const isCodeNode = data.nodeType === 'code';
   const [showCodeEditor, setShowCodeEditor] = useState(false);
-  const [showAdvancedMediaPins, setShowAdvancedMediaPins] = useState(false);
+  const [showAdvancedPins, setShowAdvancedPins] = useState(false);
+  const selectedTextModelForThinking = useMemo(() => {
+    if (isAgentNode) return firstConfigString(data.agentConfig?.model, pinDefaults.model);
+    if (isLlmNode) return firstConfigString(data.effectConfig?.model, pinDefaults.model);
+    return '';
+  }, [data.agentConfig?.model, data.effectConfig?.model, isAgentNode, isLlmNode, pinDefaults.model]);
+  const selectedThinkingValue = useMemo(() => {
+    if (isAgentNode) return firstConfigString(data.agentConfig?.thinking, pinDefaults.thinking);
+    if (isLlmNode) return firstConfigString(data.effectConfig?.thinking, pinDefaults.thinking);
+    return '';
+  }, [data.agentConfig?.thinking, data.effectConfig?.thinking, isAgentNode, isLlmNode, pinDefaults.thinking]);
+  const thinkingCapabilitiesQueryEnabled = (isAgentNode || isLlmNode) && Boolean(selectedTextModelForThinking);
+  const thinkingGatewayCapabilitiesQuery = useGatewayCapabilities(thinkingCapabilitiesQueryEnabled);
+  const thinkingGatewayContracts = gatewayContractsFromCapabilities(thinkingGatewayCapabilitiesQuery.data);
+  const modelCapabilitiesEndpoint = thinkingGatewayContracts?.common?.discovery?.model_capabilities || '';
+  const modelCapabilitiesQuery = useQuery({
+    queryKey: ['model-capabilities', modelCapabilitiesEndpoint, selectedTextModelForThinking],
+    queryFn: () =>
+      gatewayJson<Record<string, unknown>>(
+        gatewayPath(modelCapabilitiesEndpoint, {}, { model_name: selectedTextModelForThinking })
+      ),
+    enabled:
+      thinkingCapabilitiesQueryEnabled &&
+      Boolean(modelCapabilitiesEndpoint) &&
+      !thinkingGatewayCapabilitiesQuery.isLoading &&
+      !thinkingGatewayCapabilitiesQuery.isError,
+    staleTime: 30_000,
+  });
+  const thinkingOptions = useMemo(
+    () => thinkingOptionsFromModelCapabilities(modelCapabilitiesQuery.data, selectedTextModelForThinking),
+    [modelCapabilitiesQuery.data, selectedTextModelForThinking]
+  );
+  const effectiveThinkingOptions = thinkingOptions.length > 0 ? thinkingOptions : DEFAULT_THINKING_OPTIONS;
+  const thinkingSupported = thinkingOptions.length > 0 || Boolean(selectedThinkingValue);
   const artifactUploadInputsRef = useRef<Record<string, HTMLInputElement | null>>({});
   const [artifactUploadBusyPins, setArtifactUploadBusyPins] = useState<Record<string, true>>({});
   const loopProgress = (data.nodeType === 'loop' || data.nodeType === 'for')
@@ -932,7 +1032,7 @@ export const BaseNode = memo(function BaseNode({
   }, [allNodes, data.nodeType, edges, getSchemaByPath, id]);
 
   const isEmitEventNode = data.nodeType === 'emit_event';
-  const mediaPresentationNode = isMediaNodeType(data.nodeType);
+  const mediaPresentationNode = isMediaPresentationNode(data.nodeType);
 
   const normalizedMediaPins = useMemo(() => {
     if (!mediaPresentationNode) return null;
@@ -965,47 +1065,25 @@ export const BaseNode = memo(function BaseNode({
   // Separate execution pins from data pins
   const inputExec = isTriggerNode ? undefined : nodeInputs.find((p) => p.type === 'execution');
   const outputExecs = nodeOutputs.filter((p) => p.type === 'execution');
-  const mediaInputPins = mediaPresentationNode
-    ? getVisibleMediaPins(data.nodeType, 'input', nodeInputs, connectedInputPinIds, showAdvancedMediaPins)
-    : nodeInputs;
-  const inputData = mediaInputPins.filter((p) => {
-    if (p.type === 'execution') return false;
-    // Keep emit_event "session_id" as an advanced pin: hide it unless connected.
-    if (isEmitEventNode && p.id === 'session_id' && !isPinConnected('session_id', true)) {
-      return false;
-    }
-    return true;
-  });
-  const mediaOutputPins = mediaPresentationNode
-    ? getVisibleMediaPins(data.nodeType, 'output', nodeOutputs, connectedOutputPinIds, showAdvancedMediaPins)
-    : nodeOutputs;
-	  const outputData = mediaOutputPins.filter((p) => {
-	    if (p.type === 'execution') return false;
-	    // Keep legacy Agent pins hidden unless explicitly wired (cleaner UI without breaking old flows).
-	    if (
-	      data.nodeType === 'agent' &&
-	      (p.id === 'tool_calls' || p.id === 'tool_results' || p.id === 'result') &&
-	      !isPinConnected(p.id, false)
-	    ) {
-	      return false;
-	    }
-	    // Keep legacy LLM Call pins hidden unless explicitly wired.
-	    if (
-	      data.nodeType === 'llm_call' &&
-	      (p.id === 'result' || p.id === 'raw' || p.id === 'gen_time' || p.id === 'ttft_ms') &&
-	      !isPinConnected(p.id, false)
-	    ) {
-	      return false;
-	    }
-	    return true;
-	  });
-  const mediaAdvancedPinCount = mediaPresentationNode
-    ? countAdvancedMediaPins(data.nodeType, 'input', data.inputs) + countAdvancedMediaPins(data.nodeType, 'output', data.outputs)
-    : 0;
-  const hiddenAdvancedMediaPinCount = mediaPresentationNode
-    ? countHiddenAdvancedMediaPins(data.nodeType, 'input', data.inputs, connectedInputPinIds, false) +
-      countHiddenAdvancedMediaPins(data.nodeType, 'output', data.outputs, connectedOutputPinIds, false)
-    : 0;
+  const pinDisclosure = useMemo(
+    () =>
+	      getNodePinDisclosure({
+	        data,
+	        inputs: nodeInputs,
+	        outputs: nodeOutputs,
+	        connectedInputPinIds,
+	        connectedOutputPinIds,
+        thinkingSupport: { supported: thinkingSupported },
+	        expanded: showAdvancedPins,
+	      }),
+	    [connectedInputPinIds, connectedOutputPinIds, data, nodeInputs, nodeOutputs, showAdvancedPins, thinkingSupported]
+  );
+  const inputData = useMemo(() => pinDisclosure.inputPins.filter((p) => p.type !== 'execution'), [pinDisclosure.inputPins]);
+  const outputData = useMemo(() => pinDisclosure.outputPins.filter((p) => p.type !== 'execution'), [pinDisclosure.outputPins]);
+  const showPinDisclosure = pinDisclosure.expandable;
+  const pinDisclosureLabel = showAdvancedPins
+    ? 'Hide optional pins'
+    : 'Show optional pins';
   const renderedPinKey = useMemo(
     () => `${inputData.map((p) => p.id).join('|')}::${outputData.map((p) => p.id).join('|')}`,
     [inputData, outputData]
@@ -1013,7 +1091,17 @@ export const BaseNode = memo(function BaseNode({
 
   useEffect(() => {
     updateNodeInternals(id);
-  }, [connectedOutputsKey, id, renderedPinKey, showAdvancedMediaPins, updateNodeInternals]);
+  }, [connectedOutputsKey, id, renderedPinKey, showAdvancedPins, updateNodeInternals]);
+
+  const toggleAdvancedPins = useCallback(
+    (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setShowAdvancedPins((value) => !value);
+      updateNodeInternals(id);
+    },
+    [id, updateNodeInternals]
+  );
 
   const codeParams = useMemo(() => getPythonCodeUserPins(data.inputs), [data.inputs]);
   const codePermissions = useMemo(() => {
@@ -1026,8 +1114,6 @@ export const BaseNode = memo(function BaseNode({
     return '';
   }, [data.code, data.codeBody, data.functionName]);
 
-  const isLlmNode = data.nodeType === 'llm_call';
-  const isAgentNode = data.nodeType === 'agent';
   const isToolsAllowlistNode = data.nodeType === 'tools_allowlist';
   const isToolParametersNode = data.nodeType === 'tool_parameters';
   const isBoolVarNode = data.nodeType === 'bool_var';
@@ -1048,6 +1134,7 @@ export const BaseNode = memo(function BaseNode({
   const isDelayNode = data.nodeType === 'wait_until';
   const isOnEventNode = data.nodeType === 'on_event';
   const isOnScheduleNode = data.nodeType === 'on_schedule';
+  const isAnswerUserNode = data.nodeType === 'answer_user';
   const isSubflowNode = data.nodeType === 'subflow';
   const isWriteFileNode = data.nodeType === 'write_file';
   const isMemoryNoteNode = data.nodeType === 'memory_note';
@@ -1439,7 +1526,8 @@ export const BaseNode = memo(function BaseNode({
     (hasModelControls && !modelConnected) ||
       wantsTextModelCatalog ||
       (isProviderModelsNode && !providerConnected) ||
-      (residencyTextCatalogEnabled && Boolean(selectedResidencyProvider) && !isPinConnected('model', true))
+      (residencyTextCatalogEnabled && Boolean(selectedResidencyProvider) && !isPinConnected('model', true)),
+    isProviderModelsNode ? data.providerModelsConfig?.capabilityRoute || TEXT_OUTPUT_CAPABILITY_ROUTE : TEXT_OUTPUT_CAPABILITY_ROUTE
   );
   const toolsQuery = useTools((isAgentNode || isLlmNode || isToolsAllowlistNode || isVarDeclNode || isToolParametersNode || subflowHasToolsPin) && !toolsConnected);
 
@@ -3850,29 +3938,6 @@ export const BaseNode = memo(function BaseNode({
           />
         )}
 
-        {selected && mediaPresentationNode && mediaAdvancedPinCount > 0 && (showAdvancedMediaPins || hiddenAdvancedMediaPinCount > 0) && (
-          <div className="pin-disclosure-row nodrag">
-            <button
-              type="button"
-              className="pin-disclosure-button nodrag"
-              aria-expanded={showAdvancedMediaPins}
-              aria-label={showAdvancedMediaPins ? 'Hide advanced media pins' : 'Show advanced media pins'}
-              title={showAdvancedMediaPins ? 'Hide optional tuning and diagnostic pins' : 'Show optional tuning and diagnostic pins'}
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setShowAdvancedMediaPins((value) => !value);
-              }}
-            >
-              <span>{showAdvancedMediaPins ? 'Hide advanced' : 'Advanced'}</span>
-              {!showAdvancedMediaPins && hiddenAdvancedMediaPinCount > 0 ? (
-                <span className="pin-disclosure-count">{hiddenAdvancedMediaPinCount}</span>
-              ) : null}
-            </button>
-          </div>
-        )}
-
         {isCodeNode && (
           <div className="node-code-edit-row nodrag">
             <button
@@ -3985,6 +4050,8 @@ export const BaseNode = memo(function BaseNode({
                 const isWriteFileContentPin = isWriteFileNode && pin.id === 'content';
                 const isCompareOpPin = isCompareNode && pin.id === 'op';
                 const isStringifyJsonModePin = isStringifyJsonNode && pin.id === 'mode';
+                const isThinkingPin = (isAgentNode || isLlmNode) && pin.id === 'thinking';
+                const isAnswerUserLevelPin = isAnswerUserNode && pin.id === 'level';
 	                const isMemoryScopePin =
 	                  (isMemoryNoteNode ||
 	                    isMemoryQueryNode ||
@@ -4055,6 +4122,8 @@ export const BaseNode = memo(function BaseNode({
                       isMusicModelPin ||
                       isMusicFormatPin ||
                       isCodePermissionsPin ||
+                      isThinkingPin ||
+                      isAnswerUserLevelPin ||
 	                  ((isAgentNode || isLlmNode || subflowHasToolsPin) && pin.id === 'tools') ||
 	                  (isVarNode && pin.id === 'name') ||
 	                  isCompareOpPin ||
@@ -4262,6 +4331,57 @@ export const BaseNode = memo(function BaseNode({
                       searchable={false}
                       minPopoverWidth={180}
                       onChange={(v) => setPinDefault('mode', (v || 'beautify') as any)}
+                    />
+                  );
+                }
+
+                if (isThinkingPin && !connected) {
+                  const currentThinking = effectiveThinkingOptions.some((option) => option.value === selectedThinkingValue)
+                    ? selectedThinkingValue
+                    : '';
+                  controls.push(
+                    <AfSelect
+                      key="thinking"
+                      variant="pin"
+                      value={currentThinking}
+                      placeholder="Auto (Gateway default)"
+                      options={effectiveThinkingOptions}
+                      searchable={false}
+                      clearable={false}
+                      minPopoverWidth={220}
+                      onChange={(v) => {
+                        const clean = v || undefined;
+                        if (isAgentNode) {
+                          const prev = data.agentConfig || {};
+                          updateNodeData(id, { agentConfig: { ...prev, thinking: clean } });
+                          return;
+                        }
+                        if (isLlmNode) {
+                          const prev = data.effectConfig || {};
+                          updateNodeData(id, { effectConfig: { ...prev, thinking: clean } });
+                        }
+                      }}
+                    />
+                  );
+                }
+
+                if (isAnswerUserLevelPin && !connected) {
+                  const raw = pinDefaults.level;
+                  const currentLevel =
+                    typeof raw === 'string' && ANSWER_USER_LEVEL_OPTIONS.some((option) => option.value === raw.trim())
+                      ? raw.trim()
+                      : 'message';
+                  controls.push(
+                    <AfSelect
+                      key="answer-user-level"
+                      variant="pin"
+                      value={currentLevel}
+                      placeholder="message"
+                      options={ANSWER_USER_LEVEL_OPTIONS}
+                      searchable={false}
+                      clearable={false}
+                      minPopoverWidth={160}
+                      onChange={(v) => setPinDefault('level', v || 'message')}
                     />
                   );
                 }
@@ -5222,6 +5342,22 @@ export const BaseNode = memo(function BaseNode({
           );
           })}
         </div>
+
+        {showPinDisclosure && (
+          <div className="pin-disclosure-row nodrag">
+            <button
+              type="button"
+              className={clsx('pin-disclosure-button nodrag', showAdvancedPins && 'expanded')}
+              aria-expanded={showAdvancedPins}
+              aria-label={pinDisclosureLabel}
+              title={pinDisclosureLabel}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={toggleAdvancedPins}
+            >
+              <span className="pin-disclosure-chevron" aria-hidden="true" />
+            </button>
+          </div>
+        )}
       </div>
       </div>
 

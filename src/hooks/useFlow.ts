@@ -663,6 +663,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             'max_in_tokens',
             'temperature',
             'seed',
+            'thinking',
             'resp_schema',
           ];
           const ordered: Pin[] = [];
@@ -792,6 +793,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                 want({ id: 'max_in_tokens', label: 'max_in_tokens', type: 'number' }),
                 want({ id: 'temperature', label: 'temperature', type: 'number' }),
                 want({ id: 'seed', label: 'seed', type: 'number' }),
+                want({ id: 'thinking', label: 'thinking', type: 'string' }),
                 want({ id: 'resp_schema', label: 'resp_schema', type: 'object' }),
               ]
             : [
@@ -808,6 +810,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                 want({ id: 'max_in_tokens', label: 'max_in_tokens', type: 'number' }),
                 want({ id: 'temperature', label: 'temperature', type: 'number' }),
                 want({ id: 'seed', label: 'seed', type: 'number' }),
+                want({ id: 'thinking', label: 'thinking', type: 'string' }),
                 want({ id: 'resp_schema', label: 'resp_schema', type: 'object' }),
               ];
 
@@ -1397,7 +1400,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         const byId = new Map(existingInputs.map((p) => [p.id, p] as const));
 
         const dropIds = new Set(['allowed_models', 'allowedModels']);
-        const extras = existingInputs.filter((p) => p.id !== 'provider' && !dropIds.has(p.id));
+        const extras = existingInputs.filter((p) => p.id !== 'provider' && p.id !== 'capability_route' && !dropIds.has(p.id));
 
         const prevProvider = byId.get('provider');
         const providerPin: Pin = !prevProvider
@@ -1406,7 +1409,14 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             ? prevProvider
             : { ...prevProvider, label: 'provider', type: 'provider_text' };
 
-        data = { ...data, inputs: [providerPin, ...extras] };
+        const prevCapabilityRoute = byId.get('capability_route');
+        const capabilityRoutePin: Pin = !prevCapabilityRoute
+          ? { id: 'capability_route', label: 'capability_route', type: 'string' }
+          : prevCapabilityRoute.label === 'capability_route' && prevCapabilityRoute.type === 'string'
+            ? prevCapabilityRoute
+            : { ...prevCapabilityRoute, label: 'capability_route', type: 'string' };
+
+        data = { ...data, inputs: [providerPin, capabilityRoutePin, ...extras] };
       }
 
       // Backward-compat + canonical ordering for file IO nodes (remove deprecated `file_type` pin).

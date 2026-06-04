@@ -48,6 +48,7 @@ import {
   providerPinIdForModelPin,
   type PinCatalogScope,
 } from '../utils/pinCatalog';
+import { TEXT_OUTPUT_CAPABILITY_ROUTE } from '../utils/capabilityRoutes';
 import { insertModelResidencyStep, modelResidencyTaskUnsupportedReason } from '../utils/modelResidencyGraph';
 import {
   applyImagePinDefaultPatch,
@@ -70,6 +71,14 @@ const DEFAULT_VIDEO_FORMATS = ['mp4', 'mov', 'gif'];
 const DEFAULT_TTS_FORMATS = ['wav', 'mp3'];
 const DEFAULT_STT_FORMATS = ['json', 'text', 'verbose_json', 'srt', 'vtt'];
 const DEFAULT_MUSIC_FORMATS = ['wav', 'mp3', 'flac'];
+const THINKING_OPTIONS = [
+  { value: '', label: 'Auto (Gateway default)' },
+  { value: 'off', label: 'Off' },
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'high', label: 'High' },
+  { value: 'xhigh', label: 'XHigh' },
+];
 const DEFAULT_TTS_QUALITY_PRESETS: AfSelectOption[] = [
   { value: 'low', label: 'low latency' },
   { value: 'standard', label: 'standard' },
@@ -822,7 +831,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       setLoadingModels(true);
       setModels([]);
       gatewayJson<{ models?: string[]; items?: string[] }>(
-        gatewayPath(providerModelsEndpoint, { provider_name: selectedProvider })
+        gatewayPath(providerModelsEndpoint, { provider_name: selectedProvider }, { capability_route: TEXT_OUTPUT_CAPABILITY_ROUTE })
       )
         .then((data) => {
           const models = Array.isArray(data?.models)
@@ -1428,6 +1437,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const toolsPinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'tools');
   const temperaturePinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'temperature');
   const seedPinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'seed');
+  const thinkingPinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'thinking');
   const maxIterationsPinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'max_iterations');
   const maxIterationsDefault = (() => {
     const pinVal = data.pinDefaults && typeof data.pinDefaults === 'object' ? (data.pinDefaults as any).max_iterations : undefined;
@@ -2098,7 +2108,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       {/* Pin default values (unconnected primitive pins).
           This keeps the right panel consistent with inline pin editors on nodes. */}
       {(() => {
-        const skipIds = new Set(['provider', 'model', 'tools']); // shown in dedicated sections (agent/llm_call) for better UX
+        const skipIds = new Set(['provider', 'model', 'tools', 'thinking']); // shown in dedicated sections (agent/llm_call) for better UX
         const inputPins = data.inputs.filter((p) => p.type !== 'execution' && !skipIds.has(p.id));
         const mediaNode = MEDIA_NODE_TYPES.has(data.nodeType);
 
@@ -3711,6 +3721,25 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               />
             )}
             <span className="property-hint">-1 = random/unset; {'>=0'} = deterministic (provider permitting)</span>
+          </div>
+
+          <div className="property-group">
+            <label className="property-sublabel">Reasoning</label>
+            {thinkingPinConnected ? (
+              <span className="property-hint">Provided by connected pin.</span>
+            ) : (
+              <select
+                className="property-select"
+                value={data.agentConfig?.thinking || ''}
+                onChange={(e) => updateAgentConfig({ thinking: e.target.value || undefined })}
+              >
+                {THINKING_OPTIONS.map((option) => (
+                  <option key={option.value || 'auto'} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           <div className="property-group">
@@ -5754,6 +5783,25 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               />
             )}
             <span className="property-hint">-1 = random/unset; {'>=0'} = deterministic (provider permitting)</span>
+          </div>
+
+          <div className="property-group">
+            <label className="property-sublabel">Reasoning</label>
+            {thinkingPinConnected ? (
+              <span className="property-hint">Provided by connected pin.</span>
+            ) : (
+              <select
+                className="property-select"
+                value={data.effectConfig?.thinking || ''}
+                onChange={(e) => updateLlmCallEffectConfig({ thinking: e.target.value || undefined })}
+              >
+                {THINKING_OPTIONS.map((option) => (
+                  <option key={option.value || 'auto'} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           <div className="property-group">

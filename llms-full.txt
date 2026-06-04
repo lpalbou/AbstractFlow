@@ -28,6 +28,16 @@ Leave provider/model selectors on `Auto (Gateway default)` for portable
 workflows. Gateway/Core capability defaults choose the actual provider/model at
 run time for the current user/runtime.
 
+Text model selectors use Gateway's Core-backed `capability_route` discovery
+filters, so normal LLM pickers request `output.text` models. The Models Catalog
+node can store a route such as `input.image,output.text` to discover provider
+models for a specific input/output shape while the workflow runs.
+
+LLM Call and Agent nodes include a Reasoning control backed by Core's
+`thinking` option. Leave it on Auto to inherit the Gateway/runtime default, or
+set/pin values such as `off`, `low`, `medium`, `high`, or `xhigh` for reasoning
+models that support explicit effort controls.
+
 Media artifact inputs can be wired from another node or uploaded directly on
 the node when the artifact pin is unconnected. Uploaded browser files are stored
 as Gateway artifacts. During `Listen Voice` waits, Flow records in the browser,
