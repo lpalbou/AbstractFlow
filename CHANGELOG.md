@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added switch-friendly structured-output authoring: enum-backed response fields can be discovered through Parse JSON / Break Object and synced into explicit Switch cases.
 
 ### Changed
+- Redesigned the editor toolbar: consistent stroke SVG icons replace mixed emoji/glyphs, actions are organized into segmented groups (file, import/export, run + history, gateway publish/lifecycle/models, workspace tools), Run is a labeled primary button with a running spinner, and the Connect/Disconnect button shows a live connection status dot.
+- Toolbar buttons now use fast AfTooltip hints (with disabled-state explanations and the save shortcut) instead of slow native `title` tooltips; `AfTooltip` gained a `minWidthPx` override for compact hints.
 - Model residency and media provider/model selectors now include the `image_upscale` task for Gateway/Core upscaler discovery and explicit load/unload steps.
 - Workflow Authoring Assistant PDF readiness now requires an executable `Write PDF` node and exposed PDF path instead of accepting Code or generic Write File workarounds.
 - Compact node rendering now uses a shared pin disclosure policy so nodes show required, connected, or explicitly configured pins by default and hide optional/default/diagnostic pins behind a chevron.

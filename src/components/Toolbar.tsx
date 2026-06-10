@@ -2,7 +2,7 @@
  * Toolbar component with Run, Save, Export, Import actions.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { useFlowStore } from '../hooks/useFlow';
@@ -13,6 +13,23 @@ import { FlowLibraryModal } from './FlowLibraryModal';
 import { PublishFlowModal } from './PublishFlowModal';
 import { WorkflowLifecycleModal } from './WorkflowLifecycleModal';
 import { ModelResidencyPanel } from './ModelResidencyPanel';
+import { AfTooltip } from './AfTooltip';
+import {
+  IconChip,
+  IconContrast,
+  IconCopy,
+  IconExport,
+  IconFilePlus,
+  IconFolder,
+  IconHistory,
+  IconImport,
+  IconLifecycle,
+  IconPackage,
+  IconPlay,
+  IconSave,
+  IconSparkle,
+  IconSpinner,
+} from './ToolbarIcons';
 import { closeOpenNodes, createLedgerMappingState, mapLedgerRecordToEvents, type LedgerRecord } from '../utils/ledgerEvents';
 import { mapGatewayRunSummary } from '../utils/gatewayRuns';
 import { extractPendingApprovalWait, extractReplayTraceEvents } from '../utils/runHistoryReplay';
@@ -74,36 +91,36 @@ async function duplicateFlow(source: VisualFlow, newName: string, contracts: Gat
     }, { method: 'POST' }));
 }
 
-function TransferFlowIcon({ direction }: { direction: 'up' | 'down' }) {
-  const isUp = direction === 'up';
+/**
+ * Toolbar button wrapped in a fast AfTooltip (consistent with the palette,
+ * nicer than slow native `title` hints). The wrapper still receives pointer
+ * events when the inner button is disabled, so "why is this disabled" hints
+ * remain discoverable.
+ */
+function ToolbarAction({
+  tooltip,
+  label,
+  onClick,
+  disabled = false,
+  iconOnly = true,
+  className = '',
+  children,
+}: {
+  tooltip: string;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  iconOnly?: boolean;
+  className?: string;
+  children: ReactNode;
+}) {
+  const classes = ['toolbar-button', iconOnly ? 'icon-button' : '', className].filter(Boolean).join(' ');
   return (
-    <svg
-      className="toolbar-transfer-icon"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path
-        d={isUp ? 'M12 16V5' : 'M12 8v11'}
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <path
-        d={isUp ? 'M7.5 9.5 12 5l4.5 4.5' : 'M7.5 14.5 12 19l4.5-4.5'}
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d={isUp ? 'M6 19h12' : 'M6 5h12'}
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
+    <AfTooltip content={tooltip} delayMs={500} maxWidthPx={340} minWidthPx={0}>
+      <button type="button" className={classes} onClick={onClick} disabled={disabled} aria-label={label}>
+        {children}
+      </button>
+    </AfTooltip>
   );
 }
 
@@ -1134,6 +1151,26 @@ export function Toolbar({
     setShowLifecycleModal(true);
   }, [flowId]);
 
+  const needsSaveFirst = !flowId;
+  const runTooltip = visualflowRunUnavailable
+    ? visualflowRunHint || 'Gateway cannot run VisualFlows'
+    : needsSaveFirst
+      ? 'Save the flow first to run it'
+      : isRunning
+        ? 'Open current run'
+        : 'Run flow';
+  const publishTooltip = visualflowPublishUnavailable
+    ? visualflowPublishHint || 'Gateway cannot publish VisualFlows'
+    : needsSaveFirst
+      ? 'Save the flow first to publish it'
+      : 'Publish as WorkflowBundle (.flow)';
+  const lifecycleTooltip = needsSaveFirst ? 'Save the flow first' : 'Bundle lifecycle on gateway';
+  const historyTooltip = runHistoryUnavailable
+    ? runHistoryHint
+    : needsSaveFirst
+      ? 'Save the flow first to see its run history'
+      : 'Run history';
+
   return (
     <>
       <div className="toolbar">
@@ -1146,147 +1183,136 @@ export function Toolbar({
           placeholder="Flow name..."
         />
 
-        <div className="toolbar-divider" />
+        {/* File: create / open / save / duplicate */}
+        <div className="toolbar-group" role="group" aria-label="Flow file actions">
+          <ToolbarAction tooltip="New flow" label="New Flow" onClick={handleNew}>
+            <IconFilePlus />
+          </ToolbarAction>
+          <ToolbarAction
+            tooltip={visualflowCrudUnavailable ? saveUnavailableReason : 'Open a saved flow'}
+            label="Open Flow"
+            onClick={() => setShowFlowLibrary(true)}
+            disabled={visualflowCrudUnavailable}
+          >
+            <IconFolder />
+          </ToolbarAction>
+          <ToolbarAction
+            tooltip={saveDisabledReason}
+            label="Save Flow"
+            onClick={handleSave}
+            disabled={saveMutation.isPending || visualflowCrudUnavailable || isEmptyFlow || !hasUnsavedChanges}
+            className={hasUnsavedChanges ? 'save-button dirty' : 'save-button'}
+          >
+            <IconSave />
+            {hasUnsavedChanges ? <span className="save-dirty-dot" aria-hidden="true" /> : null}
+          </ToolbarAction>
+          <ToolbarAction
+            tooltip={visualflowCrudUnavailable ? saveUnavailableReason : 'Duplicate this flow'}
+            label="Duplicate Flow"
+            onClick={handleDuplicateCurrent}
+            disabled={visualflowCrudUnavailable}
+          >
+            <IconCopy />
+          </ToolbarAction>
+        </div>
 
-        {/* Actions */}
-        <button
-          className="toolbar-button icon-button"
-          onClick={handleDuplicateCurrent}
-          disabled={visualflowCrudUnavailable}
-          title={visualflowCrudUnavailable ? saveUnavailableReason : 'Duplicate Flow'}
-          aria-label="Duplicate Flow"
-        >
-          ⧉
-        </button>
+        {/* Transfer: JSON import/export */}
+        <div className="toolbar-group" role="group" aria-label="Flow transfer">
+          <ToolbarAction tooltip="Import flow from a JSON file" label="Import Flow" onClick={handleImport}>
+            <IconImport />
+          </ToolbarAction>
+          <ToolbarAction tooltip="Export flow as a JSON file" label="Export Flow" onClick={handleExport}>
+            <IconExport />
+          </ToolbarAction>
+        </div>
 
-        <button
-          className="toolbar-button icon-button"
-          onClick={handleNew}
-          title="New Flow"
-          aria-label="New Flow"
-        >
-          ＋
-        </button>
+        {/* Execution: run + history */}
+        <div className="toolbar-group" role="group" aria-label="Run actions">
+          <ToolbarAction
+            tooltip={runTooltip}
+            label={isRunning ? 'Open current run' : 'Run flow'}
+            onClick={handleRun}
+            disabled={!flowId || visualflowRunUnavailable}
+            iconOnly={false}
+            className="primary run-button"
+          >
+            {isRunning ? <IconSpinner /> : <IconPlay />}
+            <span>Run</span>
+          </ToolbarAction>
+          <ToolbarAction
+            tooltip={historyTooltip}
+            label="Open run history"
+            onClick={() => setShowRunHistory(true)}
+            disabled={!flowId || runHistoryUnavailable}
+          >
+            <IconHistory />
+          </ToolbarAction>
+        </div>
 
-        <button
-          className="toolbar-button icon-button"
-          onClick={() => setShowFlowLibrary(true)}
-          disabled={visualflowCrudUnavailable}
-          title={visualflowCrudUnavailable ? saveUnavailableReason : 'Load Flow'}
-          aria-label="Load Flow"
-        >
-          📂
-        </button>
-
-        <button
-          className={`toolbar-button icon-button save-button ${hasUnsavedChanges ? 'dirty' : ''}`}
-          onClick={handleSave}
-          disabled={saveMutation.isPending || visualflowCrudUnavailable || isEmptyFlow || !hasUnsavedChanges}
-          title={saveDisabledReason}
-          aria-label="Save Flow"
-        >
-          💾
-          {hasUnsavedChanges ? <span className="save-dirty-dot" aria-hidden="true" /> : null}
-        </button>
-
-        <button
-          className="toolbar-button icon-button primary"
-          onClick={handleRun}
-          disabled={!flowId || visualflowRunUnavailable}
-          title={visualflowRunUnavailable ? (visualflowRunHint || 'Gateway cannot run VisualFlows') : isRunning ? 'Open current run' : 'Run'}
-          aria-label={isRunning ? 'Open current run' : 'Run'}
-        >
-          {isRunning ? '⏳' : '▶'}
-        </button>
-
-        <button
-          className="toolbar-button icon-button"
-          onClick={handlePublish}
-          disabled={isRunning || !flowId || visualflowPublishUnavailable}
-          title={visualflowPublishUnavailable ? (visualflowPublishHint || 'Gateway cannot publish VisualFlows') : 'Publish WorkflowBundle (.flow)'}
-          aria-label="Publish WorkflowBundle"
-        >
-          📦
-        </button>
-
-        <button className="toolbar-button icon-button" onClick={handleLifecycle} disabled={isRunning || !flowId} title="Lifecycle on gateway" aria-label="Lifecycle on gateway">
-          🔄
-        </button>
-
-        <button
-          className="toolbar-button icon-button"
-          onClick={() => setShowRunHistory(true)}
-          disabled={!flowId || runHistoryUnavailable}
-          title={runHistoryUnavailable ? runHistoryHint : 'Run history'}
-          aria-label="Open run history"
-        >
-          🕘
-        </button>
-
-        <div className="toolbar-divider" />
-
-        <button
-          className="toolbar-button"
-          onClick={() => setShowModelResidency(true)}
-          title={
-            gatewayReadiness.optional.modelResidency
-              ? 'Loaded models'
-              : 'Loaded models unavailable from Gateway'
-          }
-          aria-label="Open loaded models"
-        >
-          <span aria-hidden="true">◫</span>
-          <span>Models</span>
-        </button>
-
-        <div className="toolbar-divider" />
-
-        <button
-          className="toolbar-button icon-button"
-          onClick={handleExport}
-          title="Export Flow"
-          aria-label="Export Flow"
-        >
-          <TransferFlowIcon direction="up" />
-        </button>
-
-        <button
-          className="toolbar-button icon-button"
-          onClick={handleImport}
-          title="Import Flow"
-          aria-label="Import Flow"
-        >
-          <TransferFlowIcon direction="down" />
-        </button>
+        {/* Gateway: publish / lifecycle / loaded models */}
+        <div className="toolbar-group" role="group" aria-label="Gateway actions">
+          <ToolbarAction
+            tooltip={publishTooltip}
+            label="Publish WorkflowBundle"
+            onClick={handlePublish}
+            disabled={isRunning || !flowId || visualflowPublishUnavailable}
+          >
+            <IconPackage />
+          </ToolbarAction>
+          <ToolbarAction
+            tooltip={lifecycleTooltip}
+            label="Lifecycle on gateway"
+            onClick={handleLifecycle}
+            disabled={isRunning || !flowId}
+          >
+            <IconLifecycle />
+          </ToolbarAction>
+          <ToolbarAction
+            tooltip={
+              gatewayReadiness.optional.modelResidency
+                ? 'Models currently loaded on the gateway'
+                : 'Loaded models unavailable from Gateway'
+            }
+            label="Open loaded models"
+            onClick={() => setShowModelResidency(true)}
+            iconOnly={false}
+          >
+            <IconChip />
+            <span>Models</span>
+          </ToolbarAction>
+        </div>
 
         <div className="toolbar-spacer" />
 
-        <button
-          className={`toolbar-button icon-button assistant-toolbar-button ${assistantOpen ? 'primary' : ''}`}
-          onClick={() => onOpenAssistant?.()}
-          title="Authoring assistant"
-          aria-label="Open authoring assistant"
-        >
-          ✦
-        </button>
+        {/* Workspace: assistant + appearance */}
+        <div className="toolbar-group" role="group" aria-label="Workspace tools">
+          <ToolbarAction
+            tooltip="Authoring assistant"
+            label="Open authoring assistant"
+            onClick={() => onOpenAssistant?.()}
+            className={assistantOpen ? 'primary' : ''}
+          >
+            <IconSparkle />
+          </ToolbarAction>
+          <ToolbarAction
+            tooltip="Appearance (theme + typography)"
+            label="Open appearance settings"
+            onClick={() => onOpenAppearance?.()}
+          >
+            <IconContrast />
+          </ToolbarAction>
+        </div>
 
-        <button
-          className="toolbar-button icon-button"
-          onClick={() => onOpenAppearance?.()}
-          title="Appearance (theme + typography)"
-          aria-label="Open appearance settings"
-        >
-          ◐
-        </button>
-
-        <button
-          className={`toolbar-button ${gatewayConnected ? '' : 'primary'}`}
+        <ToolbarAction
+          tooltip={gatewayConnected ? 'Disconnect from gateway' : 'Connect to gateway'}
+          label={gatewayConnected ? 'Disconnect from gateway' : 'Connect to gateway'}
           onClick={() => (gatewayConnected ? onDisconnect?.() : onOpenConnection?.())}
-          title={gatewayConnected ? 'Disconnect from gateway' : 'Connect to gateway'}
-          aria-label={gatewayConnected ? 'Disconnect from gateway' : 'Connect to gateway'}
+          iconOnly={false}
+          className={gatewayConnected ? 'connection-button' : 'primary connection-button'}
         >
-          {gatewayConnected ? 'Disconnect' : 'Connect'}
-        </button>
+          <span className={`connection-dot ${gatewayConnected ? 'online' : 'offline'}`} aria-hidden="true" />
+          <span>{gatewayConnected ? 'Disconnect' : 'Connect'}</span>
+        </ToolbarAction>
       </div>
 
       {showNewFlowModal ? (

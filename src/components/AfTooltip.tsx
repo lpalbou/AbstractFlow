@@ -53,6 +53,7 @@ export function AfTooltip({
   content,
   delayMs = 2000,
   maxWidthPx = 520,
+  minWidthPx,
   placement = 'top',
   priority = 0,
   block = false,
@@ -61,6 +62,8 @@ export function AfTooltip({
   content?: string;
   delayMs?: number;
   maxWidthPx?: number;
+  /** Override the default 260px bubble min-width (e.g. compact toolbar hints). */
+  minWidthPx?: number;
   placement?: AfTooltipPlacement;
   priority?: number;
   block?: boolean;
@@ -233,6 +236,9 @@ export function AfTooltip({
       maxWidth: Math.max(120, maxWidthPx),
       ['--af-tooltip-arrow-left' as any]: `${pos?.arrowLeftPct ?? 50}%`,
     };
+    if (typeof minWidthPx === 'number' && Number.isFinite(minWidthPx)) {
+      style.minWidth = Math.max(0, minWidthPx);
+    }
 
     // Render in a portal so it cannot be clipped by scroll/overflow containers.
     return createPortal(
@@ -246,7 +252,7 @@ export function AfTooltip({
       </div>,
       document.body
     );
-  }, [maxWidthPx, open, pos, show, text]);
+  }, [maxWidthPx, minWidthPx, open, pos, show, text]);
 
   // Track global hover precedence: when another tooltip becomes "top hovered",
   // close this tooltip and cancel pending timers.
