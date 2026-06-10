@@ -512,9 +512,9 @@ body,
   pointer-events: none;
   text-align: center;
   padding: 26px 34px;
-  border: 1px dashed rgba(124, 149, 188, 0.4);
+  border: 1px dashed color-mix(in srgb, var(--text-secondary) 45%, transparent);
   border-radius: 14px;
-  background: rgba(12, 16, 28, 0.5);
+  background: color-mix(in srgb, var(--bg-secondary) 55%, transparent);
   max-width: 380px;
 }
 
@@ -709,174 +709,28 @@ button.primary:hover:not(:disabled) {
 }
 
 /* AbstractFlow custom select (searchable popover) */
-.af-select {
-  display: inline-flex;
-}
-
+/* AfSelect visuals (colors, popover, options) come from the ui-kit theme.css,
+   which is theme-aware (light/dark). Only app-specific layout overrides and
+   node-scoped colors live here — do not re-style colors with hardcoded values,
+   or the theme selector stops working (that bug already happened once). */
 .af-select--pin {
   margin-left: auto;
 }
 
-.af-select-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(0, 0, 0, 0.22);
-  color: var(--text-primary);
-  border-radius: 8px;
-  padding: 0 8px;
-  line-height: 1;
-}
-
 .af-select--pin .af-select-trigger {
-  height: 20px;
   max-width: 140px;
-  font-size: var(--font-size-xs);
 }
 
-.af-select--panel .af-select-trigger {
-  height: 34px;
-  width: 100%;
+/* Node frames are intentionally dark in every theme (Blueprint style), so the
+   inline pin selects keep node-local overlay colors instead of theme panel
+   colors, which would be near-invisible in light themes. */
+.flow-node .af-select-trigger {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.22);
 }
 
-.af-select-value {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-  text-align: left;
-}
-
-.af-select-value--placeholder {
-  color: var(--text-secondary);
-}
-
-.af-select-clear {
-  display: inline-flex;
-  width: 16px;
-  height: 16px;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-
-.af-select-clear:hover {
-  color: var(--text-primary);
+.flow-node .af-select-trigger:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.08);
-}
-
-.af-select-caret {
-  color: var(--text-secondary);
-  transform: translateY(-1px);
-}
-
-.af-select-caret--open {
-  color: var(--text-primary);
-}
-
-.af-select-popover {
-  z-index: 10000;
-  background: #121223;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 12px;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
-  overflow: hidden;
-}
-
-.af-select-popover--top {
-  transform: translateY(-100%);
-}
-
-.af-select-search {
-  padding: 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.af-select-search-input {
-  width: 100%;
-  height: 32px;
-  padding: 6px 10px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(0, 0, 0, 0.25);
-  color: var(--text-primary);
-}
-
-.af-select-custom-error {
-  margin-top: 6px;
-  color: var(--accent-primary);
-  font-size: 11px;
-  line-height: 1.35;
-}
-
-.af-select-options {
-  max-height: 320px;
-  overflow: auto;
-  padding: 6px;
-}
-
-.af-select-empty {
-  padding: 10px;
-  color: var(--text-secondary);
-}
-
-.af-select-option {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  cursor: pointer;
-  color: var(--text-primary);
-}
-
-.af-select-option--highlighted {
-  background: rgba(233, 69, 96, 0.22);
-}
-
-.af-select-option--selected {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.af-select-option--disabled {
-  cursor: not-allowed;
-  color: var(--text-muted);
-  opacity: 0.58;
-}
-
-.af-select-option--disabled.af-select-option--highlighted {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.af-select-option-label {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.af-select-option-label > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.af-select-option-reason {
-  color: var(--text-muted);
-  font-size: 10px;
-  line-height: 1.25;
-}
-
-.af-select-check {
-  color: var(--accent);
-  font-weight: 700;
 }
 
 /* Blueprint-style inline default values for unconnected pins */

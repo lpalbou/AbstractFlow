@@ -121,18 +121,19 @@ graph, Save, Publish, and Run through the normal Gateway-backed controls.
 
 ## Execution View
 
-The toolbar's execution-view toggle (three linked dots) condenses the canvas to
-the control-flow skeleton. Only nodes linked by execution edges remain visible,
-along with those edges; data-only nodes (literals, concat, parsers) and data
-edges are hidden. Node positions are unchanged, so the layout matches the full
-view when switching back and forth.
+The toolbar's execution-view toggle (node-to-node arrow icon) condenses the
+canvas to the control-flow skeleton. Only nodes linked by execution edges
+remain visible, along with those edges; data-only nodes (literals, concat,
+parsers) and data edges are hidden. Node positions are unchanged, so the
+layout matches the full view when switching back and forth.
 
-Condensed nodes are compact cards with a per-family color, shape, and icon so
-the flow reads at a glance: events (red pill), control flow such as Sequence or
-If/Else (orange, with named branch pins), user interaction (green), generative
-AI (violet), generated media (pink), tools & files (teal), memory (gold),
-subflow (cyan double border), and logic/state (grey). Runtime highlights
-(executing/recent) still apply in this view.
+Each condensed node reuses the full-view node header — the same header color,
+uppercase title, and sheen — so a node is instantly recognizable across both
+modes. A family icon and silhouette add a second cue: events (pill), control
+flow such as Sequence or If/Else (sharp corners, with named branch rows in the
+dark node body), user interaction (speech-bubble corner), generative AI and
+generated media (rounded), tools & files, memory, subflow (double border), and
+logic/state. Runtime highlights (executing/recent) still apply in this view.
 
 The execution view is a reading mode: dropping new palette nodes is blocked
 with a hint, while moving nodes and rewiring execution pins remain available.

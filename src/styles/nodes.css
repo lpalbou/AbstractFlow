@@ -124,6 +124,9 @@
   color: #fff;
   position: relative;
   min-width: 0;
+  /* Subtle vertical sheen over the per-node headerColor; the execution view
+     header uses the same treatment so both modes feel like one system. */
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0) 55%, rgba(0, 0, 0, 0.12));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.16),
     inset 0 -1px 0 rgba(0, 0, 0, 0.22);
@@ -716,7 +719,10 @@
 
 .react-flow__edge-underlay {
   fill: none;
-  stroke: rgba(3, 7, 18, 0.82);
+  /* The underlay "cuts" edges passing underneath, so it must match the canvas
+     background in every theme (a hardcoded dark stroke turns into chain-link
+     artifacts on light themes). */
+  stroke: color-mix(in srgb, var(--bg-primary) 88%, transparent);
   stroke-width: 8;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -737,7 +743,7 @@
 .react-flow__edge:hover .react-flow__edge-underlay,
 .react-flow__edge.selected .react-flow__edge-underlay {
   stroke-width: 10;
-  stroke: rgba(5, 10, 24, 0.92);
+  stroke: color-mix(in srgb, var(--bg-primary) 94%, transparent);
 }
 
 .react-flow__edge:hover .react-flow__edge-path,
@@ -988,93 +994,108 @@
 /* ============================================================
    Execution view (condensed mode)
    Compact nodes showing only the control-flow skeleton.
-   Each family has its own color, icon and shape cue.
+   Each node reuses the full-view header (color, uppercase title,
+   sheen) so identity carries across modes; the family adds an
+   icon + shape cue. Node frames stay dark in every theme, like
+   the full-view Blueprint nodes.
    ============================================================ */
 
 .exec-view-node {
   --exec-family-color: #8898b0;
-  --exec-family-bg: rgba(136, 152, 176, 0.12);
+  /* Defaults to the family color; overridden per node with the same
+     headerColor the full view uses (set inline by ExecViewNode). */
+  --exec-header-color: var(--exec-family-color);
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  min-width: 150px;
-  max-width: 250px;
-  padding: 8px 14px;
-  background: linear-gradient(180deg, rgba(17, 23, 38, 0.97), rgba(12, 16, 28, 0.97));
-  border: 1.5px solid var(--exec-family-color);
+  min-width: 165px;
+  max-width: 260px;
+  /* Same dark frame as .flow-node so both modes share one identity. */
+  background: linear-gradient(180deg, rgba(48, 50, 73, 0.98), rgba(36, 37, 55, 0.98));
+  border: 2px solid color-mix(in srgb, var(--exec-header-color) 55%, rgba(132, 149, 180, 0.34));
   border-radius: 10px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
-  color: var(--text-primary);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 12px 28px rgba(0, 0, 0, 0.34);
+  color: #fff;
 }
 
-/* Family shapes */
+.react-flow__node:hover .exec-view-node:not(.selected):not(.executing):not(.recent) {
+  border-color: color-mix(in srgb, var(--exec-header-color) 70%, #fff);
+}
+
+/* Family shapes (radius cues; color comes from the node header). */
 .exec-view-family-event {
   --exec-family-color: #e15b5b;
-  --exec-family-bg: rgba(225, 91, 91, 0.16);
   border-radius: 999px;
 }
 
 .exec-view-family-control {
   --exec-family-color: #f1a33c;
-  --exec-family-bg: rgba(241, 163, 60, 0.16);
-  border-radius: 3px;
-  border-width: 1.5px 1.5px 1.5px 5px;
+  border-radius: 4px;
 }
 
 .exec-view-family-interaction {
   --exec-family-color: #3fc380;
-  --exec-family-bg: rgba(63, 195, 128, 0.16);
   border-radius: 14px 14px 14px 2px;
 }
 
 .exec-view-family-generative {
   --exec-family-color: #9b7bf5;
-  --exec-family-bg: rgba(155, 123, 245, 0.16);
   border-radius: 16px;
 }
 
 .exec-view-family-media {
   --exec-family-color: #e25fb4;
-  --exec-family-bg: rgba(226, 95, 180, 0.16);
   border-radius: 16px;
 }
 
 .exec-view-family-io {
   --exec-family-color: #2dbfa8;
-  --exec-family-bg: rgba(45, 191, 168, 0.16);
   border-radius: 8px;
 }
 
 .exec-view-family-memory {
   --exec-family-color: #cf9d4a;
-  --exec-family-bg: rgba(207, 157, 74, 0.16);
   border-radius: 8px;
 }
 
 .exec-view-family-subflow {
   --exec-family-color: #38c4d8;
-  --exec-family-bg: rgba(56, 196, 216, 0.16);
   border-radius: 10px;
+  /* Double ring: a workflow inside a workflow. The gap ring follows the
+     canvas background so it works on light and dark themes. */
   box-shadow:
-    0 0 0 3px rgba(12, 16, 28, 0.95),
-    0 0 0 4px var(--exec-family-color),
-    0 8px 20px rgba(0, 0, 0, 0.35);
+    0 0 0 3px var(--bg-primary),
+    0 0 0 4.5px color-mix(in srgb, var(--exec-header-color) 80%, #fff),
+    0 12px 28px rgba(0, 0, 0, 0.34);
 }
 
 .exec-view-family-logic {
   --exec-family-color: #8898b0;
-  --exec-family-bg: rgba(136, 152, 176, 0.14);
   border-radius: 6px;
 }
 
-/* Main row: icon chip + label */
-.exec-view-main {
+/* Header bar: mirrors the full-view .node-header (solid headerColor,
+   uppercase white title, top sheen) in a condensed form. */
+.exec-view-header {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 9px;
-  min-height: 28px;
+  gap: 8px;
+  min-height: 34px;
+  padding: 5px 12px;
+  border-radius: inherit;
+  background-color: var(--exec-header-color);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0) 55%, rgba(0, 0, 0, 0.12));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.22);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.28);
+}
+
+.exec-view-node.multi-out .exec-view-header {
+  border-radius: 6px 6px 0 0;
 }
 
 .exec-view-icon {
@@ -1082,11 +1103,12 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  background: var(--exec-family-bg);
-  color: var(--exec-family-color);
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  color: #fff;
 }
 
 .exec-view-family-event .exec-view-icon {
@@ -1094,8 +1116,8 @@
 }
 
 .exec-view-icon-svg {
-  width: 15px;
-  height: 15px;
+  width: 14px;
+  height: 14px;
   display: block;
 }
 
@@ -1107,8 +1129,10 @@
 
 .exec-view-label {
   font-size: var(--font-size-sm);
-  font-weight: 700;
+  font-weight: 600;
+  text-transform: uppercase;
   line-height: 1.2;
+  color: #fff;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1116,7 +1140,7 @@
 
 .exec-view-family-label {
   font-size: var(--font-size-xxs);
-  color: var(--exec-family-color);
+  color: rgba(255, 255, 255, 0.78);
   font-weight: 600;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -1126,13 +1150,13 @@
   white-space: nowrap;
 }
 
-/* Named execution branches (Sequence, If/Else, Switch, Loop, ...) */
+/* Named execution branches (Sequence, If/Else, Switch, Loop, ...) rendered
+   in the dark node body, like pin rows in the full view. */
 .exec-view-branches {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding-top: 2px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 5px 10px 7px 12px;
 }
 
 .exec-view-branch {
@@ -1147,7 +1171,8 @@
 
 .exec-view-branch-label {
   font-size: var(--font-size-xxs);
-  color: var(--text-secondary);
+  /* Node-local color: the dark body needs light text in every theme. */
+  color: rgba(255, 255, 255, 0.74);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

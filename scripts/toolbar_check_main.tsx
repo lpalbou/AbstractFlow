@@ -7,11 +7,13 @@
  * Usage:
  *   npx vite --port 3015 --strictPort
  *   node scripts/toolbar_check_shot.mjs
+ *   (append ?theme=one-light to check light themes)
  */
 
 import React, { useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { applyTheme } from '@abstractframework/ui-kit';
 import { Toolbar } from '../src/components/Toolbar';
 import { useFlowStore } from '../src/hooks/useFlow';
 import type { VisualFlow } from '../src/types/flow';
@@ -24,6 +26,7 @@ import '../src/styles/palette.css';
 import '../src/styles/tooltip.css';
 
 useFlowStore.getState().loadFlow(fixture as unknown as VisualFlow);
+applyTheme(new URLSearchParams(window.location.search).get('theme') || 'dark');
 
 declare global {
   interface Window {

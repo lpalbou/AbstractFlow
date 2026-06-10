@@ -1,17 +1,17 @@
 /**
  * Compact node rendering for the execution view (condensed canvas mode).
  *
- * Shows only what is needed to read the control flow: a family icon, the node
- * label, and the execution pins (named when a node has multiple exec branches,
- * e.g. Sequence "Then 0/1" or If "true/false"). Family shape/color/icon make
- * event, control-flow, interaction, generative, media, tool/file, memory and
- * subflow nodes recognizable at a glance.
+ * Each compact node is essentially the full-view node header in miniature:
+ * the same headerColor, uppercase title and sheen, plus a family icon and a
+ * family-specific silhouette (pill events, sharp control bars, speech-bubble
+ * interactions, ...). Named exec branches (Sequence "Then 0/1", If
+ * "true/false") render as rows in the dark node body, like full-view pins.
  *
  * Nodes keep their ids, positions and exec handle ids, so edges stay attached
  * and the layout matches the full view when switching back and forth.
  */
 
-import { memo } from 'react';
+import { memo, type CSSProperties } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
 import clsx from 'clsx';
 import { useFlowStore } from '../../hooks/useFlow';
@@ -126,6 +126,9 @@ export const ExecViewNode = memo(function ExecViewNode({ id, data, selected }: N
   // Show the node type as a subtitle only when the user renamed the node;
   // otherwise the family name gives the fastest orientation.
   const subtitle = data.label && data.label !== typeLabel ? typeLabel : EXEC_FAMILY_LABELS[family];
+  // Reuse the full-view header color so a node is instantly recognizable when
+  // switching modes; the family color stays as a fallback for unknown types.
+  const headerColor = data.headerColor || template?.headerColor;
 
   return (
     <div
@@ -139,6 +142,7 @@ export const ExecViewNode = memo(function ExecViewNode({ id, data, selected }: N
         isExecuting && 'executing',
         isRecent && !isExecuting && 'recent'
       )}
+      style={headerColor ? ({ '--exec-header-color': headerColor } as CSSProperties) : undefined}
     >
       {execInputs.map((pin) => (
         <Handle
@@ -150,7 +154,7 @@ export const ExecViewNode = memo(function ExecViewNode({ id, data, selected }: N
         />
       ))}
 
-      <div className="exec-view-main">
+      <div className="exec-view-header">
         <span className="exec-view-icon" aria-hidden="true">
           <FamilyIcon family={family} />
         </span>

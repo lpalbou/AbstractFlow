@@ -4,13 +4,15 @@
  *
  * Usage:
  *   npx vite --port 3015 --strictPort
- *   open http://localhost:3015/scripts/execview_check.html        (full view)
- *   open http://localhost:3015/scripts/execview_check.html?exec=1 (exec view)
+ *   open http://localhost:3015/scripts/execview_check.html                    (full view)
+ *   open http://localhost:3015/scripts/execview_check.html?exec=1             (exec view)
+ *   open http://localhost:3015/scripts/execview_check.html?theme=one-light    (light theme)
  */
 
 import React, { useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { applyTheme } from '@abstractframework/ui-kit';
 import { Canvas } from '../src/components/Canvas';
 import { useFlowStore } from '../src/hooks/useFlow';
 import type { VisualFlow } from '../src/types/flow';
@@ -22,10 +24,12 @@ import '../src/styles/nodes.css';
 import '../src/styles/palette.css';
 import '../src/styles/tooltip.css';
 
+const params = new URLSearchParams(window.location.search);
 useFlowStore.getState().loadFlow(fixture as unknown as VisualFlow);
-if (new URLSearchParams(window.location.search).get('exec') === '1') {
+if (params.get('exec') === '1') {
   useFlowStore.getState().setExecView(true);
 }
+applyTheme(params.get('theme') || 'dark');
 
 declare global {
   interface Window {

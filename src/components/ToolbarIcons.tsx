@@ -148,13 +148,15 @@ export function IconChip() {
 }
 
 export function IconExecFlow() {
+  // Two node blocks linked by an arrow: "show me the execution path".
+  // Big closed shapes stay readable at toolbar size (the previous
+  // dots-on-a-line glyph collapsed into what looked like a plain line).
   return (
     <ToolbarIcon>
-      <circle cx="4.5" cy="12" r="2.2" />
-      <circle cx="12" cy="12" r="2.2" />
-      <circle cx="19.5" cy="12" r="2.2" />
-      <path d="M6.7 12h3.1" />
-      <path d="M14.2 12h3.1" />
+      <rect x="2.2" y="8.2" width="7" height="7.6" rx="1.8" />
+      <rect x="14.8" y="8.2" width="7" height="7.6" rx="1.8" />
+      <path d="M9.2 12h5" />
+      <path d="M12.2 9.8 14.4 12l-2.2 2.2" />
     </ToolbarIcon>
   );
 }
