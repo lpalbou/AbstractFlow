@@ -906,6 +906,13 @@ function CanvasBody() {
             </>
           )}
         </ReactFlow>
+        {nodes.length === 0 ? (
+          <div className="canvas-empty-state" aria-hidden="true">
+            <div className="canvas-empty-title">Start your flow</div>
+            <div className="canvas-empty-text">Drag a node from the left palette and drop it here.</div>
+            <div className="canvas-empty-hint">Tip: begin with an event node such as “On Flow Start”.</div>
+          </div>
+        ) : null}
         <ConnectionFeedbackOverlay
           activeConnection={activeConnection}
           nodes={nodes}

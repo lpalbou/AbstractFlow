@@ -83,6 +83,16 @@ export function NodePalette() {
 
       {/* Categories */}
       <div className="palette-categories">
+        {searchTerm && Object.values(NODE_CATEGORIES).every((category) => filterNodes(category.nodes).length === 0) ? (
+          <div className="palette-empty" role="status">
+            <p>
+              No nodes match <strong>“{searchTerm}”</strong>.
+            </p>
+            <button type="button" className="palette-empty-clear" onClick={() => setSearchTerm('')}>
+              Clear search
+            </button>
+          </div>
+        ) : null}
         {Object.entries(NODE_CATEGORIES).map(([key, category]) => {
           const filteredNodes = filterNodes(category.nodes);
           if (searchTerm && filteredNodes.length === 0) return null;

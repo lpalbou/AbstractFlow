@@ -157,6 +157,38 @@
   color: var(--text-secondary);
 }
 
+/* Search empty state */
+.palette-empty {
+  padding: 14px 12px;
+  border: 1px dashed var(--bg-tertiary);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.palette-empty p {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.palette-empty-clear {
+  margin-top: 10px;
+  padding: 5px 12px;
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  background: var(--bg-primary);
+  border: 1px solid var(--bg-tertiary);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.palette-empty-clear:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
 /* Help Text */
 .palette-help {
   margin-top: auto;

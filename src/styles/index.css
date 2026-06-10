@@ -501,6 +501,43 @@ body,
   position: relative;
 }
 
+/* First-use hint shown when the canvas has no nodes. Pointer events stay
+   disabled so palette drag-and-drop onto the canvas keeps working. */
+.canvas-empty-state {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 4;
+  pointer-events: none;
+  text-align: center;
+  padding: 26px 34px;
+  border: 1px dashed rgba(124, 149, 188, 0.4);
+  border-radius: 14px;
+  background: rgba(12, 16, 28, 0.5);
+  max-width: 380px;
+}
+
+.canvas-empty-title {
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.canvas-empty-text {
+  margin-top: 8px;
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.canvas-empty-hint {
+  margin-top: 10px;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  opacity: 0.85;
+}
+
 /* Preflight validation panel (run requirements) */
 .preflight-panel {
   position: absolute;

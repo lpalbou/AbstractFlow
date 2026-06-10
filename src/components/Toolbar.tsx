@@ -266,7 +266,7 @@ export function Toolbar({
       ? 'Add at least one node before saving'
       : !hasUnsavedChanges
         ? 'No unsaved changes'
-        : 'Save Flow';
+        : 'Save Flow (Ctrl/⌘+S)';
 
   useEffect(() => {
     const nextFlowId = flowId || null;
@@ -748,6 +748,31 @@ export function Toolbar({
     }
     saveMutation.mutate({ flow, existingFlowId: flowId });
   }, [flowId, getFlow, hasUnsavedChanges, isEmptyFlow, saveMutation, saveUnavailableReason, visualflowCrudUnavailable]);
+
+  // Cmd/Ctrl+S saves the flow. Always intercept so the browser "Save page"
+  // dialog never appears inside the editor, even when there is nothing to save.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return;
+      if ((e.key || '').toLowerCase() !== 's') return;
+      e.preventDefault();
+      handleSave();
+    };
+    window.addEventListener('keydown', onKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', onKeyDown, { capture: true });
+  }, [handleSave]);
+
+  // Guard against silent data loss: closing/refreshing the tab with unsaved
+  // graph changes (or a save still in flight) asks for confirmation.
+  useEffect(() => {
+    if (!hasUnsavedChanges && !saveMutation.isPending) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [hasUnsavedChanges, saveMutation.isPending]);
 
   // Handle Run - open modal
   const handleRun = useCallback(() => {
