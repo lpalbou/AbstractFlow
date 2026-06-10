@@ -261,11 +261,12 @@ function CanvasBody() {
   // React Flow uses a multiplicative zoom factor of 1.2 per zoom step.
   // We define our own "zoom positions" relative to max zoom:
   // - Default: 2 zoom-out steps from max
-  // - Min: 13 zoom-out steps from max
+  // - Min: 17 zoom-out steps from max (~0.09 zoom, ~2x more dezoom than the
+  //   previous 13 steps so large authored workflows fit on screen)
   const ZOOM_STEP = 1.2;
   const MAX_ZOOM = 2;
   const DEFAULT_ZOOM_OUT_STEPS = 2;
-  const MIN_ZOOM_OUT_STEPS = 13;
+  const MIN_ZOOM_OUT_STEPS = 17;
 
   const DEFAULT_ZOOM = MAX_ZOOM / (ZOOM_STEP ** DEFAULT_ZOOM_OUT_STEPS);
   const MIN_ZOOM = MAX_ZOOM / (ZOOM_STEP ** MIN_ZOOM_OUT_STEPS);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Edge, Node } from 'reactflow';
 import type { FlowNodeData, VisualFlow } from '../types/flow';
+import { getAllNodeTemplates } from '../types/nodes';
 import { applyFlowAuthoringCommands } from '../utils/flowAuthoringCommands';
 
 import {
@@ -33,6 +34,7 @@ import {
   repeatedBatchProgress,
   restoreActivityPanelState,
   shouldDisplayPlannerSubrunStatus,
+  stageTickerText,
   subRunIdsFromLedger,
   visiblePlannerStatus,
   type AuthoringActivityEntry,
@@ -240,6 +242,7 @@ describe('AuthoringAssistantDrawer failure report', () => {
           { action: 'add_node', id: 'start', nodeType: 'on_flow_start' },
           { action: 'connect', source: 'start.search_query', target: 'build_json.value' },
         ],
+        graph: null,
         selfReview: 'The graph still needs validation.',
         nextStep: 'Fix the invalid edge.',
         howItWorks: '',
@@ -289,6 +292,7 @@ describe('AuthoringAssistantDrawer repair feedback', () => {
           status: 'continue',
           reply: 'Build a deep research scaffold.',
           commands: [{ action: 'connect', source: 'trace_report.result', target: 'on_end.trace_summary' }],
+          graph: null,
           selfReview: '',
           nextStep: '',
           howItWorks: '',
@@ -322,7 +326,7 @@ describe('AuthoringAssistantDrawer repair feedback', () => {
     expect(feedback).toContain('REJECTED ATTEMPT CYCLE 1');
     expect(feedback).toContain('"action":"connect"');
     expect(feedback).toContain('Type mismatch: cannot connect string to object');
-    expect(feedback).toContain('Candidate graph after accepted commands before rejection');
+    expect(feedback).toContain('Candidate workflow document after accepted commands before rejection');
     expect(feedback).toContain('Expose an audit or trace summary');
   });
 });
@@ -641,14 +645,46 @@ describe('AuthoringAssistantDrawer plan response tolerance', () => {
     expect(extractJsonObjectText('no json here')).toBe('');
   });
 
+  // Document-mode plan: the model emits the full workflow under "graph"
+  // (no commands array at all).
+  const graphPlanJson =
+    '{"status":"continue","reply":"ok","graph":{"flow_name":"X","nodes":[{"id":"start","type":"on_flow_start"}],"edges":[]},"self_review":"","next_step":""}';
+
   it('parses plans despite fences or surrounding prose', () => {
     expect(parsePlan(planJson)?.status).toBe('done');
     expect(parsePlan('```json\n' + planJson + '\n```')?.status).toBe('done');
     expect(parsePlan('Je construis le workflow.\n' + planJson)?.status).toBe('done');
   });
 
+  it('parses document-mode plans carrying a graph instead of commands', () => {
+    const plan = parsePlan(graphPlanJson);
+    expect(plan?.status).toBe('continue');
+    expect(plan?.graph).toEqual({
+      flow_name: 'X',
+      nodes: [{ id: 'start', type: 'on_flow_start' }],
+      edges: [],
+    });
+    // Commands default to an empty batch; the loop compiles the graph diff.
+    expect(plan?.commands).toEqual([]);
+    // Fenced/prose-wrapped document plans parse the same way.
+    expect(parsePlan('```json\n' + graphPlanJson + '\n```')?.graph).toBeTruthy();
+    expect(parsePlan('Voici le workflow.\n' + graphPlanJson)?.graph).toBeTruthy();
+    // A command-mode plan keeps graph null (compat path).
+    expect(parsePlan(planJson)?.graph).toBeNull();
+  });
+
+  it('rejects continue plans with neither graph nor commands and non-object graphs', () => {
+    expect(parsePlan('{"status":"continue","reply":"ok"}')).toBeNull();
+    // Arrays are not a valid document; without commands the continue plan is unusable.
+    expect(parsePlan('{"status":"continue","reply":"ok","graph":[1,2]}')).toBeNull();
+    // Blocked/done plans may arrive without either field.
+    expect(parsePlan('{"status":"needs_user","reply":"which provider?"}')?.status).toBe('needs_user');
+  });
+
   it('returns null for truncated or non-plan JSON', () => {
     expect(parsePlan(planJson.slice(0, planJson.length - 20))).toBeNull();
+    // Truncated document plans (mid-graph) must fail parse so the retry path runs.
+    expect(parsePlan(graphPlanJson.slice(0, graphPlanJson.length - 30))).toBeNull();
     expect(parsePlan('{"foo":"bar"}')).toBeNull();
     expect(parsePlan('')).toBeNull();
   });
@@ -656,6 +692,8 @@ describe('AuthoringAssistantDrawer plan response tolerance', () => {
   it('recognizes plan-looking text so truncated answers retry instead of failing as missing', () => {
     expect(looksLikePlanText(planJson.slice(0, 60))).toBe(true);
     expect(looksLikePlanText('```json\n{"status":"continue","commands":[')).toBe(true);
+    // Document-mode truncations are recognized via the "graph" key.
+    expect(looksLikePlanText('{"status":"continue","reply":"ok","graph":{"flow_name":')).toBe(true);
     expect(looksLikePlanText('completed')).toBe(false);
     expect(looksLikePlanText('')).toBe(false);
   });
@@ -717,8 +755,9 @@ describe('AuthoringAssistantDrawer conversation replay', () => {
     // Prior conversation is replayed inside the prompt.
     expect(context.prompt).toContain('Crée un workflow de discussion multi-IA.');
     expect(context.prompt).toContain('complété avec succès');
-    // The live graph is replayed: nodes, labels, declared variable config, edges.
-    expect(context.prompt).toContain('CURRENT DRAFT GRAPH SUMMARY');
+    // The live graph is replayed as the authoring document: nodes, labels,
+    // declared variable config, edges.
+    expect(context.prompt).toContain('CURRENT WORKFLOW DOCUMENT');
     expect(context.prompt).toContain('var_transcript');
     expect(context.prompt).toContain('Transcript de discussion');
     expect(context.prompt).toContain('"name": "transcript"');
@@ -764,7 +803,52 @@ describe('AuthoringAssistantDrawer language and follow-up question contract', ()
     const prompt = assistantSystemPrompt();
     expect(prompt).toContain('needs_user');
     expect(prompt).toContain('Ask instead of stalling');
-    expect(prompt).toContain('Never return status "continue" with an empty commands array');
+    // Document mode: stalling is prevented by ownership ("continue" must carry
+    // graph work) and explicit repair guidance, not an empty-batch prohibition.
+    expect(prompt).toContain('repairs keep failing, ask the user');
+  });
+});
+
+describe('AuthoringAssistantDrawer live stage ticker', () => {
+  it('prefixes the cycle and prefers the stage purpose detail over the label', () => {
+    expect(
+      stageTickerText({ cycle: 3, label: 'Planning workflow graph (cycle 3)', detail: 'Waiting for the model — authoring the full workflow document' })
+    ).toBe('Cycle 3 · Waiting for the model — authoring the full workflow document');
+    expect(stageTickerText({ label: 'Resolving Gateway model' })).toBe('Resolving Gateway model');
+  });
+});
+
+describe('AuthoringAssistantDrawer catalog fidelity (ADR-0026)', () => {
+  it('keeps every template and pin description intact in the prompt — no budget truncation', () => {
+    // The catalog rendering may compact FORMATTING (one line per template
+    // instead of repeated headings), but it must never drop or slice semantic
+    // content: full node descriptions and full per-pin descriptions are the
+    // model's only source for node semantics.
+    const flow = toVisualFlow('Untitled Flow', [], []);
+    const readiness = computeAuthoringReadiness(flow, 'Build a research workflow.', {});
+    const context = buildGatewayPromptContext(
+      'Build a research workflow.',
+      flow,
+      null,
+      [],
+      { readiness, tools: { text: 'No tools discovered.', selectedTools: 0, totalTools: 0 }, preflightOptions: {} }
+    );
+    const normalize = (text: string) => text.replace(/\s+/g, ' ').trim();
+    const prompt = normalize(context.prompt);
+    const templates = getAllNodeTemplates().filter((template) => !template.hiddenInPalette && !template.deprecated);
+    expect(templates.length).toBeGreaterThan(20);
+    for (const template of templates) {
+      if (template.description) {
+        expect(prompt).toContain(normalize(template.description));
+      }
+      for (const pin of [...template.inputs, ...template.outputs]) {
+        if (pin.description) expect(prompt).toContain(normalize(pin.description));
+        if (pin.label && pin.label !== pin.id) expect(prompt).toContain(`${pin.id}:${pin.type} "${pin.label}"`);
+      }
+    }
+    // The compact one-line catalog grammar is present.
+    expect(context.prompt).toContain('Grammar per line');
+    expect(context.prompt).toMatch(/- agent \(/);
   });
 });
 

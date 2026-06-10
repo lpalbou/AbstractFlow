@@ -541,6 +541,109 @@ body,
   color: var(--text-secondary);
 }
 
+/* Inspectable request/response payload attached to an activity entry. */
+.assistant-activity-detail {
+  margin-top: 2px;
+}
+
+.assistant-activity-detail summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 10px;
+  user-select: none;
+}
+
+.assistant-activity-detail summary:hover {
+  color: var(--text-primary);
+}
+
+.assistant-activity-detail-copy {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.assistant-activity-detail-copy:hover {
+  color: var(--text-primary);
+}
+
+.assistant-activity-detail-body {
+  margin: 4px 0 2px;
+  padding: 6px;
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: Menlo, Monaco, Consolas, monospace;
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--bg-secondary, #0d1117) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 14%, transparent);
+  border-radius: 4px;
+}
+
+/* Live in-flight ticker pinned at the bottom of the activity log: a
+   shimmering line with the current stage purpose and a per-stage elapsed
+   counter, so long model waits are visibly "alive". */
+.assistant-activity-live {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin-top: 2px;
+  padding: 3px 0 1px;
+  background: color-mix(in srgb, var(--bg-primary) 88%, transparent);
+}
+
+.assistant-activity-live-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent-primary) 85%, var(--text-primary)) 0%,
+    var(--text-primary) 45%,
+    color-mix(in srgb, var(--accent-primary) 85%, var(--text-primary)) 90%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: assistant-shimmer 2.2s linear infinite;
+}
+
+.assistant-activity-live-elapsed {
+  flex: 0 0 auto;
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+@keyframes assistant-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .assistant-activity-live-text {
+    animation: none;
+    background: none;
+    -webkit-text-fill-color: currentColor;
+    color: var(--text-primary);
+  }
+}
+
 .assistant-run-status.active {
   border-color: color-mix(in srgb, var(--accent-primary) 30%, transparent);
   background: color-mix(in srgb, var(--accent-primary) 7%, transparent);

@@ -34,36 +34,37 @@ function defaultConfig(data) {
 
 function dynamicPolicy(type) {
   const parts = [];
-  if (['on_flow_end', 'concat', 'string_template', 'make_object'].includes(type)) parts.push('dynamic inputs');
+  if (['on_flow_end', 'concat', 'string_template', 'make_object'].includes(type)) {
+    parts.push('dynamic inputs via the document `inputs` list');
+  }
   if (['on_flow_start', 'break_object'].includes(type)) {
     parts.push(type === 'break_object'
-      ? 'dynamic outputs via set_break_paths or add_output_pin; both update selectedPaths'
-      : 'dynamic outputs');
+      ? 'dynamic outputs via the document `outputs` list (also drives `breakConfig.selectedPaths`)'
+      : 'dynamic outputs via the document `outputs` list');
   }
   return parts.length > 0 ? parts.join(', ') : 'template pins only';
 }
 
 function authorableConfig(template, data, duplicate) {
   const out = [];
-  if (duplicate) out.push(`select with \`templateLabel: "${template.label}"\``);
-  if ((template.inputs || []).length > 0) out.push('input defaults with `set_pin_default`');
+  if (duplicate) out.push(`select with \`"template": "${template.label}"\``);
+  if ((template.inputs || []).length > 0) out.push('input defaults with `pin_defaults`');
   if (['literal_string', 'literal_number', 'literal_boolean', 'literal_json', 'literal_array', 'json_schema', 'edit_json_schema'].includes(template.type)) {
-    out.push('literal value with `literalValue` or `set_literal`');
+    out.push('literal value with `literal`');
   }
-  if (template.type === 'tools_allowlist') out.push('tool names with `set_literal`');
-  if (template.type === 'string_template') out.push('template with `set_literal` or `set_pin_default(template)`');
-  if (template.type === 'concat') out.push('separator with `set_concat_separator`');
-  if (template.type === 'code') out.push('body/function with `set_code_body`; permissions must remain `sandbox`');
-  if (template.type === 'break_object') out.push('selected paths with `set_break_paths`');
-  if (template.type === 'switch') out.push('cases with `set_switch_cases`');
-  if (template.type === 'sequence' || template.type === 'parallel') out.push('branch count with `set_branch_count`');
-  if (template.type === 'tool_parameters') out.push('tool and argument pins with `set_tool_parameters`');
-  if (template.type === 'tool_calls') out.push('must include `pinDefaults.allowed_tools` in `add_node`');
-  if (['on_event', 'on_agent_message', 'on_schedule'].includes(template.type)) out.push('event settings with `set_event_config`');
+  if (template.type === 'tools_allowlist') out.push('tool names array with `literal`');
+  if (template.type === 'string_template') out.push('template text with `literal` or `pin_defaults.template`');
+  if (template.type === 'concat') out.push('separator with `concat_separator`');
+  if (template.type === 'code') out.push('body/function with `code`/`function_name`; permissions must remain `sandbox`');
+  if (template.type === 'switch') out.push('cases with `switch_cases`');
+  if (template.type === 'sequence' || template.type === 'parallel') out.push('branch count with `branch_count`');
+  if (template.type === 'tool_parameters') out.push('tool and argument pins with `tool` + `tool_parameters`');
+  if (template.type === 'tool_calls') out.push('must include `pin_defaults.allowed_tools` when the node is created');
+  if (['on_event', 'on_agent_message', 'on_schedule'].includes(template.type)) out.push('event settings with `event`');
   if (template.type === 'subflow') out.push('subflow id is UI-owned; do not create an unconfigured subflow as a finished workflow');
   if (data.providerModelsConfig) out.push('provider models config is UI-owned; use provider/capability pins when possible');
   if (data.modelCatalogConfig) out.push('model catalog config is UI-owned');
-  return out.length > 0 ? out.join('; ') : 'no node-specific command config beyond pins/defaults';
+  return out.length > 0 ? out.join('; ') : 'no node-specific document config beyond label/pin_defaults';
 }
 
 async function loadNodeModule() {
@@ -96,7 +97,7 @@ export async function generateWorkflowNodeCatalog() {
     'This catalog is generated from `src/types/nodes.ts` by `npm run docs:llms`.',
     'It is the stable AI-readable companion to `docs/workflow-authoring-skill.md`.',
     '',
-    'For authoring commands, `nodeType` must match the value shown for the node. If several visible palette entries share a `nodeType`, include the exact `templateLabel` shown in the create command.',
+    'Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edges": ["node.pin -> node.pin", ...]}`. Each document node uses `type` matching the value shown here; if several visible palette entries share a `type`, set `template` to the exact variant label shown in the document node snippet.',
     '',
     '## Visible Authoring Templates',
     '',
@@ -106,14 +107,14 @@ export async function generateWorkflowNodeCatalog() {
     const data = mod.createNodeData(template);
     const duplicate = (countsByType.get(template.type) || 0) > 1;
     const create = template.type === 'tool_calls'
-      ? '{"action":"add_node","id":"<unique_id>","nodeType":"tool_calls","pinDefaults":{"allowed_tools":["<exact_tool_name>"]}}'
+      ? '{"id":"<unique_id>","type":"tool_calls","pin_defaults":{"allowed_tools":["<exact_tool_name>"]}}'
       : duplicate
-        ? `{"action":"add_node","id":"<unique_id>","nodeType":"${template.type}","templateLabel":"${template.label}"}`
-        : `{"action":"add_node","id":"<unique_id>","nodeType":"${template.type}"}`;
+        ? `{"id":"<unique_id>","type":"${template.type}","template":"${template.label}"}`
+        : `{"id":"<unique_id>","type":"${template.type}"}`;
     parts.push(`### ${template.category || 'uncategorized'} / ${template.label}`);
     parts.push('');
     parts.push(`- Node type: \`${template.type}\``);
-    parts.push(`- Create command: \`${create}\``);
+    parts.push(`- Document node: \`${create}\``);
     parts.push(`- Utility: ${template.description || 'No description.'}`);
     parts.push(`- Gateway capability: ${template.gatewayCapability || 'none'}`);
     parts.push(`- Dynamic pin policy: ${dynamicPolicy(template.type)}`);
@@ -131,7 +132,7 @@ export async function generateWorkflowNodeCatalog() {
   } else {
     for (const template of blocked) {
       const flags = [template.hiddenInPalette ? 'hidden' : '', template.deprecated ? 'deprecated' : ''].filter(Boolean).join(', ');
-      parts.push(`- \`${template.type}\` / ${template.label}: rejected by ` + '`add_node`' + ` (${flags}).`);
+      parts.push(`- \`${template.type}\` / ${template.label}: rejected by the authoring validator (${flags}).`);
     }
   }
   parts.push('');

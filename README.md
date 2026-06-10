@@ -55,10 +55,11 @@ and `Write PDF` for rendering report content to a real PDF path through
 Runtime.
 
 The toolbar star opens the Workflow Authoring Assistant in the right drawer.
-The assistant reads `docs/workflow-authoring-skill.md` plus a complete generated
+The assistant reads `docs/workflow-authoring-skill.md` plus a compact generated
 node catalog, uses Gateway's default `output.text` model by starting normal
-Gateway planner runs unless a model is pinned, reads planner responses from run
-ledgers, and applies only validated editor commands to the draft canvas. It can
+Gateway planner runs unless a model is pinned, and reads planner responses from
+run ledgers. The model authors the complete workflow as one JSON document; the
+editor diffs it against the draft canvas and applies only validated edits. It can
 create or refine common workflows such as internet research, deep research, news
 digests, and job searches; Save, Publish, and Run remain explicit user actions.
 

@@ -66,10 +66,15 @@ replaces generic `llms-full.txt` context for workflow construction. By default
 it resolves Gateway's configured `output.text` capability route and starts a
 short-lived Gateway `basic-agent` planner run through the normal
 `/api/gateway/runs/start` path. Users can pin a specific assistant
-provider/model from the drawer. The assistant runs an autonomous authoring loop:
-each cycle reads the planner response from the run ledger, applies validated
-command batches, checks the updated graph, and continues until the model
-declares the request satisfied or is explicitly blocked.
+provider/model from the drawer. The assistant authors the workflow as one
+complete JSON document (direct document authoring): each cycle the model emits
+the full graph — every node and edge — and the editor diffs that document
+against the current draft, compiles the diff into validated graph mutations,
+applies them, and continues until the model declares the request satisfied or
+is explicitly blocked. Anything the document omits is deleted, so removals are
+implicit and the assistant never asks the user to delete nodes manually. The
+first cycle aims to one-shot the workflow; later cycles exist to repair
+validator errors, readiness issues, and acceptance findings.
 
 Completion is model-owned: readiness checks are a structural floor that can
 demand more work, but they never stop the loop while the model returns
@@ -81,7 +86,7 @@ the remaining findings are reported with the result instead of being hidden.
 
 The planner run receives a single prompt plus a system prompt with strict JSON
 instructions. Its runtime tool list is explicitly empty: authoring edits must
-come back as validated command JSON, not as Gateway tool calls. Prior user turns
+come back as the workflow document JSON, not as Gateway tool calls. Prior user turns
 are included inside the current prompt, assistant turns are replayed as trimmed
 plan/result summaries (so pending plan items survive across turns), and applied
 cycles within a turn carry one-line notes of the model's own next steps. The
@@ -100,13 +105,14 @@ Plan responses are parsed tolerantly: the JSON object is extracted even when the
 model wraps it in markdown fences or surrounding prose. A planner response that
 is still unusable (empty run output, or truncated/invalid plan JSON) does not
 abort the turn: the same cycle is retried with a corrective format note (bare
-JSON only, smaller command batches), up to three unusable responses per turn.
-Each retry is logged in the activity feed.
+JSON only, shorten free-text fields rather than the graph document), up to
+three unusable responses per turn. Each retry is logged in the activity feed.
 
-A command-less `continue` cycle does not abort the turn either: the model gets
-a corrective note (return commands, declare done, or ask the user) for up to
-two consecutive empty cycles, after which the turn ends as "needs your input"
-with the model's own reply — never as a hard authoring failure. The system
+A `continue` cycle whose document matches the existing graph exactly (no
+changes) does not abort the turn either: the model gets a corrective note
+(emit a document that addresses the issues, declare done, or ask the user) for
+up to two consecutive unchanged cycles, after which the turn ends as "needs
+your input" with the model's own reply — never as a hard authoring failure. The system
 prompt and skill explicitly tell the model to return `needs_user` with concrete
 questions when the request is ambiguous or repair cycles stop making progress;
 the user's answer in the next turn resumes with the full draft graph and
@@ -114,10 +120,16 @@ conversation context. All user-visible workflow content (flow name, labels,
 prompts, replies) must match the language of the user request unless the user
 asks otherwise.
 
-While a turn runs, a live status card shows the current phase, the cycle
-number, an elapsed timer, and a real-time activity feed (plan request/response
-sizes, plan status and command counts, applied changes with labels, skipped or
-rejected commands, retries, readiness counts, and acceptance review events).
+While a turn runs, a live status card shows the current phase with the cycle
+number in the header, an elapsed timer, and a real-time activity feed (plan
+request/response sizes, per-cycle token usage read from the Gateway run-tree
+ledgers with cumulative turn totals in the footer, compiled document change
+counts, applied changes with labels, document issues, retries, readiness
+counts, and acceptance review events). A shimmering in-flight ticker pinned at
+the bottom of the feed shows what the assistant is waiting on right now — the
+request purpose ("authoring the full workflow document", "repairing 2
+validation issues", "acceptance review") — with a per-stage elapsed counter
+that ticks every second.
 Feed entries are grouped under per-cycle divider rows so iteration boundaries
 are scannable at a glance. The header carries a leading chevron with a hover
 state (collapse toggle) and a copy button that exports the whole activity feed
@@ -142,25 +154,33 @@ persisted status card without changing the current graph. If the Gateway run, mo
 response, or ledger read fails after the retry budget, the drawer reports that
 failure directly.
 
-Assistant output is treated as an untrusted edit proposal. The editor accepts
-only a small command set for flow names, node creation, safe dynamic pins,
+Assistant output is treated as an untrusted edit proposal. The emitted
+document is compiled by a diff against the current graph into the editor's
+internal validated command set (node creation/deletion, safe dynamic pins,
 pin defaults, literals, Code node bodies, labels, concat separators, and
-validated connections. The command reducer rejects unknown node types, invalid
-edges, secret-looking values, Code `full_access`, destructive edits, and Tool
-Calls nodes without an explicit `allowed_tools` allowlist.
+validated connections), so every existing validator and security guard stays
+the single source of truth for graph mutation. The reducer rejects unknown
+node types, invalid edges, secret-looking values, Code `full_access`, and Tool
+Calls nodes without an explicit `allowed_tools` allowlist. Node deletions are
+allowed as part of document ownership and remain recoverable with Undo Turn;
+secrets are serialized to the model as `<redacted>` and the diff never writes
+that sentinel back. `pin_defaults` merge per key, node ids are stable
+identities (a type change requires a new id), existing node positions are
+never moved, and new nodes without explicit positions get execution-depth
+auto-layout.
 
-Command batches are applied per-command in dependency order (nodes first, then
-configuration, then connections). Valid commands are kept even when other
-commands in the same batch fail; the failed commands are reported back to the
-planner as skipped-command feedback for the next cycle. The validator also
+Compiled changes are applied per-command in dependency order (nodes first, then
+configuration, then connections, with disconnects before connects). Valid
+changes are kept even when others fail; the failures are reported back to the
+planner as document-issue feedback for the next cycle. The validator also
 performs deterministic repairs that a human author would make: connecting an
 already-connected execution output is rewired through an auto-inserted (or
 extended) Sequence node, and loop-back edges from a loop body to the loop's
 `exec-in` are dropped with a warning because AbstractRuntime control frames
 return to the loop automatically when the body chain ends. Rejection messages
 list the node's real pins so a wrong handle guess can be corrected on the next
-cycle, and Variable nodes are configurable through the same commands used
-elsewhere (`set_pin_default` on `name`/`value`, or `set_literal` with the
+cycle, and Variable nodes are configurable through the same document fields
+used elsewhere (`pin_defaults` on `name`/`value`, or `literal` with the
 declaration config). Unlabeled nodes are flagged as non-blocking notes so
 generated graphs stay readable.
 
@@ -181,7 +201,7 @@ bytes in Runtime and exposes the resulting path through `On Flow End`. Generic
 
 Tool-dependent requests use Gateway's advertised tool inventory and exact tool
 names. If Gateway defaults, advertised discovery endpoints, the planner run,
-strict JSON parsing, or command validation fail, the assistant reports the error
+strict JSON parsing, or document validation fail, the assistant reports the error
 instead of synthesizing a substitute plan. Completed cycle edits remain visible in
 the draft; the failed cycle is not applied, and Undo Turn restores the pre-turn
 snapshot.

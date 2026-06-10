@@ -33,9 +33,9 @@ resolves Gateway's default `output.text` route unless the user pins a specific
 assistant provider/model, then starts a Gateway `basic-agent` planner run and
 reads the terminal authoring response from the run ledger. The planner run
 explicitly receives an empty runtime tool list so authoring edits are returned
-as command JSON instead of Gateway tool calls. Generated content is never
-applied as raw VisualFlow JSON. Browser-side validation converts accepted
-commands into normal graph edits, and
+as a workflow document JSON instead of Gateway tool calls. Generated content is
+never applied as raw VisualFlow JSON: the emitted document is diffed against
+the current graph in the browser and compiled into validated graph edits, and
 Save/Publish/Run remain user-controlled Gateway operations.
 
 ## Runtime Shape
@@ -92,21 +92,25 @@ discovery when available. AbstractFlow does not hardcode model context windows
 or clip chat, skill docs, or graph context. The planner is invoked through
 Gateway's normal run lifecycle, not the console sandbox.
 
-The assistant is an iterative Flow-owned authoring controller. Each turn can run
-multiple Gateway planner runs: plan commands, apply them through the validated
-command reducer, recompute preflight/readiness issues, reflect on the updated
-draft, and continue until the graph is ready or explicitly blocked. Research,
+The assistant is an iterative Flow-owned authoring controller using direct
+document authoring. Each turn can run multiple Gateway planner runs: the model
+emits the complete workflow document, the editor diffs it against the current
+graph and applies the compiled changes through the validated command reducer,
+recomputes preflight/readiness issues, and continues until the graph is ready
+or explicitly blocked. Nodes and edges omitted from the document are deleted
+(removal is implicit; deletions remain undoable via Undo Turn). Research,
 news, job-search, and deep-research requests are checked for a multi-step
 scaffold: start inputs, prompt building, explicit tools, an Agent with the
 standard `max_iterations=50` setting, and end outputs.
 
-Model output is restricted to command JSON. The editor refuses commands that
-would embed secrets, create unknown templates, bypass connection validation,
-enable Code `full_access`, delete graph content, or create Tool Calls without an
-explicit allowlist. Tool-dependent authoring uses only Gateway's advertised tool
-inventory and exact discovered tool names. The assistant has no local template
-planner: if Gateway defaults, advertised discovery endpoints, the planner run,
-JSON parsing, or command validation fail, the drawer surfaces the error instead
+Model output is restricted to the document JSON. The editor refuses changes
+that would embed secrets, create unknown templates, bypass connection
+validation, enable Code `full_access`, or create Tool Calls without an
+explicit allowlist; secrets in the serialized document are redacted before
+they reach the model. Tool-dependent authoring uses only Gateway's advertised
+tool inventory and exact discovered tool names. The assistant has no local
+template planner: if Gateway defaults, advertised discovery endpoints, the
+planner run, JSON parsing, or document validation fail, the drawer surfaces the error instead
 of synthesizing a substitute workflow.
 
 ## Defaults And Residency

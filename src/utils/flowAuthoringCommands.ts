@@ -1144,6 +1144,68 @@ export function applyFlowAuthoringCommands(input: FlowAuthoringApplyInput): Flow
       continue;
     }
 
+    if (kind === 'remove_pin') {
+      // Document-ownership counterpart of add_input_pin/add_output_pin: a pin
+      // omitted from an emitted authoring document is removed. Only dynamic
+      // pins (the same node types whose pins are author-addable) may be
+      // removed; edges touching the pin are dropped with it, mirroring what
+      // the canvas does when a dynamic pin is deleted in the Properties panel.
+      const nodeId = resolveNodeId(command.nodeId || command.node_id, idMap);
+      const node = nodeById(nodes, nodeId);
+      const id = normalizeId(command.id || command.pin || command.pinId || command.pin_id, '');
+      if (!node || !id) {
+        errors.push(`remove_pin requires an existing node and pin id (${nodeId || 'missing'}.${id || 'missing'})`);
+        continue;
+      }
+      const sideRaw = cleanText(command.side, 12).toLowerCase();
+      const side: 'input' | 'output' =
+        sideRaw === 'input' || sideRaw === 'output'
+          ? sideRaw
+          : pinExists(node, id, 'input')
+          ? 'input'
+          : 'output';
+      const removable =
+        side === 'input' ? DYNAMIC_INPUT_NODE_TYPES.has(node.data.nodeType) : DYNAMIC_OUTPUT_NODE_TYPES.has(node.data.nodeType);
+      if (!removable) {
+        errors.push(`remove_pin refused template-owned ${side} pin ${nodeId}.${id}; only dynamic pins are removable`);
+        continue;
+      }
+      const pin = pinById(node, id, side);
+      if (!pin) {
+        warnings.push(`${nodeId}.${id} does not exist; nothing to remove`);
+        continue;
+      }
+      if (pin.type === 'execution') {
+        errors.push(`remove_pin refused execution pin ${nodeId}.${id}`);
+        continue;
+      }
+      nodes = nodes.map((item) => {
+        if (item.id !== nodeId) return item;
+        if (side === 'input') {
+          return { ...item, data: { ...item.data, inputs: (item.data.inputs || []).filter((entry) => entry.id !== id) } };
+        }
+        const data: FlowNodeData = {
+          ...item.data,
+          outputs: (item.data.outputs || []).filter((entry) => entry.id !== id),
+        };
+        if (item.data.nodeType === 'break_object' && data.breakConfig?.selectedPaths) {
+          data.breakConfig = { ...data.breakConfig, selectedPaths: data.breakConfig.selectedPaths.filter((path) => path !== id) };
+        }
+        return { ...item, data };
+      });
+      const detachedEdges = edges.filter(
+        (edge) =>
+          (edge.source === nodeId && edge.sourceHandle === id) || (edge.target === nodeId && edge.targetHandle === id)
+      );
+      if (detachedEdges.length > 0) {
+        edges = edges.filter((edge) => !detachedEdges.includes(edge));
+        warnings.push(`Removed ${detachedEdges.length} edge${detachedEdges.length === 1 ? '' : 's'} attached to ${nodeId}.${id}`);
+      }
+      touched.add(nodeId);
+      applied.push(`Removed ${side} ${nodeId}.${id}`);
+      continue;
+    }
+
     if (kind === 'connect') {
       const sourceEndpoint = splitEndpoint(command.source || command.sourceNodeId || command.source_node_id, command.sourceHandle || command.source_handle, idMap);
       const targetEndpoint = splitEndpoint(command.target || command.targetNodeId || command.target_node_id, command.targetHandle || command.target_handle, idMap);
