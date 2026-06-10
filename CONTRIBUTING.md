@@ -27,7 +27,7 @@ npm run lint
 - `src/`: React/Vite editor.
 - `bin/cli.js`: static server and Gateway proxy.
 - `examples/flows/`: sample VisualFlow JSON files.
-- `docs/`: user and maintainer docs.
+- `docs/`: user and contributor docs.
 
 Do not add local Python execution/server code to this repository. Runtime execution belongs to AbstractGateway and AbstractRuntime.
 

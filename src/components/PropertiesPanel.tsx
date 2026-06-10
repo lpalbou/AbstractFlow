@@ -6,7 +6,6 @@ import React, { useCallback, useEffect, useState, useRef } from 'react';
 import type { Node } from 'reactflow';
 import toast from 'react-hot-toast';
 import type { FlowNodeData, JsonValue, ProviderInfo, VisualFlow, Pin } from '../types/flow';
-import { isEntryNodeType } from '../types/flow';
 import { RECALL_LEVEL_OPTIONS } from '../types/recall';
 import { useFlowStore } from '../hooks/useFlow';
 import { useGatewayCapabilities, gatewayContractsFromCapabilities } from '../hooks/useGatewayCapabilities';
@@ -14,6 +13,7 @@ import { useSemanticsRegistry } from '../hooks/useSemantics';
 import { CodeEditorModal } from './CodeEditorModal';
 import ProviderModelsPanel from './ProviderModelsPanel';
 import { JsonSchemaNodeEditor } from './JsonSchemaNodeEditor';
+import { JsonSchemaPinEditorModal } from './JsonSchemaPinEditorModal';
 import { JsonValueEditor } from './JsonValueEditor';
 import { ArtifactPlayer, artifactContentUrl, artifactPlayerKindFromContent } from './ArtifactPlayer';
 import { AfTooltip } from './AfTooltip';
@@ -55,6 +55,15 @@ import {
   extractImageModelParameterMetadata,
   type MediaModelParameterMetadata,
 } from '../utils/mediaModelParams';
+import { normalizeEnumValues } from '../utils/jsonSchemaEditor';
+import { structuredResponseSchemaFromGraph } from '../utils/structuredOutputs';
+import {
+  defaultSubflowPinPatch,
+  savedFlowOptions,
+  savedFlowSummariesFromResponse,
+  subflowPinPatchForSelectedFlow,
+} from '../utils/subflowPins';
+import { inferSchemaForNodeOutput } from '../utils/outputSchemaInference';
 import {
   AGENT_META_SCHEMA,
   AGENT_RESULT_SCHEMA,
@@ -90,6 +99,7 @@ const MEDIA_NODE_TYPES = new Set([
   'generate_image',
   'edit_image',
   'image_to_image',
+  'upscale_image',
   'generate_video',
   'text_to_video',
   'image_to_video',
@@ -180,6 +190,7 @@ const DATA_PIN_TYPES: DataPinType[] = [
   'number',
   'boolean',
   'object',
+  'json_schema',
   'artifact',
   'artifact_image',
   'artifact_audio',
@@ -200,12 +211,22 @@ const DATA_PIN_TYPES: DataPinType[] = [
   'any',
 ];
 
+function dataPinTypeLabel(type: DataPinType): string {
+  if (type === 'object') return 'json';
+  if (type === 'json_schema') return 'json schema';
+  return type;
+}
+
 function isTextProviderPin(pin: Pin): boolean {
   return providerCatalogScopeForPin(pin) === 'text';
 }
 
 function normalizeMediaProvider(value: string): string {
   return String(value || '').trim().toLowerCase().replace(/_/g, '-');
+}
+
+function normalizeMediaCatalogTask(value: string | undefined): string {
+  return String(value || '').trim().toLowerCase().replace(/-/g, '_');
 }
 
 function normalizePinId(raw: string): string {
@@ -225,6 +246,15 @@ function uniquePinId(base: string, used: Set<string>): string {
 
 function newOpaqueId(prefix = 'id'): string {
   return `${prefix}-${Math.random().toString(16).slice(2)}`;
+}
+
+function switchCaseIdFromValue(value: string, used: Set<string>): string {
+  const normalized = value.trim().replace(/[^A-Za-z0-9_]+/g, '_').replace(/^_+|_+$/g, '');
+  const base = normalized || 'case';
+  if (!used.has(base)) return base;
+  let idx = 2;
+  while (used.has(`${base}_${idx}`)) idx++;
+  return `${base}_${idx}`;
 }
 
 function schemaFieldsFromJsonSchema(schema: unknown): AgentSchemaField[] {
@@ -516,6 +546,8 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     gatewayContracts?.flow_editor?.media?.generated_image || gatewayContracts?.assistant?.media?.generated_image;
   const editedImageContract =
     gatewayContracts?.flow_editor?.media?.edited_image || gatewayContracts?.assistant?.media?.edited_image;
+  const upscaledImageContract =
+    gatewayContracts?.flow_editor?.media?.upscaled_image || gatewayContracts?.assistant?.media?.upscaled_image;
   const generatedVideoContract =
     gatewayContracts?.flow_editor?.media?.generated_video || gatewayContracts?.assistant?.media?.generated_video;
   const imageToVideoContract =
@@ -524,7 +556,10 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     gatewayContracts?.flow_editor?.media?.generated_voice || gatewayContracts?.assistant?.media?.generated_voice;
   const generatedMusicContract =
     gatewayContracts?.flow_editor?.media?.generated_music || gatewayContracts?.assistant?.media?.generated_music;
-  const imageFormatOptions = formatValuesFrom(generatedImageContract?.direct_endpoint?.formats, DEFAULT_IMAGE_FORMATS);
+  const imageFormatOptions = formatValuesFrom(
+    upscaledImageContract?.direct_endpoint?.formats || generatedImageContract?.direct_endpoint?.formats,
+    DEFAULT_IMAGE_FORMATS
+  );
   const videoFormatOptions = formatValuesFrom(generatedVideoContract?.direct_endpoint?.formats, DEFAULT_VIDEO_FORMATS);
   const ttsFormatOptions = formatValuesFrom(generatedVoiceContract?.direct_endpoint?.formats, DEFAULT_TTS_FORMATS);
   const sttFormatOptions = formatValuesFrom(undefined, DEFAULT_STT_FORMATS);
@@ -553,6 +588,10 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     typeof editedImageContract?.direct_endpoint?.provider_models_task === 'string' && editedImageContract.direct_endpoint.provider_models_task.trim()
       ? editedImageContract.direct_endpoint.provider_models_task.trim()
       : 'image_to_image';
+  const upscaledImageProviderModelsTask =
+    typeof upscaledImageContract?.direct_endpoint?.provider_models_task === 'string' && upscaledImageContract.direct_endpoint.provider_models_task.trim()
+      ? upscaledImageContract.direct_endpoint.provider_models_task.trim()
+      : 'image_upscale';
   const generatedVideoProviderModelsTask =
     typeof generatedVideoContract?.direct_endpoint?.provider_models_task === 'string' && generatedVideoContract.direct_endpoint.provider_models_task.trim()
       ? generatedVideoContract.direct_endpoint.provider_models_task.trim()
@@ -561,6 +600,12 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     typeof imageToVideoContract?.direct_endpoint?.provider_models_task === 'string' && imageToVideoContract.direct_endpoint.provider_models_task.trim()
       ? imageToVideoContract.direct_endpoint.provider_models_task.trim()
       : 'image_to_video';
+  const currentImageProviderModelsTask =
+    node?.data?.nodeType === 'upscale_image'
+      ? upscaledImageProviderModelsTask
+      : node?.data?.nodeType === 'edit_image' || node?.data?.nodeType === 'image_to_image'
+        ? editedImageProviderModelsTask
+        : generatedImageProviderModelsTask;
   const visionProviderModelsEndpoint = gatewayContracts?.common?.discovery?.vision_provider_models || '';
   const toolsDiscoveryEndpoint = gatewayContracts?.common?.discovery?.tools || '';
   const visualflowCollectionEndpoint = gatewayContracts?.flow_editor?.visualflows?.crud?.collection_endpoint || '';
@@ -579,7 +624,9 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const [musicProviderOptions, setMusicProviderOptions] = useState<string[]>([]);
   const [musicModelOptions, setMusicModelOptions] = useState<string[]>([]);
   const [imageProviderOptions, setImageProviderOptions] = useState<string[]>([]);
-  const [imageModelOptions, setImageModelOptions] = useState<Array<{ provider: string; model: string; label: string } & MediaModelParameterMetadata>>([]);
+  const [imageModelOptions, setImageModelOptions] = useState<
+    Array<{ provider: string; model: string; label: string; catalogTask?: string } & MediaModelParameterMetadata>
+  >([]);
   const [loadingMediaModels, setLoadingMediaModels] = useState(false);
   const [mediaCatalogRequest, setMediaCatalogRequest] = useState<{
     seq: number;
@@ -620,6 +667,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
   const [ioPinNameDrafts, setIoPinNameDrafts] = useState<Record<string, string>>({});
   const [ioPinDefaultDrafts, setIoPinDefaultDrafts] = useState<Record<string, string>>({});
+  const [ioSchemaDefaultEditorPinId, setIoSchemaDefaultEditorPinId] = useState<string | null>(null);
 
   const [agentSchemaEnabled, setAgentSchemaEnabled] = useState(false);
   const [agentSchemaMode, setAgentSchemaMode] = useState<'fields' | 'json'>('fields');
@@ -650,6 +698,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       'text_generation',
       'image_generation',
       'image_to_image',
+      'image_upscale',
       'text_to_video',
       'image_to_video',
       'tts',
@@ -663,6 +712,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       if (task === 'text_generation') return 'Text generation';
       if (task === 'image_generation') return 'Image generation';
       if (task === 'image_to_image') return 'Image edit';
+      if (task === 'image_upscale') return 'Image upscale';
       if (task === 'text_to_video') return 'Text to video';
       if (task === 'image_to_video') return 'Image to video';
       if (task === 'tts') return 'Speech';
@@ -698,6 +748,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   useEffect(() => {
     setShowCodeEditor(false);
     setIoPinDefaultDrafts({});
+    setIoSchemaDefaultEditorPinId(null);
   }, [node?.id]);
 
   useEffect(() => {
@@ -898,7 +949,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         setLoadingMediaModels(false);
         return;
       }
-      const task = request.task || generatedImageProviderModelsTask;
+      const task = request.task || currentImageProviderModelsTask;
       gatewayJson<any>(
         gatewayPath(
           visionProviderModelsEndpoint,
@@ -908,7 +959,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         { timeoutMs: request.providersOnly ? 5_000 : 30_000 }
       )
         .then((imageProviderCatalog) => {
-          const imageOptions: Array<{ provider: string; model: string; label: string } & MediaModelParameterMetadata> = [];
+          const imageOptions: Array<{ provider: string; model: string; label: string; catalogTask?: string } & MediaModelParameterMetadata> = [];
           const seenImages = new Set<string>();
           const providerValues = providersFrom(
             imageProviderCatalog,
@@ -927,7 +978,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               const key = `${provider}::${model}`;
               if (seenImages.has(key)) continue;
               seenImages.add(key);
-              imageOptions.push({ provider, model, label: raw });
+              imageOptions.push({ provider, model, label: raw, catalogTask: task });
               continue;
             }
             if (!item || typeof item !== 'object') continue;
@@ -942,6 +993,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               provider,
               model,
               label: String(rec.label || rec.display_name || (provider ? `${provider} / ${model}` : model)),
+              catalogTask: task,
               ...extractImageModelParameterMetadata(rec),
             });
           }
@@ -1071,7 +1123,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     musicProvidersEndpoint,
     musicModelsEndpoint,
     musicProviderModelsTask,
-    generatedImageProviderModelsTask,
+    currentImageProviderModelsTask,
     visionProviderModelsEndpoint,
   ]);
 
@@ -1085,15 +1137,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     setLoadingFlows(true);
     gatewayJson<VisualFlow[]>(gatewayPath(visualflowCollectionEndpoint))
       .then((data) => {
-        if (Array.isArray(data)) {
-          setSavedFlows(
-            data
-              .filter((f) => f && typeof f.id === 'string' && typeof f.name === 'string')
-              .map((f) => ({ id: f.id, name: f.name }))
-          );
-        } else {
-          setSavedFlows([]);
-        }
+        setSavedFlows(savedFlowSummariesFromResponse(data));
       })
       .catch((err) => {
         console.error('Failed to fetch flows:', err);
@@ -1112,61 +1156,10 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     const syncKey = `${node.id}:${subflowId}`;
     if (lastSyncedSubflowPins.current === syncKey) return;
 
-    const findEntryNode = (flow: VisualFlow) => {
-      const entryId = flow.entryNode;
-      if (entryId) {
-        const direct = flow.nodes.find((n) => n.id === entryId);
-        if (direct) return direct;
-      }
-
-      const execTargets = new Set(
-        flow.edges
-          .filter((e) => e.targetHandle === 'exec-in')
-          .map((e) => e.target)
-      );
-
-      const candidate =
-        flow.nodes.find((n) => isEntryNodeType(n.type) && !execTargets.has(n.id)) ||
-        flow.nodes.find((n) => isEntryNodeType(n.type)) ||
-        flow.nodes[0];
-
-      return candidate;
-    };
-
-    const findFlowStartNode = (flow: VisualFlow) =>
-      flow.nodes.find((n) => n.type === 'on_flow_start') ?? findEntryNode(flow);
-
-    const findFlowEndNode = (flow: VisualFlow) => flow.nodes.find((n) => n.type === 'on_flow_end');
-
     gatewayJson<VisualFlow>(gatewayPath(visualflowItemEndpoint, { flow_id: subflowId }))
       .then((flow: VisualFlow) => {
-        const start = findFlowStartNode(flow);
-        const end = findFlowEndNode(flow);
-
-        const entryPins = start?.data?.outputs?.filter((p) => p.type !== 'execution') ?? [];
-        const endPins = end?.data?.inputs?.filter((p) => p.type !== 'execution') ?? [];
-
-        const desiredInputs: Pin[] = entryPins.map((p) => ({ ...p }));
-        const desiredOutputs: Pin[] = endPins.map((p) => ({ ...p }));
-
-        const execIn =
-          node.data.inputs.find((p) => p.type === 'execution') ?? { id: 'exec-in', label: '', type: 'execution' };
-        const execOut =
-          node.data.outputs.find((p) => p.type === 'execution') ?? { id: 'exec-out', label: '', type: 'execution' };
-
-        const filterData = (pins: Pin[]) =>
-          pins.filter((p) => p.type !== 'execution' && p.id !== 'exec-in' && p.id !== 'exec-out');
-
-        const nextInputs: Pin[] = [execIn, ...filterData(desiredInputs)];
-        const nextOutputs: Pin[] = [execOut, ...filterData(desiredOutputs)];
-
-        const samePins = (a: Pin[], b: Pin[]) =>
-          a.length === b.length &&
-          a.every((p, idx) => p.id === b[idx]?.id && p.label === b[idx]?.label && p.type === b[idx]?.type);
-
-        if (!samePins(node.data.inputs, nextInputs) || !samePins(node.data.outputs, nextOutputs)) {
-          updateNodeData(node.id, { inputs: nextInputs, outputs: nextOutputs });
-        }
+        const patch = subflowPinPatchForSelectedFlow(node.data, flow);
+        if (patch) updateNodeData(node.id, patch);
 
         lastSyncedSubflowPins.current = syncKey;
       })
@@ -1250,7 +1243,12 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const handleSubflowChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
       if (!node) return;
-      updateNodeData(node.id, { subflowId: e.target.value || undefined });
+      const subflowId = e.target.value || undefined;
+      lastSyncedSubflowPins.current = null;
+      updateNodeData(node.id, {
+        subflowId,
+        ...(subflowId ? {} : defaultSubflowPinPatch(node.data)),
+      });
     },
     [node, updateNodeData]
   );
@@ -1432,6 +1430,16 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   }
 
   const { data } = node;
+  const ioSchemaDefaultEditorPin = (() => {
+    if (!ioSchemaDefaultEditorPinId) return null;
+    const pins =
+      data.nodeType === 'on_flow_start'
+        ? data.outputs
+        : data.nodeType === 'on_flow_end'
+          ? data.inputs
+          : [];
+    return pins.find((pin) => pin.id === ioSchemaDefaultEditorPinId && pin.type === 'json_schema') || null;
+  })();
   const providerPinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'provider');
   const modelPinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'model');
   const toolsPinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'tools');
@@ -1444,7 +1452,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     if (typeof pinVal === 'number' && Number.isFinite(pinVal)) return pinVal;
     const cfgVal = data.agentConfig?.max_iterations;
     if (typeof cfgVal === 'number' && Number.isFinite(cfgVal)) return cfgVal;
-    return 50;
+    return 20;
   })();
   const emitEventNamePinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'name');
   const scopePinConnected = edges.some((e) => e.target === node.id && e.targetHandle === 'scope');
@@ -1555,7 +1563,13 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         .map((p) => ({ value: p.name, label: (p as any).display_name || p.name }))
         .sort((a, b) => a.label.localeCompare(b.label)));
     }
-    if (scope === 'image') return withGatewayDefaultOption(selectOptionsFromValues([...imageProviderOptions, ...imageModelOptions.map((item) => item.provider)]));
+    if (scope === 'image') {
+      const task = normalizeMediaCatalogTask(currentImageProviderModelsTask);
+      const scopedProviders = imageModelOptions
+        .filter((item) => !task || normalizeMediaCatalogTask(item.catalogTask) === task)
+        .map((item) => item.provider);
+      return withGatewayDefaultOption(selectOptionsFromValues([...imageProviderOptions, ...scopedProviders]));
+    }
     if (scope === 'tts') return withGatewayDefaultOption(selectOptionsFromValues(ttsProviderOptions));
     if (scope === 'stt') return withGatewayDefaultOption(selectOptionsFromValues(sttProviderOptions));
     if (scope === 'music') return withGatewayDefaultOption(selectOptionsFromValues(musicProviderOptions));
@@ -1570,8 +1584,13 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     }
     if (scope === 'image') {
       const normalizedProvider = normalizeMediaProvider(provider);
+      const task = normalizeMediaCatalogTask(currentImageProviderModelsTask);
       return imageModelOptions
-        .filter((item) => !normalizedProvider || normalizeMediaProvider(item.provider) === normalizedProvider)
+        .filter(
+          (item) =>
+            (!task || normalizeMediaCatalogTask(item.catalogTask) === task) &&
+            (!normalizedProvider || normalizeMediaProvider(item.provider) === normalizedProvider)
+        )
         .map((item) => ({ value: item.model, label: item.label || item.model }));
     }
     if (scope === 'tts') return selectOptionsFromValues(ttsModelOptions);
@@ -1602,14 +1621,14 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   };
 
   const requestProviderOptionsForScope = (scope: PinCatalogScope) => {
-    if (scope === 'image') requestMediaCatalog('image', { task: generatedImageProviderModelsTask, providersOnly: true });
+    if (scope === 'image') requestMediaCatalog('image', { task: currentImageProviderModelsTask, providersOnly: true });
     if (scope === 'tts') requestMediaCatalog('tts');
     if (scope === 'stt') requestMediaCatalog('stt');
     if (scope === 'music') requestMediaCatalog('music');
   };
 
   const requestModelOptionsForScope = (scope: PinCatalogScope, provider: string) => {
-    if (scope === 'image') requestMediaCatalog('image', { provider, task: generatedImageProviderModelsTask });
+    if (scope === 'image') requestMediaCatalog('image', { provider, task: currentImageProviderModelsTask });
     if (scope === 'tts') requestMediaCatalog('tts', { provider });
     if (scope === 'stt') requestMediaCatalog('stt', { provider });
     if (scope === 'music') requestMediaCatalog('music', { provider });
@@ -1821,9 +1840,14 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         eligible: true,
       };
     }
-    if (data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image') {
+    if (data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image' || data.nodeType === 'upscale_image') {
       const pinBlocked = isInputPinConnected('image_provider') || isInputPinConnected('image_model');
-      const task = data.nodeType === 'edit_image' || data.nodeType === 'image_to_image' ? 'image_to_image' : 'image_generation';
+      const task =
+        data.nodeType === 'upscale_image'
+          ? 'image_upscale'
+          : data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
+            ? 'image_to_image'
+            : 'image_generation';
       const unsupportedReason = modelResidencyTaskUnsupportedReason(gatewayContracts, task);
       return {
         task,
@@ -2038,7 +2062,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
             .map((pin) => (
               <li key={pin.id} className="pin-info">
                 <span className="pin-name">{pin.label}</span>
-                <span className="pin-type">{pin.type}</span>
+                <span className="pin-type">{dataPinTypeLabel(pin.type as DataPinType)}</span>
               </li>
             ))}
         </ul>
@@ -2052,7 +2076,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
             .map((pin) => (
               <li key={pin.id} className="pin-info">
                 <span className="pin-name">{pin.label}</span>
-                <span className="pin-type">{pin.type}</span>
+                <span className="pin-type">{dataPinTypeLabel(pin.type as DataPinType)}</span>
               </li>
             ))}
         </ul>
@@ -2157,11 +2181,21 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
               if (mediaNode && pin.id === 'image_provider') {
                 const currentProvider = stringDefaultFor('image_provider', 'provider');
-                const providerOptions = withGatewayDefaultOption(selectOptionsFromValues([...imageProviderOptions, ...imageModelOptions.map((item) => item.provider)]));
                 const imageTask =
-                  data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
+                  data.nodeType === 'upscale_image'
+                    ? upscaledImageProviderModelsTask
+                    : data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
                     ? editedImageProviderModelsTask
                     : generatedImageProviderModelsTask;
+                const normalizedImageTask = normalizeMediaCatalogTask(imageTask);
+                const providerOptions = withGatewayDefaultOption(
+                  selectOptionsFromValues([
+                    ...imageProviderOptions,
+                    ...imageModelOptions
+                      .filter((item) => !normalizedImageTask || normalizeMediaCatalogTask(item.catalogTask) === normalizedImageTask)
+                      .map((item) => item.provider),
+                  ])
+                );
                 return (
                   <div key={pin.id} className="property-group">
                     <label className="property-sublabel">{rowLabel}</label>
@@ -2192,11 +2226,17 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 const currentProvider = stringDefaultFor('image_provider', 'provider');
                 const currentModel = stringDefaultFor('image_model');
                 const imageTask =
-                  data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
+                  data.nodeType === 'upscale_image'
+                    ? upscaledImageProviderModelsTask
+                    : data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
                     ? editedImageProviderModelsTask
                     : generatedImageProviderModelsTask;
                 const modelOptions = imageModelOptions
-                  .filter((item) => !currentProvider || normalizeMediaProvider(item.provider) === normalizeMediaProvider(currentProvider))
+                  .filter(
+                    (item) =>
+                      (!imageTask || normalizeMediaCatalogTask(item.catalogTask) === normalizeMediaCatalogTask(imageTask)) &&
+                      (!currentProvider || normalizeMediaProvider(item.provider) === normalizeMediaProvider(currentProvider))
+                  )
                   .map((item) => ({ value: item.model, label: item.label || item.model }));
                 return (
                   <div key={pin.id} className="property-group">
@@ -2225,12 +2265,16 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                         const picked = imageModelOptions.find(
                           (item) =>
                             item.model === cleanModel &&
+                            (!imageTask || normalizeMediaCatalogTask(item.catalogTask) === normalizeMediaCatalogTask(imageTask)) &&
                             (!currentProvider || normalizeMediaProvider(item.provider) === normalizeMediaProvider(currentProvider))
                         );
                         const nextDefaults = applyImagePinDefaultPatch(
                           { ...((data.pinDefaults || {}) as Record<string, JsonValue>) },
                           picked,
-                          { excludeKeys: imageTask === 'image_to_image' ? ['width', 'height'] : undefined }
+                          {
+                            excludeKeys: imageTask === 'image_to_image' || imageTask === 'image_upscale' ? ['width', 'height'] : undefined,
+                            includeUpscale: imageTask === 'image_upscale',
+                          }
                         );
                         if (cleanModel) nextDefaults.image_model = cleanModel;
                         else delete nextDefaults.image_model;
@@ -2253,8 +2297,16 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
               if (mediaNode && pin.id === 'video_provider') {
                 const currentProvider = stringDefaultFor('video_provider', 'provider');
-                const providerOptions = withGatewayDefaultOption(selectOptionsFromValues([...imageProviderOptions, ...imageModelOptions.map((item) => item.provider)]));
                 const videoTask = data.nodeType === 'image_to_video' ? imageToVideoProviderModelsTask : generatedVideoProviderModelsTask;
+                const normalizedVideoTask = normalizeMediaCatalogTask(videoTask);
+                const providerOptions = withGatewayDefaultOption(
+                  selectOptionsFromValues([
+                    ...imageProviderOptions,
+                    ...imageModelOptions
+                      .filter((item) => !normalizedVideoTask || normalizeMediaCatalogTask(item.catalogTask) === normalizedVideoTask)
+                      .map((item) => item.provider),
+                  ])
+                );
                 return (
                   <div key={pin.id} className="property-group">
                     <label className="property-sublabel">{rowLabel}</label>
@@ -2286,7 +2338,11 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 const currentModel = stringDefaultFor('video_model');
                 const videoTask = data.nodeType === 'image_to_video' ? imageToVideoProviderModelsTask : generatedVideoProviderModelsTask;
                 const modelOptions = imageModelOptions
-                  .filter((item) => !currentProvider || normalizeMediaProvider(item.provider) === normalizeMediaProvider(currentProvider))
+                  .filter(
+                    (item) =>
+                      (!videoTask || normalizeMediaCatalogTask(item.catalogTask) === normalizeMediaCatalogTask(videoTask)) &&
+                      (!currentProvider || normalizeMediaProvider(item.provider) === normalizeMediaProvider(currentProvider))
+                  )
                   .map((item) => ({ value: item.model, label: item.label || item.model }));
                 return (
                   <div key={pin.id} className="property-group">
@@ -2315,6 +2371,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                         const picked = imageModelOptions.find(
                           (item) =>
                             item.model === cleanModel &&
+                            (!videoTask || normalizeMediaCatalogTask(item.catalogTask) === normalizeMediaCatalogTask(videoTask)) &&
                             (!currentProvider || normalizeMediaProvider(item.provider) === normalizeMediaProvider(currentProvider))
                         );
                         const nextDefaults = applyImagePinDefaultPatch(
@@ -2561,7 +2618,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
               if (mediaNode && pin.id === 'format') {
                 const fallback =
-	                  data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
+	                  data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image' || data.nodeType === 'upscale_image'
 	                    ? 'png'
 	                    : data.nodeType === 'generate_video' || data.nodeType === 'text_to_video' || data.nodeType === 'image_to_video'
 	                      ? 'mp4'
@@ -2569,7 +2626,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 	                      ? 'json'
 	                      : 'wav';
 	                const options =
-	                  data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
+	                  data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image' || data.nodeType === 'upscale_image'
 	                    ? imageFormatOptions
 	                    : data.nodeType === 'generate_video' || data.nodeType === 'text_to_video' || data.nodeType === 'image_to_video'
 	                      ? videoFormatOptions
@@ -2743,6 +2800,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 	                (data.nodeType === 'generate_image' ||
 	                  data.nodeType === 'edit_image' ||
 	                  data.nodeType === 'image_to_image' ||
+	                  data.nodeType === 'upscale_image' ||
 	                  data.nodeType === 'generate_video' ||
 	                  data.nodeType === 'text_to_video' ||
 	                  data.nodeType === 'image_to_video' ||
@@ -2751,7 +2809,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                   data.nodeType === 'transcribe_audio')
               ) {
                 const fallback =
-	                  data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
+	                  data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image' || data.nodeType === 'upscale_image'
 	                    ? 'png'
 	                    : data.nodeType === 'generate_video' || data.nodeType === 'text_to_video' || data.nodeType === 'image_to_video'
 	                      ? 'mp4'
@@ -2759,7 +2817,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 	                      ? 'json'
 	                      : 'wav';
 	                const baseOptions =
-	                  data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
+	                  data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image' || data.nodeType === 'upscale_image'
 	                    ? imageFormatOptions
 	                    : data.nodeType === 'generate_video' || data.nodeType === 'text_to_video' || data.nodeType === 'image_to_video'
 	                      ? videoFormatOptions
@@ -3012,7 +3070,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           <div className="property-group">
             <label className="property-sublabel">Cases</label>
             {(() => {
-              const cases = data.switchConfig?.cases ?? [];
+            const cases = data.switchConfig?.cases ?? [];
 
               const buildOutputs = (nextCases: { id: string; value: string }[]) => {
                 const execPins = [
@@ -3024,6 +3082,74 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                   { id: 'default', label: 'default', type: 'execution' as const },
                 ];
                 return execPins;
+              };
+
+              const schemaForLlmLikeOutput = (source: Node<FlowNodeData> | undefined, handle: string): unknown => {
+                if (!source) return undefined;
+                if (source.data.nodeType === 'agent') {
+                  if (handle === 'scratchpad') return AGENT_SCRATCHPAD_SCHEMA;
+                  if (handle === 'meta') return AGENT_META_SCHEMA;
+                  if (handle === 'data' || handle === 'response') return structuredResponseSchemaFromGraph(source, nodes, edges);
+                  return undefined;
+                }
+                if (source.data.nodeType === 'llm_call') {
+                  if (handle === 'meta') return LLM_META_SCHEMA;
+                  if (handle === 'data' || handle === 'response') return structuredResponseSchemaFromGraph(source, nodes, edges);
+                  return undefined;
+                }
+                return undefined;
+              };
+
+              const schemaForParseJsonOutput = (parseNode: Node<FlowNodeData>): unknown => {
+                const textEdge = edges.find((e) => e.target === parseNode.id && e.targetHandle === 'text');
+                const textSource = textEdge ? nodes.find((n) => n.id === textEdge.source) : undefined;
+                const textHandle = typeof textEdge?.sourceHandle === 'string' ? textEdge.sourceHandle : '';
+                return schemaForLlmLikeOutput(textSource, textHandle);
+              };
+
+              const enumValuesForSwitchInput = (): string[] => {
+                const valueEdge = edges.find((e) => e.target === node.id && e.targetHandle === 'value');
+                if (!valueEdge) return [];
+                const valueSource = nodes.find((n) => n.id === valueEdge.source);
+                if (!valueSource || valueSource.data.nodeType !== 'break_object') return [];
+
+                const fieldPath = typeof valueEdge.sourceHandle === 'string' ? valueEdge.sourceHandle : '';
+                if (!fieldPath) return [];
+
+                const breakInputEdge = edges.find((e) => e.target === valueSource.id && e.targetHandle === 'object');
+                if (!breakInputEdge) return [];
+                const objectSource = nodes.find((n) => n.id === breakInputEdge.source);
+                const objectSourceHandle = typeof breakInputEdge.sourceHandle === 'string' ? breakInputEdge.sourceHandle : '';
+
+                let baseSchema: unknown = undefined;
+                if (objectSource?.data.nodeType === 'parse_json') {
+                  baseSchema = schemaForParseJsonOutput(objectSource);
+                } else {
+                  baseSchema = schemaForLlmLikeOutput(objectSource, objectSourceHandle);
+                }
+
+                const leafSchema = getSchemaByPath(baseSchema, fieldPath);
+                return normalizeEnumValues(
+                  leafSchema && typeof leafSchema === 'object' ? (leafSchema as Record<string, unknown>).enum : undefined
+                );
+              };
+
+              const enumValues = enumValuesForSwitchInput();
+
+              const syncCasesFromEnum = () => {
+                if (enumValues.length === 0) return;
+                const existingIdsByValue = new Map(cases.map((c) => [c.value, c.id]));
+                const used = new Set<string>();
+                const nextCases = enumValues.map((value) => {
+                  const existingId = existingIdsByValue.get(value);
+                  const id = existingId && !used.has(existingId) ? existingId : switchCaseIdFromValue(value, used);
+                  used.add(id);
+                  return { id, value };
+                });
+                updateNodeData(node.id, {
+                  switchConfig: { cases: nextCases },
+                  outputs: buildOutputs(nextCases),
+                });
               };
 
               const addCase = () => {
@@ -3057,6 +3183,12 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
               return (
                 <div className="array-editor">
+                  {enumValues.length > 0 && (
+                    <button type="button" className="array-add-button schema-sync-button" onClick={syncCasesFromEnum}>
+                      Sync cases from enum
+                    </button>
+                  )}
+
                   {cases.map((c) => (
                     <div key={c.id} className="array-item">
                       <input
@@ -3105,38 +3237,13 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 		            let sample: unknown = undefined;
 		            let schema: unknown = undefined;
 		            const sourceHandle = typeof inputEdge?.sourceHandle === 'string' ? inputEdge.sourceHandle : '';
+                if (sourceNode) {
+                  schema = inferSchemaForNodeOutput(sourceNode, sourceHandle, nodes, edges);
+                }
 
 			            const inferSchemaForOutput = (n: any, handle: string, depth: number): unknown => {
 			              if (!n || depth > 6) return undefined;
-			              const nodeType = n?.data?.nodeType;
-			              if (handle === 'context') return CONTEXT_SCHEMA;
-			              if (handle === 'context_extra') return CONTEXT_EXTRA_SCHEMA;
-			              if (nodeType === 'make_context' && handle === 'context') return CONTEXT_SCHEMA;
-			              if (nodeType === 'make_scratchpad' && handle === 'scratchpad') return AGENT_SCRATCHPAD_SCHEMA;
-			              if (nodeType === 'make_meta' && handle === 'meta') return AGENT_META_SCHEMA;
-			              if (nodeType === 'on_event' && handle === 'event') return EVENT_ENVELOPE_SCHEMA;
-		              if (nodeType === 'agent') {
-		                if (handle === 'scratchpad') return AGENT_SCRATCHPAD_SCHEMA;
-		                if (handle === 'meta') return AGENT_META_SCHEMA;
-		                const outputSchema = n.data.agentConfig?.outputSchema;
-		                if (outputSchema?.enabled && outputSchema.jsonSchema && typeof outputSchema.jsonSchema === 'object') {
-		                  return outputSchema.jsonSchema;
-		                }
-		                return AGENT_RESULT_SCHEMA;
-		              }
-		              if (nodeType === 'llm_call') {
-		                return handle === 'meta' ? LLM_META_SCHEMA : LLM_RESULT_SCHEMA;
-		              }
-		              if (nodeType === 'break_object') {
-		                const inputEdge2 = edges.find((e) => e.target === n.id && e.targetHandle === 'object');
-		                if (!inputEdge2) return undefined;
-		                const srcNode2 = nodes.find((nn) => nn.id === inputEdge2.source);
-		                const srcHandle2 = typeof inputEdge2.sourceHandle === 'string' ? inputEdge2.sourceHandle : '';
-		                const base = inferSchemaForOutput(srcNode2, srcHandle2, depth + 1);
-		                if (!base) return undefined;
-		                return getSchemaByPath(base, handle);
-		              }
-		              return undefined;
+                    return inferSchemaForNodeOutput(n, handle, nodes, edges, depth);
 		            };
 
 	            if (sourceNode?.data.nodeType === 'literal_json') {
@@ -3154,6 +3261,8 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 
               const textEdge = edges.find((e) => e.target === parseNode.id && e.targetHandle === 'text');
               const textSource = textEdge ? nodes.find((n) => n.id === textEdge.source) : undefined;
+              const textSourceHandle = typeof textEdge?.sourceHandle === 'string' ? textEdge.sourceHandle : '';
+              const inputSchema = textSource ? inferSchemaForOutput(textSource, textSourceHandle, 0) : undefined;
 
               if (textSource?.data.nodeType === 'literal_string') {
                 const v = textSource.data.literalValue;
@@ -3201,6 +3310,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 	                const parsed = tryParse(candidateText);
 	                if (parsed !== undefined) sample = parsed;
 	              }
+	              if (inputSchema) schema = inputSchema;
 		            } else if (sourceHandle === 'context') {
 		              schema = CONTEXT_SCHEMA;
 		            } else if (sourceHandle === 'context_extra') {
@@ -3247,22 +3357,21 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 	                // Minimal, still useful: exposes the stable `{ value }` wrapper field.
 	                sample = { value: inferred ?? '' };
 	              }
-			            } else if (sourceNode?.data.nodeType === 'agent') {
+		            } else if (sourceNode?.data.nodeType === 'agent') {
 			              if (sourceHandle === 'scratchpad') {
 			                schema = AGENT_SCRATCHPAD_SCHEMA;
 			              } else if (sourceHandle === 'meta') {
 			                schema = AGENT_META_SCHEMA;
 			              } else {
-		                // Legacy: assume the Agent `result` output (deprecated pin).
-		                const outputSchema = sourceNode.data.agentConfig?.outputSchema;
-		                if (outputSchema?.enabled && outputSchema.jsonSchema && typeof outputSchema.jsonSchema === 'object') {
-		                  schema = outputSchema.jsonSchema;
-		                } else {
-		                  schema = AGENT_RESULT_SCHEMA;
-		                }
+		                // Structured Agent/LLM response pins are JSON strings at runtime; Break Object can still
+		                // infer their object schema after Parse JSON or a direct tolerant connection.
+		                schema = inferSchemaForOutput(sourceNode, sourceHandle, 0) ?? AGENT_RESULT_SCHEMA;
 		              }
 			            } else if (sourceNode?.data.nodeType === 'llm_call') {
-			              schema = sourceHandle === 'meta' ? LLM_META_SCHEMA : LLM_RESULT_SCHEMA;
+			              schema =
+		                sourceHandle === 'meta'
+		                  ? LLM_META_SCHEMA
+		                  : inferSchemaForOutput(sourceNode, sourceHandle, 0) ?? LLM_RESULT_SCHEMA;
 			            } else if (sourceNode?.data.nodeType === 'break_object') {
 			              schema = inferSchemaForOutput(sourceNode, sourceHandle, 0);
 			            }
@@ -3277,11 +3386,19 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
             const existingPins: Pin[] =
               existing.length > 0
                 ? existing
-                : selectedPaths.map((p) => ({
-                    id: p,
-                    label: p.split('.').slice(-1)[0] || p,
-                    type: 'any' as const,
-                  }));
+                : selectedPaths.map((p) => {
+                    const leafSchema = schema ? getSchemaByPath(schema, p) : undefined;
+                    return {
+                      id: p,
+                      label: p.split('.').slice(-1)[0] || p,
+                      type: (schema
+                        ? inferPinTypeFromSchema(leafSchema)
+                        : inferPinType(getByPath(sample, p))) as DataPinType,
+                      ...(leafSchema && typeof leafSchema === 'object'
+                        ? { schema: leafSchema as Record<string, unknown> }
+                        : {}),
+                    };
+                  });
 
             const syncPins = (nextPins: Pin[]) => {
               updateNodeData(node.id, {
@@ -3356,9 +3473,17 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               const inferredType = (schema
                 ? inferPinTypeFromSchema(getSchemaByPath(schema, path))
                 : inferPinType(getByPath(sample, path))) as DataPinType;
+              const leafSchema = schema ? getSchemaByPath(schema, path) : undefined;
               const nextPins = [
                 ...existingPins,
-                { id: path, label: path.split('.').slice(-1)[0] || path, type: inferredType },
+                {
+                  id: path,
+                  label: path.split('.').slice(-1)[0] || path,
+                  type: inferredType,
+                  ...(leafSchema && typeof leafSchema === 'object'
+                    ? { schema: leafSchema as Record<string, unknown> }
+                    : {}),
+                },
               ];
 	              syncPins(nextPins);
 	            };
@@ -3463,7 +3588,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                         >
                           {DATA_PIN_TYPES.map((t) => (
                             <option key={t} value={t}>
-                              {t}
+                              {dataPinTypeLabel(t)}
                             </option>
                           ))}
                         </select>
@@ -3490,10 +3615,10 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         </div>
       )}
 
-      {/* Create JSON (Make Object) node properties */}
+      {/* Build JSON (Make Object) node properties */}
       {data.nodeType === 'make_object' && (
         <div className="property-section">
-          <label className="property-label">Create JSON</label>
+          <label className="property-label">Build JSON</label>
           {(() => {
             const existingPins: Pin[] = (data.inputs || []).filter((p) => p.type !== 'execution');
 
@@ -3607,7 +3732,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                         >
                           {DATA_PIN_TYPES.map((t) => (
                             <option key={t} value={t}>
-                              {t}
+                              {dataPinTypeLabel(t)}
                             </option>
                           ))}
                         </select>
@@ -3632,6 +3757,22 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
             );
           })()}
         </div>
+      )}
+
+      {/* Add Schema Fields node properties */}
+      {data.nodeType === 'edit_json_schema' && (
+        <JsonSchemaNodeEditor
+          nodeId={node.id}
+          label="Fields to add"
+          hint={
+            <>
+              Define only the fields this node should add. The connected schema is passed through unchanged when it cannot be
+              inspected.
+            </>
+          }
+          schema={data.literalValue}
+          onChange={(nextSchema) => updateNodeData(node.id, { literalValue: nextSchema })}
+        />
       )}
 
       {/* Agent-specific properties */}
@@ -4308,7 +4449,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                         >
                           {DATA_PIN_TYPES.map((t) => (
                             <option key={t} value={t}>
-                              {t}
+                              {dataPinTypeLabel(t)}
                             </option>
                           ))}
                         </select>
@@ -4376,9 +4517,9 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               <option value="">
                 {loadingFlows ? 'Loading...' : 'Select flow...'}
               </option>
-              {savedFlows.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name} ({f.id}){flowId && f.id === flowId ? ' — this flow (recursive)' : ''}
+              {savedFlowOptions(savedFlows, flowId).map((flow) => (
+                <option key={flow.value} value={flow.value}>
+                  {flow.label}
                 </option>
               ))}
             </select>
@@ -4742,6 +4883,20 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 );
               }
 
+              if (pin.type === 'json_schema') {
+                const hasSchema = Boolean(raw && typeof raw === 'object' && !Array.isArray(raw) && Object.keys(raw).length > 0);
+                return (
+                  <button
+                    type="button"
+                    className="node-schema-edit-button"
+                    onClick={() => setIoSchemaDefaultEditorPinId(pin.id)}
+                    title={`${hasSchema ? 'Edit' : 'Define'} default JSON Schema for ${pin.label || pin.id}`}
+                  >
+                    {hasSchema ? 'Edit Schema' : 'Define Schema'}
+                  </button>
+                );
+              }
+
               if (
                 pin.type === 'object' ||
                 pin.type === 'memory' ||
@@ -4916,7 +5071,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                         >
                           {DATA_PIN_TYPES.map((t) => (
                             <option key={t} value={t}>
-                              {t}
+                              {dataPinTypeLabel(t)}
                             </option>
                           ))}
                         </select>
@@ -5062,6 +5217,20 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                     }}
                     step="any"
                   />
+                );
+              }
+
+              if (pin.type === 'json_schema') {
+                const hasSchema = Boolean(raw && typeof raw === 'object' && !Array.isArray(raw) && Object.keys(raw).length > 0);
+                return (
+                  <button
+                    type="button"
+                    className="node-schema-edit-button"
+                    onClick={() => setIoSchemaDefaultEditorPinId(pin.id)}
+                    title={`${hasSchema ? 'Edit' : 'Define'} default JSON Schema for ${pin.label || pin.id}`}
+                  >
+                    {hasSchema ? 'Edit Schema' : 'Define Schema'}
+                  </button>
                 );
               }
 
@@ -5237,7 +5406,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                         >
                           {DATA_PIN_TYPES.map((t) => (
                             <option key={t} value={t}>
-                              {t}
+                              {dataPinTypeLabel(t)}
                             </option>
                           ))}
                         </select>
@@ -5501,6 +5670,15 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         const taskValue = String(task || 'text_generation');
         const providerValue = String(provider || '');
         const modelValue = String(model || '');
+        const visionProviderModelsTaskFor = (value: string): string => {
+          if (value === 'image_generation') return generatedImageProviderModelsTask;
+          if (value === 'image_to_image') return editedImageProviderModelsTask;
+          if (value === 'image_upscale') return upscaledImageProviderModelsTask;
+          if (value === 'text_to_video') return generatedVideoProviderModelsTask;
+          if (value === 'image_to_video') return imageToVideoProviderModelsTask;
+          return '';
+        };
+        const currentVisionResidencyTask = visionProviderModelsTaskFor(taskValue);
         const addOption = (out: AfSelectOption[], seen: Set<string>, value: string, label?: string) => {
           const clean = String(value || '').trim();
           if (!clean || seen.has(clean)) return;
@@ -5511,8 +5689,11 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         const seenProviders = new Set<string>();
         if (taskValue === 'text_generation') {
           for (const item of providers) addOption(residencyProviderOptions, seenProviders, item.name, item.display_name || item.name);
-        } else if (taskValue === 'image_generation' || taskValue === 'image_to_image') {
-          for (const item of imageModelOptions) addOption(residencyProviderOptions, seenProviders, item.provider);
+        } else if (currentVisionResidencyTask) {
+          for (const item of imageModelOptions) {
+            if (normalizeMediaCatalogTask(item.catalogTask) !== normalizeMediaCatalogTask(currentVisionResidencyTask)) continue;
+            addOption(residencyProviderOptions, seenProviders, item.provider);
+          }
         } else if (taskValue === 'tts') {
           for (const item of ttsProviderOptions) addOption(residencyProviderOptions, seenProviders, item);
         } else if (taskValue === 'stt') {
@@ -5526,9 +5707,10 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
         const seenModels = new Set<string>();
         if (taskValue === 'text_generation') {
           for (const item of models) addOption(residencyModelOptions, seenModels, item);
-        } else if (taskValue === 'image_generation' || taskValue === 'image_to_image') {
+        } else if (currentVisionResidencyTask) {
           const normalizedProvider = normalizeMediaProvider(providerValue);
           for (const item of imageModelOptions) {
+            if (normalizeMediaCatalogTask(item.catalogTask) !== normalizeMediaCatalogTask(currentVisionResidencyTask)) continue;
             if (normalizedProvider && normalizeMediaProvider(item.provider) !== normalizedProvider) continue;
             addOption(residencyModelOptions, seenModels, item.model, item.label);
           }
@@ -5548,6 +5730,12 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
             ? 'Image generation'
             : taskValue === 'image_to_image'
               ? 'Image edit'
+              : taskValue === 'image_upscale'
+                ? 'Image upscale'
+              : taskValue === 'text_to_video'
+                ? 'Text to video'
+              : taskValue === 'image_to_video'
+                ? 'Image to video'
             : taskValue === 'tts'
               ? 'Speech'
               : taskValue === 'stt'
@@ -5560,6 +5748,10 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
             ? 'Image provider…'
             : taskValue === 'image_to_image'
               ? 'Image edit provider…'
+              : taskValue === 'image_upscale'
+                ? 'Image upscaler provider…'
+              : taskValue === 'text_to_video' || taskValue === 'image_to_video'
+                ? 'Video provider…'
             : taskValue === 'tts'
               ? 'Speech provider…'
               : taskValue === 'stt'
@@ -5572,6 +5764,10 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
             ? 'Image model…'
             : taskValue === 'image_to_image'
               ? 'Image edit model…'
+              : taskValue === 'image_upscale'
+                ? 'Image upscaler model…'
+              : taskValue === 'text_to_video' || taskValue === 'image_to_video'
+                ? 'Video model…'
             : taskValue === 'tts'
               ? 'Speech model…'
               : taskValue === 'stt'
@@ -5606,8 +5802,8 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 onChange={(value) => {
                   const nextTask = value || 'text_generation';
                   updateResidency({ task: nextTask, provider: undefined, model: undefined });
-                  if (nextTask === 'image_generation') requestMediaCatalog('image');
-                  if (nextTask === 'image_to_image') requestMediaCatalog('image', { task: editedImageProviderModelsTask });
+                  const visionTask = visionProviderModelsTaskFor(nextTask);
+                  if (visionTask) requestMediaCatalog('image', { task: visionTask });
                   if (nextTask === 'tts') requestMediaCatalog('tts');
                   if (nextTask === 'stt') requestMediaCatalog('stt');
                   if (nextTask === 'music_generation') requestMediaCatalog('music');
@@ -5630,8 +5826,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                   minPopoverWidth={300}
                   searchPlaceholder="Search providers…"
                   onOpen={() => {
-                    if (taskValue === 'image_generation') requestMediaCatalog('image');
-                    if (taskValue === 'image_to_image') requestMediaCatalog('image', { task: editedImageProviderModelsTask });
+                    if (currentVisionResidencyTask) requestMediaCatalog('image', { task: currentVisionResidencyTask });
                     if (taskValue === 'tts') requestMediaCatalog('tts');
                     if (taskValue === 'stt') requestMediaCatalog('stt');
                     if (taskValue === 'music_generation') requestMediaCatalog('music');
@@ -5639,8 +5834,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                   onChange={(value) => {
                     const nextProvider = value.trim();
                     updateResidency({ provider: nextProvider || undefined, model: undefined });
-                    if (taskValue === 'image_generation' && nextProvider) requestMediaCatalog('image', { provider: nextProvider });
-                    if (taskValue === 'image_to_image' && nextProvider) requestMediaCatalog('image', { provider: nextProvider, task: editedImageProviderModelsTask });
+                    if (currentVisionResidencyTask && nextProvider) requestMediaCatalog('image', { provider: nextProvider, task: currentVisionResidencyTask });
                     if (taskValue === 'tts') requestMediaCatalog('tts', { provider: nextProvider || undefined });
                     if (taskValue === 'stt') requestMediaCatalog('stt', { provider: nextProvider || undefined });
                     if (taskValue === 'music_generation') requestMediaCatalog('music', { provider: nextProvider || undefined });
@@ -5665,8 +5859,9 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                   minPopoverWidth={420}
                   searchPlaceholder="Search models…"
                   onOpen={() => {
-                    if (taskValue === 'image_generation') requestMediaCatalog('image', providerValue ? { provider: providerValue } : {});
-                    if (taskValue === 'image_to_image') requestMediaCatalog('image', providerValue ? { provider: providerValue, task: editedImageProviderModelsTask } : { task: editedImageProviderModelsTask });
+                    if (currentVisionResidencyTask) {
+                      requestMediaCatalog('image', providerValue ? { provider: providerValue, task: currentVisionResidencyTask } : { task: currentVisionResidencyTask });
+                    }
                     if (taskValue === 'tts') requestMediaCatalog('tts', providerValue ? { provider: providerValue } : {});
                     if (taskValue === 'stt') requestMediaCatalog('stt', providerValue ? { provider: providerValue } : {});
                     if (taskValue === 'music_generation') requestMediaCatalog('music', providerValue ? { provider: providerValue } : {});
@@ -6169,6 +6364,23 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           </div>
         </div>
       )}
+
+      <JsonSchemaPinEditorModal
+        isOpen={Boolean(ioSchemaDefaultEditorPin)}
+        nodeLabel={data.label || ''}
+        pin={ioSchemaDefaultEditorPin}
+        schema={ioSchemaDefaultEditorPin ? data.pinDefaults?.[ioSchemaDefaultEditorPin.id] : undefined}
+        hint="Define the JSON Schema used as this flow parameter's default value."
+        onClose={() => setIoSchemaDefaultEditorPinId(null)}
+        onSave={(nextSchema) => {
+          if (!ioSchemaDefaultEditorPin) return;
+          setPinDefault(ioSchemaDefaultEditorPin.id, nextSchema as JsonValue);
+        }}
+        onClear={() => {
+          if (!ioSchemaDefaultEditorPin) return;
+          setPinDefault(ioSchemaDefaultEditorPin.id, undefined);
+        }}
+      />
 
       {/* Quick actions */}
       <div className="property-section">

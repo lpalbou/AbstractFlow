@@ -187,6 +187,16 @@ export function areTypesCompatible(
     return true;
   }
 
+  // JSON Schema is still a JSON object at runtime, but a nominal type in the editor
+  // so schema pins get dedicated authoring controls.
+  if (
+    (sourceType === 'json_schema' && targetType === 'object') ||
+    (sourceType === 'object' && targetType === 'json_schema') ||
+    (sourceType === 'json_schema' && targetType === 'json_schema')
+  ) {
+    return true;
+  }
+
   // Assertion is an object-like type; allow assertion <-> object.
   if (
     (sourceType === 'assertion' && targetType === 'object') ||

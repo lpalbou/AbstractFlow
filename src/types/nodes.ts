@@ -254,7 +254,7 @@ const CORE_NODES: NodeTemplate[] = [
 		      { id: 'temperature', label: 'temperature', type: 'number', description: 'Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature.' },
 		      { id: 'seed', label: 'seed', type: 'number', description: 'Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed.' },
 		      { id: 'thinking', label: 'thinking', type: 'string', description: 'Reasoning/thinking control for supported models. If unset, uses the Gateway/runtime default.' },
-		      { id: 'resp_schema', label: 'resp_schema', type: 'object', description: 'Optional JSON Schema object (type=object) the final answer must conform to.' },
+		      { id: 'resp_schema', label: 'resp_schema', type: 'json_schema', description: 'Optional JSON Schema object (type=object) the final answer must conform to.' },
 		    ],
 	    outputs: [
 	      { id: 'exec-out', label: '', type: 'execution' },
@@ -263,12 +263,19 @@ const CORE_NODES: NodeTemplate[] = [
 	        label: 'response',
 	        type: 'string',
 	        description:
-	          'Final response string. When resp_schema is provided, this is a JSON string matching the response schema.',
+	          'Final response text. When resp_schema is provided, the structured object is also exposed on data.',
 	      },
-      {
-        id: 'success',
-        label: 'success',
-        type: 'boolean',
+	      {
+	        id: 'data',
+	        label: 'data',
+	        type: 'object',
+	        description:
+	          'Structured response object matching resp_schema. Visible by default when a response schema is configured.',
+	      },
+	      {
+	        id: 'success',
+	        label: 'success',
+	        type: 'boolean',
         description: 'True if the Agent node completed successfully.',
       },
       {
@@ -362,12 +369,19 @@ const CORE_NODES: NodeTemplate[] = [
 		      { id: 'temperature', label: 'temperature', type: 'number', description: 'Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature.' },
 		      { id: 'seed', label: 'seed', type: 'number', description: 'Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed.' },
 		      { id: 'thinking', label: 'thinking', type: 'string', description: 'Reasoning/thinking control for supported models. If unset, uses the Gateway/runtime default.' },
-		      { id: 'resp_schema', label: 'resp_schema', type: 'object', description: 'Optional JSON Schema object (type=object) the assistant content must conform to.' },
+		      { id: 'resp_schema', label: 'resp_schema', type: 'json_schema', description: 'Optional JSON Schema object (type=object) the assistant content must conform to.' },
 		    ],
 	    outputs: [
 	      { id: 'exec-out', label: '', type: 'execution' },
-      { id: 'response', label: 'response', type: 'string', description: 'Assistant text content (best-effort). For tool calls, content may be empty.' },
-      { id: 'success', label: 'success', type: 'boolean', description: 'True if the LLM call completed successfully.' },
+	      { id: 'response', label: 'response', type: 'string', description: 'Assistant text content (best-effort). For tool calls, content may be empty.' },
+	      {
+	        id: 'data',
+	        label: 'data',
+	        type: 'object',
+	        description:
+	          'Structured assistant output object matching resp_schema. Visible by default when a response schema is configured.',
+	      },
+	      { id: 'success', label: 'success', type: 'boolean', description: 'True if the LLM call completed successfully.' },
       {
         id: 'meta',
         label: 'meta',
@@ -395,7 +409,7 @@ const CORE_NODES: NodeTemplate[] = [
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
       { id: 'operation', label: 'operation', type: 'string', description: 'list_loaded, load, or unload.' },
-      { id: 'task', label: 'task', type: 'string', description: 'text_generation, image_generation, image_to_image, text_to_video, image_to_video, tts, stt, or music_generation.' },
+      { id: 'task', label: 'task', type: 'string', description: 'text_generation, image_generation, image_to_image, image_upscale, text_to_video, image_to_video, tts, stt, or music_generation.' },
       { id: 'provider', label: 'provider', type: 'provider', description: 'Provider/backend id to load or filter.' },
       { id: 'model', label: 'model', type: 'model', description: 'Model id to load or filter.' },
     ],
@@ -507,6 +521,39 @@ const CORE_NODES: NodeTemplate[] = [
     ],
     category: 'media',
     hiddenInPalette: true,
+  },
+  {
+    type: 'upscale_image',
+    icon: '&#x1F50D;',
+    label: 'Restore / Upscale Image',
+    description: 'Restore or upscale an input image through Gateway image upscaling and return an image artifact.',
+    headerColor: '#0EA5A4',
+    gatewayCapability: NODE_GATEWAY_CAPABILITIES.upscale_image,
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'image_artifact', label: 'image_artifact', type: 'artifact_image', description: 'Source image artifact ref. Wire from an image node, or use an uploaded/selected artifact.' },
+      { id: 'image_provider', label: 'provider', type: 'provider_image', description: 'Optional image upscaler provider/backend.' },
+      { id: 'image_model', label: 'model', type: 'model', description: 'Optional image upscaler model id for the selected provider.' },
+      { id: 'scale', label: 'scale', type: 'string', description: 'Upscale factor such as 2x.' },
+      { id: 'resolution', label: 'resolution', type: 'string', description: 'Target shortest edge in pixels or scale factor such as 2x.' },
+      { id: 'softness', label: 'softness', type: 'number', description: 'Optional restoration softness in [0.0, 1.0].' },
+      { id: 'seed', label: 'seed', type: 'number' },
+      { id: 'quantize', label: 'quantize', type: 'number', description: 'Optional backend quantization hint.' },
+      { id: 'vae_tiling', label: 'vae_tiling', type: 'boolean', description: 'Force tiled VAE encode/decode when true, explicitly disable it when false, or leave unset for the MLX-Gen SeedVR2 runtime policy.' },
+      { id: 'format', label: 'format', type: 'string', description: 'png, jpg, or webp.' },
+      { id: 'extra', label: 'extra', type: 'object', description: 'Optional provider-specific image upscaler options.' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'image_artifact', label: 'image_artifact', type: 'artifact_image', description: 'Artifact ref for the upscaled image.' },
+      { id: 'artifact_ref', label: 'artifact_ref', type: 'artifact' },
+      { id: 'artifact_id', label: 'artifact_id', type: 'string' },
+      { id: 'content_type', label: 'content_type', type: 'string' },
+      { id: 'outputs', label: 'outputs', type: 'object' },
+      { id: 'meta', label: 'meta', type: 'object' },
+      { id: 'success', label: 'success', type: 'boolean' },
+    ],
+    category: 'media',
   },
   {
     type: 'generate_video',
@@ -931,6 +978,7 @@ const STRING_NODES: NodeTemplate[] = [
   { type: 'uppercase', icon: 'AA', label: 'Uppercase', description: 'Convert text to UPPERCASE.', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
   { type: 'lowercase', icon: 'aa', label: 'Lowercase', description: 'Convert text to lowercase.', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
   { type: 'trim', icon: '&#x2702;', label: 'Trim', description: 'Trim whitespace from both ends of a string.', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
+  { type: 'is_empty_string', icon: '""', label: 'Is Empty', description: 'True if text is empty.', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'boolean' }], category: 'string' },
   { type: 'contains', icon: 'in', label: 'Contains', description: 'True if text contains pattern.', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }, { id: 'pattern', label: 'pattern', type: 'string' }], outputs: [{ id: 'result', label: 'result', type: 'boolean' }], category: 'string' },
   { type: 'replace', icon: '&#x21BA;', label: 'Replace', description: 'Replace pattern with replacement (mode: first|all).', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }, { id: 'pattern', label: 'pattern', type: 'string' }, { id: 'replacement', label: 'replacement', type: 'string' }, { id: 'mode', label: 'mode', type: 'string', description: "Replacement mode: 'first' or 'all' (default: all)." }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
   { type: 'substring', icon: '&#x1F4CC;', label: 'Substring', description: 'Extract a substring by start/end indices (end is optional).', headerColor: '#E74C3C', inputs: [{ id: 'text', label: 'text', type: 'string' }, { id: 'start', label: 'start', type: 'number' }, { id: 'end', label: 'end', type: 'number' }], outputs: [{ id: 'result', label: 'result', type: 'string' }], category: 'string' },
@@ -1052,7 +1100,7 @@ const DATA_NODES: NodeTemplate[] = [
   { type: 'set', icon: '&#x1F4E4;', label: 'Set Property', description: 'Pure transform: return a new object with key set. To persist state, use Set Variable (dotted path) or Set Variable Property.', headerColor: '#3498DB', inputs: [{ id: 'object', label: 'object', type: 'object' }, { id: 'key', label: 'key', type: 'string' }, { id: 'value', label: 'value', type: 'any' }], outputs: [{ id: 'result', label: 'result', type: 'object' }], category: 'data' },
   { type: 'merge', icon: '&#x1F517;', label: 'Merge Objects', description: 'Shallow merge two objects (b overrides a).', headerColor: '#3498DB', inputs: [{ id: 'a', label: 'a', type: 'object' }, { id: 'b', label: 'b', type: 'object' }], outputs: [{ id: 'result', label: 'result', type: 'object' }], category: 'data' },
   { type: 'make_array', icon: '[]', label: 'Make Array', description: 'Build an array from 1+ inputs in pin order (Blueprint-style). Skips null/unset inputs.', headerColor: '#3498DB', inputs: [{ id: 'a', label: 'a', type: 'any' }], outputs: [{ id: 'result', label: 'result', type: 'array' }], category: 'data' },
-  { type: 'make_object', icon: '{}', label: 'Create JSON', description: 'Build a flat JSON object from dynamically configured input fields (set fields in the Properties panel).', headerColor: '#3498DB', inputs: [], outputs: [{ id: 'result', label: 'result', type: 'object' }], category: 'data' },
+  { type: 'make_object', icon: '{}', label: 'Build JSON', description: 'Build a JSON object from live input pins. Use the JSON literal node for static objects.', headerColor: '#3498DB', inputs: [{ id: 'value', label: 'value', type: 'any', description: 'First object field. Rename/add fields in the Properties panel.' }], outputs: [{ id: 'result', label: 'result', type: 'object' }], category: 'data' },
   {
     type: 'make_context',
     icon: '&#x1F4AC;', // Speech bubble
@@ -1373,7 +1421,7 @@ const LITERAL_NODES: NodeTemplate[] = [
 	      'Define a JSON Schema object for schema-constrained responses. Connect to `resp_schema` on LLM Call / Agent nodes.',
 	    headerColor: '#00FFFF', // object pin color (schema is an object)
 	    inputs: [],
-	    outputs: [{ id: 'value', label: 'schema', type: 'object' }],
+	    outputs: [{ id: 'value', label: 'schema', type: 'json_schema' }],
 	    category: 'literals',
 	  },
   {
@@ -1543,6 +1591,53 @@ const MEMORY_NODES: NodeTemplate[] = [
       { id: 'exec-out', label: '', type: 'execution' },
       { id: 'bytes', label: 'bytes', type: 'number' },
       { id: 'file_path', label: 'file_path', type: 'string' },
+    ],
+    category: 'memory',
+  },
+  {
+    type: 'read_pdf',
+    icon: '&#x1F4D6;', // Open book
+    label: 'Read PDF',
+    description: 'Extract text and metadata from a PDF file using the Runtime permissive PDF reader.',
+    headerColor: '#16A085', // Teal - IO
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'file_path', label: 'file_path', type: 'string' },
+      { id: 'page_start', label: 'page_start', type: 'number', description: 'Optional 1-based first page to read.' },
+      { id: 'page_end', label: 'page_end', type: 'number', description: 'Optional 1-based last page to read.' },
+      { id: 'max_chars', label: 'max_chars', type: 'number', description: 'Optional explicit text limit. If used, output warnings include #TRUNCATION.' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'content', label: 'content', type: 'string' },
+      { id: 'pages', label: 'pages', type: 'number' },
+      { id: 'processed_pages', label: 'processed_pages', type: 'number' },
+      { id: 'metadata', label: 'metadata', type: 'object' },
+      { id: 'warnings', label: 'warnings', type: 'array' },
+      { id: 'truncated', label: 'truncated', type: 'boolean' },
+      { id: 'file_path', label: 'file_path', type: 'string' },
+      { id: 'content_type', label: 'content_type', type: 'string' },
+    ],
+    category: 'memory',
+  },
+  {
+    type: 'write_pdf',
+    icon: '&#x1F4D5;', // Closed book
+    label: 'Write PDF',
+    description: 'Render text or Markdown-style report content to a real PDF file using the Runtime permissive PDF writer.',
+    headerColor: '#16A085', // Teal - IO
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'file_path', label: 'file_path', type: 'string' },
+      { id: 'content', label: 'content', type: 'any' },
+      { id: 'title', label: 'title', type: 'string', description: 'Optional PDF document title.' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'bytes', label: 'bytes', type: 'number' },
+      { id: 'file_path', label: 'file_path', type: 'string' },
+      { id: 'sha256', label: 'sha256', type: 'string' },
+      { id: 'content_type', label: 'content_type', type: 'string' },
     ],
     category: 'memory',
   },
@@ -1802,6 +1897,34 @@ const PALETTE_DATA_NODES: NodeTemplate[] = [
   ...DATA_NODES.map((n) => ({ ...n, category: 'data' })),
 ];
 
+const SCHEMA_NODES: NodeTemplate[] = [
+  {
+    type: 'edit_json_schema',
+    icon: '&#x1F4CB;',
+    label: 'Add Schema Fields',
+    description:
+      'Add fields to an incoming JSON Schema object. Existing schema fields are preserved; if the input is unavailable, outputs only the added fields.',
+    headerColor: '#00FFFF',
+    inputs: [
+      {
+        id: 'schema',
+        label: 'schema',
+        type: 'json_schema',
+        description: 'Base JSON Schema object. Leave unconnected to output only the added fields.',
+      },
+    ],
+    outputs: [
+      {
+        id: 'schema',
+        label: 'schema',
+        type: 'json_schema',
+        description: 'JSON Schema with added fields.',
+      },
+    ],
+    category: 'schema',
+  },
+];
+
 const PALETTE_CORE_NODES: NodeTemplate[] = CORE_NODES.filter((n) => n.category !== 'media');
 const MEDIA_NODES: NodeTemplate[] = CORE_NODES.filter((n) => n.category === 'media');
 
@@ -1841,6 +1964,11 @@ export const NODE_CATEGORIES: Record<string, NodeCategory> = {
     label: 'Artifacts',
     icon: '&#x1F4CE;', // Paperclip
     nodes: ARTIFACT_LITERAL_NODES,
+  },
+  schema: {
+    label: 'Schema',
+    icon: '&#x1F4CB;', // Clipboard
+    nodes: SCHEMA_NODES,
   },
   variables: {
     label: 'Variables',
@@ -1928,6 +2056,13 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
         steps: 20,
       },
     }),
+    ...(template.type === 'upscale_image' && {
+      pinDefaults: {
+        format: 'png',
+        resolution: '2x',
+        softness: 0.25,
+      },
+    }),
     ...((template.type === 'generate_video' || template.type === 'text_to_video' || template.type === 'image_to_video') && {
       pinDefaults: {
         format: 'mp4',
@@ -2008,6 +2143,7 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
         required: ['data'],
       },
     }),
+    ...(template.type === 'edit_json_schema' && { literalValue: {} }),
     ...(template.type === 'literal_array' && { literalValue: [] }),
     ...(template.type === 'tool_parameters' && { toolParametersConfig: { tool: '' } }),
     ...(template.type === 'break_object' && { breakConfig: { selectedPaths: [] } }),
@@ -2025,6 +2161,7 @@ const CANONICAL_TEMPLATE_PIN_NODE_TYPES = new Set<string>([
   'generate_image',
   'edit_image',
   'image_to_image',
+  'upscale_image',
   'generate_video',
   'text_to_video',
   'image_to_video',

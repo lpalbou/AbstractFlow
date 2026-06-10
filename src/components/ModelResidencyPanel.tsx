@@ -143,6 +143,7 @@ function taskLabel(task: string): string {
   if (task === 'text_generation') return 'Text';
   if (task === 'image_generation') return 'Image';
   if (task === 'image_to_image') return 'Image edit';
+  if (task === 'image_upscale') return 'Image upscale';
   if (task === 'text_to_video') return 'Text to video';
   if (task === 'image_to_video') return 'Image to video';
   if (task === 'tts') return 'Speech';
@@ -152,18 +153,19 @@ function taskLabel(task: string): string {
 }
 
 function isVisionCatalogTask(task: string): boolean {
-  return task === 'image_generation' || task === 'image_to_image' || task === 'text_to_video' || task === 'image_to_video';
+  return task === 'image_generation' || task === 'image_to_image' || task === 'image_upscale' || task === 'text_to_video' || task === 'image_to_video';
 }
 
 function visionProviderModelsTask(task: string): string {
   if (task === 'image_to_image') return 'image_to_image';
+  if (task === 'image_upscale') return 'image_upscale';
   if (task === 'text_to_video' || task === 'image_to_video') return task;
   return 'text_to_image';
 }
 
 function taskOptions(contracts: GatewayContracts | null): AfSelectOption[] {
   const residency = contracts?.common?.model_residency;
-  const canonicalTasks = ['text_generation', 'image_generation', 'image_to_image', 'text_to_video', 'image_to_video', 'tts', 'stt', 'music_generation'];
+  const canonicalTasks = ['text_generation', 'image_generation', 'image_to_image', 'image_upscale', 'text_to_video', 'image_to_video', 'tts', 'stt', 'music_generation'];
   const rawTasks = [
     ...canonicalTasks,
     ...(Array.isArray(residency?.tasks) ? residency.tasks : []),
@@ -466,6 +468,8 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
       ? 'Image provider…'
       : task === 'image_to_image'
         ? 'Image edit provider…'
+        : task === 'image_upscale'
+          ? 'Image upscaler provider…'
       : task === 'text_to_video' || task === 'image_to_video'
         ? 'Video provider…'
         : task === 'tts'
@@ -482,6 +486,8 @@ export function ModelResidencyPanel({ isOpen, gatewayContracts, onClose }: Model
         ? 'Image model…'
         : task === 'image_to_image'
           ? 'Image edit model…'
+          : task === 'image_upscale'
+            ? 'Image upscaler model…'
         : task === 'text_to_video' || task === 'image_to_video'
           ? 'Video model…'
           : task === 'tts'

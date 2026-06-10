@@ -17,6 +17,8 @@ Useful files:
 - [README](README.md)
 - [Getting started](docs/getting-started.md)
 - [Web editor](docs/web-editor.md)
+- [Workflow authoring skill](docs/workflow-authoring-skill.md)
+- [Workflow node catalog](docs/workflow-node-catalog.md)
 - [Architecture](docs/architecture.md)
 - [API and contracts](docs/api.md)
 - [VisualFlow JSON](docs/visualflow.md)
@@ -28,14 +30,29 @@ Useful files:
 - [Connection modal](src/components/GatewayConnectionModal.tsx)
 - [Node templates](src/types/nodes.ts)
 
+Workflow authoring assistant context:
+
+- Use [Workflow authoring skill](docs/workflow-authoring-skill.md) for the
+  command contract, validation rules, repair loop, and workflow composition
+  patterns.
+- Use [Workflow node catalog](docs/workflow-node-catalog.md) for all visible
+  node templates, pins, dynamic pin policy, Gateway capability requirements,
+  and command-authorable config fields.
+
 Current media/editor behavior:
 
 - Gateway is the only execution boundary. Flow may capture browser-local files
   or microphone audio, but uploads them to Gateway as artifacts before
   start/resume.
 - Unconnected artifact input pins expose node-level upload controls.
-- Direct image, image-edit, video, and image-to-video child-run progress is
-  rendered from Gateway `abstract.progress` ledger records when available.
+- Direct image, image-edit, image-upscale, video, and image-to-video child-run
+  progress is rendered from Gateway `abstract.progress` ledger records when
+  available.
+- Unconnected LLM Call and Agent `resp_schema` pins can be edited inline.
+  Builder Choice fields are saved as JSON Schema enums in `pinDefaults`, and
+  schema-active nodes expose structured object output on `data` while `response`
+  stays textual. Wire `data` into Break Object; enum-backed Break Object
+  outputs can be synced into explicit Switch cases.
 - Connection previews must use canonical pin types; execution handles only
   preview/connect to execution handles.
 

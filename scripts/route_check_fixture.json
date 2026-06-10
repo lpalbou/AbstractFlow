@@ -1,0 +1,2170 @@
+{
+  "id": "f3adf322",
+  "name": "create-resume-v2",
+  "description": "",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "on_flow_start",
+      "position": {
+        "x": 272,
+        "y": -48
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "On Flow Start",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "position",
+            "label": "position",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "position": "Head Clinical AI Strategy - Translational Research  Location: Basel  The Head Clinical AI Strategy - Translational Research will be responsible for directing and implementing the strategic roadmap and impact of Data Science & AI efforts related to early clinical development trials. This role acts as the integrator addressing key scientific questions, data‑science methodologies, and operational execution to ensure delivery of high‑value, decision‑enabling AI solutions for Translational Medicine and Biomedical Research.  This role integrates and converts complex scientific/clinical needs into coherent, realistic, and trackable strategies that incorporate data science solutions, operational execution, KPIs, ROI assessments, and value frameworks to show how the implementation of AI can improve scientific understanding, trial design, and development decisions. About the Role  Key Responsibilities: Scientific–Technical Integration: Serve as the bridge between scientific leaders and data‑science teams to decipher and articulate key scientific questions into actionable AI use-cases. Use‑Case Delivery & Scale: Identify and shape high‑value AI use cases in early clinical development to bring forward for prioritization. Support governance and decision-making processes by preparing content, facilitating meetings, and communicating the proposals to stakeholder audiences. For use cases that are endorsed, work together with clinical teams to build an actionable delivery plan and oversee delivery and assessment in partnership with the team. Oversee development of the BR Clinical Design Lab to enable scaled and process optimized implementation of data driven and AI solutions to all clinical teams approaching tollgates and governance. Define, develop and track impact measurements and KPIs to enable quantification of value of the work, both at trial and program level. In collaboration with partners in Data & Digital, Data Science teams, and enterprise partners, actively assess the data landscape that supports clinical development AI work and enable fit-for-purpose data availability. Evaluate AI startups and technology vendors to access cutting edge methodologies and recommend strategic partnerships or collaborations that accelerate AI capability development Promote awareness, adoption, and change management for AI-driven processes and foster understanding organization-wide. Demonstrate internal and external presence that brings recognition of Novartis as a leader and innovator in Data Science and AI. Serve as a strategic thought partner to clinical leadership teams in Biomedical Research and Novartis, providing insights and advice on AI enablement, scientific value, and emerging trends.   Essential Requirements: Advanced degree (PhD, MD, MSc) in relevant scientific fields. PhD or equivalent experience in Data Science, Computer Science, or related field desirable  Excellent English required (oral & written)  Minimum 10 years of relevant experience in pharmaceutical settings combined with Data Science projects Demonstratable track record of delivering global solutions at scale in healthcare settings, with a strong preference for experience in the drug development space. Experience integrating scientific, data‑science, and operational perspectives in R&D. Experience in defining KPI and ROI frameworks Proven experience developing and implementing digital or AI strategy in a complex, matrixed organization, ideally within life sciences or pharmaceutical R&D. Strong understanding of AI/ML methodologies in biomedical contexts Up-to-date knowledge of digital, AI, and data science trends, applied to Pharma or Healthcare, including expertise in aligning internal capabilities with evolving external landscapes. Excellent stakeholder engagement, influencing, and communication skills with the ability to drive organizational change and foster collaboration. Strategic thinker with the ability to see the \"big picture\", translating complex strategies into concrete actions and measurable impact."
+        }
+      }
+    },
+    {
+      "id": "node-3",
+      "type": "subflow",
+      "position": {
+        "x": 560,
+        "y": -48
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Subflow",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean",
+            "description": "When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "position",
+            "label": "position",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "evidences",
+            "label": "evidences",
+            "type": "string",
+            "schema": {
+              "type": "object",
+              "title": "LLM Result",
+              "description": "Normalized LLM_CALL result envelope (content/tool calls/usage/metadata).",
+              "properties": {
+                "content": {
+                  "type": "string",
+                  "description": "Assistant text content (may be empty for tool-call turns)."
+                },
+                "reasoning": {
+                  "type": "string",
+                  "description": "Provider-specific reasoning text (when available)."
+                },
+                "data": {
+                  "type": "object",
+                  "description": "Structured output object when a response schema is used.",
+                  "additionalProperties": true
+                },
+                "tool_calls": {
+                  "type": "array",
+                  "description": "Requested tool calls (normalized).",
+                  "items": {
+                    "type": "object",
+                    "title": "Tool Call",
+                    "description": "Single tool call request: tool name + JSON-safe arguments.",
+                    "properties": {
+                      "call_id": {
+                        "type": "string",
+                        "description": "Optional stable id for matching results (call_id)."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "Tool name (must exist in the runtime tool registry)."
+                      },
+                      "arguments": {
+                        "type": "object",
+                        "description": "Tool arguments (JSON object).",
+                        "additionalProperties": true
+                      }
+                    },
+                    "additionalProperties": true
+                  }
+                },
+                "usage": {
+                  "type": "object",
+                  "title": "Usage",
+                  "description": "Token usage counters (provider-dependent; fields may be missing).",
+                  "properties": {
+                    "input_tokens": {
+                      "type": "number",
+                      "description": "Input tokens used (best-effort)."
+                    },
+                    "output_tokens": {
+                      "type": "number",
+                      "description": "Output tokens used (best-effort)."
+                    },
+                    "total_tokens": {
+                      "type": "number",
+                      "description": "Total tokens used (best-effort)."
+                    },
+                    "prompt_tokens": {
+                      "type": "number",
+                      "description": "Prompt tokens (OpenAI-style; optional)."
+                    },
+                    "completion_tokens": {
+                      "type": "number",
+                      "description": "Completion tokens (OpenAI-style; optional)."
+                    }
+                  },
+                  "additionalProperties": true
+                },
+                "model": {
+                  "type": "string",
+                  "description": "Resolved model id/name."
+                },
+                "finish_reason": {
+                  "type": "string",
+                  "description": "Finish reason (e.g. stop, length, tool_calls)."
+                },
+                "metadata": {
+                  "type": "object",
+                  "description": "Provider/runtime metadata (debug/observability).",
+                  "additionalProperties": true
+                },
+                "trace_id": {
+                  "type": "string",
+                  "description": "Trace id (best-effort)."
+                }
+              },
+              "additionalProperties": true
+            }
+          }
+        ],
+        "subflowId": "f538c8e3",
+        "pinDefaults": {}
+      }
+    },
+    {
+      "id": "node-4",
+      "type": "llm_call",
+      "position": {
+        "x": 1536,
+        "y": -352
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Introduction Writer",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "use_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object",
+            "description": "Optional explicit context object for this call (e.g. {messages:[...]}). If provided, context.messages overrides inherited run context messages."
+          },
+          {
+            "id": "memory",
+            "label": "memory",
+            "type": "memory",
+            "description": "Memory configuration object (KG/span/session controls). If set, overrides this call’s recall behavior; if unset, runtime defaults apply."
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text",
+            "description": "Text/LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model",
+            "description": "Text/LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string",
+            "description": "Optional system prompt for this single call."
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string",
+            "description": "User prompt/content for this single call."
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools",
+            "description": "Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node)."
+          },
+          {
+            "id": "max_in_tokens",
+            "label": "max_in_tokens",
+            "type": "number",
+            "description": "Optional per-call input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for this call."
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number",
+            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number",
+            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
+          },
+          {
+            "id": "thinking",
+            "label": "thinking",
+            "type": "string",
+            "description": "Reasoning/thinking control for supported models. If unset, uses the Gateway/runtime default."
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema",
+            "description": "Optional JSON Schema object (type=object) the assistant content must conform to."
+          },
+          {
+            "id": "prompt_cache_binding",
+            "label": "prompt_cache_binding",
+            "type": "any",
+            "description": "Advanced: durable exact-reuse prompt-cache binding from Gateway blocs. Accepts a binding object or binding_id string; this does not create or load blocs during the run."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string",
+            "description": "Assistant text content (best-effort). For tool calls, content may be empty."
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object",
+            "description": "Structured assistant output object matching resp_schema. Visible by default when a response schema is configured."
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean",
+            "description": "True if the LLM call completed successfully."
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object",
+            "description": "Host-facing meta envelope (schema=abstractflow.llm_call.v1.meta). Includes provider/model, usage, trace ids, and lightweight execution metadata."
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array",
+            "description": "Normalized tool call requests. This pin exists to make wiring into Tool Calls / Emit Event nodes simpler."
+          }
+        ],
+        "pinDefaults": {
+          "prompt": "Your goal is to write a short introduction at the top of the resume to explain why the candidate is a great fit for the POSITION and explain how his experiences and skills would help meet the challenges of the POSITION."
+        }
+      }
+    },
+    {
+      "id": "node-5",
+      "type": "sequence",
+      "position": {
+        "x": 864,
+        "y": -48
+      },
+      "data": {
+        "nodeType": "sequence",
+        "label": "Sequence",
+        "icon": "&#x21E5;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "then:0",
+            "label": "Then 0",
+            "type": "execution"
+          },
+          {
+            "id": "then:1",
+            "label": "Then 1",
+            "type": "execution"
+          },
+          {
+            "id": "then:2",
+            "label": "Then 2",
+            "type": "execution"
+          },
+          {
+            "id": "then:3",
+            "label": "Then 3",
+            "type": "execution"
+          },
+          {
+            "id": "then:4",
+            "label": "Then 4",
+            "type": "execution"
+          },
+          {
+            "id": "then:5",
+            "label": "Then 5",
+            "type": "execution"
+          }
+        ]
+      }
+    },
+    {
+      "id": "node-6",
+      "type": "llm_call",
+      "position": {
+        "x": 1536,
+        "y": -160
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Selected Work Writer",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "use_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object",
+            "description": "Optional explicit context object for this call (e.g. {messages:[...]}). If provided, context.messages overrides inherited run context messages."
+          },
+          {
+            "id": "memory",
+            "label": "memory",
+            "type": "memory",
+            "description": "Memory configuration object (KG/span/session controls). If set, overrides this call’s recall behavior; if unset, runtime defaults apply."
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text",
+            "description": "Text/LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model",
+            "description": "Text/LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string",
+            "description": "Optional system prompt for this single call."
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string",
+            "description": "User prompt/content for this single call."
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools",
+            "description": "Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node)."
+          },
+          {
+            "id": "max_in_tokens",
+            "label": "max_in_tokens",
+            "type": "number",
+            "description": "Optional per-call input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for this call."
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number",
+            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number",
+            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
+          },
+          {
+            "id": "thinking",
+            "label": "thinking",
+            "type": "string",
+            "description": "Reasoning/thinking control for supported models. If unset, uses the Gateway/runtime default."
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema",
+            "description": "Optional JSON Schema object (type=object) the assistant content must conform to."
+          },
+          {
+            "id": "prompt_cache_binding",
+            "label": "prompt_cache_binding",
+            "type": "any",
+            "description": "Advanced: durable exact-reuse prompt-cache binding from Gateway blocs. Accepts a binding object or binding_id string; this does not create or load blocs during the run."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string",
+            "description": "Assistant text content (best-effort). For tool calls, content may be empty."
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object",
+            "description": "Structured assistant output object matching resp_schema. Visible by default when a response schema is configured."
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean",
+            "description": "True if the LLM call completed successfully."
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object",
+            "description": "Host-facing meta envelope (schema=abstractflow.llm_call.v1.meta). Includes provider/model, usage, trace ids, and lightweight execution metadata."
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array",
+            "description": "Normalized tool call requests. This pin exists to make wiring into Tool Calls / Emit Event nodes simpler."
+          }
+        ],
+        "pinDefaults": {
+          "prompt": "Your goal is to write a short SELECTED WORK, just after the INTRODUCTION at the top of the resume to showcase the experience and skills of the candidate that would directly help for the POSITION."
+        }
+      }
+    },
+    {
+      "id": "node-7",
+      "type": "llm_call",
+      "position": {
+        "x": 1552,
+        "y": 176
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Experience Writer",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "use_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object",
+            "description": "Optional explicit context object for this call (e.g. {messages:[...]}). If provided, context.messages overrides inherited run context messages."
+          },
+          {
+            "id": "memory",
+            "label": "memory",
+            "type": "memory",
+            "description": "Memory configuration object (KG/span/session controls). If set, overrides this call’s recall behavior; if unset, runtime defaults apply."
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text",
+            "description": "Text/LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model",
+            "description": "Text/LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string",
+            "description": "Optional system prompt for this single call."
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string",
+            "description": "User prompt/content for this single call."
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools",
+            "description": "Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node)."
+          },
+          {
+            "id": "max_in_tokens",
+            "label": "max_in_tokens",
+            "type": "number",
+            "description": "Optional per-call input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for this call."
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number",
+            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number",
+            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
+          },
+          {
+            "id": "thinking",
+            "label": "thinking",
+            "type": "string",
+            "description": "Reasoning/thinking control for supported models. If unset, uses the Gateway/runtime default."
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema",
+            "description": "Optional JSON Schema object (type=object) the assistant content must conform to."
+          },
+          {
+            "id": "prompt_cache_binding",
+            "label": "prompt_cache_binding",
+            "type": "any",
+            "description": "Advanced: durable exact-reuse prompt-cache binding from Gateway blocs. Accepts a binding object or binding_id string; this does not create or load blocs during the run."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string",
+            "description": "Assistant text content (best-effort). For tool calls, content may be empty."
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object",
+            "description": "Structured assistant output object matching resp_schema. Visible by default when a response schema is configured."
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean",
+            "description": "True if the LLM call completed successfully."
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object",
+            "description": "Host-facing meta envelope (schema=abstractflow.llm_call.v1.meta). Includes provider/model, usage, trace ids, and lightweight execution metadata."
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array",
+            "description": "Normalized tool call requests. This pin exists to make wiring into Tool Calls / Emit Event nodes simpler."
+          }
+        ],
+        "pinDefaults": {
+          "prompt": "Your goal is to write the EXPERIENCE section of the resume and highlight terms, projects or ROI that are directly relevant to the POSITION"
+        }
+      }
+    },
+    {
+      "id": "node-8",
+      "type": "llm_call",
+      "position": {
+        "x": 1552,
+        "y": 368
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Education Pub Skills Writer",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "use_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object",
+            "description": "Optional explicit context object for this call (e.g. {messages:[...]}). If provided, context.messages overrides inherited run context messages."
+          },
+          {
+            "id": "memory",
+            "label": "memory",
+            "type": "memory",
+            "description": "Memory configuration object (KG/span/session controls). If set, overrides this call’s recall behavior; if unset, runtime defaults apply."
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text",
+            "description": "Text/LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model",
+            "description": "Text/LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string",
+            "description": "Optional system prompt for this single call."
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string",
+            "description": "User prompt/content for this single call."
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools",
+            "description": "Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node)."
+          },
+          {
+            "id": "max_in_tokens",
+            "label": "max_in_tokens",
+            "type": "number",
+            "description": "Optional per-call input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for this call."
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number",
+            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number",
+            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
+          },
+          {
+            "id": "thinking",
+            "label": "thinking",
+            "type": "string",
+            "description": "Reasoning/thinking control for supported models. If unset, uses the Gateway/runtime default."
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema",
+            "description": "Optional JSON Schema object (type=object) the assistant content must conform to."
+          },
+          {
+            "id": "prompt_cache_binding",
+            "label": "prompt_cache_binding",
+            "type": "any",
+            "description": "Advanced: durable exact-reuse prompt-cache binding from Gateway blocs. Accepts a binding object or binding_id string; this does not create or load blocs during the run."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string",
+            "description": "Assistant text content (best-effort). For tool calls, content may be empty."
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object",
+            "description": "Structured assistant output object matching resp_schema. Visible by default when a response schema is configured."
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean",
+            "description": "True if the LLM call completed successfully."
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object",
+            "description": "Host-facing meta envelope (schema=abstractflow.llm_call.v1.meta). Includes provider/model, usage, trace ids, and lightweight execution metadata."
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array",
+            "description": "Normalized tool call requests. This pin exists to make wiring into Tool Calls / Emit Event nodes simpler."
+          }
+        ],
+        "pinDefaults": {
+          "prompt": "Your goal is to write the EDUCATION, PUBLICATION AND SKILLS section of the resume."
+        }
+      }
+    },
+    {
+      "id": "node-9",
+      "type": "concat",
+      "position": {
+        "x": 848,
+        "y": -464
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          },
+          {
+            "id": "d",
+            "label": "d",
+            "type": "string"
+          },
+          {
+            "id": "e",
+            "label": "e",
+            "type": "string"
+          },
+          {
+            "id": "f",
+            "label": "f",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "a": "You are a professional resume writer.\n\nThis is your authentic voice, follow it: \n",
+          "c": "\n# POSITION\n",
+          "e": "\n# CANDIDATE INFORMATION\n"
+        }
+      }
+    },
+    {
+      "id": "node-10",
+      "type": "literal_string",
+      "position": {
+        "x": 624,
+        "y": -368
+      },
+      "data": {
+        "nodeType": "literal_string",
+        "label": "Authentic Voice",
+        "icon": "\"",
+        "headerColor": "#FF00FF",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "string"
+          }
+        ],
+        "literalValue": "# Authentic Voice and Thinking Style Memory\n\nThis file describes Laurent-Philippe's authentic thinking and writing style for downstream writers and reviewers. It is not a template. It is a constraint on how to transform the factual memories into public prose.\n\nCore thinking pattern:\n- Start from the scientific, biomedical, clinical, regulatory, user, or operational problem.\n- Understand what is currently hard, ambiguous, missing, or repeated.\n- Identify the missing representation, data layer, semantic layer, computational method, user workflow, or review mechanism.\n- Build or test that missing layer with the people facing the question.\n- Use the layer to make a deeper question tractable: prediction, explanation, comparison, reuse, review, collaboration, or decision.\n- AI is a method, not the goal.\n\nBiomedical purpose:\n- The goal is not to `turn biomedical questions into AI use cases`.\n- The goals are answering difficult biomedical questions, finding better therapies, understanding which patients respond and why, improving drug-development and regulatory decisions, improving the pipeline, helping scientists and clinicians work better, and ultimately helping patients.\n- AI/data capabilities can be described as a practical way to prioritize, analyze, compare, retrieve, predict, explain, review, or measure something that matters.\n\nTypical authentic themes:\n- Representation matters: molecular surfaces, semantic graphs, JSON-LD, FAIR data models, causal signatures, synthetic data graphs, article-first analyses, cognitive architectures.\n- Context matters: molecules in cellular environment, patients in cohorts and trial arms, documents in regulatory corpora, models in orchestration loops, data in workflows.\n- Review matters: provenance, assumptions, source references, traceability, human-review boundaries, testing, quality/privacy trade-offs, model behavior over time.\n- Adoption matters: users, research camps, onboarding, active users, time saved, reusable workflows, data products that people can actually use.\n- Prediction matters: target/anti-target prediction, side-effect prediction, repositioning, patient / trial-arm similarity, causal signatures, multimodal integration, clinical-trial optimization.\n\nTone:\n- Direct, precise, explanatory, pragmatic, and concrete.\n- Senior without sounding like a generic corporate executive.\n- Scientific without sounding like a dissertation.\n- Confident but not grandiose.\n- Collaborative and humble: work with scientists, clinicians, engineers, regulatory experts, medical teams, commercial teams, and users.\n- Avoid ego-coded separations such as `so others can use it`; use joint practice and collaboration.\n\nSentence shape:\n- Laurent-Philippe often explains the problem, the mechanism, and the consequence in sequence.\n- He may use longer explanatory sentences when the logic is important, but public resumes should avoid overloaded chains of disconnected facts.\n- Strong writing should make the purpose and mechanism clear before naming frameworks or tools.\n- Avoid polished generic openings that sound like an AI wrote a job application.\n\nGood transformation pattern:\n- Weak AI-style framing: `I help teams turn biomedical questions into AI use cases`.\n- Better authentic framing: start from the biomedical problem, then say the AI/data layer helps compare, predict, retrieve, structure, or review what matters.\n- Weak AI-style framing: `source-visible AI/ML for portfolio decisions`.\n- Better authentic framing: the system keeps document references, assumptions, provenance, and review points visible so experts can use the result without losing the link to the original material.\n- Weak AI-style framing: `external-method judgment`.\n- Better authentic framing: built and evaluated computational methods and platforms for real pharma / biotech drug-discovery questions.\n\nWords and phrases to avoid in public assets:\n- `Roche Computational Biomedicine`.\n- `turn biomedical questions into AI use cases` as a main goal.\n- `source-visible AI/ML`.\n- `evidence people can check`.\n- `external-method judgment`.\n- `failure envelopes`.\n- `safety-relevant observability`.\n- `autonomy boundaries` unless discussing AI architecture in a technical document.\n- `operating model` when a simpler phrase works.\n- `This matters because` as an explanatory bridge.\n- `For [employer], this matters because` as a repeated bridge.\n- `natural collaborator`.\n- `names to borrow`.\n- `conversation to earn`.\n- Generic phrases like `AI-ready solutions`, `robust semantic layer`, `decision-enabling AI` unless immediately grounded in a concrete system, data, user, or workflow.\n\nPreferred concrete verbs:\n- built, co-led, structured, introduced, coordinated, reduced, enabled, tested, deployed, mentored, analyzed, compared, predicted, integrated, modeled, visualized, reviewed, made reusable, made inspectable.\n\nVoice guardrails for job applications:\n- Do not paste reviewer recommendations as resume text.\n- Do not reuse canned sentences across applications.\n- Do not stitch together existing fragments as if they were a tailored document.\n- Select facts from the memory base, understand the role, and write new prose.\n- Use the candidate's own logic: problem -> missing layer -> system/method -> what it enables -> evidence or ROI.\n- Preserve technical substance; do not flatten into generic leadership language.\n- Make ROI and adoption visible when relevant: weeks/months saved, users, onboarding reduction, public-resource scale, grants, customer work, research-camp productivity, faster analysis.\n\nExamples of authentic factual framing:\n- BIONEXT: built multimodal structural-bioinformatics and multi-omics pipelines to predict unexpected targets, anti-targets, side effects, and repositioning opportunities, reducing target-identification cycles from months to computational analysis.\n- RAGnarok: structures large scientific and regulatory corpora into entities, relationships, document references, provenance, and reusable evidence objects so experts can query eCTD, EPAR, reimbursement, and scientific corpora without losing the link to original material.\n- Digital Article: helps technical and non-technical experts explore data while preserving the scientific question, executable code, methods, results, and structured outputs.\n- FAIR 2.0: helps data-structuration efforts because good AI needs a strong data foundation, not only a model added on top of poorly structured data.\n- Synthetic data: introduces QPS to reason about the necessary balance between preserved data quality and privacy risks.\n\nReviewer obligations:\n- Review for factual accuracy, not only style.\n- Check whether the output preserved prediction, multimodal integration, ROI, adoption, scientific purpose, and user-facing value when the role calls for them.\n- Flag invented organization names, missing ROI, missing Apollo/TRACE, missing AI Champion when relevant, missing BVS for drug-discovery roles, and missing FAIR/Semantic Data Layer for data-foundation roles.\n- If the voice feels AI-written, the reviewer must give concrete edits tied to this memory, not vague criticism.\n\nProvenance class:\n- User feedback across application work, original articles, thesis style, public Medium writing, resumes, and manually rewritten examples provided by Laurent-Philippe.\n"
+      }
+    },
+    {
+      "id": "node-14",
+      "type": "llm_call",
+      "position": {
+        "x": 2176,
+        "y": 80
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "LLM Call",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "use_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object",
+            "description": "Optional explicit context object for this call (e.g. {messages:[...]}). If provided, context.messages overrides inherited run context messages."
+          },
+          {
+            "id": "memory",
+            "label": "memory",
+            "type": "memory",
+            "description": "Memory configuration object (KG/span/session controls). If set, overrides this call’s recall behavior; if unset, runtime defaults apply."
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text",
+            "description": "Text/LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model",
+            "description": "Text/LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string",
+            "description": "Optional system prompt for this single call."
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string",
+            "description": "User prompt/content for this single call."
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools",
+            "description": "Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node)."
+          },
+          {
+            "id": "max_in_tokens",
+            "label": "max_in_tokens",
+            "type": "number",
+            "description": "Optional per-call input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for this call."
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number",
+            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number",
+            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
+          },
+          {
+            "id": "thinking",
+            "label": "thinking",
+            "type": "string",
+            "description": "Reasoning/thinking control for supported models. If unset, uses the Gateway/runtime default."
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema",
+            "description": "Optional JSON Schema object (type=object) the assistant content must conform to."
+          },
+          {
+            "id": "prompt_cache_binding",
+            "label": "prompt_cache_binding",
+            "type": "any",
+            "description": "Advanced: durable exact-reuse prompt-cache binding from Gateway blocs. Accepts a binding object or binding_id string; this does not create or load blocs during the run."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string",
+            "description": "Assistant text content (best-effort). For tool calls, content may be empty."
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object",
+            "description": "Structured assistant output object matching resp_schema. Visible by default when a response schema is configured."
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean",
+            "description": "True if the LLM call completed successfully."
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object",
+            "description": "Host-facing meta envelope (schema=abstractflow.llm_call.v1.meta). Includes provider/model, usage, trace ids, and lightweight execution metadata."
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array",
+            "description": "Normalized tool call requests. This pin exists to make wiring into Tool Calls / Emit Event nodes simpler."
+          }
+        ],
+        "pinDefaults": {}
+      }
+    },
+    {
+      "id": "node-15",
+      "type": "concat",
+      "position": {
+        "x": 1888,
+        "y": -176
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          },
+          {
+            "id": "d",
+            "label": "d",
+            "type": "string"
+          },
+          {
+            "id": "e",
+            "label": "e",
+            "type": "string"
+          },
+          {
+            "id": "f",
+            "label": "f",
+            "type": "string"
+          },
+          {
+            "id": "g",
+            "label": "g",
+            "type": "string"
+          },
+          {
+            "id": "h",
+            "label": "h",
+            "type": "string"
+          },
+          {
+            "id": "i",
+            "label": "i",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "a": "Those are suggestions to write the article with the following sections:\n\n{{INTRODUCTION}}\n\n{{SELECTED WORK}}\n\n{{EXPERIENCE}}\n\n{{EDUCATION, PUBLICATIONS, SKILLS}}\n\nYour role is to merge them back into a single top-tier resume of two pages maximum, leveraging the candidate experience to tailor it for the POSITION to improve it if and where you can.",
+          "b": "\n{{INTRODUCTION}}\n",
+          "d": "\n{{SELECTED WORK}}\n",
+          "f": "\n{{EXPERIENCE}}\n",
+          "h": "\n{{EDUCATION, PUBLICATIONS, SKILLS}}\n"
+        }
+      }
+    },
+    {
+      "id": "node-16",
+      "type": "llm_call",
+      "position": {
+        "x": 1200,
+        "y": 672
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Cover Letter Writer",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "use_context",
+            "label": "use_context",
+            "type": "boolean",
+            "description": "When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false."
+          },
+          {
+            "id": "context",
+            "label": "context",
+            "type": "object",
+            "description": "Optional explicit context object for this call (e.g. {messages:[...]}). If provided, context.messages overrides inherited run context messages."
+          },
+          {
+            "id": "memory",
+            "label": "memory",
+            "type": "memory",
+            "description": "Memory configuration object (KG/span/session controls). If set, overrides this call’s recall behavior; if unset, runtime defaults apply."
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text",
+            "description": "Text/LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider."
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model",
+            "description": "Text/LLM model id/name. If unset, uses the node’s configured model."
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string",
+            "description": "Optional system prompt for this single call."
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string",
+            "description": "User prompt/content for this single call."
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools",
+            "description": "Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node)."
+          },
+          {
+            "id": "max_in_tokens",
+            "label": "max_in_tokens",
+            "type": "number",
+            "description": "Optional per-call input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for this call."
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number",
+            "description": "Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature."
+          },
+          {
+            "id": "seed",
+            "label": "seed",
+            "type": "number",
+            "description": "Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed."
+          },
+          {
+            "id": "thinking",
+            "label": "thinking",
+            "type": "string",
+            "description": "Reasoning/thinking control for supported models. If unset, uses the Gateway/runtime default."
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema",
+            "description": "Optional JSON Schema object (type=object) the assistant content must conform to."
+          },
+          {
+            "id": "prompt_cache_binding",
+            "label": "prompt_cache_binding",
+            "type": "any",
+            "description": "Advanced: durable exact-reuse prompt-cache binding from Gateway blocs. Accepts a binding object or binding_id string; this does not create or load blocs during the run."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string",
+            "description": "Assistant text content (best-effort). For tool calls, content may be empty."
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object",
+            "description": "Structured assistant output object matching resp_schema. Visible by default when a response schema is configured."
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean",
+            "description": "True if the LLM call completed successfully."
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object",
+            "description": "Host-facing meta envelope (schema=abstractflow.llm_call.v1.meta). Includes provider/model, usage, trace ids, and lightweight execution metadata."
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array",
+            "description": "Normalized tool call requests. This pin exists to make wiring into Tool Calls / Emit Event nodes simpler."
+          }
+        ],
+        "pinDefaults": {
+          "prompt": "Your goal is to write the EDUCATION, PUBLICATION AND SKILLS section of the resume."
+        }
+      }
+    },
+    {
+      "id": "node-17",
+      "type": "concat",
+      "position": {
+        "x": 880,
+        "y": 688
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "a": "\n# RESUME\n",
+          "c": "\nYour goal is to write a COVER LETTER for this POSITION based on all the EVIDENCES you have and the RESUME we just wrote."
+        }
+      }
+    },
+    {
+      "id": "node-18",
+      "type": "on_flow_end",
+      "position": {
+        "x": 2224,
+        "y": 672
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "On Flow End",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "resume",
+            "label": "resume",
+            "type": "string"
+          },
+          {
+            "id": "cover_letter",
+            "label": "cover_letter",
+            "type": "string"
+          }
+        ],
+        "outputs": []
+      }
+    },
+    {
+      "id": "node-19",
+      "type": "write_file",
+      "position": {
+        "x": 2848,
+        "y": 80
+      },
+      "data": {
+        "nodeType": "write_file",
+        "label": "Write File",
+        "icon": "&#x1F4BE;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "file_path",
+            "label": "file_path",
+            "type": "string"
+          },
+          {
+            "id": "content",
+            "label": "content",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "bytes",
+            "label": "bytes",
+            "type": "number"
+          },
+          {
+            "id": "file_path",
+            "label": "file_path",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "file_path": "albou_resume.md"
+        }
+      }
+    },
+    {
+      "id": "node-20",
+      "type": "break_object",
+      "position": {
+        "x": 2416,
+        "y": 208
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object",
+            "description": "Input object to decompose into selected output fields."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model",
+            "schema": {
+              "type": "string",
+              "description": "Model id/name."
+            }
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "model"
+          ]
+        }
+      }
+    },
+    {
+      "id": "node-21",
+      "type": "concat",
+      "position": {
+        "x": 2608,
+        "y": 112
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "a": "albou_resume_",
+          "c": ".md"
+        }
+      }
+    },
+    {
+      "id": "node-22",
+      "type": "write_file",
+      "position": {
+        "x": 1664,
+        "y": 672
+      },
+      "data": {
+        "nodeType": "write_file",
+        "label": "Write File",
+        "icon": "&#x1F4BE;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "file_path",
+            "label": "file_path",
+            "type": "string"
+          },
+          {
+            "id": "content",
+            "label": "content",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "bytes",
+            "label": "bytes",
+            "type": "number"
+          },
+          {
+            "id": "file_path",
+            "label": "file_path",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "file_path": "albou_cover.md"
+        }
+      }
+    },
+    {
+      "id": "node-23",
+      "type": "break_object",
+      "position": {
+        "x": 1424,
+        "y": 784
+      },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Break Object",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object",
+            "description": "Input object to decompose into selected output fields."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model",
+            "schema": {
+              "type": "string",
+              "description": "Model id/name."
+            }
+          }
+        ],
+        "breakConfig": {
+          "selectedPaths": [
+            "model"
+          ]
+        }
+      }
+    },
+    {
+      "id": "node-25",
+      "type": "write_pdf",
+      "position": {
+        "x": 3152,
+        "y": 80
+      },
+      "data": {
+        "nodeType": "write_pdf",
+        "label": "Write PDF",
+        "icon": "&#x1F4D5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "file_path",
+            "label": "file_path",
+            "type": "string"
+          },
+          {
+            "id": "content",
+            "label": "content",
+            "type": "any"
+          },
+          {
+            "id": "title",
+            "label": "title",
+            "type": "string",
+            "description": "Optional PDF document title."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "bytes",
+            "label": "bytes",
+            "type": "number"
+          },
+          {
+            "id": "file_path",
+            "label": "file_path",
+            "type": "string"
+          },
+          {
+            "id": "sha256",
+            "label": "sha256",
+            "type": "string"
+          },
+          {
+            "id": "content_type",
+            "label": "content_type",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "file_path": "albou_resume.pdf",
+          "title": "Resume - LP.Albou"
+        }
+      }
+    },
+    {
+      "id": "node-28",
+      "type": "write_pdf",
+      "position": {
+        "x": 1952,
+        "y": 672
+      },
+      "data": {
+        "nodeType": "write_pdf",
+        "label": "Write PDF",
+        "icon": "&#x1F4D5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "file_path",
+            "label": "file_path",
+            "type": "string"
+          },
+          {
+            "id": "content",
+            "label": "content",
+            "type": "any"
+          },
+          {
+            "id": "title",
+            "label": "title",
+            "type": "string",
+            "description": "Optional PDF document title."
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "bytes",
+            "label": "bytes",
+            "type": "number"
+          },
+          {
+            "id": "file_path",
+            "label": "file_path",
+            "type": "string"
+          },
+          {
+            "id": "sha256",
+            "label": "sha256",
+            "type": "string"
+          },
+          {
+            "id": "content_type",
+            "label": "content_type",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "file_path": "albou_cover.pdf",
+          "title": "Cover Letter - LP.Albou"
+        }
+      }
+    },
+    {
+      "id": "node-29",
+      "type": "concat",
+      "position": {
+        "x": 2880,
+        "y": 288
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "a": "albou_resume_",
+          "c": ".pdf"
+        }
+      }
+    },
+    {
+      "id": "node-30",
+      "type": "concat",
+      "position": {
+        "x": 1584,
+        "y": 944
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "a": "albou_cover_",
+          "c": ".md"
+        }
+      }
+    },
+    {
+      "id": "node-31",
+      "type": "concat",
+      "position": {
+        "x": 1808,
+        "y": 944
+      },
+      "data": {
+        "nodeType": "concat",
+        "label": "Concat",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          {
+            "id": "a",
+            "label": "a",
+            "type": "string"
+          },
+          {
+            "id": "b",
+            "label": "b",
+            "type": "string"
+          },
+          {
+            "id": "c",
+            "label": "c",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "concatConfig": {
+          "separator": " "
+        },
+        "pinDefaults": {
+          "a": "albou_cover_",
+          "c": ".pdf"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1780941836317",
+      "source": "node-1",
+      "sourceHandle": "exec-out",
+      "target": "node-3",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1780942073437",
+      "source": "node-1",
+      "sourceHandle": "position",
+      "target": "node-3",
+      "targetHandle": "position",
+      "animated": false
+    },
+    {
+      "id": "edge-1780942087377",
+      "source": "node-3",
+      "sourceHandle": "exec-out",
+      "target": "node-5",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1780942103160",
+      "source": "node-5",
+      "sourceHandle": "then:0",
+      "target": "node-4",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1780942105660",
+      "source": "node-5",
+      "sourceHandle": "then:1",
+      "target": "node-6",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1780942108307",
+      "source": "node-5",
+      "sourceHandle": "then:2",
+      "target": "node-7",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1780942117527",
+      "source": "node-5",
+      "sourceHandle": "then:3",
+      "target": "node-8",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1780942229478",
+      "source": "node-10",
+      "sourceHandle": "value",
+      "target": "node-9",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-1780942386478",
+      "source": "node-9",
+      "sourceHandle": "result",
+      "target": "node-4",
+      "targetHandle": "system",
+      "animated": false
+    },
+    {
+      "id": "edge-1780942555773",
+      "source": "node-9",
+      "sourceHandle": "result",
+      "target": "node-6",
+      "targetHandle": "system",
+      "animated": false
+    },
+    {
+      "id": "edge-1780942810092",
+      "source": "node-3",
+      "sourceHandle": "evidences",
+      "target": "node-9",
+      "targetHandle": "f",
+      "animated": false
+    },
+    {
+      "id": "edge-1780942836989",
+      "source": "node-1",
+      "sourceHandle": "position",
+      "target": "node-9",
+      "targetHandle": "d",
+      "animated": false
+    },
+    {
+      "id": "edge-1780942891546",
+      "source": "node-9",
+      "sourceHandle": "result",
+      "target": "node-7",
+      "targetHandle": "system",
+      "animated": false
+    },
+    {
+      "id": "edge-1780942894014",
+      "source": "node-9",
+      "sourceHandle": "result",
+      "target": "node-8",
+      "targetHandle": "system",
+      "animated": false
+    },
+    {
+      "id": "edge-1780943058119",
+      "source": "node-5",
+      "sourceHandle": "then:4",
+      "target": "node-14",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1780943095024",
+      "source": "node-9",
+      "sourceHandle": "result",
+      "target": "node-14",
+      "targetHandle": "system",
+      "animated": false
+    },
+    {
+      "id": "edge-1780943211628",
+      "source": "node-4",
+      "sourceHandle": "response",
+      "target": "node-15",
+      "targetHandle": "c",
+      "animated": false
+    },
+    {
+      "id": "edge-1780943229605",
+      "source": "node-6",
+      "sourceHandle": "response",
+      "target": "node-15",
+      "targetHandle": "e",
+      "animated": false
+    },
+    {
+      "id": "edge-1780943247288",
+      "source": "node-7",
+      "sourceHandle": "response",
+      "target": "node-15",
+      "targetHandle": "g",
+      "animated": false
+    },
+    {
+      "id": "edge-1780943266473",
+      "source": "node-8",
+      "sourceHandle": "response",
+      "target": "node-15",
+      "targetHandle": "i",
+      "animated": false
+    },
+    {
+      "id": "edge-1780943270455",
+      "source": "node-15",
+      "sourceHandle": "result",
+      "target": "node-14",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "edge-1780951576809",
+      "source": "node-5",
+      "sourceHandle": "then:5",
+      "target": "node-16",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1780951594984",
+      "source": "node-9",
+      "sourceHandle": "result",
+      "target": "node-16",
+      "targetHandle": "system",
+      "animated": false
+    },
+    {
+      "id": "edge-1780951625410",
+      "source": "node-14",
+      "sourceHandle": "response",
+      "target": "node-17",
+      "targetHandle": "b",
+      "animated": false
+    },
+    {
+      "id": "edge-1780951686570",
+      "source": "node-17",
+      "sourceHandle": "result",
+      "target": "node-16",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "edge-1780951717901",
+      "source": "node-16",
+      "sourceHandle": "response",
+      "target": "node-18",
+      "targetHandle": "cover_letter",
+      "animated": false
+    },
+    {
+      "id": "edge-1780951722437",
+      "source": "node-14",
+      "sourceHandle": "response",
+      "target": "node-18",
+      "targetHandle": "resume",
+      "animated": false
+    },
+    {
+      "id": "edge-1780951762717",
+      "source": "node-14",
+      "sourceHandle": "exec-out",
+      "target": "node-19",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1780951822943",
+      "source": "node-14",
+      "sourceHandle": "response",
+      "target": "node-19",
+      "targetHandle": "content",
+      "animated": false
+    },
+    {
+      "id": "edge-1780951866567",
+      "source": "node-16",
+      "sourceHandle": "exec-out",
+      "target": "node-22",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1780951889427",
+      "source": "node-16",
+      "sourceHandle": "meta",
+      "target": "node-23",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1780951905158",
+      "source": "node-16",
+      "sourceHandle": "response",
+      "target": "node-22",
+      "targetHandle": "content",
+      "animated": false
+    },
+    {
+      "id": "edge-1780956092105",
+      "source": "node-19",
+      "sourceHandle": "exec-out",
+      "target": "node-25",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1780956191772",
+      "source": "node-14",
+      "sourceHandle": "response",
+      "target": "node-25",
+      "targetHandle": "content",
+      "animated": false
+    },
+    {
+      "id": "edge-1780956211005",
+      "source": "node-22",
+      "sourceHandle": "exec-out",
+      "target": "node-28",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1780956215755",
+      "source": "node-28",
+      "sourceHandle": "exec-out",
+      "target": "node-18",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "edge-1780956230430",
+      "source": "node-16",
+      "sourceHandle": "response",
+      "target": "node-28",
+      "targetHandle": "content",
+      "animated": false
+    },
+    {
+      "id": "edge-1780956483019",
+      "source": "node-14",
+      "sourceHandle": "meta",
+      "target": "node-20",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "edge-1780956523039",
+      "source": "node-21",
+      "sourceHandle": "result",
+      "target": "node-19",
+      "targetHandle": "file_path",
+      "animated": false
+    },
+    {
+      "id": "edge-1780956538999",
+      "source": "node-29",
+      "sourceHandle": "result",
+      "target": "node-25",
+      "targetHandle": "file_path",
+      "animated": false
+    },
+    {
+      "id": "edge-1780956572783",
+      "source": "node-30",
+      "sourceHandle": "result",
+      "target": "node-22",
+      "targetHandle": "file_path",
+      "animated": false
+    },
+    {
+      "id": "edge-1780956590049",
+      "source": "node-31",
+      "sourceHandle": "result",
+      "target": "node-28",
+      "targetHandle": "file_path",
+      "animated": false
+    }
+  ],
+  "entryNode": "node-1",
+  "created_at": "2026-06-09T20:25:13.574812+00:00",
+  "updated_at": "2026-06-09T20:32:54.594933+00:00"
+}

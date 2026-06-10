@@ -18,10 +18,16 @@ import { createNodeData, getNodeTemplate, mergePinDocsFromTemplate, NodeTemplate
 import { inferRouteOverrideRouteKey, validateConnection } from '../utils/validation';
 import { inferEntryNode, isRouteOverrideEdge, routeKey as buildRouteKey, withMultiEntryRouteData } from '../utils/multiEntryRoutes';
 import { isLegacyMusicCompatNode, normalizeLegacyMusicCompatVisualFlow } from '../utils/visualFlowCompat';
+import {
+  applyFlowAuthoringCommands,
+  type FlowAuthoringApplyResult,
+  type FlowAuthoringSnapshot,
+} from '../utils/flowAuthoringCommands';
 
 interface FlowState {
   // Flow data
   flowId: string | null;
+  draftInstanceId: string;
   flowName: string;
   flowInterfaces: string[];
   nodes: Node<FlowNodeData>[];
@@ -53,6 +59,8 @@ interface FlowState {
   setFlowInterfaces: (interfaces: string[]) => void;
   setNodes: (nodes: Node<FlowNodeData>[]) => void;
   setEdges: (edges: Edge[]) => void;
+  applyAuthoringCommands: (commands: unknown[]) => FlowAuthoringApplyResult;
+  restoreAuthoringSnapshot: (snapshot: FlowAuthoringSnapshot) => void;
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (connection: Connection) => void;
@@ -85,6 +93,10 @@ let nodeIdCounter = 0;
 
 type Point = { x: number; y: number };
 
+function newDraftInstanceId(): string {
+  return `draft-${Math.random().toString(16).slice(2)}-${Date.now().toString(16)}`;
+}
+
 interface NodeClipboardItem {
   type: string;
   data: FlowNodeData;
@@ -98,6 +110,17 @@ interface NodeClipboard {
 }
 
 const DEFAULT_CLONE_OFFSET: Point = { x: 40, y: 40 };
+
+function syncNodeIdCounter(nodes: Node<FlowNodeData>[]): void {
+  let maxNodeId = nodeIdCounter;
+  for (const node of nodes) {
+    const m = /^node-(\d+)$/.exec(String(node.id || ''));
+    if (!m) continue;
+    const n = Number(m[1]);
+    if (Number.isFinite(n) && n > maxNodeId) maxNodeId = n;
+  }
+  nodeIdCounter = maxNodeId;
+}
 
 function deepClone<T>(value: T): T {
   // Flow node data is expected to be JSON-serializable. Prefer structuredClone if available.
@@ -139,6 +162,7 @@ function getBounds(nodes: Node<FlowNodeData>[]): { minX: number; minY: number } 
 export const useFlowStore = create<FlowState>((set, get) => ({
   // Initial state
   flowId: null,
+  draftInstanceId: newDraftInstanceId(),
   flowName: 'Untitled Flow',
   flowInterfaces: [],
   nodes: [],
@@ -159,8 +183,51 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   setFlowId: (id) => set({ flowId: id }),
   setFlowName: (name) => set({ flowName: name }),
   setFlowInterfaces: (interfaces) => set({ flowInterfaces: Array.isArray(interfaces) ? interfaces : [] }),
-  setNodes: (nodes) => set({ nodes }),
+  setNodes: (nodes) => {
+    syncNodeIdCounter(nodes);
+    set({ nodes });
+  },
   setEdges: (edges) => set({ edges }),
+
+  applyAuthoringCommands: (commands) => {
+    const state = get();
+    const result = applyFlowAuthoringCommands({
+      flowName: state.flowName,
+      flowInterfaces: state.flowInterfaces,
+      nodes: state.nodes,
+      edges: state.edges,
+      commands,
+    });
+    if (result.errors.length > 0) {
+      return result;
+    }
+    syncNodeIdCounter(result.nodes);
+    const selectedNode =
+      result.touchedNodeIds.length > 0
+        ? result.nodes.find((node) => node.id === result.touchedNodeIds[result.touchedNodeIds.length - 1]) || null
+        : state.selectedNode && result.nodes.find((node) => node.id === state.selectedNode?.id) || null;
+    set({
+      flowName: result.flowName,
+      flowInterfaces: result.flowInterfaces,
+      nodes: result.nodes,
+      edges: result.edges,
+      selectedNode,
+      selectedEdge: null,
+    });
+    return result;
+  },
+
+  restoreAuthoringSnapshot: (snapshot) => {
+    syncNodeIdCounter(snapshot.nodes);
+    set({
+      flowName: snapshot.flowName,
+      flowInterfaces: Array.isArray(snapshot.flowInterfaces) ? snapshot.flowInterfaces : [],
+      nodes: snapshot.nodes,
+      edges: snapshot.edges,
+      selectedNode: null,
+      selectedEdge: null,
+    });
+  },
 
   // React Flow change handlers
   onNodesChange: (changes) => {
@@ -583,6 +650,39 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         ? { ...createNodeData(template), ...vn.data }
         : (vn.data as FlowNodeData);
 
+      if (data.nodeType === 'make_object' && data.label === 'Create JSON') {
+        data = { ...data, label: 'Build JSON' };
+      }
+      if (data.nodeType === 'edit_json_schema' && data.label === 'Edit JSON Schema') {
+        data = { ...data, label: 'Add Schema Fields' };
+      }
+      if (data.nodeType === 'json_schema') {
+        const nextOutputs = Array.isArray(data.outputs)
+          ? data.outputs.map((pin) =>
+              pin.id === 'value' || pin.id === 'schema' ? { ...pin, type: 'json_schema' as const } : pin
+            )
+          : data.outputs;
+        data = { ...data, outputs: nextOutputs };
+      }
+      if (data.nodeType === 'edit_json_schema') {
+        const nextInputs = Array.isArray(data.inputs)
+          ? data.inputs.map((pin) => (pin.id === 'schema' ? { ...pin, type: 'json_schema' as const } : pin))
+          : data.inputs;
+        const nextOutputs = Array.isArray(data.outputs)
+          ? data.outputs.map((pin) => (pin.id === 'schema' ? { ...pin, type: 'json_schema' as const } : pin))
+          : data.outputs;
+        data = { ...data, inputs: nextInputs, outputs: nextOutputs };
+      }
+      if (
+        data.nodeType === 'make_object' &&
+        (!Array.isArray(data.inputs) || data.inputs.filter((pin) => pin.type !== 'execution').length === 0)
+      ) {
+        data = {
+          ...data,
+          inputs: [{ id: 'value', label: 'value', type: 'any', description: 'First object field. Rename/add fields in the Properties panel.' }],
+        };
+      }
+
       if (data.nodeType === 'on_flow_start') {
         // Prefer a stable, interface-aligned output order when pins are present.
         const existingOutputs = Array.isArray(data.outputs) ? [...data.outputs] : [];
@@ -794,7 +894,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                 want({ id: 'temperature', label: 'temperature', type: 'number' }),
                 want({ id: 'seed', label: 'seed', type: 'number' }),
                 want({ id: 'thinking', label: 'thinking', type: 'string' }),
-                want({ id: 'resp_schema', label: 'resp_schema', type: 'object' }),
+                want({ id: 'resp_schema', label: 'resp_schema', type: 'json_schema' }),
               ]
             : [
                 execIn,
@@ -811,7 +911,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
                 want({ id: 'temperature', label: 'temperature', type: 'number' }),
                 want({ id: 'seed', label: 'seed', type: 'number' }),
                 want({ id: 'thinking', label: 'thinking', type: 'string' }),
-                want({ id: 'resp_schema', label: 'resp_schema', type: 'object' }),
+                want({ id: 'resp_schema', label: 'resp_schema', type: 'json_schema' }),
               ];
 
         // Drop truly deprecated pins (kept for backward compat in old flows).
@@ -842,6 +942,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
               ? [
                   execOut,
                   wantOut({ id: 'response', label: 'response', type: 'string' }),
+                  wantOut({ id: 'data', label: 'data', type: 'object' }),
                   wantOut({ id: 'success', label: 'success', type: 'boolean' }),
                   wantOut({ id: 'meta', label: 'meta', type: 'object' }),
                   wantOut({ id: 'tool_calls', label: 'tool_calls', type: 'array' }),
@@ -849,6 +950,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
               : [
                   execOut,
                   wantOut({ id: 'response', label: 'response', type: 'string' }),
+                  wantOut({ id: 'data', label: 'data', type: 'object' }),
                   wantOut({ id: 'success', label: 'success', type: 'boolean' }),
                   wantOut({ id: 'meta', label: 'meta', type: 'object' }),
                   wantOut({ id: 'scratchpad', label: 'scratchpad', type: 'object' }),
@@ -1004,11 +1106,21 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 	      }
 
 	      // Backward-compat + canonical ordering for Subflow nodes.
-	      // Add the inherit_context pin (default false via node config) so it can be driven via data edges.
+	      // Keep inherit_context as a local control pin; selected child-flow data pins remain preserved below it.
 	      if (data.nodeType === 'subflow') {
 	        const existingInputs = Array.isArray(data.inputs) ? data.inputs : [];
         const byId = new Map(existingInputs.map((p) => [p.id, p] as const));
         const used = new Set<string>();
+        const subflowRef =
+          typeof data.subflowId === 'string' && data.subflowId.trim()
+            ? data.subflowId.trim()
+            : typeof (data as any).flowId === 'string' && (data as any).flowId.trim()
+              ? (data as any).flowId.trim()
+              : typeof (data as any).workflowId === 'string' && (data as any).workflowId.trim()
+                ? (data as any).workflowId.trim()
+                : typeof (data as any).workflow_id === 'string' && (data as any).workflow_id.trim()
+                  ? (data as any).workflow_id.trim()
+                  : '';
 
         const want = (pin: Pin): Pin => {
           const prev = byId.get(pin.id);
@@ -1021,7 +1133,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         const canonicalInputs: Pin[] = [
           want({ id: 'exec-in', label: '', type: 'execution' }),
           want({ id: 'inherit_context', label: 'inherit_context', type: 'boolean' }),
-          want({ id: 'input', label: 'input', type: 'object' }),
+          ...(subflowRef ? [] : [want({ id: 'input', label: 'input', type: 'object' })]),
         ];
 
         const extras = existingInputs.filter((p) => !used.has(p.id));
@@ -1458,9 +1570,42 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         data = { ...data, pinDefaults: nextDefaults, inputs: [...canonicalInputs, ...extras] };
       }
 
+      if (data.nodeType === 'read_pdf' || data.nodeType === 'write_pdf') {
+        const existingInputs = Array.isArray(data.inputs) ? data.inputs : [];
+        const byId = new Map(existingInputs.map((p) => [p.id, p] as const));
+        const used = new Set<string>();
+
+        const want = (pin: Pin): Pin => {
+          const prev = byId.get(pin.id);
+          used.add(pin.id);
+          if (!prev) return pin;
+          if (prev.label === pin.label && prev.type === pin.type) return prev;
+          return { ...prev, label: pin.label, type: pin.type };
+        };
+
+        const canonicalInputs: Pin[] =
+          data.nodeType === 'read_pdf'
+            ? [
+                want({ id: 'exec-in', label: '', type: 'execution' }),
+                want({ id: 'file_path', label: 'file_path', type: 'string' }),
+                want({ id: 'page_start', label: 'page_start', type: 'number' }),
+                want({ id: 'page_end', label: 'page_end', type: 'number' }),
+                want({ id: 'max_chars', label: 'max_chars', type: 'number' }),
+              ]
+            : [
+                want({ id: 'exec-in', label: '', type: 'execution' }),
+                want({ id: 'file_path', label: 'file_path', type: 'string' }),
+                want({ id: 'content', label: 'content', type: 'any' }),
+                want({ id: 'title', label: 'title', type: 'string' }),
+              ];
+
+        const extras = existingInputs.filter((p) => !used.has(p.id));
+        data = { ...data, inputs: [...canonicalInputs, ...extras] };
+      }
+
       // Backward-compat: media nodes added before inline media controls had empty
       // local-friendly defaults, leaving basic settings blank in existing flows.
-      if (['generate_image', 'edit_image', 'image_to_image', 'generate_video', 'text_to_video', 'image_to_video', 'generate_voice', 'generate_music', 'transcribe_audio', 'listen_voice'].includes(data.nodeType)) {
+      if (['generate_image', 'edit_image', 'image_to_image', 'upscale_image', 'generate_video', 'text_to_video', 'image_to_video', 'generate_voice', 'generate_music', 'transcribe_audio', 'listen_voice'].includes(data.nodeType)) {
         const prevDefaults =
           data.pinDefaults && typeof data.pinDefaults === 'object' ? (data.pinDefaults as Record<string, unknown>) : {};
         const normalizeScopedMediaValue = (value: unknown, provider: unknown = ''): string => {
@@ -1560,7 +1705,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
               ]
             : data.nodeType === 'generate_music'
               ? (getNodeTemplate('generate_music')?.inputs || [])
-            : data.nodeType === 'generate_video' || data.nodeType === 'text_to_video' || data.nodeType === 'image_to_video'
+            : data.nodeType === 'upscale_image' || data.nodeType === 'generate_video' || data.nodeType === 'text_to_video' || data.nodeType === 'image_to_video'
               ? (getNodeTemplate(data.nodeType)?.inputs || [])
             : data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
               ? [
@@ -1631,6 +1776,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             ? { format: 'png', steps: 20 }
             : data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
               ? { format: 'png', steps: 20 }
+            : data.nodeType === 'upscale_image'
+              ? { format: 'png', resolution: '2x', softness: 0.25 }
             : data.nodeType === 'generate_video' || data.nodeType === 'text_to_video' || data.nodeType === 'image_to_video'
               ? { format: 'mp4', width: 512, height: 512, frames: 41, fps: 24, steps: 20, guidance_scale: 5.0 }
             : data.nodeType === 'generate_voice'
@@ -1665,7 +1812,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             nextDefaults.tts_model = model;
             changedDefaults = true;
           }
-        } else if (data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image') {
+        } else if (data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image' || data.nodeType === 'upscale_image') {
           const provider = normalizeScopedMediaValue(firstString(nextDefaults.image_provider, nextDefaults.imageProvider, nextDefaults.provider));
           const model = normalizeScopedMediaValue(firstString(nextDefaults.image_model, nextDefaults.imageModel, nextDefaults.model), provider);
           if (nextDefaults.size !== undefined) {
@@ -1771,7 +1918,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
             changedEffectConfig = true;
           }
           setEffectIfMissing('quality_preset', quality);
-        } else if (data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image') {
+        } else if (data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image' || data.nodeType === 'upscale_image') {
           const provider = normalizeScopedMediaValue(firstString(nextEffectConfig.image_provider, nextDefaults.image_provider, nextEffectConfig.provider, nextDefaults.provider));
           const model = normalizeScopedMediaValue(firstString(nextEffectConfig.image_model, nextDefaults.image_model, nextEffectConfig.model, nextDefaults.model), provider);
           setEffectIfMissing('image_provider', provider);
@@ -1818,7 +1965,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         const canonicalInputSpecs: Pin[] = [
           { id: 'exec-in', label: '', type: 'execution' },
           { id: 'operation', label: 'operation', type: 'string', description: 'list_loaded, load, or unload.' },
-          { id: 'task', label: 'task', type: 'string', description: 'text_generation, image_generation, image_to_image, text_to_video, image_to_video, tts, stt, or music_generation.' },
+          { id: 'task', label: 'task', type: 'string', description: 'text_generation, image_generation, image_to_image, image_upscale, text_to_video, image_to_video, tts, stt, or music_generation.' },
           { id: 'provider', label: 'provider', type: 'provider', description: 'Provider/backend id to load or filter.' },
           { id: 'model', label: 'model', type: 'model', description: 'Model id to load or filter.' },
         ];
@@ -2161,6 +2308,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
 
     set({
       flowId: flow.id,
+      draftInstanceId: newDraftInstanceId(),
       flowName: flow.name,
       flowInterfaces: Array.isArray(flow.interfaces) ? flow.interfaces : [],
       nodes,
@@ -2207,6 +2355,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   clearFlow: () => {
     set({
       flowId: null,
+      draftInstanceId: newDraftInstanceId(),
       flowName: 'Untitled Flow',
       flowInterfaces: [],
       nodes: [],

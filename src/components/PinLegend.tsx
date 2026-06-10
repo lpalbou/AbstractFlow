@@ -20,6 +20,7 @@ const PIN_INFO: PinInfo[] = [
   { type: 'number', label: 'Number', shape: '\u25CF', description: 'Integer or float' },
   { type: 'boolean', label: 'Boolean', shape: '\u25C7', description: 'True/False' },
   { type: 'object', label: 'Object', shape: '\u25CF', description: 'JSON objects' },
+  { type: 'json_schema', label: 'JSON Schema', shape: '\u25CF', description: 'JSON Schema object' },
   { type: 'artifact', label: 'Artifact', shape: '\u25CF', description: 'Generic Gateway artifact reference' },
   { type: 'artifact_image', label: 'Image Artifact', shape: '\u25CF', description: 'Image artifact reference' },
   { type: 'artifact_audio', label: 'Audio Artifact', shape: '\u25CF', description: 'Audio, voice, or music artifact reference' },

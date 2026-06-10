@@ -2,13 +2,19 @@
 
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import { generateWorkflowNodeCatalog } from './generate-workflow-node-catalog.mjs';
 
 const root = process.cwd();
+
+await generateWorkflowNodeCatalog();
+
 const files = [
   'README.md',
   'docs/README.md',
   'docs/getting-started.md',
   'docs/web-editor.md',
+  'docs/workflow-authoring-skill.md',
+  'docs/workflow-node-catalog.md',
   'docs/architecture.md',
   'docs/api.md',
   'docs/visualflow.md',

@@ -9,6 +9,7 @@ export type PinType =
   | 'number'    // Green #00FF00 - Integer/Float
   | 'boolean'   // Red #FF0000 - True/False
   | 'object'    // Cyan #00FFFF - JSON objects
+  | 'json_schema' // Cyan #00FFFF - JSON Schema objects
   | 'artifact'  // Generic Gateway artifact reference object
   | 'artifact_image' // Image Gateway artifact reference object
   | 'artifact_audio' // Audio Gateway artifact reference object (voice/music/sound)
@@ -41,6 +42,7 @@ export const PIN_COLORS: Record<PinType, string> = {
   number: '#00FF00',
   boolean: '#FF0000',
   object: '#00FFFF',
+  json_schema: '#00FFFF',
   artifact: '#5EEAD4',
   artifact_image: '#19D3B8',
   artifact_audio: '#22D3EE',
@@ -77,6 +79,11 @@ export interface Pin {
    * Keep it short and action-oriented: what this pin represents + how it affects runtime behavior.
    */
   description?: string;
+  /**
+   * Optional JSON Schema metadata for structured object pins.
+   * This is authoring metadata only; runtime values still flow by pin id.
+   */
+  schema?: Record<string, unknown>;
 }
 
 export type PinConnectionFeedback = {
@@ -120,13 +127,14 @@ export type NodeType =
   | 'random_int' | 'random_float'
   // String - Pure functions (no exec pins)
   | 'concat' | 'split' | 'join' | 'format' | 'string_template' | 'uppercase' | 'lowercase' | 'trim' | 'substring' | 'length'
-  | 'contains' | 'replace'
+  | 'is_empty_string' | 'contains' | 'replace'
   // Control - if/loop/while have exec, logic gates are pure
   | 'if' | 'switch' | 'loop' | 'while' | 'sequence' | 'parallel' | 'compare' | 'not' | 'and' | 'or' | 'coalesce'
   | 'for'
   // Data - Pure functions (no exec pins)
   | 'get' | 'set' | 'merge' | 'make_array' | 'array_map' | 'array_filter' | 'array_concat' | 'array_length' | 'array_append' | 'array_dedup'
   | 'make_object'
+  | 'edit_json_schema'
   | 'get_element'
   | 'get_random_element'
   | 'make_context' | 'make_meta' | 'make_scratchpad'
@@ -150,6 +158,7 @@ export type NodeType =
   | 'generate_image'
   | 'edit_image'
   | 'image_to_image'
+  | 'upscale_image'
   | 'generate_video'
   | 'text_to_video'
   | 'image_to_video'
@@ -162,6 +171,8 @@ export type NodeType =
   | 'emit_event'
   | 'read_file'
   | 'write_file'
+  | 'read_pdf'
+  | 'write_pdf'
   | 'memory_note'
   | 'memory_query'
   | 'memory_tag'
@@ -275,7 +286,7 @@ export interface FlowNodeData {
     provider?: string;     // For llm_call
     model?: string;        // For llm_call
     operation?: string;    // For model_residency: list_loaded, load, unload
-    task?: string;         // For model_residency: text_generation, image_generation, image_to_image, text_to_video, image_to_video, tts, stt, music_generation
+    task?: string;         // For model_residency: text_generation, image_generation, image_to_image, image_upscale, text_to_video, image_to_video, tts, stt, music_generation
     runtime_id?: string;   // For model_residency unload
     base_url?: string;     // For model_residency disambiguation/remote provider override
     timeout_s?: number;    // For model_residency load/unload control calls
@@ -295,6 +306,11 @@ export interface FlowNodeData {
     image_artifact?: any;    // For image edit source artifact
     source_image?: any;      // For image edit/source-image alias
     mask_artifact?: any;     // For optional image edit mask artifact
+    scale?: string;       // For image upscale, for example 2x
+    resolution?: number | string; // For image upscale target resolution, for example 2048 or 2x
+    softness?: number;     // For image upscale softness control
+    quantize?: number;     // For image upscale backend quantization hint
+    vae_tiling?: boolean;  // For image upscale tiled VAE decode
     video_provider?: string; // For generated video backend/catalog selection
     video_model?: string;    // For generated video backend/catalog selection
     tts_provider?: string;   // For generated voice backend/catalog selection
@@ -482,6 +498,7 @@ export interface RunSummary {
 export interface RunHistoryResponse {
   run: RunSummary;
   events: ExecutionEvent[];
+  traceEvents: ExecutionEvent[];
 }
 
 // Provider information from AbstractCore

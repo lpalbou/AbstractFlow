@@ -7,6 +7,7 @@ export type MediaModelParameterMetadata = {
 
 export type ImagePinDefaultPatchOptions = {
   includeGuidanceScale?: boolean;
+  includeUpscale?: boolean;
   excludeKeys?: Iterable<string>;
 };
 
@@ -16,6 +17,14 @@ const IMAGE_PARAMETER_PIN_KEYS = new Set([
   'seed',
   'steps',
   'negative_prompt',
+]);
+
+const UPSCALE_PARAMETER_PIN_KEYS = new Set([
+  'scale',
+  'resolution',
+  'softness',
+  'quantize',
+  'vae_tiling',
 ]);
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -81,6 +90,7 @@ export function extractImageModelParameterMetadata(record: Record<string, unknow
 function shouldPatchImageParameter(key: string, options: ImagePinDefaultPatchOptions, excluded: ReadonlySet<string>): boolean {
   if (excluded.has(key)) return false;
   if (key === 'guidance_scale') return options.includeGuidanceScale === true;
+  if (UPSCALE_PARAMETER_PIN_KEYS.has(key)) return options.includeUpscale === true;
   return IMAGE_PARAMETER_PIN_KEYS.has(key);
 }
 

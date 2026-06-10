@@ -23,6 +23,7 @@ export function NodePalette() {
     events: true,
     core: true,
     media: true,
+    schema: true,
   });
 
   const [searchTerm, setSearchTerm] = useState('');

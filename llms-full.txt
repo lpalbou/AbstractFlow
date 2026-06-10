@@ -38,11 +38,35 @@ LLM Call and Agent nodes include a Reasoning control backed by Core's
 set/pin values such as `off`, `low`, `medium`, `high`, or `xhigh` for reasoning
 models that support explicit effort controls.
 
+LLM Call and Agent response schemas can be defined directly on the unconnected
+`resp_schema` pin. The Builder tab creates ordinary JSON Schema, including
+Choice fields saved as `enum` values. Connected schema inputs override the
+inline default, and published workflows keep the schema in
+`data.pinDefaults.resp_schema` for Gateway/Runtime execution. When a response
+schema is configured, `response` remains the text output and a structured
+`data` object output is shown for Break Object, Switch, and other object-aware
+nodes.
+
 Media artifact inputs can be wired from another node or uploaded directly on
 the node when the artifact pin is unconnected. Uploaded browser files are stored
-as Gateway artifacts. During `Listen Voice` waits, Flow records in the browser,
+as Gateway artifacts. Image generation, editing, restoration/upscaling, video,
+voice, music, and transcription nodes all execute through Gateway-advertised
+capabilities. During `Listen Voice` waits, Flow records in the browser,
 uploads the captured audio artifact, and resumes the Gateway run; Flow does not
 execute local audio or transcription logic itself.
+
+File and document workflows can use `Write File` for Markdown/JSON/text paths,
+`Read File` for UTF-8/JSON inputs, `Read PDF` for extracting PDF text/metadata,
+and `Write PDF` for rendering report content to a real PDF path through
+Runtime.
+
+The toolbar star opens the Workflow Authoring Assistant in the right drawer.
+The assistant reads `docs/workflow-authoring-skill.md` plus a complete generated
+node catalog, uses Gateway's default `output.text` model by starting normal
+Gateway planner runs unless a model is pinned, reads planner responses from run
+ledgers, and applies only validated editor commands to the draft canvas. It can
+create or refine common workflows such as internet research, deep research, news
+digests, and job searches; Save, Publish, and Run remain explicit user actions.
 
 ## Gateway Setup
 
@@ -64,7 +88,7 @@ Use:
 - `src/` - React/Vite visual editor.
 - `bin/cli.js` - npm CLI/static server and Gateway proxy.
 - `examples/flows/` - sample VisualFlow JSON files kept for reference/import tests.
-- `docs/` - external documentation for users and maintainers.
+- `docs/` - external documentation for users and contributors.
 
 AbstractFlow does not ship a Python package or local execution host. VisualFlow compilation, bundle execution, runtime state, and provider calls are handled by AbstractGateway and AbstractRuntime.
 
@@ -116,17 +140,25 @@ Normal operation:
 
 AbstractFlow does not own runtime execution or provider secrets. Gateway and Runtime do.
 
+Flow can author runtime-facing pin defaults, including inline JSON Schema
+response schemas for LLM Call and Agent nodes. Those schemas are saved in
+VisualFlow JSON and enforced later by Runtime/Core after Gateway publish/start.
+When a schema is active, `data` is the structured object output and `response`
+stays textual for compatibility.
+
 ## Pages
 
 - [Getting started](getting-started.md)
 - [Web editor](web-editor.md)
+- [Workflow authoring skill](workflow-authoring-skill.md)
+- [Workflow node catalog](workflow-node-catalog.md)
 - [Architecture](architecture.md)
 - [API and contracts](api.md)
 - [VisualFlow JSON](visualflow.md)
 - [CLI](cli.md)
 - [FAQ](faq.md)
 
-## Maintainer Notes
+## Documentation Upkeep
 
 - Keep docs written around the web package layout: `src/`, `bin/`, `examples/flows/`, `docs/`.
 - Do not add Python package or local server launch instructions; those surfaces were removed from this repository.
@@ -253,12 +285,101 @@ The Model Residency modal shows only provider-reported resident/loaded models.
 Configure capability defaults in Gateway Console or with the Gateway/Core
 config CLIs; changing a default does not load or unload a model.
 
+## Workflow Authoring Assistant
+
+The star button on the right side of the toolbar opens a conversational
+assistant in the right drawer. The drawer shares space with Properties, so users
+can switch between assistant guidance and node editing while keeping the canvas
+visible.
+
+The assistant uses `docs/workflow-authoring-skill.md` plus a complete generated
+node catalog from `src/types/nodes.ts` as its graph-authoring context. This
+replaces generic `llms-full.txt` context for workflow construction. By default
+it resolves Gateway's configured `output.text` capability route and starts a
+short-lived Gateway `basic-agent` planner run through the normal
+`/api/gateway/runs/start` path. Users can pin a specific assistant
+provider/model from the drawer. The assistant runs an autonomous authoring loop:
+each cycle reads the planner response from the run ledger, applies validated
+command batches, checks the updated graph, and continues until the draft is
+ready or explicitly blocked.
+
+The planner run receives a single prompt plus a system prompt with strict JSON
+instructions. Its runtime tool list is explicitly empty: authoring edits must
+come back as validated command JSON, not as Gateway tool calls. Prior user turns
+are included inside the current prompt, while assistant prose is represented by
+the current graph summary rather than replayed as separate chat-history
+messages. The visible graph remains the source of applied draft state.
+
+The drawer shows the prompt size that will be sent to Gateway and, when Gateway
+model-capability discovery is available, the selected model's context and output
+limits. It also includes a Clear Chat button and a loop status strip showing
+phase, cycle count, applied command count, and readiness issue count.
+AbstractFlow does not truncate the assistant conversation, selected docs
+sections, or graph summary to fit a local limit, and it does not hardcode model
+context windows. The drawer conversation and draft text are persisted locally so
+closing and reopening the Assistant rail does not erase the ongoing authoring
+discussion. Clear Chat resets the local assistant conversation and planner
+session without changing the current graph. If the Gateway run, model call,
+structured response, or ledger read fails, the drawer reports that failure
+directly.
+
+Assistant output is treated as an untrusted edit proposal. The editor accepts
+only a small command set for flow names, node creation, safe dynamic pins,
+pin defaults, literals, Code node bodies, labels, concat separators, and
+validated connections. The command reducer rejects unknown node types, invalid
+edges, secret-looking values, Code `full_access`, destructive edits, and Tool
+Calls nodes without an explicit `allowed_tools` allowlist.
+
+Research-oriented readiness checks require an authored Agent system prompt,
+explicit tool configuration when web tools are needed, prompt-building nodes,
+sources/citations that are not `Agent.meta`, an audit trace, and final outputs.
+`Agent Trace Report` is accepted only for audit output, not as a report source.
+When a request asks for Markdown/PDF artifacts, the assistant must create
+an executable `Write File` node for Markdown and an executable `Write PDF` node
+for PDF. `Write PDF` renders report text or Markdown-style content to real PDF
+bytes in Runtime and exposes the resulting path through `On Flow End`. Generic
+`Write File` and sandbox Code are not treated as PDF generation.
+
+Tool-dependent requests use Gateway's advertised tool inventory and exact tool
+names. If Gateway defaults, advertised discovery endpoints, the planner run,
+strict JSON parsing, or command validation fail, the assistant reports the error
+instead of synthesizing a substitute plan. Completed cycle edits remain visible in
+the draft; the failed cycle is not applied, and Undo Turn restores the pre-turn
+snapshot.
+
+Each assistant turn ends with how the draft works, how to test it, and what to
+expect. The assistant changes the in-memory draft only. Users still review the
+graph, Save, Publish, and Run through the normal Gateway-backed controls.
+
+## Structured Output Schemas
+
+LLM Call and Agent nodes expose `resp_schema` as an optional JSON Schema input.
+When that input is not connected, the node shows an inline schema editor. The
+Builder tab is for object fields, required/optional fields, descriptions, and
+Choice fields. Choice fields are saved as standard JSON Schema string enums.
+
+The JSON Schema tab accepts advanced object schemas directly, including `$ref`
+schemas that Runtime can resolve. Switching back to Builder preserves supported
+top-level fields and Choice values.
+
+Connected schema inputs always override the inline default. When a workflow is
+published, Gateway stores and packs the VisualFlow JSON unchanged; Runtime then
+applies unconnected `pinDefaults.resp_schema` values and Core enforces the
+structured output schema.
+
+For branch routing, define a Choice field such as `choice`, wire the
+LLM/Agent `data` output into Break Object, expose `choice`, and connect it to a
+Switch node. `response` remains available as text for display and compatibility.
+The Switch panel can sync explicit cases from the discovered enum values, so the
+published workflow contains stable `switchConfig.cases`.
+
 ## Media Nodes
 
 Flow exposes media nodes only when Gateway advertises the corresponding capability:
 
 - Generate Image
 - Edit Image / Image-to-Image
+- Restore / Upscale Image
 - Generate Video
 - Image-to-Video
 - Generate Voice
@@ -266,7 +387,7 @@ Flow exposes media nodes only when Gateway advertises the corresponding capabili
 - Transcribe Audio
 - Listen Voice
 
-Generated outputs are Gateway artifacts. The run modal renders image/video/audio previews and keeps the artifact content link available for open/download. When Gateway returns a media child run, Flow streams the child-run ledger and renders `abstract.progress` records for image, image-edit, video, and image-to-video runs when available.
+Generated outputs are Gateway artifacts. The run modal renders image/video/audio previews and keeps the artifact content link available for open/download. When Gateway returns a media child run, Flow streams the child-run ledger and renders `abstract.progress` records for image, image-edit, image-upscale, video, and image-to-video runs when available.
 
 Unconnected artifact input pins expose a browser upload affordance directly on the node. Uploads go to Gateway and are stored as session-visible artifacts, then the node stores the canonical artifact ref as its pin default. Flow does not use server workspace paths for browser-local uploads.
 
@@ -292,6 +413,2522 @@ npm run build
 npm start -- --host 0.0.0.0 --port 3003 --gateway-url http://127.0.0.1:8080
 ```
 
+## docs/workflow-authoring-skill.md
+
+# AbstractFlow Workflow Authoring Skill
+
+This is the operational guide for agents that author AbstractFlow VisualFlow
+graphs. It is not general product documentation. It is the procedure and domain
+model an authoring agent must use to create inspectable, runnable workflows.
+
+The authoring prompt includes two sources of truth:
+
+1. This skill document, which explains how to think and compose workflows.
+2. A complete generated node catalog from `src/types/nodes.ts`, which lists
+   every accessible node type, utility description, input pins, output pins, pin
+   types, Gateway capability requirements, command-authorable config, dynamic
+   pin policy, and default configuration. The generated catalog is authoritative
+   for exact node types and pins.
+
+Use this guide for semantics and patterns. Use the generated catalog for exact
+parameters.
+
+The committed companion catalog is `docs/workflow-node-catalog.md`. In the web
+assistant, the same information is generated at runtime and appended to the
+prompt with current Gateway capability availability.
+
+## Catalog Reading Protocol
+
+Before emitting commands, read the generated node catalog as an API contract:
+
+- Classify each node you intend to use as execution, pure data, config/literal,
+  media/capability, memory/IO, event, or control.
+- Check exact input pin ids and output pin ids before connecting.
+- Check pin types before connecting.
+- Check default configuration to understand implicit behavior.
+- Prefer catalog descriptions over guesses from node labels.
+- Do not use hidden or deprecated nodes unless the catalog explicitly exposes
+  them.
+- If multiple visible palette entries share a `nodeType`, use the catalog's
+  `templateLabel` value on `add_node` to select the desired variant.
+- Read `authorable_config` before assuming a config object can be set. Some UI
+  config fields are not command-authorable.
+- If the catalog lacks a dedicated node for a required transformation, use Code
+  only when a sandbox transform is appropriate.
+
+## Node Catalog And Contracts
+
+The catalog is the node contract. For every visible template, it supplies:
+
+- `nodeType` and `templateLabel` when needed for duplicate palette variants;
+- category and utility;
+- Gateway capability requirement and current availability in the live assistant;
+- dynamic pin policy;
+- command-authorable config fields;
+- input pins and output pins with exact ids and types;
+- default config;
+- hidden/deprecated templates rejected by `add_node`.
+
+Duplicate palette variants matter. For example, generic JSON, Memory, Assertion,
+Text Artifact, Image Artifact, Voice Artifact, Music Artifact, and Video Artifact
+share low-level literal node types, but they expose different output pin types
+and default literal values. Use the catalog create command exactly.
+
+## Gateway Capability Contract
+
+Some nodes require Gateway capabilities such as tool execution, generated image,
+generated video, image-to-video, generated voice, generated music, model
+residency, or KG memory. The live catalog row includes current availability:
+
+- `available`: the node can be authored and preflight should allow it.
+- `checking`: Gateway capability data is still loading; be conservative and
+  explain that execution depends on Gateway support.
+- `unavailable`: do not build a workflow that depends on that node unless the
+  user explicitly accepts a blocked workflow. Return `failed` or `needs_user`
+  with the missing capability.
+
+Tool-dependent workflows must also use the discovered Gateway tool inventory.
+Never invent tool names or rely on implicit tools.
+
+## Non-Negotiable Contract
+
+- Author the visible graph. Do not emit raw VisualFlow JSON.
+- Return only validated authoring commands.
+- Use only node types and pins present in the generated node catalog, except for
+  explicitly allowed dynamic pins.
+- Do not invent tools, providers, models, pins, node types, or Gateway routes.
+- Do not silently fall back to a simpler workflow.
+- Do not mark the graph done until the request is satisfied and readiness checks
+  are clear.
+- If a capability is missing, fail or ask the user clearly with no graph commands
+  for that cycle.
+
+The editor applies commands atomically per cycle. If one command is invalid,
+that cycle is rejected and no changes from that cycle are kept. Use validator
+feedback to repair the next cycle.
+
+## Authoring Loop
+
+For each user turn:
+
+1. Parse the user intent into workflow responsibilities: trigger, inputs,
+   context building, model/tool/generative actions, transforms, state, side
+   effects, outputs, and observability.
+2. Inspect the current draft graph and preserve useful existing nodes.
+3. Check readiness issues and repair feedback.
+4. Emit one coherent command batch for this cycle.
+5. After validation, continue with more commands if the graph still lacks
+   required behavior.
+6. End with `status: done` only when the graph visibly implements the requested
+   workflow.
+
+A good workflow is not just a chain that "runs". It is readable: node labels
+explain responsibility, data edges expose intent, and final outputs are wired to
+On Flow End.
+
+## Command Schema
+
+Use only these actions:
+
+- `set_flow_name`
+  - Fields: `name`.
+  - Use for a descriptive workflow name.
+
+- `add_node`
+  - Fields: `id`, `nodeType`, optional `templateLabel`, optional `label`,
+    optional `position`, optional `pinDefaults`, optional `literalValue`,
+    optional `concatSeparator`, optional `codeBody`, optional `functionName`.
+  - `nodeType` must match the generated catalog.
+  - `templateLabel` selects a duplicate palette variant with the same
+    `nodeType`. Use it exactly when the catalog create command includes it.
+  - `pinDefaults` can configure existing input pins.
+  - `literalValue` configures literal/config nodes such as JSON, Array, Tools
+    Allowlist, JSON Schema, and artifact literals.
+  - `codeBody` is allowed only for Code nodes and runs in the sandbox.
+
+- `set_pin_default`
+  - Fields: `nodeId`, `pin`, `value`.
+  - Use for existing non-execution input pins only.
+  - Typical uses: prompts, system text, max_iterations, temperatures, file_path,
+    model/provider only when explicitly requested, media sizing, schema defaults.
+  - Use `set_literal` for literal/config nodes and Tools Allowlist.
+
+- `set_literal`
+  - Fields: `nodeId`, `value`.
+  - Use for literal/config nodes. For String Template, this sets the template.
+    For Tools Allowlist, this sets selected tool names.
+
+- `set_code_body`
+  - Fields: `nodeId`, `codeBody`, optional `functionName`.
+  - Use to author the body of a Code node.
+
+- `set_break_paths`
+  - Fields: `nodeId`, `paths`.
+  - Use for Break Object selected output paths. Each path can be a string or an
+    object with `path`, optional `label`, and optional `pinType`.
+  - If `id` is used, it is treated as the path/handle, not as an alias. Do not
+    send different `id` and `path` values.
+  - Emits matching output pins. Do not use `add_output_pin` alone for
+    Break Object; runtime also needs `breakConfig.selectedPaths`.
+
+- `set_switch_cases`
+  - Fields: `nodeId`, `cases`.
+  - Use for Switch case branches. Cases can be strings or objects with `value`
+    and optional `id`. Outputs become `case:<id>` plus `default`.
+
+- `set_branch_count`
+  - Fields: `nodeId`, `count`.
+  - Use for Sequence or Parallel branch outputs (`then:0`, `then:1`, ...).
+    Parallel also keeps `completed`.
+
+- `set_tool_parameters`
+  - Fields: `nodeId`, `tool`, optional `parameters`, optional `defaults`.
+  - Use for Tool Parameters. `parameters` should mirror the discovered tool
+    parameter schema from the available tool inventory.
+  - Emits dynamic input pins for each parameter and a `tool_call` output object.
+
+- `set_event_config`
+  - Fields: `nodeId`, optional `name`, optional `scope`, optional `channel`,
+    optional `agentFilter`, optional `schedule`, optional `recurrent`, optional
+    `description`.
+  - Use for `on_event`, `on_agent_message`, and `on_schedule` runtime event
+    configuration.
+  - Valid scopes are `session`, `workflow`, `run`, and `global`.
+
+- `add_input_pin`
+  - Fields: `nodeId`, `id`, optional `label`, optional `pinType`.
+  - Allowed only on dynamic-input nodes listed below.
+
+- `add_output_pin`
+  - Fields: `nodeId`, `id`, optional `label`, optional `pinType`.
+  - Allowed only on dynamic-output nodes listed below.
+
+- `connect`
+  - Fields: `source`, `sourceHandle`, `target`, `targetHandle`.
+  - You may also use shorthand endpoints such as `source: "agent.response"`,
+    `target: "end.report"` if handles are unambiguous.
+
+- `set_label`
+  - Fields: `nodeId`, `label`.
+
+- `set_concat_separator`
+  - Fields: `nodeId`, `separator`.
+
+Do not emit delete, save, publish, run, HTTP, Gateway API, icon, theme, or raw
+state mutation commands.
+
+Command examples:
+
+```json
+{"action":"add_node","id":"image_ref","nodeType":"literal_json","templateLabel":"Image Artifact"}
+{"action":"add_node","id":"call_search","nodeType":"tool_calls","pinDefaults":{"allowed_tools":["web_search"]}}
+{"action":"set_break_paths","nodeId":"extract_report","paths":[{"path":"markdown_report","pinType":"string"},{"path":"sources","pinType":"array"}]}
+{"action":"set_switch_cases","nodeId":"route_kind","cases":[{"id":"research","value":"research"},{"id":"digest","value":"digest"}]}
+{"action":"set_branch_count","nodeId":"side_effects","count":3}
+{"action":"set_tool_parameters","nodeId":"search_params","tool":"web_search","parameters":{"query":{"type":"string"},"num_results":{"type":"number"}}}
+{"action":"set_event_config","nodeId":"incoming_event","name":"daily_digest","scope":"session"}
+```
+
+## Authoring Command Capability Limits
+
+The authoring reducer supports the commands listed above. For node-specific
+configuration, use the specific command:
+
+- Break Object fields: `set_break_paths`.
+- Switch cases: `set_switch_cases`.
+- Sequence/Parallel branch count: `set_branch_count`.
+- Tool Parameters selected tool and parameter pins: `set_tool_parameters`.
+- Event trigger settings: `set_event_config`.
+- Concat separator: `set_concat_separator`.
+- Code transform body: `set_code_body`.
+- Literal/config values: `set_literal`.
+- Input pin defaults: `set_pin_default`.
+
+If a required node configuration has no command support, do not pretend it is
+done. Either build the workflow with supported nodes or return `failed` /
+`needs_user` clearly.
+
+## Dynamic Pins
+
+Dynamic pins are the only pins you can add. All other pins are template-owned.
+
+Dynamic input nodes:
+
+- `on_flow_end`: add final output inputs such as `markdown_report`,
+  `sources`, `audit_trace`, `pdf_path`.
+- `make_object`: add object fields such as `topic`, `instructions`,
+  `format_requirements`.
+- `string_template`: add extra template variable inputs when not using `vars`.
+- `concat`: add additional string inputs when the default `a` and `b` are not
+  enough.
+
+Dynamic output nodes:
+
+- `on_flow_start`: add runtime input outputs such as `research_topic`,
+  `location`, `max_sources`.
+- `break_object`: add extracted object-field outputs such as
+  `markdown_report`, `sources`, `confidence`. For multiple fields or explicit
+  pin types, prefer `set_break_paths`; simple `add_output_pin` also updates
+  `breakConfig.selectedPaths`.
+
+Do not add execution pins. Execution pins must already exist in the catalog.
+
+## Pin Types And Data Discipline
+
+Use exact pin types from the catalog:
+
+- `execution`: control flow only.
+- `string`, `number`, `boolean`: scalar values.
+- `object`: JSON object data.
+- `array`: JSON arrays.
+- `json_schema`: JSON Schema objects for structured outputs.
+- `tools`: tool-name allowlists for Agent/LLM/tool nodes.
+- `artifact`, `artifact_image`, `artifact_audio`, `artifact_text`,
+  `artifact_video`: Gateway artifact references.
+- `provider_*`, `model_*`: provider/model selectors for specific capabilities.
+- `memory`, `assertion`, `assertions`: memory/KG configuration and data.
+- `any`: flexible data pin.
+
+Never connect data to execution or execution to data. Avoid relying on `any`
+when a more precise pin exists.
+
+## Connection Compatibility Matrix
+
+Exact type matches are valid except where artifact modality checks reject an
+artifact mismatch. Additional valid data connections:
+
+- `any` accepts payload values after provider/model/control-like types have had
+  a chance to reject accidental wiring.
+- `tools <-> array`.
+- `tools -> object`.
+- `assertions <-> array`.
+- `assertions -> object` and `object -> assertions`.
+- `json_schema <-> object` and `json_schema <-> json_schema`.
+- `assertion <-> object` and `assertion <-> assertion`.
+- `memory <-> object` and `memory <-> memory`.
+- `array -> object`.
+- `number -> string`.
+- `boolean -> string`.
+- Artifact pins connect only to compatible artifact modalities: generic artifact
+  can bridge typed artifacts, image connects to image, audio to audio, text to
+  text, and video to video. Media node `outputs`/`meta` object pins are not
+  artifact refs.
+- Provider pins are nominal and modality-scoped. Provider pins connect only to
+  provider pins with compatible scope.
+- Model pins are nominal and connect only to model pins.
+
+When a validator reports a type mismatch, repair by changing the target dynamic
+pin type, wiring a compatible source, or inserting a transform/schema/break node.
+Do not retry the same invalid edge.
+
+## Connection Cardinality
+
+- Data inputs accept at most one normal incoming edge.
+- Execution inputs allow fan-in; the runtime lowers multi-entry execution into
+  internal join/mux behavior.
+- Execution outputs are one-to-one. For fan-out, insert `sequence` for ordered
+  branches or `parallel` for concurrent branches, then connect each `then:<n>`
+  output once.
+- Data self-wiring is rejected. Only explicit execution re-entry can self-loop.
+- A route override edge is advanced behavior created only when the target already
+  has multiple execution entry routes and a data input needs a route-specific
+  source. Do not invent route override fields in commands.
+
+## Execution Model
+
+Some nodes are execution nodes and must be in the execution chain. Others are
+pure data/config nodes and are evaluated from data dependencies.
+
+Entry and terminal:
+
+- `on_flow_start`: standard run entry. Add runtime input outputs here.
+- `on_user_request`: chat/request entry. Outputs user `message` and `context`.
+- `on_schedule`, `on_event`, `on_agent_message`: specialized event entries.
+- `on_flow_end`: terminal. Add input pins for every output the run should
+  expose.
+
+Common execution chains:
+
+- Simple AI workflow:
+  - `on_flow_start.exec-out -> agent.exec-in -> on_flow_end.exec-in`
+- LLM plus tool execution:
+  - `on_flow_start.exec-out -> llm_call.exec-in -> tool_calls.exec-in ->
+    llm_call/agent/reporting step -> on_flow_end.exec-in`
+- File side effect:
+  - `agent.exec-out -> write_file.exec-in -> on_flow_end.exec-in`
+- Multiple side effects in order:
+  - Use `sequence` or chain execution-capable nodes.
+- Branches:
+  - `if` uses a boolean condition and `true`/`false` execution outputs.
+  - `switch` uses a string value and configured case outputs from the catalog.
+- Loops:
+  - `loop` iterates arrays.
+  - `for` iterates numeric ranges.
+  - `while` repeats while a boolean is true.
+
+Pure nodes such as `make_object`, `string_template`, `json_schema`,
+`tools_allowlist`, `parse_json`, `break_object`, `agent_trace_report`, math,
+string, and most data transforms do not drive execution. Wire their data outputs
+to execution nodes that consume them.
+
+## Node Family Guide
+
+The generated catalog gives exact pins. This section explains how to use each
+accessible family.
+
+### Events And Timing
+
+Use event nodes to define how the workflow starts, waits, emits events, and
+ends.
+
+- `on_flow_start`: default for manually run workflows. Add outputs for all
+  runtime inputs.
+- `on_flow_end`: final result boundary. Add inputs for final report, status,
+  artifacts, paths, citations, traces, metrics, and any user-requested outputs.
+- `on_user_request`: use for chat-style workflows that start from a user prompt
+  and inherited context.
+- `on_agent_message`: use for agent-to-agent message entrypoints.
+- `system_datetime`: pure node for current time metadata. Useful in prompts,
+  filenames, news digests, and date-bounded reports.
+- `on_schedule`: scheduled entrypoint. Configure `schedule` and `recurrent`.
+- `on_event`: durable custom event entrypoint.
+- `wait_event`: pause until an event arrives. Use for external async workflows
+  or host-mediated waits.
+- `emit_event`: emit a durable event with payload.
+- `wait_until`: delay execution by seconds.
+
+Pattern: scheduled digest
+
+- `on_schedule` -> prompt builder -> Agent/LLM -> write/report -> `on_flow_end`.
+- Include `system_datetime.iso` in prompt variables and output metadata.
+
+### LLM And Agent Nodes
+
+Use `llm_call` for one model call. Use `agent` for autonomous multi-step work
+with tools and iterative reasoning.
+
+`llm_call`:
+
+- Best for classification, rewriting, extraction, summarization, formatting,
+  routing, and final synthesis when no autonomous tool loop is needed.
+- Inputs include `system`, `prompt`, optional `context`, `memory`, provider,
+  model, `tools`, generation controls, thinking, and `resp_schema`.
+- Outputs include text `response`, structured `data` when schema is active,
+  `tool_calls`, `meta`, and `success`.
+- If you expose tools to `llm_call`, the model may request tool calls, but a
+  separate `tool_calls` node executes them.
+
+`agent`:
+
+- Best for deep research, iterative tool use, planning, debugging, search,
+  multi-source synthesis, and tasks requiring many observations.
+- Always author a non-empty `system` for created Agent nodes.
+- Use `prompt` for the concrete task from String Template.
+- Use `tools` from Tools Allowlist or discovered runtime tool names.
+- Set `max_iterations` to 50 for deep iterative workflows unless the user asks
+  for a smaller budget.
+- Use `resp_schema` when downstream nodes need structured fields. Then wire
+  `agent.data` to Break Object or On Flow End object outputs.
+- Use `agent.response` for final text.
+- Use `agent.scratchpad` only for audit/trace reporting.
+- Do not use `agent.meta` as sources, citations, or user-facing research data.
+
+Pattern: structured agent report
+
+- On Flow Start topic output -> Build JSON topic field.
+- Build JSON -> String Template vars.
+- String Template result -> Agent prompt.
+- JSON Schema value -> Agent resp_schema.
+- Tools Allowlist tools -> Agent tools.
+- Agent data -> Break Object.
+- Break Object markdown_report/sources -> On Flow End.
+- Agent scratchpad -> Agent Trace Report -> On Flow End audit_trace.
+
+### Tools
+
+Use Gateway tool inventory from the prompt. Tool names must match exactly.
+The live assistant receives the full discovered inventory, including each
+tool's JSON parameter schema and required args. Use `recommended_for_request=true`
+as a relevance hint only; unmarked tools are still available if their names and
+schemas match the workflow need.
+
+- `tools_allowlist`: reusable selected list of tool names. Set with
+  `set_literal` to an array of exact names.
+- `tool_parameters`: constructs a single tool call object with arguments for a
+  selected tool. Use when a deterministic workflow should call a known tool
+  directly. Configure it with `set_tool_parameters`, not raw config mutation.
+- `tool_calls`: executes one or more tool call objects. Requires an explicit
+  `allowed_tools` allowlist. When creating this node, include
+  `pinDefaults.allowed_tools` in the same `add_node` command; creating it first
+  and setting the allowlist later is rejected.
+- `format_tool_results`: turns tool call results into readable text for prompts
+  or reports.
+- Deprecated/hidden single-tool nodes must not be used if the reducer rejects
+  them.
+
+Patterns:
+
+- Agentic research: Tools Allowlist -> Agent.tools.
+- Deterministic tool step: Tool Parameters -> Make Array -> Tool Calls.
+- LLM plans tool calls: LLM Call.tool_calls -> Tool Calls.tool_calls, then
+  Tool Calls.results -> Format Tool Results -> next LLM/Agent prompt.
+
+### Generative Media And Capability Nodes
+
+Generative nodes call Gateway capabilities and return artifact references.
+Use them when the user asks for generated or transformed media.
+
+- `generate_image`: prompt to image artifact. Configure prompt, optional image
+  provider/model, width, height, format, seed, steps, guidance, negative prompt.
+- `edit_image`: source image artifact plus prompt to edited image artifact.
+  Optional mask and edit strength.
+- `upscale_image`: source image artifact to restored/upscaled image artifact.
+  Configure optional image provider/model, scale, resolution, softness, seed,
+  quantize, VAE tiling, format, and provider-specific extras.
+- `generate_video`: prompt to video artifact. Configure dimensions, frames,
+  fps, format, seed, steps, guidance.
+- `image_to_video`: source image plus prompt to video artifact.
+- `generate_voice`: text to speech/audio artifact. Configure TTS provider/model,
+  voice, profile, quality, format, speed, instructions.
+- `generate_music`: prompt/lyrics/options to music audio artifact. Configure
+  duration, format, seed, steps, guidance, instrumental, styles, BPM, key, and
+  provider-specific extras.
+- `transcribe_audio`: audio artifact to text and transcript artifact.
+- `listen_voice`: host-captured audio wait; outputs audio artifact and text.
+- `model_residency`: list/load/unload resident models when the workflow needs
+  explicit residency operations.
+
+Media nodes expose typed artifact outputs and also generic `artifact_ref`,
+`artifact_id`, `content_type`, `outputs`, `meta`, and `success`. Prefer typed
+artifact outputs for downstream media nodes and expose artifact refs or ids at
+On Flow End for user retrieval.
+
+Leave provider/model pins blank unless the user explicitly asks to pin a media
+backend. Gateway defaults should route capabilities.
+
+Pattern: illustrated report
+
+- Agent/LLM creates image prompt -> Generate Image -> On Flow End image_artifact.
+- Report text remains separate from image artifact.
+
+Pattern: voice summary
+
+- Report text -> Generate Voice.text -> On Flow End audio_artifact.
+
+### Code
+
+Use `code` when the catalog does not provide a dedicated transform.
+
+Contract:
+
+- It runs a Python transform body in the Runtime sandbox.
+- Input pin `input` is the payload consumed by the transform.
+- It returns `output`, `success`, and `execution`.
+- Keep `permissions` as `sandbox`.
+- Never set `full_access`.
+- The authoring validator rejects `full_access` and secret-looking code/defaults.
+- The runtime sandbox may reject imports, network, subprocesses, filesystem
+  access, and other unsafe operations. Treat those as runtime failures to avoid.
+- Use Code for deterministic transforms: formatting, parsing, object shaping,
+  simple rendering, checksums, filenames, small conversions, validation, and
+  content generation for file writes.
+- Do not use Code to fake PDF generation. Use the dedicated Write PDF node when
+  a workflow must create a PDF.
+
+### Files vs Artifacts
+
+Use file and artifact nodes when the user asks for assets, downloads, paths, or
+durable outputs.
+
+- `read_file`: execution node. Reads a file path and outputs content.
+- `write_file`: execution node. Writes UTF-8 text/JSON content to file path and
+  outputs byte count plus file_path. Use for `.md`, `.json`, `.txt`, and other
+  text files. Do not use it as PDF generation.
+- `read_pdf`: execution node. Reads a `.pdf` path and outputs extracted text,
+  page counts, metadata, warnings, truncated, content_type, and file_path.
+  Optional `page_start`, `page_end`, and `max_chars` inputs are explicit
+  controls; do not add hidden limits.
+- `write_pdf`: execution node. Renders text or Markdown-style report content to
+  a real `.pdf` file path with Runtime's permissive PDF writer, then outputs
+  bytes, sha256, content_type, and file_path.
+- File paths are workspace paths produced or consumed by Runtime/Gateway file
+  operations. Expose paths through On Flow End when the user asked for files.
+- Gateway artifacts are artifact-reference objects. Artifact literal nodes
+  create typed refs for existing uploaded/generated artifacts: text, image,
+  voice, music, video. Use `templateLabel` to select the typed artifact variant.
+- Media generation nodes produce typed artifact refs directly. Expose those refs
+  or artifact ids through On Flow End when the user asked for generated media.
+
+File workflow pattern:
+
+- Content source -> Write File.content.
+- Literal/string/default path -> Write File.file_path.
+- Upstream execution -> Write File.exec-in.
+- Write File.exec-out -> downstream exec or On Flow End.exec-in.
+- Write File.file_path -> On Flow End output such as `markdown_path` or
+  `report_path`.
+- Write PDF.content receives the final report text or Markdown field.
+- Write PDF.file_path is a `.pdf` path.
+- Write PDF.exec-in/exec-out must be placed on the execution path before On Flow
+  End.
+- Write PDF.file_path -> On Flow End output such as `pdf_path`.
+
+Do not claim an asset exists unless the graph creates or exposes it.
+
+### Data, JSON, And Prompt Building
+
+Use pure data nodes to shape values before model or side-effect nodes.
+
+Core data nodes:
+
+- `make_object` / Build JSON: assemble objects from dynamic input fields.
+- `make_array`: assemble arrays.
+- `get`, `set`, `merge`: object property operations.
+- `get_element`, `get_random_element`: array access.
+- `parse_json`, `stringify_json`: convert text and JSON.
+- `break_object`: expose selected object fields as output pins.
+- `coalesce`: fallback value selection.
+- `make_context`, `add_message`, `get_context`: context/message shaping.
+- `make_meta`, `make_scratchpad`, `agent_trace_report`: observability and
+  host-facing envelopes.
+- Array utilities: length, append, dedup, map, filter, concat.
+- `format_tool_results`: prompt-friendly tool result digest.
+
+Prompt-building pattern:
+
+- On Flow Start fields -> Build JSON dynamic inputs.
+- Literal JSON or Build JSON instructions -> Build JSON fields.
+- Build JSON.result -> String Template.vars.
+- String Template.template configured with `set_pin_default` or `set_literal`.
+- String Template.result -> Agent.prompt or LLM Call.prompt.
+
+Use String Template for readable prompt construction instead of embedding large
+prompt text in Agent.prompt when runtime variables are needed.
+
+### String And Math Nodes
+
+String nodes are pure transforms:
+
+- `concat`, `split`, `join`, `format`, `string_template`.
+- `uppercase`, `lowercase`, `trim`.
+- `contains`, `replace`, `substring`, `length`, `is_empty_string`.
+
+Math nodes are pure transforms:
+
+- arithmetic: add, subtract, multiply, divide, modulo, power, abs, round.
+- random: random_int, random_float.
+
+Use them for small deterministic preparation and checks. For complex transforms,
+prefer Code.
+
+### Control Flow
+
+Control nodes manage execution paths:
+
+- `if`: boolean branch.
+- `switch`: string branch with configured cases. Use with structured enum output
+  from LLM/Agent plus Break Object.
+- `sequence`: run branches in order.
+- `parallel`: run branches concurrently and continue after completion.
+- `loop`: foreach over array with `item` and `index`.
+- `for`: numeric loop.
+- `while`: conditional loop.
+- `compare`, `and`, `or`, `not`: pure boolean helpers.
+
+Pattern: classify and branch
+
+- LLM Call with JSON Schema enum -> LLM Call.data -> Break Object.choice.
+- Break Object.choice -> Switch.value.
+- LLM Call.exec-out -> Switch.exec-in.
+- Switch case outputs -> specialized branch nodes.
+
+### Variables And Runtime State
+
+Use variables when the workflow needs state across execution steps.
+
+- `var_decl` and `bool_var`: declare workflow-scope variables and defaults.
+- `get_var`: read workflow state.
+- `set_var`: write a variable; supports dotted nested paths.
+- `set_var_property`: update one property of an object variable.
+- `set_vars`: write multiple variables.
+- `get_context`: read current run context, task, and messages.
+
+Use variables for counters, accumulated arrays, branch decisions, intermediate
+objects, and loop state. Use pure data nodes for local transforms that do not
+need persistence.
+
+### Memory And Knowledge Graph
+
+Memory nodes are execution nodes for durable memory operations.
+
+- `memory_note`: store a durable memory note; optionally insert into context.
+- `memory_query`: recall notes/spans by query, tags, scope, time, and filters.
+- `memory_tag`: tag an existing memory span.
+- `memory_compact`: archive older messages into a compacted summary span.
+- `memory_rehydrate`: insert recalled spans into active context.
+- `memory_kg_query`: query KG assertions and optionally pack Active Memory text.
+- `memory_kg_resolve`: resolve entity labels to KG ids.
+- `memory_kg_assert`: append KG assertions.
+- `memact_compose`: compose KG results into MemAct active memory blocks.
+
+Use memory when the workflow should remember, recall, ground, or update durable
+knowledge. Do not use memory nodes as a substitute for ordinary prompt building.
+
+Pattern: memory-grounded agent
+
+- On Flow Start question -> Memory Query.query -> Memory Query.rendered.
+- Rendered memory + question -> Build JSON/String Template.
+- Agent receives prompt and optional memory config.
+- Agent output -> Memory Note if the result should be remembered.
+
+### Schemas And Structured Output
+
+Use `json_schema` and `edit_json_schema` when model outputs need reliable fields.
+
+- `json_schema`: static schema literal. Connect to Agent.resp_schema or
+  LLM Call.resp_schema.
+- `edit_json_schema`: add fields to an incoming schema.
+- Agent/LLM with schema exposes both `response` text and `data` object.
+- Use Break Object to expose fields from `data`.
+- When Markdown is a field inside a structured JSON result, do not stringify or
+  write the whole object as Markdown. Extract the Markdown string first:
+  `Agent.data -> Break Object.markdown_report -> Write File.content`. If the
+  model returned JSON as text instead of structured `data`, use
+  `Parse JSON -> Break Object.markdown_report -> Write File.content`.
+
+Use structured output for:
+
+- report sections plus citations;
+- classifications and switch cases;
+- extracted entities;
+- job search result arrays;
+- validation results;
+- file path plans and metadata.
+
+### Provider And Model Catalog Nodes
+
+Use catalog nodes when the workflow itself needs to inspect providers/models.
+Do not use them just to set normal runtime defaults.
+
+- `provider_catalog`: list providers.
+- `provider_models`: list models for a provider and optional capability route.
+- `model_residency`: inspect/load/unload resident models.
+
+For ordinary workflows, leave provider/model pins blank so Gateway defaults
+apply.
+
+## Best-In-Class Patterns
+
+### Deep Research With Markdown And PDF Outputs
+
+Expected graph responsibilities:
+
+- On Flow Start outputs: topic/query, optional scope, optional source policy.
+- Build JSON: topic, instructions, report structure, source/citation rules,
+  output requirements.
+- String Template: final research prompt from the JSON object.
+- Tools Allowlist: discovered web/search/fetch tool names.
+- JSON Schema: markdown_report, sources/citations, optional confidence, optional
+  limitations.
+- Agent: system prompt, prompt, tools, resp_schema, max_iterations 50.
+- Break Object: markdown_report and sources from Agent.data.
+- Write File `.md`: markdown_report -> content; expose file_path.
+- Do not connect Agent.data or a stringified whole result object directly to the
+  Markdown Write File content. A Markdown file must receive the Markdown field
+  string, normally `Break Object.markdown_report`.
+- Write PDF `.pdf`: markdown_report -> content; expose file_path.
+- Do not use generic Write File or sandbox Code as PDF generation.
+- Agent Trace Report: Agent.scratchpad -> audit_trace.
+- On Flow End: markdown_report, sources, audit_trace, markdown_path, pdf_path.
+
+This is a multi-step workflow. A single Agent connected directly to On Flow End
+is not enough when the user requested files, citations, and auditability.
+
+### News Digest
+
+- On Flow Start: topic, region, date range, audience.
+- System Date/Time for current date.
+- Build JSON/String Template with freshness and source policy.
+- Tools Allowlist with search/fetch/news tools if discovered.
+- Agent or LLM plus Tool Calls depending on whether autonomous search is needed.
+- Structured output: headline summaries, links, dates, source reliability,
+  watchlist, final digest.
+- Optional Write File for Markdown digest.
+
+### Job Search
+
+- On Flow Start: field, seniority, location, remote preference, exclusions.
+- Tools Allowlist with search/fetch/job tools if discovered.
+- Agent with system rules for deduplication and source capture.
+- JSON Schema: jobs array with title, company, location, URL, fit score, reason,
+  date seen.
+- Break Object jobs -> On Flow End.
+- Optional Markdown report and CSV/JSON Write File through Code/Stringify JSON.
+
+### Media Generation
+
+- Use LLM/Agent to plan prompts when needed.
+- Feed generated prompt text into Generate Image/Video/Voice/Music.
+- Expose typed artifact refs at On Flow End.
+- For chained media, connect typed artifact output to the next media node input
+  such as Edit Image.image_artifact, Restore / Upscale Image.image_artifact, or
+  Image To Video.source_image.
+
+### Human-In-The-Loop
+
+- Use Ask User only when the workflow must pause during execution.
+- Use On Flow Start inputs for normal run parameters.
+- Use Answer User for host-visible messages.
+- Use Wait Event for durable external waits.
+
+## Validation And Repair
+
+The assistant runs graph readiness checks after each accepted or rejected cycle.
+For research/news/job-search/deep-research requests, readiness requires:
+
+- an On Flow Start node;
+- an On Flow End node;
+- an Agent node for research/reporting;
+- at least one On Flow Start data output for runtime input;
+- a prompt scaffold with Build JSON feeding String Template;
+- execution flow `On Flow Start.exec-out -> Agent.exec-in`;
+- execution flow `Agent.exec-out -> On Flow End.exec-in`;
+- `Build JSON.result -> String Template.vars`;
+- `String Template.result -> Agent.prompt`;
+- a connected or configured Agent prompt;
+- a non-empty Agent system instruction;
+- Agent `max_iterations >= 50` for deep iterative work;
+- final report exposed through a connected On Flow End input;
+- sources/citations exposed through a connected On Flow End input;
+- no `Agent.meta` edge used as research sources/citations;
+- no Agent Trace Report edge used as the final report;
+- an audit/trace output exposed through On Flow End;
+- `Agent.scratchpad -> Agent Trace Report.scratchpad` when using trace report;
+- Tools Allowlist wired to Agent.tools or explicit Agent tools when tools are
+  required.
+
+For Markdown artifact requests, readiness requires:
+
+- a Write File node targeting a Markdown path or clearly labeled Markdown file;
+- report content connected to `Write File.content`;
+- Write File on the execution path before On Flow End;
+- `Write File.file_path` exposed through On Flow End.
+
+For PDF artifact requests, readiness requires:
+
+- a Write PDF node targeting a `.pdf` path;
+- report content connected to `Write PDF.content`;
+- Write PDF on the execution path before On Flow End;
+- `Write PDF.file_path` exposed through On Flow End.
+
+If validation rejects a batch:
+
+- Read every validator error.
+- Do not repeat the same invalid edge or nonexistent pin.
+- If a pure node lacks execution pins, remove execution edges to or from it.
+- If a data pin type mismatches, change the target pin type or insert a
+  transform node.
+- If an output is missing, add the required On Flow End input and connect a
+  real producer.
+- If a requested artifact is missing, add the file/media/artifact path and wire
+  it visibly.
+
+If readiness remains after a successful batch, continue with another command
+batch. Do not declare completion early.
+
+## Response Requirements
+
+Every turn must include:
+
+- how the workflow works;
+- how to test it with the normal Save/Run path;
+- what to expect from outputs and artifacts.
+
+Successful chat replies should be concise. Failure replies should include enough
+planner and validator detail to debug the graph.
+
+## docs/workflow-node-catalog.md
+
+# AbstractFlow Workflow Node Catalog
+
+This catalog is generated from `src/types/nodes.ts` by `npm run docs:llms`.
+It is the stable AI-readable companion to `docs/workflow-authoring-skill.md`.
+
+For authoring commands, `nodeType` must match the value shown for the node. If several visible palette entries share a `nodeType`, include the exact `templateLabel` shown in the create command.
+
+## Visible Authoring Templates
+
+### artifacts / Image Artifact
+
+- Node type: `literal_json`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"literal_json","templateLabel":"Image Artifact"}`
+- Utility: Artifact reference object for an image Gateway artifact. Wire this into Edit Image image_artifact or mask_artifact.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: select with `templateLabel: "Image Artifact"`; literal value with `literalValue` or `set_literal`
+- Inputs: none
+- Outputs: `value` artifact_image (image_artifact)
+- Default config: {
+  "literalValue": {
+    "$artifact": "",
+    "content_type": "image/png",
+    "modality": "image"
+  }
+}
+
+### artifacts / Music Artifact
+
+- Node type: `literal_json`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"literal_json","templateLabel":"Music Artifact"}`
+- Utility: Artifact reference object for a music/audio Gateway artifact.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: select with `templateLabel: "Music Artifact"`; literal value with `literalValue` or `set_literal`
+- Inputs: none
+- Outputs: `value` artifact_audio (music_artifact)
+- Default config: {
+  "literalValue": {
+    "$artifact": "",
+    "content_type": "audio/wav",
+    "modality": "music"
+  }
+}
+
+### artifacts / Text Artifact
+
+- Node type: `literal_json`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"literal_json","templateLabel":"Text Artifact"}`
+- Utility: Artifact reference object for a text/plain Gateway artifact. Paste an uploaded or generated artifact id into $artifact.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: select with `templateLabel: "Text Artifact"`; literal value with `literalValue` or `set_literal`
+- Inputs: none
+- Outputs: `value` artifact_text (text_artifact)
+- Default config: {
+  "literalValue": {
+    "$artifact": "",
+    "content_type": "text/plain",
+    "modality": "text"
+  }
+}
+
+### artifacts / Video Artifact
+
+- Node type: `literal_json`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"literal_json","templateLabel":"Video Artifact"}`
+- Utility: Artifact reference object for a video Gateway artifact.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: select with `templateLabel: "Video Artifact"`; literal value with `literalValue` or `set_literal`
+- Inputs: none
+- Outputs: `value` artifact_video (video_artifact)
+- Default config: {
+  "literalValue": {
+    "$artifact": "",
+    "content_type": "video/mp4",
+    "modality": "video"
+  }
+}
+
+### artifacts / Voice Artifact
+
+- Node type: `literal_json`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"literal_json","templateLabel":"Voice Artifact"}`
+- Utility: Artifact reference object for a speech/audio Gateway artifact.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: select with `templateLabel: "Voice Artifact"`; literal value with `literalValue` or `set_literal`
+- Inputs: none
+- Outputs: `value` artifact_audio (voice_artifact)
+- Default config: {
+  "literalValue": {
+    "$artifact": "",
+    "content_type": "audio/wav",
+    "modality": "voice"
+  }
+}
+
+### control / AND
+
+- Node type: `and`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"and"}`
+- Utility: Logical AND.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `a` boolean; `b` boolean
+- Outputs: `result` boolean
+- Default config: none
+
+### control / Compare
+
+- Node type: `compare`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"compare"}`
+- Utility: Compare a and b using operator op (==, !=, <, <=, >, >=).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `a` any; `op` string; `b` any
+- Outputs: `result` boolean
+- Default config: none
+
+### control / For
+
+- Node type: `for`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"for"}`
+- Utility: Numeric loop from start to end with step. Outputs i and a 0-based index.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `start` number; `end` number; `step` number
+- Outputs: `loop` execution; `done` execution; `i` number; `index` number
+- Default config: none
+
+### control / If/Else
+
+- Node type: `if`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"if"}`
+- Utility: Branch execution based on a boolean condition.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `condition` boolean
+- Outputs: `true` execution; `false` execution
+- Default config: none
+
+### control / ForEach
+
+- Node type: `loop`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"loop"}`
+- Utility: Iterate over an array. Outputs current item and 0-based index.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `items` array
+- Outputs: `loop` execution; `done` execution; `item` any; `index` number
+- Default config: none
+
+### control / NOT
+
+- Node type: `not`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"not"}`
+- Utility: Logical NOT.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `value` boolean
+- Outputs: `result` boolean
+- Default config: none
+
+### control / OR
+
+- Node type: `or`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"or"}`
+- Utility: Logical OR.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `a` boolean; `b` boolean
+- Outputs: `result` boolean
+- Default config: none
+
+### control / Parallel
+
+- Node type: `parallel`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"parallel"}`
+- Utility: Run multiple branches concurrently and emit Completed when all finish.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`; branch count with `set_branch_count`
+- Inputs: `exec-in` execution
+- Outputs: `then:0` execution (Then 0); `then:1` execution (Then 1); `completed` execution (Completed)
+- Default config: none
+
+### control / Sequence
+
+- Node type: `sequence`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"sequence"}`
+- Utility: Run multiple branches in order (Then 0, Then 1, ...).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`; branch count with `set_branch_count`
+- Inputs: `exec-in` execution
+- Outputs: `then:0` execution (Then 0); `then:1` execution (Then 1)
+- Default config: none
+
+### control / Switch
+
+- Node type: `switch`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"switch"}`
+- Utility: Branch execution by matching a string value to configured cases (default branch always exists).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`; cases with `set_switch_cases`
+- Inputs: `exec-in` execution; `value` string
+- Outputs: `default` execution
+- Default config: {
+  "switchConfig": {
+    "cases": []
+  }
+}
+
+### control / While
+
+- Node type: `while`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"while"}`
+- Utility: Loop while condition is true. Outputs a pass-through item and a 0-based iteration index.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `condition` boolean
+- Outputs: `loop` execution; `done` execution; `item` any; `index` number
+- Default config: none
+
+### core / Add Message
+
+- Node type: `add_message`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"add_message"}`
+- Utility: Append a canonical message to the run active context (context.messages).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `role` string: Message role (e.g. user, assistant, system, tool).; `content` string: Message content.
+- Outputs: `exec-out` execution; `message` object: Message object {role, content, timestamp, metadata.message_id}.; `context` object: Updated active context object (run.vars.context).; `task` string: Convenience output for context.task.; `messages` array: Updated context.messages list.
+- Default config: none
+
+### core / Agent
+
+- Node type: `agent`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"agent"}`
+- Utility: Run an agent (ReAct) that can call tools. Outputs response, success, meta, and a runtime scratchpad.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `use_context` boolean: When true, include this run's active context messages (context.messages) as agent history. If the pin is not connected, the node checkbox is used. Default: false.; `context` object: Optional explicit context object for the agent (e.g. {messages:[...]}). If provided, context.messages overrides the inherited run context messages.; `memory` memory: Memory configuration object (KG/span/session controls). If set, overrides this node’s recall/ingest behavior; if unset, runtime defaults apply.; `provider` provider_text: Text/LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider.; `model` model: Text/LLM model id/name. If unset, uses the node’s configured model.; `system` string: Optional system prompt for this agent instance (high priority instructions).; `prompt` string: User prompt/task string for the agent to solve.; `tools` tools: Allowlist of tool names this agent can call (defense-in-depth; runtime still enforces allowlists).; `prompt_cache_binding` any: Advanced: durable exact-reuse prompt-cache binding from Gateway blocs. Accepts a binding object or binding_id string; this does not create or load blocs during the run.; `max_iterations` number: Maximum internal ReAct iterations (safety cap). Higher values allow more tool-use steps.; `max_in_tokens` number: Optional per-agent input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for the agent sub-run.; `temperature` number: Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature.; `seed` number: Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed.; `thinking` string: Reasoning/thinking control for supported models. If unset, uses the Gateway/runtime default.; `resp_schema` json_schema: Optional JSON Schema object (type=object) the final answer must conform to.
+- Outputs: `exec-out` execution; `response` string: Final response text. When resp_schema is provided, the structured object is also exposed on data.; `data` object: Structured response object matching resp_schema. Visible by default when a response schema is configured.; `success` boolean: True if the Agent node completed successfully.; `meta` object: Host-facing meta envelope (schema=abstractcode.agent.v1.meta). Includes provider/model and lightweight execution metadata.; `scratchpad` object: Runtime-owned execution trace/scratchpad for observability (LLM/tool steps, timings). Includes best-effort tool_calls/tool_results extracted post-run.
+- Default config: {
+  "pinDefaults": {
+    "max_iterations": 50
+  }
+}
+
+### core / Answer User
+
+- Node type: `answer_user`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"answer_user"}`
+- Utility: Display a message to the user (UI output).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `message` string; `level` string: Message level for hosts (message|warning|error). Defaults to 'message' when unset.
+- Outputs: `exec-out` execution; `message` string
+- Default config: none
+
+### core / Ask User
+
+- Node type: `ask_user`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"ask_user"}`
+- Utility: Pause execution and ask the user for input (free text or choices).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `prompt` string; `choices` array
+- Outputs: `exec-out` execution; `response` string
+- Default config: none
+
+### core / Code
+
+- Node type: `code`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"code"}`
+- Utility: Run a Python transform body as `transform(_input)` in the Runtime sandbox.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`; body/function with `set_code_body`; permissions must remain `sandbox`
+- Inputs: `exec-in` execution; `input` any; `permissions` string: Execution policy for this Code node. sandbox is the protected default. full_access requires explicit Runtime/Gateway policy and otherwise fails closed.
+- Outputs: `exec-out` execution; `output` any: Value returned by transform(_input).; `success` boolean: True when the transform ran without error.; `execution` object: Execution metrics such as duration_ms, cpu_time_ms, cpu_percent, memory_rss_mb, and memory_rss_delta_mb.
+- Default config: {
+  "pinDefaults": {
+    "permissions": "sandbox"
+  },
+  "codeBody": "# Available variables:\n# _input (dict)\n# input (any)\n\nreturn _input",
+  "functionName": "transform"
+}
+
+### core / LLM Call
+
+- Node type: `llm_call`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"llm_call"}`
+- Utility: Single LLM call (no autonomous loop). Can optionally request tool calls via the tools allowlist.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `use_context` boolean: When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false.; `context` object: Optional explicit context object for this call (e.g. {messages:[...]}). If provided, context.messages overrides inherited run context messages.; `memory` memory: Memory configuration object (KG/span/session controls). If set, overrides this call’s recall behavior; if unset, runtime defaults apply.; `provider` provider_text: Text/LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider.; `model` model: Text/LLM model id/name. If unset, uses the node’s configured model.; `system` string: Optional system prompt for this single call.; `prompt` string: User prompt/content for this single call.; `tools` tools: Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node).; `prompt_cache_binding` any: Advanced: durable exact-reuse prompt-cache binding from Gateway blocs. Accepts a binding object or binding_id string; this does not create or load blocs during the run.; `max_in_tokens` number: Optional per-call input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for this call.; `temperature` number: Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature.; `seed` number: Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed.; `thinking` string: Reasoning/thinking control for supported models. If unset, uses the Gateway/runtime default.; `resp_schema` json_schema: Optional JSON Schema object (type=object) the assistant content must conform to.
+- Outputs: `exec-out` execution; `response` string: Assistant text content (best-effort). For tool calls, content may be empty.; `data` object: Structured assistant output object matching resp_schema. Visible by default when a response schema is configured.; `success` boolean: True if the LLM call completed successfully.; `meta` object: Host-facing meta envelope (schema=abstractflow.llm_call.v1.meta). Includes provider/model, usage, trace ids, and lightweight execution metadata.; `tool_calls` array: Normalized tool call requests. This pin exists to make wiring into Tool Calls / Emit Event nodes simpler.
+- Default config: none
+
+### core / Model Residency
+
+- Node type: `model_residency`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"model_residency"}`
+- Utility: Gateway/Runtime model residency controls for listing, loading, and unloading resident models.
+- Gateway capability: model_residency
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `operation` string: list_loaded, load, or unload.; `task` string: text_generation, image_generation, image_to_image, image_upscale, text_to_video, image_to_video, tts, stt, or music_generation.; `provider` provider: Provider/backend id to load or filter.; `model` model: Model id to load or filter.
+- Outputs: `exec-out` execution; `success` boolean; `affected_models` array; `models` array; `error` string; `warnings` array; `result` object
+- Default config: {
+  "pinDefaults": {
+    "operation": "load",
+    "task": "text_generation"
+  },
+  "effectConfig": {
+    "operation": "load",
+    "task": "text_generation"
+  }
+}
+
+### core / Subflow
+
+- Node type: `subflow`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"subflow"}`
+- Utility: Run another saved workflow (subflow) and return its output object.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`; subflow id is UI-owned; do not create an unconfigured subflow as a finished workflow
+- Inputs: `exec-in` execution; `inherit_context` boolean: When true, seed the child run's context.messages from the parent's active context messages. If the pin is not connected, the node checkbox is used. Default: false.; `input` object
+- Outputs: `exec-out` execution; `output` object
+- Default config: none
+
+### core / Tool Calls
+
+- Node type: `tool_calls`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"tool_calls","pinDefaults":{"allowed_tools":["<exact_tool_name>"]}}`
+- Utility: Execute one or more tool calls via the runtime. Outputs per-call results and a success boolean.
+- Gateway capability: tools
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`; must include `pinDefaults.allowed_tools` in `add_node`
+- Inputs: `exec-in` execution; `tool_calls` array: List of tool call requests. Each entry shape: {name, arguments, call_id?}. Often comes from LLM Call.tool_calls.; `allowed_tools` array: Optional allowlist of tool names enforced by the runtime effect handler (empty list => allow none). If not connected, the node config (if any) is used.
+- Outputs: `exec-out` execution; `results` array: Per-call results in input order. Each entry shape: {call_id, name, success, output, error}. When success=true, output contains the tool output and error is null; when success=false, error contains the failure message and output is null (or best-effort structured output for some tools).; `success` boolean: Aggregate: true only if all per-call results have success=true (see results[].success/results[].error for per-call failures).
+- Default config: none
+
+### data / Agent Trace Report
+
+- Node type: `agent_trace_report`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"agent_trace_report"}`
+- Utility: Render an agent scratchpad (runtime-owned node_traces) into a condensed Markdown report of actions and tool results.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `scratchpad` object: Agent scratchpad object (typically contains node_traces).
+- Outputs: `result` string
+- Default config: none
+
+### data / Array Append
+
+- Node type: `array_append`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"array_append"}`
+- Utility: Append an item to an array (returns a new array).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `array` array; `item` any
+- Outputs: `result` array
+- Default config: none
+
+### data / Array Concat
+
+- Node type: `array_concat`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"array_concat"}`
+- Utility: Concatenate arrays (a then b).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `a` array; `b` array
+- Outputs: `result` array
+- Default config: none
+
+### data / Array Dedup
+
+- Node type: `array_dedup`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"array_dedup"}`
+- Utility: Stable-order dedup for arrays (optionally by key path).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `array` array; `key` string
+- Outputs: `result` array
+- Default config: none
+
+### data / Filter Array
+
+- Node type: `array_filter`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"array_filter"}`
+- Utility: Filter array items where item[key] == value (or item == value).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `items` array; `key` string; `value` any
+- Outputs: `result` array
+- Default config: none
+
+### data / Array Length
+
+- Node type: `array_length`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"array_length"}`
+- Utility: Return the length of an array.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `array` array
+- Outputs: `result` number
+- Default config: none
+
+### data / Map Array
+
+- Node type: `array_map`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"array_map"}`
+- Utility: Map array items by extracting a field (key) from objects.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `items` array; `key` string
+- Outputs: `result` array
+- Default config: none
+
+### data / Break Object
+
+- Node type: `break_object`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"break_object"}`
+- Utility: Expose selected fields of an object as individual output pins (configured paths).
+- Gateway capability: none
+- Dynamic pin policy: dynamic outputs via set_break_paths or add_output_pin; both update selectedPaths
+- Authorable config: input defaults with `set_pin_default`; selected paths with `set_break_paths`
+- Inputs: `object` object: Input object to decompose into selected output fields.
+- Outputs: none
+- Default config: {
+  "breakConfig": {
+    "selectedPaths": []
+  }
+}
+
+### data / Coalesce
+
+- Node type: `coalesce`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"coalesce"}`
+- Utility: Return the first non-null value (A, then B, ...).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `a` any; `b` any
+- Outputs: `result` any
+- Default config: none
+
+### data / Concat
+
+- Node type: `concat`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"concat"}`
+- Utility: Concatenate two strings.
+- Gateway capability: none
+- Dynamic pin policy: dynamic inputs
+- Authorable config: input defaults with `set_pin_default`; separator with `set_concat_separator`
+- Inputs: `a` string; `b` string
+- Outputs: `result` string
+- Default config: {
+  "concatConfig": {
+    "separator": " "
+  }
+}
+
+### data / Contains
+
+- Node type: `contains`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"contains"}`
+- Utility: True if text contains pattern.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `text` string; `pattern` string
+- Outputs: `result` boolean
+- Default config: none
+
+### data / Format Tool Results
+
+- Node type: `format_tool_results`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"format_tool_results"}`
+- Utility: Convert Tool Calls results [{call_id,name,success,output,error}, ...] into a condensed human-readable digest string.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `tool_results` array: Array of tool results (typically from Tool Calls.results).
+- Outputs: `result` string
+- Default config: none
+
+### data / Format
+
+- Node type: `format`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"format"}`
+- Utility: Python-style string format: template.format(**values).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `template` string; `values` object
+- Outputs: `result` string
+- Default config: none
+
+### data / Get Element
+
+- Node type: `get_element`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"get_element"}`
+- Utility: Get a single array element by index (supports negative indices).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `array` array: Input array (list/tuple).; `index` number: 0-based index (negative allowed; -1 is last).; `default` any: Fallback value when index is invalid (default null).
+- Outputs: `result` any: Element value (or default when not found).; `found` boolean: True when index is valid for the given array.
+- Default config: none
+
+### data / Get Random Element
+
+- Node type: `get_random_element`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"get_random_element"}`
+- Utility: Pick a random element from an array.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `array` array: Input array (list/tuple).; `default` any: Fallback value when the array is empty (default null).
+- Outputs: `result` any: Random element (or default when not found).; `found` boolean: True when an element was selected.
+- Default config: none
+
+### data / Get Property
+
+- Node type: `get`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"get"}`
+- Utility: Safely read a nested path from an object (dot/bracket path) with an optional default.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `object` object; `key` string; `default` any
+- Outputs: `value` any
+- Default config: none
+
+### data / Has Tools
+
+- Node type: `has_tools`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"has_tools"}`
+- Utility: True if the input array has at least one element (commonly: LLM tool_calls).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `array` array
+- Outputs: `result` boolean
+- Default config: none
+
+### data / Is Empty
+
+- Node type: `is_empty_string`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"is_empty_string"}`
+- Utility: True if text is empty.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `text` string
+- Outputs: `result` boolean
+- Default config: none
+
+### data / Join
+
+- Node type: `join`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"join"}`
+- Utility: Join array items into a string using a delimiter.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `items` array; `delimiter` string
+- Outputs: `result` string
+- Default config: none
+
+### data / Length
+
+- Node type: `length`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"length"}`
+- Utility: String length (number of characters).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `text` string
+- Outputs: `result` number
+- Default config: none
+
+### data / Lowercase
+
+- Node type: `lowercase`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"lowercase"}`
+- Utility: Convert text to lowercase.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `text` string
+- Outputs: `result` string
+- Default config: none
+
+### data / Make Array
+
+- Node type: `make_array`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"make_array"}`
+- Utility: Build an array from 1+ inputs in pin order (Blueprint-style). Skips null/unset inputs.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `a` any
+- Outputs: `result` array
+- Default config: none
+
+### data / Make Context
+
+- Node type: `make_context`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"make_context"}`
+- Utility: Build a context object {task, messages, ...context_extra}.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `task` string: Task / user request string (context.task).; `messages` array: Conversation messages list (context.messages).; `context_extra` object: Optional extra context fields merged into the context (task/messages win). Common: session, attachments.
+- Outputs: `context` object: Context object {task, messages, ...context_extra}.
+- Default config: none
+
+### data / Make Meta
+
+- Node type: `make_meta`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"make_meta"}`
+- Utility: Build a host-facing meta envelope (Agent / LLM Call).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `schema` string: Schema identifier (default: abstractcode.agent.v1.meta).; `version` number: Schema version number (default: 1).; `output_mode` string: Output mode: unstructured | structured.; `provider` provider_text: Text/LLM provider id/name (e.g. lmstudio).; `model` model: Text/LLM model id/name.; `sub_run_id` string: Optional sub-run id (Agent nodes).; `iterations` number: Optional iteration count (Agent nodes).; `tool_calls` number: Optional tool call count.; `tool_results` number: Optional tool result count.; `finish_reason` string: Optional finish reason (LLM Call nodes).; `gen_time` number: Optional generation time (LLM Call nodes).; `ttft_ms` number: Optional time-to-first-token in ms (LLM Call nodes).; `usage` object: Usage object (e.g. {input_tokens, output_tokens}).; `trace` object: Optional trace object (e.g. {trace_id:"..."}). Treat as opaque.; `warnings` array: Optional list of warning strings.; `debug` object: Optional debug payload (host-facing).; `extra` object: Optional extra fields merged into the meta object (reserved keys win).
+- Outputs: `meta` object: Meta object (portable host-friendly envelope).
+- Default config: none
+
+### data / Build JSON
+
+- Node type: `make_object`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"make_object"}`
+- Utility: Build a JSON object from live input pins. Use the JSON literal node for static objects.
+- Gateway capability: none
+- Dynamic pin policy: dynamic inputs
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `value` any: First object field. Rename/add fields in the Properties panel.
+- Outputs: `result` object
+- Default config: none
+
+### data / Make Scratchpad
+
+- Node type: `make_scratchpad`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"make_scratchpad"}`
+- Utility: Build a scratchpad/trace envelope (commonly from Agent outputs).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `sub_run_id` string: Optional sub-run id associated with the trace.; `workflow_id` string: Optional workflow id associated with the trace.; `task` string: Agent task/prompt string for this run.; `messages` array: Agent-internal transcript messages for this run.; `context_extra` object: Additional context fields passed into the agent (excluding task/messages).; `node_traces` object: Per-node trace mapping (node_id -> trace object).; `steps` array: Flattened trace steps list (optional; used by some UIs).; `tool_calls` array: Tool calls extracted from steps (best-effort).; `tool_results` array: Tool results extracted from steps (best-effort).
+- Outputs: `scratchpad` object: Scratchpad object containing trace info.
+- Default config: none
+
+### data / Merge Objects
+
+- Node type: `merge`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"merge"}`
+- Utility: Shallow merge two objects (b overrides a).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `a` object; `b` object
+- Outputs: `result` object
+- Default config: none
+
+### data / Parse JSON
+
+- Node type: `parse_json`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"parse_json"}`
+- Utility: Parse JSON (or JSON-ish) text into an object/array suitable for downstream nodes.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `text` string
+- Outputs: `result` object
+- Default config: none
+
+### data / Replace
+
+- Node type: `replace`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"replace"}`
+- Utility: Replace pattern with replacement (mode: first|all).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `text` string; `pattern` string; `replacement` string; `mode` string: Replacement mode: 'first' or 'all' (default: all).
+- Outputs: `result` string
+- Default config: none
+
+### data / Set Property
+
+- Node type: `set`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"set"}`
+- Utility: Pure transform: return a new object with key set. To persist state, use Set Variable (dotted path) or Set Variable Property.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `object` object; `key` string; `value` any
+- Outputs: `result` object
+- Default config: none
+
+### data / Split
+
+- Node type: `split`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"split"}`
+- Utility: Split text by a delimiter into an array (with trimming/drop-empty defaults).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `text` string; `delimiter` string
+- Outputs: `result` array
+- Default config: none
+
+### data / String Template
+
+- Node type: `string_template`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"string_template"}`
+- Utility: Render a template like "Hello {{user.name}}" using a vars object (supports filters).
+- Gateway capability: none
+- Dynamic pin policy: dynamic inputs
+- Authorable config: input defaults with `set_pin_default`; template with `set_literal` or `set_pin_default(template)`
+- Inputs: `template` string; `vars` object
+- Outputs: `result` string
+- Default config: none
+
+### data / Stringify JSON
+
+- Node type: `stringify_json`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"stringify_json"}`
+- Utility: Render a JSON value (object/array/scalar) into a string. Mode: none | beautify | minified.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `value` any: JSON value (or JSON-ish string) to stringify.; `mode` string: Rendering mode: none | beautify | minified. Default beautify.
+- Outputs: `result` string
+- Default config: none
+
+### data / Substring
+
+- Node type: `substring`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"substring"}`
+- Utility: Extract a substring by start/end indices (end is optional).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `text` string; `start` number; `end` number
+- Outputs: `result` string
+- Default config: none
+
+### data / Trim
+
+- Node type: `trim`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"trim"}`
+- Utility: Trim whitespace from both ends of a string.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `text` string
+- Outputs: `result` string
+- Default config: none
+
+### data / Uppercase
+
+- Node type: `uppercase`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"uppercase"}`
+- Utility: Convert text to UPPERCASE.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `text` string
+- Outputs: `result` string
+- Default config: none
+
+### events / Emit Event
+
+- Node type: `emit_event`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"emit_event"}`
+- Utility: Emit a durable event (scope/session) with payload. Useful for cross-node or cross-agent signaling.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `name` string; `scope` string; `payload` any; `session_id` string
+- Outputs: `exec-out` execution; `delivered` number; `delivered_to` array; `wait_key` string
+- Default config: {
+  "effectConfig": {
+    "name": "my_event",
+    "scope": "session",
+    "sessionId": ""
+  }
+}
+
+### events / On Agent Message
+
+- Node type: `on_agent_message`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"on_agent_message"}`
+- Utility: Entry point triggered by an agent-to-agent message (broadcast or direct).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: event settings with `set_event_config`
+- Inputs: none
+- Outputs: `exec-out` execution; `sender` agent; `message` string; `channel` string
+- Default config: none
+
+### events / On Event
+
+- Node type: `on_event`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"on_event"}`
+- Utility: Entry point triggered by a durable custom event. Outputs event metadata + payload.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`; event settings with `set_event_config`
+- Inputs: `scope` string
+- Outputs: `exec-out` execution; `event` object; `payload` any
+- Default config: {
+  "eventConfig": {
+    "name": "my_event",
+    "scope": "session"
+  }
+}
+
+### events / On Flow End
+
+- Node type: `on_flow_end`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"on_flow_end"}`
+- Utility: Terminal node. End execution and expose the flow result via upstream data wiring.
+- Gateway capability: none
+- Dynamic pin policy: dynamic inputs
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution
+- Outputs: none
+- Default config: none
+
+### events / On Flow Start
+
+- Node type: `on_flow_start`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"on_flow_start"}`
+- Utility: Entry point for a workflow run. Emits exec-out and any configured inputs as outputs.
+- Gateway capability: none
+- Dynamic pin policy: dynamic outputs
+- Authorable config: no node-specific command config beyond pins/defaults
+- Inputs: none
+- Outputs: `exec-out` execution
+- Default config: none
+
+### events / On Schedule
+
+- Node type: `on_schedule`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"on_schedule"}`
+- Utility: Entry point triggered by a schedule (timestamp or recurring). Outputs the trigger time.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`; event settings with `set_event_config`
+- Inputs: `schedule` string (timestamp); `recurrent` boolean
+- Outputs: `exec-out` execution; `timestamp` string (time)
+- Default config: {
+  "eventConfig": {
+    "schedule": "15s",
+    "recurrent": true
+  }
+}
+
+### events / On User Request
+
+- Node type: `on_user_request`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"on_user_request"}`
+- Utility: Entry point for a run started from a user prompt. Outputs the user message and initial context.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: no node-specific command config beyond pins/defaults
+- Inputs: none
+- Outputs: `exec-out` execution; `message` string; `context` object
+- Default config: none
+
+### events / System Date/Time
+
+- Node type: `system_datetime`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"system_datetime"}`
+- Utility: Return current time metadata (ISO string, timezone, UTC offset, locale).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: no node-specific command config beyond pins/defaults
+- Inputs: none
+- Outputs: `iso` string; `timezone` string; `utc_offset_minutes` number; `locale` string
+- Default config: none
+
+### events / Wait Event
+
+- Node type: `wait_event`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"wait_event"}`
+- Utility: Pause the workflow until an event matching event_key is received, then resume with event_data. Optional pins (prompt/choices/allow_free_text) enable durable “ask + wait” UX for hosts like AbstractCode.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `event_key` string; `prompt` string; `choices` array; `allow_free_text` boolean
+- Outputs: `exec-out` execution; `event_data` object
+- Default config: none
+
+### events / Delay
+
+- Node type: `wait_until`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"wait_until"}`
+- Utility: Pause execution for a duration (seconds), then continue.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `duration` number
+- Outputs: `exec-out` execution
+- Default config: none
+
+### literals / JSON Schema
+
+- Node type: `json_schema`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"json_schema"}`
+- Utility: Define a JSON Schema object for schema-constrained responses. Connect to `resp_schema` on LLM Call / Agent nodes.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: literal value with `literalValue` or `set_literal`
+- Inputs: none
+- Outputs: `value` json_schema (schema)
+- Default config: {
+  "literalValue": {
+    "type": "object",
+    "properties": {
+      "data": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "data"
+    ]
+  }
+}
+
+### literals / Array
+
+- Node type: `literal_array`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"literal_array","templateLabel":"Array"}`
+- Utility: Array literal value.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: select with `templateLabel: "Array"`; literal value with `literalValue` or `set_literal`
+- Inputs: none
+- Outputs: `value` array
+- Default config: none
+
+### literals / Assertions
+
+- Node type: `literal_array`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"literal_array","templateLabel":"Assertions"}`
+- Utility: KG assertion list literal value (assertion[]).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: select with `templateLabel: "Assertions"`; literal value with `literalValue` or `set_literal`
+- Inputs: none
+- Outputs: `value` assertions (assertions)
+- Default config: none
+
+### literals / Boolean
+
+- Node type: `literal_boolean`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"literal_boolean"}`
+- Utility: Boolean literal value.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: literal value with `literalValue` or `set_literal`
+- Inputs: none
+- Outputs: `value` boolean
+- Default config: {
+  "literalValue": false
+}
+
+### literals / Assertion
+
+- Node type: `literal_json`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"literal_json","templateLabel":"Assertion"}`
+- Utility: KG assertion literal value (subject/predicate/object + optional metadata).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: select with `templateLabel: "Assertion"`; literal value with `literalValue` or `set_literal`
+- Inputs: none
+- Outputs: `value` assertion (assertion)
+- Default config: none
+
+### literals / JSON
+
+- Node type: `literal_json`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"literal_json","templateLabel":"JSON"}`
+- Utility: Object (JSON) literal value.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: select with `templateLabel: "JSON"`; literal value with `literalValue` or `set_literal`
+- Inputs: none
+- Outputs: `value` object
+- Default config: none
+
+### literals / Memory
+
+- Node type: `literal_json`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"literal_json","templateLabel":"Memory"}`
+- Utility: Memory configuration object for Agent/LLM Call recall and KG settings.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: select with `templateLabel: "Memory"`; literal value with `literalValue` or `set_literal`
+- Inputs: none
+- Outputs: `value` memory (memory)
+- Default config: {
+  "literalValue": {
+    "use_session_attachments": true,
+    "use_span_memory": false,
+    "use_semantic_search": false,
+    "use_kg_memory": true,
+    "memory_query": "",
+    "memory_scope": "session",
+    "recall_level": "standard",
+    "max_span_messages": 24,
+    "kg_max_input_tokens": 1200,
+    "kg_limit": 80,
+    "kg_min_score": 0.35,
+    "kg_write_scope": "session",
+    "kg_domain_focus": "",
+    "kg_max_out_tokens": 0
+  }
+}
+
+### literals / Number
+
+- Node type: `literal_number`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"literal_number"}`
+- Utility: Number literal value.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: literal value with `literalValue` or `set_literal`
+- Inputs: none
+- Outputs: `value` number
+- Default config: {
+  "literalValue": 0
+}
+
+### literals / String
+
+- Node type: `literal_string`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"literal_string"}`
+- Utility: String literal value.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: literal value with `literalValue` or `set_literal`
+- Inputs: none
+- Outputs: `value` string
+- Default config: {
+  "literalValue": ""
+}
+
+### literals / Provider Catalog
+
+- Node type: `provider_catalog`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"provider_catalog"}`
+- Utility: List available LLM providers (optionally filtered by an allowlist).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `allowed_providers` array
+- Outputs: `providers` array
+- Default config: none
+
+### literals / Models Catalog
+
+- Node type: `provider_models`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"provider_models"}`
+- Utility: List models for a provider. Optionally restrict the list by capability route and selected allowed models.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`; provider models config is UI-owned; use provider/capability pins when possible
+- Inputs: `provider` provider_text: Provider id to list models for. If this pin is not connected, the node’s selected provider is used.; `capability_route` string: Optional comma-separated route filter such as output.text or input.image,output.text.
+- Outputs: `provider` provider_text: Resolved provider id used to compute the models list.; `models` array: Array of model ids/names for the provider (filtered to the selected allowed models when set).
+- Default config: {
+  "providerModelsConfig": {
+    "provider": "",
+    "capabilityRoute": "output.text",
+    "allowedModels": []
+  }
+}
+
+### literals / Tool Parameters
+
+- Node type: `tool_parameters`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"tool_parameters"}`
+- Utility: Pick a tool and set its arguments (typed + defaults). Outputs a tool call object for Tool Calls.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: tool and argument pins with `set_tool_parameters`
+- Inputs: none
+- Outputs: `tool_call` object: Single tool call request object: {name, arguments, call_id?}.
+- Default config: {
+  "toolParametersConfig": {
+    "tool": ""
+  }
+}
+
+### literals / Tools Allowlist
+
+- Node type: `tools_allowlist`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"tools_allowlist"}`
+- Utility: Select an allowlist of tool names once and reuse it across LLM/Agent/Tool Calls nodes.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: tool names with `set_literal`
+- Inputs: none
+- Outputs: `tools` tools
+- Default config: none
+
+### math / Absolute
+
+- Node type: `abs`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"abs"}`
+- Utility: Absolute value of a number.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `value` number
+- Outputs: `result` number
+- Default config: none
+
+### math / Add
+
+- Node type: `add`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"add"}`
+- Utility: Add two numbers.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `a` number; `b` number
+- Outputs: `result` number
+- Default config: none
+
+### math / Divide
+
+- Node type: `divide`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"divide"}`
+- Utility: Compute a / b (error on division by zero).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `a` number; `b` number
+- Outputs: `result` number
+- Default config: none
+
+### math / Modulo
+
+- Node type: `modulo`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"modulo"}`
+- Utility: Compute a % b (error on modulo by zero).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `a` number; `b` number
+- Outputs: `result` number
+- Default config: none
+
+### math / Multiply
+
+- Node type: `multiply`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"multiply"}`
+- Utility: Multiply two numbers.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `a` number; `b` number
+- Outputs: `result` number
+- Default config: none
+
+### math / Power
+
+- Node type: `power`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"power"}`
+- Utility: Compute base ** exp.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `base` number; `exp` number
+- Outputs: `result` number
+- Default config: none
+
+### math / Random Float
+
+- Node type: `random_float`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"random_float"}`
+- Utility: Generate a random float in [min, max].
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `min` number: Minimum (inclusive).; `max` number: Maximum (inclusive).
+- Outputs: `result` number
+- Default config: none
+
+### math / Random Int
+
+- Node type: `random_int`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"random_int"}`
+- Utility: Generate a random integer in [min, max] (inclusive).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `min` number: Minimum integer (inclusive).; `max` number: Maximum integer (inclusive).
+- Outputs: `result` number
+- Default config: none
+
+### math / Round
+
+- Node type: `round`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"round"}`
+- Utility: Round a number to N decimals.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `value` number; `decimals` number
+- Outputs: `result` number
+- Default config: none
+
+### math / Subtract
+
+- Node type: `subtract`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"subtract"}`
+- Utility: Compute a - b.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `a` number; `b` number
+- Outputs: `result` number
+- Default config: none
+
+### media / Edit Image
+
+- Node type: `edit_image`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"edit_image"}`
+- Utility: Edit or transform an input image through Gateway image editing and return an image artifact.
+- Gateway capability: edited_image
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `prompt` string: Instruction for the image edit.; `image_artifact` artifact_image: Source image artifact ref. Wire from Generate Image, or use an uploaded/selected artifact.; `mask_artifact` artifact_image: Optional mask artifact ref.; `image_provider` provider_image (provider): Optional image edit provider/backend.; `image_model` model (model): Optional image edit model id for the selected provider.; `format` string: png, jpg, or webp.; `seed` number; `steps` number; `guidance_scale` number (guidance); `strength` number: Optional edit strength for image-to-image backends.; `negative_prompt` string (negative); `extra` object: Optional provider-specific image edit options.
+- Outputs: `exec-out` execution; `image_artifact` artifact_image: Artifact ref for the edited image.; `artifact_ref` artifact; `artifact_id` string; `content_type` string; `outputs` object; `meta` object; `success` boolean
+- Default config: {
+  "pinDefaults": {
+    "format": "png",
+    "steps": 20
+  }
+}
+
+### media / Generate Image
+
+- Node type: `generate_image`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"generate_image"}`
+- Utility: Generate an image through Gateway vision capability and return an artifact reference.
+- Gateway capability: generated_image
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `prompt` string: Image prompt.; `image_provider` provider_image (provider): Optional image provider/backend.; `image_model` model (model): Optional image model id for the selected image provider.; `width` number; `height` number; `format` string: png, jpg, or webp.; `seed` number; `steps` number; `guidance_scale` number (guidance); `negative_prompt` string (negative)
+- Outputs: `exec-out` execution; `image_artifact` artifact_image: Artifact ref for the generated image.; `artifact_ref` artifact; `artifact_id` string; `content_type` string; `outputs` object; `meta` object; `success` boolean
+- Default config: {
+  "pinDefaults": {
+    "format": "png",
+    "steps": 20
+  }
+}
+
+### media / Generate Music
+
+- Node type: `generate_music`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"generate_music"}`
+- Utility: Generate music through Gateway music capability and return an audio artifact.
+- Gateway capability: generated_music
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `prompt` string: Music prompt.; `music_provider` provider_music (provider): Optional Gateway music backend/provider.; `music_model` model (model): Optional music model id for the selected music provider.; `lyrics` string: Optional lyrics for vocal music backends.; `duration_s` number: Optional requested duration in seconds.; `format` string: wav, mp3, or flac.; `seed` number; `num_inference_steps` number (steps); `guidance_scale` number (guidance); `instrumental` boolean; `enhance_prompt` boolean (enhance); `structure_prompt` boolean (structure); `auto_lyrics` boolean; `text_planner_mode` string (planner); `vocal_language` string (language); `negative_prompt` string (negative); `sample_rate` number; `bpm` number; `keyscale` string (key); `timesignature` string (time); `composition_plan` object (plan); `positive_styles` array (styles); `negative_styles` array (avoid_styles); `planning` boolean; `extra` object: Optional provider-specific music-generation options.
+- Outputs: `exec-out` execution; `music_artifact` artifact_audio: Artifact ref for generated music.; `audio_artifact` artifact_audio: Alias artifact ref for audio-compatible downstream nodes.; `artifact_ref` artifact; `artifact_id` string; `content_type` string; `outputs` object; `meta` object; `success` boolean
+- Default config: {
+  "pinDefaults": {
+    "format": "wav"
+  }
+}
+
+### media / Generate Video
+
+- Node type: `generate_video`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"generate_video"}`
+- Utility: Generate a video through Gateway vision capability and return a video artifact.
+- Gateway capability: generated_video
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `prompt` string: Video prompt.; `video_provider` provider_video (provider): Optional video provider/backend.; `video_model` model (model): Optional video model id for the selected video provider.; `width` number; `height` number; `frames` number; `fps` number; `format` string: mp4, mov, or gif.; `seed` number; `steps` number; `guidance_scale` number (guidance); `negative_prompt` string (negative); `extra` object: Optional provider-specific video-generation options.
+- Outputs: `exec-out` execution; `video_artifact` artifact_video: Artifact ref for the generated video.; `artifact_ref` artifact; `artifact_id` string; `content_type` string; `outputs` object; `meta` object; `success` boolean
+- Default config: {
+  "pinDefaults": {
+    "format": "mp4",
+    "width": 512,
+    "height": 512,
+    "frames": 41,
+    "fps": 24,
+    "steps": 20,
+    "guidance_scale": 5
+  }
+}
+
+### media / Generate Voice
+
+- Node type: `generate_voice`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"generate_voice"}`
+- Utility: Generate speech audio through Gateway voice capability and return an audio artifact.
+- Gateway capability: generated_voice
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `text` string: Text to speak.; `tts_provider` provider_voice (provider): Optional media/voice provider id.; `tts_model` model (model): Optional TTS model/language/voice model for the selected provider.; `voice` string: Optional base or cloned voice for the selected provider.; `profile` string: Optional voice profile override.; `quality_preset` string (quality): Optional AbstractVoice quality preset: low, standard, or high.; `format` string: wav or mp3.; `speed` number; `instructions` string
+- Outputs: `exec-out` execution; `audio_artifact` artifact_audio: Artifact ref for generated audio.; `artifact_ref` artifact; `artifact_id` string; `content_type` string; `outputs` object; `meta` object; `success` boolean
+- Default config: {
+  "pinDefaults": {
+    "format": "wav",
+    "quality_preset": "standard",
+    "speed": 1
+  }
+}
+
+### media / Image To Video
+
+- Node type: `image_to_video`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"image_to_video"}`
+- Utility: Animate an input image through Gateway image-to-video capability and return a video artifact.
+- Gateway capability: image_to_video
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `prompt` string: Instruction for the image-to-video generation.; `source_image` artifact_image: Source image artifact ref.; `video_provider` provider_video (provider): Optional image-to-video provider/backend.; `video_model` model (model): Optional image-to-video model id for the selected provider.; `width` number; `height` number; `frames` number; `fps` number; `format` string: mp4, mov, or gif.; `seed` number; `steps` number; `guidance_scale` number (guidance); `strength` number: Optional conditioning strength for image-to-video backends.; `negative_prompt` string (negative); `extra` object: Optional provider-specific image-to-video options.
+- Outputs: `exec-out` execution; `video_artifact` artifact_video: Artifact ref for the generated video.; `artifact_ref` artifact; `artifact_id` string; `content_type` string; `outputs` object; `meta` object; `success` boolean
+- Default config: {
+  "pinDefaults": {
+    "format": "mp4",
+    "width": 512,
+    "height": 512,
+    "frames": 41,
+    "fps": 24,
+    "steps": 20,
+    "guidance_scale": 5
+  }
+}
+
+### media / Listen Voice
+
+- Node type: `listen_voice`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"listen_voice"}`
+- Utility: Pause the workflow and ask the host UI to capture a voice/audio response.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `prompt` string; `language` string; `stt_provider` provider_voice (provider): Optional STT provider id for host-side voice transcription.; `stt_model` model (model): Optional STT model id for the selected voice provider.; `max_duration_s` number; `wait_key` string
+- Outputs: `exec-out` execution; `audio_artifact` artifact_audio; `artifact_ref` artifact; `artifact_id` string; `text` string
+- Default config: {
+  "pinDefaults": {
+    "max_duration_s": 30
+  }
+}
+
+### media / Transcribe Audio
+
+- Node type: `transcribe_audio`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"transcribe_audio"}`
+- Utility: Transcribe an audio artifact through Gateway audio capability.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `audio_artifact` artifact_audio: Audio artifact ref.; `stt_provider` provider_voice (provider): Optional audio/STT provider id.; `language` string; `stt_model` model (model): Optional STT model id for the selected voice provider.; `prompt` string; `format` string; `temperature` number
+- Outputs: `exec-out` execution; `text` string; `transcript_artifact` artifact_text; `artifact_ref` artifact; `artifact_id` string; `meta` object; `success` boolean
+- Default config: {
+  "pinDefaults": {
+    "format": "json",
+    "temperature": 0
+  }
+}
+
+### media / Restore / Upscale Image
+
+- Node type: `upscale_image`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"upscale_image"}`
+- Utility: Restore or upscale an input image through Gateway image upscaling and return an image artifact.
+- Gateway capability: upscaled_image
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `image_artifact` artifact_image: Source image artifact ref. Wire from an image node, or use an uploaded/selected artifact.; `image_provider` provider_image (provider): Optional image upscaler provider/backend.; `image_model` model (model): Optional image upscaler model id for the selected provider.; `scale` string: Upscale factor such as 2x.; `resolution` string: Target shortest edge in pixels or scale factor such as 2x.; `softness` number: Optional restoration softness in [0.0, 1.0].; `seed` number; `quantize` number: Optional backend quantization hint.; `vae_tiling` boolean: Force tiled VAE encode/decode when true, explicitly disable it when false, or leave unset for the MLX-Gen SeedVR2 runtime policy.; `format` string: png, jpg, or webp.; `extra` object: Optional provider-specific image upscaler options.
+- Outputs: `exec-out` execution; `image_artifact` artifact_image: Artifact ref for the upscaled image.; `artifact_ref` artifact; `artifact_id` string; `content_type` string; `outputs` object; `meta` object; `success` boolean
+- Default config: {
+  "pinDefaults": {
+    "format": "png",
+    "resolution": "2x",
+    "softness": 0.25
+  }
+}
+
+### memory / MemAct Compose
+
+- Node type: `memact_compose`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"memact_compose"}`
+- Utility: Map KG query results (packets/items) into MemAct CURRENT CONTEXT and render a MemAct system prompt for inspection.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `kg_result` object: Connect memory_kg_query.raw (or the full node output).; `stimulus` string: Optional stimulus label for trace (defaults to query_text/task).; `marker` string: Prefix marker used to replace previous KG-composed context entries. Default: KG:; `max_items` number: Optional cap on inserted packets (after packetization/packing).
+- Outputs: `exec-out` execution; `ok` boolean: True when composition succeeded.; `delta` object: MemAct delta applied to Active Memory (current_context added/removed).; `trace` object: JSON-safe composition trace (selected packets, budgets, warnings).; `active_memory` object: Raw MemAct Active Memory object (run.vars._runtime.active_memory).; `memact_blocks` array: Rendered MemAct block list (for UI/debug).; `memact_system_prompt` string: Rendered MemAct system prompt (memory blueprints + blocks).
+- Default config: none
+
+### memory / Compact memory
+
+- Node type: `memory_compact`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"memory_compact"}`
+- Utility: Runtime-owned compaction: archives older messages into an artifact span and inserts a summary message with an LLM-visible span_id handle.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `preserve_recent` number: Number of most recent non-system messages to keep verbatim (default 6).; `compression_mode` string: light | standard | heavy (default standard).; `focus` string: Optional topic/focus hint for the compaction summary.
+- Outputs: `exec-out` execution; `span_id` string: The archived conversation span_id (artifact id). Use it for tagging or recall.
+- Default config: none
+
+### memory / KG Assert
+
+- Node type: `memory_kg_assert`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"memory_kg_assert"}`
+- Utility: Append triple assertions into AbstractMemory (provenance-first, no destructive updates).
+- Gateway capability: kg_memory
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `assertions` assertions: List of {subject,predicate,object,...} assertion objects.; `scope` string: run | session | global. Determines the owner_id when not explicitly provided.; `span_id` string: Optional provenance pointer to a runtime span/artifact id.; `owner_id` string: Optional explicit owner id override (advanced; normally derived from scope).; `attributes_defaults` object: Optional attributes merged into each assertion.attributes (defaults only; assertion keys win).; `allow_custom_predicates` boolean: If true, allow custom predicates under the ex:* namespace (advanced; default false).
+- Outputs: `exec-out` execution; `assertion_ids` array: IDs assigned by the store (implementation-specific).; `count` number: Number of asserted triples.; `ok` boolean: True when assertion succeeded.
+- Default config: none
+
+### memory / KG Query
+
+- Node type: `memory_kg_query`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"memory_kg_query"}`
+- Utility: Query the AbstractMemory triple store (pattern filters + optional semantic query_text).
+- Gateway capability: kg_memory
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `query_text` string: Optional semantic query. Requires embeddings to be configured in the host.; `subject` string: Optional subject filter (case-insensitive exact match).; `predicate` string: Optional predicate filter (case-insensitive exact match).; `object` string: Optional object filter (case-insensitive exact match).; `since` string: Optional observed_at lower bound (ISO8601).; `until` string: Optional observed_at upper bound (ISO8601).; `active_at` string: Optional validity window selector (ISO8601). Filters assertions active at that time.; `scope` string: run | session | global | all (fan-out over run+session+global).; `recall_level` string: Recall effort policy: urgent | standard | deep (optional; when set, applies bounded budgets and no-silent-downgrade semantics).; `owner_id` string: Optional explicit owner id override (advanced; normally derived from scope).; `min_score` number: Optional cosine similarity threshold (semantic query_text only). Range ~[-1..1]; start with 0.2–0.4.; `max_input_tokens` number: Optional token budget for Active Memory packing (KG → prompt). If set, returns active_memory_text + packets.; `model` model: Optional text model id used for token estimation (improves budgeting accuracy).; `limit` number: Max assertions to return (default 100).
+- Outputs: `exec-out` execution; `items` assertions: List of triple assertions (dicts).; `count` number: Number of returned assertions.; `ok` boolean: True when query succeeded.; `packets` array: Packed Memory Packets (v0) for Active Memory injection (when max_input_tokens is set).; `active_memory_text` string: Token-budgeted Active Memory block (when max_input_tokens is set).; `packed_count` number: Number of packets included in active_memory_text.; `dropped` number: Packets dropped due to the Active Memory token budget.; `estimated_tokens` number: Estimated token count of active_memory_text.; `raw` object: Raw result object (debug).
+- Default config: none
+
+### memory / KG Resolve Entity
+
+- Node type: `memory_kg_resolve`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"memory_kg_resolve"}`
+- Utility: Resolve candidate ex:* entity ids by label (+ optional rdf:type filter), using bounded exact-match rules and optional semantic fallback.
+- Gateway capability: kg_memory
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `label` string: Entity label text to resolve (case-insensitive; whitespace collapsed).; `expected_type` string: Optional rdf:type filter (e.g. schema:person, skos:concept).; `scope` string: run | session | global | all (fan-out over run+session+global).; `recall_level` string: Recall effort policy: urgent | standard | deep (optional; no silent downgrade).; `max_candidates` number: Optional cap on returned candidates (default depends on recall_level; max 50).; `min_score` number: Optional cosine similarity threshold for semantic fallback (when enabled).; `include_semantic` boolean: Optional override to disable/enable semantic fallback (defaults depend on recall_level).; `owner_id` string: Optional explicit owner id override (advanced; normally derived from scope).
+- Outputs: `exec-out` execution; `candidates` array: Resolved candidates (bounded list): {id,label,types,scope,owner_id,score,evidence}.; `count` number: Number of returned candidates.; `ok` boolean: True when the resolver executed successfully.; `raw` object: Raw result object (debug).
+- Default config: none
+
+### memory / Memorize
+
+- Node type: `memory_note`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"memory_note"}`
+- Utility: Store a durable memory note with optional tags/sources and a scope (run/session/global).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `keep_in_context` boolean (in_context): When true, also insert the stored note into this run's context.messages (synthetic system message). If the pin is not connected, the node checkbox is used. Default: false.; `scope` string: Where to store/index the note: run (this run), session (all runs with the same session_id; owned by an internal session memory run), or global (shared global memory run). If session_id is missing, session falls back to the run-tree root.; `content` string: The note text to store durably (keep it short; prefer references in sources for large payloads).; `location` string: Optional location label (where the note was produced, e.g. "flow:my_flow/node-12"). Useful for filtering.; `tags` object: Key/value tags for filtering (e.g. {topic:"memory", person:"laurent"}). Values must be strings.; `sources` object: Optional provenance refs (e.g. {run_id, span_ids, message_ids}). The note stores refs, not the full source content.
+- Outputs: `exec-out` execution; `note_id` string: The stored note’s span_id / artifact_id. Use it for Recall into context (span_ids) or for precise Recall.
+- Default config: none
+
+### memory / Recall
+
+- Node type: `memory_query`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"memory_query"}`
+- Utility: Query memory by text/tags and return structured results plus a rendered summary.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `query` string: Keyword query (substring match over span metadata and small previews). Combined with tags/authors/locations using AND semantics.; `recall_level` string: Recall effort policy: urgent | standard | deep (optional; when set, applies bounded budgets and no-silent-downgrade semantics).; `limit` number: Maximum number of spans to return (limit_spans). Default: 5.; `tags` object: Tag filters as key→string or key→list[string]. Reserved key "kind" is ignored.; `tags_mode` string: How to combine tag keys: all (AND) or any (OR). Within a single key, list values are OR.; `usernames` array: Filter by created_by (actor id). Case-insensitive exact match. Empty means no filter.; `locations` array: Filter by location metadata (or tags.location). Case-insensitive exact match.; `since` string: ISO8601 start time. Matches spans whose [from,to] intersects this range.; `until` string: ISO8601 end time. Matches spans whose [from,to] intersects this range.; `scope` string: Which span index to query: run | session | global | all. (all queries run+session+global. session uses session_id authority; if session_id is missing, it falls back to the run-tree root.)
+- Outputs: `exec-out` execution; `results` array: Structured match list (meta.matches). Use it to extract span_ids for Recall into context.; `rendered` string: Human-readable recall summary (tool-style output string).
+- Default config: none
+
+### memory / Recall into context
+
+- Node type: `memory_rehydrate`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"memory_rehydrate"}`
+- Utility: Insert recalled message spans into the active context so future LLM/Agent calls can “see” them.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `span_ids` array: List of span_ids (artifact_ids) to insert into context.messages. Typically comes from Recall results.; `placement` string: Where to insert: after_summary | after_system | end.; `recall_level` string: Recall effort policy: urgent | standard | deep (optional; when set, applies bounded budgets and no-silent-downgrade semantics).; `max_messages` number: Optional cap on inserted messages across all spans (None/empty = unlimited). Useful to avoid huge contexts.
+- Outputs: `exec-out` execution; `inserted` number: Number of messages inserted into context.messages.; `skipped` number: Number of messages skipped (usually due to dedup).
+- Default config: none
+
+### memory / Tag memory
+
+- Node type: `memory_tag`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"memory_tag"}`
+- Utility: Apply/merge tags onto an existing memory span record (conversation span or memory note).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `span_id` string: Target span_id (artifact id). Also accepts a 1-based span index as a string/number in some hosts.; `scope` string: Which span index to tag: run | session | global | all. (all tags every matching record across run+session+global; indices are not allowed with all.); `tags` object: Key/value tags to set (values must be strings). Reserved key "kind" is ignored.; `merge` boolean: When true, merges with existing tags. When false, replaces the tag dict. Default: true.
+- Outputs: `exec-out` execution; `success` boolean: Whether the tag operation succeeded.; `rendered` string: Human-readable result string.
+- Default config: none
+
+### memory / Read File
+
+- Node type: `read_file`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"read_file"}`
+- Utility: Read a file from disk and output its content.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `file_path` string
+- Outputs: `exec-out` execution; `content` any
+- Default config: none
+
+### memory / Read PDF
+
+- Node type: `read_pdf`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"read_pdf"}`
+- Utility: Extract text and metadata from a PDF file using the Runtime permissive PDF reader.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `file_path` string; `page_start` number: Optional 1-based first page to read.; `page_end` number: Optional 1-based last page to read.; `max_chars` number: Optional explicit text limit. If used, output warnings include #TRUNCATION.
+- Outputs: `exec-out` execution; `content` string; `pages` number; `processed_pages` number; `metadata` object; `warnings` array; `truncated` boolean; `file_path` string; `content_type` string
+- Default config: none
+
+### memory / Write File
+
+- Node type: `write_file`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"write_file"}`
+- Utility: Write content to a file on disk (creates parent folders if needed).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `file_path` string; `content` any
+- Outputs: `exec-out` execution; `bytes` number; `file_path` string
+- Default config: none
+
+### memory / Write PDF
+
+- Node type: `write_pdf`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"write_pdf"}`
+- Utility: Render text or Markdown-style report content to a real PDF file using the Runtime permissive PDF writer.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `file_path` string; `content` any; `title` string: Optional PDF document title.
+- Outputs: `exec-out` execution; `bytes` number; `file_path` string; `sha256` string; `content_type` string
+- Default config: none
+
+### schema / Add Schema Fields
+
+- Node type: `edit_json_schema`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"edit_json_schema"}`
+- Utility: Add fields to an incoming JSON Schema object. Existing schema fields are preserved; if the input is unavailable, outputs only the added fields.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`; literal value with `literalValue` or `set_literal`
+- Inputs: `schema` json_schema: Base JSON Schema object. Leave unconnected to output only the added fields.
+- Outputs: `schema` json_schema: JSON Schema with added fields.
+- Default config: none
+
+### variables / Bool Variable
+
+- Node type: `bool_var`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"bool_var"}`
+- Utility: Declare a workflow-scope boolean variable (name + default).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: no node-specific command config beyond pins/defaults
+- Inputs: none
+- Outputs: `name` string; `value` boolean
+- Default config: none
+
+### variables / Get Context
+
+- Node type: `get_context`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"get_context"}`
+- Utility: Read the current run's context namespace (run.vars.context).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: no node-specific command config beyond pins/defaults
+- Inputs: none
+- Outputs: `context` object: Full context object from workflow state (run.vars.context).; `task` string: Convenience output for context.task.; `messages` array: Convenience output for context.messages (conversation history).
+- Default config: none
+
+### variables / Get Variable
+
+- Node type: `get_var`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"get_var"}`
+- Utility: Read a variable from workflow state by name.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `name` string
+- Outputs: `value` any
+- Default config: none
+
+### variables / Set Variable Property
+
+- Node type: `set_var_property`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"set_var_property"}`
+- Utility: Update a nested property on an object variable in workflow state (name + key), then continue.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `name` string; `key` string; `value` any
+- Outputs: `exec-out` execution; `value` object
+- Default config: none
+
+### variables / Set Variable
+
+- Node type: `set_var`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"set_var"}`
+- Utility: Write a variable into workflow state by name (supports dotted paths for nested updates; updates run vars).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `name` string; `value` any
+- Outputs: `exec-out` execution; `value` any
+- Default config: none
+
+### variables / Set Variables
+
+- Node type: `set_vars`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"set_vars"}`
+- Utility: Write multiple variables into workflow state in a single step (updates is an object of name→value).
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `set_pin_default`
+- Inputs: `exec-in` execution; `updates` object
+- Outputs: `exec-out` execution; `updates` object
+- Default config: none
+
+### variables / Variable
+
+- Node type: `var_decl`
+- Create command: `{"action":"add_node","id":"<unique_id>","nodeType":"var_decl"}`
+- Utility: Declare a workflow-scope typed variable (name/type/default) and output its current value.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: no node-specific command config beyond pins/defaults
+- Inputs: none
+- Outputs: `name` string; `value` any
+- Default config: none
+
+## Hidden Or Deprecated Templates
+
+- `call_tool` / Call Tool: rejected by `add_node` (hidden, deprecated).
+- `image_to_image` / Image To Image: rejected by `add_node` (hidden).
+- `text_to_video` / Text To Video: rejected by `add_node` (hidden).
+
 ## docs/architecture.md
 
 # Architecture
@@ -306,6 +2943,8 @@ AbstractFlow owns:
 - the npm CLI/static server and Gateway proxy in `bin/cli.js`
 - browser-session UX for connecting to a Gateway user
 - client-side mapping of Gateway discovery, run ledgers, artifacts, and media catalogs into editor controls
+- VisualFlow authoring UX for node pin defaults, including inline JSON Schema response schemas on unconnected schema pins
+- the right-drawer Workflow Authoring Assistant, including its Gateway-routed model call and validated draft-graph command reducer
 - sample VisualFlow JSON files in `examples/flows/`
 
 AbstractFlow delegates:
@@ -316,6 +2955,21 @@ AbstractFlow delegates:
 - run execution, waits, ledgers, artifacts, and runtime isolation to AbstractGateway/AbstractRuntime
 - VisualFlow compilation and `.flow` bundle semantics to AbstractRuntime
 - provider calls and capability plugins to AbstractCore through Gateway/Runtime
+
+Flow authors schemas; it does not enforce model responses. Gateway persists and
+publishes the VisualFlow JSON. Runtime applies unconnected `pinDefaults` and
+normalizes structured-output schemas. Core/provider integrations enforce the
+schema for the actual model call when supported.
+
+The Workflow Authoring Assistant is an editor feature, not a runtime. It
+resolves Gateway's default `output.text` route unless the user pins a specific
+assistant provider/model, then starts a Gateway `basic-agent` planner run and
+reads the terminal authoring response from the run ledger. The planner run
+explicitly receives an empty runtime tool list so authoring edits are returned
+as command JSON instead of Gateway tool calls. Generated content is never
+applied as raw VisualFlow JSON. Browser-side validation converts accepted
+commands into normal graph edits, and
+Save/Publish/Run remain user-controlled Gateway operations.
 
 ## Runtime Shape
 
@@ -336,7 +2990,7 @@ Flow serves static assets and proxies HTTP/SSE calls. The browser does not talk 
 bin/                  npm CLI and Gateway proxy
 src/                  React editor source
 examples/flows/       sample VisualFlow JSON files
-docs/                 user and maintainer docs
+docs/                 user and contributor docs
 package.json          npm package manifest
 ```
 
@@ -359,6 +3013,34 @@ Flow must discover capabilities from Gateway instead of hardcoding local provide
 - workspace and artifact affordances
 
 Provider secrets stay in Gateway.
+
+## Authoring Assistant Boundary
+
+The assistant reads `docs/workflow-authoring-skill.md` bundled with the web app
+plus a complete generated node catalog from `src/types/nodes.ts`. This
+authoring skill replaces generic `llms-full.txt` context for graph
+construction. The UI shows the prompt size it will send to Gateway and displays
+the selected model's context/output limits from Gateway model-capability
+discovery when available. AbstractFlow does not hardcode model context windows
+or clip chat, skill docs, or graph context. The planner is invoked through
+Gateway's normal run lifecycle, not the console sandbox.
+
+The assistant is an iterative Flow-owned authoring controller. Each turn can run
+multiple Gateway planner runs: plan commands, apply them through the validated
+command reducer, recompute preflight/readiness issues, reflect on the updated
+draft, and continue until the graph is ready or explicitly blocked. Research,
+news, job-search, and deep-research requests are checked for a multi-step
+scaffold: start inputs, prompt building, explicit tools, an Agent with the
+standard `max_iterations=50` setting, and end outputs.
+
+Model output is restricted to command JSON. The editor refuses commands that
+would embed secrets, create unknown templates, bypass connection validation,
+enable Code `full_access`, delete graph content, or create Tool Calls without an
+explicit allowlist. Tool-dependent authoring uses only Gateway's advertised tool
+inventory and exact discovered tool names. The assistant has no local template
+planner: if Gateway defaults, advertised discovery endpoints, the planner run,
+JSON parsing, or command validation fail, the drawer surfaces the error instead
+of synthesizing a substitute workflow.
 
 ## Defaults And Residency
 
@@ -408,6 +3090,7 @@ The Flow server proxies browser calls under `/api/*` to the configured Gateway. 
 - `/api/gateway/me`
 - `/api/gateway/discovery/capabilities`
 - `/api/gateway/providers`
+- `/api/gateway/config/capability-defaults`
 - `/api/gateway/visualflows`
 - `/api/gateway/visualflows/{flow_id}/publish`
 - `/api/gateway/runs/start`
@@ -415,6 +3098,9 @@ The Flow server proxies browser calls under `/api/*` to the configured Gateway. 
 - `/api/gateway/runs/{run_id}/ledger/stream`
 - `/api/gateway/runs/{run_id}/artifacts`
 - Gateway media catalog and artifact content routes
+
+The Workflow Authoring Assistant uses the normal run and ledger routes to start
+Gateway planner runs and read their terminal responses.
 
 Flow treats Gateway as the source of truth. Any local fallback must be visible in UI state and should be limited to degraded editor display, not execution.
 
@@ -429,13 +3115,27 @@ Execution semantics are not implemented in this package. Gateway/Runtime execute
 High-value source modules:
 
 - `src/utils/gatewayClient.ts`: Gateway HTTP/SSE client helpers.
+- `src/utils/flowAuthoringCommands.ts`: typed Workflow Authoring Assistant command validation and graph mutation helpers.
 - `src/utils/gatewayCatalog.ts`: provider/model/media catalog normalization.
 - `src/utils/ledgerEvents.ts`: Gateway ledger to UI execution-event mapping.
 - `src/utils/artifactInputs.ts`: artifact references and modality-aware UI helpers.
+- `src/utils/jsonSchemaEditor.ts`: shared JSON Schema builder helpers, including Choice/enum round-tripping.
 - `src/components/GatewayConnectionModal.tsx`: browser sign-in UX.
+- `src/components/AuthoringAssistantDrawer.tsx`: right-drawer conversational workflow authoring assistant.
 - `src/components/RunFlowModal.tsx`: run start, replay, stream, artifact, progress, and Gateway wait/resume UX, including browser-captured `Listen Voice` audio upload before run resume.
-- `src/components/nodes/BaseNode.tsx`: node rendering, connection feedback, and unconnected artifact-input upload affordances.
+- `src/components/JsonSchemaEditor.tsx` and `src/components/JsonSchemaPinEditorModal.tsx`: inline schema-pin editing for unconnected JSON Schema inputs.
+- `src/components/nodes/BaseNode.tsx`: node rendering, connection feedback, unconnected artifact-input upload affordances, and schema-pin edit buttons.
 - `src/types/nodes.ts`: editor node templates and pins.
+
+Schema pin defaults are stored under `node.data.pinDefaults`, for example
+`pinDefaults.resp_schema` on LLM Call and Agent nodes. Gateway persists and
+publishes that JSON as part of the VisualFlow document; Runtime decides whether
+the pin default is used or overridden by a connected input.
+
+Structured LLM Call and Agent results have two outputs: `response` remains a
+string, while `data` is the object that conforms to `resp_schema`. Editors and
+clients should wire `data` into Break Object, Switch, or other object-aware
+nodes when schema fields are needed.
 
 ## docs/visualflow.md
 
@@ -483,6 +3183,84 @@ Execution semantics are owned by AbstractRuntime. Flow's job is to author and se
 - Provider/model pins should use Gateway-discovered provider ids and models.
 - Secrets must not be embedded in VisualFlow JSON.
 - Reusable endpoint credentials belong in Gateway provider endpoint profiles.
+
+## File And Document Nodes
+
+File/document side effects are execution nodes and must be on the execution path
+before `on_flow_end` if their outputs are part of the requested result.
+
+- `read_file` reads UTF-8 text or JSON from a workspace path.
+- `write_file` writes UTF-8 text or JSON to a workspace path.
+- `read_pdf` extracts text and metadata from a `.pdf` path using Runtime's
+  permissive PDF reader.
+- `write_pdf` renders text or Markdown-style report content to real PDF bytes
+  using Runtime's permissive PDF writer.
+
+Use `write_file` for Markdown, JSON, and text artifacts. Use `write_pdf` for PDF
+artifacts; do not represent PDF generation by writing Markdown to a `.pdf` path.
+
+## Structured Output And Switch Cases
+
+Inline response schemas for LLM Call and Agent nodes are stored as pin defaults.
+Connected schema edges override these defaults at runtime.
+
+When a schema is active, LLM Call and Agent nodes keep `response` as a text
+output for compatibility and expose `data` as the structured object output. Wire
+`data` directly into Break Object or other object-aware nodes; use `response`
+when you explicitly want the textual assistant content.
+
+```json
+{
+  "id": "classify",
+  "type": "llm_call",
+  "position": { "x": 240, "y": 80 },
+  "data": {
+    "nodeType": "llm_call",
+    "pinDefaults": {
+      "prompt": "Classify the request.",
+      "resp_schema": {
+        "type": "object",
+        "properties": {
+          "choice": {
+            "type": "string",
+            "enum": ["approve", "reject", "escalate"]
+          }
+        },
+        "required": ["choice"]
+      }
+    }
+  }
+}
+```
+
+For enum-driven control flow, wire the structured `data` output into Break
+Object, expose the enum field, and connect that field to Switch. Flow stores
+explicit Switch cases. Gateway publishes these fields unchanged, and Runtime
+routes by the saved case handles.
+
+```json
+{
+  "id": "route_choice",
+  "type": "switch",
+  "position": { "x": 640, "y": 80 },
+  "data": {
+    "nodeType": "switch",
+    "switchConfig": {
+      "cases": [
+        { "id": "approve", "value": "approve" },
+        { "id": "reject", "value": "reject" },
+        { "id": "escalate", "value": "escalate" }
+      ]
+    },
+    "outputs": [
+      { "id": "case:approve", "label": "approve", "type": "execution" },
+      { "id": "case:reject", "label": "reject", "type": "execution" },
+      { "id": "case:escalate", "label": "escalate", "type": "execution" },
+      { "id": "default", "label": "default", "type": "execution" }
+    ]
+  }
+}
+```
 
 ## Sharing Workflows
 
@@ -585,6 +3363,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Added
+- Added first-class `Read PDF` and `Write PDF` VisualFlow nodes so workflows can extract PDF text/metadata and render report content to real PDF files through Runtime.
+- Added a first-class Restore / Upscale Image media node backed by Gateway's `upscaled_image` contract and `image_upscale` vision catalog task.
+- Added a right-drawer Workflow Authoring Assistant that reads `docs/workflow-authoring-skill.md` plus a complete generated node catalog, drafts edits through Gateway's default `output.text` model unless a model is pinned, applies only validated graph commands, and fails closed without draft changes when Gateway/model/JSON/command validation fails.
+- Added capability-route filtering for text model discovery, including reusable `output.text` defaults and Models Catalog support for input/output-shaped routes such as `input.image,output.text`.
+- Added reasoning/thinking controls for Agent and LLM Call nodes, with Gateway/Core-backed model capability lookup and inline/right-panel selectors for supported reasoning models.
+- Added Vitest coverage for node pin disclosure behavior, including compact media nodes, default-value handling, and generated-video defaults.
+- Added inline JSON Schema editing for unconnected schema input pins, including a Builder tab for fields and Choice/enum values plus an expert JSON Schema tab.
+- Added switch-friendly structured-output authoring: enum-backed response fields can be discovered through Parse JSON / Break Object and synced into explicit Switch cases.
+
+### Changed
+- Model residency and media provider/model selectors now include the `image_upscale` task for Gateway/Core upscaler discovery and explicit load/unload steps.
+- Workflow Authoring Assistant PDF readiness now requires an executable `Write PDF` node and exposed PDF path instead of accepting Code or generic Write File workarounds.
+- Compact node rendering now uses a shared pin disclosure policy so nodes show required, connected, or explicitly configured pins by default and hide optional/default/diagnostic pins behind a chevron.
+- Workflow Authoring Assistant now shows prompt size plus Gateway-discovered model context/output limits and includes a Clear Chat control instead of trimming conversation history.
+- Workflow Authoring Assistant now persists drawer chat/draft/session state across close/reopen and uses the authoring skill instead of generic `llms-full.txt` context for graph construction.
+- Improved canvas rendering with clearer node cards, stronger edge readability, state-aware MiniMap node styling, and a pannable/zoomable preview.
+- Restyled the MiniMap collapse/expand control as an icon button and moved React Flow attribution away from the preview while removing its grey backing.
+- Restyled the schema-pin editor modal with clearer titles, validation, and editable Choice chips while keeping saved data as standard JSON Schema.
+
+### Fixed
+- Workflow Authoring Assistant requests now keep full prior turns inside the current prompt instead of sending assistant-led chat history to OpenAI-compatible endpoints, avoiding LM Studio/Qwen prompt-template failures without imposing a local model-context cap.
+- Model selectors now request provider models with the appropriate capability route so discovery stays aligned with Gateway/Core model capability metadata.
+- Optional single-pin disclosures no longer collapse unnecessarily, and thinking pins stay hidden for models without detected thinking support unless already configured.
+- Schema Builder mode no longer drops JSON Schema `enum` values when switching between Builder and JSON Schema editing.
 
 ## [0.3.18] - 2026-06-03
 
@@ -997,7 +3801,7 @@ npm run lint
 - `src/`: React/Vite editor.
 - `bin/cli.js`: static server and Gateway proxy.
 - `examples/flows/`: sample VisualFlow JSON files.
-- `docs/`: user and maintainer docs.
+- `docs/`: user and contributor docs.
 
 Do not add local Python execution/server code to this repository. Runtime execution belongs to AbstractGateway and AbstractRuntime.
 

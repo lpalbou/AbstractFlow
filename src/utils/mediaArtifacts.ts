@@ -19,6 +19,7 @@ const MEDIA_NODE_TYPES = new Set([
   'generate_image',
   'edit_image',
   'image_to_image',
+  'upscale_image',
   'generate_video',
   'text_to_video',
   'image_to_video',

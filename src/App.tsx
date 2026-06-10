@@ -10,6 +10,7 @@ import {
   fetchGatewayConnection,
   type GatewayConnectionStatus,
 } from './components/GatewayConnectionModal';
+import { AuthoringAssistantDrawer } from './components/AuthoringAssistantDrawer';
 import { NodePalette } from './components/NodePalette';
 import { PropertiesPanel } from './components/PropertiesPanel';
 import { Toolbar } from './components/Toolbar';
@@ -47,6 +48,7 @@ function has_browser_gateway_session(status: GatewayConnectionStatus | null): bo
 }
 
 const UI_SETTINGS_KEY = 'abstractflow_ui_settings_v1';
+type RightDrawerMode = 'assistant' | 'properties' | null;
 
 function load_appearance_settings(): AppearanceSettings {
   try {
@@ -82,8 +84,26 @@ function App() {
   const [connection_checked, set_connection_checked] = useState(false);
   const [connection_status, set_connection_status] = useState<GatewayConnectionStatus | null>(null);
   const [connection_required, set_connection_required] = useState(false);
+  const [right_drawer_mode, set_right_drawer_mode] = useState<RightDrawerMode>(null);
   const gateway_connected = has_browser_gateway_session(connection_status);
-  const properties_open = Boolean(selectedNode);
+  const selected_node_id = selectedNode?.id || null;
+  const assistant_open = right_drawer_mode === 'assistant';
+  const properties_open = right_drawer_mode === 'properties';
+  const right_drawer_open = assistant_open || properties_open;
+  const toggle_assistant_drawer = () => {
+    set_right_drawer_mode((mode) => (mode === 'assistant' ? null : 'assistant'));
+  };
+  const toggle_properties_drawer = () => {
+    set_right_drawer_mode((mode) => (mode === 'properties' ? null : 'properties'));
+  };
+
+  useEffect(() => {
+    set_right_drawer_mode((mode) => {
+      if (mode === 'assistant') return mode;
+      if (selected_node_id) return 'properties';
+      return null;
+    });
+  }, [selected_node_id]);
 
   useEffect(() => {
     if (!gpu_enabled) return;
@@ -184,8 +204,10 @@ function App() {
         </div>
         <Toolbar
           onOpenAppearance={() => set_show_appearance(true)}
+          onOpenAssistant={() => set_right_drawer_mode('assistant')}
           onOpenConnection={() => set_show_connection(true)}
           onDisconnect={handle_disconnect}
+          assistantOpen={assistant_open}
           gatewayConnected={gateway_connected}
         />
         {gpu_enabled ? (
@@ -213,7 +235,7 @@ function App() {
       </header>
 
       {/* Main content */}
-      <main className={`app-main ${properties_open ? 'properties-open' : 'properties-collapsed'}`}>
+      <main className={`app-main ${right_drawer_open ? 'properties-open' : 'properties-collapsed'}`}>
         {/* Left sidebar - Node palette */}
         <aside className="sidebar left">
           <NodePalette />
@@ -224,16 +246,38 @@ function App() {
           <Canvas />
         </div>
 
-        {/* Right sidebar - Properties panel */}
-        <aside className={`sidebar right properties-drawer ${properties_open ? 'open' : 'collapsed'}`}>
-          {properties_open ? (
-            <PropertiesPanel node={selectedNode} />
-          ) : (
-            <div className="properties-collapsed-rail" aria-label="Properties drawer collapsed">
-              <span className="properties-collapsed-icon">⚙</span>
-              <span className="properties-collapsed-text">Properties</span>
+        {/* Right sidebar - Properties / Assistant drawer */}
+        <aside
+          className={`sidebar right properties-drawer ${right_drawer_open ? 'open' : 'collapsed'} ${assistant_open ? 'assistant-drawer-open' : ''} ${properties_open ? 'properties-drawer-open' : ''}`}
+        >
+          {right_drawer_open ? (
+            <div className="right-drawer-content">
+              {assistant_open ? <AuthoringAssistantDrawer isOpen={assistant_open} /> : null}
+              {properties_open ? <PropertiesPanel node={selectedNode} /> : null}
             </div>
-          )}
+          ) : null}
+          <div className="right-drawer-rail" aria-label="Right drawer">
+            <button
+              type="button"
+              className={`right-drawer-rail-action ${assistant_open ? 'active' : ''}`}
+              onClick={toggle_assistant_drawer}
+              title={assistant_open ? 'Close authoring assistant' : 'Open authoring assistant'}
+              aria-label={assistant_open ? 'Close authoring assistant' : 'Open authoring assistant'}
+            >
+              <span className="right-drawer-rail-icon" aria-hidden="true">✦</span>
+              <span className="right-drawer-rail-text">Assistant</span>
+            </button>
+            <button
+              type="button"
+              className={`right-drawer-rail-action ${properties_open ? 'active' : ''}`}
+              onClick={toggle_properties_drawer}
+              title={properties_open ? 'Close properties' : 'Open properties'}
+              aria-label={properties_open ? 'Close properties' : 'Open properties'}
+            >
+              <span className="right-drawer-rail-icon" aria-hidden="true">⚙</span>
+              <span className="right-drawer-rail-text">Properties</span>
+            </button>
+          </div>
         </aside>
       </main>
 

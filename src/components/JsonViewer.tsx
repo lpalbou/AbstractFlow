@@ -1,5 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import clsx from 'clsx';
+
+const DEFAULT_FOLDED_DEPTH = 3;
+const UNFOLDED_DEPTH = Number.MAX_SAFE_INTEGER;
+const COLLAPSIBLE_STRING_LENGTH = 96;
+
+type JsonExpansionMode = 'folded' | 'unfolded';
 
 function isJsonObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -23,6 +29,16 @@ function tryParseJsonString(value: string): unknown {
     }
   }
   return value;
+}
+
+function isCollapsibleRenderedString(value: string): boolean {
+  const rendered = JSON.stringify(value);
+  return (
+    rendered.length > COLLAPSIBLE_STRING_LENGTH ||
+    rendered.includes('\\n') ||
+    rendered.includes('\\r') ||
+    rendered.includes('\\t')
+  );
 }
 
 function copyStringForJson(value: unknown): string {
@@ -60,9 +76,52 @@ function Token({
   return <span className={clsx('json-token', kind)}>{children}</span>;
 }
 
-function renderPrimitive(value: unknown): JSX.Element {
+function JsonStringValue({
+  value,
+  expansionMode,
+  expansionVersion,
+}: {
+  value: string;
+  expansionMode: JsonExpansionMode;
+  expansionVersion: number;
+}): JSX.Element {
+  const rendered = JSON.stringify(value);
+  const collapsible = isCollapsibleRenderedString(value);
+  const [open, setOpen] = useState(!collapsible || expansionMode === 'unfolded');
+
+  useEffect(() => {
+    if (!collapsible) return;
+    setOpen(expansionMode === 'unfolded');
+  }, [collapsible, expansionMode, expansionVersion]);
+
+  if (!collapsible) return <Token kind="string">{rendered}</Token>;
+
+  return (
+    <span className={clsx('json-string', open ? 'open' : 'collapsed')}>
+      <button
+        type="button"
+        className="json-string__toggle"
+        onClick={() => setOpen((value) => !value)}
+        aria-label={open ? 'Collapse string value' : 'Expand string value'}
+        aria-expanded={open}
+      >
+        {open ? '▾' : '▸'}
+      </button>
+      {open ? (
+        <span className="json-token string json-string__value">{rendered}</span>
+      ) : (
+        <button type="button" className="json-string__preview" onClick={() => setOpen(true)} aria-label="Expand string value">
+          <span className="json-token string json-string__preview_text">{rendered}</span>
+          <span className="json-string__suffix">(...)</span>
+        </button>
+      )}
+    </span>
+  );
+}
+
+function renderPrimitive(value: unknown, expansionMode: JsonExpansionMode, expansionVersion: number): JSX.Element {
   if (value === null) return <Token kind="null">null</Token>;
-  if (typeof value === 'string') return <Token kind="string">{JSON.stringify(value)}</Token>;
+  if (typeof value === 'string') return <JsonStringValue value={value} expansionMode={expansionMode} expansionVersion={expansionVersion} />;
   if (typeof value === 'number') return <Token kind="number">{String(value)}</Token>;
   if (typeof value === 'boolean') return <Token kind="boolean">{value ? 'true' : 'false'}</Token>;
   return <Token kind="string">{JSON.stringify(String(value))}</Token>;
@@ -79,11 +138,13 @@ type JsonNodeProps = {
   value: unknown;
   depth: number;
   collapseAfterDepth: number;
+  expansionMode: JsonExpansionMode;
+  expansionVersion: number;
   trailingComma: boolean;
 };
 
 function JsonNode(props: JsonNodeProps) {
-  const { label, value, depth, collapseAfterDepth, trailingComma } = props;
+  const { label, value, depth, collapseAfterDepth, expansionMode, expansionVersion, trailingComma } = props;
   const indentPx = depth * 14;
 
   const isObject = isJsonObject(value);
@@ -91,6 +152,10 @@ function JsonNode(props: JsonNodeProps) {
   const isContainer = isObject || isArray;
   const defaultOpen = depth < collapseAfterDepth;
   const [open, setOpen] = useState(defaultOpen);
+
+  useEffect(() => {
+    setOpen(defaultOpen);
+  }, [defaultOpen, expansionVersion]);
 
   const prefix = label ? (
     <>
@@ -103,7 +168,7 @@ function JsonNode(props: JsonNodeProps) {
     return (
       <div className="json-viewer__line" style={{ paddingLeft: indentPx }}>
         {prefix}
-        {renderPrimitive(value)}
+        {renderPrimitive(value, expansionMode, expansionVersion)}
         {trailingComma ? ',' : ''}
       </div>
     );
@@ -155,6 +220,8 @@ function JsonNode(props: JsonNodeProps) {
                     value={e.value}
                     depth={depth + 1}
                     collapseAfterDepth={collapseAfterDepth}
+                    expansionMode={expansionMode}
+                    expansionVersion={expansionVersion}
                     trailingComma={childTrailing}
                   />
                 );
@@ -178,27 +245,69 @@ export function JsonViewer(props: {
   showCopy?: boolean;
 }) {
   const { value, className, showCopy = true } = props;
-  const collapseAfterDepth = Number.isFinite(props.collapseAfterDepth ?? NaN) ? Number(props.collapseAfterDepth) : 3;
+  const [expansion, setExpansion] = useState<{ mode: JsonExpansionMode; version: number }>({
+    mode: 'folded',
+    version: 0,
+  });
 
   const displayValue = useMemo(() => {
     if (typeof value === 'string') return tryParseJsonString(value);
     return value;
   }, [value]);
 
+  const foldedDepth = Number.isFinite(props.collapseAfterDepth ?? NaN)
+    ? Number(props.collapseAfterDepth)
+    : DEFAULT_FOLDED_DEPTH;
+  const collapseAfterDepth = expansion.mode === 'unfolded' ? UNFOLDED_DEPTH : foldedDepth;
   const copyTextValue = useMemo(() => copyStringForJson(value), [value]);
+  const showToggleAll =
+    isJsonArray(displayValue) ||
+    isJsonObject(displayValue) ||
+    (typeof displayValue === 'string' && isCollapsibleRenderedString(displayValue));
+  const showToolbar = showToggleAll || showCopy;
+
+  useEffect(() => {
+    setExpansion((current) => ({ mode: 'folded', version: current.version + 1 }));
+  }, [displayValue]);
+
+  const toggleExpansion = () => {
+    setExpansion((current) => ({
+      mode: current.mode === 'unfolded' ? 'folded' : 'unfolded',
+      version: current.version + 1,
+    }));
+  };
 
   return (
     <div className={clsx('json-viewer run-details-output', className)}>
-      {showCopy ? (
+      {showToolbar ? (
         <div className="json-viewer__toolbar">
-          <button type="button" className="modal-button json-viewer__copy" onClick={() => void copyText(copyTextValue)}>
-            Copy
-          </button>
+          {showToggleAll ? (
+            <button
+              type="button"
+              className="modal-button json-viewer__toggle-all"
+              onClick={toggleExpansion}
+              aria-expanded={expansion.mode === 'unfolded'}
+            >
+              {expansion.mode === 'unfolded' ? 'Fold all' : 'Unfold all'}
+            </button>
+          ) : null}
+          {showCopy ? (
+            <button type="button" className="modal-button json-viewer__copy" onClick={() => void copyText(copyTextValue)}>
+              Copy
+            </button>
+          ) : null}
         </div>
       ) : null}
 
       <div className="json-viewer__tree" role="tree" aria-label="JSON viewer">
-        <JsonNode value={displayValue} depth={0} collapseAfterDepth={collapseAfterDepth} trailingComma={false} />
+        <JsonNode
+          value={displayValue}
+          depth={0}
+          collapseAfterDepth={collapseAfterDepth}
+          expansionMode={expansion.mode}
+          expansionVersion={expansion.version}
+          trailingComma={false}
+        />
       </div>
     </div>
   );

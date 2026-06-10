@@ -1,5 +1,6 @@
 import type { FlowNodeData, NodeType, Pin } from '../types/flow';
 import { createNodeData, getNodeTemplate } from '../types/nodes';
+import { hasStructuredResponseSchema, isStructuredResponseDataPin } from './structuredOutputs';
 
 export type PinDisclosureDirection = 'input' | 'output';
 
@@ -72,6 +73,7 @@ const MEDIA_NODE_TYPES = new Set<string>([
   'generate_image',
   'edit_image',
   'image_to_image',
+  'upscale_image',
   'generate_video',
   'text_to_video',
   'image_to_video',
@@ -126,6 +128,11 @@ const DEFAULT_PIN_VALUES_BY_NODE_TYPE: Record<string, PinValueMap> = {
   image_to_image: {
     format: 'png',
     steps: 20,
+  },
+  upscale_image: {
+    format: 'png',
+    resolution: '2x',
+    softness: 0.25,
   },
   generate_video: VIDEO_DEFAULT_PIN_VALUES,
   text_to_video: VIDEO_DEFAULT_PIN_VALUES,
@@ -227,6 +234,11 @@ const GENERATION_TUNING_INPUTS = [
   'num_inference_steps',
   'guidance_scale',
   'strength',
+  'scale',
+  'resolution',
+  'softness',
+  'quantize',
+  'vae_tiling',
   'negative_prompt',
   'extra',
   'quality_preset',
@@ -334,6 +346,7 @@ const POLICY_BY_NODE_TYPE: Partial<Record<NodeType, NodeDisclosurePolicy>> = {
     compactOutputs: true,
     primaryInputs: ['system', 'prompt', 'tools'],
     primaryOutputs: ['response'],
+    advancedOutputs: ['data'],
     advancedInputs: LLM_AGENT_ADVANCED_INPUTS,
     diagnosticOutputs: ['success', 'meta', 'scratchpad', 'tool_calls', 'tool_results', 'result'],
   },
@@ -342,6 +355,7 @@ const POLICY_BY_NODE_TYPE: Partial<Record<NodeType, NodeDisclosurePolicy>> = {
     compactOutputs: true,
     primaryInputs: ['system', 'prompt'],
     primaryOutputs: ['response'],
+    advancedOutputs: ['data'],
     advancedInputs: LLM_AGENT_ADVANCED_INPUTS.filter((pin) => pin !== 'max_iterations'),
     diagnosticOutputs: ['success', 'meta', 'tool_calls', 'result', 'raw', 'gen_time', 'ttft_ms'],
   },
@@ -380,6 +394,14 @@ const POLICY_BY_NODE_TYPE: Partial<Record<NodeType, NodeDisclosurePolicy>> = {
     primaryInputs: ['prompt', 'source_image'],
     primaryOutputs: ['image_artifact'],
     advancedInputs: ['mask_artifact', ...PROVIDER_MODEL_INPUTS, ...GENERATION_TUNING_INPUTS],
+    diagnosticOutputs: MEDIA_DIAGNOSTIC_OUTPUTS,
+  },
+  upscale_image: {
+    compactInputs: true,
+    compactOutputs: true,
+    primaryInputs: ['image_artifact'],
+    primaryOutputs: ['image_artifact'],
+    advancedInputs: [...PROVIDER_MODEL_INPUTS, ...GENERATION_TUNING_INPUTS],
     diagnosticOutputs: MEDIA_DIAGNOSTIC_OUTPUTS,
   },
   generate_video: {
@@ -535,6 +557,16 @@ const POLICY_BY_NODE_TYPE: Partial<Record<NodeType, NodeDisclosurePolicy>> = {
     compactInputs: true,
     primaryInputs: ['file_path', 'content'],
   },
+  read_pdf: {
+    compactInputs: true,
+    primaryInputs: ['file_path'],
+    advancedInputs: ['page_start', 'page_end', 'max_chars'],
+  },
+  write_pdf: {
+    compactInputs: true,
+    primaryInputs: ['file_path', 'content'],
+    advancedInputs: ['title'],
+  },
   concat: {
     compactInputs: true,
     primaryInputs: ['a', 'b'],
@@ -564,6 +596,10 @@ const POLICY_BY_NODE_TYPE: Partial<Record<NodeType, NodeDisclosurePolicy>> = {
     primaryInputs: ['text'],
   },
   trim: {
+    compactInputs: true,
+    primaryInputs: ['text'],
+  },
+  is_empty_string: {
     compactInputs: true,
     primaryInputs: ['text'],
   },
@@ -1026,6 +1062,17 @@ function decidePinVisibility<TPin extends PinLike>(args: {
     return { pinId: args.pin.id, direction: args.direction, visible: true, className: 'unmanaged', reason: 'connected' };
   }
 
+  if (args.direction === 'output' && isStructuredResponseDataPin(args.pin, String(args.nodeType))) {
+    const schemaActive = hasStructuredResponseSchema(args.data) || args.config?.__structured_response_active === true;
+    return {
+      pinId: args.pin.id,
+      direction: args.direction,
+      visible: schemaActive,
+      className: schemaActive ? 'primary' : 'advanced',
+      reason: schemaActive ? 'configured' : 'unsupported',
+    };
+  }
+
   const isUnsupportedThinkingPin =
     args.direction === 'input' &&
     args.pin.id === 'thinking' &&
@@ -1193,12 +1240,15 @@ export function getNodePinDisclosure(args: {
     thinkingSupport: args.thinkingSupport,
     expanded: args.expanded,
   });
+  const structuredResponseSchemaConnected =
+    args.connectedInputPinIds.has('resp_schema') || args.connectedInputPinIds.has('response_schema');
   const outputDisclosure = computeNodePinDisclosure({
     nodeType: args.data.nodeType,
     direction: 'output',
     pins: args.outputs,
     connectedPinIds: args.connectedOutputPinIds,
     data: args.data,
+    config: structuredResponseSchemaConnected ? { __structured_response_active: true } : undefined,
     expanded: args.expanded,
   });
   const inputPins = inputDisclosure.visiblePins;

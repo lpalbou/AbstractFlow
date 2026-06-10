@@ -1,14 +1,14 @@
 # AbstractFlow Backlog Overview
 
 ## Snapshot
-- Updated: 2026-06-02
+- Updated: 2026-06-05
 - Planned: 0
 - Proposed: 13
-- Completed: 28
+- Completed: 32
 - Deprecated: 0
 
 ## Current Priorities
-- No planned items are currently open. The next artifact/file-system design pass
+- The next artifact/file-system design pass
   should resolve `proposed/0095_file_nodes_artifact_io_boundary_resolution.md`:
   `Read File` / `Write File` may need to become artifact-aware, or be paired
   with explicit artifact IO nodes, while keeping Gateway as filesystem policy
@@ -26,6 +26,10 @@
 - `proposed/0095_file_nodes_artifact_io_boundary_resolution.md`: preserves the unresolved design tension around whether `Read File` / `Write File` should import/export artifacts directly, whether explicit artifact IO nodes are clearer, and how JSON/document/file artifacts should become first-class without conflating Runtime artifact storage with user-authored file trees.
 
 ## Completed Ledger
+- `completed/0101_permissive_pdf_document_nodes.md`: added first-class Runtime/Flow `Read PDF` and `Write PDF` VisualFlow nodes backed by permissive `pypdf`/`reportlab`, removed PyMuPDF-family packages and `abstractcore[media]` from Runtime's base PDF path, tightened authoring readiness so Markdown/PDF writers must be on the execution path, and updated Flow/Runtime docs plus LLM context. Validation: Runtime PDF round-trip pytest and focused Flow authoring tests.
+- `completed/0100_authoring_assistant_artifact_readiness_and_persistence.md`: persisted assistant chat/draft/session state across drawer close/reopen, replaced generic `llms-full.txt` planner context with `docs/workflow-authoring-skill.md` plus a generated complete node catalog with pin/config/capability contracts, added validated Code body/event/config authoring commands, hardened duplicate-template and pin-default validation, passed full Gateway tool schemas and graph config into planner context, tightened research readiness so Agent.system is required and Agent.meta/Agent Trace Report cannot masquerade as sources/report content, required real Markdown/PDF Write File artifact paths for matching requests, reduced successful chat output noise, and regenerated `llms-full.txt`. Validation: focused Flow frontend tests, lint, build, and docs generation.
+- `completed/0099_autonomous_authoring_assistant_loop.md`: replaced the authoring assistant's one-shot planner with a Flow-owned iterative loop that starts Gateway `basic-agent` planner runs, reads terminal responses from ledgers, applies validated command batches, recomputes readiness, reflects, and continues until ready or explicitly blocked. It uses advertised Gateway defaults/tool discovery only, rejects malformed JSON instead of extracting partial plans, rejects hidden/deprecated/secret-bearing authoring commands, uses normal Gateway run/ledger routes instead of the console sandbox contract, aligns authored Agent defaults to `max_iterations=50`, and fails closed without local substitute workflows. Validation: Flow frontend lint, tests, and build.
+- `completed/0098_flow_authoring_assistant_drawer.md`: added a Flow-owned conversational authoring assistant drawer that reads `llms-full.txt`, drafts typed edit commands through Gateway's default text model unless pinned, applies validated graph commands with undo, shows prompt size plus Gateway-discovered model context/output limits without truncating chat/docs, and fails closed without graph changes when Gateway defaults, model calls, JSON parsing, or command validation fail. Save/Publish/Run remain existing explicit user actions. Validation: Flow frontend tests, lint, and build.
 - `completed/0097_artifact_pin_upload_voice_wait_and_media_progress.md`: added node-level artifact uploads for unconnected artifact input pins, browser capture/upload/resume for `Listen Voice` waits, stricter execution-pin preview inference, and image/image-edit child-run `abstract.progress` parity. Validation: Flow frontend build, focused Runtime media-node tests, focused Gateway generated-media/voice contract tests, and Core vision endpoint tests.
 - `completed/0094_artifact_search_export_and_kg_memory_readiness.md` from `planned/0094_artifact_search_export_and_kg_memory_readiness.md`: added Gateway artifact search with all/session/run scope, modality/content-type/query/tag filters, Flow artifact picker search with session-list fallback, and KG memory readiness that stays available on fresh resolved stores. An initial Run modal export control was removed in favor of the graph-level file/artifact IO design tracked by `proposed/0095_file_nodes_artifact_io_boundary_resolution.md`. Validation: focused Gateway artifact/capability/default-scan tests, Flow frontend contract tests, and frontend build.
 - `completed/0093_artifact_reference_visibility_and_runtime_handoff.md` from `planned/0093_artifact_reference_visibility_and_runtime_handoff.md`: standardized artifact refs at the Gateway/Flow boundary, added session-visible artifact listing, allowed same-session artifact metadata/content access, and validated run-start refs before Runtime handoff. Validation: focused Gateway, Flow frontend contract/build, and Runtime artifact-store tests.

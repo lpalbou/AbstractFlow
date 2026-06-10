@@ -11,7 +11,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Handle, Position, NodeProps, useEdges, useReactFlow, useUpdateNodeInternals } from 'reactflow';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
-import type { FlowNodeData, JsonValue, Pin, PinType } from '../../types/flow';
+import type { FlowNodeData, JsonValue, Pin, PinType, VisualFlow } from '../../types/flow';
 import { PIN_COLORS, isEntryNodeType } from '../../types/flow';
 import { PinShape } from '../pins/PinShape';
 import { useFlowStore } from '../../hooks/useFlow';
@@ -36,6 +36,7 @@ import {
   gatewayFetch,
   gatewayJson,
   gatewayPath,
+  getGatewayFlowEditorReadiness,
 } from '../../utils/gatewayClient';
 import {
   artifactAcceptForPin,
@@ -49,11 +50,13 @@ import {
   type ModelResidencyOperation,
 } from '../../utils/modelResidencyGraph';
 import { getNodePinDisclosure, isMediaPresentationNode } from '../../utils/nodePinDisclosure';
+import { hasJsonSchemaPinDefault, isJsonSchemaInputPin } from '../../utils/jsonSchemaPins';
 import {
   applyImagePinDefaultPatch,
   extractImageModelParameterMetadata,
   type MediaModelParameterMetadata,
 } from '../../utils/mediaModelParams';
+import { inferSchemaForNodeOutput } from '../../utils/outputSchemaInference';
 import {
   isModelPin,
   modelCatalogScopeForPin,
@@ -62,23 +65,26 @@ import {
   type PinCatalogScope,
 } from '../../utils/pinCatalog';
 import { normalizeVariableName, validateVariableName, variableNameCustomOptionLabel } from '../../utils/variableNames';
+import {
+  defaultSubflowPinPatch,
+  savedFlowSummariesFromResponse,
+  subflowPinPatchForSelectedFlow,
+} from '../../utils/subflowPins';
 import { createNodeData, getNodeTemplate, mergePinDocsFromTemplate } from '../../types/nodes';
 import { AfTooltip } from '../AfTooltip';
 import { CodeEditorModal } from '../CodeEditorModal';
-import {
-  AGENT_META_SCHEMA,
-  AGENT_RESULT_SCHEMA,
-  AGENT_SCRATCHPAD_SCHEMA,
-  CONTEXT_EXTRA_SCHEMA,
-  CONTEXT_SCHEMA,
-  EVENT_ENVELOPE_SCHEMA,
-  LLM_META_SCHEMA,
-  LLM_RESULT_SCHEMA,
-  type JsonSchema,
-} from '../../schemas/known_json_schemas';
+import { JsonLiteralNodeEditorModal } from '../JsonLiteralNodeEditorModal';
+import { JsonSchemaPinEditorModal } from '../JsonSchemaPinEditorModal';
+import { type JsonSchema } from '../../schemas/known_json_schemas';
 
 type SelectOption = { value: string; label: string };
-type MediaModelOption = { provider: string; model: string; label: string; scopeModel?: string } & MediaModelParameterMetadata;
+type MediaModelOption = {
+  provider: string;
+  model: string;
+  label: string;
+  scopeModel?: string;
+  catalogTask?: string;
+} & MediaModelParameterMetadata;
 type ProviderOptionMap = Record<string, SelectOption[]>;
 type MediaCatalogScope = 'image' | 'tts' | 'stt' | 'music';
 type MediaCatalogKind = 'providers' | 'models' | 'voices' | 'profiles';
@@ -145,15 +151,21 @@ function normalizeMediaProvider(value: string): string {
   return String(value || '').trim().toLowerCase().replace(/_/g, '-');
 }
 
+function normalizeMediaCatalogTask(value: string | undefined): string {
+  return String(value || '').trim().toLowerCase().replace(/-/g, '_');
+}
+
 function mediaCatalogLoadedKey(
   scope: MediaCatalogScope,
   kind: MediaCatalogKind,
   provider = '',
-  model = ''
+  model = '',
+  task = ''
 ): string {
   return [
     scope,
     kind,
+    normalizeMediaCatalogTask(task),
     normalizeMediaProvider(provider),
     String(model || '').trim().toLowerCase(),
   ].join(':');
@@ -277,12 +289,19 @@ function mergeSelectOptions(current: SelectOption[], incoming: SelectOption[]): 
 function replaceMediaOptionsForProvider(
   current: MediaModelOption[],
   incoming: MediaModelOption[],
-  provider: string
+  provider: string,
+  task = ''
 ): MediaModelOption[] {
   const providerKey = normalizeMediaProvider(provider);
+  const taskKey = normalizeMediaCatalogTask(task);
   if (!providerKey) return incoming;
   return [
-    ...current.filter((option) => normalizeMediaProvider(option.provider) !== providerKey),
+    ...current.filter((option) => {
+      if (normalizeMediaProvider(option.provider) !== providerKey) return true;
+      if (!taskKey) return false;
+      const optionTask = normalizeMediaCatalogTask(option.catalogTask);
+      return optionTask && optionTask !== taskKey;
+    }),
     ...incoming,
   ];
 }
@@ -533,7 +552,8 @@ const VarDeclInline = memo(function VarDeclInline({
     { value: 'provider', label: 'provider (legacy)' },
     { value: 'model', label: 'model' },
     { value: 'model_music', label: 'model_music' },
-    { value: 'object', label: 'object' },
+    { value: 'object', label: 'json' },
+    { value: 'json_schema', label: 'json schema' },
     { value: 'assertion', label: 'assertion' },
     { value: 'assertions', label: 'assertion[]' },
     { value: 'array', label: 'array' },
@@ -638,7 +658,7 @@ const VarDeclInline = memo(function VarDeclInline({
     const preview =
       varType === 'array'
         ? '[]'
-        : varType === 'object'
+        : varType === 'object' || varType === 'json_schema'
         ? '{}'
         : varType === 'assertion'
         ? '{assertion}'
@@ -699,7 +719,7 @@ const VarDeclInline = memo(function VarDeclInline({
                         ? []
                     : nextType === 'array'
                       ? []
-                      : nextType === 'object'
+                      : nextType === 'object' || nextType === 'json_schema'
                         ? {}
                         : null;
             onChange({ name, type: nextType, default: nextDefault });
@@ -747,6 +767,9 @@ export const BaseNode = memo(function BaseNode({
   const isVarNode = data.nodeType === 'get_var' || data.nodeType === 'set_var';
   const isCodeNode = data.nodeType === 'code';
   const [showCodeEditor, setShowCodeEditor] = useState(false);
+  const [showJsonLiteralEditor, setShowJsonLiteralEditor] = useState(false);
+  const [jsonDefaultEditorPinId, setJsonDefaultEditorPinId] = useState<string | null>(null);
+  const [schemaEditorPinId, setSchemaEditorPinId] = useState<string | null>(null);
   const [showAdvancedPins, setShowAdvancedPins] = useState(false);
   const selectedTextModelForThinking = useMemo(() => {
     if (isAgentNode) return firstConfigString(data.agentConfig?.model, pinDefaults.model);
@@ -854,6 +877,7 @@ export const BaseNode = memo(function BaseNode({
             t === 'provider_music' ||
             t === 'model_music' ||
             t === 'object' ||
+            t === 'json_schema' ||
             t === 'assertion' ||
             t === 'assertions' ||
             t === 'array' ||
@@ -920,6 +944,9 @@ export const BaseNode = memo(function BaseNode({
   };
 
   const handlePinClick = (e: MouseEvent, pinId: string, isInput: boolean) => {
+    // React Flow starts connection drags on mousedown. Keep disconnect as a
+    // click-only action so connected pins can still start a drag/reconnect.
+    if (e.type !== 'click') return;
     if (!isPinConnected(pinId, isInput)) return;
     e.preventDefault();
     e.stopPropagation();
@@ -993,43 +1020,8 @@ export const BaseNode = memo(function BaseNode({
     const sourceNode = allNodes.find((n) => n.id === inputEdge.source);
     if (!sourceNode) return null;
 
-    const inferSchemaForOutput = (n: any, handle: string, depth: number): JsonSchema | null => {
-      if (!n || depth > 6) return null;
-      const nodeType = n.data?.nodeType;
-      if (handle === 'context') return CONTEXT_SCHEMA;
-      if (handle === 'context_extra') return CONTEXT_EXTRA_SCHEMA;
-      if (nodeType === 'make_context' && handle === 'context') return CONTEXT_SCHEMA;
-      if (nodeType === 'make_meta' && handle === 'meta') return AGENT_META_SCHEMA;
-      if (nodeType === 'make_scratchpad' && handle === 'scratchpad') return AGENT_SCRATCHPAD_SCHEMA;
-      if (nodeType === 'on_event' && handle === 'event') return EVENT_ENVELOPE_SCHEMA;
-      if (nodeType === 'agent') {
-        if (handle === 'scratchpad') return AGENT_SCRATCHPAD_SCHEMA;
-        if (handle === 'meta') return AGENT_META_SCHEMA;
-        const outputSchema = n.data?.agentConfig?.outputSchema;
-        if (outputSchema?.enabled && outputSchema.jsonSchema && typeof outputSchema.jsonSchema === 'object') {
-          return outputSchema.jsonSchema as JsonSchema;
-        }
-        return AGENT_RESULT_SCHEMA;
-      }
-      if (nodeType === 'llm_call') {
-        if (handle === 'meta') return LLM_META_SCHEMA;
-        return LLM_RESULT_SCHEMA;
-      }
-      if (nodeType === 'break_object') {
-        const inputEdge2 = edges.find((e) => e.target === n.id && e.targetHandle === 'object');
-        if (!inputEdge2) return null;
-        const srcNode2 = allNodes.find((nn) => nn.id === inputEdge2.source);
-        if (!srcNode2) return null;
-        const srcHandle2 = typeof inputEdge2.sourceHandle === 'string' ? inputEdge2.sourceHandle : '';
-        const base = inferSchemaForOutput(srcNode2, srcHandle2, depth + 1);
-        if (!base) return null;
-        return getSchemaByPath(base, handle) ?? null;
-      }
-      return null;
-    };
-
-    return inferSchemaForOutput(sourceNode, sourceHandle, 0);
-  }, [allNodes, data.nodeType, edges, getSchemaByPath, id]);
+    return (inferSchemaForNodeOutput(sourceNode, sourceHandle, allNodes, edges) as JsonSchema | undefined) ?? null;
+  }, [allNodes, data.nodeType, edges, id]);
 
   const isEmitEventNode = data.nodeType === 'emit_event';
   const mediaPresentationNode = isMediaPresentationNode(data.nodeType);
@@ -1080,6 +1072,20 @@ export const BaseNode = memo(function BaseNode({
   );
   const inputData = useMemo(() => pinDisclosure.inputPins.filter((p) => p.type !== 'execution'), [pinDisclosure.inputPins]);
   const outputData = useMemo(() => pinDisclosure.outputPins.filter((p) => p.type !== 'execution'), [pinDisclosure.outputPins]);
+  const isPlainJsonLiteralNode =
+    data.nodeType === 'literal_json' &&
+    outputData.some((pin) => pin.id === 'value' && pin.type === 'object');
+  const isJsonSchemaNode = data.nodeType === 'json_schema';
+  const isEditJsonSchemaNode = data.nodeType === 'edit_json_schema';
+  const canEditJsonLiteralOnNode = isPlainJsonLiteralNode || isJsonSchemaNode || isEditJsonSchemaNode;
+  const schemaEditorPin = useMemo(
+    () => inputData.find((pin) => pin.id === schemaEditorPinId) || null,
+    [inputData, schemaEditorPinId]
+  );
+  const jsonDefaultEditorPin = useMemo(
+    () => inputData.find((pin) => pin.id === jsonDefaultEditorPinId) || null,
+    [inputData, jsonDefaultEditorPinId]
+  );
   const showPinDisclosure = pinDisclosure.expandable;
   const pinDisclosureLabel = showAdvancedPins
     ? 'Hide optional pins'
@@ -1122,6 +1128,7 @@ export const BaseNode = memo(function BaseNode({
   const isModelResidencyNode = data.nodeType === 'model_residency';
   const isGenerateImageNode = data.nodeType === 'generate_image';
   const isEditImageNode = data.nodeType === 'edit_image' || data.nodeType === 'image_to_image';
+  const isUpscaleImageNode = data.nodeType === 'upscale_image';
   const isGenerateVideoNode = data.nodeType === 'generate_video' || data.nodeType === 'text_to_video';
   const isImageToVideoNode = data.nodeType === 'image_to_video';
   const isVideoNode = isGenerateVideoNode || isImageToVideoNode;
@@ -1129,7 +1136,7 @@ export const BaseNode = memo(function BaseNode({
   const isGenerateMusicNode = data.nodeType === 'generate_music';
   const isTranscribeAudioNode = data.nodeType === 'transcribe_audio';
   const isListenVoiceNode = data.nodeType === 'listen_voice';
-  const isMediaNode = isGenerateImageNode || isEditImageNode || isVideoNode || isGenerateVoiceNode || isGenerateMusicNode || isTranscribeAudioNode || isListenVoiceNode;
+  const isMediaNode = isGenerateImageNode || isEditImageNode || isUpscaleImageNode || isVideoNode || isGenerateVoiceNode || isGenerateMusicNode || isTranscribeAudioNode || isListenVoiceNode;
   const imageProviderPinConnected = connectedInputPinIds.has('image_provider');
   const isDelayNode = data.nodeType === 'wait_until';
   const isOnEventNode = data.nodeType === 'on_event';
@@ -1231,9 +1238,76 @@ export const BaseNode = memo(function BaseNode({
     [data.nodeType, inputData]
   );
   const wantsResidencyCapabilities =
-    isLlmNode || isAgentNode || isMediaNode || isModelResidencyNode || isCodeNode || wantsMediaCatalogCapabilities;
+    isLlmNode ||
+    isAgentNode ||
+    isSubflowNode ||
+    isMediaNode ||
+    isModelResidencyNode ||
+    isCodeNode ||
+    wantsMediaCatalogCapabilities;
   const mediaCapabilitiesQuery = useGatewayCapabilities(wantsResidencyCapabilities);
   const gatewayContracts = gatewayContractsFromCapabilities(mediaCapabilitiesQuery.data);
+  const gatewayReadiness = getGatewayFlowEditorReadiness(gatewayContracts);
+  const visualflowCollectionEndpoint = gatewayContracts?.flow_editor?.visualflows?.crud?.collection_endpoint || '';
+  const visualflowItemEndpoint = gatewayContracts?.flow_editor?.visualflows?.crud?.item_endpoint || '';
+  const subflowPinsSyncedRef = useRef<string | null>(null);
+  const subflowFlowListQuery = useQuery({
+    queryKey: ['visualflows', visualflowCollectionEndpoint],
+    queryFn: () => gatewayJson<VisualFlow[]>(gatewayPath(visualflowCollectionEndpoint)),
+    enabled:
+      isSubflowNode &&
+      gatewayReadiness.operations.save.ready &&
+      Boolean(visualflowCollectionEndpoint),
+    staleTime: 30_000,
+  });
+  const subflowFlowOptions = useMemo(
+    () =>
+      savedFlowSummariesFromResponse(subflowFlowListQuery.data).map((flow) => ({
+        value: flow.id,
+        label: `${flow.name}${flowId && flow.id === flowId ? ' (recursive)' : ''}`,
+      })),
+    [flowId, subflowFlowListQuery.data]
+  );
+  const subflowSelectorLoading =
+    mediaCapabilitiesQuery.isLoading || (isSubflowNode && subflowFlowListQuery.isLoading);
+  const subflowSelectorDisabled =
+    mediaCapabilitiesQuery.isLoading ||
+    !gatewayReadiness.operations.save.ready ||
+    !visualflowCollectionEndpoint;
+
+  useEffect(() => {
+    if (!isSubflowNode) return;
+    const subflowId = typeof data.subflowId === 'string' ? data.subflowId.trim() : '';
+    if (!subflowId) return;
+    if (!gatewayReadiness.operations.save.ready || !visualflowItemEndpoint) return;
+
+    const syncKey = `${id}:${subflowId}`;
+    if (subflowPinsSyncedRef.current === syncKey) return;
+
+    let cancelled = false;
+    gatewayJson<VisualFlow>(gatewayPath(visualflowItemEndpoint, { flow_id: subflowId }))
+      .then((flow) => {
+        if (cancelled) return;
+        const patch = subflowPinPatchForSelectedFlow(data, flow);
+        if (patch) updateNodeData(id, patch);
+        subflowPinsSyncedRef.current = syncKey;
+      })
+      .catch((err) => {
+        if (!cancelled) console.error('Failed to sync subflow pins:', err);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    data,
+    data.subflowId,
+    gatewayReadiness.operations.save.ready,
+    id,
+    isSubflowNode,
+    updateNodeData,
+    visualflowItemEndpoint,
+  ]);
   const codePermissionSelectOptions = useMemo(
     () => codePermissionOptions(gatewayContracts, codePermissions),
     [codePermissions, gatewayContracts]
@@ -1267,11 +1341,11 @@ export const BaseNode = memo(function BaseNode({
         blockedReason: blocked ? 'Dynamic provider/model is wired from pins.' : unsupportedReason,
       };
     }
-    if (isGenerateImageNode || isEditImageNode) {
+    if (isGenerateImageNode || isEditImageNode || isUpscaleImageNode) {
       const providerBlocked = isPinConnected('image_provider', true);
       const modelBlocked = isPinConnected('image_model', true);
       const blocked = providerBlocked || modelBlocked;
-      const task = isEditImageNode ? 'image_to_image' : 'image_generation';
+      const task = isUpscaleImageNode ? 'image_upscale' : isEditImageNode ? 'image_to_image' : 'image_generation';
       const unsupportedReason = modelResidencyTaskUnsupportedReason(gatewayContracts, task);
       return {
         task,
@@ -1359,6 +1433,7 @@ export const BaseNode = memo(function BaseNode({
     isAgentNode,
     isEditImageNode,
     isGenerateImageNode,
+    isUpscaleImageNode,
     isImageToVideoNode,
     isGenerateMusicNode,
     isVideoNode,
@@ -1451,6 +1526,8 @@ export const BaseNode = memo(function BaseNode({
     gatewayContracts?.flow_editor?.media?.generated_image || gatewayContracts?.assistant?.media?.generated_image;
   const editedImageContract =
     gatewayContracts?.flow_editor?.media?.edited_image || gatewayContracts?.assistant?.media?.edited_image;
+  const upscaledImageContract =
+    gatewayContracts?.flow_editor?.media?.upscaled_image || gatewayContracts?.assistant?.media?.upscaled_image;
   const generatedVideoContract =
     gatewayContracts?.flow_editor?.media?.generated_video || gatewayContracts?.assistant?.media?.generated_video;
   const imageToVideoContract =
@@ -1481,7 +1558,15 @@ export const BaseNode = memo(function BaseNode({
     typeof editedImageContract?.direct_endpoint?.provider_models_task === 'string' && editedImageContract.direct_endpoint.provider_models_task.trim()
       ? editedImageContract.direct_endpoint.provider_models_task.trim()
       : 'image_to_image';
-  const currentImageProviderModelsTask = isEditImageNode ? editedImageProviderModelsTask : generatedImageProviderModelsTask;
+  const upscaledImageProviderModelsTask =
+    typeof upscaledImageContract?.direct_endpoint?.provider_models_task === 'string' && upscaledImageContract.direct_endpoint.provider_models_task.trim()
+      ? upscaledImageContract.direct_endpoint.provider_models_task.trim()
+      : 'image_upscale';
+  const currentImageProviderModelsTask = isUpscaleImageNode
+    ? upscaledImageProviderModelsTask
+    : isEditImageNode
+      ? editedImageProviderModelsTask
+      : generatedImageProviderModelsTask;
   const generatedVideoProviderModelsTask =
     typeof generatedVideoContract?.direct_endpoint?.provider_models_task === 'string' && generatedVideoContract.direct_endpoint.provider_models_task.trim()
       ? generatedVideoContract.direct_endpoint.provider_models_task.trim()
@@ -1537,8 +1622,8 @@ export const BaseNode = memo(function BaseNode({
 
   const modelOptions = useMemo(() => models.map((m) => ({ value: m, label: m })), [models]);
   const hasLoadedMediaCatalog = useCallback(
-    (scope: MediaCatalogScope, kind: MediaCatalogKind, provider = '', model = '') =>
-      loadedMediaCatalogKeys.has(mediaCatalogLoadedKey(scope, kind, provider, model)),
+    (scope: MediaCatalogScope, kind: MediaCatalogKind, provider = '', model = '', task = '') =>
+      loadedMediaCatalogKeys.has(mediaCatalogLoadedKey(scope, kind, provider, model, task)),
     [loadedMediaCatalogKeys]
   );
   const markMediaCatalogLoaded = useCallback((keys: string[]) => {
@@ -1582,7 +1667,7 @@ export const BaseNode = memo(function BaseNode({
     if (
       visibleMediaProviderCatalogScopes.includes('image') &&
       imageProviderCatalogOptions.length === 0 &&
-      !hasLoadedMediaCatalog('image', 'providers') &&
+      !hasLoadedMediaCatalog('image', 'providers', '', '', currentVisionProviderModelsTask) &&
       visionProviderModelsEndpoint
     ) {
       requestMediaCatalog('image', { providersOnly: true, task: currentVisionProviderModelsTask });
@@ -1658,6 +1743,7 @@ export const BaseNode = memo(function BaseNode({
   const imageProviderOptions = useMemo(() => {
     const seen = new Set<string>();
     const out: SelectOption[] = [];
+    const task = normalizeMediaCatalogTask(currentImageProviderModelsTask);
     const add = (provider: string, label?: string) => {
       const clean = normalizeMediaProvider(provider);
       if (!clean || seen.has(clean)) return;
@@ -1665,27 +1751,58 @@ export const BaseNode = memo(function BaseNode({
       out.push({ value: clean, label: label || clean });
     };
     for (const option of imageProviderCatalogOptions) add(option.value, option.label);
-    for (const option of imageModelOptions) add(option.provider);
+    for (const option of imageModelOptions) {
+      if (task && normalizeMediaCatalogTask(option.catalogTask) !== task) continue;
+      add(option.provider);
+    }
     if (selectedImageProvider) add(selectedImageProvider);
     if (selectedVideoProvider) add(selectedVideoProvider);
     return out;
-  }, [imageModelOptions, imageProviderCatalogOptions, selectedImageProvider, selectedVideoProvider]);
+  }, [currentImageProviderModelsTask, imageModelOptions, imageProviderCatalogOptions, selectedImageProvider, selectedVideoProvider]);
   const visibleImageModelOptions = useMemo(() => {
-    if (!selectedImageProvider) return imageModelOptions.map((option) => ({ value: option.model, label: option.label }));
+    const task = normalizeMediaCatalogTask(currentImageProviderModelsTask);
+    const taskOptions = imageModelOptions.filter((option) => !task || normalizeMediaCatalogTask(option.catalogTask) === task);
+    if (!selectedImageProvider) return taskOptions.map((option) => ({ value: option.model, label: option.label }));
     return imageModelOptions
-      .filter((option) => normalizeMediaProvider(option.provider) === normalizeMediaProvider(selectedImageProvider))
+      .filter(
+        (option) =>
+          (!task || normalizeMediaCatalogTask(option.catalogTask) === task) &&
+          normalizeMediaProvider(option.provider) === normalizeMediaProvider(selectedImageProvider)
+      )
       .map((option) => ({ value: option.model, label: option.label }));
-  }, [imageModelOptions, selectedImageProvider]);
+  }, [currentImageProviderModelsTask, imageModelOptions, selectedImageProvider]);
   const visibleVideoModelOptions = useMemo(() => {
-    if (!selectedVideoProvider) return imageModelOptions.map((option) => ({ value: option.model, label: option.label }));
+    const task = normalizeMediaCatalogTask(currentVideoProviderModelsTask);
+    const taskOptions = imageModelOptions.filter((option) => !task || normalizeMediaCatalogTask(option.catalogTask) === task);
+    if (!selectedVideoProvider) return taskOptions.map((option) => ({ value: option.model, label: option.label }));
     return imageModelOptions
-      .filter((option) => normalizeMediaProvider(option.provider) === normalizeMediaProvider(selectedVideoProvider))
+      .filter(
+        (option) =>
+          (!task || normalizeMediaCatalogTask(option.catalogTask) === task) &&
+          normalizeMediaProvider(option.provider) === normalizeMediaProvider(selectedVideoProvider)
+      )
       .map((option) => ({ value: option.model, label: option.label }));
-  }, [imageModelOptions, selectedVideoProvider]);
+  }, [currentVideoProviderModelsTask, imageModelOptions, selectedVideoProvider]);
+  const selectedResidencyVisionProviderModelsTask = useMemo(() => {
+    if (selectedResidencyTask === 'image_generation') return generatedImageProviderModelsTask;
+    if (selectedResidencyTask === 'image_to_image') return editedImageProviderModelsTask;
+    if (selectedResidencyTask === 'image_upscale') return upscaledImageProviderModelsTask;
+    if (selectedResidencyTask === 'text_to_video') return generatedVideoProviderModelsTask;
+    if (selectedResidencyTask === 'image_to_video') return imageToVideoProviderModelsTask;
+    return '';
+  }, [
+    editedImageProviderModelsTask,
+    generatedImageProviderModelsTask,
+    generatedVideoProviderModelsTask,
+    imageToVideoProviderModelsTask,
+    selectedResidencyTask,
+    upscaledImageProviderModelsTask,
+  ]);
   const residencyProviderOptions = useMemo(() => {
     if (
       selectedResidencyTask === 'image_generation' ||
       selectedResidencyTask === 'image_to_image' ||
+      selectedResidencyTask === 'image_upscale' ||
       selectedResidencyTask === 'text_to_video' ||
       selectedResidencyTask === 'image_to_video'
     ) {
@@ -1818,12 +1935,18 @@ export const BaseNode = memo(function BaseNode({
     if (
       selectedResidencyTask === 'image_generation' ||
       selectedResidencyTask === 'image_to_image' ||
+      selectedResidencyTask === 'image_upscale' ||
       selectedResidencyTask === 'text_to_video' ||
       selectedResidencyTask === 'image_to_video'
     ) {
+      const task = normalizeMediaCatalogTask(selectedResidencyVisionProviderModelsTask);
       const options = !selectedResidencyProvider
-        ? imageModelOptions
-        : imageModelOptions.filter((option) => normalizeMediaProvider(option.provider) === normalizeMediaProvider(selectedResidencyProvider));
+        ? imageModelOptions.filter((option) => !task || normalizeMediaCatalogTask(option.catalogTask) === task)
+        : imageModelOptions.filter(
+            (option) =>
+              (!task || normalizeMediaCatalogTask(option.catalogTask) === task) &&
+              normalizeMediaProvider(option.provider) === normalizeMediaProvider(selectedResidencyProvider)
+          );
       const seen = new Set<string>();
       const out: SelectOption[] = [];
       const add = (value: string, label?: string) => {
@@ -1849,10 +1972,20 @@ export const BaseNode = memo(function BaseNode({
       return models.map((m) => ({ value: m, label: m }));
     }
     return selectedResidencyModel ? [{ value: selectedResidencyModel, label: selectedResidencyModel }] : [];
-  }, [imageModelOptions, models, selectedResidencyModel, selectedResidencyProvider, selectedResidencyTask, visibleMusicModelOptions, visibleSttModelOptions, visibleTtsModelOptions]);
+  }, [
+    imageModelOptions,
+    models,
+    selectedResidencyModel,
+    selectedResidencyProvider,
+    selectedResidencyTask,
+    selectedResidencyVisionProviderModelsTask,
+    visibleMusicModelOptions,
+    visibleSttModelOptions,
+    visibleTtsModelOptions,
+  ]);
   const imageFormatOptions = useMemo(
-    () => formatOptionsFrom(generatedImageContract?.direct_endpoint?.formats, DEFAULT_IMAGE_FORMATS),
-    [generatedImageContract?.direct_endpoint?.formats]
+    () => formatOptionsFrom(upscaledImageContract?.direct_endpoint?.formats || generatedImageContract?.direct_endpoint?.formats, DEFAULT_IMAGE_FORMATS),
+    [generatedImageContract?.direct_endpoint?.formats, upscaledImageContract?.direct_endpoint?.formats]
   );
   const ttsFormatOptions = useMemo(
     () => {
@@ -1901,7 +2034,11 @@ export const BaseNode = memo(function BaseNode({
           ? modelOptions
           : scope === 'image'
             ? imageModelOptions
-                .filter((option) => !normalizedProvider || normalizeMediaProvider(option.provider) === normalizedProvider)
+                .filter(
+                  (option) =>
+                    normalizeMediaCatalogTask(option.catalogTask) === normalizeMediaCatalogTask(currentVisionProviderModelsTask) &&
+                    (!normalizedProvider || normalizeMediaProvider(option.provider) === normalizedProvider)
+                )
                 .map((option) => ({ value: option.model, label: option.label }))
             : scope === 'tts'
               ? ttsModelOptions
@@ -1916,7 +2053,7 @@ export const BaseNode = memo(function BaseNode({
                     .map((option) => ({ value: option.model, label: option.label }));
       return withCurrentOption(options, current);
     },
-    [imageModelOptions, modelOptions, musicModelOptions, sttModelOptions, ttsModelOptions]
+    [currentVisionProviderModelsTask, imageModelOptions, modelOptions, musicModelOptions, sttModelOptions, ttsModelOptions]
   );
 
   const mediaCatalogLoading = useCallback(
@@ -2459,7 +2596,8 @@ export const BaseNode = memo(function BaseNode({
         scanImagePayload(nextImageModels, seenImageModels, nextImageProviders, seenImageProviders, visionProvidersCatalog);
         scanImagePayload(nextImageModels, seenImageModels, nextImageProviders, seenImageProviders, visionProviderCatalog);
         scanImagePayload(nextImageModels, seenImageModels, nextImageProviders, seenImageProviders, visionModelCatalog);
-        for (const option of nextImageModels) addProvider(nextImageProviders, seenImageProviders, option.provider);
+        const taskScopedImageModels = nextImageModels.map((option) => ({ ...option, catalogTask: imageTask }));
+        for (const option of taskScopedImageModels) addProvider(nextImageProviders, seenImageProviders, option.provider);
 
         if (!cancelled) {
           const loadedKeys: string[] = [];
@@ -2481,11 +2619,11 @@ export const BaseNode = memo(function BaseNode({
                   : Boolean(visionProviderCatalog || visionModelCatalog);
           const voiceCatalogReturned = request.scope === 'tts' && Boolean(voiceCatalog);
           if ((request.providersOnly || request.includeProviders || !request.provider) && providerCatalogReturned) {
-            loadedKeys.push(mediaCatalogLoadedKey(request.scope, 'providers'));
+            loadedKeys.push(mediaCatalogLoadedKey(request.scope, 'providers', '', '', request.scope === 'image' ? imageTask : ''));
           }
           if (!request.providersOnly && request.provider) {
             if (request.includeModels !== false && modelCatalogReturned) {
-              loadedKeys.push(mediaCatalogLoadedKey(request.scope, 'models', request.provider));
+              loadedKeys.push(mediaCatalogLoadedKey(request.scope, 'models', request.provider, '', request.scope === 'image' ? imageTask : ''));
             }
             if (request.scope === 'tts' && request.includeVoices !== false && voiceCatalogReturned) {
               loadedKeys.push(mediaCatalogLoadedKey('tts', 'voices', request.provider, request.model || ''));
@@ -2530,7 +2668,7 @@ export const BaseNode = memo(function BaseNode({
               setImageProviderCatalogOptions((prev) => mergeSelectOptions(prev, nextImageProviders));
             }
             if (!request.providersOnly) {
-              setImageModelOptions((prev) => replaceMediaOptionsForProvider(prev, nextImageModels, request.provider || ''));
+              setImageModelOptions((prev) => replaceMediaOptionsForProvider(prev, taskScopedImageModels, request.provider || '', imageTask));
             }
           }
         }
@@ -2812,7 +2950,10 @@ export const BaseNode = memo(function BaseNode({
     (model: string | null | undefined) => {
       const cleanModel = typeof model === 'string' ? model.trim() : '';
       const match = imageModelOptions.find(
-        (option) => option.model === cleanModel && (!selectedImageProvider || option.provider === selectedImageProvider)
+        (option) =>
+          option.model === cleanModel &&
+          normalizeMediaCatalogTask(option.catalogTask) === normalizeMediaCatalogTask(currentImageProviderModelsTask) &&
+          (!selectedImageProvider || option.provider === selectedImageProvider)
       );
       updateNodeData(id, {
         effectConfig: {
@@ -2823,11 +2964,22 @@ export const BaseNode = memo(function BaseNode({
           model: undefined,
         } as FlowNodeData['effectConfig'],
         pinDefaults: applyImagePinDefaultPatch(data.pinDefaults || {}, match, {
-          excludeKeys: isEditImageNode ? ['width', 'height'] : undefined,
+          excludeKeys: isEditImageNode || isUpscaleImageNode ? ['width', 'height'] : undefined,
+          includeUpscale: isUpscaleImageNode,
         }),
       });
     },
-    [data.effectConfig, data.pinDefaults, id, imageModelOptions, isEditImageNode, selectedImageProvider, updateNodeData]
+    [
+      currentImageProviderModelsTask,
+      data.effectConfig,
+      data.pinDefaults,
+      id,
+      imageModelOptions,
+      isEditImageNode,
+      isUpscaleImageNode,
+      selectedImageProvider,
+      updateNodeData,
+    ]
   );
 
   const setVideoProviderSelection = useCallback(
@@ -2856,7 +3008,10 @@ export const BaseNode = memo(function BaseNode({
     (model: string | null | undefined) => {
       const cleanModel = typeof model === 'string' ? model.trim() : '';
       const match = imageModelOptions.find(
-        (option) => option.model === cleanModel && (!selectedVideoProvider || option.provider === selectedVideoProvider)
+        (option) =>
+          option.model === cleanModel &&
+          normalizeMediaCatalogTask(option.catalogTask) === normalizeMediaCatalogTask(currentVideoProviderModelsTask) &&
+          (!selectedVideoProvider || option.provider === selectedVideoProvider)
       );
       const nextDefaults = applyImagePinDefaultPatch(data.pinDefaults || {}, match, { includeGuidanceScale: true });
       if (cleanModel) nextDefaults.video_model = cleanModel;
@@ -2873,7 +3028,7 @@ export const BaseNode = memo(function BaseNode({
         pinDefaults: nextDefaults,
       });
     },
-    [data.effectConfig, data.pinDefaults, id, imageModelOptions, selectedVideoProvider, updateNodeData]
+    [currentVideoProviderModelsTask, data.effectConfig, data.pinDefaults, id, imageModelOptions, selectedVideoProvider, updateNodeData]
   );
 
   const setTtsProviderSelection = useCallback(
@@ -2960,13 +3115,14 @@ export const BaseNode = memo(function BaseNode({
 	      setModelResidencyPatch({ task: clean, provider: undefined, model: undefined });
 	      if (clean === 'image_generation') requestMediaCatalog('image', { providersOnly: true });
 	      if (clean === 'image_to_image') requestMediaCatalog('image', { providersOnly: true, task: editedImageProviderModelsTask });
+	      if (clean === 'image_upscale') requestMediaCatalog('image', { providersOnly: true, task: upscaledImageProviderModelsTask });
 	      if (clean === 'text_to_video') requestMediaCatalog('image', { providersOnly: true, task: generatedVideoProviderModelsTask });
 	      if (clean === 'image_to_video') requestMediaCatalog('image', { providersOnly: true, task: imageToVideoProviderModelsTask });
 	      if (clean === 'tts') requestMediaCatalog('tts', { providersOnly: true });
       if (clean === 'stt') requestMediaCatalog('stt', { providersOnly: true });
       if (clean === 'music_generation') requestMediaCatalog('music', { providersOnly: true });
     },
-	    [editedImageProviderModelsTask, generatedVideoProviderModelsTask, imageToVideoProviderModelsTask, requestMediaCatalog, setModelResidencyPatch]
+	    [editedImageProviderModelsTask, generatedVideoProviderModelsTask, imageToVideoProviderModelsTask, requestMediaCatalog, setModelResidencyPatch, upscaledImageProviderModelsTask]
   );
 
   const setModelResidencyProvider = useCallback(
@@ -2975,13 +3131,14 @@ export const BaseNode = memo(function BaseNode({
 	      setModelResidencyPatch({ provider: clean || undefined, model: undefined });
 	      if (selectedResidencyTask === 'image_generation' && clean) requestMediaCatalog('image', { provider: clean });
 	      if (selectedResidencyTask === 'image_to_image' && clean) requestMediaCatalog('image', { provider: clean, task: editedImageProviderModelsTask });
+	      if (selectedResidencyTask === 'image_upscale' && clean) requestMediaCatalog('image', { provider: clean, task: upscaledImageProviderModelsTask });
 	      if (selectedResidencyTask === 'text_to_video' && clean) requestMediaCatalog('image', { provider: clean, task: generatedVideoProviderModelsTask });
 	      if (selectedResidencyTask === 'image_to_video' && clean) requestMediaCatalog('image', { provider: clean, task: imageToVideoProviderModelsTask });
 	      if (selectedResidencyTask === 'tts') requestMediaCatalog('tts', { provider: clean || undefined, includeVoices: false });
       if (selectedResidencyTask === 'stt') requestMediaCatalog('stt', { provider: clean || undefined });
       if (selectedResidencyTask === 'music_generation') requestMediaCatalog('music', { provider: clean || undefined });
     },
-	    [editedImageProviderModelsTask, generatedVideoProviderModelsTask, imageToVideoProviderModelsTask, requestMediaCatalog, selectedResidencyTask, setModelResidencyPatch]
+	    [editedImageProviderModelsTask, generatedVideoProviderModelsTask, imageToVideoProviderModelsTask, requestMediaCatalog, selectedResidencyTask, setModelResidencyPatch, upscaledImageProviderModelsTask]
   );
 
   const setModelResidencyModel = useCallback(
@@ -3133,6 +3290,18 @@ export const BaseNode = memo(function BaseNode({
     [data.agentConfig, data.effectConfig, data.pinDefaults, data.providerModelsConfig, id, isAgentNode, isLlmNode, isProviderModelsNode, isSubflowNode, updateNodeData]
   );
 
+  const setSubflowFlow = useCallback(
+    (value: string) => {
+      const subflowId = value.trim() || undefined;
+      subflowPinsSyncedRef.current = null;
+      updateNodeData(id, {
+        subflowId,
+        ...(subflowId ? {} : defaultSubflowPinPatch(data)),
+      });
+    },
+    [data, id, updateNodeData]
+  );
+
   const setNodeTools = useCallback(
     (nextTools: string[]) => {
       const cleaned = nextTools
@@ -3212,6 +3381,7 @@ export const BaseNode = memo(function BaseNode({
         t === 'provider_music' ||
         t === 'model_music' ||
         t === 'object' ||
+        t === 'json_schema' ||
         t === 'assertion' ||
         t === 'assertions' ||
         t === 'array' ||
@@ -3655,7 +3825,7 @@ export const BaseNode = memo(function BaseNode({
               position={Position.Left}
               id={inputExec.id}
               className="exec-handle"
-              onMouseDownCapture={(e) => handlePinClick(e, inputExec.id, true)}
+              onClickCapture={(e) => handlePinClick(e, inputExec.id, true)}
             />
             <span
               className="exec-shape"
@@ -3697,7 +3867,7 @@ export const BaseNode = memo(function BaseNode({
               position={Position.Right}
               id={outputExecs[0].id}
               className="exec-handle"
-              onMouseDownCapture={(e) => handlePinClick(e, outputExecs[0].id, false)}
+              onClickCapture={(e) => handlePinClick(e, outputExecs[0].id, false)}
             />
           </div>
         )}
@@ -3705,6 +3875,41 @@ export const BaseNode = memo(function BaseNode({
 
       {/* Body with pins */}
       <div className="node-body">
+        {isSubflowNode && (
+          <div
+            className="pins-left node-subflow-selector"
+            style={{ ['--pin-label-width' as any]: inputLabelWidth }}
+          >
+            <div className="pin-row input subflow-selector-row nodrag">
+              <span className="pin-hit">
+                <span className="pin-shape pin-shape-placeholder" aria-hidden="true" />
+                <span className="pin-label">flow</span>
+              </span>
+              <div className="pin-inline-controls subflow-selector-controls">
+                <AfSelect
+                  variant="pin"
+                  value={data.subflowId || ''}
+                  placeholder={
+                    subflowSelectorLoading
+                      ? 'Loading...'
+                      : subflowSelectorDisabled
+                        ? 'Gateway unavailable'
+                        : 'Select flow...'
+                  }
+                  options={subflowFlowOptions}
+                  disabled={subflowSelectorDisabled}
+                  loading={subflowSelectorLoading}
+                  searchable
+                  searchPlaceholder="Search flows..."
+                  clearable
+                  minPopoverWidth={320}
+                  onChange={setSubflowFlow}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Multiple execution outputs (for branch nodes like If/Else) */}
         {(outputExecs.length > 1 || isSwitchNode) && (
           <div className="pins-right exec-branches">
@@ -3749,7 +3954,7 @@ export const BaseNode = memo(function BaseNode({
                           position={Position.Right}
                           id={pin.id}
                           className="exec-handle"
-                          onMouseDownCapture={(e) => handlePinClick(e, pin.id, false)}
+                          onClickCapture={(e) => handlePinClick(e, pin.id, false)}
                         />
                       </div>
                     ))}
@@ -3778,7 +3983,7 @@ export const BaseNode = memo(function BaseNode({
                           position={Position.Right}
                           id={completed.id}
                           className="exec-handle"
-                          onMouseDownCapture={(e) => handlePinClick(e, completed.id, false)}
+                          onClickCapture={(e) => handlePinClick(e, completed.id, false)}
                         />
                       </div>
                     ) : null}
@@ -3809,7 +4014,7 @@ export const BaseNode = memo(function BaseNode({
                           position={Position.Right}
                           id={pin.id}
                           className="exec-handle"
-                          onMouseDownCapture={(e) => handlePinClick(e, pin.id, false)}
+                          onClickCapture={(e) => handlePinClick(e, pin.id, false)}
                         />
                       </div>
                     ))}
@@ -3829,7 +4034,7 @@ export const BaseNode = memo(function BaseNode({
                           position={Position.Right}
                           id={pin.id}
                           className="exec-handle"
-                          onMouseDownCapture={(e) => handlePinClick(e, pin.id, false)}
+                          onClickCapture={(e) => handlePinClick(e, pin.id, false)}
                         />
                       </div>
                     ))}
@@ -3849,7 +4054,7 @@ export const BaseNode = memo(function BaseNode({
                           position={Position.Right}
                           id={defaultPin.id}
                           className="exec-handle"
-                          onMouseDownCapture={(e) => handlePinClick(e, defaultPin.id, false)}
+                          onClickCapture={(e) => handlePinClick(e, defaultPin.id, false)}
                         />
                       </div>
                     ) : null}
@@ -3882,7 +4087,7 @@ export const BaseNode = memo(function BaseNode({
                     position={Position.Right}
                     id={pin.id}
                     className="exec-handle"
-                    onMouseDownCapture={(e) => handlePinClick(e, pin.id, false)}
+                    onClickCapture={(e) => handlePinClick(e, pin.id, false)}
                   />
                 </div>
               ));
@@ -4018,7 +4223,6 @@ export const BaseNode = memo(function BaseNode({
                       className="pin-shape"
                       style={{ color: PIN_COLORS[pin.type] }}
                       onClick={(e) => handlePinClick(e, pin.id, true)}
-                      onMouseDownCapture={(e) => handlePinClick(e, pin.id, true)}
                     >
                       <PinShape type={pin.type} size={10} filled={isPinConnected(pin.id, true)} />
                       <Handle
@@ -4027,8 +4231,7 @@ export const BaseNode = memo(function BaseNode({
                         id={pin.id}
                         className={`pin ${pin.type}`}
                         style={overlayHandleStyle}
-                        onMouseDownCapture={(e) => handlePinClick(e, pin.id, true)}
-                        onClick={(e) => handlePinClick(e, pin.id, true)}
+                        onClickCapture={(e) => handlePinClick(e, pin.id, true)}
                       />
                     </span>
                     <span className="pin-label">{pin.label}</span>
@@ -4071,9 +4274,9 @@ export const BaseNode = memo(function BaseNode({
 	                const isMemoryTagsModePin = isMemoryQueryNode && pin.id === 'tags_mode';
                 const isMemoryPlacementPin = isMemoryRehydrateNode && pin.id === 'placement';
                 const isArtifactInputPin = isArtifactPinType(pin.type);
-	                  const isImageProviderPin = (isGenerateImageNode || isEditImageNode) && pin.id === 'image_provider';
-	                  const isImageModelPin = (isGenerateImageNode || isEditImageNode) && pin.id === 'image_model';
-	                  const isImageFormatPin = (isGenerateImageNode || isEditImageNode) && pin.id === 'format';
+	                  const isImageProviderPin = (isGenerateImageNode || isEditImageNode || isUpscaleImageNode) && pin.id === 'image_provider';
+	                  const isImageModelPin = (isGenerateImageNode || isEditImageNode || isUpscaleImageNode) && pin.id === 'image_model';
+	                  const isImageFormatPin = (isGenerateImageNode || isEditImageNode || isUpscaleImageNode) && pin.id === 'format';
 	                  const isVideoProviderPin = isVideoNode && pin.id === 'video_provider';
 	                  const isVideoModelPin = isVideoNode && pin.id === 'video_model';
 	                  const isVideoFormatPin = isVideoNode && pin.id === 'format';
@@ -4091,6 +4294,8 @@ export const BaseNode = memo(function BaseNode({
                   const isMusicModelPin = isGenerateMusicNode && pin.id === 'music_model';
                   const isMusicFormatPin = isGenerateMusicNode && pin.id === 'format';
                   const isCodePermissionsPin = isCodeNode && pin.id === 'permissions';
+                  const isSchemaPin = isJsonSchemaInputPin(pin);
+                  const isJsonDefaultPin = pin.type === 'object' && !isSchemaPin;
                   const isResidencyOperationPin = isModelResidencyNode && pin.id === 'operation';
                   const isResidencyTaskPin = isModelResidencyNode && pin.id === 'task';
                   const isResidencyProviderPin = isModelResidencyNode && pin.id === 'provider';
@@ -4122,6 +4327,8 @@ export const BaseNode = memo(function BaseNode({
                       isMusicModelPin ||
                       isMusicFormatPin ||
                       isCodePermissionsPin ||
+                      isSchemaPin ||
+                      isJsonDefaultPin ||
                       isThinkingPin ||
                       isAnswerUserLevelPin ||
 	                  ((isAgentNode || isLlmNode || subflowHasToolsPin) && pin.id === 'tools') ||
@@ -4457,6 +4664,45 @@ export const BaseNode = memo(function BaseNode({
                   );
                 }
 
+                if (isSchemaPin && !connected) {
+                  const hasSchema = hasJsonSchemaPinDefault(pinDefaults[pin.id]);
+                  controls.push(
+                    <button
+                      key="schema-editor"
+                      type="button"
+                      className="node-schema-edit-button nodrag"
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSchemaEditorPinId(pin.id);
+                      }}
+                      title={`${hasSchema ? 'Edit' : 'Define'} ${pin.label || pin.id}`}
+                    >
+                      {hasSchema ? 'Edit' : 'Define'}
+                    </button>
+                  );
+                }
+
+                if (isJsonDefaultPin && !connected) {
+                  const raw = pinDefaults[pin.id];
+                  const hasJsonDefault = Boolean(raw && typeof raw === 'object' && !Array.isArray(raw));
+                  controls.push(
+                    <button
+                      key="json-default-editor"
+                      type="button"
+                      className="node-schema-edit-button nodrag"
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setJsonDefaultEditorPinId(pin.id);
+                      }}
+                      title={`${hasJsonDefault ? 'Edit' : 'Define'} ${pin.label || pin.id} JSON`}
+                    >
+                      {hasJsonDefault ? 'Edit' : 'Define'}
+                    </button>
+                  );
+                }
+
                 if (isWriteFileContentPin && !connected) {
                   const raw = pinDefaults.content;
                   controls.push(
@@ -4528,6 +4774,7 @@ export const BaseNode = memo(function BaseNode({
                         { value: 'text_generation', label: 'text' },
                         { value: 'image_generation', label: 'image' },
                         { value: 'image_to_image', label: 'image edit' },
+                        { value: 'image_upscale', label: 'image upscale' },
                         { value: 'text_to_video', label: 'text to video' },
                         { value: 'image_to_video', label: 'image to video' },
                         { value: 'tts', label: 'speech' },
@@ -4563,6 +4810,7 @@ export const BaseNode = memo(function BaseNode({
 	                      onOpen={() => {
 	                        if (selectedResidencyTask === 'image_generation') requestMediaCatalog('image', { providersOnly: true });
 	                        if (selectedResidencyTask === 'image_to_image') requestMediaCatalog('image', { providersOnly: true, task: editedImageProviderModelsTask });
+	                        if (selectedResidencyTask === 'image_upscale') requestMediaCatalog('image', { providersOnly: true, task: upscaledImageProviderModelsTask });
 	                        if (selectedResidencyTask === 'text_to_video') requestMediaCatalog('image', { providersOnly: true, task: generatedVideoProviderModelsTask });
 	                        if (selectedResidencyTask === 'image_to_video') requestMediaCatalog('image', { providersOnly: true, task: imageToVideoProviderModelsTask });
 	                        if (selectedResidencyTask === 'tts') requestMediaCatalog('tts', { providersOnly: true });
@@ -4601,6 +4849,9 @@ export const BaseNode = memo(function BaseNode({
 	                        }
 	                        if (selectedResidencyTask === 'image_to_image' && selectedResidencyProvider) {
 	                          requestMediaCatalog('image', { provider: selectedResidencyProvider, task: editedImageProviderModelsTask });
+	                        }
+	                        if (selectedResidencyTask === 'image_upscale' && selectedResidencyProvider) {
+	                          requestMediaCatalog('image', { provider: selectedResidencyProvider, task: upscaledImageProviderModelsTask });
 	                        }
 	                        if (selectedResidencyTask === 'text_to_video' && selectedResidencyProvider) {
 	                          requestMediaCatalog('image', { provider: selectedResidencyProvider, task: generatedVideoProviderModelsTask });
@@ -5231,7 +5482,7 @@ export const BaseNode = memo(function BaseNode({
                         id={pin.id}
                         className={`pin ${pin.type}`}
                         style={overlayHandleStyle}
-                        onClick={(e) => handlePinClick(e, pin.id, false)}
+                        onClickCapture={(e) => handlePinClick(e, pin.id, false)}
                       />
                     </span>
                   );
@@ -5294,12 +5545,17 @@ export const BaseNode = memo(function BaseNode({
         <div className="pins-right">
           {(isToolParametersNode ? outputData.filter((p) => p.id === 'tool_call') : outputData).map((pin) => {
             const feedback = connectionPreview?.outputs?.[pin.id];
+            const showJsonOutputEdit =
+              canEditJsonLiteralOnNode &&
+              (pin.id === 'value' || pin.id === 'schema') &&
+              (pin.type === 'object' || pin.type === 'any');
             return (
             <div
               key={pin.id}
               className={clsx(
                 'pin-row',
                 'output',
+                showJsonOutputEdit && 'output-with-action',
                 feedback?.status === 'valid' && 'pin-feedback-valid',
                 feedback?.status === 'invalid' && 'pin-feedback-invalid'
               )}
@@ -5307,6 +5563,20 @@ export const BaseNode = memo(function BaseNode({
               data-connection-feedback={feedback?.status}
               title={feedback?.message || undefined}
             >
+              {showJsonOutputEdit && (
+                <button
+                  type="button"
+                  className="node-schema-edit-button node-json-output-edit-button nodrag"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowJsonLiteralEditor(true);
+                  }}
+                  title={isEditJsonSchemaNode ? 'Add Schema Fields' : isJsonSchemaNode ? 'Edit JSON Schema' : 'Edit JSON'}
+                >
+                  Edit
+                </button>
+              )}
               {(() => {
                 const tooltip =
                   pin.description ||
@@ -5331,7 +5601,7 @@ export const BaseNode = memo(function BaseNode({
                           id={pin.id}
                           className={`pin ${pin.type}`}
                           style={overlayHandleStyle}
-                          onClick={(e) => handlePinClick(e, pin.id, false)}
+                          onClickCapture={(e) => handlePinClick(e, pin.id, false)}
                         />
                       </span>
                     </span>
@@ -5360,6 +5630,58 @@ export const BaseNode = memo(function BaseNode({
         )}
       </div>
       </div>
+
+      <JsonSchemaPinEditorModal
+        isOpen={Boolean(schemaEditorPin)}
+        nodeLabel={data.label || ''}
+        pin={schemaEditorPin}
+        schema={schemaEditorPin ? pinDefaults[schemaEditorPin.id] : undefined}
+        onClose={() => setSchemaEditorPinId(null)}
+        onSave={(nextSchema) => {
+          if (!schemaEditorPin) return;
+          setPinDefault(schemaEditorPin.id, nextSchema as JsonValue);
+        }}
+        onClear={() => {
+          if (!schemaEditorPin) return;
+          setPinDefault(schemaEditorPin.id, undefined);
+        }}
+      />
+
+      {canEditJsonLiteralOnNode && (
+        <JsonLiteralNodeEditorModal
+          isOpen={showJsonLiteralEditor}
+          kind={isJsonSchemaNode || isEditJsonSchemaNode ? 'json_schema' : 'json'}
+          nodeId={id}
+          nodeLabel={data.label || ''}
+          title={isEditJsonSchemaNode ? 'Add Schema Fields' : undefined}
+          schemaHint={
+            isEditJsonSchemaNode
+              ? 'Define only the fields this node should add. Existing upstream fields are preserved when a schema is connected.'
+              : undefined
+          }
+          value={data.literalValue}
+          onClose={() => setShowJsonLiteralEditor(false)}
+          onSave={(nextValue) => {
+            updateNodeData(id, { literalValue: nextValue });
+          }}
+        />
+      )}
+
+      <JsonLiteralNodeEditorModal
+        isOpen={Boolean(jsonDefaultEditorPin)}
+        kind="json"
+        nodeId={id}
+        nodeLabel={data.label || ''}
+        title={jsonDefaultEditorPin ? `${jsonDefaultEditorPin.label || jsonDefaultEditorPin.id} JSON` : 'JSON'}
+        subtitle={jsonDefaultEditorPin ? `${data.label || id} - ${jsonDefaultEditorPin.id}` : id}
+        value={jsonDefaultEditorPin ? pinDefaults[jsonDefaultEditorPin.id] : undefined}
+        jsonHint="Define the JSON object used when this input pin is not connected."
+        onClose={() => setJsonDefaultEditorPinId(null)}
+        onSave={(nextValue) => {
+          if (!jsonDefaultEditorPin) return;
+          setPinDefault(jsonDefaultEditorPin.id, nextValue);
+        }}
+      />
 
       {isCodeNode && (
         <CodeEditorModal

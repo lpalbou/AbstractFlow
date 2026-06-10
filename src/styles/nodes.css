@@ -35,6 +35,10 @@
   min-width: 210px;
 }
 
+.flow-node.flow-node--subflow {
+  min-width: 250px;
+}
+
 /* Tooltips are rendered inside node DOM; ensure hovered nodes float above neighbors
    so tooltip bubbles don't get occluded by nearby nodes with higher z-index. */
 .react-flow__node:hover {
@@ -182,6 +186,8 @@
   opacity: 0 !important;
   position: absolute;
   pointer-events: all;
+  z-index: 2;
+  cursor: crosshair;
 }
 
 .exec-pin-in .exec-handle {
@@ -504,6 +510,16 @@
   justify-content: flex-end;
 }
 
+.pin-row.output.output-with-action {
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.pin-row.output.output-with-action > .pin-hit,
+.pin-row.output.output-with-action > .af-tooltip-wrap {
+  margin-left: auto;
+}
+
 .pin-label {
   font-size: var(--font-size-xs);
   color: var(--text-secondary);
@@ -524,11 +540,50 @@
   width: 14px;
   height: 14px;
   border-radius: 999px;
+  cursor: crosshair;
   transition:
     transform 140ms ease,
     filter 140ms ease,
     box-shadow 140ms ease,
     opacity 140ms ease;
+}
+
+.node-subflow-selector {
+  margin-bottom: 8px;
+}
+
+.subflow-selector-row {
+  align-items: center;
+}
+
+.subflow-selector-row .pin-hit {
+  flex: 0 0 48px;
+}
+
+.subflow-selector-row .pin-label {
+  flex: 1 1 auto;
+}
+
+.subflow-selector-row .pin-shape-placeholder {
+  opacity: 0;
+}
+
+.subflow-selector-controls {
+  justify-content: stretch;
+  width: auto;
+}
+
+.subflow-selector-controls .af-select--pin {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+}
+
+.subflow-selector-controls .af-select--pin .af-select-trigger {
+  width: 100%;
+  max-width: none;
+  height: 24px;
 }
 
 .flow-node.connection-preview-active .pin-row.pin-feedback-valid {
@@ -603,6 +658,15 @@
   background: transparent !important;
   opacity: 0 !important;  /* Force invisible always */
   pointer-events: all;  /* Still allow connections */
+}
+
+.pin-shape > .react-flow__handle.pin {
+  inset: -7px !important;
+  width: calc(100% + 14px) !important;
+  height: calc(100% + 14px) !important;
+  transform: none !important;
+  z-index: 2;
+  cursor: crosshair;
 }
 
 /* Never show data handles, even on hover - only colored shapes are visible */
@@ -746,9 +810,20 @@
 }
 
 /* Connection Line */
-.react-flow__connection-line {
+.react-flow__connectionline {
+  z-index: 10000 !important;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.react-flow__connectionline .react-flow__connection-path {
   stroke: var(--accent);
-  stroke-width: 2;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  opacity: 0.96;
+  filter: drop-shadow(0 0 6px rgba(98, 241, 255, 0.36));
 }
 
 /* MiniMap */

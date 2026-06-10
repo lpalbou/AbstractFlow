@@ -35,76 +35,7 @@ import {
   type ConnectionDragEndpoint,
 } from '../utils/connectionPreview';
 
-type RoutePoint = { x: number; y: number };
-type RouteRect = { x: number; y: number; width: number; height: number };
-
-function compactPoints(points: RoutePoint[]): RoutePoint[] {
-  const out: RoutePoint[] = [];
-  for (const p of points) {
-    const prev = out[out.length - 1];
-    if (prev && Math.abs(prev.x - p.x) < 0.5 && Math.abs(prev.y - p.y) < 0.5) continue;
-    out.push(p);
-  }
-  return out;
-}
-
-function roundedPolylinePath(pointsIn: RoutePoint[], radius = 18): string {
-  const points = compactPoints(pointsIn);
-  if (points.length === 0) return '';
-  if (points.length === 1) return `M ${points[0].x},${points[0].y}`;
-  let path = `M ${points[0].x},${points[0].y}`;
-  for (let i = 1; i < points.length - 1; i += 1) {
-    const prev = points[i - 1];
-    const curr = points[i];
-    const next = points[i + 1];
-    const inDx = curr.x - prev.x;
-    const inDy = curr.y - prev.y;
-    const outDx = next.x - curr.x;
-    const outDy = next.y - curr.y;
-    const inLen = Math.hypot(inDx, inDy);
-    const outLen = Math.hypot(outDx, outDy);
-    if (inLen < 1 || outLen < 1) {
-      path += ` L ${curr.x},${curr.y}`;
-      continue;
-    }
-    const r = Math.min(radius, inLen / 2, outLen / 2);
-    const before = { x: curr.x - (inDx / inLen) * r, y: curr.y - (inDy / inLen) * r };
-    const after = { x: curr.x + (outDx / outLen) * r, y: curr.y + (outDy / outLen) * r };
-    path += ` L ${before.x},${before.y} Q ${curr.x},${curr.y} ${after.x},${after.y}`;
-  }
-  const last = points[points.length - 1];
-  path += ` L ${last.x},${last.y}`;
-  return path;
-}
-
-function routeLength(points: RoutePoint[]): number {
-  let length = 0;
-  for (let i = 1; i < points.length; i += 1) {
-    length += Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
-  }
-  return length;
-}
-
-function routeIntersectsRects(points: RoutePoint[], rects: RouteRect[], padding = 14): boolean {
-  if (points.length < 2 || rects.length === 0) return false;
-  for (let i = 1; i < points.length; i += 1) {
-    const a = points[i - 1];
-    const b = points[i];
-    const minX = Math.min(a.x, b.x);
-    const maxX = Math.max(a.x, b.x);
-    const minY = Math.min(a.y, b.y);
-    const maxY = Math.max(a.y, b.y);
-    for (const rect of rects) {
-      const left = rect.x - padding;
-      const right = rect.x + rect.width + padding;
-      const top = rect.y - padding;
-      const bottom = rect.y + rect.height + padding;
-      if (maxX < left || minX > right || maxY < top || minY > bottom) continue;
-      return true;
-    }
-  }
-  return false;
-}
+import { roundedPolylinePath, routeOrthogonal, type RouteRect } from '../utils/edgeRouting';
 
 function WorkflowEdge({
   id,
@@ -170,41 +101,29 @@ function WorkflowEdge({
   }
 
   if (!path && shouldUseOuterLane) {
-    const nodeTop = Math.min(sourceRect?.y ?? sourceY, targetRect?.y ?? targetY);
+    // Obstacle-avoiding orthogonal route. The source/target nodes are passed
+    // separately so the router can project pin stubs past their boundaries
+    // (pin handles are anchored inset inside the node body) while still
+    // treating both nodes as obstacles for the rest of the route.
     const nodeBottom = Math.max(
       sourceRect ? sourceRect.y + sourceRect.height : sourceY,
       targetRect ? targetRect.y + targetRect.height : targetY
     );
-    const direction = targetX >= sourceX ? 1 : -1;
-    const sourceStub = sourceX + direction * 48;
-    const targetStub = targetX - direction * 48;
-    const laneMargin = isControl ? 54 : 78;
-    const preferredAbove = isControl && isBackEdge ? true : sourceY <= nodeTop + (targetY - nodeTop) / 2;
-    const makePoints = (laneY: number): RoutePoint[] => [
-      { x: sourceX, y: sourceY },
-      { x: sourceStub, y: sourceY },
-      { x: sourceStub, y: laneY },
-      { x: targetStub, y: laneY },
-      { x: targetStub, y: targetY },
-      { x: targetX, y: targetY },
-    ];
-    const laneCandidates: Array<{ above: boolean; points: RoutePoint[] }> = [];
-    for (let step = 0; step < 5; step += 1) {
-      const margin = laneMargin + step * 36;
-      const above = { above: true, points: makePoints(nodeTop - margin) };
-      const below = { above: false, points: makePoints(nodeBottom + margin) };
-      laneCandidates.push(preferredAbove ? above : below, preferredAbove ? below : above);
-    }
-    const clearCandidates = laneCandidates.filter((candidate) =>
-      !routeIntersectsRects(candidate.points, routeRects, isControl ? 12 : 18)
-    );
-    const candidates = clearCandidates.length > 0 ? clearCandidates : laneCandidates;
-    const chosen = candidates.reduce((best, candidate) => {
-      if (isControl && isBackEdge && best.above !== candidate.above) return best.above ? best : candidate;
-      return routeLength(candidate.points) < routeLength(best.points) ? candidate : best;
-    }, candidates[0]);
-    path = roundedPolylinePath(chosen.points, isControl ? 16 : 18);
-  } else if (!path && isControl) {
+    const routed = routeOrthogonal({
+      source: { x: sourceX, y: sourceY },
+      target: { x: targetX, y: targetY },
+      obstacles: routeRects,
+      sourceRect,
+      targetRect,
+      padding: isControl ? 22 : 26,
+      bendPenalty: 56,
+      // Exec loop-backs conventionally route above the node row (see backlog
+      // 0076); data edges simply take the shortest clear route.
+      penalizeBelowY: isControl && isBackEdge ? nodeBottom : undefined,
+    });
+    if (routed) path = roundedPolylinePath(routed, isControl ? 16 : 18);
+  }
+  if (!path && isControl && !isForwardNodeEdge) {
     const dx = targetX - sourceX;
     const direction = dx >= 0 ? 1 : -1;
     const sourceStub = sourceX + direction * 36;
@@ -249,6 +168,10 @@ type ReactFlowConnectingHandle = {
   nodeId: string;
   type: 'source' | 'target';
   handleId?: string | null;
+};
+
+type ResetCanvasInteractionOptions = {
+  forceConnectionCancel?: boolean;
 };
 
 function connectionFromDragEndpoint(active: ConnectionDragEndpoint, end: ReactFlowConnectingHandle | null): Connection | null {
@@ -377,8 +300,13 @@ function CanvasBody() {
     }
   }, []);
 
+  const hasActiveReactFlowConnection = useCallback((): boolean => {
+    const store = reactFlowStore.getState() as any;
+    return Boolean(store.connectionStartHandle || store.connectionNodeId || store.connectionHandleId);
+  }, [reactFlowStore]);
+
   const resetCanvasInteraction = useCallback(
-    (pointerId?: number) => {
+    (pointerId?: number, options: ResetCanvasInteractionOptions = {}) => {
       if (typeof pointerId === 'number') {
         activeCanvasPointerIds.current.delete(pointerId);
         releasePointerCapture(pointerId);
@@ -386,14 +314,22 @@ function CanvasBody() {
         for (const id of activeCanvasPointerIds.current) releasePointerCapture(id);
         activeCanvasPointerIds.current.clear();
       }
-      setActiveConnection(null);
+
+      const preserveConnectionDrag = !options.forceConnectionCancel && hasActiveReactFlowConnection();
+      if (!preserveConnectionDrag) setActiveConnection(null);
 
       // React Flow's d3 drag handlers can miss release/cancel on trackpads or
       // window focus changes. Clear only transient interaction flags; persisted
       // graph state remains owned by the store/actions above.
       window.setTimeout(() => {
         const store = reactFlowStore.getState() as any;
-        store.cancelConnection?.();
+        const connectionStillActive = Boolean(
+          store.connectionStartHandle || store.connectionNodeId || store.connectionHandleId
+        );
+        if (options.forceConnectionCancel || !connectionStillActive) {
+          store.cancelConnection?.();
+          setActiveConnection(null);
+        }
         (reactFlowStore as any).setState?.({
           paneDragging: false,
           userSelectionActive: false,
@@ -402,7 +338,7 @@ function CanvasBody() {
         });
       }, 0);
     },
-    [reactFlowStore, releasePointerCapture]
+    [reactFlowStore, releasePointerCapture, hasActiveReactFlowConnection]
   );
 
   const handleCanvasPointerDownCapture = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
@@ -412,6 +348,13 @@ function CanvasBody() {
   const handleCanvasPointerReleaseCapture = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       resetCanvasInteraction(event.pointerId);
+    },
+    [resetCanvasInteraction]
+  );
+
+  const handleCanvasPointerCancelCapture = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      resetCanvasInteraction(event.pointerId, { forceConnectionCancel: true });
     },
     [resetCanvasInteraction]
   );
@@ -510,7 +453,7 @@ function CanvasBody() {
     };
     const onPointerRelease = (event: PointerEvent) => {
       if (activeCanvasPointerIds.current.size > 0 || activeConnection) {
-        resetCanvasInteraction(event.pointerId);
+        resetCanvasInteraction(event.pointerId, { forceConnectionCancel: event.type === 'pointercancel' });
       }
     };
     const onPointerMove = (event: PointerEvent) => {
@@ -521,8 +464,13 @@ function CanvasBody() {
     const onMouseRelease = () => {
       if (activeCanvasPointerIds.current.size > 0 || activeConnection) resetCanvasInteraction();
     };
+    const onForcedMouseRelease = () => {
+      if (activeCanvasPointerIds.current.size > 0 || activeConnection) {
+        resetCanvasInteraction(undefined, { forceConnectionCancel: true });
+      }
+    };
     const onVisibilityChange = () => {
-      if (document.visibilityState !== 'visible') resetCanvasInteraction();
+      if (document.visibilityState !== 'visible') resetCanvasInteraction(undefined, { forceConnectionCancel: true });
     };
 
     window.addEventListener('pointerdown', onPointerDown, opts);
@@ -530,8 +478,8 @@ function CanvasBody() {
     window.addEventListener('pointercancel', onPointerRelease, opts);
     window.addEventListener('pointermove', onPointerMove, opts);
     window.addEventListener('mouseup', onMouseRelease, opts);
-    window.addEventListener('blur', onMouseRelease, opts);
-    window.addEventListener('contextmenu', onMouseRelease, opts);
+    window.addEventListener('blur', onForcedMouseRelease, opts);
+    window.addEventListener('contextmenu', onForcedMouseRelease, opts);
     document.addEventListener('visibilitychange', onVisibilityChange, opts);
     return () => {
       window.removeEventListener('pointerdown', onPointerDown, opts);
@@ -539,8 +487,8 @@ function CanvasBody() {
       window.removeEventListener('pointercancel', onPointerRelease, opts);
       window.removeEventListener('pointermove', onPointerMove, opts);
       window.removeEventListener('mouseup', onMouseRelease, opts);
-      window.removeEventListener('blur', onMouseRelease, opts);
-      window.removeEventListener('contextmenu', onMouseRelease, opts);
+      window.removeEventListener('blur', onForcedMouseRelease, opts);
+      window.removeEventListener('contextmenu', onForcedMouseRelease, opts);
       document.removeEventListener('visibilitychange', onVisibilityChange, opts);
     };
   }, [activeConnection, resetCanvasInteraction]);
@@ -649,6 +597,40 @@ function CanvasBody() {
   // Store ReactFlow instance
   const handleInit = useCallback((instance: ReactFlowInstance) => {
     reactFlowInstance.current = instance;
+  }, []);
+
+  useEffect(() => {
+    const root = reactFlowWrapper.current;
+    if (!root) return;
+
+    let frame = 0;
+    let lastWidth = 0;
+    let lastHeight = 0;
+    const notifyLayoutChanged = () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        window.dispatchEvent(new Event('resize'));
+      });
+    };
+
+    const observer = new ResizeObserver((entries) => {
+      const rect = entries[0]?.contentRect;
+      const width = Math.round(rect?.width || 0);
+      const height = Math.round(rect?.height || 0);
+      if (width <= 0 || height <= 0) return;
+      if (width === lastWidth && height === lastHeight) return;
+      lastWidth = width;
+      lastHeight = height;
+      notifyLayoutChanged();
+    });
+    observer.observe(root);
+    notifyLayoutChanged();
+
+    return () => {
+      observer.disconnect();
+      if (frame) window.cancelAnimationFrame(frame);
+    };
   }, []);
 
   const focusNode = useCallback(
@@ -839,9 +821,9 @@ function CanvasBody() {
       onPointerDownCapture={handleCanvasPointerDownCapture}
       onPointerMoveCapture={handleCanvasPointerMoveCapture}
       onPointerUpCapture={handleCanvasPointerReleaseCapture}
-      onPointerCancelCapture={handleCanvasPointerReleaseCapture}
+      onPointerCancelCapture={handleCanvasPointerCancelCapture}
       onLostPointerCapture={handleCanvasPointerReleaseCapture}
-      onContextMenuCapture={() => resetCanvasInteraction()}
+      onContextMenuCapture={() => resetCanvasInteraction(undefined, { forceConnectionCancel: true })}
     >
         <ReactFlow
           nodes={previewNodes}

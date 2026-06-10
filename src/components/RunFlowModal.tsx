@@ -7,6 +7,7 @@
 
 import { useState, useCallback, useMemo, useEffect, useRef, type DragEvent, type FormEvent, type MouseEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import { useFlowStore } from '../hooks/useFlow';
 import type { ExecutionEvent, ExecutionMetrics, Pin, FlowRunResult, RunSummary } from '../types/flow';
 import { isEntryNodeType } from '../types/flow';
@@ -46,6 +47,15 @@ import {
   parseArtifactRefText,
   type CanonicalArtifactRef,
 } from '../utils/artifactInputs';
+import { extractRunWorkspaceRoot, selectRunWorkspaceRunId } from '../utils/runWorkspace';
+import { savedFlowSummariesFromResponse, subflowExecutionLabel } from '../utils/subflowPins';
+import {
+  formatProgressSummary,
+  progressDisplayPercent,
+  progressIsIndeterminate,
+  progressIsUnreported,
+  progressTimingParts,
+} from '../utils/runProgress';
 
 type FlowGraphNode = {
   id: string;
@@ -56,6 +66,10 @@ type FlowGraphNode = {
     agentConfig?: Record<string, unknown>;
     pinDefaults?: Record<string, unknown>;
     literalValue?: unknown;
+    subflowId?: string;
+    flowId?: string;
+    workflowId?: string;
+    workflow_id?: string;
   };
 };
 
@@ -118,6 +132,7 @@ interface RunFlowModalProps {
   onSelectRunId?: (runId: string) => void;
   runSummary?: RunSummary | null;
   stableSessionId?: string;
+  autoApproveSessions?: Set<string>;
   threadRootRunId?: string;
   runWorkflowId?: string | null;
   gatewayContracts?: GatewayContracts | null;
@@ -149,6 +164,21 @@ function isStringArray(value: unknown): value is string[] {
 
 function pickNonEmptyString(value: unknown): string {
   return typeof value === 'string' && value.trim() ? value.trim() : '';
+}
+
+function approvalDismissKey(runId?: string, waitKey?: string): string {
+  const key = typeof waitKey === 'string' ? waitKey.trim() : '';
+  if (!key) return '';
+  const rid = typeof runId === 'string' ? runId.trim() : '';
+  return `${rid}:${key}`;
+}
+
+function createRunModalSessionId(): string {
+  const random =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  return `abstractflow-run-${random}`;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -986,122 +1016,6 @@ function extractGeneratedTextPreview(value: unknown, step: { id: string; nodeTyp
   };
 }
 
-function progressNumber(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'string' && value.trim()) {
-    const n = Number(value);
-    if (Number.isFinite(n)) return n;
-  }
-  return null;
-}
-
-function progressPercent(value: Record<string, unknown> | null | undefined): number | null {
-  if (!value) return null;
-  const directPercent = progressNumber(value.percent);
-  if (directPercent != null) return Math.max(0, Math.min(100, directPercent > 1 ? directPercent : directPercent * 100));
-  const directProgress = progressNumber(value.progress);
-  if (directProgress != null) return Math.max(0, Math.min(100, directProgress > 1 ? directProgress : directProgress * 100));
-
-  const current = progressNumber(value.current) ?? progressNumber(value.frame) ?? progressNumber(value.step);
-  const total = progressNumber(value.total) ?? progressNumber(value.total_frames) ?? progressNumber(value.total_steps);
-  if (current != null && total != null && total > 0) return Math.max(0, Math.min(100, (current / total) * 100));
-  return null;
-}
-
-function progressDurationMs(
-  value: Record<string, unknown> | null | undefined,
-  secondKeys: string[],
-  msKeys: string[] = []
-): number | null {
-  if (!value) return null;
-  for (const key of msKeys) {
-    const raw = progressNumber(value[key]);
-    if (raw != null && raw >= 0) return raw;
-  }
-  for (const key of secondKeys) {
-    const raw = progressNumber(value[key]);
-    if (raw != null && raw >= 0) return raw * 1000;
-  }
-  return null;
-}
-
-function parseTimeMs(value: unknown): number | null {
-  if (typeof value !== 'string' || !value.trim()) return null;
-  const ms = new Date(value).getTime();
-  return Number.isFinite(ms) ? ms : null;
-}
-
-function formatProgressDurationMs(rawMs: unknown): string {
-  const ms = typeof rawMs === 'number' ? rawMs : rawMs == null ? NaN : Number(rawMs);
-  if (!Number.isFinite(ms) || ms < 0) return '';
-  if (ms < 1000) return '<1s';
-  const totalSeconds = Math.max(1, Math.round(ms / 1000));
-  if (totalSeconds < 60) return `${totalSeconds}s`;
-  const totalMinutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  if (totalMinutes < 60) return `${totalMinutes}m ${seconds.toString().padStart(2, '0')}s`;
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  return `${hours}h ${minutes.toString().padStart(2, '0')}m`;
-}
-
-function progressTimingParts(
-  value: Record<string, unknown> | null | undefined,
-  startedAt: string | undefined,
-  nowMs: number
-): { elapsedLabel?: string; remainingLabel?: string; remainingApproximate?: boolean } | null {
-  if (!value) return null;
-  const directElapsedMs = progressDurationMs(
-    value,
-    ['elapsed_s', 'elapsed_seconds', 'elapsed'],
-    ['elapsed_ms']
-  );
-  const startedMs = parseTimeMs(startedAt);
-  const elapsedMs = directElapsedMs ?? (startedMs != null ? Math.max(0, nowMs - startedMs) : null);
-
-  let remainingMs = progressDurationMs(
-    value,
-    ['remaining_s', 'remaining_seconds', 'eta_s', 'eta_seconds', 'eta'],
-    ['remaining_ms', 'eta_ms']
-  );
-  let remainingApproximate = false;
-  const pct = progressPercent(value);
-  if (remainingMs == null && elapsedMs != null && pct != null && pct >= 1 && pct < 99.9) {
-    remainingMs = (elapsedMs * (100 - pct)) / pct;
-    remainingApproximate = true;
-  }
-
-  const elapsedLabel = elapsedMs != null ? `Elapsed ${formatProgressDurationMs(elapsedMs)}` : undefined;
-  const remainingLabel = remainingMs != null
-    ? `Remaining ${remainingApproximate ? '~' : ''}${formatProgressDurationMs(remainingMs)}`
-    : undefined;
-  return elapsedLabel || remainingLabel ? { elapsedLabel, remainingLabel, remainingApproximate } : null;
-}
-
-function formatProgressSummary(value: Record<string, unknown> | null | undefined): string {
-  if (!value) return '';
-  const phase =
-    (typeof value.phase === 'string' && value.phase.trim()) ||
-    (typeof value.stage === 'string' && value.stage.trim()) ||
-    (typeof value.status === 'string' && value.status.trim()) ||
-    (typeof value.message === 'string' && value.message.trim()) ||
-    'running';
-  const parts = [phase];
-  const frame = progressNumber(value.frame);
-  const totalFrames = progressNumber(value.total_frames);
-  if (frame != null && totalFrames != null) {
-    parts.push(`frame ${Math.floor(frame)}/${Math.floor(totalFrames)}`);
-  } else {
-    const current = progressNumber(value.current);
-    const total = progressNumber(value.total);
-    if (current != null && total != null) parts.push(`${Math.floor(current)}/${Math.floor(total)}`);
-  }
-  const step = progressNumber(value.step);
-  const totalSteps = progressNumber(value.total_steps);
-  if (step != null && totalSteps != null) parts.push(`step ${Math.floor(step)}/${Math.floor(totalSteps)}`);
-  return parts.join(' · ');
-}
-
 function GeneratedImageCard({
   preview,
   compact = false,
@@ -1399,6 +1313,34 @@ function RestoreWindowIcon({ size = 18 }: { size?: number }) {
   );
 }
 
+function FolderOpenIcon({ size = 15 }: { size?: number }) {
+  return (
+    <svg
+      aria-hidden="true"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M3.5 7.75V18a2 2 0 0 0 2 2h12.1a2 2 0 0 0 1.9-1.37l2-6A2 2 0 0 0 19.6 10H7.3a2 2 0 0 0-1.9 1.37L3.5 17"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M3.5 7.75A2.25 2.25 0 0 1 5.75 5.5h4.4l2 2.25h6.1a2.25 2.25 0 0 1 2.25 2.25"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function ChevronUpIcon({ size = 16 }: { size?: number }) {
   return (
     <svg
@@ -1520,6 +1462,7 @@ function getInputTypeForPin(pinType: string): 'text' | 'number' | 'checkbox' | '
       return 'checkbox';
     case 'string':
     case 'object':
+    case 'json_schema':
     case 'memory':
     case 'array':
     case 'artifact':
@@ -1541,6 +1484,7 @@ function getPlaceholderForPin(pin: Pin): string {
     case 'number':
       return '0';
     case 'object':
+    case 'json_schema':
     case 'memory':
       return '{ }';
     case 'array':
@@ -1566,6 +1510,12 @@ function getPlaceholderForPin(pin: Pin): string {
     default:
       return '';
   }
+}
+
+function displayPinType(type: string | undefined): string {
+  if (type === 'object') return 'json';
+  if (type === 'json_schema') return 'json schema';
+  return type || 'any';
 }
 
 type ProviderScope = 'text' | 'image' | 'voice' | 'music';
@@ -1707,6 +1657,7 @@ export function RunFlowModal({
   onSelectRunId,
   runSummary = null,
   stableSessionId,
+  autoApproveSessions,
   threadRootRunId,
   runWorkflowId,
   gatewayContracts = null,
@@ -1755,6 +1706,26 @@ export function RunFlowModal({
     return map;
   }, [nodes]);
 
+  const hasSubflowNodes = useMemo(
+    () => nodes.some((node) => node.data?.nodeType === 'subflow'),
+    [nodes]
+  );
+  const visualflowCollectionEndpoint = gatewayContracts?.flow_editor?.visualflows?.crud?.collection_endpoint || '';
+  const subflowFlowListQuery = useQuery({
+    queryKey: ['visualflows', visualflowCollectionEndpoint],
+    queryFn: () => gatewayJson<unknown>(gatewayPath(visualflowCollectionEndpoint)),
+    enabled: isOpen && hasSubflowNodes && Boolean(visualflowCollectionEndpoint),
+    staleTime: 30_000,
+  });
+  const subflowFlowNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    if (flowId && flowName) map.set(flowId, flowName);
+    for (const flow of savedFlowSummariesFromResponse(subflowFlowListQuery.data)) {
+      map.set(flow.id, flow.name);
+    }
+    return map;
+  }, [flowId, flowName, subflowFlowListQuery.data]);
+
   const resolveNodeMeta = useCallback((nodeId: string | undefined) => {
     if (!nodeId) return null;
     const n = nodeById.get(nodeId);
@@ -1777,13 +1748,17 @@ export function RunFlowModal({
       }
       return null;
     }
+    const label =
+      n.data.nodeType === 'subflow'
+        ? subflowExecutionLabel(n.data, subflowFlowNameById, nodeId)
+        : n.data.label || nodeId;
     return {
-      label: n.data.label || nodeId,
+      label,
       type: n.data.nodeType,
       icon: n.data.icon,
       color: n.data.headerColor,
     };
-  }, [nodeById]);
+  }, [nodeById, subflowFlowNameById]);
 
   const sequenceLayouts = useMemo(() => {
     const out = new Map<string, Array<{ handleId: string; index: number; label: string; targetNodeId: string }>>();
@@ -1881,6 +1856,8 @@ export function RunFlowModal({
   const [rehydrateArtifactLoading, setRehydrateArtifactLoading] = useState(false);
   const [startInputData, setStartInputData] = useState<Record<string, unknown> | null>(null);
   const [startInputDefaults, setStartInputDefaults] = useState<Record<string, unknown> | null>(null);
+  const [runWorkspaceOpenBusy, setRunWorkspaceOpenBusy] = useState(false);
+  const [runWorkspaceOpenMessage, setRunWorkspaceOpenMessage] = useState('');
   const [followUpContext, setFollowUpContext] = useState<FollowUpContext | null>(null);
   const [lastRunSeed, setLastRunSeed] = useState<FollowUpContext | null>(null);
   // Follow-up modal state.
@@ -1890,6 +1867,9 @@ export function RunFlowModal({
   const [followUpError, setFollowUpError] = useState<string | null>(null);
   const [followUpSubmitting, setFollowUpSubmitting] = useState(false);
   const [followUpDragActive, setFollowUpDragActive] = useState(false);
+  const [dismissedApprovalWaits, setDismissedApprovalWaits] = useState<Set<string>>(() => new Set());
+  const [localAutoApproveSessions, setLocalAutoApproveSessions] = useState<Set<string>>(() => new Set());
+  const [localAutoApproveRoots, setLocalAutoApproveRoots] = useState<Set<string>>(() => new Set());
   const [promptCacheBusy, setPromptCacheBusy] = useState(false);
   const [promptCacheResult, setPromptCacheResult] = useState<Record<string, unknown> | null>(null);
   const [promptCacheError, setPromptCacheError] = useState<string | null>(null);
@@ -1902,6 +1882,10 @@ export function RunFlowModal({
   const [durableBlocArtifactPath, setDurableBlocArtifactPath] = useState('');
   const [durableBlocCacheKey, setDurableBlocCacheKey] = useState('');
   const [durablePromptCacheBindingInput, setDurablePromptCacheBindingInput] = useState('');
+  const localRunSessionIdRef = useRef<string>('');
+  if (!localRunSessionIdRef.current) {
+    localRunSessionIdRef.current = createRunModalSessionId();
+  }
 
   const sessionPinId = useMemo(() => {
     const pin = formInputPins.find((p) => p.id === 'session_id' || p.id === 'sessionId');
@@ -1917,7 +1901,8 @@ export function RunFlowModal({
           ? startInputData.session_id.trim()
           : '';
     if (fromInput) return fromInput;
-    return typeof stableSessionId === 'string' && stableSessionId.trim() ? stableSessionId.trim() : '';
+    if (typeof stableSessionId === 'string' && stableSessionId.trim()) return stableSessionId.trim();
+    return localRunSessionIdRef.current;
   }, [stableSessionId, startInputData]);
 
   const textProviderPinId = useMemo(() => {
@@ -2371,6 +2356,7 @@ export function RunFlowModal({
         // Objects/arrays/assertions/memory (render as JSON in textarea pins).
         if (
           pin.type === 'object' ||
+          pin.type === 'json_schema' ||
           pin.type === 'memory' ||
           pin.type === 'array' ||
           pin.type === 'assertion' ||
@@ -2610,6 +2596,7 @@ export function RunFlowModal({
           inputData[pin.id] = value === 'true' || value === '1';
           break;
         case 'object':
+        case 'json_schema':
         case 'memory':
         case 'array':
         case 'assertion':
@@ -3311,6 +3298,56 @@ export function RunFlowModal({
   const steps = runSteps.rootSteps;
   const stepById = runSteps.stepById;
   const stepsByRunId = runSteps.stepsByRunId;
+  const runWorkspaceOpenDescriptor = gatewayContracts?.common?.workspace?.open_run_directory;
+  const runWorkspaceRunId = useMemo(
+    () => selectRunWorkspaceRunId(runSummary, rootRunId),
+    [rootRunId, runSummary]
+  );
+  const runWorkspaceOpenCapabilityMessage = useMemo(() => {
+    if (!runWorkspaceRunId) return 'No run is selected.';
+    const descriptor =
+      runWorkspaceOpenDescriptor && typeof runWorkspaceOpenDescriptor === 'object'
+        ? (runWorkspaceOpenDescriptor as Record<string, unknown>)
+        : null;
+    if (descriptor?.available === false) {
+      const denied = typeof descriptor.denied_reason === 'string' && descriptor.denied_reason.trim()
+        ? descriptor.denied_reason.trim()
+        : '';
+      const role = typeof descriptor.required_role === 'string' && descriptor.required_role.trim()
+        ? descriptor.required_role.trim()
+        : '';
+      if (denied === 'admin_required' || role === 'admin') {
+        return 'Gateway directory opener requires an admin session.';
+      }
+      return denied ? `Gateway directory opener is unavailable: ${denied}.` : 'Gateway directory opener is unavailable.';
+    }
+    if (strictGatewayContract && !descriptorEndpointAvailable(runWorkspaceOpenDescriptor)) {
+      return 'Gateway discovery does not advertise the directory opener. Restart or update the Gateway, then reload Flow.';
+    }
+    return '';
+  }, [runWorkspaceOpenDescriptor, runWorkspaceRunId, strictGatewayContract]);
+  const runWorkspaceRoot = useMemo(
+    () =>
+      extractRunWorkspaceRoot(
+        { workspace: startInputDefaults, input_data: startInputData },
+        startInputDefaults,
+        startInputData,
+        runSummary
+      ),
+    [runSummary, startInputData, startInputDefaults]
+  );
+  const runWorkspaceOpenEndpoint = useMemo(() => {
+    if (!runWorkspaceRunId) return '';
+    if (descriptorEndpointAvailable(runWorkspaceOpenDescriptor)) {
+      return endpointFromDescriptor(runWorkspaceOpenDescriptor, '/api/gateway/runs/{run_id}/workspace/open', {
+        run_id: runWorkspaceRunId,
+      });
+    }
+    if (!strictGatewayContract || !runWorkspaceOpenCapabilityMessage) {
+      return gatewayPath('/api/gateway/runs/{run_id}/workspace/open', { run_id: runWorkspaceRunId });
+    }
+    return '';
+  }, [runWorkspaceRunId, runWorkspaceOpenDescriptor, runWorkspaceOpenCapabilityMessage, strictGatewayContract]);
 
   const failureSummary = useMemo(() => {
     const out: Array<{ step: Step; snippet: string; shortRunId: string }> = [];
@@ -3350,7 +3387,69 @@ export function RunFlowModal({
   }, [derivedSessionId, runSummary]);
 
   useEffect(() => {
-    if (!isOpen || !rootRunId) {
+    setDismissedApprovalWaits(new Set());
+  }, [rootRunId]);
+
+  useEffect(() => {
+    setRunWorkspaceOpenBusy(false);
+    setRunWorkspaceOpenMessage('');
+  }, [runWorkspaceRunId]);
+
+  const approvalAutoApproveActive = useMemo(() => {
+    const sid = approvalSessionId.trim();
+    if (sid && (autoApproveSessions?.has(sid) || localAutoApproveSessions.has(sid))) return true;
+    const rid = typeof rootRunId === 'string' ? rootRunId.trim() : '';
+    return Boolean(rid && localAutoApproveRoots.has(rid));
+  }, [approvalSessionId, autoApproveSessions, localAutoApproveRoots, localAutoApproveSessions, rootRunId]);
+
+  const handleOpenRunWorkspace = useCallback(async () => {
+    const workspaceRoot = runWorkspaceRoot.trim();
+    if ((!workspaceRoot && !runWorkspaceOpenEndpoint) || runWorkspaceOpenBusy) return;
+    setRunWorkspaceOpenMessage('');
+    if (workspaceRoot) {
+      await copyTextToClipboard(workspaceRoot);
+    }
+    if (runWorkspaceOpenCapabilityMessage && !runWorkspaceOpenEndpoint) {
+      const message = workspaceRoot
+        ? `${runWorkspaceOpenCapabilityMessage} Copied the path instead.`
+        : runWorkspaceOpenCapabilityMessage;
+      setRunWorkspaceOpenMessage(message);
+      toast.error(message);
+      return;
+    }
+    if (!runWorkspaceOpenEndpoint) {
+      const message = workspaceRoot
+        ? 'Copied run directory path. Gateway opener is not available.'
+        : 'Gateway opener is not available.';
+      setRunWorkspaceOpenMessage(message);
+      toast.error(message);
+      return;
+    }
+    setRunWorkspaceOpenBusy(true);
+    const toastId = toast.loading('Opening run directory...');
+    try {
+      await gatewayJson<Record<string, unknown>>(runWorkspaceOpenEndpoint, { method: 'POST', timeoutMs: 10_000 });
+      const message = workspaceRoot ? 'Opened run directory and copied path.' : 'Opened run directory.';
+      setRunWorkspaceOpenMessage(message);
+      toast.success(message, { id: toastId });
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : String(e || 'Gateway opener failed');
+      const staleHint =
+        /HTTP 404\b/i.test(detail) || /not found/i.test(detail)
+          ? ' The running Gateway may need to be restarted or updated.'
+          : '';
+      const message = workspaceRoot
+        ? `Could not open run directory. Copied path instead. ${detail}${staleHint}`
+        : `Could not open run directory. ${detail}${staleHint}`;
+      setRunWorkspaceOpenMessage(message);
+      toast.error(message, { id: toastId });
+    } finally {
+      setRunWorkspaceOpenBusy(false);
+    }
+  }, [runWorkspaceOpenBusy, runWorkspaceOpenCapabilityMessage, runWorkspaceOpenEndpoint, runWorkspaceRoot]);
+
+  useEffect(() => {
+    if (!isOpen || !runWorkspaceRunId) {
       setStartInputData(null);
       setStartInputDefaults(null);
       return;
@@ -3359,7 +3458,9 @@ export function RunFlowModal({
     const hasInputDataDescriptor = descriptorEndpointAvailable(runInputDataDescriptor);
     const inputDataEndpoint = (() => {
       if (hasInputDataDescriptor) {
-        return endpointFromDescriptor(runInputDataDescriptor, '/api/gateway/runs/{run_id}/input_data', { run_id: rootRunId });
+        return endpointFromDescriptor(runInputDataDescriptor, '/api/gateway/runs/{run_id}/input_data', {
+          run_id: runWorkspaceRunId,
+        });
       }
       if (strictGatewayContract) {
         console.warn('Gateway contract requires runs.input_data for run rehydration; endpoint is not advertised.');
@@ -3368,7 +3469,7 @@ export function RunFlowModal({
       console.warn(
         '#FALLBACK: runs.input_data descriptor missing in discovery; using legacy canonical route for run detail rehydration compatibility.'
       );
-      return gatewayPath('/api/gateway/runs/{run_id}/input_data', { run_id: rootRunId });
+      return gatewayPath('/api/gateway/runs/{run_id}/input_data', { run_id: runWorkspaceRunId });
     })();
     (async () => {
       if (!inputDataEndpoint) {
@@ -3411,7 +3512,7 @@ export function RunFlowModal({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, rootRunId, runInputDataDescriptor, strictGatewayContract]);
+  }, [isOpen, runInputDataDescriptor, runWorkspaceRunId, strictGatewayContract]);
 
   // Map (parentRunId:nodeId[:stepId]) -> sub_run_id for subworkflow waits, so the UI can show
   // child run steps even before the parent subflow node completes.
@@ -3984,7 +4085,10 @@ export function RunFlowModal({
     return mode === 'approval_required' || kind === 'tool_approval';
   }, []);
   const approvalWait = useMemo(() => {
+    if (approvalAutoApproveActive) return null;
     if (isApprovalDetails(waitingInfoDetails)) {
+      const dismissKey = approvalDismissKey(waitingInfo?.runId, waitingInfo?.waitKey);
+      if (dismissKey && dismissedApprovalWaits.has(dismissKey)) return null;
       return { details: waitingInfoDetails, waitKey: waitingInfo?.waitKey, runId: waitingInfo?.runId };
     }
     const allSteps = Array.from(stepById.values());
@@ -3994,13 +4098,77 @@ export function RunFlowModal({
       const details =
         waiting?.details && typeof waiting.details === 'object' ? (waiting.details as Record<string, unknown>) : null;
       if (!isApprovalDetails(details)) continue;
+      const dismissKey = approvalDismissKey(waiting?.runId || step.runId, waiting?.waitKey);
+      if (dismissKey && dismissedApprovalWaits.has(dismissKey)) continue;
       return { details, waitKey: waiting?.waitKey, runId: waiting?.runId || step.runId };
     }
     return null;
-  }, [isApprovalDetails, stepById, waitingInfo?.runId, waitingInfo?.waitKey, waitingInfoDetails]);
+  }, [
+    approvalAutoApproveActive,
+    dismissedApprovalWaits,
+    isApprovalDetails,
+    stepById,
+    waitingInfo?.runId,
+    waitingInfo?.waitKey,
+    waitingInfoDetails,
+  ]);
   const approvalDetails = approvalWait ? approvalWait.details : null;
   const approvalToolCalls = approvalDetails && Array.isArray(approvalDetails.tool_calls) ? approvalDetails.tool_calls : [];
   const approvalRunId = approvalWait?.runId || waitingInfo?.runId;
+
+  const handleApprovalDecision = useCallback(
+    (approved: boolean, approveAll = false) => {
+      const runId = approvalWait?.runId;
+      const waitKey = approvalWait?.waitKey;
+      const dismissKey = approvalDismissKey(runId, waitKey);
+      if (dismissKey) {
+        setDismissedApprovalWaits((prev) => {
+          const next = new Set(prev);
+          next.add(dismissKey);
+          return next;
+        });
+      }
+
+      if (approveAll) {
+        const sid = approvalSessionId.trim();
+        const rid = typeof rootRunId === 'string' ? rootRunId.trim() : '';
+        if (sid) {
+          setLocalAutoApproveSessions((prev) => {
+            const next = new Set(prev);
+            next.add(sid);
+            return next;
+          });
+        }
+        if (rid) {
+          setLocalAutoApproveRoots((prev) => {
+            const next = new Set(prev);
+            next.add(rid);
+            return next;
+          });
+        }
+        onApproveAll?.({
+          rootRunId: rid || undefined,
+          sessionId: sid || undefined,
+        });
+      }
+
+      const result = onResume?.({
+        approved,
+        runId,
+        waitKey,
+      });
+      if (result && typeof (result as Promise<void>).catch === 'function' && dismissKey) {
+        (result as Promise<void>).catch(() => {
+          setDismissedApprovalWaits((prev) => {
+            const next = new Set(prev);
+            next.delete(dismissKey);
+            return next;
+          });
+        });
+      }
+    },
+    [approvalSessionId, approvalWait?.runId, approvalWait?.waitKey, onApproveAll, onResume, rootRunId]
+  );
 
   const waitingPayload = selectedStep?.waiting || null;
   const waitingKey = `${selectedStep?.id || ''}:${waitingPayload?.waitKey || ''}`;
@@ -4022,7 +4190,12 @@ export function RunFlowModal({
     selectedStep?.metrics && selectedStep.metrics.duration_ms != null
       ? formatDuration(selectedStep.metrics.duration_ms)
       : '';
-  const selectedProgressPct = selectedStep?.progress ? progressPercent(selectedStep.progress) : null;
+  const selectedProgressPct = selectedStep?.progress ? progressDisplayPercent(selectedStep.progress, selectedStep.status) : null;
+  const selectedProgressIndeterminate = selectedStep?.progress ? progressIsIndeterminate(selectedStep.progress) : false;
+  const selectedProgressTrackVisible =
+    Boolean(selectedStep?.progress) &&
+    !progressIsUnreported(selectedStep?.progress) &&
+    (selectedProgressPct != null || selectedProgressIndeterminate);
   const selectedProgressTiming = selectedStep?.progress
     ? progressTimingParts(selectedStep.progress, selectedStep.startedAt, progressClockMs)
     : null;
@@ -5582,10 +5755,36 @@ export function RunFlowModal({
             {flowId && onSelectRunId ? (
               <RunSwitcherDropdown
                 workflowId={flowId}
-                currentRunId={rootRunId}
+                currentRunId={runWorkspaceRunId || rootRunId}
                 gatewayContracts={gatewayContracts}
                 onSelectRun={onSelectRunId}
               />
+            ) : null}
+            {runWorkspaceRunId && (runWorkspaceRoot || runWorkspaceOpenEndpoint || runWorkspaceOpenCapabilityMessage) ? (
+              <button
+                type="button"
+                className="run-modal-runid run-workspace-open"
+                onClick={handleOpenRunWorkspace}
+                disabled={runWorkspaceOpenBusy}
+                title={
+                  runWorkspaceOpenMessage ||
+                  (runWorkspaceOpenEndpoint
+                    ? runWorkspaceRoot
+                      ? `Open run directory: ${runWorkspaceRoot}`
+                      : 'Open run directory'
+                    : runWorkspaceOpenCapabilityMessage ||
+                      (runWorkspaceRoot ? `Copy run directory path: ${runWorkspaceRoot}` : 'Run directory opener unavailable'))
+                }
+                aria-label={
+                  runWorkspaceOpenEndpoint
+                    ? 'Open run directory'
+                    : runWorkspaceRoot
+                      ? 'Copy run directory path'
+                      : 'Show run directory opener status'
+                }
+              >
+                <FolderOpenIcon />
+              </button>
             ) : null}
           </div>
         </div>
@@ -5724,7 +5923,12 @@ export function RunFlowModal({
                           s.status === 'completed' && s.metrics && s.metrics.duration_ms != null
                             ? formatDuration(s.metrics.duration_ms)
                             : '';
-                        const progressPct = s.progress ? progressPercent(s.progress) : null;
+                        const progressPct = s.progress ? progressDisplayPercent(s.progress, s.status) : null;
+                        const progressIndeterminate = s.progress ? progressIsIndeterminate(s.progress) : false;
+                        const progressTrackVisible =
+                          Boolean(s.progress) &&
+                          !progressIsUnreported(s.progress) &&
+                          (progressPct != null || progressIndeterminate);
                         const progressTiming = s.status === 'running' && s.progress
                           ? progressTimingParts(s.progress, s.startedAt, progressClockMs)
                           : null;
@@ -5824,7 +6028,7 @@ export function RunFlowModal({
                                   <div className="run-step-progress">
                                     <div className="run-step-progress-row">
                                       <span>{formatProgressSummary(s.progress) || 'running'}</span>
-                                      {progressPct != null ? (
+                                      {progressPct != null && !progressIndeterminate ? (
                                         <span>{progressPct.toFixed(1)}%</span>
                                       ) : null}
                                     </div>
@@ -5838,12 +6042,19 @@ export function RunFlowModal({
                                         ) : null}
                                       </div>
                                     ) : null}
-                                    {progressPct != null ? (
-                                      <div className="run-step-progress-track" aria-hidden="true">
-                                        <div
-                                          className="run-step-progress-fill"
-                                          style={{ width: `${progressPct}%` }}
-                                        />
+                                    {progressTrackVisible ? (
+                                      <div
+                                        className={progressIndeterminate ? 'run-step-progress-track indeterminate' : 'run-step-progress-track'}
+                                        aria-hidden="true"
+                                      >
+                                        {progressIndeterminate ? (
+                                          <div className="run-step-progress-fill" />
+                                        ) : (
+                                          <div
+                                            className="run-step-progress-fill"
+                                            style={{ width: `${progressPct ?? 0}%` }}
+                                          />
+                                        )}
                                       </div>
                                     ) : null}
                                   </div>
@@ -5958,7 +6169,7 @@ export function RunFlowModal({
                           <div className="run-step-progress">
                             <div className="run-step-progress-row">
                               <span>{formatProgressSummary(selectedStep.progress) || 'running'}</span>
-                              {selectedProgressPct != null ? (
+                              {selectedProgressPct != null && !selectedProgressIndeterminate ? (
                                 <span>{selectedProgressPct.toFixed(1)}%</span>
                               ) : null}
                             </div>
@@ -5972,12 +6183,19 @@ export function RunFlowModal({
                                 ) : null}
                               </div>
                             ) : null}
-                            {selectedProgressPct != null ? (
-                              <div className="run-step-progress-track" aria-hidden="true">
-                                <div
-                                  className="run-step-progress-fill"
-                                  style={{ width: `${selectedProgressPct}%` }}
-                                />
+                            {selectedProgressTrackVisible ? (
+                              <div
+                                className={selectedProgressIndeterminate ? 'run-step-progress-track indeterminate' : 'run-step-progress-track'}
+                                aria-hidden="true"
+                              >
+                                {selectedProgressIndeterminate ? (
+                                  <div className="run-step-progress-fill" />
+                                ) : (
+                                  <div
+                                    className="run-step-progress-fill"
+                                    style={{ width: `${selectedProgressPct ?? 0}%` }}
+                                  />
+                                )}
                               </div>
                             ) : null}
                           </div>
@@ -6791,7 +7009,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({pin.type})</span>
+                                  <span className="run-form-type">({displayPinType(pin.type)})</span>
                                 </label>
                                 <ArtifactInputField
                                   pin={pin}
@@ -6815,7 +7033,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({pin.type})</span>
+                                  <span className="run-form-type">({displayPinType(pin.type)})</span>
                                 </label>
                                 <AfSelect
                                   value={value}
@@ -6844,7 +7062,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({pin.type})</span>
+                                  <span className="run-form-type">({displayPinType(pin.type)})</span>
                                 </label>
                                 <AfSelect
                                   value={value}
@@ -6873,7 +7091,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({pin.type})</span>
+                                  <span className="run-form-type">({displayPinType(pin.type)})</span>
                                 </label>
                                 <AfSelect
                                   value={value}
@@ -6902,7 +7120,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({pin.type})</span>
+                                  <span className="run-form-type">({displayPinType(pin.type)})</span>
                                 </label>
                                 <AfSelect
                                   value={value}
@@ -6956,7 +7174,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({pin.type})</span>
+                                  <span className="run-form-type">({displayPinType(pin.type)})</span>
                                 </label>
                                 <AfSelect
                                   value={value}
@@ -6993,7 +7211,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({pin.type})</span>
+                                  <span className="run-form-type">({displayPinType(pin.type)})</span>
                                 </label>
                                 <AfMultiSelect
                                   values={values}
@@ -7017,7 +7235,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({pin.type})</span>
+                                  <span className="run-form-type">({displayPinType(pin.type)})</span>
                                 </label>
                                 <AfSelect
                                   value={value}
@@ -7037,7 +7255,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({pin.type})</span>
+                                  <span className="run-form-type">({displayPinType(pin.type)})</span>
                                 </label>
                                 <AfSelect
                                   value={value}
@@ -7056,7 +7274,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({pin.type})</span>
+                                  <span className="run-form-type">({displayPinType(pin.type)})</span>
                                 </label>
                                 <ArrayParamEditor
                                   value={value}
@@ -7071,7 +7289,7 @@ export function RunFlowModal({
                             <div key={pin.id} className="run-form-field">
                               <label className="run-form-label">
                                 {pin.label}
-                                <span className="run-form-type">({pin.type})</span>
+                                <span className="run-form-type">({displayPinType(pin.type)})</span>
                               </label>
 
                               {inputType === 'textarea' ? (
@@ -7397,137 +7615,117 @@ export function RunFlowModal({
           ) : null}
 
           <div className="run-modal-footer-actions">
-            <div className="run-modal-footer-left">
+            <div className="run-modal-footer-left" />
+
+            <div className="run-modal-footer-right">
               {approvalDetails ? (
                 <>
                   <button
                     type="button"
-                    className="modal-button primary"
-                    onClick={() => {
-                      onApproveAll?.({
-                        rootRunId: rootRunId || undefined,
-                        sessionId: approvalSessionId || undefined,
-                      });
-                      onResume?.({
-                        approved: true,
-                        runId: approvalWait?.runId,
-                        waitKey: approvalWait?.waitKey,
-                      });
-                    }}
+                    className="modal-button cancel"
+                    onClick={() => handleApprovalDecision(false)}
                   >
-                    Approve All
+                    Deny
                   </button>
                   <button
                     type="button"
                     className="modal-button"
-                    onClick={() =>
-                      onResume?.({
-                        approved: true,
-                        runId: approvalWait?.runId,
-                        waitKey: approvalWait?.waitKey,
-                      })
-                    }
+                    onClick={() => handleApprovalDecision(true)}
                   >
                     Approve
                   </button>
                   <button
                     type="button"
-                    className="modal-button cancel"
-                    onClick={() =>
-                      onResume?.({
-                        approved: false,
-                        runId: approvalWait?.runId,
-                        waitKey: approvalWait?.waitKey,
-                      })
-                    }
-                  >
-                    Deny
-                  </button>
-                </>
-              ) : null}
-            </div>
-
-            <div className="run-modal-footer-right">
-              {isActiveRun && !isWaiting && (onPause || onResumeRun) && (
-                <button
-                  type="button"
-                  className={isPaused ? 'modal-button primary' : 'modal-button cancel'}
-                  onClick={() => {
-                    if (isPaused) onResumeRun?.();
-                    else onPause?.();
-                  }}
-                  disabled={isPaused ? !isPaused : !(isRunning && !isWaiting)}
-                >
-                  {isPaused ? 'Resume' : 'Pause'}
-                </button>
-              )}
-
-              {isActiveRun && onCancelRun && (
-                <button
-                  type="button"
-                  className="modal-button cancel"
-                  onClick={onCancelRun}
-                >
-                  Cancel
-                </button>
-              )}
-
-              {isBeforeRun && (
-                <>
-                  <button
-                    type="button"
-                    className="modal-button cancel"
-                    onClick={onClose}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
                     className="modal-button primary"
-                    onClick={handleSubmit}
-                    disabled={
-                      !entryNode ||
-                      (workspaceRootRequired && !workspaceRoot.trim() && !(workspaceRandom && executionWorkspaceQuery.isError))
-                    }
+                    onClick={() => handleApprovalDecision(true, true)}
                   >
-                    Run
+                    Approve All
                   </button>
                 </>
-              )}
+              ) : (
+                <>
+                  {isActiveRun && !isWaiting && (onPause || onResumeRun) && (
+                    <button
+                      type="button"
+                      className={isPaused ? 'modal-button primary' : 'modal-button cancel'}
+                      onClick={() => {
+                        if (isPaused) onResumeRun?.();
+                        else onPause?.();
+                      }}
+                      disabled={isPaused ? !isPaused : !(isRunning && !isWaiting)}
+                    >
+                      {isPaused ? 'Resume' : 'Pause'}
+                    </button>
+                  )}
 
-              {hasCompletedRun && onFollowUpSubmit && activeFollowUpSeed && (
-                <button
-                  type="button"
-                  className="modal-button cancel"
-                  onClick={() => {
-                    setFollowUpError(null);
-                    setShowFollowUpModal(true);
-                  }}
-                >
-                  Follow Up
-                </button>
-              )}
+                  {isActiveRun && onCancelRun && (
+                    <button
+                      type="button"
+                      className="modal-button cancel"
+                      onClick={onCancelRun}
+                    >
+                      Cancel
+                    </button>
+                  )}
 
-              {hasCompletedRun && onNewRun && (
-                <button
-                  type="button"
-                  className="modal-button primary"
-                  onClick={() => {
-                    if (workspaceRandom) {
-                      setWorkspaceRoot('');
-                    }
-                    setFollowUpContext(null);
-                    setLastRunSeed(null);
-                    if (sessionPinId) {
-                      setFormValues((prev) => ({ ...prev, [sessionPinId]: '' }));
-                    } else {
-                      setSessionIdOverride('');
-                    }
-                    onNewRun();
-                  }}
-                >
-                  New Run
-                </button>
+                  {isBeforeRun && (
+                    <>
+                      <button
+                        type="button"
+                        className="modal-button cancel"
+                        onClick={onClose}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="modal-button primary"
+                        onClick={handleSubmit}
+                        disabled={
+                          !entryNode ||
+                          (workspaceRootRequired && !workspaceRoot.trim() && !(workspaceRandom && executionWorkspaceQuery.isError))
+                        }
+                      >
+                        Run
+                      </button>
+                    </>
+                  )}
+
+                  {hasCompletedRun && onFollowUpSubmit && activeFollowUpSeed && (
+                    <button
+                      type="button"
+                      className="modal-button cancel"
+                      onClick={() => {
+                        setFollowUpError(null);
+                        setShowFollowUpModal(true);
+                      }}
+                    >
+                      Follow Up
+                    </button>
+                  )}
+
+                  {hasCompletedRun && onNewRun && (
+                    <button
+                      type="button"
+                      className="modal-button primary"
+                      onClick={() => {
+                        if (workspaceRandom) {
+                          setWorkspaceRoot('');
+                        }
+                        setFollowUpContext(null);
+                        setLastRunSeed(null);
+                        if (sessionPinId) {
+                          setFormValues((prev) => ({ ...prev, [sessionPinId]: '' }));
+                        } else {
+                          setSessionIdOverride('');
+                        }
+                        onNewRun();
+                      }}
+                    >
+                      New Run
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>

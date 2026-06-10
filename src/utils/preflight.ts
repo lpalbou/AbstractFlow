@@ -206,6 +206,12 @@ export function computeRunPreflightIssues(
       }
     }
 
+    if (t === 'upscale_image') {
+      if (!artifactInputPresent(edges, n, 'image_artifact', 'source_image')) {
+        push(n, 'Missing required input: image_artifact');
+      }
+    }
+
     if (t === 'generate_voice') {
       if (!stringInputPresent(edges, n, 'text')) push(n, 'Missing required input: text');
     }

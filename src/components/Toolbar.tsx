@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { useFlowStore } from '../hooks/useFlow';
-import { useWebSocket, type WaitingInfo } from '../hooks/useWebSocket';
+import { useWebSocket } from '../hooks/useWebSocket';
 import { RunFlowModal } from './RunFlowModal';
 import { RunHistoryModal } from './RunHistoryModal';
 import { FlowLibraryModal } from './FlowLibraryModal';
@@ -15,6 +15,7 @@ import { WorkflowLifecycleModal } from './WorkflowLifecycleModal';
 import { ModelResidencyPanel } from './ModelResidencyPanel';
 import { closeOpenNodes, createLedgerMappingState, mapLedgerRecordToEvents, type LedgerRecord } from '../utils/ledgerEvents';
 import { mapGatewayRunSummary } from '../utils/gatewayRuns';
+import { extractPendingApprovalWait, extractReplayTraceEvents } from '../utils/runHistoryReplay';
 import type { ExecutionEvent, FlowRunResult, VisualFlow, RunHistoryResponse, RunSummary } from '../types/flow';
 import { computeRunPreflightIssues } from '../utils/preflight';
 import { useGatewayCapabilities, gatewayContractsFromCapabilities } from '../hooks/useGatewayCapabilities';
@@ -169,13 +170,17 @@ function flowSignatureFor(flow: Partial<VisualFlow> | null | undefined): string 
 
 export function Toolbar({
   onOpenAppearance,
+  onOpenAssistant,
   onOpenConnection,
   onDisconnect,
+  assistantOpen = false,
   gatewayConnected = false,
 }: {
   onOpenAppearance?: () => void;
+  onOpenAssistant?: () => void;
   onOpenConnection?: () => void;
   onDisconnect?: () => void;
+  assistantOpen?: boolean;
   gatewayConnected?: boolean;
 }) {
   const queryClient = useQueryClient();
@@ -450,7 +455,7 @@ export function Toolbar({
       }
     }
 
-    return { run, events };
+    return { run, events, traceEvents: extractReplayTraceEvents(events) };
   }
 
   // When viewing a persisted run that is still active (running/waiting), keep the UI fresh by
@@ -470,6 +475,7 @@ export function Toolbar({
         if (cancelled) return;
         setInspectedRun(data.run);
         setInspectedEvents(Array.isArray(data.events) ? data.events : []);
+        setInspectedTraceEvents(Array.isArray(data.traceEvents) ? data.traceEvents : []);
       } catch {
         // ignore transient errors (user may be offline / server restarting)
       }
@@ -622,6 +628,7 @@ export function Toolbar({
     cancelRun,
     resetSession,
     stableSessionId,
+    autoApproveSessions,
     setAutoApproveForSession,
     setAutoApproveForRunRoot,
   } = useWebSocket({
@@ -998,7 +1005,7 @@ export function Toolbar({
         const data = await fetchRunHistory(rid);
         setInspectedRun(data.run);
         setInspectedEvents(Array.isArray(data.events) ? data.events : []);
-        setInspectedTraceEvents([]);
+        setInspectedTraceEvents(Array.isArray(data.traceEvents) ? data.traceEvents : []);
         setRunResult(null);
         if (opts?.closeHistory) setShowRunHistory(false);
         setShowRunModal(true);
@@ -1101,29 +1108,6 @@ export function Toolbar({
     }
     setShowLifecycleModal(true);
   }, [flowId]);
-
-  const extractApprovalWait = useCallback((events: ExecutionEvent[]): WaitingInfo | null => {
-    for (let i = events.length - 1; i >= 0; i--) {
-      const ev = events[i];
-      if (ev.type !== 'flow_waiting') continue;
-      const details = ev.details && typeof ev.details === 'object' ? (ev.details as Record<string, unknown>) : null;
-      if (!details) continue;
-      const mode = typeof details.mode === 'string' ? details.mode.toLowerCase() : '';
-      const kind = typeof details.kind === 'string' ? details.kind.toLowerCase() : '';
-      if (mode !== 'approval_required' && kind !== 'tool_approval') continue;
-      return {
-        prompt: ev.prompt || 'Please respond:',
-        choices: ev.choices || [],
-        allowFreeText: ev.allow_free_text !== false,
-        nodeId: ev.nodeId || null,
-        waitKey: ev.wait_key,
-        runId: ev.runId || undefined,
-        reason: typeof ev.reason === 'string' ? ev.reason : undefined,
-        details,
-      };
-    }
-    return null;
-  }, []);
 
   return (
     <>
@@ -1253,6 +1237,15 @@ export function Toolbar({
         <div className="toolbar-spacer" />
 
         <button
+          className={`toolbar-button icon-button assistant-toolbar-button ${assistantOpen ? 'primary' : ''}`}
+          onClick={() => onOpenAssistant?.()}
+          title="Authoring assistant"
+          aria-label="Open authoring assistant"
+        >
+          ✦
+        </button>
+
+        <button
           className="toolbar-button icon-button"
           onClick={() => onOpenAppearance?.()}
           title="Appearance (theme + typography)"
@@ -1307,7 +1300,7 @@ export function Toolbar({
         const runningLike =
           status === 'running' ||
           (status === 'waiting' && inspectedRun?.wait_reason === 'subworkflow' && !inspectedRun?.paused);
-        const approvalWaitInfo = viewing ? extractApprovalWait(evs) : null;
+        const approvalWaitInfo = viewing ? extractPendingApprovalWait(evs) : null;
         const waitingLike =
           Boolean(approvalWaitInfo) ||
           (status === 'waiting' && !inspectedRun?.paused && inspectedRun?.wait_reason !== 'subworkflow');
@@ -1337,8 +1330,9 @@ export function Toolbar({
         events={evs}
         traceEvents={traces}
         isWaiting={viewing ? waitingLike : isWaiting}
-        waitingInfo={viewing ? waitingInfo2 : waitingInfo}
+	        waitingInfo={viewing ? waitingInfo2 : waitingInfo}
 	        stableSessionId={stableSessionId}
+        autoApproveSessions={autoApproveSessions}
         threadRootRunId={viewing ? undefined : threadRootRunId || undefined}
         runWorkflowId={viewing ? inspectedRun?.workflow_id || flowId || null : runWorkflowId}
         gatewayContracts={gatewayContracts}

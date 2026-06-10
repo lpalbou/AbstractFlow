@@ -3,6 +3,7 @@ import type { NodeType } from '../types/flow';
 export type GatewayAuthoringCapability =
   | 'generated_image'
   | 'edited_image'
+  | 'upscaled_image'
   | 'generated_video'
   | 'image_to_video'
   | 'generated_voice'
@@ -16,6 +17,7 @@ export const NODE_GATEWAY_CAPABILITIES: Partial<Record<NodeType, GatewayAuthorin
   generate_image: 'generated_image',
   edit_image: 'edited_image',
   image_to_image: 'edited_image',
+  upscale_image: 'upscaled_image',
   generate_video: 'generated_video',
   text_to_video: 'generated_video',
   image_to_video: 'image_to_video',

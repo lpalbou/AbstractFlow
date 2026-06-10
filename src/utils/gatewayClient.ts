@@ -93,6 +93,7 @@ export interface GatewayCommonContract {
   };
   workspace?: {
     policy_endpoint?: string;
+    open_run_directory?: GatewayEndpointDescriptor;
   };
   configuration?: {
     capability_defaults?: GatewayEndpointDescriptor & {
@@ -230,6 +231,7 @@ export interface GatewayGeneratedVideoContract {
 export interface GatewayMediaContract {
   generated_image?: GatewayGeneratedImageContract;
   edited_image?: GatewayGeneratedImageContract;
+  upscaled_image?: GatewayGeneratedImageContract;
   generated_video?: GatewayGeneratedVideoContract;
   image_to_video?: GatewayGeneratedVideoContract;
   generated_voice?: GatewayGeneratedVoiceContract;
@@ -342,6 +344,7 @@ export interface GatewayOptionalFeatureStatus {
   kgMemory: boolean;
   generatedImage: boolean;
   editedImage: boolean;
+  upscaledImage: boolean;
   generatedVideo: boolean;
   imageToVideo: boolean;
   generatedVoice: boolean;
@@ -387,6 +390,7 @@ export class GatewayHttpError extends Error {
 const AUTHORING_CAPABILITY_LABELS: Record<GatewayAuthoringCapability, string> = {
   generated_image: 'Generate Image',
   edited_image: 'Edit Image',
+  upscaled_image: 'Restore / Upscale Image',
   generated_video: 'Generate Video',
   image_to_video: 'Image To Video',
   generated_voice: 'Generate Voice',
@@ -399,6 +403,7 @@ const AUTHORING_CAPABILITY_LABELS: Record<GatewayAuthoringCapability, string> = 
 const AUTHORING_CAPABILITY_OPTIONAL_KEYS: Record<GatewayAuthoringCapability, keyof GatewayOptionalFeatureStatus> = {
   generated_image: 'generatedImage',
   edited_image: 'editedImage',
+  upscaled_image: 'upscaledImage',
   generated_video: 'generatedVideo',
   image_to_video: 'imageToVideo',
   generated_voice: 'generatedVoice',
@@ -871,6 +876,14 @@ export function getGatewayFlowEditorReadiness(
         directGeneratedMediaAvailable(image?.direct_endpoint, surface)
     );
   })();
+  const upscaledImage = (() => {
+    const image = flow?.media?.upscaled_image || contracts?.assistant?.media?.upscaled_image;
+    const surface = gatewayMediaSurface(surfaceReadiness, 'upscaled_image');
+    return Boolean(
+      (image?.workflow?.available === true && gatewayWorkflowMediaSurfaceAllows(surface)) ||
+        directGeneratedMediaAvailable(image?.direct_endpoint, surface)
+    );
+  })();
   const generatedVideo = (() => {
     const video = flow?.media?.generated_video || contracts?.assistant?.media?.generated_video;
     const surface = gatewayMediaSurface(surfaceReadiness, 'generated_video');
@@ -948,6 +961,7 @@ export function getGatewayFlowEditorReadiness(
       ),
       generatedImage,
       editedImage,
+      upscaledImage,
       generatedVideo,
       imageToVideo,
       generatedVoice,
@@ -1025,6 +1039,140 @@ export function jsonRequest(payload: unknown, init: RequestInit = {}): RequestIn
     },
     body: JSON.stringify(payload),
   };
+}
+
+export interface GatewayCapabilityDefaultRoute {
+  key?: string;
+  kind?: string;
+  modality?: string;
+  provider?: string;
+  model?: string;
+  configured?: boolean;
+  source?: string;
+  [key: string]: unknown;
+}
+
+export interface GatewayCapabilityDefaultsResponse {
+  ok?: boolean;
+  routes?: GatewayCapabilityDefaultRoute[];
+  errors?: string[];
+  [key: string]: unknown;
+}
+
+export async function gatewayCapabilityDefaults(
+  contracts?: GatewayContracts | null
+): Promise<GatewayCapabilityDefaultsResponse> {
+  const descriptor = contracts?.common?.configuration?.capability_defaults;
+  const endpoint = endpointTemplateFromDescriptor(descriptor);
+  if (!endpoint) {
+    throw new Error('Gateway did not advertise a capability-defaults endpoint');
+  }
+  return gatewayJson<GatewayCapabilityDefaultsResponse>(
+    gatewayPath(endpoint)
+  );
+}
+
+export function findGatewayCapabilityDefault(
+  payload: GatewayCapabilityDefaultsResponse | null | undefined,
+  routeKey: string
+): GatewayCapabilityDefaultRoute | null {
+  const target = String(routeKey || '').trim().toLowerCase();
+  if (!target || !Array.isArray(payload?.routes)) return null;
+  return (
+    payload.routes.find((route) => {
+      const key = String(route?.key || '').trim().toLowerCase();
+      if (key) return key === target;
+      const kind = String(route?.kind || '').trim().toLowerCase();
+      const modality = String(route?.modality || '').trim().toLowerCase();
+      return `${kind}.${modality}` === target;
+    }) || null
+  );
+}
+
+export interface GatewayStartRunRequest {
+  registry_scope?: string;
+  bundle_id?: string;
+  bundle_version?: string;
+  flow_id?: string;
+  input_data?: Record<string, unknown>;
+  thinking?: boolean | string;
+  run_lifecycle?: Record<string, unknown>;
+  session_id?: string;
+}
+
+export interface GatewayStartRunResponse {
+  run_id?: string;
+}
+
+export interface GatewayRunSummaryResponse {
+  run_id?: string;
+  status?: string;
+  error?: string | null;
+  waiting?: unknown;
+  updated_at?: string | null;
+  [key: string]: unknown;
+}
+
+export interface GatewayLedgerRecord {
+  run_id?: string;
+  step_id?: string;
+  node_id?: string;
+  status?: string;
+  effect?: Record<string, unknown> | null;
+  result?: Record<string, unknown> | null;
+  error?: string | null;
+  [key: string]: unknown;
+}
+
+export interface GatewayLedgerResponse {
+  items?: GatewayLedgerRecord[];
+  next_after?: number;
+}
+
+export async function gatewayStartRun(
+  request: GatewayStartRunRequest,
+  contracts?: GatewayContracts | null
+): Promise<GatewayStartRunResponse> {
+  const endpoint = endpointFromDescriptor(contracts?.common?.runs?.start, '/api/gateway/runs/start');
+  return gatewayJson<GatewayStartRunResponse>(
+    endpoint,
+    jsonRequest(
+      {
+        registry_scope: request.registry_scope,
+        bundle_id: request.bundle_id,
+        bundle_version: request.bundle_version,
+        flow_id: request.flow_id,
+        input_data: request.input_data || {},
+        thinking: request.thinking,
+        run_lifecycle: request.run_lifecycle,
+        session_id: request.session_id,
+      },
+      { method: 'POST' }
+    )
+  );
+}
+
+export async function gatewayRunSummary(
+  runId: string,
+  contracts?: GatewayContracts | null
+): Promise<GatewayRunSummaryResponse> {
+  const endpoint = endpointFromDescriptor(contracts?.common?.runs?.summary, '/api/gateway/runs/{run_id}', { run_id: runId });
+  return gatewayJson<GatewayRunSummaryResponse>(endpoint);
+}
+
+export async function gatewayRunLedger(
+  runId: string,
+  contracts?: GatewayContracts | null,
+  after = 0,
+  limit = 2000
+): Promise<GatewayLedgerResponse> {
+  const endpoint = endpointFromDescriptor(
+    contracts?.common?.ledger?.replay,
+    '/api/gateway/runs/{run_id}/ledger',
+    { run_id: runId },
+    { after, limit }
+  );
+  return gatewayJson<GatewayLedgerResponse>(endpoint);
 }
 
 export function makeGatewayRequestId(prefix = 'gw'): string {

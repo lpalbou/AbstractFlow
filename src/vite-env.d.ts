@@ -2,6 +2,11 @@
 
 import type React from "react";
 
+declare module "*.txt?raw" {
+  const content: string;
+  export default content;
+}
+
 declare global {
   interface ImportMetaEnv {
     readonly VITE_MONITOR_GPU?: string;

@@ -65,11 +65,37 @@ function isProviderOrModelVisualType(value: string): boolean {
     'model_text',
     'provider_image',
     'model_image',
+    'provider_video',
+    'model_video',
     'provider_voice',
     'model_voice',
     'provider_music',
     'model_music',
   ].includes(value);
+}
+
+function isArtifactVisualType(value: string): boolean {
+  return ['artifact', 'artifact_image', 'artifact_audio', 'artifact_text', 'artifact_video'].includes(value);
+}
+
+function coerceArtifactRef(value: unknown): unknown {
+  if (isRecord(value)) {
+    const raw = value.$artifact ?? value.artifact_id;
+    if (typeof raw === 'string' && raw.trim()) {
+      const artifactId = raw.trim();
+      return { ...value, $artifact: artifactId, artifact_id: artifactId };
+    }
+    return value;
+  }
+  if (typeof value !== 'string') return value;
+  const text = value.trim();
+  if (!text) return value;
+  if (text.startsWith('{')) {
+    const parsed = parseJsonish(text, null);
+    if (isRecord(parsed)) return coerceArtifactRef(parsed);
+    return value;
+  }
+  return { $artifact: text, artifact_id: text };
 }
 
 function coerceValue(value: unknown, pin: GatewayInputPin): unknown {
@@ -78,6 +104,9 @@ function coerceValue(value: unknown, pin: GatewayInputPin): unknown {
   const target = visualType || jsonType;
 
   if (value == null) return value;
+  if (isArtifactVisualType(target)) {
+    return coerceArtifactRef(value);
+  }
   if (target === 'string' || isProviderOrModelVisualType(target)) {
     return typeof value === 'string' ? value : String(value);
   }
@@ -103,7 +132,7 @@ function coerceValue(value: unknown, pin: GatewayInputPin): unknown {
     if (typeof value === 'string') return parseJsonish(value, []);
     return value;
   }
-  if (target === 'object' || target === 'memory' || target === 'assertion') {
+  if (target === 'object' || target === 'json_schema' || target === 'memory' || target === 'assertion') {
     if (isRecord(value)) return value;
     if (typeof value === 'string') return parseJsonish(value, {});
     return value;
@@ -154,6 +183,7 @@ export function gatewayPinTypeToVisualPinType(pin: GatewayInputPin): PinType {
     raw === 'number' ||
     raw === 'boolean' ||
     raw === 'object' ||
+    raw === 'json_schema' ||
     raw === 'memory' ||
     raw === 'assertion' ||
     raw === 'assertions' ||
@@ -165,10 +195,17 @@ export function gatewayPinTypeToVisualPinType(pin: GatewayInputPin): PinType {
     raw === 'model_text' ||
     raw === 'provider_image' ||
     raw === 'model_image' ||
+    raw === 'provider_video' ||
+    raw === 'model_video' ||
     raw === 'provider_voice' ||
     raw === 'model_voice' ||
     raw === 'provider_music' ||
     raw === 'model_music' ||
+    raw === 'artifact' ||
+    raw === 'artifact_image' ||
+    raw === 'artifact_audio' ||
+    raw === 'artifact_text' ||
+    raw === 'artifact_video' ||
     raw === 'agent' ||
     raw === 'any'
   ) {
