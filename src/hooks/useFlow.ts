@@ -203,7 +203,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       edges: state.edges,
       commands,
     });
-    if (result.errors.length > 0) {
+    // Non-atomic by design: keep every command that validated even when others
+    // failed. Atomic rejection made the planner reference phantom nodes from
+    // discarded batches; the per-command errors are reported back instead.
+    if (result.applied.length === 0) {
       return result;
     }
     syncNodeIdCounter(result.nodes);

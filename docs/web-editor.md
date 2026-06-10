@@ -68,28 +68,56 @@ short-lived Gateway `basic-agent` planner run through the normal
 `/api/gateway/runs/start` path. Users can pin a specific assistant
 provider/model from the drawer. The assistant runs an autonomous authoring loop:
 each cycle reads the planner response from the run ledger, applies validated
-command batches, checks the updated graph, and continues until the draft is
-ready or explicitly blocked.
+command batches, checks the updated graph, and continues until the model
+declares the request satisfied or is explicitly blocked.
+
+Completion is model-owned: readiness checks are a structural floor that can
+demand more work, but they never stop the loop while the model returns
+`continue`. When the model declares `done` with clean readiness, the editor runs
+an acceptance review — a second model pass that compares the draft graph against
+the original request and the model's own declared acceptance criteria. Unmet
+findings are fed back into the loop as issues; if the review budget is exhausted
+the remaining findings are reported with the result instead of being hidden.
 
 The planner run receives a single prompt plus a system prompt with strict JSON
 instructions. Its runtime tool list is explicitly empty: authoring edits must
 come back as validated command JSON, not as Gateway tool calls. Prior user turns
-are included inside the current prompt, while assistant prose is represented by
-the current graph summary rather than replayed as separate chat-history
-messages. The visible graph remains the source of applied draft state.
+are included inside the current prompt, assistant turns are replayed as trimmed
+plan/result summaries (so pending plan items survive across turns), and applied
+cycles within a turn carry one-line notes of the model's own next steps. The
+visible graph remains the source of applied draft state.
 
-The drawer shows the prompt size that will be sent to Gateway and, when Gateway
-model-capability discovery is available, the selected model's context and output
-limits. It also includes a Clear Chat button and a loop status strip showing
-phase, cycle count, applied command count, and readiness issue count.
-AbstractFlow does not truncate the assistant conversation, selected docs
-sections, or graph summary to fit a local limit, and it does not hardcode model
-context windows. The drawer conversation and draft text are persisted locally so
-closing and reopening the Assistant rail does not erase the ongoing authoring
-discussion. Clear Chat resets the local assistant conversation and planner
-session without changing the current graph. If the Gateway run, model call,
-structured response, or ledger read fails, the drawer reports that failure
-directly.
+Plan responses are parsed tolerantly: the JSON object is extracted even when the
+model wraps it in markdown fences or surrounding prose. A planner response that
+is still unusable (empty run output, or truncated/invalid plan JSON) does not
+abort the turn: the same cycle is retried with a corrective format note (bare
+JSON only, smaller command batches), up to three unusable responses per turn.
+Each retry is logged in the activity feed.
+
+While a turn runs, a live status card shows the current phase, the cycle
+number, an elapsed timer, and a real-time activity feed (plan request/response
+sizes, plan status and command counts, applied changes with labels, skipped or
+rejected commands, retries, readiness counts, and acceptance review events).
+The card header toggles a collapsed view, and the card persists after the turn
+ends with its final state (green dot for "Draft graph updated", red dot for
+"Authoring failed" or "Interrupted by user") so the cycle history can be
+reviewed post-turn. A Stop control — in the status card and in place of Send
+while busy — interrupts the autonomous loop between calls and best-effort
+cancels the in-flight Gateway planner run; applied edits stay in the draft and
+remain undoable via Undo Turn.
+
+Conversation actions are compact icon buttons on the input row (copy
+conversation, clear conversation, undo last turn) next to the Send/Stop button;
+the estimated context usage appears above the model row while a request is
+typed or running. AbstractFlow does not truncate the assistant conversation,
+selected docs sections, or graph summary to fit a local limit, and it does not
+hardcode model context windows. The drawer conversation and draft text are
+persisted locally so closing and reopening the Assistant rail does not erase
+the ongoing authoring discussion. Clear resets the local assistant
+conversation, the planner session, and the persisted status card without
+changing the current graph. If the Gateway run, model call, structured
+response, or ledger read fails after the retry budget, the drawer reports that
+failure directly.
 
 Assistant output is treated as an untrusted edit proposal. The editor accepts
 only a small command set for flow names, node creation, safe dynamic pins,
@@ -97,6 +125,16 @@ pin defaults, literals, Code node bodies, labels, concat separators, and
 validated connections. The command reducer rejects unknown node types, invalid
 edges, secret-looking values, Code `full_access`, destructive edits, and Tool
 Calls nodes without an explicit `allowed_tools` allowlist.
+
+Command batches are applied per-command in dependency order (nodes first, then
+configuration, then connections). Valid commands are kept even when other
+commands in the same batch fail; the failed commands are reported back to the
+planner as skipped-command feedback for the next cycle. The validator also
+performs deterministic repairs that a human author would make: connecting an
+already-connected execution output is rewired through an auto-inserted (or
+extended) Sequence node, and loop-back edges from a loop body to the loop's
+`exec-in` are dropped with a warning because AbstractRuntime control frames
+return to the loop automatically when the body chain ends.
 
 Research-oriented readiness checks require an authored Agent system prompt,
 explicit tool configuration when web tools are needed, prompt-building nodes,

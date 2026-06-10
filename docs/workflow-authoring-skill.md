@@ -86,9 +86,18 @@ Never invent tool names or rely on implicit tools.
 - If a capability is missing, fail or ask the user clearly with no graph commands
   for that cycle.
 
-The editor applies commands atomically per cycle. If one command is invalid,
-that cycle is rejected and no changes from that cycle are kept. Use validator
-feedback to repair the next cycle.
+The editor applies commands per-command in dependency order: `add_node` first,
+then configuration commands, then `connect`. Valid commands are kept even when
+other commands in the same batch fail; the failed commands come back as
+"skipped commands" feedback. Within one batch you may reference nodes created
+earlier in the same batch. Never resend commands that already applied; the
+current draft graph summary is the authoritative list of existing nodes and
+edges.
+
+Keep each cycle's command batch moderate (roughly 30 commands or fewer) and
+return `status: continue` to finish in later cycles. Oversized batches risk a
+truncated response that wastes the whole cycle. Respond with one bare JSON
+object only: no markdown fences and no prose before or after it.
 
 ## Authoring Loop
 
@@ -98,12 +107,21 @@ For each user turn:
    context building, model/tool/generative actions, transforms, state, side
    effects, outputs, and observability.
 2. Inspect the current draft graph and preserve useful existing nodes.
-3. Check readiness issues and repair feedback.
+3. Check readiness issues, acceptance review findings, and repair feedback.
 4. Emit one coherent command batch for this cycle.
 5. After validation, continue with more commands if the graph still lacks
-   required behavior.
+   required behavior. The editor keeps cycling while you return
+   `status: continue`; readiness heuristics never declare completion for you.
 6. End with `status: done` only when the graph visibly implements the requested
-   workflow.
+   workflow. A separate acceptance review then compares the graph against the
+   user request; unmet findings come back as issues you must implement before
+   `done` is accepted.
+
+On the first cycle of a new request, declare `acceptance_criteria`: 3-8
+concrete, checkable statements derived from the request (the user's language is
+fine), such as "one LLM Call per participant, each with a distinct model pin
+default" or "a For loop bounded by the max-cycles input". These criteria guide
+the acceptance review and your own stopping decision.
 
 A good workflow is not just a chain that "runs". It is readable: node labels
 explain responsibility, data edges expose intent, and final outputs are wired to
@@ -311,8 +329,9 @@ Do not retry the same invalid edge.
   internal join/mux behavior.
 - Execution outputs are one-to-one. For fan-out, insert `sequence` for ordered
   branches or `parallel` for concurrent branches, then connect each `then:<n>`
-  output once.
-- Data self-wiring is rejected. Only explicit execution re-entry can self-loop.
+  output once. If you connect an already-connected execution output, the editor
+  auto-inserts a `sequence` and reports the rewiring as a warning.
+- Data self-wiring is rejected.
 - A route override edge is advanced behavior created only when the target already
   has multiple execution entry routes and a data input needs a route-specific
   source. Do not invent route override fields in commands.
@@ -348,6 +367,19 @@ Common execution chains:
   - `loop` iterates arrays.
   - `for` iterates numeric ranges.
   - `while` repeats while a boolean is true.
+
+Loop body semantics (control frames):
+
+- Connect `<loop>.loop` to the first body node and chain the body with
+  execution edges. When the body chain ends, the runtime returns to the loop
+  node automatically and starts the next iteration.
+- NEVER wire the last body node back to the loop's `exec-in`: re-entering a
+  loop from its own body resets the iteration counter (infinite loop). The
+  editor removes such loop-back edges with a warning.
+- `done` is an execution OUTPUT that fires after the final iteration. Connect
+  `<loop>.done -> <next step>.exec-in`; never wire anything into `done`.
+- To run several body steps per iteration, either chain them with exec edges
+  or connect `<loop>.loop -> sequence.exec-in` and use the `then:<n>` branches.
 
 Pure nodes such as `make_object`, `string_template`, `json_schema`,
 `tools_allowlist`, `parse_json`, `break_object`, `agent_trace_report`, math,
@@ -702,6 +734,59 @@ apply.
 
 ## Best-In-Class Patterns
 
+These patterns are worked exemplars, not a closed list. Derive the graph
+structure from the request itself. The most common authoring failure is
+collapsing requested structure into a single Agent prompt that "simulates" it:
+if the user asks for multiple AI participants, distinct models, rounds/cycles,
+or visible intermediate state, those must exist as nodes and edges, not as
+sentences inside one prompt.
+
+### Iterative Multi-Participant Discussion (Loop + State)
+
+Request shape: "N AIs discuss a topic for up to M rounds, each round deepens
+the reasoning, then a final answer is synthesized from the whole discussion."
+
+Expected graph responsibilities:
+
+- On Flow Start outputs: topic, participant count, max rounds (numbers).
+- A model pool: `literal_array` of model id strings (or `provider_models` when
+  the pool must be discovered), sliced/selected to the participant count.
+- Round loop: `for` with `start=0`, `end` from the max-rounds input,
+  `for.loop -> participant loop.exec-in`, `for.done -> synthesis`.
+- Participant loop: `loop` (ForEach) over the model array;
+  `loop.item -> LLM Call.model` so each participant uses a different model.
+- Discussion state: declare a transcript variable; inside the participant loop,
+  `get_var(transcript)` feeds prompt building (String Template with topic,
+  round index, transcript so far, and the participant's role), and after the
+  call `Array Append(transcript, contribution)` (or Concat for a text
+  transcript) -> `set_var(transcript)`.
+- Participant body exec chain ends at the state update; the loop re-enters by
+  itself: `loop.loop -> llm_call.exec-in -> set_var.exec-in` and STOP. Do not
+  add `set_var.exec-out -> loop.exec-in`. `get_var`, String Template, and
+  Array Append are pure data nodes evaluated from data edges, not exec edges.
+- Each participant prompt must instruct the model to advance the discussion
+  (challenge, refine, add evidence), not repeat prior turns.
+- Synthesis: after `for.done`, a final LLM Call receives the topic plus the
+  full transcript via `get_var` and produces the final answer.
+- On Flow End: final answer, transcript (or transcript file path), round count.
+
+One Agent node prompted to "simulate a discussion between N AIs" does not
+satisfy this request: there is one model, one call, and no visible rounds.
+
+### Multi-Model Fan-Out (Different Model Per Call)
+
+Request shape: "ask several different models the same question and compare /
+merge their answers."
+
+- One `llm_call` per pinned model (set the `model` pin default per node), wired
+  in `sequence` or `parallel`; or a `loop` over a model-array feeding one
+  `llm_call.model` pin with `array_append` accumulation when the model list is
+  dynamic.
+- Accumulate responses into an object/array variable, then a synthesis
+  LLM Call compares or merges them.
+- Expose each model's answer (or the accumulated object) and the synthesis at
+  On Flow End.
+
 ### Deep Research With Markdown And PDF Outputs
 
 Expected graph responsibilities:
@@ -804,8 +889,11 @@ For PDF artifact requests, readiness requires:
 - Write PDF on the execution path before On Flow End;
 - `Write PDF.file_path` exposed through On Flow End.
 
-If validation rejects a batch:
+If some commands fail validation:
 
+- Valid commands from the batch are already applied; only the listed failures
+  need repair. Repair against the current graph summary, not against your
+  earlier batch.
 - Read every validator error.
 - Do not repeat the same invalid edge or nonexistent pin.
 - If a pure node lacks execution pins, remove execution edges to or from it.
@@ -819,13 +907,24 @@ If validation rejects a batch:
 If readiness remains after a successful batch, continue with another command
 batch. Do not declare completion early.
 
+### Acceptance Review
+
+Readiness checks are structural floors; they cannot verify that the graph means
+what the user asked. When you return `status: done` with clean readiness, the
+editor runs an acceptance review: a reviewer receives the user request, your
+declared `acceptance_criteria`, and the current graph summary, and returns
+unmet findings. Findings come back in the next cycle under
+`ACCEPTANCE REVIEW FINDINGS TO RESOLVE` and must be implemented in the graph
+(not argued with) before `done` is accepted.
+
 ## Response Requirements
 
 Every turn must include:
 
 - how the workflow works;
 - how to test it with the normal Save/Run path;
-- what to expect from outputs and artifacts.
+- what to expect from outputs and artifacts;
+- `acceptance_criteria` on the first cycle of each new request.
 
 Successful chat replies should be concise. Failure replies should include enough
 planner and validator detail to debug the graph.

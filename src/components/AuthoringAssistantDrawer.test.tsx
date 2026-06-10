@@ -7,8 +7,20 @@ import {
   assistantConversationClipboardText,
   assistantWorkflowStorageKey,
   authoringFailureMarkdown,
+  AuthoringInterruptedError,
+  buildAcceptanceReviewPrompt,
   computeAuthoringReadiness,
+  conversationContextFor,
+  cycleNoteFor,
+  extractJsonObjectText,
+  formatActivityTime,
+  formatElapsed,
   isGatewayPlannerInternalWait,
+  looksLikePlanText,
+  parseAcceptanceReview,
+  parsePlan,
+  PlannerEmptyResponseError,
+  postApplyLoopAction,
   readinessProgressText,
   repairFeedbackText,
   shouldDisplayPlannerSubrunStatus,
@@ -184,6 +196,24 @@ describe('AuthoringAssistantDrawer progress labels', () => {
     expect(readinessProgressText({ stage: 'checking_graph', applied: 4, issues: 2 })).toBe('2 readiness checks pending');
     expect(readinessProgressText({ stage: 'done', applied: 12, issues: 0 })).toBe('Readiness checks passed');
   });
+
+  it('formats elapsed time and activity offsets as m:ss', () => {
+    expect(formatElapsed(0)).toBe('0:00');
+    expect(formatElapsed(7)).toBe('0:07');
+    expect(formatElapsed(134.8)).toBe('2:14');
+    expect(formatActivityTime(10_000, null)).toBe('0:00');
+    expect(formatActivityTime(75_500, 10_000)).toBe('1:05');
+    expect(formatActivityTime(5_000, 10_000)).toBe('0:00');
+  });
+});
+
+describe('AuthoringAssistantDrawer interruption', () => {
+  it('marks user stops with a dedicated error type distinct from failures', () => {
+    const error = new AuthoringInterruptedError();
+    expect(error.name).toBe('AuthoringInterrupted');
+    expect(error).toBeInstanceOf(Error);
+    expect(error.message).toContain('interrupted');
+  });
 });
 
 describe('AuthoringAssistantDrawer failure report', () => {
@@ -204,6 +234,7 @@ describe('AuthoringAssistantDrawer failure report', () => {
         howItWorks: '',
         howToTest: '',
         expectedResult: '',
+        acceptanceCriteria: [],
       },
       rawPlannerResponse: '',
       readiness: { issues: ['Expose a report output.'], requiresRuntimeTools: true, requiresResearchScaffold: true },
@@ -253,6 +284,7 @@ describe('AuthoringAssistantDrawer repair feedback', () => {
           howToTest: '',
           expectedResult: '',
           workflowSteps: [],
+          acceptanceCriteria: [],
         },
         result: {
           flowName: 'Deep Research',
@@ -379,5 +411,128 @@ describe('AuthoringAssistantDrawer readiness', () => {
       {}
     );
     expect(artifactReadiness.issues).toEqual([]);
+  });
+});
+
+describe('AuthoringAssistantDrawer loop completion ownership', () => {
+  it('keeps cycling while the model returns continue, even with clean readiness', () => {
+    // Regression guard: the loop used to force-stop on clean heuristic
+    // readiness, cutting the model off before it finished its own plan.
+    expect(postApplyLoopAction('continue', 0)).toBe('continue');
+    expect(postApplyLoopAction('continue', 3)).toBe('continue');
+  });
+
+  it('routes a done claim through acceptance review only when readiness is clean', () => {
+    expect(postApplyLoopAction('done', 0)).toBe('request-review');
+    expect(postApplyLoopAction('done', 2)).toBe('continue');
+  });
+
+  it('summarizes applied cycles with the pending plan for later cycles', () => {
+    const note = cycleNoteFor(
+      2,
+      { status: 'continue', nextStep: 'Wire the model pool into the loop.', workflowSteps: ['Add For loop', 'Add LLM Call per participant'] },
+      13
+    );
+    expect(note).toContain('Cycle 2: applied 13 changes (status continue).');
+    expect(note).toContain('Wire the model pool into the loop.');
+    expect(note).toContain('Add For loop | Add LLM Call per participant');
+  });
+});
+
+describe('AuthoringAssistantDrawer acceptance review', () => {
+  it('parses pass and fail verdicts', () => {
+    expect(parseAcceptanceReview('{"verdict":"pass","unmet":[],"notes":"ok"}')).toEqual({ verdict: 'pass', unmet: [], notes: 'ok' });
+    expect(
+      parseAcceptanceReview('{"verdict":"fail","unmet":["No distinct model per participant"],"notes":""}')
+    ).toEqual({ verdict: 'fail', unmet: ['No distinct model per participant'], notes: '' });
+  });
+
+  it('rejects malformed or non-actionable reviews', () => {
+    expect(parseAcceptanceReview('not json')).toBeNull();
+    expect(parseAcceptanceReview('{"verdict":"maybe","unmet":[]}')).toBeNull();
+    // A fail without findings cannot drive a repair cycle.
+    expect(parseAcceptanceReview('{"verdict":"fail","unmet":[]}')).toBeNull();
+  });
+
+  it('builds a review prompt around the request, criteria, and graph', () => {
+    const prompt = buildAcceptanceReviewPrompt({
+      request: 'N AIs discuss for M rounds with different models.',
+      priorUserTurns: 'USER TURN 1: ...',
+      criteria: ['Each participant uses a distinct model'],
+      graph: '{"nodes":[]}',
+    });
+    expect(prompt).toContain('USER REQUEST:');
+    expect(prompt).toContain('Each participant uses a distinct model');
+    expect(prompt).toContain('CURRENT DRAFT GRAPH:');
+  });
+
+  it('parses reviews wrapped in markdown fences or prose', () => {
+    expect(parseAcceptanceReview('```json\n{"verdict":"pass","unmet":[],"notes":""}\n```')).toEqual({
+      verdict: 'pass',
+      unmet: [],
+      notes: '',
+    });
+    expect(parseAcceptanceReview('Here is my verdict:\n{"verdict":"fail","unmet":["missing loop"]}\nDone.')).toEqual({
+      verdict: 'fail',
+      unmet: ['missing loop'],
+      notes: '',
+    });
+  });
+});
+
+describe('AuthoringAssistantDrawer plan response tolerance', () => {
+  const planJson =
+    '{"status":"done","reply":"ok","commands":[{"action":"set_flow_name","name":"X"}],"self_review":"","next_step":""}';
+
+  it('extracts a JSON object from fenced and prose-wrapped responses', () => {
+    expect(extractJsonObjectText(planJson)).toBe(planJson);
+    expect(extractJsonObjectText('```json\n' + planJson + '\n```')).toBe(planJson);
+    expect(extractJsonObjectText('Voici le plan :\n' + planJson + '\nFin.')).toBe(planJson);
+    // String-aware: braces inside string values must not break the scan.
+    const withBraces = '{"status":"done","reply":"uses { and } inside","commands":[]}';
+    expect(extractJsonObjectText('prefix ' + withBraces + ' suffix')).toBe(withBraces);
+    expect(extractJsonObjectText('no json here')).toBe('');
+  });
+
+  it('parses plans despite fences or surrounding prose', () => {
+    expect(parsePlan(planJson)?.status).toBe('done');
+    expect(parsePlan('```json\n' + planJson + '\n```')?.status).toBe('done');
+    expect(parsePlan('Je construis le workflow.\n' + planJson)?.status).toBe('done');
+  });
+
+  it('returns null for truncated or non-plan JSON', () => {
+    expect(parsePlan(planJson.slice(0, planJson.length - 20))).toBeNull();
+    expect(parsePlan('{"foo":"bar"}')).toBeNull();
+    expect(parsePlan('')).toBeNull();
+  });
+
+  it('recognizes plan-looking text so truncated answers retry instead of failing as missing', () => {
+    expect(looksLikePlanText(planJson.slice(0, 60))).toBe(true);
+    expect(looksLikePlanText('```json\n{"status":"continue","commands":[')).toBe(true);
+    expect(looksLikePlanText('completed')).toBe(false);
+    expect(looksLikePlanText('')).toBe(false);
+  });
+
+  it('keeps a typed error for runs that complete without any response', () => {
+    const error = new PlannerEmptyResponseError('run-123');
+    expect(error.name).toBe('PlannerEmptyResponse');
+    expect(error.message).toContain('run-123');
+    expect(error.message).toContain('without an authoring response');
+  });
+});
+
+describe('AuthoringAssistantDrawer conversation replay', () => {
+  it('replays assistant turns trimmed so pending plan items survive across turns', () => {
+    const longAssistant = `**Workflow Plan**\n- 1. Add nodes\n- 6. Ajouter la logique de sélection de modèles\n${'x'.repeat(2000)}`;
+    const context = conversationContextFor([
+      { id: 'u1', role: 'user', content: 'Create a multi-AI discussion workflow.' },
+      { id: 'a1', role: 'assistant', content: longAssistant },
+      { id: 'u2', role: 'user', content: 'Each AI must use a different model.' },
+    ]);
+    expect(context).toContain('USER TURN 1:');
+    expect(context).toContain('ASSISTANT TURN 2');
+    expect(context).toContain('Ajouter la logique de sélection de modèles');
+    expect(context).toContain('#TRUNCATION');
+    expect(context).toContain('Each AI must use a different model.');
   });
 });

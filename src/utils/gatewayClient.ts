@@ -1160,6 +1160,25 @@ export async function gatewayRunSummary(
   return gatewayJson<GatewayRunSummaryResponse>(endpoint);
 }
 
+export async function gatewayCancelRun(
+  runId: string,
+  contracts?: GatewayContracts | null
+): Promise<void> {
+  const endpoint = endpointFromDescriptor(contracts?.common?.runs?.commands, '/api/gateway/commands');
+  await gatewayFetch(
+    endpoint,
+    jsonRequest(
+      {
+        command_id: makeGatewayRequestId('cmd'),
+        run_id: runId,
+        type: 'cancel',
+        payload: {},
+      },
+      { method: 'POST' }
+    )
+  );
+}
+
 export async function gatewayRunLedger(
   runId: string,
   contracts?: GatewayContracts | null,

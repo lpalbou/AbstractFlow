@@ -10,6 +10,7 @@ import { computeRunPreflightIssues, type RunPreflightOptions } from '../utils/pr
 import {
 	  findGatewayCapabilityDefault,
 	  gatewayAuthoringCapabilityStatus,
+	  gatewayCancelRun,
 	  gatewayCapabilityDefaults,
 	  gatewayJson,
 	  gatewayPath,
@@ -46,6 +47,15 @@ interface AssistantPlan {
   howToTest: string;
   expectedResult: string;
   workflowSteps: string[];
+  /** Concrete, checkable statements the finished graph must satisfy (model-derived from the request, language-agnostic). */
+  acceptanceCriteria: string[];
+}
+
+/** Verdict of the acceptance review run after the planner claims "done". */
+export interface AcceptanceReview {
+  verdict: 'pass' | 'fail';
+  unmet: string[];
+  notes: string;
 }
 
 interface ResolvedAssistantModel {
@@ -64,6 +74,8 @@ const ASSISTANT_MESSAGES_KEY = 'abstractflow_authoring_assistant_messages_v1';
 const ASSISTANT_DRAFT_KEY = 'abstractflow_authoring_assistant_draft_v1';
 const ASSISTANT_SESSION_KEY = 'abstractflow_authoring_assistant_session_v1';
 const AUTHORING_MAX_AUTONOMOUS_CYCLES = 50;
+/** Unusable planner responses (empty run output or unparseable JSON) tolerated per turn before failing. */
+const AUTHORING_MAX_UNUSABLE_RESPONSES = 3;
 const ASSISTANT_INITIAL_CONTENT =
   '**Assistant**\nDescribe the workflow you want. I will run autonomous Gateway planning cycles, apply validated command batches to the draft canvas, then report what changed. Save and Run remain explicit.';
 
@@ -119,6 +131,14 @@ interface AuthoringPromptContext {
   tools: ToolsContext;
   preflightOptions: RunPreflightOptions;
   repairAttempts?: AuthoringRepairAttempt[];
+  /** Summaries of prior applied cycles this turn so the model keeps its own pending plan. */
+  cycleNotes?: string[];
+  /** Unmet findings from the latest acceptance review; must be addressed before "done" can stick. */
+  acceptanceFindings?: string[];
+  /** Acceptance criteria the model declared earlier this turn. */
+  acceptanceCriteria?: string[];
+  /** Per-command errors from the last partially-applied batch; valid commands were kept. */
+  skippedCommands?: string[];
 }
 
 type AuthoringProgressStage =
@@ -140,6 +160,14 @@ interface WorkingStatus {
   rootRunId?: string;
   activeRunId?: string;
   detail?: string;
+}
+
+/** One real-time event in the authoring activity feed shown while the loop runs. */
+export interface AuthoringActivityEntry {
+  id: string;
+  ts: number;
+  kind: 'info' | 'model' | 'apply' | 'error' | 'review';
+  text: string;
 }
 
 export interface PlannerRunStatus {
@@ -178,19 +206,18 @@ function scopedAssistantStorageKey(baseKey: string, workflowKey: string): string
   return `${baseKey}:${workflowKey}`;
 }
 
-const AUTHORING_PROGRESS: Array<{ stage: AuthoringProgressStage; label: string; percent: number }> = [
-  { stage: 'resolving_model', label: 'Model', percent: 8 },
-  { stage: 'loading_tools', label: 'Tools', percent: 20 },
-  { stage: 'planning_graph', label: 'Plan', percent: 45 },
-  { stage: 'validating_plan', label: 'Validate', percent: 62 },
-  { stage: 'applying_commands', label: 'Apply', percent: 78 },
-  { stage: 'checking_graph', label: 'Check', percent: 92 },
-  { stage: 'done', label: 'Done', percent: 100 },
-  { stage: 'blocked', label: 'Blocked', percent: 100 },
-];
+/** Format seconds as m:ss for the live status header. */
+export function formatElapsed(totalSeconds: number): string {
+  const safe = Number.isFinite(totalSeconds) && totalSeconds > 0 ? Math.floor(totalSeconds) : 0;
+  const minutes = Math.floor(safe / 60);
+  const seconds = safe % 60;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
 
-function progressForStage(stage: AuthoringProgressStage): { label: string; percent: number } {
-  return AUTHORING_PROGRESS.find((item) => item.stage === stage) || AUTHORING_PROGRESS[0];
+/** Format an activity timestamp as offset from turn start (m:ss). */
+export function formatActivityTime(ts: number, turnStartedAt: number | null): string {
+  if (!turnStartedAt || ts < turnStartedAt) return formatElapsed(0);
+  return formatElapsed((ts - turnStartedAt) / 1000);
 }
 
 export function readinessProgressText(status: Pick<WorkingStatus, 'stage' | 'applied' | 'issues'>): string {
@@ -1070,12 +1097,16 @@ function assistantSystemPrompt(): string {
   return [
     'You are AbstractFlow Workflow Authoring Assistant.',
     'Return ONLY valid JSON. No markdown fences.',
-    'JSON schema: {"status":"continue"|"done"|"needs_user"|"failed","reply":string,"workflow_steps"?:string[],"commands":array,"self_review":string,"next_step":string,"how_it_works":string,"how_to_test":string,"expected_result":string}.',
+    'Keep each command batch moderate (about 30 commands or fewer); oversized responses risk truncation. Return status "continue" and finish in later cycles.',
+    'JSON schema: {"status":"continue"|"done"|"needs_user"|"failed","reply":string,"workflow_steps"?:string[],"acceptance_criteria"?:string[],"commands":array,"self_review":string,"next_step":string,"how_it_works":string,"how_to_test":string,"expected_result":string}.',
     'Use commands, not raw VisualFlow JSON.',
-    'You are in an autonomous authoring loop. Each cycle receives the updated graph and readiness issues.',
-    'Return status "continue" with concrete commands when more graph work is needed. Return "done" only when the graph satisfies the request and readiness issues are empty.',
+    'You are in an autonomous authoring loop. Each cycle receives the updated graph, readiness issues, your prior cycle notes, and acceptance review findings.',
+    'Return status "continue" with concrete commands when more graph work is needed. The editor keeps cycling while you return "continue"; you control completion, not the readiness heuristics.',
+    'Return "done" only when the graph fully implements the request. A separate acceptance review then compares the graph against the user request; unmet findings come back as issues you must fix before "done" is accepted.',
+    'On the first cycle of a new request, include acceptance_criteria: 3-8 concrete, checkable statements (in the user\'s language) describing what the finished graph must contain, e.g. "one LLM Call per participant with a distinct model pin".',
     'Return status "needs_user" or "failed" with commands=[] when blocked and explain the missing information.',
     'Before writing commands, internally decompose the requested workflow into visible graph responsibilities: inputs, prompt/context assembly, tools/capabilities, execution node, result formatting, artifacts/files, and final outputs.',
+    'Implement requested structure visibly in the graph. If the user asks for multiple AI participants, rounds/cycles/iterations, or different models per step, build them with control-flow nodes (For/ForEach/While), Get Variable/Set Variable state, and separate LLM Call nodes or a model-array loop feeding LLM Call.model. Do not collapse requested multi-step or multi-participant structure into a single Agent prompt simulation unless the user explicitly asks for one agent.',
     'Supported commands:',
     '- {"action":"set_flow_name","name":string}',
     '- {"action":"add_node","id":string,"nodeType":string,"templateLabel"?:string,"label"?:string,"position"?:{"x":number,"y":number},"pinDefaults"?:object,"literalValue"?:json,"concatSeparator"?:string,"codeBody"?:string,"functionName"?:string}',
@@ -1092,9 +1123,13 @@ function assistantSystemPrompt(): string {
     '- {"action":"set_label","nodeId":string,"label":string}',
     '- {"action":"set_concat_separator","nodeId":string,"separator":string}',
     '- {"action":"connect","source":string,"sourceHandle":string,"target":string,"targetHandle":string}',
-    'Command batches are atomic: if any command is invalid, no commands from that batch are kept. Therefore prefer a complete but conservative graph over speculative pins or nonexistent nodes.',
-    'If VALIDATOR REPAIR FEEDBACK is present in the prompt, the previous command batch was rejected and not kept. Do not repeat it. Return a corrected full command batch for the current draft graph.',
-    'When repairing a rejected batch, directly address every validator error and warning. If a target pin type is wrong, change the pin type or target handle; if an execution pin does not exist, remove that execution edge.',
+    'Commands are applied per-command in dependency order: add_node first, then configuration, then connect. Valid commands are kept even when other commands in the same batch fail; failed commands are reported back to you.',
+    'Within one batch you may reference nodes created earlier in the same batch. Never resend commands that already applied; CURRENT DRAFT GRAPH SUMMARY is the authoritative list of existing nodes and edges.',
+    'If SKIPPED COMMANDS LAST CYCLE is present, everything else from that batch was applied. Fix only the listed failures against the current graph.',
+    'If VALIDATOR REPAIR FEEDBACK is present in the prompt, the previous command batch had no applicable commands and was not kept. Do not repeat it. Return a corrected command batch for the current draft graph.',
+    'When repairing, directly address every validator error and warning. If a target pin type is wrong, change the pin type or target handle; if an execution pin does not exist, remove that execution edge.',
+    'Execution outputs are one-to-one. To run several branches from one exec output, add a sequence node and connect each then:<n> once. If you connect an already-connected exec output, the editor auto-inserts a Sequence and reports it as a warning.',
+    'Loop bodies (loop/for/while) return to the loop automatically when their execution chain ends. Connect <loop>.loop to the first body node and chain the body with exec edges; NEVER wire the last body node back to the loop exec-in (that resets the loop) and never wire anything into done (done is an output that fires after the last iteration).',
     'Use only node types and pins from NODE CATALOG unless adding safe dynamic data pins to On Flow Start, On Flow End, Concat, String Template, Build JSON, or Break Object.',
     'When NODE CATALOG create line includes templateLabel, include that exact templateLabel in add_node to select the palette variant.',
     'Only connect execution pins that exist in NODE CATALOG. Pure data/config nodes such as Build JSON, String Template, Tools Allowlist, and Agent Trace Report do not have exec-in/exec-out pins.',
@@ -1117,16 +1152,28 @@ function assistantSystemPrompt(): string {
   ].join('\n');
 }
 
-function conversationContextFor(messages: AssistantMessage[]): string {
+const ASSISTANT_TURN_REPLAY_MAX_CHARS = 1200;
+
+export function conversationContextFor(messages: AssistantMessage[]): string {
   const entries = messages
-    .filter((message) => message.role === 'user')
-    .map((message, index) => ({ index: index + 1, content: String(message.content || '').trim() }))
-    .filter((message) => message.content.trim());
-  if (entries.length === 0) return 'No prior user turns in this assistant session.';
+    .map((message) => ({ role: message.role, content: String(message.content || '').trim() }))
+    .filter((message) => message.content)
+    .filter((message) => message.content !== ASSISTANT_INITIAL_CONTENT);
+  if (entries.length === 0) return 'No prior turns in this assistant session.';
+  const rendered = entries.map((message, index) => {
+    if (message.role === 'user') return `USER TURN ${index + 1}:\n${message.content}`;
+    // Replay assistant turns trimmed: the plan/summary part carries the
+    // assistant's own pending intentions across turns (losing them caused the
+    // model to forget unfinished plan items between user messages).
+    const content = message.content.length > ASSISTANT_TURN_REPLAY_MAX_CHARS
+      ? `${message.content.slice(0, ASSISTANT_TURN_REPLAY_MAX_CHARS)}\n… [#TRUNCATION assistant turn trimmed for prompt budget]`
+      : message.content;
+    return `ASSISTANT TURN ${index + 1} (summary; the current graph summary is the source of applied draft state):\n${content}`;
+  });
   return [
-    'Prior user turns in this assistant session are included below. Assistant prose is not replayed; the current graph summary is the source of applied draft state.',
+    'Prior turns in this assistant session are included below. Assistant turns are summaries of past plans/results; the current graph summary is authoritative for draft state.',
     '',
-    entries.map((message) => `USER TURN ${message.index}:\n${message.content}`).join('\n\n'),
+    rendered.join('\n\n'),
   ].join('\n');
 }
 
@@ -1141,6 +1188,18 @@ function buildGatewayPromptContext(
   const docs = docsContextFor();
   const catalog = nodeCatalogFor(context.preflightOptions);
   const graph = graphSummary(flow, selectedNodeId);
+  const cycleNotes = context.cycleNotes && context.cycleNotes.length > 0
+    ? context.cycleNotes.join('\n')
+    : 'This is the first planning cycle for this turn.';
+  const acceptanceFindings = context.acceptanceFindings && context.acceptanceFindings.length > 0
+    ? context.acceptanceFindings.map((item) => `- ${item}`).join('\n')
+    : 'No acceptance review findings yet.';
+  const acceptanceCriteria = context.acceptanceCriteria && context.acceptanceCriteria.length > 0
+    ? context.acceptanceCriteria.map((item) => `- ${item}`).join('\n')
+    : 'Not declared yet; include acceptance_criteria in your next response.';
+  const skippedCommands = context.skippedCommands && context.skippedCommands.length > 0
+    ? context.skippedCommands.map((item) => `- ${item}`).join('\n')
+    : 'None.';
   const authoringBrief = [
     `Requires runtime tools: ${context.readiness.requiresRuntimeTools ? 'yes' : 'no'}.`,
     `Requires research scaffold: ${context.readiness.requiresResearchScaffold ? 'yes' : 'no'}.`,
@@ -1148,8 +1207,20 @@ function buildGatewayPromptContext(
     'READINESS ISSUES TO FIX:',
     readinessText(context.readiness),
     '',
+    'ACCEPTANCE CRITERIA FOR THIS TURN:',
+    acceptanceCriteria,
+    '',
+    'ACCEPTANCE REVIEW FINDINGS TO RESOLVE (the reviewer rejected "done" until these are implemented in the graph):',
+    acceptanceFindings,
+    '',
+    'SKIPPED COMMANDS LAST CYCLE (all other commands from that batch were applied and exist in the graph; fix only these, do not resend applied commands):',
+    skippedCommands,
+    '',
+    'PRIOR CYCLES THIS TURN:',
+    cycleNotes,
+    '',
     'AUTHORING REQUIREMENT:',
-    'Return one complete command batch for this cycle. If readiness issues remain after the batch, use status "continue"; the editor will run another autonomous repair cycle with the updated graph.',
+    'Return one complete command batch for this cycle. If more graph work remains (your own plan, readiness issues, or acceptance findings), use status "continue"; the editor will run another autonomous cycle with the updated graph. The loop never stops while you return "continue".',
     '',
     'VALIDATOR REPAIR FEEDBACK:',
     repairFeedbackText(context.repairAttempts),
@@ -1204,8 +1275,54 @@ function modelCapabilitySummary(payload: unknown): ModelCapabilitySummary {
   };
 }
 
-function parsePlan(raw: string): AssistantPlan | null {
+/**
+ * Extract the most plausible top-level JSON object text from a raw model
+ * response. Models routinely wrap JSON in markdown fences or surround it with
+ * prose; a strict JSON.parse on the raw text rejected such responses and the
+ * whole authoring turn failed as "no authoring response". String-aware
+ * balanced-brace scanning keeps this general (no model-specific heuristics).
+ */
+export function extractJsonObjectText(raw: string): string {
   const text = raw.trim();
+  if (!text) return '';
+  if (text.startsWith('{') && text.endsWith('}')) return text;
+  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence && fence[1].trim().startsWith('{')) return fence[1].trim();
+  const start = text.indexOf('{');
+  if (start === -1) return '';
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < text.length; i += 1) {
+    const ch = text[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === '{') depth += 1;
+    else if (ch === '}') {
+      depth -= 1;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  return '';
+}
+
+/**
+ * True when the text plausibly contains (or is) a plan response, even if it is
+ * malformed or truncated. Used to distinguish "the model answered but the JSON
+ * is unusable" (retryable) from "the run produced no answer at all".
+ */
+export function looksLikePlanText(raw: string): boolean {
+  const text = raw.trim();
+  if (!text) return false;
+  return text.includes('"status"') && (text.includes('"commands"') || text.includes('"reply"'));
+}
+
+function planFromJsonText(text: string): AssistantPlan | null {
   try {
     const parsed = JSON.parse(text);
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
@@ -1226,10 +1343,83 @@ function parsePlan(raw: string): AssistantPlan | null {
       workflowSteps: Array.isArray(rec.workflow_steps)
         ? rec.workflow_steps.map((item) => String(item || '').trim()).filter(Boolean)
         : [],
+      acceptanceCriteria: Array.isArray(rec.acceptance_criteria)
+        ? rec.acceptance_criteria.map((item) => String(item || '').trim()).filter(Boolean)
+        : [],
     };
   } catch {
     return null;
   }
+}
+
+export function parsePlan(raw: string): AssistantPlan | null {
+  const text = raw.trim();
+  if (!text) return null;
+  const direct = planFromJsonText(text);
+  if (direct) return direct;
+  const extracted = extractJsonObjectText(text);
+  return extracted && extracted !== text ? planFromJsonText(extracted) : null;
+}
+
+/**
+ * Decide what the autonomous loop does after a successfully applied batch.
+ *
+ * Readiness checks are a floor, never a ceiling: they can demand more work,
+ * but they must not declare the request satisfied on the model's behalf.
+ * Only the model can claim completion (status "done"), and that claim still
+ * goes through the acceptance review before the loop stops. This replaces the
+ * earlier behavior that force-stopped as soon as heuristic readiness passed,
+ * which cut the model off mid-build on requests outside the heuristics.
+ */
+export function postApplyLoopAction(
+  planStatus: AssistantPlan['status'],
+  readinessIssueCount: number
+): 'request-review' | 'continue' {
+  if (planStatus === 'done' && readinessIssueCount === 0) return 'request-review';
+  return 'continue';
+}
+
+/** One-line memory of an applied cycle so later cycles keep the model's own pending plan. */
+export function cycleNoteFor(
+  cycle: number,
+  plan: Pick<AssistantPlan, 'status' | 'nextStep' | 'workflowSteps'>,
+  appliedCount: number
+): string {
+  const parts = [`Cycle ${cycle}: applied ${appliedCount} change${appliedCount === 1 ? '' : 's'} (status ${plan.status}).`];
+  if (plan.nextStep) parts.push(`next_step: ${plan.nextStep}`);
+  if (plan.workflowSteps.length > 0) parts.push(`plan: ${plan.workflowSteps.join(' | ')}`);
+  return parts.join(' ');
+}
+
+function acceptanceReviewFromJsonText(text: string): AcceptanceReview | null {
+  try {
+    const parsed = JSON.parse(text);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    const rec = parsed as Record<string, unknown>;
+    if (rec.verdict !== 'pass' && rec.verdict !== 'fail') return null;
+    const unmet = Array.isArray(rec.unmet)
+      ? rec.unmet.map((item) => String(item || '').trim()).filter(Boolean)
+      : [];
+    // A fail verdict without findings is not actionable; treat it as malformed
+    // so the caller can fall back instead of looping on an empty complaint.
+    if (rec.verdict === 'fail' && unmet.length === 0) return null;
+    return {
+      verdict: rec.verdict,
+      unmet,
+      notes: typeof rec.notes === 'string' ? rec.notes : '',
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function parseAcceptanceReview(raw: string): AcceptanceReview | null {
+  const text = raw.trim();
+  if (!text) return null;
+  const direct = acceptanceReviewFromJsonText(text);
+  if (direct) return direct;
+  const extracted = extractJsonObjectText(text);
+  return extracted && extracted !== text ? acceptanceReviewFromJsonText(extracted) : null;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -1262,7 +1452,11 @@ function planResponseFromValue(value: unknown): string {
   if (looksLikePlanObject(value)) return stringifyPlanObject(value);
   if (typeof value === 'string' && value.trim()) {
     const text = value.trim();
-    return parsePlan(text) ? text : '';
+    if (parsePlan(text)) return text;
+    // A plan-looking but malformed/truncated answer is still the model's
+    // response: return it so the caller can retry the cycle with corrective
+    // feedback instead of failing the turn as "no authoring response".
+    return looksLikePlanText(text) ? text : '';
   }
   const rec = asRecord(value);
   if (!rec) return '';
@@ -1443,12 +1637,32 @@ async function inspectGatewayPlannerSubruns(
   return fallbackStatus;
 }
 
+/** Thrown when the user stops the authoring loop; handled as an interruption, not a failure. */
+export class AuthoringInterruptedError extends Error {
+  constructor() {
+    super('Authoring interrupted by user.');
+    this.name = 'AuthoringInterrupted';
+  }
+}
+
+/** Thrown when a planner run completes but no response text can be found in its run tree; retryable. */
+export class PlannerEmptyResponseError extends Error {
+  constructor(runId: string) {
+    super(`Gateway planner run ${runId} completed without an authoring response in its run tree ledger.`);
+    this.name = 'PlannerEmptyResponse';
+  }
+}
+
 async function waitForGatewayPlannerRun(
   runId: string,
   contracts: GatewayContracts | null,
-  onStatus: (summary: PlannerRunStatus) => void
+  onStatus: (summary: PlannerRunStatus) => void,
+  isCancelled?: () => boolean
 ): Promise<string> {
   while (true) {
+    if (isCancelled?.()) {
+      throw new AuthoringInterruptedError();
+    }
     const summary = await gatewayRunSummary(runId, contracts);
     const status = typeof summary.status === 'string' ? summary.status.trim().toLowerCase() : '';
 
@@ -1471,7 +1685,7 @@ async function waitForGatewayPlannerRun(
           const childResponse = extractPlanResponseFromLedger(childRecords);
           if (childResponse) return childResponse;
         }
-        throw new Error(`Gateway planner run ${runId} completed without an authoring response in its run tree ledger.`);
+        throw new PlannerEmptyResponseError(runId);
       }
       return response;
     }
@@ -1495,33 +1709,25 @@ async function waitForGatewayPlannerRun(
   }
 }
 
-async function runGatewayAuthoringPlanner(args: {
+async function runGatewayPlannerText(args: {
   assistantModel: ResolvedAssistantModel;
-  prompt: GatewayPromptContext;
+  prompt: string;
   systemPrompt: string;
   contracts: GatewayContracts | null;
   sessionId: string;
-  docsBadge: string;
-  readiness: AuthoringReadiness;
-  tools: ToolsContext;
+  context: Record<string, unknown>;
   onStatus: (summary: PlannerRunStatus) => void;
+  isCancelled?: () => boolean;
+  onRunStarted?: (runId: string) => void;
 }): Promise<string> {
+  if (args.isCancelled?.()) throw new AuthoringInterruptedError();
   const inputData: Record<string, unknown> = {
     provider: args.assistantModel.provider,
     model: args.assistantModel.model,
-    prompt: args.prompt.prompt,
+    prompt: args.prompt,
     system: args.systemPrompt,
     tools: [],
-    context: {
-      source: 'abstractflow_authoring_assistant',
-      authoring_skill_checksum: args.docsBadge,
-      prompt_chars: args.prompt.prompt.length,
-      graph_chars: args.prompt.graphChars,
-      readiness_issues: args.readiness.issues.length,
-      authoring_skill_docs: args.prompt.docsSections,
-      selected_node_templates: args.prompt.catalogTemplates,
-      selected_tools: args.tools.selectedTools,
-    },
+    context: args.context,
   };
   const started = await gatewayStartRun(
     {
@@ -1534,8 +1740,81 @@ async function runGatewayAuthoringPlanner(args: {
   );
   const runId = typeof started.run_id === 'string' ? started.run_id.trim() : '';
   if (!runId) throw new Error('Gateway did not return a planner run_id.');
+  args.onRunStarted?.(runId);
   args.onStatus({ status: 'started', runId, role: 'root' });
-  return waitForGatewayPlannerRun(runId, args.contracts, args.onStatus);
+  return waitForGatewayPlannerRun(runId, args.contracts, args.onStatus, args.isCancelled);
+}
+
+async function runGatewayAuthoringPlanner(args: {
+  assistantModel: ResolvedAssistantModel;
+  prompt: GatewayPromptContext;
+  systemPrompt: string;
+  contracts: GatewayContracts | null;
+  sessionId: string;
+  docsBadge: string;
+  readiness: AuthoringReadiness;
+  tools: ToolsContext;
+  onStatus: (summary: PlannerRunStatus) => void;
+  isCancelled?: () => boolean;
+  onRunStarted?: (runId: string) => void;
+}): Promise<string> {
+  return runGatewayPlannerText({
+    assistantModel: args.assistantModel,
+    prompt: args.prompt.prompt,
+    systemPrompt: args.systemPrompt,
+    contracts: args.contracts,
+    sessionId: args.sessionId,
+    context: {
+      source: 'abstractflow_authoring_assistant',
+      authoring_skill_checksum: args.docsBadge,
+      prompt_chars: args.prompt.prompt.length,
+      graph_chars: args.prompt.graphChars,
+      readiness_issues: args.readiness.issues.length,
+      authoring_skill_docs: args.prompt.docsSections,
+      selected_node_templates: args.prompt.catalogTemplates,
+      selected_tools: args.tools.selectedTools,
+    },
+    onStatus: args.onStatus,
+    isCancelled: args.isCancelled,
+    onRunStarted: args.onRunStarted,
+  });
+}
+
+const ACCEPTANCE_REVIEW_MAX_ROUNDS = 2;
+
+export function acceptanceReviewSystemPrompt(): string {
+  return [
+    'You are an AbstractFlow workflow acceptance reviewer.',
+    'A workflow author claims the draft graph now satisfies the user request. Verify that claim skeptically.',
+    'Judge ONLY whether the visible graph implements what the user asked for: node structure (loops, branches, distinct model calls), configured pin defaults, data wiring, and final outputs.',
+    'Structural validity is already checked elsewhere; focus on semantic fidelity to the request.',
+    'Typical failures to catch: requested multi-participant or multi-model structure collapsed into a single prompt; requested iteration/cycles without any loop or state nodes; requested inputs or outputs missing; requested artifacts not written or not exposed.',
+    'Do not invent requirements the user never asked for; cosmetic or stylistic preferences are not findings.',
+    'Return ONLY valid JSON. No markdown fences.',
+    'JSON schema: {"verdict":"pass"|"fail","unmet":string[],"notes":string}.',
+    'Each unmet item must be one concrete, fixable statement about the graph, written so the author can act on it.',
+  ].join('\n');
+}
+
+export function buildAcceptanceReviewPrompt(args: {
+  request: string;
+  priorUserTurns: string;
+  criteria: string[];
+  graph: string;
+}): string {
+  return [
+    'USER REQUEST:',
+    args.request,
+    '',
+    'PRIOR USER TURNS:',
+    args.priorUserTurns,
+    '',
+    'ACCEPTANCE CRITERIA (author-declared; incomplete criteria do not limit your review of the request itself):',
+    args.criteria.length > 0 ? args.criteria.map((item) => `- ${item}`).join('\n') : '- None declared; derive expectations from the request.',
+    '',
+    'CURRENT DRAFT GRAPH:',
+    args.graph,
+  ].join('\n');
 }
 
 function resultMarkdown(
@@ -1697,21 +1976,65 @@ export function authoringFailureMarkdown(
   return parts.join('\n');
 }
 
-function IconCopy({ size = 15 }: { size?: number }) {
+function IconCopy({ size = 19 }: { size?: number }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" focusable="false">
-      <rect x="8" y="8" width="11" height="11" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />
-      <path d="M5 16H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <rect x="9" y="9" width="11" height="11" rx="2.5" fill="none" stroke="currentColor" strokeWidth="2" />
+      <path
+        d="M5.5 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
 
-function IconClear({ size = 15 }: { size?: number }) {
+function IconClear({ size = 19 }: { size?: number }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" focusable="false">
-      <path d="M4 7h16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      <path d="M10 11v6M14 11v6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      <path d="M6 7l1 14h10l1-14M9 7V4h6v3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4 6.5h16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="M9.5 3.5h5M10 10.5v6.5M14 10.5v6.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path
+        d="M6 6.5l.8 13a1.5 1.5 0 0 0 1.5 1.4h7.4a1.5 1.5 0 0 0 1.5-1.4l.8-13"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function IconUndo({ size = 19 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" focusable="false">
+      <path d="M8.5 4.5 4 9l4.5 4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M4 9h10.5a5 5 0 0 1 5 5v0a5 5 0 0 1-5 5H9"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function IconChevron({ collapsed, size = 14 }: { collapsed: boolean; size?: number }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      aria-hidden="true"
+      focusable="false"
+      style={{ transform: collapsed ? 'rotate(-90deg)' : 'none', transition: 'transform 140ms ease', flex: '0 0 auto' }}
+    >
+      <path d="M6 9.5 12 15.5 18 9.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -1771,13 +2094,50 @@ export function AuthoringAssistantDrawer({
   const [busy, setBusy] = useState(false);
   const [workingStatus, setWorkingStatus] = useState<WorkingStatus | null>(null);
   const [lastSnapshot, setLastSnapshot] = useState<FlowAuthoringSnapshot | null>(null);
+  const [activity, setActivity] = useState<AuthoringActivityEntry[]>([]);
+  const [turnStartedAt, setTurnStartedAt] = useState<number | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [stopRequested, setStopRequested] = useState(false);
+  const [statusCollapsed, setStatusCollapsed] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const activityEndRef = useRef<HTMLDivElement | null>(null);
   const plannerStatusKeyRef = useRef('');
   const plannerSessionIdRef = useRef(loadAssistantSessionId(workflowStorageKey));
+  const cancelRequestedRef = useRef(false);
+  const activePlannerRunRef = useRef('');
+
+  const logActivity = useCallback((kind: AuthoringActivityEntry['kind'], text: string) => {
+    setActivity((prev) => [...prev.slice(-199), { id: newId('act'), ts: Date.now(), kind, text }]);
+  }, []);
+
+  useEffect(() => {
+    if (!busy || turnStartedAt === null) return undefined;
+    setElapsedSeconds(Math.floor((Date.now() - turnStartedAt) / 1000));
+    const interval = window.setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - turnStartedAt) / 1000));
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, [busy, turnStartedAt]);
+
+  useEffect(() => {
+    activityEndRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [activity]);
   const providersQuery = useProviders(isOpen);
   const modelsQuery = useModels(modelChoice.provider, isOpen && Boolean(modelChoice.provider), TEXT_OUTPUT_CAPABILITY_ROUTE);
   const gatewayCapabilitiesQuery = useGatewayCapabilities(isOpen);
   const gatewayContracts = gatewayContractsFromCapabilities(gatewayCapabilitiesQuery.data);
+
+  const stopAuthoring = useCallback(() => {
+    if (!busy || cancelRequestedRef.current) return;
+    cancelRequestedRef.current = true;
+    setStopRequested(true);
+    logActivity('info', 'Stop requested; interrupting after the current call…');
+    const runId = activePlannerRunRef.current;
+    if (runId) {
+      // Best-effort: also cancel the in-flight Gateway planner run.
+      void gatewayCancelRun(runId, gatewayContracts).catch(() => undefined);
+    }
+  }, [busy, gatewayContracts, logActivity]);
   const gatewayReadiness = useMemo(
     () => gatewayReadinessFromCapabilities(gatewayCapabilitiesQuery.data),
     [gatewayCapabilitiesQuery.data]
@@ -1922,7 +2282,6 @@ export function AuthoringAssistantDrawer({
     const estimatedTokens = Math.ceil(promptContext.prompt.length / 4);
     return Math.max(1, Math.min(100, Math.round((estimatedTokens / modelCaps.maxTokens) * 100)));
   }, [modelCaps.maxTokens, promptContext.prompt.length]);
-  const currentProgress = workingStatus ? progressForStage(workingStatus.stage) : null;
 
 	  useEffect(() => {
 	    messagesEndRef.current?.scrollIntoView({ block: 'end' });
@@ -1939,6 +2298,14 @@ export function AuthoringAssistantDrawer({
 	    setDraft('');
 	    setBusy(true);
     plannerStatusKeyRef.current = '';
+    cancelRequestedRef.current = false;
+    activePlannerRunRef.current = '';
+    setStopRequested(false);
+    setActivity([]);
+    setTurnStartedAt(Date.now());
+    setElapsedSeconds(0);
+    setStatusCollapsed(false);
+    logActivity('info', `Turn started (request ${request.length} chars)`);
     const setProgress = (
       stage: AuthoringProgressStage,
       label: string,
@@ -1987,7 +2354,85 @@ export function AuthoringAssistantDrawer({
 	      const modelNote = `Assistant model: ${assistantModel.label} (${assistantModel.provider} / ${assistantModel.model}).`;
 	      failureModelNote = modelNote;
 
+	      // Acceptance state for this turn: criteria the model declared, unmet
+	      // findings from the reviewer, and the review budget. The reviewer is the
+	      // gate that prevents self-declared success on a graph that does not
+	      // implement the request.
+	      let acceptanceCriteria: string[] = [];
+	      let acceptanceFindings: string[] = [];
+	      let acceptanceRounds = 0;
+	      let lastSkippedCommands: string[] = [];
+	      let unusableResponses = 0;
+	      const cycleNotes: string[] = [];
+
+	      const reviewAcceptance = async (flow: VisualFlow, cycleLabel: string): Promise<boolean> => {
+	        if (acceptanceRounds >= ACCEPTANCE_REVIEW_MAX_ROUNDS) {
+	          // Budget exhausted: accept to preserve applied work, but keep the
+	          // last findings so the final message reports them honestly.
+	          logActivity('review', 'Acceptance review budget exhausted; accepting with prior findings reported.');
+	          return true;
+	        }
+	        acceptanceRounds += 1;
+	        setProgress(
+	          'checking_graph',
+	          `Acceptance review (${cycleLabel})`,
+	          totalApplied,
+	          0,
+	          'Reviewing the draft graph against the request before accepting completion.'
+	        );
+	        logActivity('review', `Acceptance review ${acceptanceRounds}/${ACCEPTANCE_REVIEW_MAX_ROUNDS}: checking graph against the request…`);
+	        const reviewPrompt = buildAcceptanceReviewPrompt({
+	          request,
+	          priorUserTurns: conversationContextFor(priorMessages),
+	          criteria: acceptanceCriteria,
+	          graph: graphSummary(flow, null),
+	        });
+	        let raw = '';
+	        try {
+	          raw = await runGatewayPlannerText({
+	            assistantModel,
+	            prompt: reviewPrompt,
+	            systemPrompt: acceptanceReviewSystemPrompt(),
+	            contracts: gatewayContracts,
+	            sessionId: plannerSessionIdRef.current,
+	            context: { source: 'abstractflow_authoring_acceptance_review', prompt_chars: reviewPrompt.length },
+	            onStatus: () => undefined,
+	            isCancelled: () => cancelRequestedRef.current,
+	            onRunStarted: (runId) => {
+	              activePlannerRunRef.current = runId;
+	            },
+	          });
+	        } catch (error) {
+	          if (error instanceof AuthoringInterruptedError) throw error;
+	          aggregateWarnings.push("#FALLBACK acceptance review could not run; completion accepted on the author model's claim alone.");
+	          logActivity('error', 'Acceptance review failed to run; accepting completion with a #FALLBACK note.');
+	          acceptanceFindings = [];
+	          return true;
+	        }
+	        const review = parseAcceptanceReview(raw);
+	        if (!review) {
+	          aggregateWarnings.push("#FALLBACK acceptance review returned malformed JSON; completion accepted on the author model's claim alone.");
+	          logActivity('error', 'Acceptance review returned malformed JSON; accepting completion with a #FALLBACK note.');
+	          acceptanceFindings = [];
+	          return true;
+	        }
+	        if (review.verdict === 'pass') {
+	          logActivity('review', 'Acceptance review passed.');
+	          acceptanceFindings = [];
+	          return true;
+	        }
+	        acceptanceFindings = review.unmet;
+	        logActivity(
+	          'review',
+	          `Acceptance review found ${review.unmet.length} unmet item${review.unmet.length === 1 ? '' : 's'}: ${review.unmet.slice(0, 2).join(' | ')}${review.unmet.length > 2 ? ' | …' : ''}`
+	        );
+	        return false;
+	      };
+
       for (let cycle = 1; cycle <= AUTHORING_MAX_AUTONOMOUS_CYCLES; cycle += 1) {
+        if (cancelRequestedRef.current) {
+          throw new AuthoringInterruptedError();
+        }
         const readiness = computeAuthoringReadiness(currentFlow, request, preflightOptions);
         failureCycle = cycle;
         failureReadiness = readiness;
@@ -2002,45 +2447,111 @@ export function AuthoringAssistantDrawer({
           tools,
           preflightOptions,
           repairAttempts,
+          cycleNotes,
+          acceptanceFindings,
+          acceptanceCriteria,
+          skippedCommands: lastSkippedCommands,
         });
         const cycleLabel = `cycle ${cycle}`;
-        setProgress('planning_graph', `Planning workflow graph (${cycleLabel})`, totalApplied, readiness.issues.length);
-        const rawPlannerResponse = await runGatewayAuthoringPlanner({
-          assistantModel,
-          prompt,
-          systemPrompt,
-          contracts: gatewayContracts,
-          sessionId: plannerSessionIdRef.current,
-          docsBadge,
-          readiness,
-          tools,
-          onStatus: ({ status, runId, role, parentRunId }) => {
-            const key = `${cycle}:${role || 'root'}:${runId}:${status}:${parentRunId || ''}`;
-            if (plannerStatusKeyRef.current === key) return;
-            plannerStatusKeyRef.current = key;
-            const isSubrun = role === 'subrun';
-            const shortId = shortRunId(runId);
-            setProgress(
-              'planning_graph',
-              status === 'waiting for subworkflow' || isSubrun ? 'Agent is building the plan' : `Planning workflow graph (${cycleLabel})`,
-              totalApplied,
-              readiness.issues.length,
-              isSubrun
-                ? `Planner subrun ${shortId} is ${status} (${cycleLabel})`
-                : `Planner run ${shortId} is ${status} (${cycleLabel})`,
-              runId,
-              isSubrun ? parentRunId : runId
-            );
-          },
-        });
-        failureRawPlannerResponse = rawPlannerResponse;
+        // Skipped-command feedback is one-shot: it describes the previous
+        // batch only and must not leak into later cycles.
+        lastSkippedCommands = [];
 
-        setProgress('validating_plan', `Validating command plan (${cycleLabel})`, totalApplied, readiness.issues.length);
-        const plan = parsePlan(rawPlannerResponse);
-        failurePlan = plan;
-        if (!plan) {
-          throw new Error('Gateway assistant response was not valid authoring command JSON.');
+        // One unusable model response (empty run output or unparseable JSON)
+        // must not kill the whole turn: retry the same cycle with a corrective
+        // note, up to a per-turn budget.
+        let plan: AssistantPlan | null = null;
+        let rawPlannerResponse = '';
+        let retryNote = '';
+        while (true) {
+          if (cancelRequestedRef.current) throw new AuthoringInterruptedError();
+          const attemptPrompt = retryNote
+            ? { ...prompt, prompt: `${prompt.prompt}\n\nRESPONSE FORMAT CORRECTION:\n${retryNote}` }
+            : prompt;
+          setProgress(
+            'planning_graph',
+            `Planning workflow graph (${cycleLabel})`,
+            totalApplied,
+            readiness.issues.length,
+            retryNote ? 'Retrying after an unusable planner response.' : undefined
+          );
+          logActivity(
+            'model',
+            `Cycle ${cycle}: sending plan request (${Math.round(attemptPrompt.prompt.length / 1000)}k chars prompt)${retryNote ? ' [retry]' : ''}`
+          );
+          try {
+            rawPlannerResponse = await runGatewayAuthoringPlanner({
+              assistantModel,
+              prompt: attemptPrompt,
+              systemPrompt,
+              contracts: gatewayContracts,
+              sessionId: plannerSessionIdRef.current,
+              docsBadge,
+              readiness,
+              tools,
+              isCancelled: () => cancelRequestedRef.current,
+              onRunStarted: (runId) => {
+                activePlannerRunRef.current = runId;
+              },
+              onStatus: ({ status, runId, role, parentRunId }) => {
+                const key = `${cycle}:${role || 'root'}:${runId}:${status}:${parentRunId || ''}`;
+                if (plannerStatusKeyRef.current === key) return;
+                plannerStatusKeyRef.current = key;
+                const isSubrun = role === 'subrun';
+                const shortId = shortRunId(runId);
+                setProgress(
+                  'planning_graph',
+                  status === 'waiting for subworkflow' || isSubrun ? 'Agent is building the plan' : `Planning workflow graph (${cycleLabel})`,
+                  totalApplied,
+                  readiness.issues.length,
+                  isSubrun
+                    ? `Planner subrun ${shortId} is ${status} (${cycleLabel})`
+                    : `Planner run ${shortId} is ${status} (${cycleLabel})`,
+                  runId,
+                  isSubrun ? parentRunId : runId
+                );
+              },
+            });
+          } catch (error) {
+            if (error instanceof PlannerEmptyResponseError && unusableResponses < AUTHORING_MAX_UNUSABLE_RESPONSES) {
+              unusableResponses += 1;
+              logActivity(
+                'error',
+                `Cycle ${cycle}: planner run completed without a response (${unusableResponses}/${AUTHORING_MAX_UNUSABLE_RESPONSES}); retrying.`
+              );
+              retryNote =
+                'Your previous planner run completed without a usable response. Return ONLY one JSON object matching the schema. If your batch is long, return fewer commands this cycle and use status "continue" to finish next cycle.';
+              continue;
+            }
+            throw error;
+          }
+          failureRawPlannerResponse = rawPlannerResponse;
+          logActivity('model', `Cycle ${cycle}: response received (${Math.round(rawPlannerResponse.length / 1000)}k chars)`);
+
+          setProgress('validating_plan', `Validating command plan (${cycleLabel})`, totalApplied, readiness.issues.length);
+          plan = parsePlan(rawPlannerResponse);
+          if (plan) break;
+          if (unusableResponses >= AUTHORING_MAX_UNUSABLE_RESPONSES) {
+            throw new Error(
+              `Gateway assistant returned ${unusableResponses + 1} unusable responses this turn; the last one was not valid authoring command JSON (possibly truncated).`
+            );
+          }
+          unusableResponses += 1;
+          logActivity(
+            'error',
+            `Cycle ${cycle}: response was not valid plan JSON (${unusableResponses}/${AUTHORING_MAX_UNUSABLE_RESPONSES}); retrying with a format correction.`
+          );
+          retryNote =
+            'Your previous response was not valid plan JSON (it may have been truncated or wrapped in extra text). Return ONLY one JSON object matching the schema, with no markdown fences or prose. If the command batch is long, return fewer commands this cycle and use status "continue" to finish in the next cycle.';
         }
+        failurePlan = plan;
+        if (plan.acceptanceCriteria.length > 0) {
+          acceptanceCriteria = plan.acceptanceCriteria;
+        }
+        logActivity(
+          'model',
+          `Cycle ${cycle}: plan status "${plan.status}" with ${plan.commands.length} command${plan.commands.length === 1 ? '' : 's'}`
+        );
         if ((plan.status === 'failed' || plan.status === 'needs_user') && plan.commands.length === 0) {
           finalPlan = plan;
           setProgress('blocked', 'Assistant authoring blocked', totalApplied, readiness.issues.length);
@@ -2048,9 +2559,20 @@ export function AuthoringAssistantDrawer({
         }
         if (plan.commands.length === 0) {
           if (readiness.issues.length === 0 && plan.status === 'done') {
-            finalPlan = plan;
-            finalReadiness = readiness;
-            break;
+            if (await reviewAcceptance(currentFlow, cycleLabel)) {
+              if (lastRejectedAttempt) {
+                aggregateWarnings.push(
+                  'The command batch before completion was rejected; the model declared the existing graph sufficient and the acceptance review accepted it.'
+                );
+              }
+              finalPlan = plan;
+              finalReadiness = readiness;
+              break;
+            }
+            cycleNotes.push(
+              `Cycle ${cycle}: declared done with no commands; acceptance review rejected it with ${acceptanceFindings.length} finding${acceptanceFindings.length === 1 ? '' : 's'}.`
+            );
+            continue;
           }
           throw new Error('Gateway assistant returned no graph commands.');
         }
@@ -2058,7 +2580,7 @@ export function AuthoringAssistantDrawer({
         setProgress('applying_commands', `Applying validated commands (${cycleLabel})`, totalApplied, readiness.issues.length);
         const result = applyAuthoringCommands(plan.commands);
         failureResult = result;
-        if (result.errors.length > 0) {
+        if (result.errors.length > 0 && result.applied.length === 0) {
           const candidateReadiness = computeAuthoringReadiness(visualFlowFromApplyResult(result), request, preflightOptions);
           const attempt: AuthoringRepairAttempt = { cycle, plan, result, candidateReadiness };
           repairAttempts = [...repairAttempts, attempt];
@@ -2071,6 +2593,10 @@ export function AuthoringAssistantDrawer({
             totalApplied,
             candidateReadiness.issues.length,
             `Validator rejected ${result.errors.length} command issue${result.errors.length === 1 ? '' : 's'}; asking the model to repair next cycle.`
+          );
+          logActivity(
+            'error',
+            `Cycle ${cycle}: batch rejected (${result.errors.length} error${result.errors.length === 1 ? '' : 's'}): ${result.errors.slice(0, 2).join(' | ')}${result.errors.length > 2 ? ' | …' : ''}`
           );
           continue;
         }
@@ -2093,6 +2619,7 @@ export function AuthoringAssistantDrawer({
             candidateReadiness.issues.length,
             'The model returned commands that made no graph changes; asking it to repair next cycle.'
           );
+          logActivity('error', `Cycle ${cycle}: command batch was a no-op; asking the model to repair.`);
           continue;
         }
 
@@ -2100,6 +2627,19 @@ export function AuthoringAssistantDrawer({
         repairAttempts = [];
         failureRepairAttempts = [];
         lastRejectedAttempt = null;
+        // Partial application: valid commands are kept; failed ones come back
+        // to the model as skipped-command feedback for the next cycle.
+        lastSkippedCommands = result.errors;
+        logActivity(
+          'apply',
+          `Cycle ${cycle}: applied ${result.applied.length} change${result.applied.length === 1 ? '' : 's'} — ${result.applied.slice(0, 3).join('; ')}${result.applied.length > 3 ? `; +${result.applied.length - 3} more` : ''}`
+        );
+        if (result.errors.length > 0) {
+          logActivity(
+            'error',
+            `Cycle ${cycle}: skipped ${result.errors.length} invalid command${result.errors.length === 1 ? '' : 's'} (kept the rest): ${result.errors.slice(0, 2).join(' | ')}${result.errors.length > 2 ? ' | …' : ''}`
+          );
+        }
         totalApplied += result.applied.length;
         aggregateApplied.push(...result.applied);
         aggregateWarnings.push(...result.warnings);
@@ -2116,64 +2656,126 @@ export function AuthoringAssistantDrawer({
         currentFlow = getFlow();
         finalReadiness = computeAuthoringReadiness(currentFlow, request, preflightOptions);
         failureReadiness = finalReadiness;
-        finalPlan = finalReadiness.issues.length === 0 ? { ...plan, status: 'done' } : { ...plan, status: 'continue' };
+        cycleNotes.push(cycleNoteFor(cycle, plan, result.applied.length));
 
         setProgress('checking_graph', `Checking graph (${cycleLabel})`, totalApplied, finalReadiness.issues.length);
-        if (finalReadiness.issues.length === 0) {
-          break;
+        if (finalReadiness.issues.length > 0) {
+          logActivity(
+            'info',
+            `Cycle ${cycle}: ${finalReadiness.issues.length} readiness issue${finalReadiness.issues.length === 1 ? '' : 's'} remaining`
+          );
         }
+        // The model owns completion: heuristic readiness can demand more work
+        // but never declares "done" on the model's behalf. A "done" claim with
+        // clean readiness still has to pass the acceptance review.
+        if (postApplyLoopAction(plan.status, finalReadiness.issues.length) === 'request-review') {
+          if (await reviewAcceptance(currentFlow, cycleLabel)) {
+            finalPlan = { ...plan, status: 'done' };
+            break;
+          }
+          cycleNotes.push(
+            `Cycle ${cycle}: acceptance review rejected done with ${acceptanceFindings.length} finding${acceptanceFindings.length === 1 ? '' : 's'}.`
+          );
+        }
+        finalPlan = { ...plan, status: 'continue' };
       }
 
-      if (lastRejectedAttempt) {
-        throw new Error(
-          `Autonomous authoring reached ${AUTHORING_MAX_AUTONOMOUS_CYCLES} cycles after validator rejections. Last validator errors: ${lastRejectedAttempt.result.errors.join(' ')}`
-        );
-      }
+      // Cap-exhaustion errors apply only when the loop genuinely ran out of
+      // cycles; an accepted "done"/"blocked" break must not be re-labeled a
+      // failure because some earlier cycle had a rejected batch.
       if (!finalPlan) {
+        if (lastRejectedAttempt) {
+          throw new Error(
+            `Autonomous authoring stopped after ${AUTHORING_MAX_AUTONOMOUS_CYCLES} cycles with the last command batch rejected. Last validator errors: ${lastRejectedAttempt.result.errors.join(' ')}`
+          );
+        }
         throw new Error('Gateway assistant did not return an authoring plan.');
       }
-      if (finalReadiness.issues.length > 0 && finalPlan.status === 'continue') {
+      if (finalPlan.status === 'continue') {
+        const remaining = [
+          ...finalReadiness.issues,
+          ...acceptanceFindings.map((item) => `Acceptance review: ${item}`),
+          ...(lastRejectedAttempt ? [`Last validator errors: ${lastRejectedAttempt.result.errors.join(' ')}`] : []),
+        ];
         throw new Error(
-          `Autonomous authoring reached ${AUTHORING_MAX_AUTONOMOUS_CYCLES} cycles with remaining readiness issues: ${finalReadiness.issues.join(' ')}`
+          `Autonomous authoring reached ${AUTHORING_MAX_AUTONOMOUS_CYCLES} cycles without the model declaring done.${remaining.length > 0 ? ` Remaining issues: ${remaining.join(' ')}` : ''}`
         );
       }
 
+      // Pick up warnings/errors recorded after the last applied cycle (e.g.
+      // acceptance-review fallbacks) so the final report stays complete.
+      if (finalResult) {
+        finalResult = { ...finalResult, warnings: [...aggregateWarnings], errors: [...aggregateErrors] };
+      }
+      // Surface unresolved acceptance findings (review budget exhaustion) as
+      // remaining issues so completion is never reported cleaner than it is.
+      const displayReadiness: AuthoringReadiness = acceptanceFindings.length > 0
+        ? { ...finalReadiness, issues: [...finalReadiness.issues, ...acceptanceFindings.map((item) => `Acceptance review: ${item}`)] }
+        : finalReadiness;
       setProgress(
-        finalReadiness.issues.length === 0 && finalPlan.status === 'done' ? 'done' : 'blocked',
-        finalReadiness.issues.length === 0 ? 'Draft graph updated' : 'Draft graph updated with remaining issues',
+        displayReadiness.issues.length === 0 && finalPlan.status === 'done' ? 'done' : 'blocked',
+        displayReadiness.issues.length === 0 ? 'Draft graph updated' : 'Draft graph updated with remaining issues',
         totalApplied,
-        finalReadiness.issues.length
+        displayReadiness.issues.length
       );
 	      if (firstSnapshot) setLastSnapshot(firstSnapshot);
-	      const content = resultMarkdown(finalPlan, finalResult, finalReadiness, modelNote, preflightOptions);
+	      const content = resultMarkdown(finalPlan, finalResult, displayReadiness, modelNote, preflightOptions);
 	      setMessages((prev) => [...prev, { id: newId('assistant'), role: 'assistant', content }]);
-	      if (finalPlan.status === 'done' && finalReadiness.issues.length === 0) {
+	      if (finalPlan.status === 'done' && displayReadiness.issues.length === 0) {
 	        toast.success(`Assistant applied ${totalApplied} change${totalApplied === 1 ? '' : 's'}`);
 	      } else {
 	        toast.error('Assistant authoring blocked');
 	      }
 	    } catch (error) {
-	      const message = error instanceof Error ? error.message : 'Assistant authoring failed.';
-	      setMessages((prev) => [
-	        ...prev,
-	        {
-	          id: newId('assistant'),
-	          role: 'assistant',
-	          content: authoringFailureMarkdown(message, partialApplied, {
-	            cycle: failureCycle,
-	            modelNote: failureModelNote,
-	            plan: failurePlan,
-	            rawPlannerResponse: failureRawPlannerResponse,
-	            result: failureResult,
-	            readiness: failureReadiness,
-	            repairAttempts: failureRepairAttempts,
-	          }),
-	        },
-	      ]);
-	      toast.error('Assistant authoring failed');
+	      if (error instanceof AuthoringInterruptedError) {
+	        logActivity('info', 'Authoring loop interrupted.');
+	        setWorkingStatus((prev) => (prev ? { ...prev, stage: 'blocked', label: 'Interrupted by user', detail: undefined } : prev));
+	        setMessages((prev) => [
+	          ...prev,
+	          {
+	            id: newId('assistant'),
+	            role: 'assistant',
+	            content: [
+	              '**Interrupted**',
+	              'You stopped this authoring turn.',
+	              '',
+	              '**What To Expect**',
+	              partialApplied
+	                ? 'Command batches validated before the stop remain applied to the draft. Use Undo Turn to restore the pre-turn snapshot, or send a follow-up request to continue from the current graph.'
+	                : 'No draft changes were applied before the stop; the workflow draft is unchanged.',
+	            ].join('\n'),
+	          },
+	        ]);
+	        toast('Assistant authoring stopped');
+	      } else {
+	        const message = error instanceof Error ? error.message : 'Assistant authoring failed.';
+	        logActivity('error', `Turn failed: ${message}`);
+	        setWorkingStatus((prev) => (prev ? { ...prev, stage: 'blocked', label: 'Authoring failed', detail: undefined } : prev));
+	        setMessages((prev) => [
+	          ...prev,
+	          {
+	            id: newId('assistant'),
+	            role: 'assistant',
+	            content: authoringFailureMarkdown(message, partialApplied, {
+	              cycle: failureCycle,
+	              modelNote: failureModelNote,
+	              plan: failurePlan,
+	              rawPlannerResponse: failureRawPlannerResponse,
+	              result: failureResult,
+	              readiness: failureReadiness,
+	              repairAttempts: failureRepairAttempts,
+	            }),
+	          },
+	        ]);
+	        toast.error('Assistant authoring failed');
+	      }
 	    } finally {
+	      // The status card (with its activity log) persists after the turn so
+	      // the user can review what happened; Clear resets it explicitly.
 	      setBusy(false);
-	      setWorkingStatus(null);
+	      setStopRequested(false);
+	      cancelRequestedRef.current = false;
+	      activePlannerRunRef.current = '';
 	    }
 	  };
 
@@ -2183,6 +2785,9 @@ export function AuthoringAssistantDrawer({
     setMessages(initialAssistantMessages());
     setDraft('');
     setLastSnapshot(null);
+    setWorkingStatus(null);
+    setActivity([]);
+    setTurnStartedAt(null);
     toast.success('Assistant conversation cleared; graph unchanged');
   };
 
@@ -2225,27 +2830,16 @@ export function AuthoringAssistantDrawer({
 
   return (
     <div className="authoring-assistant">
-      <div className="assistant-topbar" aria-label="Assistant conversation actions">
-        <button
-          type="button"
-          className="assistant-icon-button"
-          onClick={() => void copyConversation()}
-          title="Copy assistant conversation"
-          aria-label="Copy assistant conversation"
-        >
-          <IconCopy />
-        </button>
-        <button
-          type="button"
-          className="assistant-icon-button"
-          onClick={clearConversation}
-          disabled={busy}
-          title="Clear assistant conversation"
-          aria-label="Clear assistant conversation"
-        >
-          <IconClear />
-        </button>
-      </div>
+      {contextUsagePercent !== null && (draft.trim() || busy) ? (
+        <div className="assistant-topbar" aria-label="Assistant context usage">
+          <div className="assistant-context-usage">
+            <div className="assistant-context-usage-track">
+              <div className="assistant-context-usage-fill" style={{ width: `${contextUsagePercent}%` }} />
+            </div>
+            <span>Context {contextUsagePercent}%</span>
+          </div>
+        </div>
+      ) : null}
       <div className="assistant-model-row">
         <select
           value={modelChoice.provider}
@@ -2275,33 +2869,66 @@ export function AuthoringAssistantDrawer({
         </select>
       </div>
 
-      {contextUsagePercent !== null && (draft.trim() || busy) ? (
-        <div className="assistant-context-usage" aria-label="Estimated assistant context usage">
-          <div className="assistant-context-usage-track">
-            <div className="assistant-context-usage-fill" style={{ width: `${contextUsagePercent}%` }} />
-          </div>
-          <span>Context {contextUsagePercent}%</span>
-        </div>
-      ) : null}
-
-      {busy && workingStatus && currentProgress ? (
+      {workingStatus ? (
         <div className={`assistant-run-status ${workingStatus.stage === 'blocked' ? 'blocked' : 'active'}`}>
-          <div className="assistant-run-status-header">
-            <span>{workingStatus.label}</span>
-            <span>{currentProgress.label}</span>
-          </div>
-          <div className="assistant-progress-track">
-            <div className="assistant-progress-fill" style={{ width: `${currentProgress.percent}%` }} />
-          </div>
-          <div className="assistant-run-status-footer">
-            <span>
-              {workingStatus.applied > 0
-                ? `${workingStatus.applied} change${workingStatus.applied === 1 ? '' : 's'} applied`
-                : 'No graph changes applied yet'}
-            </span>
-            <span>{readinessProgressText(workingStatus)}</span>
-          </div>
-          {workingStatus.detail ? <div className="assistant-run-status-detail">{workingStatus.detail}</div> : null}
+          <button
+            type="button"
+            className="assistant-run-status-header"
+            onClick={() => setStatusCollapsed((prev) => !prev)}
+            aria-expanded={!statusCollapsed}
+            title={statusCollapsed ? 'Expand authoring activity' : 'Collapse authoring activity'}
+          >
+            {busy ? (
+              <span className="assistant-run-spinner" aria-hidden="true" />
+            ) : (
+              <span className={`assistant-run-status-dot ${workingStatus.stage}`} aria-hidden="true" />
+            )}
+            <span className="assistant-run-status-label">{workingStatus.label}</span>
+            <span className="assistant-run-status-meta">{formatElapsed(elapsedSeconds)}</span>
+            {busy ? (
+              <span
+                role="button"
+                tabIndex={0}
+                className={`assistant-stop-button ${stopRequested ? 'disabled' : ''}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  stopAuthoring();
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    stopAuthoring();
+                  }
+                }}
+                title="Stop the authoring loop; applied edits are kept"
+              >
+                {stopRequested ? 'Stopping…' : 'Stop'}
+              </span>
+            ) : null}
+            <IconChevron collapsed={statusCollapsed} />
+          </button>
+          {!statusCollapsed ? (
+            <>
+              <div className="assistant-activity-log" role="log" aria-label="Authoring activity">
+                {activity.map((entry) => (
+                  <div key={entry.id} className={`assistant-activity-entry ${entry.kind}`}>
+                    <span className="assistant-activity-time">{formatActivityTime(entry.ts, turnStartedAt)}</span>
+                    <span className="assistant-activity-text">{entry.text}</span>
+                  </div>
+                ))}
+                <div ref={activityEndRef} aria-hidden="true" />
+              </div>
+              <div className="assistant-run-status-footer">
+                <span>
+                  {workingStatus.applied > 0
+                    ? `${workingStatus.applied} change${workingStatus.applied === 1 ? '' : 's'} applied`
+                    : 'No graph changes applied yet'}
+                </span>
+                <span>{readinessProgressText(workingStatus)}</span>
+              </div>
+            </>
+          ) : null}
         </div>
       ) : null}
 
@@ -2328,15 +2955,46 @@ export function AuthoringAssistantDrawer({
           rows={4}
         />
         <div className="assistant-actions">
-          <button type="button" onClick={clearConversation} disabled={busy}>
-            Clear Chat
-          </button>
-          <button type="button" onClick={undo} disabled={!lastSnapshot || busy}>
-            Undo Turn
-          </button>
-          <button type="button" className="primary" onClick={() => void submit()} disabled={!draft.trim() || busy}>
-            Send
-          </button>
+          <div className="assistant-actions-icons">
+            <button
+              type="button"
+              className="assistant-icon-button"
+              onClick={() => void copyConversation()}
+              title="Copy conversation"
+              aria-label="Copy assistant conversation"
+            >
+              <IconCopy />
+            </button>
+            <button
+              type="button"
+              className="assistant-icon-button"
+              onClick={clearConversation}
+              disabled={busy}
+              title="Clear conversation"
+              aria-label="Clear assistant conversation"
+            >
+              <IconClear />
+            </button>
+            <button
+              type="button"
+              className="assistant-icon-button"
+              onClick={undo}
+              disabled={!lastSnapshot || busy}
+              title="Undo last assistant turn"
+              aria-label="Undo last assistant turn"
+            >
+              <IconUndo />
+            </button>
+          </div>
+          {busy ? (
+            <button type="button" className="danger" onClick={stopAuthoring} disabled={stopRequested}>
+              {stopRequested ? 'Stopping…' : 'Stop'}
+            </button>
+          ) : (
+            <button type="button" className="primary" onClick={() => void submit()} disabled={!draft.trim()}>
+              Send
+            </button>
+          )}
         </div>
       </div>
     </div>

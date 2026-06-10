@@ -557,4 +557,134 @@ describe('flow authoring commands', () => {
     expect(result.nodes).toEqual([]);
     expect(result.errors.some((error) => error.includes('secret-looking literal'))).toBe(true);
   });
+
+  it('applies commands in dependency order so connect can precede add_node in the batch', () => {
+    const result = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'connect', source: 'start', sourceHandle: 'exec-out', target: 'agent', targetHandle: 'exec-in' },
+        { action: 'add_node', id: 'start', nodeType: 'on_flow_start' },
+        { action: 'add_node', id: 'agent', nodeType: 'agent' },
+      ],
+    });
+
+    expect(result.errors).toEqual([]);
+    expect(result.edges).toEqual([
+      expect.objectContaining({ source: 'start', sourceHandle: 'exec-out', target: 'agent', targetHandle: 'exec-in' }),
+    ]);
+  });
+
+  it('keeps valid commands and reports per-command errors for the rest', () => {
+    const result = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'add_node', id: 'start', nodeType: 'on_flow_start' },
+        { action: 'add_node', id: 'agent', nodeType: 'agent' },
+        { action: 'connect', source: 'start', sourceHandle: 'exec-out', target: 'agent', targetHandle: 'exec-in' },
+        { action: 'connect', source: 'ghost', sourceHandle: 'value', target: 'agent', targetHandle: 'prompt' },
+      ],
+    });
+
+    expect(result.applied.length).toBeGreaterThanOrEqual(3);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]).toContain('connect refused invalid edge');
+    expect(result.edges).toHaveLength(1);
+  });
+
+  it('auto-inserts a sequence node when an execution output fans out', () => {
+    const result = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'add_node', id: 'start', nodeType: 'on_flow_start' },
+        { action: 'add_node', id: 'agent_a', nodeType: 'agent' },
+        { action: 'add_node', id: 'agent_b', nodeType: 'agent' },
+        { action: 'connect', source: 'start', sourceHandle: 'exec-out', target: 'agent_a', targetHandle: 'exec-in' },
+        { action: 'connect', source: 'start', sourceHandle: 'exec-out', target: 'agent_b', targetHandle: 'exec-in' },
+      ],
+    });
+
+    expect(result.errors).toEqual([]);
+    const sequence = result.nodes.find((node) => node.data.nodeType === 'sequence');
+    expect(sequence).toBeDefined();
+    expect(result.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ source: 'start', sourceHandle: 'exec-out', target: sequence?.id, targetHandle: 'exec-in' }),
+        expect.objectContaining({ source: sequence?.id, sourceHandle: 'then:0', target: 'agent_a', targetHandle: 'exec-in' }),
+        expect.objectContaining({ source: sequence?.id, sourceHandle: 'then:1', target: 'agent_b', targetHandle: 'exec-in' }),
+      ])
+    );
+    expect(result.warnings.some((warning) => warning.includes('Canonicalized execution fan-out'))).toBe(true);
+  });
+
+  it('extends an existing sequence when fanning out an exec output already routed through it', () => {
+    const result = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'add_node', id: 'start', nodeType: 'on_flow_start' },
+        { action: 'add_node', id: 'seq', nodeType: 'sequence' },
+        { action: 'add_node', id: 'agent_a', nodeType: 'agent' },
+        { action: 'add_node', id: 'agent_b', nodeType: 'agent' },
+        { action: 'add_node', id: 'agent_c', nodeType: 'agent' },
+        { action: 'connect', source: 'start', sourceHandle: 'exec-out', target: 'seq', targetHandle: 'exec-in' },
+        { action: 'connect', source: 'seq', sourceHandle: 'then:0', target: 'agent_a', targetHandle: 'exec-in' },
+        { action: 'connect', source: 'seq', sourceHandle: 'then:1', target: 'agent_b', targetHandle: 'exec-in' },
+        { action: 'connect', source: 'start', sourceHandle: 'exec-out', target: 'agent_c', targetHandle: 'exec-in' },
+      ],
+    });
+
+    expect(result.errors).toEqual([]);
+    expect(result.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ source: 'seq', sourceHandle: 'then:2', target: 'agent_c', targetHandle: 'exec-in' }),
+      ])
+    );
+    const seq = result.nodes.find((node) => node.id === 'seq');
+    expect((seq?.data.outputs || []).some((pin) => pin.id === 'then:2')).toBe(true);
+  });
+
+  it('drops loop-back edges from a loop body to the loop exec-in', () => {
+    const result = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'add_node', id: 'start', nodeType: 'on_flow_start' },
+        { action: 'add_node', id: 'items', nodeType: 'literal_array', templateLabel: 'Array', literalValue: ['a', 'b'] },
+        { action: 'add_node', id: 'each', nodeType: 'loop' },
+        { action: 'add_node', id: 'llm', nodeType: 'llm_call' },
+        { action: 'add_node', id: 'save', nodeType: 'set_var', pinDefaults: { name: 'transcript' } },
+        { action: 'connect', source: 'start', sourceHandle: 'exec-out', target: 'each', targetHandle: 'exec-in' },
+        { action: 'connect', source: 'items', sourceHandle: 'value', target: 'each', targetHandle: 'items' },
+        { action: 'connect', source: 'each', sourceHandle: 'loop', target: 'llm', targetHandle: 'exec-in' },
+        { action: 'connect', source: 'llm', sourceHandle: 'exec-out', target: 'save', targetHandle: 'exec-in' },
+        { action: 'connect', source: 'save', sourceHandle: 'exec-out', target: 'each', targetHandle: 'exec-in' },
+      ],
+    });
+
+    expect(result.errors).toEqual([]);
+    expect(
+      result.edges.some((edge) => edge.source === 'save' && edge.target === 'each' && edge.targetHandle === 'exec-in')
+    ).toBe(false);
+    expect(result.warnings.some((warning) => warning.toLowerCase().includes('loop-back'))).toBe(true);
+  });
+
+  it('drops loop-back edges even when emitted before the body wiring', () => {
+    const result = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'add_node', id: 'start', nodeType: 'on_flow_start' },
+        { action: 'add_node', id: 'items', nodeType: 'literal_array', templateLabel: 'Array', literalValue: ['a', 'b'] },
+        { action: 'add_node', id: 'each', nodeType: 'loop' },
+        { action: 'add_node', id: 'llm', nodeType: 'llm_call' },
+        { action: 'connect', source: 'llm', sourceHandle: 'exec-out', target: 'each', targetHandle: 'exec-in' },
+        { action: 'connect', source: 'start', sourceHandle: 'exec-out', target: 'each', targetHandle: 'exec-in' },
+        { action: 'connect', source: 'items', sourceHandle: 'value', target: 'each', targetHandle: 'items' },
+        { action: 'connect', source: 'each', sourceHandle: 'loop', target: 'llm', targetHandle: 'exec-in' },
+      ],
+    });
+
+    expect(result.errors).toEqual([]);
+    expect(
+      result.edges.some((edge) => edge.source === 'llm' && edge.target === 'each' && edge.targetHandle === 'exec-in')
+    ).toBe(false);
+    expect(result.warnings.some((warning) => warning.toLowerCase().includes('loop-back'))).toBe(true);
+  });
 });

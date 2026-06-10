@@ -390,6 +390,49 @@ export function makeFlowAuthoringSnapshot(
   };
 }
 
+/**
+ * Application rank for a command kind. Commands are applied in dependency
+ * order (nodes first, then configuration, then connections, then destructive
+ * edits) regardless of the order the model emitted them, so a connect command
+ * can reference a node created anywhere in the same batch.
+ */
+function commandOrderRank(kind: string): number {
+  if (kind === 'add_node') return 0;
+  if (kind === 'connect') return 2;
+  if (kind === 'delete_node' || kind === 'delete_edge') return 3;
+  return 1;
+}
+
+function orderCommandsForApplication(commands: unknown[]): unknown[] {
+  return commands
+    .map((command, index) => {
+      const record = asRecord(command);
+      return { command, index, rank: record ? commandOrderRank(commandKind(record)) : 1 };
+    })
+    .sort((a, b) => a.rank - b.rank || a.index - b.index)
+    .map((item) => item.command);
+}
+
+/** True when `toNodeId` is reachable from `fromNodeId.fromHandle` over execution edges. */
+function execReachableFrom(edges: Edge[], fromNodeId: string, fromHandle: string, toNodeId: string): boolean {
+  const queue: string[] = edges
+    .filter((edge) => edge.source === fromNodeId && edge.sourceHandle === fromHandle)
+    .map((edge) => edge.target);
+  const seen = new Set<string>(queue);
+  while (queue.length > 0) {
+    const current = queue.shift() as string;
+    if (current === toNodeId) return true;
+    for (const edge of edges) {
+      if (edge.source !== current || seen.has(edge.target)) continue;
+      seen.add(edge.target);
+      queue.push(edge.target);
+    }
+  }
+  return false;
+}
+
+const LOOPING_NODE_TYPES = new Set(['loop', 'for', 'while']);
+
 export function applyFlowAuthoringCommands(input: FlowAuthoringApplyInput): FlowAuthoringApplyResult {
   let flowName = input.flowName;
   let flowInterfaces = [...input.flowInterfaces];
@@ -406,7 +449,7 @@ export function applyFlowAuthoringCommands(input: FlowAuthoringApplyInput): Flow
   const usedNodeIds = () => new Set(nodes.map((node) => node.id));
   const usedEdgeIds = () => new Set(edges.map((edge) => edge.id));
 
-  for (const rawCommand of input.commands || []) {
+  for (const rawCommand of orderCommandsForApplication(input.commands || [])) {
     const command = asRecord(rawCommand);
     if (!command) {
       errors.push('Ignored non-object command');
@@ -1030,6 +1073,120 @@ export function applyFlowAuthoringCommands(input: FlowAuthoringApplyInput): Flow
         warnings.push(`Connection ${source}.${normalizedConnection.sourceHandle} -> ${target}.${targetHandle} already exists`);
         continue;
       }
+
+      // Loop bodies return to their loop node implicitly via runtime control
+      // frames; an explicit body -> loop.exec-in edge resets the loop frame
+      // (infinite loop). Drop such loop-back edges instead of materializing a
+      // broken graph.
+      const loopBackTarget = nodeById(nodes, target);
+      if (
+        loopBackTarget &&
+        LOOPING_NODE_TYPES.has(loopBackTarget.data.nodeType) &&
+        targetHandle === 'exec-in' &&
+        execReachableFrom(edges, target, 'loop', source)
+      ) {
+        warnings.push(
+          `Skipped loop-back edge ${source}.${sourceHandle} -> ${target}.${targetHandle}; loop bodies return to the loop automatically when their execution chain ends`
+        );
+        continue;
+      }
+
+      // Execution outputs are one-to-one. When the model fans out an exec
+      // output, canonicalize through a Sequence node (the repair a human
+      // author would perform) instead of rejecting the edge.
+      const fanoutSource = nodeById(nodes, source);
+      const fanoutTarget = nodeById(nodes, target);
+      const fanoutSourcePin = fanoutSource ? pinById(fanoutSource, sourceHandle, 'output') : undefined;
+      const fanoutTargetPin = fanoutTarget ? pinById(fanoutTarget, targetHandle, 'input') : undefined;
+      const existingExecEdge =
+        fanoutSourcePin?.type === 'execution' && fanoutTargetPin?.type === 'execution'
+          ? edges.find((edge) => edge.source === source && edge.sourceHandle === sourceHandle)
+          : undefined;
+      if (existingExecEdge) {
+        const existingTargetNode = nodeById(nodes, existingExecEdge.target);
+        if (
+          existingTargetNode &&
+          (existingTargetNode.data.nodeType === 'sequence' || existingTargetNode.data.nodeType === 'parallel') &&
+          existingExecEdge.targetHandle === 'exec-in'
+        ) {
+          // The exec output already routes through a Sequence/Parallel: attach
+          // the new target to a free branch (adding one if needed).
+          const seqNode = existingTargetNode;
+          const thenPins = (seqNode.data.outputs || []).filter((pin) => /^then:\d+$/.test(pin.id));
+          const freePin = thenPins.find(
+            (pin) => !edges.some((edge) => edge.source === seqNode.id && edge.sourceHandle === pin.id)
+          );
+          let branchHandle = freePin?.id || '';
+          if (!branchHandle) {
+            branchHandle = `then:${thenPins.length}`;
+            const newPin: Pin = { id: branchHandle, label: `Then ${thenPins.length}`, type: 'execution' };
+            nodes = nodes.map((item) => {
+              if (item.id !== seqNode.id) return item;
+              const completed = (item.data.outputs || []).filter((pin) => pin.id === 'completed');
+              return {
+                ...item,
+                data: { ...item.data, outputs: [...thenPins, newPin, ...completed] },
+              };
+            });
+            touched.add(seqNode.id);
+          }
+          const branchConnection = { source: seqNode.id, sourceHandle: branchHandle, target, targetHandle };
+          if (validateConnection(nodes, edges, branchConnection)) {
+            edges = [...edges, { ...branchConnection, id: edgeIdFor(branchConnection, usedEdgeIds()), animated: true }];
+            touched.add(target);
+            applied.push(`Connected ${seqNode.id}.${branchHandle} -> ${target}.${targetHandle}`);
+            warnings.push(
+              `Canonicalized execution fan-out ${source}.${sourceHandle} -> ${target}.${targetHandle} through ${seqNode.id}.${branchHandle}`
+            );
+            continue;
+          }
+        } else {
+          // Insert a new Sequence node between the exec output and both targets.
+          const seqResolution = nodeTemplateForCommand('sequence', {});
+          if (seqResolution.template) {
+            const seqId = uniqueId('exec_fanout', usedNodeIds());
+            const seqData = createNodeData(seqResolution.template);
+            seqData.label = 'Sequence';
+            const sourcePosition = fanoutSource?.position || { x: 0, y: 0 };
+            const candidateNodes = [
+              ...nodes,
+              { id: seqId, type: 'custom', position: { x: sourcePosition.x + 220, y: sourcePosition.y + 120 }, data: seqData },
+            ];
+            const baseEdges = edges.filter((edge) => edge !== existingExecEdge);
+            const rewired = [
+              { source, sourceHandle, target: seqId, targetHandle: 'exec-in' },
+              { source: seqId, sourceHandle: 'then:0', target: existingExecEdge.target, targetHandle: existingExecEdge.targetHandle || 'exec-in' },
+              { source: seqId, sourceHandle: 'then:1', target, targetHandle },
+            ];
+            let candidateEdges = baseEdges;
+            let valid = true;
+            for (const connection of rewired) {
+              if (!validateConnection(candidateNodes, candidateEdges, connection)) {
+                valid = false;
+                break;
+              }
+              candidateEdges = [
+                ...candidateEdges,
+                { ...connection, id: edgeIdFor(connection, new Set(candidateEdges.map((edge) => edge.id))), animated: true },
+              ];
+            }
+            if (valid) {
+              nodes = candidateNodes;
+              edges = candidateEdges;
+              touched.add(seqId);
+              touched.add(source);
+              touched.add(target);
+              applied.push(`Added Sequence ${seqId} to fan out ${source}.${sourceHandle}`);
+              applied.push(`Connected ${seqId}.then:1 -> ${target}.${targetHandle}`);
+              warnings.push(
+                `Canonicalized execution fan-out: ${source}.${sourceHandle} now routes through ${seqId} (then:0 -> ${existingExecEdge.target}, then:1 -> ${target})`
+              );
+              continue;
+            }
+          }
+        }
+      }
+
       if (!validateConnection(nodes, edges, normalizedConnection)) {
         const currentSourceNode = nodeById(nodes, source);
         const currentTargetNode = nodeById(nodes, target);
@@ -1154,6 +1311,25 @@ export function applyFlowAuthoringCommands(input: FlowAuthoringApplyInput): Flow
       touched.add(end.id);
       applied.push(`Connected ${agent.id}.exec-out -> ${end.id}.exec-in`);
       warnings.push('Canonicalized terminal execution edge Agent -> On Flow End');
+    }
+  }
+
+  // Final invariant pass: drop loop-back edges that were added before the loop
+  // body wiring existed (the inline connect check can only see edges already
+  // present at that point).
+  const loopBackEdges = edges.filter((edge) => {
+    if (edge.targetHandle !== 'exec-in') return false;
+    const targetNode = nodeById(nodes, edge.target);
+    if (!targetNode || !LOOPING_NODE_TYPES.has(targetNode.data.nodeType)) return false;
+    const others = edges.filter((item) => item !== edge);
+    return execReachableFrom(others, edge.target, 'loop', edge.source);
+  });
+  if (loopBackEdges.length > 0) {
+    edges = edges.filter((edge) => !loopBackEdges.includes(edge));
+    for (const edge of loopBackEdges) {
+      warnings.push(
+        `Removed loop-back edge ${edge.source}.${edge.sourceHandle} -> ${edge.target}.${edge.targetHandle}; loop bodies return to the loop automatically when their execution chain ends`
+      );
     }
   }
 

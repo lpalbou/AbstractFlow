@@ -300,15 +300,24 @@ short-lived Gateway `basic-agent` planner run through the normal
 `/api/gateway/runs/start` path. Users can pin a specific assistant
 provider/model from the drawer. The assistant runs an autonomous authoring loop:
 each cycle reads the planner response from the run ledger, applies validated
-command batches, checks the updated graph, and continues until the draft is
-ready or explicitly blocked.
+command batches, checks the updated graph, and continues until the model
+declares the request satisfied or is explicitly blocked.
+
+Completion is model-owned: readiness checks are a structural floor that can
+demand more work, but they never stop the loop while the model returns
+`continue`. When the model declares `done` with clean readiness, the editor runs
+an acceptance review — a second model pass that compares the draft graph against
+the original request and the model's own declared acceptance criteria. Unmet
+findings are fed back into the loop as issues; if the review budget is exhausted
+the remaining findings are reported with the result instead of being hidden.
 
 The planner run receives a single prompt plus a system prompt with strict JSON
 instructions. Its runtime tool list is explicitly empty: authoring edits must
 come back as validated command JSON, not as Gateway tool calls. Prior user turns
-are included inside the current prompt, while assistant prose is represented by
-the current graph summary rather than replayed as separate chat-history
-messages. The visible graph remains the source of applied draft state.
+are included inside the current prompt, assistant turns are replayed as trimmed
+plan/result summaries (so pending plan items survive across turns), and applied
+cycles within a turn carry one-line notes of the model's own next steps. The
+visible graph remains the source of applied draft state.
 
 The drawer shows the prompt size that will be sent to Gateway and, when Gateway
 model-capability discovery is available, the selected model's context and output
@@ -350,6 +359,25 @@ snapshot.
 Each assistant turn ends with how the draft works, how to test it, and what to
 expect. The assistant changes the in-memory draft only. Users still review the
 graph, Save, Publish, and Run through the normal Gateway-backed controls.
+
+## Execution View
+
+The toolbar's execution-view toggle (node-to-node arrow icon) condenses the
+canvas to the control-flow skeleton. Only nodes linked by execution edges
+remain visible, along with those edges; data-only nodes (literals, concat,
+parsers) and data edges are hidden. Node positions are unchanged, so the
+layout matches the full view when switching back and forth.
+
+Each condensed node reuses the full-view node header — the same header color,
+uppercase title, and sheen — so a node is instantly recognizable across both
+modes. A family icon and silhouette add a second cue: events (pill), control
+flow such as Sequence or If/Else (sharp corners, with named branch rows in the
+dark node body), user interaction (speech-bubble corner), generative AI and
+generated media (rounded), tools & files, memory, subflow (double border), and
+logic/state. Runtime highlights (executing/recent) still apply in this view.
+
+The execution view is a reading mode: dropping new palette nodes is blocked
+with a hint, while moving nodes and rewiring execution pins remain available.
 
 ## Structured Output Schemas
 
@@ -515,12 +543,21 @@ For each user turn:
    context building, model/tool/generative actions, transforms, state, side
    effects, outputs, and observability.
 2. Inspect the current draft graph and preserve useful existing nodes.
-3. Check readiness issues and repair feedback.
+3. Check readiness issues, acceptance review findings, and repair feedback.
 4. Emit one coherent command batch for this cycle.
 5. After validation, continue with more commands if the graph still lacks
-   required behavior.
+   required behavior. The editor keeps cycling while you return
+   `status: continue`; readiness heuristics never declare completion for you.
 6. End with `status: done` only when the graph visibly implements the requested
-   workflow.
+   workflow. A separate acceptance review then compares the graph against the
+   user request; unmet findings come back as issues you must implement before
+   `done` is accepted.
+
+On the first cycle of a new request, declare `acceptance_criteria`: 3-8
+concrete, checkable statements derived from the request (the user's language is
+fine), such as "one LLM Call per participant, each with a distinct model pin
+default" or "a For loop bounded by the max-cycles input". These criteria guide
+the acceptance review and your own stopping decision.
 
 A good workflow is not just a chain that "runs". It is readable: node labels
 explain responsibility, data edges expose intent, and final outputs are wired to
@@ -1119,6 +1156,55 @@ apply.
 
 ## Best-In-Class Patterns
 
+These patterns are worked exemplars, not a closed list. Derive the graph
+structure from the request itself. The most common authoring failure is
+collapsing requested structure into a single Agent prompt that "simulates" it:
+if the user asks for multiple AI participants, distinct models, rounds/cycles,
+or visible intermediate state, those must exist as nodes and edges, not as
+sentences inside one prompt.
+
+### Iterative Multi-Participant Discussion (Loop + State)
+
+Request shape: "N AIs discuss a topic for up to M rounds, each round deepens
+the reasoning, then a final answer is synthesized from the whole discussion."
+
+Expected graph responsibilities:
+
+- On Flow Start outputs: topic, participant count, max rounds (numbers).
+- A model pool: `literal_array` of model id strings (or `provider_models` when
+  the pool must be discovered), sliced/selected to the participant count.
+- Round loop: `for` with `start=0`, `end` from the max-rounds input,
+  `for.loop -> participant loop.exec-in`, `for.done -> synthesis`.
+- Participant loop: `loop` (ForEach) over the model array;
+  `loop.item -> LLM Call.model` so each participant uses a different model.
+- Discussion state: declare a transcript variable; inside the participant loop,
+  `get_var(transcript)` feeds prompt building (String Template with topic,
+  round index, transcript so far, and the participant's role), and after the
+  call `Array Append(transcript, contribution)` (or Concat for a text
+  transcript) -> `set_var(transcript)`.
+- Each participant prompt must instruct the model to advance the discussion
+  (challenge, refine, add evidence), not repeat prior turns.
+- Synthesis: after `for.done`, a final LLM Call receives the topic plus the
+  full transcript via `get_var` and produces the final answer.
+- On Flow End: final answer, transcript (or transcript file path), round count.
+
+One Agent node prompted to "simulate a discussion between N AIs" does not
+satisfy this request: there is one model, one call, and no visible rounds.
+
+### Multi-Model Fan-Out (Different Model Per Call)
+
+Request shape: "ask several different models the same question and compare /
+merge their answers."
+
+- One `llm_call` per pinned model (set the `model` pin default per node), wired
+  in `sequence` or `parallel`; or a `loop` over a model-array feeding one
+  `llm_call.model` pin with `array_append` accumulation when the model list is
+  dynamic.
+- Accumulate responses into an object/array variable, then a synthesis
+  LLM Call compares or merges them.
+- Expose each model's answer (or the accumulated object) and the synthesis at
+  On Flow End.
+
 ### Deep Research With Markdown And PDF Outputs
 
 Expected graph responsibilities:
@@ -1236,13 +1322,24 @@ If validation rejects a batch:
 If readiness remains after a successful batch, continue with another command
 batch. Do not declare completion early.
 
+### Acceptance Review
+
+Readiness checks are structural floors; they cannot verify that the graph means
+what the user asked. When you return `status: done` with clean readiness, the
+editor runs an acceptance review: a reviewer receives the user request, your
+declared `acceptance_criteria`, and the current graph summary, and returns
+unmet findings. Findings come back in the next cycle under
+`ACCEPTANCE REVIEW FINDINGS TO RESOLVE` and must be implemented in the graph
+(not argued with) before `done` is accepted.
+
 ## Response Requirements
 
 Every turn must include:
 
 - how the workflow works;
 - how to test it with the normal Save/Run path;
-- what to expect from outputs and artifacts.
+- what to expect from outputs and artifacts;
+- `acceptance_criteria` on the first cycle of each new request.
 
 Successful chat replies should be concise. Failure replies should include enough
 planner and validator detail to debug the graph.
@@ -3365,6 +3462,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added a toolbar Execution View toggle that condenses the canvas to the control-flow skeleton: only nodes linked by execution edges (and those edges) stay visible, rendered as compact cards with per-family color, shape, and iconography (events, control flow, user interaction, generative AI, generated media, tools & files, memory, subflow, logic & state). Node positions are preserved so switching between views keeps the same layout.
+- Added a `Ctrl/⌘+S` keyboard shortcut that saves the current flow and suppresses the browser "Save page" dialog inside the editor.
+- Added a leave-page confirmation (`beforeunload`) when the flow has unsaved changes or a save is still in flight, preventing silent loss of graph edits.
+- Added a node palette search empty state ("No nodes match …" with a Clear search action) instead of a blank list when a search has no results.
+- Added a first-use empty-canvas hint that explains dragging nodes from the palette and disappears once the flow has nodes.
 - Added first-class `Read PDF` and `Write PDF` VisualFlow nodes so workflows can extract PDF text/metadata and render report content to real PDF files through Runtime.
 - Added a first-class Restore / Upscale Image media node backed by Gateway's `upscaled_image` contract and `image_upscale` vision catalog task.
 - Added a right-drawer Workflow Authoring Assistant that reads `docs/workflow-authoring-skill.md` plus a complete generated node catalog, drafts edits through Gateway's default `output.text` model unless a model is pinned, applies only validated graph commands, and fails closed without draft changes when Gateway/model/JSON/command validation fails.
@@ -3375,6 +3477,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added switch-friendly structured-output authoring: enum-backed response fields can be discovered through Parse JSON / Break Object and synced into explicit Switch cases.
 
 ### Changed
+- Workflow Authoring Assistant completion is now model-owned: the autonomous loop keeps cycling while the planner returns `continue` instead of force-stopping as soon as heuristic readiness checks pass (which previously cut the model off mid-build on requests outside the research/PDF/Markdown keyword heuristics, e.g. non-English multi-AI discussion workflows).
+- Workflow Authoring Assistant now runs an acceptance review before accepting `done`: the planner declares per-request acceptance criteria, and a second model pass compares the draft graph against the original request; unmet findings are fed back into the loop as issues, and any findings left when the review budget is exhausted are reported with the result instead of being hidden.
+- Workflow Authoring Assistant now preserves the planner's own plan memory: applied cycles carry one-line next-step notes into later cycles, and assistant turns are replayed across user turns as trimmed plan/result summaries (`#TRUNCATION`-labeled) so pending plan items are no longer forgotten between turns.
+- Workflow authoring skill now documents iterative multi-participant discussion (loop + state) and multi-model fan-out patterns, and the system prompt explicitly forbids collapsing requested multi-participant/multi-model/iteration structure into a single Agent prompt simulation.
+- Redesigned the editor toolbar: consistent stroke SVG icons replace mixed emoji/glyphs, actions are organized into segmented groups (file, import/export, run + history, gateway publish/lifecycle/models, workspace tools), Run is a labeled primary button with a running spinner, and the Connect/Disconnect button shows a live connection status dot.
+- Execution View compact nodes now reuse the full-view node header (same per-node header color, uppercase title, and sheen) over a dark node body, so node identity carries across both modes while family icon and silhouette cues remain; the full-view header gained the same subtle sheen for harmony.
+- Replaced the Execution View toolbar glyph (three dots on a line, easily read as a plain line) with a clearer node-to-node arrow icon, and toggle buttons now use accent-tinted pressed styling that works in all themes.
+- Toolbar buttons now use fast AfTooltip hints (with disabled-state explanations and the save shortcut) instead of slow native `title` tooltips; `AfTooltip` gained a `minWidthPx` override for compact hints.
 - Model residency and media provider/model selectors now include the `image_upscale` task for Gateway/Core upscaler discovery and explicit load/unload steps.
 - Workflow Authoring Assistant PDF readiness now requires an executable `Write PDF` node and exposed PDF path instead of accepting Code or generic Write File workarounds.
 - Compact node rendering now uses a shared pin disclosure policy so nodes show required, connected, or explicitly configured pins by default and hide optional/default/diagnostic pins behind a chevron.
@@ -3385,6 +3495,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Restyled the schema-pin editor modal with clearer titles, validation, and editable Choice chips while keeping saved data as standard JSON Schema.
 
 ### Fixed
+- Theme support: the theme selector dropdown (and other AfSelect popovers) no longer hardcodes dark panel colors that broke light themes — app-level overrides were removed in favor of the ui-kit's theme-aware styles, with node-scoped colors kept for inline pin selects inside the intentionally dark node frames.
+- Theme support: toolbar group chrome, toggle states, the offline connection dot, and the empty-canvas hint now derive from theme variables instead of white-alpha/hardcoded darks, so they stay visible in light themes.
+- Theme support: the edge underlay now follows the canvas background color per theme, removing the chain-link edge artifacts that appeared on light themes.
 - Workflow Authoring Assistant requests now keep full prior turns inside the current prompt instead of sending assistant-led chat history to OpenAI-compatible endpoints, avoiding LM Studio/Qwen prompt-template failures without imposing a local model-context cap.
 - Model selectors now request provider models with the appropriate capability route so discovery stays aligned with Gateway/Core model capability metadata.
 - Optional single-pin disclosures no longer collapse unnecessarily, and thinking pins stay hidden for models without detected thinking support unless already configured.
