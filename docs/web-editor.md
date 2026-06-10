@@ -87,6 +87,15 @@ plan/result summaries (so pending plan items survive across turns), and applied
 cycles within a turn carry one-line notes of the model's own next steps. The
 visible graph remains the source of applied draft state.
 
+Session policy: one durable Gateway session per workflow conversation. The
+session id is scoped to the workflow storage key (never shared across
+workflows), follows a draft when it is promoted to a saved flow, and is
+rotated by Clear Chat — so gateway-side agent memory restarts together with
+the visible conversation. Because the gateway agent replays session memory
+into the model context, the prompt anchors a language directive at the request
+site and marks replayed conversation as historical, so the active request —
+not session history in another language — controls the output language.
+
 Plan responses are parsed tolerantly: the JSON object is extracted even when the
 model wraps it in markdown fences or surrounding prose. A planner response that
 is still unusable (empty run output, or truncated/invalid plan JSON) does not
@@ -94,17 +103,31 @@ abort the turn: the same cycle is retried with a corrective format note (bare
 JSON only, smaller command batches), up to three unusable responses per turn.
 Each retry is logged in the activity feed.
 
+A command-less `continue` cycle does not abort the turn either: the model gets
+a corrective note (return commands, declare done, or ask the user) for up to
+two consecutive empty cycles, after which the turn ends as "needs your input"
+with the model's own reply — never as a hard authoring failure. The system
+prompt and skill explicitly tell the model to return `needs_user` with concrete
+questions when the request is ambiguous or repair cycles stop making progress;
+the user's answer in the next turn resumes with the full draft graph and
+conversation context. All user-visible workflow content (flow name, labels,
+prompts, replies) must match the language of the user request unless the user
+asks otherwise.
+
 While a turn runs, a live status card shows the current phase, the cycle
 number, an elapsed timer, and a real-time activity feed (plan request/response
 sizes, plan status and command counts, applied changes with labels, skipped or
 rejected commands, retries, readiness counts, and acceptance review events).
-The card header toggles a collapsed view, and the card persists after the turn
-ends with its final state (green dot for "Draft graph updated", red dot for
-"Authoring failed" or "Interrupted by user") so the cycle history can be
-reviewed post-turn. A Stop control — in the status card and in place of Send
-while busy — interrupts the autonomous loop between calls and best-effort
-cancels the in-flight Gateway planner run; applied edits stay in the draft and
-remain undoable via Undo Turn.
+Feed entries are grouped under per-cycle divider rows so iteration boundaries
+are scannable at a glance. The header carries a leading chevron with a hover
+state (collapse toggle) and a copy button that exports the whole activity feed
+— grouped by cycle, with elapsed timestamps — to the clipboard. The card
+persists after the turn ends with its final state (green dot for "Draft graph
+updated", red dot for "Authoring failed" or "Interrupted by user") so the
+cycle history can be reviewed post-turn. A Stop control — in the status card
+and in place of Send while busy — interrupts the autonomous loop between calls
+and best-effort cancels the in-flight Gateway planner run; applied edits stay
+in the draft and remain undoable via Undo Turn.
 
 Conversation actions are compact icon buttons on the input row (copy
 conversation, clear conversation, undo last turn) next to the Send/Stop button;
@@ -114,8 +137,8 @@ selected docs sections, or graph summary to fit a local limit, and it does not
 hardcode model context windows. The drawer conversation and draft text are
 persisted locally so closing and reopening the Assistant rail does not erase
 the ongoing authoring discussion. Clear resets the local assistant
-conversation, the planner session, and the persisted status card without
-changing the current graph. If the Gateway run, model call, structured
+conversation, rotates the workflow's durable Gateway session, and clears the
+persisted status card without changing the current graph. If the Gateway run, model call, structured
 response, or ledger read fails after the retry budget, the drawer reports that
 failure directly.
 
@@ -134,12 +157,22 @@ performs deterministic repairs that a human author would make: connecting an
 already-connected execution output is rewired through an auto-inserted (or
 extended) Sequence node, and loop-back edges from a loop body to the loop's
 `exec-in` are dropped with a warning because AbstractRuntime control frames
-return to the loop automatically when the body chain ends.
+return to the loop automatically when the body chain ends. Rejection messages
+list the node's real pins so a wrong handle guess can be corrected on the next
+cycle, and Variable nodes are configurable through the same commands used
+elsewhere (`set_pin_default` on `name`/`value`, or `set_literal` with the
+declaration config). Unlabeled nodes are flagged as non-blocking notes so
+generated graphs stay readable.
 
 Research-oriented readiness checks require an authored Agent system prompt,
 explicit tool configuration when web tools are needed, prompt-building nodes,
 sources/citations that are not `Agent.meta`, an audit trace, and final outputs.
 `Agent Trace Report` is accepted only for audit output, not as a report source.
+These checks apply only when the request's deliverable is researched content
+(deep research, internet/web research, news, digests, job search, or "research"
+coupled to a workflow/report deliverable in the same sentence); an incidental
+mention of "research" — such as "discussion, research, and deepening of ideas"
+— does not force the research scaffold onto an unrelated workflow.
 When a request asks for Markdown/PDF artifacts, the assistant must create
 an executable `Write File` node for Markdown and an executable `Write PDF` node
 for PDF. `Write PDF` renders report text or Markdown-style content to real PDF

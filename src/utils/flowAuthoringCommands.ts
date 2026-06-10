@@ -1,7 +1,7 @@
 import type { Edge, Node } from 'reactflow';
 import type { FlowNodeData, JsonValue, NodeType, Pin, PinType } from '../types/flow';
 import { createNodeData, getAllNodeTemplates, getNodeTemplate, type NodeTemplate } from '../types/nodes';
-import { getConnectionError, validateConnection } from './validation';
+import { getConnectionError, inferRouteOverrideRouteKey, validateConnection } from './validation';
 
 export interface FlowAuthoringSnapshot {
   flowName: string;
@@ -99,6 +99,18 @@ function toJsonValue(value: unknown): JsonValue | undefined {
   return isJsonValue(value) ? clone(value) : undefined;
 }
 
+/**
+ * Short human-readable preview of a written value for applied-change logs.
+ * Without it, "Set node.provider" hides WHAT was set (observed: a user could
+ * not tell which provider the assistant had chosen, and the assistant itself
+ * could not see that it kept rewriting the same empty string).
+ */
+function describePinValue(value: JsonValue): string {
+  const text = JSON.stringify(value);
+  if (typeof text !== 'string') return String(value);
+  return text.length > 60 ? `${text.slice(0, 57)}…` : text;
+}
+
 function toolNamesFromValue(value: unknown): string[] | null {
   if (!Array.isArray(value)) return null;
   const names: string[] = [];
@@ -116,6 +128,61 @@ function toolNamesFromValue(value: unknown): string[] | null {
 
 function cleanText(value: unknown, maxLen: number): string {
   return typeof value === 'string' ? value.trim().slice(0, maxLen) : '';
+}
+
+/**
+ * Variable declaration nodes (var_decl/bool_var) keep their configuration in
+ * literalValue ({name, type, default}) rather than input pins. The helpers
+ * below let authoring commands address that configuration through the same
+ * commands used elsewhere (set_pin_default on the visible name/value pins, or
+ * set_literal with the config object) instead of refusing them.
+ */
+const VARIABLE_DECL_NODE_TYPES = new Set<NodeType>(['var_decl', 'bool_var']);
+
+const VARIABLE_DECL_VALUE_TYPES = new Set<string>([
+  'boolean', 'number', 'string', 'object', 'json_schema', 'assertion', 'assertions', 'array', 'tools', 'any',
+  'provider', 'model', 'provider_text', 'model_text', 'provider_image', 'model_image',
+  'provider_voice', 'model_voice', 'provider_music', 'model_music',
+]);
+
+interface VariableDeclConfig {
+  name: string;
+  type: string;
+  default: JsonValue;
+}
+
+function variableDeclConfigFrom(node: Node<FlowNodeData>): VariableDeclConfig {
+  const fallbackType = node.data.nodeType === 'bool_var' ? 'boolean' : 'any';
+  const raw = asRecord(node.data.literalValue);
+  if (!raw) return { name: '', type: fallbackType, default: null };
+  return {
+    name: typeof raw.name === 'string' ? raw.name.trim() : '',
+    type: typeof raw.type === 'string' && VARIABLE_DECL_VALUE_TYPES.has(raw.type) ? raw.type : fallbackType,
+    default: toJsonValue(raw.default) ?? null,
+  };
+}
+
+function inferVariableDeclType(value: JsonValue): string {
+  if (typeof value === 'boolean') return 'boolean';
+  if (typeof value === 'number') return 'number';
+  if (typeof value === 'string') return 'string';
+  if (Array.isArray(value)) return 'array';
+  if (value && typeof value === 'object') return 'object';
+  return 'any';
+}
+
+function withVariableDeclConfig(node: Node<FlowNodeData>, config: VariableDeclConfig): Node<FlowNodeData> {
+  const type = node.data.nodeType === 'bool_var' ? 'boolean' : config.type;
+  return {
+    ...node,
+    data: {
+      ...node.data,
+      literalValue: { name: config.name, type, default: config.default },
+      // Keep the value output pin's editor type in sync, mirroring the inline
+      // VarDecl editor behavior.
+      outputs: node.data.outputs.map((pin) => (pin.id === 'value' ? { ...pin, type: type as PinType } : pin)),
+    },
+  };
 }
 
 function cleanCodeBody(value: unknown): string | null {
@@ -398,7 +465,9 @@ export function makeFlowAuthoringSnapshot(
  */
 function commandOrderRank(kind: string): number {
   if (kind === 'add_node') return 0;
-  if (kind === 'connect') return 2;
+  // disconnect shares the connect rank so "disconnect a->b, connect c->b"
+  // batches apply in the order the model emitted them (stable sort).
+  if (kind === 'connect' || kind === 'disconnect') return 2;
   if (kind === 'delete_node' || kind === 'delete_edge') return 3;
   return 1;
 }
@@ -500,7 +569,13 @@ export function applyFlowAuthoringCommands(input: FlowAuthoringApplyInput): Flow
       const id = uniqueId(requestedId, usedNodeIds());
       const data = createNodeData(template);
       const label = cleanText(command.label, 120);
-      if (label) data.label = label;
+      if (label) {
+        data.label = label;
+      } else if (nodeType !== 'on_flow_start' && nodeType !== 'on_flow_end') {
+        // Default template labels ("Variable", "Array", ...) make multi-node
+        // graphs unreadable; nudge authors to name what each node does.
+        warnings.push(`Node ${id} (${nodeType}) was added without a label; use "label" or set_label to describe its role`);
+      }
       const defaultsErrors: string[] = [];
       const defaults = safePinDefaults(command.pinDefaults || command.pin_defaults || command.defaults, defaultsErrors, `add_node ${id}`);
       if (defaultsErrors.length > 0) {
@@ -612,9 +687,40 @@ export function applyFlowAuthoringCommands(input: FlowAuthoringApplyInput): Flow
         applied.push(`Set ${nodeId}.tools allowlist`);
         continue;
       }
+      // Variable declarations have no input pins; their name/default live in
+      // the declaration config. Authors naturally address the visible name and
+      // value pins, so map those onto the config instead of refusing.
+      if (VARIABLE_DECL_NODE_TYPES.has(node.data.nodeType) && (pin === 'name' || pin === 'value' || pin === 'default')) {
+        if (hasSecretLikeValue(pin, value)) {
+          errors.push(`set_pin_default refused secret-looking value for ${nodeId}.${pin}`);
+          continue;
+        }
+        const config = variableDeclConfigFrom(node);
+        if (pin === 'name') {
+          if (typeof value !== 'string' || !value.trim()) {
+            errors.push(`set_pin_default requires a non-empty string variable name for ${nodeId}.name`);
+            continue;
+          }
+          config.name = value.trim();
+        } else {
+          config.default = value;
+          if (config.type === 'any') config.type = inferVariableDeclType(value);
+        }
+        nodes = nodes.map((item) => (item.id === nodeId ? withVariableDeclConfig(item, config) : item));
+        touched.add(nodeId);
+        applied.push(
+          pin === 'name' ? `Named variable ${nodeId} "${config.name}"` : `Set variable ${nodeId} default value`
+        );
+        continue;
+      }
       const targetPin = pinById(node, pin, 'input');
       if (!targetPin) {
-        errors.push(`set_pin_default refused unknown input pin '${pin}' on ${nodeId}`);
+        const available = (node.data.inputs || [])
+          .filter((item) => item.type !== 'execution')
+          .map((item) => item.id);
+        errors.push(
+          `set_pin_default refused unknown input pin '${pin}' on ${nodeId}${available.length > 0 ? ` (available input pins: ${available.join(', ')})` : ' (node has no data input pins)'}`
+        );
         continue;
       }
       if (targetPin.type === 'execution') {
@@ -629,13 +735,23 @@ export function applyFlowAuthoringCommands(input: FlowAuthoringApplyInput): Flow
         errors.push(`set_pin_default refused Code full_access permissions on ${nodeId}`);
         continue;
       }
+      // Rewriting an identical default is not a change. Reporting it as
+      // "applied" lets a looping model believe it is making progress (observed:
+      // the same provider/model rewrite counted as 2 changes per cycle for 8
+      // cycles). Surface it as a warning instead so the no-op feedback paths
+      // and the stall guard see the truth.
+      const existingDefault = (node.data.pinDefaults || {})[pin];
+      if (existingDefault !== undefined && JSON.stringify(existingDefault) === JSON.stringify(value)) {
+        warnings.push(`${nodeId}.${pin} is already ${describePinValue(value)}; no change`);
+        continue;
+      }
       nodes = nodes.map((item) =>
         item.id === nodeId
           ? { ...item, data: { ...item.data, pinDefaults: { ...(item.data.pinDefaults || {}), [pin]: value } } }
           : item
       );
       touched.add(nodeId);
-      applied.push(`Set ${nodeId}.${pin}`);
+      applied.push(`Set ${nodeId}.${pin} = ${describePinValue(value)}`);
       continue;
     }
 
@@ -697,6 +813,25 @@ export function applyFlowAuthoringCommands(input: FlowAuthoringApplyInput): Flow
       }
       if (hasSecretLikeValue('literalValue', value)) {
         errors.push(`set_literal refused secret-looking value for ${nodeId}`);
+        continue;
+      }
+      // For variable declarations the literal IS the config: accept either the
+      // canonical {name, type, default} object or a bare value treated as the
+      // default, and keep the value output pin type in sync.
+      if (VARIABLE_DECL_NODE_TYPES.has(node.data.nodeType)) {
+        const config = variableDeclConfigFrom(node);
+        const rec = asRecord(value);
+        if (rec && (typeof rec.name === 'string' || 'default' in rec || typeof rec.type === 'string')) {
+          if (typeof rec.name === 'string' && rec.name.trim()) config.name = rec.name.trim();
+          if (typeof rec.type === 'string' && VARIABLE_DECL_VALUE_TYPES.has(rec.type)) config.type = rec.type;
+          if ('default' in rec) config.default = toJsonValue(rec.default) ?? null;
+        } else {
+          config.default = value;
+          if (config.type === 'any') config.type = inferVariableDeclType(value);
+        }
+        nodes = nodes.map((item) => (item.id === nodeId ? withVariableDeclConfig(item, config) : item));
+        touched.add(nodeId);
+        applied.push(`Configured variable ${nodeId}${config.name ? ` "${config.name}"` : ''}`);
         continue;
       }
       nodes = nodes.map((item) => (item.id === nodeId ? { ...item, data: { ...item.data, literalValue: value } } : item));
@@ -1187,6 +1322,73 @@ export function applyFlowAuthoringCommands(input: FlowAuthoringApplyInput): Flow
         }
       }
 
+      // Multi-entry route overrides take priority over replacement: on a node
+      // with several execution entry paths, a data pin may carry one edge per
+      // path (base edge + per-path overrides). Mirror the canvas onConnect
+      // behavior and add the override edge instead of replacing the base one.
+      const routeOverrideKey = inferRouteOverrideRouteKey(nodes, edges, normalizedConnection);
+      if (routeOverrideKey) {
+        const overrideEdge: Edge = {
+          ...normalizedConnection,
+          id: edgeIdFor(normalizedConnection, usedEdgeIds()),
+          animated: false,
+          data: { routeOverride: true, routeKey: routeOverrideKey },
+        };
+        edges = [...edges, overrideEdge];
+        touched.add(source);
+        touched.add(target);
+        applied.push(
+          `Connected ${source}.${sourceHandle} -> ${target}.${targetHandle} as per-path route override (${routeOverrideKey})`
+        );
+        continue;
+      }
+
+      // Single-entry data inputs hold exactly one connection (Blueprint
+      // semantics). When a valid edge from a different source targets an
+      // occupied data input, replace the existing edge — the gesture a human
+      // performs by re-dragging the wire. Without this the model has no way to
+      // rewire an input and burns repair cycles on "already connected"
+      // rejections. Multi-entry nodes (2+ incoming exec edges) are excluded:
+      // their base edge feeds every non-overridden path, so replacing it
+      // silently would change unrelated paths.
+      const replaceTargetNode = nodeById(nodes, target);
+      const replaceTargetPin = replaceTargetNode ? pinById(replaceTargetNode, targetHandle, 'input') : undefined;
+      const incomingExecCount = edges.filter((edge) => edge.target === target && edge.targetHandle === 'exec-in').length;
+      if (replaceTargetPin && replaceTargetPin.type !== 'execution' && incomingExecCount < 2) {
+        const occupied = edges.filter(
+          (edge) =>
+            edge.target === target &&
+            edge.targetHandle === targetHandle &&
+            !(edge.data && typeof edge.data === 'object' && !Array.isArray(edge.data) && (edge.data as Record<string, unknown>).routeOverride === true)
+        );
+        if (occupied.length === 1) {
+          const remaining = edges.filter((edge) => edge !== occupied[0]);
+          if (validateConnection(nodes, remaining, normalizedConnection)) {
+            const replacementEdge: Edge = {
+              ...normalizedConnection,
+              id: edgeIdFor(normalizedConnection, new Set(remaining.map((edge) => edge.id))),
+              animated: false,
+            };
+            edges = [...remaining, replacementEdge];
+            touched.add(source);
+            touched.add(target);
+            applied.push(
+              `Replaced ${target}.${targetHandle} input source ${occupied[0].source}.${occupied[0].sourceHandle} -> ${source}.${sourceHandle}`
+            );
+            continue;
+          }
+          // Replacement was applicable but the new edge is invalid on its own
+          // merits (e.g. type mismatch). Report that underlying reason —
+          // "already connected" would be misleading now that occupancy alone
+          // no longer blocks a connect.
+          const replaceReason = getConnectionError(nodes, remaining, normalizedConnection);
+          errors.push(
+            `connect refused invalid edge ${source}.${sourceHandle} -> ${target}.${targetHandle}${replaceReason ? ` (${replaceReason})` : ''}`
+          );
+          continue;
+        }
+      }
+
       if (!validateConnection(nodes, edges, normalizedConnection)) {
         const currentSourceNode = nodeById(nodes, source);
         const currentTargetNode = nodeById(nodes, target);
@@ -1230,6 +1432,42 @@ export function applyFlowAuthoringCommands(input: FlowAuthoringApplyInput): Flow
       touched.add(source);
       touched.add(target);
       applied.push(`Connected ${source}.${sourceHandle} -> ${target}.${targetHandle}`);
+      continue;
+    }
+
+    if (kind === 'disconnect') {
+      // Edge removal by endpoints. Unlike delete_edge (internal edge ids the
+      // model never sees), disconnect uses the same endpoint vocabulary as
+      // connect, and edge removal is recoverable via the turn snapshot, so it
+      // does not require the destructive-edits flag.
+      const sourceEndpoint = splitEndpoint(command.source || command.sourceNodeId || command.source_node_id, command.sourceHandle || command.source_handle, idMap);
+      const targetEndpoint = splitEndpoint(command.target || command.targetNodeId || command.target_node_id, command.targetHandle || command.target_handle, idMap);
+      const source = sourceEndpoint.node;
+      const target = targetEndpoint.node;
+      const sourceHandle = sourceEndpoint.handle;
+      const targetHandle = targetEndpoint.handle;
+      if (!source || !target || !sourceHandle || !targetHandle) {
+        errors.push('disconnect requires source/sourceHandle/target/targetHandle');
+        continue;
+      }
+      const match = edges.find(
+        (edge) =>
+          edge.source === source && edge.sourceHandle === sourceHandle && edge.target === target && edge.targetHandle === targetHandle
+      );
+      if (!match) {
+        const incoming = edges
+          .filter((edge) => edge.target === target && edge.targetHandle === targetHandle)
+          .map((edge) => `${edge.source}.${edge.sourceHandle}`)
+          .join(', ');
+        errors.push(
+          `disconnect found no edge ${source}.${sourceHandle} -> ${target}.${targetHandle}${incoming ? ` (current sources into ${target}.${targetHandle}: ${incoming})` : ''}`
+        );
+        continue;
+      }
+      edges = edges.filter((edge) => edge !== match);
+      touched.add(source);
+      touched.add(target);
+      applied.push(`Disconnected ${source}.${sourceHandle} -> ${target}.${targetHandle}`);
       continue;
     }
 

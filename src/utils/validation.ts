@@ -160,6 +160,16 @@ export function areTypesCompatible(
     return artifactCompatibility;
   }
 
+  // 'any' is the dynamic escape hatch: ForEach item, Get Variable value, Code
+  // outputs, and Parse JSON results are all 'any'. It must stay connectable to
+  // nominal provider/model pins too, otherwise documented patterns like
+  // iterating a model array into LLM Call.model (loop.item -> model) or reading
+  // a model-typed variable via Get Variable are unconstructible. Artifact pins
+  // already accept 'any' for the same reason.
+  if (sourceType === 'any' || targetType === 'any') {
+    return true;
+  }
+
   // Providers are modality-scoped nominal values. They should only wire into
   // provider-compatible pins, not into generic payload/string params where the
   // graph would look like a provider variable was available but arrive as an
@@ -174,12 +184,6 @@ export function areTypesCompatible(
   // the catalog; model aliases remain compatible only with other model pins.
   if (MODEL_PIN_TYPES.has(sourceType) || MODEL_PIN_TYPES.has(targetType)) {
     return MODEL_PIN_TYPES.has(sourceType) && MODEL_PIN_TYPES.has(targetType);
-  }
-
-  // 'any' accepts payload values after nominal/control-like pin types had a
-  // chance to reject accidental cross-wiring above.
-  if (sourceType === 'any' || targetType === 'any') {
-    return true;
   }
 
   // Object can connect to object (for JSON compatibility)
@@ -273,12 +277,16 @@ export function getConnectionError(
     (p) => p.id === connection.targetHandle
   );
 
+  // Listing the real pins lets authors (and the authoring assistant) self-
+  // correct guessed handles like for.end instead of retrying blind.
   if (!sourcePin) {
-    return `Output pin '${connection.sourceHandle}' not found`;
+    const available = sourceNode.data.outputs.map((p) => p.id).join(', ');
+    return `Output pin '${connection.sourceHandle}' not found${available ? ` (available outputs: ${available})` : ''}`;
   }
 
   if (!targetPin) {
-    return `Input pin '${connection.targetHandle}' not found`;
+    const available = targetNode.data.inputs.map((p) => p.id).join(', ');
+    return `Input pin '${connection.targetHandle}' not found${available ? ` (available inputs: ${available})` : ''}`;
   }
 
   const isExecutionConnection = sourcePin.type === 'execution' && targetPin.type === 'execution';
@@ -297,7 +305,14 @@ export function getConnectionError(
       if (incomingExecCount > 1) {
         return `Input pin '${connection.targetHandle}' already has a default value. For multi-entry nodes, connect from a direct execution predecessor or use route overrides for per-path values.`;
       }
-      return `Input pin '${connection.targetHandle}' already connected`;
+      // Naming the current source lets authors (and the authoring assistant)
+      // decide whether the existing wiring is already correct instead of
+      // retrying the same edge blind.
+      const existing = edges.find(
+        (e) => e.target === connection.target && e.targetHandle === connection.targetHandle && edgeData(e).routeOverride !== true
+      );
+      const from = existing ? ` (from ${existing.source}.${existing.sourceHandle})` : '';
+      return `Input pin '${connection.targetHandle}' already connected${from}`;
     }
   }
 

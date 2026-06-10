@@ -354,17 +354,49 @@ body,
   gap: 8px;
 }
 
-/* The header is a button (collapse toggle); neutralize button chrome. */
+/* The header is a button (collapse toggle); neutralize button chrome but keep
+   a visible hover affordance so the collapse behavior is discoverable. */
 .assistant-run-status-header {
   width: 100%;
   margin: 0;
-  padding: 0;
+  padding: 4px 6px;
   border: none;
+  border-radius: 6px;
   background: transparent;
   color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.assistant-run-status-header:hover {
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+.assistant-run-status-header:hover .assistant-run-status-label {
+  color: var(--text-primary);
+}
+
+/* Copy-activity affordance in the status header. */
+.assistant-status-copy {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 22px;
+  border: 1px solid color-mix(in srgb, var(--text-primary) 22%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.assistant-status-copy:hover {
+  border-color: color-mix(in srgb, var(--accent-primary) 60%, transparent);
+  background: color-mix(in srgb, var(--accent-primary) 14%, transparent);
 }
 
 .assistant-run-status-dot {
@@ -454,6 +486,32 @@ body,
   gap: 7px;
   min-width: 0;
   color: var(--text-secondary);
+}
+
+/* Planning-cycle divider rows make iteration boundaries scannable. */
+.assistant-activity-cycle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 2px;
+  color: color-mix(in srgb, var(--accent-primary) 80%, var(--text-primary));
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.assistant-activity-cycle::before,
+.assistant-activity-cycle::after {
+  content: '';
+  flex: 1 1 auto;
+  height: 1px;
+  background: color-mix(in srgb, var(--accent-primary) 30%, transparent);
+}
+
+.assistant-activity-cycle::before {
+  max-width: 14px;
+  flex: 0 0 14px;
 }
 
 .assistant-activity-time {
@@ -588,6 +646,17 @@ body,
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+.assistant-actions-send {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.assistant-cycles-select {
+  font-size: var(--font-size-sm);
+  padding: 6px 8px;
 }
 
 .assistant-actions button.primary,

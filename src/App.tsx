@@ -85,6 +85,11 @@ function App() {
   const [connection_status, set_connection_status] = useState<GatewayConnectionStatus | null>(null);
   const [connection_required, set_connection_required] = useState(false);
   const [right_drawer_mode, set_right_drawer_mode] = useState<RightDrawerMode>(null);
+  // Once the assistant has been opened it stays mounted for the whole editor
+  // session (it renders null while hidden). Unmounting on tab switch would
+  // destroy the in-flight autonomous authoring loop plus all conversation,
+  // plan, and activity state that lives in the drawer.
+  const [assistant_mounted, set_assistant_mounted] = useState(false);
   const gateway_connected = has_browser_gateway_session(connection_status);
   const selected_node_id = selectedNode?.id || null;
   const assistant_open = right_drawer_mode === 'assistant';
@@ -104,6 +109,10 @@ function App() {
       return null;
     });
   }, [selected_node_id]);
+
+  useEffect(() => {
+    if (assistant_open) set_assistant_mounted(true);
+  }, [assistant_open]);
 
   useEffect(() => {
     if (!gpu_enabled) return;
@@ -250,9 +259,9 @@ function App() {
         <aside
           className={`sidebar right properties-drawer ${right_drawer_open ? 'open' : 'collapsed'} ${assistant_open ? 'assistant-drawer-open' : ''} ${properties_open ? 'properties-drawer-open' : ''}`}
         >
-          {right_drawer_open ? (
-            <div className="right-drawer-content">
-              {assistant_open ? <AuthoringAssistantDrawer isOpen={assistant_open} /> : null}
+          {right_drawer_open || assistant_mounted ? (
+            <div className="right-drawer-content" style={right_drawer_open ? undefined : { display: 'none' }}>
+              {assistant_mounted ? <AuthoringAssistantDrawer isOpen={assistant_open} /> : null}
               {properties_open ? <PropertiesPanel node={selectedNode} /> : null}
             </div>
           ) : null}

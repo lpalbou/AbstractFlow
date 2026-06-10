@@ -1,10 +1,11 @@
 /**
  * Browser harness for visually checking the Authoring Assistant drawer chrome:
  * bottom icon actions (copy/clear/undo + Send), and the collapsible live
- * activity status card. The left pane mounts the REAL drawer (idle state;
- * gateway calls fail by design in this harness). The right pane shows static
- * replicas of the busy and finished status card states using the exact
- * production class names, because those states require a live Gateway run.
+ * activity status card with cycle dividers and the header copy affordance.
+ * The left pane mounts the REAL drawer (idle state; gateway calls fail by
+ * design in this harness). The right pane shows static replicas of the busy
+ * and finished status card states using the exact production class names,
+ * because those states require a live Gateway run.
  *
  * Usage:
  *   npx vite --port 3015 --strictPort
@@ -12,7 +13,7 @@
  *   (append ?theme=one-light to check light themes)
  */
 
-import { useEffect } from 'react';
+import { Fragment, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { applyTheme } from '@abstractframework/ui-kit';
@@ -36,14 +37,16 @@ declare global {
   }
 }
 
-const SAMPLE_ACTIVITY = [
+const SAMPLE_ACTIVITY: Array<{ id: string; kind: string; time: string; text: string; cycle?: number }> = [
   { id: 'a1', kind: 'info', time: '0:00', text: 'Turn started (request 412 chars)' },
-  { id: 'a2', kind: 'model', time: '0:01', text: 'Cycle 1: sending plan request (28k chars prompt)' },
-  { id: 'a3', kind: 'model', time: '0:42', text: 'Cycle 1: response received (6k chars)' },
-  { id: 'a4', kind: 'model', time: '0:42', text: 'Cycle 1: plan status "continue" with 24 commands' },
-  { id: 'a5', kind: 'apply', time: '0:43', text: 'Cycle 1: applied 22 changes — Added On Flow Start; Added Boucle des cycles; Added LLM Call; +19 more' },
-  { id: 'a6', kind: 'error', time: '0:43', text: 'Cycle 1: skipped 2 invalid commands (kept the rest): connect refused invalid edge x.y -> z.w | …' },
-  { id: 'a7', kind: 'review', time: '1:58', text: 'Acceptance review 1/3: checking graph against the request…' },
+  { id: 'a2', kind: 'model', time: '0:01', text: 'Sending plan request (28k chars prompt)', cycle: 1 },
+  { id: 'a3', kind: 'model', time: '0:42', text: 'Response received (6k chars)', cycle: 1 },
+  { id: 'a4', kind: 'model', time: '0:42', text: 'Plan status "continue" with 24 commands', cycle: 1 },
+  { id: 'a5', kind: 'apply', time: '0:43', text: 'Applied 22 changes — Added On Flow Start; Added Cycle loop; Added LLM Call; +19 more', cycle: 1 },
+  { id: 'a6', kind: 'error', time: '0:43', text: 'Skipped 2 invalid commands (kept the rest): connect refused invalid edge x.y -> z.w | …', cycle: 1 },
+  { id: 'a7', kind: 'model', time: '0:44', text: 'Sending plan request (31k chars prompt)', cycle: 2 },
+  { id: 'a8', kind: 'apply', time: '1:32', text: 'Applied 9 changes — connected loop.loop -> llm.exec-in; +8 more', cycle: 2 },
+  { id: 'a9', kind: 'review', time: '1:58', text: 'Acceptance review 1/3: checking graph against the request…', cycle: 2 },
 ];
 
 function Chevron({ collapsed }: { collapsed: boolean }) {
@@ -54,15 +57,35 @@ function Chevron({ collapsed }: { collapsed: boolean }) {
   );
 }
 
+function CopyGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="9" width="11" height="11" rx="2" />
+      <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+    </svg>
+  );
+}
+
 function ActivityLog() {
   return (
     <div className="assistant-activity-log">
-      {SAMPLE_ACTIVITY.map((entry) => (
-        <div key={entry.id} className={`assistant-activity-entry ${entry.kind}`}>
-          <span className="assistant-activity-time">{entry.time}</span>
-          <span className="assistant-activity-text">{entry.text}</span>
-        </div>
-      ))}
+      {SAMPLE_ACTIVITY.map((entry, index) => {
+        const prevCycle = index > 0 ? SAMPLE_ACTIVITY[index - 1].cycle : undefined;
+        const showDivider = entry.cycle !== undefined && entry.cycle !== prevCycle;
+        return (
+          <Fragment key={entry.id}>
+            {showDivider ? (
+              <div className="assistant-activity-cycle">
+                <span>Cycle {entry.cycle}</span>
+              </div>
+            ) : null}
+            <div className={`assistant-activity-entry ${entry.kind}`}>
+              <span className="assistant-activity-time">{entry.time}</span>
+              <span className="assistant-activity-text">{entry.text}</span>
+            </div>
+          </Fragment>
+        );
+      })}
     </div>
   );
 }
@@ -71,17 +94,20 @@ function StatusCardReplica() {
   return (
     <div className="assistant-run-status active" style={{ marginTop: 10 }}>
       <button type="button" className="assistant-run-status-header">
+        <Chevron collapsed={false} />
         <span className="assistant-run-spinner" aria-hidden="true" />
         <span className="assistant-run-status-label">Planning workflow graph (cycle 2)</span>
         <span className="assistant-run-status-meta">2:14</span>
+        <span role="button" tabIndex={0} className="assistant-status-copy" title="Copy authoring activity">
+          <CopyGlyph />
+        </span>
         <span role="button" tabIndex={0} className="assistant-stop-button">
           Stop
         </span>
-        <Chevron collapsed={false} />
       </button>
       <ActivityLog />
       <div className="assistant-run-status-footer">
-        <span>22 changes applied</span>
+        <span>31 changes applied</span>
         <span>Readiness checks passed</span>
       </div>
     </div>
@@ -93,10 +119,13 @@ function FinishedCardReplica() {
   return (
     <div className="assistant-run-status active" style={{ marginTop: 10 }}>
       <button type="button" className="assistant-run-status-header">
+        <Chevron collapsed={false} />
         <span className="assistant-run-status-dot done" aria-hidden="true" />
         <span className="assistant-run-status-label">Draft graph updated</span>
         <span className="assistant-run-status-meta">3:41</span>
-        <Chevron collapsed={false} />
+        <span role="button" tabIndex={0} className="assistant-status-copy" title="Copy authoring activity">
+          <CopyGlyph />
+        </span>
       </button>
       <ActivityLog />
       <div className="assistant-run-status-footer">
@@ -112,10 +141,13 @@ function CollapsedCardReplica() {
   return (
     <div className="assistant-run-status blocked" style={{ marginTop: 10 }}>
       <button type="button" className="assistant-run-status-header">
+        <Chevron collapsed />
         <span className="assistant-run-status-dot blocked" aria-hidden="true" />
         <span className="assistant-run-status-label">Interrupted by user</span>
         <span className="assistant-run-status-meta">1:07</span>
-        <Chevron collapsed />
+        <span role="button" tabIndex={0} className="assistant-status-copy" title="Copy authoring activity">
+          <CopyGlyph />
+        </span>
       </button>
     </div>
   );

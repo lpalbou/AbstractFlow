@@ -4,14 +4,21 @@ import type { FlowNodeData, VisualFlow } from '../types/flow';
 import { applyFlowAuthoringCommands } from '../utils/flowAuthoringCommands';
 
 import {
+  activityClipboardText,
   assistantConversationClipboardText,
+  AUTHORING_CYCLE_OPTIONS,
+  AUTHORING_DEFAULT_MAX_CYCLES,
+  normalizeMaxCycles,
+  assistantSystemPrompt,
   assistantWorkflowStorageKey,
   authoringFailureMarkdown,
   AuthoringInterruptedError,
   buildAcceptanceReviewPrompt,
+  buildGatewayPromptContext,
   computeAuthoringReadiness,
   conversationContextFor,
   cycleNoteFor,
+  emptyBatchLoopAction,
   extractJsonObjectText,
   formatActivityTime,
   formatElapsed,
@@ -23,9 +30,13 @@ import {
   postApplyLoopAction,
   readinessProgressText,
   repairFeedbackText,
+  repeatedBatchProgress,
+  restoreActivityPanelState,
   shouldDisplayPlannerSubrunStatus,
   subRunIdsFromLedger,
   visiblePlannerStatus,
+  type AuthoringActivityEntry,
+  type PersistedActivityState,
 } from './AuthoringAssistantDrawer';
 
 function toVisualFlow(name: string, nodes: Node<FlowNodeData>[], edges: Edge[]): VisualFlow {
@@ -375,6 +386,97 @@ describe('AuthoringAssistantDrawer readiness', () => {
     );
   });
 
+  it('does not force the research scaffold onto a discussion workflow that merely mentions research', () => {
+    // Regression (draft-4517c65caf619): "genuine discussion, research, and
+    // deepening of ideas" triggered the full deep-research floor (Agent node,
+    // sources, citations, audit trace), producing 8 readiness issues the
+    // model could never satisfy with a multi-LLM discussion graph.
+    const discussionRequest =
+      'I would like you to create a workflow to determine (a) the number of AIs in a discussion and (b) the maximum number of discussion cycles between these AIs before concluding and providing an answer.\n\nThere must be a genuine discussion, research, and deepening of ideas. Each iteration must add something more to the reasoning and the discussion. When this discussion ends, a final response is provided to the user based on all the elements addressed.';
+    const readiness = computeAuthoringReadiness(
+      toVisualFlow('Discussion Multi-AI', [], []),
+      discussionRequest,
+      {}
+    );
+    expect(readiness.requiresResearchScaffold).toBe(false);
+    expect(readiness.issues).not.toContain('Add an Agent node for the research and reporting step.');
+    expect(readiness.issues).not.toContain('Expose sources or citations through a connected On Flow End data input.');
+  });
+
+  it('accepts a dynamically wired model pin with provider left on Gateway defaults', () => {
+    // Regression (flow 4a9eee4e): "Set both provider and model, or leave both
+    // blank" fired on llm_call.model wired from a loop item (a model pool).
+    // The demand was unsatisfiable without deleting a wire the design needed,
+    // and the authoring loop burned 10 cycles trying to clear it.
+    const result = applyFlowAuthoringCommands({
+      flowName: 'Untitled Flow',
+      flowInterfaces: [],
+      nodes: [],
+      edges: [],
+      commands: [
+        { action: 'add_node', id: 'start', nodeType: 'on_flow_start' },
+        { action: 'add_node', id: 'pool', nodeType: 'literal_array', templateLabel: 'Array' },
+        { action: 'set_literal', nodeId: 'pool', value: ['model-a', 'model-b'] },
+        { action: 'add_node', id: 'ploop', nodeType: 'loop' },
+        { action: 'add_node', id: 'llm', nodeType: 'llm_call' },
+        { action: 'add_node', id: 'end', nodeType: 'on_flow_end' },
+        { action: 'connect', source: 'start', sourceHandle: 'exec-out', target: 'ploop', targetHandle: 'exec-in' },
+        { action: 'connect', source: 'pool', sourceHandle: 'value', target: 'ploop', targetHandle: 'items' },
+        { action: 'connect', source: 'ploop', sourceHandle: 'loop', target: 'llm', targetHandle: 'exec-in' },
+        { action: 'connect', source: 'ploop', sourceHandle: 'item', target: 'llm', targetHandle: 'model' },
+        { action: 'connect', source: 'ploop', sourceHandle: 'done', target: 'end', targetHandle: 'exec-in' },
+      ],
+    });
+    expect(result.errors).toEqual([]);
+
+    const readiness = computeAuthoringReadiness(
+      toVisualFlow(result.flowName, result.nodes, result.edges),
+      'A discussion between several AIs using different models.',
+      {}
+    );
+    expect(readiness.issues.filter((issue) => /provider/i.test(issue))).toEqual([]);
+  });
+
+  it('flags a half-typed provider/model default pair with the current values', () => {
+    const result = applyFlowAuthoringCommands({
+      flowName: 'Untitled Flow',
+      flowInterfaces: [],
+      nodes: [],
+      edges: [],
+      commands: [
+        { action: 'add_node', id: 'start', nodeType: 'on_flow_start' },
+        { action: 'add_node', id: 'llm', nodeType: 'llm_call' },
+        { action: 'add_node', id: 'end', nodeType: 'on_flow_end' },
+        { action: 'set_pin_default', nodeId: 'llm', pin: 'provider', value: 'openai' },
+        { action: 'connect', source: 'start', sourceHandle: 'exec-out', target: 'llm', targetHandle: 'exec-in' },
+        { action: 'connect', source: 'llm', sourceHandle: 'exec-out', target: 'end', targetHandle: 'exec-in' },
+      ],
+    });
+    expect(result.errors).toEqual([]);
+
+    const readiness = computeAuthoringReadiness(
+      toVisualFlow(result.flowName, result.nodes, result.edges),
+      'Summarize a text.',
+      {}
+    );
+    // The message names the current values so users and the authoring model
+    // can see exactly what to fix (the old message gave no state at all, and
+    // the old check could not even see typed pin defaults).
+    expect(
+      readiness.issues.some((issue) =>
+        issue.includes('Provider is "openai" but model is blank')
+      )
+    ).toBe(true);
+  });
+
+  it('still requires the research scaffold for genuine research deliverables', () => {
+    const flow = toVisualFlow('Research', [], []);
+    expect(computeAuthoringReadiness(flow, 'Create an internet research workflow about a topic.', {}).requiresResearchScaffold).toBe(true);
+    expect(computeAuthoringReadiness(flow, DEEP_RESEARCH_REQUEST, {}).requiresResearchScaffold).toBe(true);
+    expect(computeAuthoringReadiness(flow, 'Build a research report with cited sources.', {}).requiresResearchScaffold).toBe(true);
+    expect(computeAuthoringReadiness(flow, 'Summarize tomorrow\'s news into a digest.', {}).requiresResearchScaffold).toBe(true);
+  });
+
   it('requires executable markdown and PDF artifact generation when requested', () => {
     const request = 'Create a deep research workflow that produces both markdown and PDF results.';
     const missingArtifacts = applyFlowAuthoringCommands({
@@ -425,6 +527,51 @@ describe('AuthoringAssistantDrawer loop completion ownership', () => {
   it('routes a done claim through acceptance review only when readiness is clean', () => {
     expect(postApplyLoopAction('done', 0)).toBe('request-review');
     expect(postApplyLoopAction('done', 2)).toBe('continue');
+  });
+
+  it('never hard-fails a command-less continue; it notes, retries, then stalls as blocked', () => {
+    // Regression (draft-4517c65caf619): a "continue" plan with zero commands
+    // used to throw "Gateway assistant returned no graph commands", killing
+    // the whole turn at cycle 8 of an otherwise progressing build.
+    expect(emptyBatchLoopAction('continue', 3, 0, 2)).toBe('note-and-continue');
+    expect(emptyBatchLoopAction('continue', 3, 1, 2)).toBe('note-and-continue');
+    expect(emptyBatchLoopAction('continue', 3, 2, 2)).toBe('stalled');
+  });
+
+  it('routes command-less done and blocked statuses correctly', () => {
+    expect(emptyBatchLoopAction('done', 0, 0, 2)).toBe('request-review');
+    // done with readiness issues gets a corrective cycle instead of a hard failure.
+    expect(emptyBatchLoopAction('done', 2, 0, 2)).toBe('note-and-continue');
+    expect(emptyBatchLoopAction('needs_user', 1, 0, 2)).toBe('blocked');
+    expect(emptyBatchLoopAction('failed', 0, 0, 2)).toBe('blocked');
+  });
+
+  it('counts identical applied batches with unchanged readiness as repetition, not progress', () => {
+    // Regression (flow 4a9eee4e): "Set provider; Set model" applied 8 times
+    // across 10 minutes, each cycle counted as progress because commands
+    // "applied", until the 20-cycle cap failed the turn.
+    const applied = ['Set llm.provider = ""', 'Set llm.model = ""'];
+    const issues = ['AI Participant Response: Provider is blank'];
+
+    const first = repeatedBatchProgress('', applied, issues, 0);
+    expect(first.repeats).toBe(0);
+    const second = repeatedBatchProgress(first.signature, applied, issues, first.repeats);
+    expect(second.repeats).toBe(1);
+    const third = repeatedBatchProgress(second.signature, applied, issues, second.repeats);
+    expect(third.repeats).toBe(2);
+  });
+
+  it('resets the repetition count when the batch or the readiness issues change', () => {
+    const issues = ['issue-a'];
+    const first = repeatedBatchProgress('', ['Set llm.provider = ""'], issues, 0);
+    const second = repeatedBatchProgress(first.signature, ['Set llm.provider = ""'], issues, first.repeats);
+    expect(second.repeats).toBe(1);
+    // Different batch -> reset.
+    const differentBatch = repeatedBatchProgress(second.signature, ['Connected a.x -> b.y'], issues, second.repeats);
+    expect(differentBatch.repeats).toBe(0);
+    // Same batch but the readiness issues changed -> real progress -> reset.
+    const differentIssues = repeatedBatchProgress(second.signature, ['Set llm.provider = ""'], [], second.repeats);
+    expect(differentIssues.repeats).toBe(0);
   });
 
   it('summarizes applied cycles with the pending plan for later cycles', () => {
@@ -534,5 +681,172 @@ describe('AuthoringAssistantDrawer conversation replay', () => {
     expect(context).toContain('Ajouter la logique de sélection de modèles');
     expect(context).toContain('#TRUNCATION');
     expect(context).toContain('Each AI must use a different model.');
+  });
+
+  it('gives follow-up turns the prior conversation AND the current workflow graph', () => {
+    // Build the current draft the way a prior turn would have left it.
+    const applied = applyFlowAuthoringCommands({
+      flowName: 'Discussion Multi-IA Itérative',
+      flowInterfaces: [],
+      nodes: [],
+      edges: [],
+      commands: [
+        { action: 'add_node', id: 'start', nodeType: 'on_flow_start' },
+        { action: 'add_node', id: 'var_transcript', nodeType: 'var_decl', label: 'Transcript de discussion' },
+        { action: 'set_pin_default', nodeId: 'var_transcript', pin: 'name', value: 'transcript' },
+        { action: 'add_node', id: 'synthesis_llm', nodeType: 'llm_call', label: 'Synthèse Finale' },
+        { action: 'connect', source: 'start', sourceHandle: 'exec-out', target: 'synthesis_llm', targetHandle: 'exec-in' },
+      ],
+    });
+    expect(applied.errors).toEqual([]);
+    const flow = toVisualFlow(applied.flowName, applied.nodes, applied.edges);
+
+    const followUpRequest = 'Ajoute un résumé par cycle dans le transcript.';
+    const readiness = computeAuthoringReadiness(flow, followUpRequest, {});
+    const context = buildGatewayPromptContext(
+      followUpRequest,
+      flow,
+      null,
+      [
+        { id: 'u1', role: 'user', content: 'Crée un workflow de discussion multi-IA.' },
+        { id: 'a1', role: 'assistant', content: 'Workflow de discussion multi-IA itérative complété avec succès.' },
+      ],
+      { readiness, tools: { text: 'No tools discovered.', selectedTools: 0, totalTools: 0 }, preflightOptions: {} }
+    );
+
+    // Prior conversation is replayed inside the prompt.
+    expect(context.prompt).toContain('Crée un workflow de discussion multi-IA.');
+    expect(context.prompt).toContain('complété avec succès');
+    // The live graph is replayed: nodes, labels, declared variable config, edges.
+    expect(context.prompt).toContain('CURRENT DRAFT GRAPH SUMMARY');
+    expect(context.prompt).toContain('var_transcript');
+    expect(context.prompt).toContain('Transcript de discussion');
+    expect(context.prompt).toContain('"name": "transcript"');
+    expect(context.prompt).toContain('synthesis_llm');
+    expect(context.prompt).toContain('start.exec-out');
+    // And the new request is the active instruction.
+    expect(context.prompt).toContain(followUpRequest);
+  });
+});
+
+describe('AuthoringAssistantDrawer language and follow-up question contract', () => {
+  it('instructs the model to match the request language and never embeds non-English example labels', () => {
+    // Regression: an English request produced a French workflow. The system
+    // prompt carried a French example label and no explicit language rule.
+    const prompt = assistantSystemPrompt();
+    expect(prompt).toContain('language of the USER REQUEST');
+    expect(prompt).not.toContain('Transcript de discussion');
+  });
+
+  it('anchors the language directive at the request site and marks replayed history as non-authoritative', () => {
+    // Regression: with a French prior conversation replayed in the prompt,
+    // an English follow-up request still produced French labels. The active
+    // request must carry the language rule next to its own text.
+    const flow = toVisualFlow('Untitled Flow', [], []);
+    const readiness = computeAuthoringReadiness(flow, 'Build a discussion workflow.', {});
+    const context = buildGatewayPromptContext(
+      'Build a discussion workflow.',
+      flow,
+      null,
+      [
+        { id: 'u1', role: 'user', content: 'Crée un workflow de discussion multi-IA.' },
+        { id: 'a1', role: 'assistant', content: 'Workflow créé avec succès.' },
+      ],
+      { readiness, tools: { text: 'No tools discovered.', selectedTools: 0, totalTools: 0 }, preflightOptions: {} }
+    );
+    expect(context.prompt).toContain('in the language of THIS request');
+    expect(context.prompt).toContain('the USER REQUEST above controls the language');
+    // The directive precedes the replayed (possibly other-language) history.
+    expect(context.prompt.indexOf('language of THIS request')).toBeLessThan(context.prompt.indexOf('Crée un workflow'));
+  });
+
+  it('instructs the model to ask the user instead of stalling in the loop', () => {
+    const prompt = assistantSystemPrompt();
+    expect(prompt).toContain('needs_user');
+    expect(prompt).toContain('Ask instead of stalling');
+    expect(prompt).toContain('Never return status "continue" with an empty commands array');
+  });
+});
+
+describe('AuthoringAssistantDrawer activity panel export', () => {
+  it('copies the activity feed grouped by planning cycle', () => {
+    const start = Date.now();
+    const entries: AuthoringActivityEntry[] = [
+      { id: 'a', ts: start, kind: 'info', text: 'Turn started (request 120 chars)' },
+      { id: 'b', ts: start + 5000, kind: 'model', text: 'Sending plan request (12k chars prompt)', cycle: 1 },
+      { id: 'c', ts: start + 65000, kind: 'apply', text: 'Applied 14 changes — added start; added loop; +12 more', cycle: 1 },
+      { id: 'd', ts: start + 70000, kind: 'model', text: 'Sending plan request (15k chars prompt)', cycle: 2 },
+      { id: 'e', ts: start + 130000, kind: 'error', text: 'Batch rejected (1 error)', cycle: 2 },
+    ];
+    const text = activityClipboardText('Authoring complete', entries, start);
+    expect(text).toContain('# Authoring Activity — Authoring complete');
+    expect(text).toContain('## Cycle 1');
+    expect(text).toContain('## Cycle 2');
+    expect(text).toContain('[0:05] Sending plan request (12k chars prompt)');
+    expect(text).toContain('[2:10] Batch rejected (1 error)');
+    // Pre-cycle entries appear before the first cycle header.
+    expect(text.indexOf('Turn started')).toBeLessThan(text.indexOf('## Cycle 1'));
+  });
+});
+
+describe('AuthoringAssistantDrawer max cycles selection', () => {
+  it('accepts only supported cycle caps and defaults to 40', () => {
+    expect(AUTHORING_DEFAULT_MAX_CYCLES).toBe(40);
+    expect(AUTHORING_CYCLE_OPTIONS).toEqual([10, 20, 40, 60, 80]);
+    for (const option of AUTHORING_CYCLE_OPTIONS) {
+      expect(normalizeMaxCycles(option)).toBe(option);
+      expect(normalizeMaxCycles(String(option))).toBe(option);
+    }
+    // Foreign/corrupted values fall back to the default.
+    for (const bad of [null, undefined, '', '50', 50, 0, -10, 'lots', Number.NaN]) {
+      expect(normalizeMaxCycles(bad)).toBe(AUTHORING_DEFAULT_MAX_CYCLES);
+    }
+  });
+});
+
+describe('AuthoringAssistantDrawer activity panel persistence', () => {
+  it('round-trips a terminal status card through persisted JSON', () => {
+    const persisted: PersistedActivityState = {
+      activity: [
+        { id: 'a', ts: 1000, kind: 'info', text: 'Turn started' },
+        { id: 'b', ts: 2000, kind: 'apply', text: 'Applied 12 changes', cycle: 1 },
+      ],
+      turnStartedAt: 1000,
+      statusCollapsed: true,
+      workingStatus: { stage: 'done', label: 'Draft graph updated', applied: 12, issues: 0 },
+    };
+
+    const restored = restoreActivityPanelState(JSON.stringify(persisted));
+
+    expect(restored).toEqual(persisted);
+  });
+
+  it('marks a persisted in-flight turn as interrupted instead of still running', () => {
+    // The autonomous loop is in-memory; if the page reloaded mid-turn the
+    // restored card must not pretend the run is still progressing.
+    const persisted: PersistedActivityState = {
+      activity: [{ id: 'a', ts: 1000, kind: 'model', text: 'Sending plan request', cycle: 3 }],
+      turnStartedAt: 1000,
+      statusCollapsed: false,
+      workingStatus: { stage: 'applying_commands', label: 'Applying commands', applied: 4, issues: 2, detail: 'cycle 3' },
+    };
+
+    const restored = restoreActivityPanelState(JSON.stringify(persisted));
+
+    expect(restored.workingStatus?.stage).toBe('blocked');
+    expect(restored.workingStatus?.label).toBe('Interrupted (editor reloaded)');
+    expect(restored.workingStatus?.detail).toBeUndefined();
+    expect(restored.workingStatus?.applied).toBe(4);
+    expect(restored.activity).toHaveLength(1);
+  });
+
+  it('returns an empty panel for missing or corrupted persisted state', () => {
+    for (const raw of [null, '', 'not-json', '{"activity":"nope"}']) {
+      const restored = restoreActivityPanelState(raw);
+      expect(restored.activity).toEqual([]);
+      expect(restored.workingStatus).toBeNull();
+      expect(restored.turnStartedAt).toBeNull();
+      expect(restored.statusCollapsed).toBe(false);
+    }
   });
 });

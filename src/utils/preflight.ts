@@ -59,6 +59,42 @@ function artifactInputPresent(edges: Edge[], node: Node<FlowNodeData>, ...handle
   return false;
 }
 
+/**
+ * Provider/model pairing rule for LLM Call and Agent nodes.
+ *
+ * The runtime treats provider and model as independently optional (each falls
+ * back to Gateway/client defaults when blank), and a CONNECTED pin is resolved
+ * at runtime — e.g. a model pool feeding `llm_call.model` per loop iteration
+ * with provider left on Gateway defaults is a valid, intended pattern. The old
+ * "set both or leave both blank" rule fired on that pattern and was impossible
+ * to satisfy without deleting a wire the design required (observed: an
+ * authoring run burned 10 cycles trying to clear it). It also read only the
+ * effect config, so typed pin defaults could never satisfy it.
+ *
+ * The rule now fires only for half-typed DEFAULTS (one side typed, the other
+ * blank and unconnected) — an actionable state — and the message names the
+ * current values so both users and the authoring model can see what to fix.
+ */
+function providerModelPairingIssue(
+  edges: Edge[],
+  node: Node<FlowNodeData>,
+  agentConfig?: Record<string, unknown>
+): string | null {
+  if (inputConnected(edges, node.id, 'provider') || inputConnected(edges, node.id, 'model')) return null;
+  const configured = (key: string): string => {
+    const fromAgent = agentConfig?.[key];
+    if (isNonEmptyString(fromAgent)) return fromAgent.trim();
+    const value = configValue(node, key);
+    return isNonEmptyString(value) ? value.trim() : '';
+  };
+  const provider = configured('provider');
+  const model = configured('model');
+  if (Boolean(provider) === Boolean(model)) return null;
+  return provider
+    ? `Provider is "${provider}" but model is blank — set a model too, or clear provider to use Gateway defaults`
+    : `Model is "${model}" but provider is blank — set its provider too, or clear model to use Gateway defaults`;
+}
+
 function pinTypeOf(node: Node<FlowNodeData>, handleId: string, isInput: boolean): string | null {
   const pins = isInput ? node.data.inputs : node.data.outputs;
   const p = pins?.find((x) => x.id === handleId);
@@ -164,24 +200,9 @@ export function computeRunPreflightIssues(
     }
 
     const t = n.data.nodeType;
-    if (t === 'llm_call') {
-      const providerExplicit =
-        inputConnected(edges, n.id, 'provider') || isNonEmptyString(n.data.effectConfig?.provider);
-      const modelExplicit =
-        inputConnected(edges, n.id, 'model') || isNonEmptyString(n.data.effectConfig?.model);
-      if (providerExplicit !== modelExplicit) {
-        push(n, 'Set both provider and model, or leave both blank for Gateway defaults');
-      }
-    }
-
-    if (t === 'agent') {
-      const providerExplicit =
-        inputConnected(edges, n.id, 'provider') || isNonEmptyString(n.data.agentConfig?.provider);
-      const modelExplicit =
-        inputConnected(edges, n.id, 'model') || isNonEmptyString(n.data.agentConfig?.model);
-      if (providerExplicit !== modelExplicit) {
-        push(n, 'Set both provider and model, or leave both blank for Gateway defaults');
-      }
+    if (t === 'llm_call' || t === 'agent') {
+      const pairingIssue = providerModelPairingIssue(edges, n, t === 'agent' ? (n.data.agentConfig as Record<string, unknown> | undefined) : undefined);
+      if (pairingIssue) push(n, pairingIssue);
     }
 
     if (t === 'generate_image') {

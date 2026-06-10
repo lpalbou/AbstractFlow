@@ -52,6 +52,48 @@ describe('flow authoring commands', () => {
     expect(result.edges).toEqual([]);
   });
 
+  it('reports the written value in set_pin_default applied messages', () => {
+    // Regression (flow 4a9eee4e): "Set ai_llm_call.provider" hid WHAT was set,
+    // so neither the user nor the authoring model could see which provider had
+    // been chosen (or that it was an empty string).
+    const result = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'add_node', id: 'llm', nodeType: 'llm_call' },
+        { action: 'set_pin_default', nodeId: 'llm', pin: 'provider', value: 'openai' },
+        { action: 'set_pin_default', nodeId: 'llm', pin: 'model', value: '' },
+      ],
+    });
+
+    expect(result.errors).toEqual([]);
+    expect(result.applied).toContain('Set llm.provider = "openai"');
+    expect(result.applied).toContain('Set llm.model = ""');
+  });
+
+  it('treats rewriting an identical pin default as a warning no-op, not progress', () => {
+    // Regression (flow 4a9eee4e): the same provider/model rewrite counted as
+    // 2 applied changes per cycle for 8 cycles, hiding the stall.
+    const first = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'add_node', id: 'llm', nodeType: 'llm_call' },
+        { action: 'set_pin_default', nodeId: 'llm', pin: 'provider', value: 'openai' },
+      ],
+    });
+    expect(first.errors).toEqual([]);
+
+    const rewrite = applyFlowAuthoringCommands({
+      flowName: first.flowName,
+      flowInterfaces: [],
+      nodes: first.nodes,
+      edges: first.edges,
+      commands: [{ action: 'set_pin_default', nodeId: 'llm', pin: 'provider', value: 'openai' }],
+    });
+    expect(rewrite.errors).toEqual([]);
+    expect(rewrite.applied).toEqual([]);
+    expect(rewrite.warnings).toContain('llm.provider is already "openai"; no change');
+  });
+
   it('warns and skips incompatible terminal agent meta audit summaries without rejecting the batch', () => {
     const result = applyFlowAuthoringCommands({
       ...emptyState(),
@@ -686,5 +728,306 @@ describe('flow authoring commands', () => {
       result.edges.some((edge) => edge.source === 'llm' && edge.target === 'each' && edge.targetHandle === 'exec-in')
     ).toBe(false);
     expect(result.warnings.some((warning) => warning.toLowerCase().includes('loop-back'))).toBe(true);
+  });
+});
+
+/**
+ * Regressions reproduced verbatim from the multi-AI discussion authoring run
+ * (flow 691c58f8): each case below was a rejected command in that transcript.
+ */
+describe('flow authoring transcript regressions (691c58f8)', () => {
+  it('configures a Variable node through set_pin_default on name/value pins', () => {
+    const result = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'add_node', id: 'var_transcript', nodeType: 'var_decl', label: 'Transcript de discussion' },
+        // Rejected in the transcript: "unknown input pin 'name'/'value' on var_transcript"
+        { action: 'set_pin_default', nodeId: 'var_transcript', pin: 'name', value: 'transcript' },
+        { action: 'set_pin_default', nodeId: 'var_transcript', pin: 'value', value: [] },
+      ],
+    });
+
+    expect(result.errors).toEqual([]);
+    const node = result.nodes.find((item) => item.id === 'var_transcript');
+    expect(node?.data.literalValue).toEqual({ name: 'transcript', type: 'array', default: [] });
+    // The value output pin type follows the declared type, like the inline editor.
+    expect(node?.data.outputs.find((pin) => pin.id === 'value')?.type).toBe('array');
+    expect(result.applied).toContain('Named variable var_transcript "transcript"');
+    expect(result.applied).toContain('Set variable var_transcript default value');
+  });
+
+  it('configures a Variable node through set_literal with the canonical config object', () => {
+    const result = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'add_node', id: 'var_cycle', nodeType: 'var_decl', label: 'Compteur de cycles' },
+        { action: 'set_literal', nodeId: 'var_cycle', value: { name: 'cycle_count', type: 'number', default: 0 } },
+      ],
+    });
+
+    expect(result.errors).toEqual([]);
+    const node = result.nodes.find((item) => item.id === 'var_cycle');
+    expect(node?.data.literalValue).toEqual({ name: 'cycle_count', type: 'number', default: 0 });
+    expect(node?.data.outputs.find((pin) => pin.id === 'value')?.type).toBe('number');
+  });
+
+  it('treats a bare set_literal value on a Variable node as its default', () => {
+    const result = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'add_node', id: 'var_t', nodeType: 'var_decl', label: 'Transcript' },
+        { action: 'set_pin_default', nodeId: 'var_t', pin: 'name', value: 'transcript' },
+        { action: 'set_literal', nodeId: 'var_t', value: [] },
+      ],
+    });
+
+    expect(result.errors).toEqual([]);
+    const node = result.nodes.find((item) => item.id === 'var_t');
+    expect(node?.data.literalValue).toEqual({ name: 'transcript', type: 'array', default: [] });
+  });
+
+  it('connects a ForEach item (any) to llm_call.model for multi-model fan-out', () => {
+    const result = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'add_node', id: 'models_array', nodeType: 'literal_array', templateLabel: 'Array', literalValue: ['m1', 'm2'], label: 'Pool de modèles' },
+        { action: 'add_node', id: 'loop_participants', nodeType: 'loop', label: 'Boucle participants' },
+        { action: 'add_node', id: 'llm_participant', nodeType: 'llm_call', label: 'Contribution IA' },
+        { action: 'connect', source: 'models_array', sourceHandle: 'value', target: 'loop_participants', targetHandle: 'items' },
+        // Rejected in the transcript: "Type mismatch: cannot connect any to model"
+        { action: 'connect', source: 'loop_participants', sourceHandle: 'item', target: 'llm_participant', targetHandle: 'model' },
+      ],
+    });
+
+    expect(result.errors).toEqual([]);
+    expect(
+      result.edges.some(
+        (edge) => edge.source === 'loop_participants' && edge.sourceHandle === 'item' && edge.target === 'llm_participant' && edge.targetHandle === 'model'
+      )
+    ).toBe(true);
+  });
+
+  it('lists available output pins when a guessed handle does not exist (for.end)', () => {
+    const result = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'add_node', id: 'for_cycles', nodeType: 'for', label: 'Boucle cycles' },
+        { action: 'add_node', id: 'end', nodeType: 'on_flow_end' },
+        { action: 'add_input_pin', nodeId: 'end', id: 'cycle_count', pinType: 'number' },
+        // Rejected in the transcript: "Output pin 'end' not found"
+        { action: 'connect', source: 'for_cycles', sourceHandle: 'end', target: 'end', targetHandle: 'cycle_count' },
+      ],
+    });
+
+    const error = result.errors.find((item) => item.includes("Output pin 'end' not found"));
+    expect(error).toBeTruthy();
+    expect(error).toContain('available outputs: loop, done, i, index');
+  });
+
+  it('lists available input pins when set_pin_default targets an unknown pin', () => {
+    const result = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'add_node', id: 'llm', nodeType: 'llm_call', label: 'Synthèse' },
+        { action: 'set_pin_default', nodeId: 'llm', pin: 'instructions', value: 'x' },
+      ],
+    });
+
+    const error = result.errors.find((item) => item.includes("unknown input pin 'instructions'"));
+    expect(error).toBeTruthy();
+    expect(error).toContain('available input pins:');
+    expect(error).toContain('prompt');
+  });
+
+  it('still refuses execution-to-data edges (loop -> get_var.name)', () => {
+    const result = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'add_node', id: 'loop_participants', nodeType: 'loop', label: 'Boucle participants' },
+        { action: 'add_node', id: 'get_transcript', nodeType: 'get_var', label: 'Lire transcript' },
+        { action: 'connect', source: 'loop_participants', sourceHandle: 'loop', target: 'get_transcript', targetHandle: 'name' },
+      ],
+    });
+
+    expect(result.errors.some((item) => item.includes('cannot connect execution to string'))).toBe(true);
+  });
+
+  it('warns when nodes are added without a descriptive label', () => {
+    const result = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'add_node', id: 'start', nodeType: 'on_flow_start' },
+        { action: 'add_node', id: 'var_a', nodeType: 'var_decl' },
+        { action: 'add_node', id: 'llm', nodeType: 'llm_call', label: 'Contribution IA' },
+      ],
+    });
+
+    expect(result.errors).toEqual([]);
+    // Event nodes keep canonical labels silently; unlabeled working nodes are flagged.
+    expect(result.warnings.some((item) => item.includes('var_a') && item.includes('without a label'))).toBe(true);
+    expect(result.warnings.some((item) => item.includes('start') && item.includes('without a label'))).toBe(false);
+    expect(result.warnings.some((item) => item.includes("llm") && item.includes('without a label'))).toBe(false);
+  });
+
+  it('replaces an occupied data input when a different valid source connects to it', () => {
+    // Observed failure mode: the model created a better source for
+    // string_template.vars but could not rewire it; "already connected"
+    // rejections burned three repair cycles. Blueprint semantics: a data
+    // input holds one edge and a new connection replaces it.
+    const result = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'add_node', id: 'json_a', nodeType: 'make_object', label: 'Old vars' },
+        { action: 'add_node', id: 'json_b', nodeType: 'make_object', label: 'New vars' },
+        { action: 'add_node', id: 'tpl', nodeType: 'string_template', label: 'Prompt template' },
+        { action: 'connect', source: 'json_a', sourceHandle: 'result', target: 'tpl', targetHandle: 'vars' },
+        { action: 'connect', source: 'json_b', sourceHandle: 'result', target: 'tpl', targetHandle: 'vars' },
+      ],
+    });
+
+    expect(result.errors).toEqual([]);
+    const varsEdges = result.edges.filter((edge) => edge.target === 'tpl' && edge.targetHandle === 'vars');
+    expect(varsEdges).toHaveLength(1);
+    expect(varsEdges[0].source).toBe('json_b');
+    expect(result.applied.some((item) => item.includes('Replaced tpl.vars input source json_a.result -> json_b.result'))).toBe(true);
+  });
+
+  it('does not replace an occupied data input with a type-incompatible source', () => {
+    const result = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'add_node', id: 'json_a', nodeType: 'make_object', label: 'Vars' },
+        { action: 'add_node', id: 'start', nodeType: 'on_flow_start' },
+        { action: 'add_output_pin', nodeId: 'start', id: 'topic', pinType: 'string' },
+        { action: 'add_node', id: 'tpl', nodeType: 'string_template', label: 'Prompt template' },
+        { action: 'connect', source: 'json_a', sourceHandle: 'result', target: 'tpl', targetHandle: 'vars' },
+        { action: 'connect', source: 'start', sourceHandle: 'topic', target: 'tpl', targetHandle: 'vars' },
+      ],
+    });
+
+    expect(result.errors.some((item) => item.includes('cannot connect string to object'))).toBe(true);
+    const varsEdges = result.edges.filter((edge) => edge.target === 'tpl' && edge.targetHandle === 'vars');
+    expect(varsEdges).toHaveLength(1);
+    expect(varsEdges[0].source).toBe('json_a');
+  });
+
+  it('treats an exact duplicate connect as a no-op warning, not an error', () => {
+    const result = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'add_node', id: 'json_a', nodeType: 'make_object', label: 'Vars' },
+        { action: 'add_node', id: 'tpl', nodeType: 'string_template', label: 'Prompt template' },
+        { action: 'connect', source: 'json_a', sourceHandle: 'result', target: 'tpl', targetHandle: 'vars' },
+        { action: 'connect', source: 'json_a', sourceHandle: 'result', target: 'tpl', targetHandle: 'vars' },
+      ],
+    });
+
+    expect(result.errors).toEqual([]);
+    expect(result.warnings.some((item) => item.includes('already exists'))).toBe(true);
+    expect(result.edges.filter((edge) => edge.target === 'tpl' && edge.targetHandle === 'vars')).toHaveLength(1);
+  });
+
+  it('disconnects an existing edge by endpoints without the destructive flag', () => {
+    const result = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'add_node', id: 'json_a', nodeType: 'make_object', label: 'Vars' },
+        { action: 'add_node', id: 'tpl', nodeType: 'string_template', label: 'Prompt template' },
+        { action: 'connect', source: 'json_a', sourceHandle: 'result', target: 'tpl', targetHandle: 'vars' },
+        { action: 'disconnect', source: 'json_a', sourceHandle: 'result', target: 'tpl', targetHandle: 'vars' },
+      ],
+    });
+
+    expect(result.errors).toEqual([]);
+    expect(result.applied.some((item) => item.includes('Disconnected json_a.result -> tpl.vars'))).toBe(true);
+    expect(result.edges).toEqual([]);
+  });
+
+  it('reports current sources when disconnect targets a missing edge', () => {
+    const result = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'add_node', id: 'json_a', nodeType: 'make_object', label: 'Vars' },
+        { action: 'add_node', id: 'json_b', nodeType: 'make_object', label: 'Other vars' },
+        { action: 'add_node', id: 'tpl', nodeType: 'string_template', label: 'Prompt template' },
+        { action: 'connect', source: 'json_a', sourceHandle: 'result', target: 'tpl', targetHandle: 'vars' },
+        { action: 'disconnect', source: 'json_b', sourceHandle: 'result', target: 'tpl', targetHandle: 'vars' },
+      ],
+    });
+
+    const error = result.errors.find((item) => item.includes('disconnect found no edge json_b.result -> tpl.vars'));
+    expect(error).toBeTruthy();
+    expect(error).toContain('current sources into tpl.vars: json_a.result');
+  });
+
+  it('adds a per-path route override instead of replacing on multi-entry nodes', () => {
+    // Recursive/multi-entry pattern: a node reached by 2+ execution paths may
+    // carry one data edge per path on the same pin (base edge + overrides).
+    const result = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'add_node', id: 'llm_a', nodeType: 'llm_call', label: 'Branch A' },
+        { action: 'add_node', id: 'llm_b', nodeType: 'llm_call', label: 'Branch B' },
+        { action: 'add_node', id: 'synth', nodeType: 'llm_call', label: 'Synthesis' },
+        { action: 'connect', source: 'llm_a', sourceHandle: 'exec-out', target: 'synth', targetHandle: 'exec-in' },
+        { action: 'connect', source: 'llm_b', sourceHandle: 'exec-out', target: 'synth', targetHandle: 'exec-in' },
+        { action: 'connect', source: 'llm_a', sourceHandle: 'response', target: 'synth', targetHandle: 'prompt' },
+        { action: 'connect', source: 'llm_b', sourceHandle: 'response', target: 'synth', targetHandle: 'prompt' },
+      ],
+    });
+
+    expect(result.errors).toEqual([]);
+    const promptEdges = result.edges.filter((edge) => edge.target === 'synth' && edge.targetHandle === 'prompt');
+    expect(promptEdges).toHaveLength(2);
+    const overrideEdge = promptEdges.find((edge) => (edge.data as Record<string, unknown> | undefined)?.routeOverride === true);
+    expect(overrideEdge?.source).toBe('llm_b');
+    expect((overrideEdge?.data as Record<string, unknown>).routeKey).toBe('llm_b::exec-out');
+    expect(result.applied.some((item) => item.includes('per-path route override'))).toBe(true);
+  });
+
+  it('does not replace the base data edge of a multi-entry node from a non-predecessor source', () => {
+    const result = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'add_node', id: 'llm_a', nodeType: 'llm_call', label: 'Branch A' },
+        { action: 'add_node', id: 'llm_b', nodeType: 'llm_call', label: 'Branch B' },
+        { action: 'add_node', id: 'synth', nodeType: 'llm_call', label: 'Synthesis' },
+        { action: 'add_node', id: 'start', nodeType: 'on_flow_start' },
+        { action: 'add_output_pin', nodeId: 'start', id: 'topic', pinType: 'string' },
+        { action: 'connect', source: 'llm_a', sourceHandle: 'exec-out', target: 'synth', targetHandle: 'exec-in' },
+        { action: 'connect', source: 'llm_b', sourceHandle: 'exec-out', target: 'synth', targetHandle: 'exec-in' },
+        { action: 'connect', source: 'llm_a', sourceHandle: 'response', target: 'synth', targetHandle: 'prompt' },
+        // start is not a direct execution predecessor: no override, no replace.
+        { action: 'connect', source: 'start', sourceHandle: 'topic', target: 'synth', targetHandle: 'prompt' },
+      ],
+    });
+
+    expect(result.errors.some((item) => item.includes('multi-entry'))).toBe(true);
+    const promptEdges = result.edges.filter((edge) => edge.target === 'synth' && edge.targetHandle === 'prompt');
+    expect(promptEdges).toHaveLength(1);
+    expect(promptEdges[0].source).toBe('llm_a');
+  });
+
+  it('names the existing source in remaining already-connected errors', () => {
+    // Exec-target inputs are not replaceable data pins, so the error path
+    // still fires there; it must name the current source for self-repair.
+    const result = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'add_node', id: 'start', nodeType: 'on_flow_start' },
+        { action: 'add_output_pin', nodeId: 'start', id: 'a', pinType: 'string' },
+        { action: 'add_output_pin', nodeId: 'start', id: 'b', pinType: 'string' },
+        { action: 'add_node', id: 'tpl', nodeType: 'string_template', label: 'Prompt template' },
+        { action: 'connect', source: 'start', sourceHandle: 'a', target: 'tpl', targetHandle: 'template' },
+        { action: 'connect', source: 'start', sourceHandle: 'b', target: 'tpl', targetHandle: 'template' },
+      ],
+    });
+
+    // template accepts string from both sources, so this exercises replace.
+    expect(result.errors).toEqual([]);
+    const templateEdges = result.edges.filter((edge) => edge.target === 'tpl' && edge.targetHandle === 'template');
+    expect(templateEdges).toHaveLength(1);
+    expect(templateEdges[0].source).toBe('start');
+    expect(templateEdges[0].sourceHandle).toBe('b');
   });
 });
