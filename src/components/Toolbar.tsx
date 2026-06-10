@@ -18,6 +18,7 @@ import {
   IconChip,
   IconContrast,
   IconCopy,
+  IconExecFlow,
   IconExport,
   IconFilePlus,
   IconFolder,
@@ -103,6 +104,7 @@ function ToolbarAction({
   onClick,
   disabled = false,
   iconOnly = true,
+  pressed,
   className = '',
   children,
 }: {
@@ -111,13 +113,24 @@ function ToolbarAction({
   onClick: () => void;
   disabled?: boolean;
   iconOnly?: boolean;
+  /** For toggle buttons: renders aria-pressed + the active style. */
+  pressed?: boolean;
   className?: string;
   children: ReactNode;
 }) {
-  const classes = ['toolbar-button', iconOnly ? 'icon-button' : '', className].filter(Boolean).join(' ');
+  const classes = ['toolbar-button', iconOnly ? 'icon-button' : '', pressed ? 'active' : '', className]
+    .filter(Boolean)
+    .join(' ');
   return (
     <AfTooltip content={tooltip} delayMs={500} maxWidthPx={340} minWidthPx={0}>
-      <button type="button" className={classes} onClick={onClick} disabled={disabled} aria-label={label}>
+      <button
+        type="button"
+        className={classes}
+        onClick={onClick}
+        disabled={disabled}
+        aria-label={label}
+        aria-pressed={pressed}
+      >
         {children}
       </button>
     </AfTooltip>
@@ -246,6 +259,8 @@ export function Toolbar({
     nodes,
     edges,
     flowInterfaces,
+    execView,
+    setExecView,
     setPreflightIssues,
     clearPreflightIssues,
   } = useFlowStore();
@@ -1279,6 +1294,22 @@ export function Toolbar({
           >
             <IconChip />
             <span>Models</span>
+          </ToolbarAction>
+        </div>
+
+        {/* Canvas view: condensed execution-flow toggle */}
+        <div className="toolbar-group" role="group" aria-label="Canvas view">
+          <ToolbarAction
+            tooltip={
+              execView
+                ? 'Back to the full graph (all nodes and data edges)'
+                : 'Execution view: condensed graph showing only the execution flow'
+            }
+            label="Toggle execution view"
+            onClick={() => setExecView(!execView)}
+            pressed={execView}
+          >
+            <IconExecFlow />
           </ToolbarAction>
         </div>
 

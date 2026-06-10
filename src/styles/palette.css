@@ -516,6 +516,18 @@
   background: #ff6b81;
 }
 
+/* Toggle buttons (aria-pressed) — e.g. the execution-view switch */
+.toolbar-group .toolbar-button.active {
+  background: rgba(132, 177, 255, 0.16);
+  color: #cfe1ff;
+  box-shadow: inset 0 0 0 1px rgba(132, 177, 255, 0.45);
+}
+
+.toolbar-group .toolbar-button.active:hover:not(:disabled) {
+  background: rgba(132, 177, 255, 0.24);
+  color: #e6f0ff;
+}
+
 .toolbar-icon {
   width: calc(17px * var(--font-scale, 1));
   height: calc(17px * var(--font-scale, 1));

@@ -984,3 +984,251 @@
 .react-flow__controls-button:hover {
   background: rgba(71, 104, 160, 0.36);
 }
+
+/* ============================================================
+   Execution view (condensed mode)
+   Compact nodes showing only the control-flow skeleton.
+   Each family has its own color, icon and shape cue.
+   ============================================================ */
+
+.exec-view-node {
+  --exec-family-color: #8898b0;
+  --exec-family-bg: rgba(136, 152, 176, 0.12);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 150px;
+  max-width: 250px;
+  padding: 8px 14px;
+  background: linear-gradient(180deg, rgba(17, 23, 38, 0.97), rgba(12, 16, 28, 0.97));
+  border: 1.5px solid var(--exec-family-color);
+  border-radius: 10px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  color: var(--text-primary);
+}
+
+/* Family shapes */
+.exec-view-family-event {
+  --exec-family-color: #e15b5b;
+  --exec-family-bg: rgba(225, 91, 91, 0.16);
+  border-radius: 999px;
+}
+
+.exec-view-family-control {
+  --exec-family-color: #f1a33c;
+  --exec-family-bg: rgba(241, 163, 60, 0.16);
+  border-radius: 3px;
+  border-width: 1.5px 1.5px 1.5px 5px;
+}
+
+.exec-view-family-interaction {
+  --exec-family-color: #3fc380;
+  --exec-family-bg: rgba(63, 195, 128, 0.16);
+  border-radius: 14px 14px 14px 2px;
+}
+
+.exec-view-family-generative {
+  --exec-family-color: #9b7bf5;
+  --exec-family-bg: rgba(155, 123, 245, 0.16);
+  border-radius: 16px;
+}
+
+.exec-view-family-media {
+  --exec-family-color: #e25fb4;
+  --exec-family-bg: rgba(226, 95, 180, 0.16);
+  border-radius: 16px;
+}
+
+.exec-view-family-io {
+  --exec-family-color: #2dbfa8;
+  --exec-family-bg: rgba(45, 191, 168, 0.16);
+  border-radius: 8px;
+}
+
+.exec-view-family-memory {
+  --exec-family-color: #cf9d4a;
+  --exec-family-bg: rgba(207, 157, 74, 0.16);
+  border-radius: 8px;
+}
+
+.exec-view-family-subflow {
+  --exec-family-color: #38c4d8;
+  --exec-family-bg: rgba(56, 196, 216, 0.16);
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 3px rgba(12, 16, 28, 0.95),
+    0 0 0 4px var(--exec-family-color),
+    0 8px 20px rgba(0, 0, 0, 0.35);
+}
+
+.exec-view-family-logic {
+  --exec-family-color: #8898b0;
+  --exec-family-bg: rgba(136, 152, 176, 0.14);
+  border-radius: 6px;
+}
+
+/* Main row: icon chip + label */
+.exec-view-main {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 28px;
+}
+
+.exec-view-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--exec-family-bg);
+  color: var(--exec-family-color);
+}
+
+.exec-view-family-event .exec-view-icon {
+  border-radius: 999px;
+}
+
+.exec-view-icon-svg {
+  width: 15px;
+  height: 15px;
+  display: block;
+}
+
+.exec-view-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.exec-view-label {
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exec-view-family-label {
+  font-size: var(--font-size-xxs);
+  color: var(--exec-family-color);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Named execution branches (Sequence, If/Else, Switch, Loop, ...) */
+.exec-view-branches {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 2px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.exec-view-branch {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-height: 18px;
+  margin-right: -8px; /* pull pin shapes toward the node edge */
+}
+
+.exec-view-branch-label {
+  font-size: var(--font-size-xxs);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exec-view-branch-shape {
+  display: flex;
+  align-items: center;
+}
+
+/* Exec handles: generous invisible hit areas anchored to the node edges,
+   matching the full-view convention (visuals drawn separately). */
+.exec-view-handle {
+  width: 22px !important;
+  height: 22px !important;
+  background: transparent !important;
+  border: none !important;
+  opacity: 0 !important;
+  position: absolute;
+  z-index: 2;
+  cursor: crosshair;
+}
+
+.exec-view-handle-in {
+  left: -6px !important;
+}
+
+.exec-view-handle-out {
+  right: -6px !important;
+}
+
+.exec-view-handle-branch {
+  right: -10px !important;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* Visible entry/exit markers: small white diamonds on the node border,
+   echoing the full-view execution pin shapes. */
+.exec-view-node.has-exec-in::before,
+.exec-view-node.has-exec-out::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  background: #fff;
+  border: 1.5px solid rgba(10, 14, 24, 0.9);
+  transform: translateY(-50%) rotate(45deg);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.exec-view-node.has-exec-in::before {
+  left: -5px;
+}
+
+.exec-view-node.has-exec-out::after {
+  right: -5px;
+}
+
+/* Multi-branch nodes mark exits per row instead of on the node border. */
+.exec-view-node.multi-out.has-exec-out::after {
+  content: none;
+}
+
+/* Selection / runtime states */
+.exec-view-node.selected {
+  box-shadow:
+    0 0 0 2px rgba(248, 251, 255, 0.85),
+    0 10px 24px rgba(0, 0, 0, 0.4);
+}
+
+.exec-view-node.executing {
+  box-shadow:
+    0 0 0 2px #31f08a,
+    0 0 22px rgba(49, 240, 138, 0.5);
+}
+
+.exec-view-node.recent {
+  box-shadow:
+    0 0 0 2px rgba(103, 184, 255, 0.75),
+    0 0 18px rgba(103, 184, 255, 0.35);
+}

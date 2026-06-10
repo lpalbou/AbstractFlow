@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added a toolbar Execution View toggle that condenses the canvas to the control-flow skeleton: only nodes linked by execution edges (and those edges) stay visible, rendered as compact cards with per-family color, shape, and iconography (events, control flow, user interaction, generative AI, generated media, tools & files, memory, subflow, logic & state). Node positions are preserved so switching between views keeps the same layout.
 - Added a `Ctrl/⌘+S` keyboard shortcut that saves the current flow and suppresses the browser "Save page" dialog inside the editor.
 - Added a leave-page confirmation (`beforeunload`) when the flow has unsaved changes or a save is still in flight, preventing silent loss of graph edits.
 - Added a node palette search empty state ("No nodes match …" with a Clear search action) instead of a blank list when a search has no results.

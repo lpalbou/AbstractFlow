@@ -119,6 +119,24 @@ Each assistant turn ends with how the draft works, how to test it, and what to
 expect. The assistant changes the in-memory draft only. Users still review the
 graph, Save, Publish, and Run through the normal Gateway-backed controls.
 
+## Execution View
+
+The toolbar's execution-view toggle (three linked dots) condenses the canvas to
+the control-flow skeleton. Only nodes linked by execution edges remain visible,
+along with those edges; data-only nodes (literals, concat, parsers) and data
+edges are hidden. Node positions are unchanged, so the layout matches the full
+view when switching back and forth.
+
+Condensed nodes are compact cards with a per-family color, shape, and icon so
+the flow reads at a glance: events (red pill), control flow such as Sequence or
+If/Else (orange, with named branch pins), user interaction (green), generative
+AI (violet), generated media (pink), tools & files (teal), memory (gold),
+subflow (cyan double border), and logic/state (grey). Runtime highlights
+(executing/recent) still apply in this view.
+
+The execution view is a reading mode: dropping new palette nodes is blocked
+with a hint, while moving nodes and rewiring execution pins remain available.
+
 ## Structured Output Schemas
 
 LLM Call and Agent nodes expose `resp_schema` as an optional JSON Schema input.

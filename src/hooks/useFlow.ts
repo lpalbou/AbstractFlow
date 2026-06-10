@@ -46,6 +46,9 @@ interface FlowState {
   loopProgressByNodeId: Record<string, { index: number; total: number }>;
   lastLoopProgress: { nodeId: string; index: number; total: number } | null;
 
+  // Condensed execution view (show only exec-linked nodes + exec edges)
+  execView: boolean;
+
   // Preflight validation (before starting a run)
   preflightIssues: Array<{ id: string; nodeId: string; nodeLabel: string; message: string }>;
 
@@ -74,6 +77,7 @@ interface FlowState {
   copySelectionToClipboard: () => number;
   pasteClipboard: () => number;
   duplicateSelection: () => number;
+  setExecView: (enabled: boolean) => void;
   setExecutingNodeId: (nodeId: string | null) => void;
   setIsRunning: (running: boolean) => void;
   resetExecutionDecorations: () => void;
@@ -171,6 +175,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   selectedEdge: null,
   executingNodeId: null,
   isRunning: false,
+  execView: false,
   recentNodeIds: {},
   recentEdgeIds: {},
   loopProgressByNodeId: {},
@@ -571,6 +576,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   },
 
   // Execution state
+  setExecView: (enabled) => set({ execView: Boolean(enabled) }),
   setExecutingNodeId: (nodeId) => set({ executingNodeId: nodeId }),
   setIsRunning: (running) =>
     set({ isRunning: running, executingNodeId: running ? null : null }),

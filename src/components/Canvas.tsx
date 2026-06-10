@@ -34,6 +34,7 @@ import {
   connectionHintText,
   type ConnectionDragEndpoint,
 } from '../utils/connectionPreview';
+import { computeExecSubgraph } from '../utils/execView';
 
 import { roundedPolylinePath, routeOrthogonal, type RouteRect } from '../utils/edgeRouting';
 
@@ -274,6 +275,7 @@ function CanvasBody() {
     edges,
     selectedNode,
     executingNodeId,
+    execView,
     recentNodeIds,
     recentEdgeIds,
     onNodesChange,
@@ -286,6 +288,26 @@ function CanvasBody() {
     pasteClipboard,
     duplicateSelection,
   } = useFlowStore();
+
+  // Condensed execution view: only nodes linked by execution edges (and those
+  // edges) stay visible; visible nodes render compact (type 'execView').
+  const execSubgraph = useMemo(
+    () => (execView ? computeExecSubgraph(nodes, edges) : null),
+    [execView, nodes, edges]
+  );
+
+  // Hidden elements cannot stay selected: the properties panel and delete
+  // shortcuts would otherwise operate on invisible graph parts.
+  useEffect(() => {
+    if (!execSubgraph) return;
+    const state = useFlowStore.getState();
+    if (state.selectedNode && !execSubgraph.nodeIds.has(state.selectedNode.id)) {
+      state.setSelectedNode(null);
+    }
+    if (state.selectedEdge && !execSubgraph.edgeIds.has(state.selectedEdge.id)) {
+      state.setSelectedEdge(null);
+    }
+  }, [execSubgraph]);
 
   const releasePointerCapture = useCallback((pointerId: number) => {
     const root = reactFlowWrapper.current;
@@ -570,6 +592,13 @@ function CanvasBody() {
     (event: DragEvent<HTMLDivElement>) => {
       event.preventDefault();
 
+      // The execution view is a condensed reading mode: a freshly dropped node
+      // has no exec edges yet and would be invisible, so block with guidance.
+      if (useFlowStore.getState().execView) {
+        toast('Switch back to the full view to add nodes', { icon: 'ℹ️' });
+        return;
+      }
+
       const templateData = event.dataTransfer.getData('application/reactflow');
       if (!templateData || !reactFlowInstance.current || !reactFlowWrapper.current) {
         return;
@@ -690,6 +719,8 @@ function CanvasBody() {
   const baseStyledEdges = useMemo(() => {
     const nodeRectsById = new Map<string, RouteRect>();
     for (const node of nodes) {
+      // Hidden nodes (exec view) must not act as routing obstacles.
+      if (execSubgraph && !execSubgraph.nodeIds.has(node.id)) continue;
       const measured = (node as any).measured || {};
       const width = Number(node.width || measured.width || 320);
       const height = Number(node.height || measured.height || 220);
@@ -702,6 +733,10 @@ function CanvasBody() {
     }
 
     return edges.map((e) => {
+      // Exec view hides data edges entirely; only execution edges remain.
+      if (execSubgraph && !execSubgraph.edgeIds.has(e.id)) {
+        return e.hidden ? e : { ...e, hidden: true };
+      }
       const sourceHandle = e.sourceHandle || '';
       const targetHandle = e.targetHandle || '';
       const sourceType = pinTypesByNodeId.outputsByNode.get(e.source)?.get(sourceHandle);
@@ -778,10 +813,10 @@ function CanvasBody() {
         (prevData.routeRects as unknown[]).length !== routeRects.length ||
         prevData.sourceRect !== sourceRect ||
         prevData.targetRect !== targetRect;
-      if (!classChanged && !styleChanged && !zIndexChanged && !typeChanged && !dataChanged) return e;
-      return { ...e, className: nextClassName, style: nextStyle, zIndex: nextZIndex, type: nextType, data: nextData };
+      if (!classChanged && !styleChanged && !zIndexChanged && !typeChanged && !dataChanged && !e.hidden) return e;
+      return { ...e, className: nextClassName, style: nextStyle, zIndex: nextZIndex, type: nextType, data: nextData, hidden: false };
     });
-  }, [edges, nodes, pinTypesByNodeId]);
+  }, [edges, execSubgraph, nodes, pinTypesByNodeId]);
 
   const decoratedEdges = useMemo(() => {
     const hasRecent = Boolean(recentEdgeIds && Object.keys(recentEdgeIds).length > 0);
@@ -795,16 +830,30 @@ function CanvasBody() {
     });
   }, [baseStyledEdges, recentEdgeIds]);
 
+  // Exec view presentation: visible nodes render compact ('execView' type),
+  // all other nodes are hidden. Store nodes keep their original type, so
+  // switching back restores the full rendering and layout.
+  const displayNodes = useMemo(() => {
+    if (!execSubgraph) return nodes;
+    return nodes.map((node) =>
+      execSubgraph.nodeIds.has(node.id)
+        ? { ...node, type: 'execView' }
+        : node.hidden
+          ? node
+          : { ...node, hidden: true }
+    );
+  }, [execSubgraph, nodes]);
+
   const previewNodes = useMemo(() => {
-    if (!activeConnection) return nodes;
-    return nodes.map((node) => ({
+    if (!activeConnection) return displayNodes;
+    return displayNodes.map((node) => ({
       ...node,
       data: {
         ...node.data,
         connectionPreview: buildConnectionPreviewForNode(nodes, edges, activeConnection, node),
       },
     }));
-  }, [activeConnection, nodes, edges]);
+  }, [activeConnection, displayNodes, nodes, edges]);
 
   const connectionLineStyle = useMemo(() => {
     const sourceType = activeConnection?.pinType;

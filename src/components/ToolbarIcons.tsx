@@ -147,6 +147,18 @@ export function IconChip() {
   );
 }
 
+export function IconExecFlow() {
+  return (
+    <ToolbarIcon>
+      <circle cx="4.5" cy="12" r="2.2" />
+      <circle cx="12" cy="12" r="2.2" />
+      <circle cx="19.5" cy="12" r="2.2" />
+      <path d="M6.7 12h3.1" />
+      <path d="M14.2 12h3.1" />
+    </ToolbarIcon>
+  );
+}
+
 export function IconSparkle() {
   return (
     <ToolbarIcon>
