@@ -10,11 +10,18 @@ export type PinType =
   | 'boolean'   // Red #FF0000 - True/False
   | 'object'    // Cyan #00FFFF - JSON objects
   | 'json_schema' // Cyan #00FFFF - JSON Schema objects
-  | 'artifact'  // Generic Gateway artifact reference object
-  | 'artifact_image' // Image Gateway artifact reference object
-  | 'artifact_audio' // Audio Gateway artifact reference object (voice/music/sound)
-  | 'artifact_text'  // Text/transcript Gateway artifact reference object
-  | 'artifact_video' // Video Gateway artifact reference object
+  | 'artifact'  // Generic saved artifact reference object
+  | 'artifact_image' // Image artifact reference object
+  | 'artifact_audio' // Audio artifact reference object (voice/music/sound)
+  | 'artifact_text'  // Text/transcript artifact reference object
+  | 'artifact_video' // Video artifact reference object
+  | 'artifacts' // Ordered list of generic saved artifact reference objects
+  | 'artifacts_image' // Ordered list of image artifact refs
+  | 'artifacts_audio' // Ordered list of audio artifact refs (voice/music/sound)
+  | 'artifacts_text' // Ordered list of text/transcript artifact refs
+  | 'artifacts_video' // Ordered list of video artifact refs
+  | 'workspace_file' // Canonical workspace-scoped server file path (string-backed)
+  | 'workspace_folder' // Canonical workspace-scoped server folder path (string-backed)
   | 'memory'    // Mint - Memory configuration object (KG/span/session controls)
   | 'assertion' // Teal - KG assertion object (subject/predicate/object + metadata)
   | 'assertions' // Teal - List of KG assertion objects (assertion[])
@@ -48,6 +55,13 @@ export const PIN_COLORS: Record<PinType, string> = {
   artifact_audio: '#22D3EE',
   artifact_text: '#D946EF',
   artifact_video: '#A855F7',
+  artifacts: '#2DD4BF',
+  artifacts_image: '#0F766E',
+  artifacts_audio: '#0891B2',
+  artifacts_text: '#C026D3',
+  artifacts_video: '#7C3AED',
+  workspace_file: '#84CC16',
+  workspace_folder: '#65A30D',
   memory: '#00C49A',
   assertion: '#00B8D4',
   assertions: '#00B8D4',
@@ -173,6 +187,10 @@ export type NodeType =
   | 'write_file'
   | 'read_pdf'
   | 'write_pdf'
+  | 'read_artifact'
+  | 'list_folder_files'
+  | 'import_workspace_file'
+  | 'export_artifact'
   | 'memory_note'
   | 'memory_query'
   | 'memory_tag'

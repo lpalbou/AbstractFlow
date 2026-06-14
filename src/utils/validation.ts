@@ -16,6 +16,7 @@ function edgeData(edge: Edge): Record<string, unknown> {
 
 const PROVIDER_PIN_TYPES = new Set<PinType>(['provider', 'provider_text', 'provider_image', 'provider_voice', 'provider_music']);
 const MODEL_PIN_TYPES = new Set<PinType>(['model', 'model_text', 'model_image', 'model_voice', 'model_music']);
+const WORKSPACE_PIN_TYPES = new Set<PinType>(['workspace_file', 'workspace_folder']);
 
 function providerScope(type: PinType): 'text' | 'image' | 'voice' | 'music' | 'legacy' | null {
   if (type === 'provider') return 'legacy';
@@ -158,6 +159,13 @@ export function areTypesCompatible(
   const artifactCompatibility = artifactPinTypesCompatible(sourceType, targetType);
   if (artifactCompatibility !== null) {
     return artifactCompatibility;
+  }
+
+  if (WORKSPACE_PIN_TYPES.has(sourceType) || WORKSPACE_PIN_TYPES.has(targetType)) {
+    if (sourceType === targetType) return true;
+    if ((sourceType === 'workspace_file' || sourceType === 'workspace_folder') && targetType === 'string') return true;
+    if (sourceType === 'string' && (targetType === 'workspace_file' || targetType === 'workspace_folder')) return true;
+    return false;
   }
 
   // 'any' is the dynamic escape hatch: ForEach item, Get Variable value, Code

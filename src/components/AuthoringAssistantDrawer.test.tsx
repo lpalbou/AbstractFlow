@@ -497,7 +497,7 @@ describe('AuthoringAssistantDrawer readiness', () => {
       request,
       {}
     );
-    expect(missingReadiness.issues).toContain('Create a Write File node for the Markdown artifact, connect report content to Write File.content, and place it on the execution path before On Flow End.');
+    expect(missingReadiness.issues).toContain('Create a Write File node for the Markdown report file, connect report content to Write File.content, and place it on the execution path before On Flow End.');
     expect(missingReadiness.issues).toContain(
       'Create a Write PDF node for the PDF artifact, set a .pdf file_path, connect report content to Write PDF.content, and place it on the execution path before On Flow End.'
     );
@@ -849,6 +849,42 @@ describe('AuthoringAssistantDrawer catalog fidelity (ADR-0026)', () => {
     // The compact one-line catalog grammar is present.
     expect(context.prompt).toContain('Grammar per line');
     expect(context.prompt).toMatch(/- agent \(/);
+  });
+
+  it('ships the node-choice and tool-selection decision guidance to the model every cycle', () => {
+    // The authoring model only knows AbstractFlow through this prompt. These
+    // contracts cover the two recurring quality gaps observed in real runs:
+    // picking llm_call vs agent vs direct tool calls, and matching each
+    // agent's tool allowlist to its role.
+    const flow = toVisualFlow('Untitled Flow', [], []);
+    const readiness = computeAuthoringReadiness(flow, 'Build a research workflow.', {});
+    const context = buildGatewayPromptContext(
+      'Build a research workflow.',
+      flow,
+      null,
+      [],
+      { readiness, tools: { text: 'No tools discovered.', selectedTools: 0, totalTools: 0 }, preflightOptions: {} }
+    );
+    // llm_call vs agent vs deterministic tool-call decision matrix.
+    expect(context.prompt).toContain('decide per\nstep, not per workflow');
+    expect(context.prompt).toContain('ONE model pass over inputs already in the graph');
+    expect(context.prompt).toContain('DISCOVER information or iterate');
+    expect(context.prompt).toContain('a bare `llm_call` CANNOT satisfy it');
+    // Per-agent least-privilege tool selection + the unset-tools default.
+    expect(context.prompt).toContain('Tool selection discipline (per agent, least privilege)');
+    expect(context.prompt).toContain('DIFFERENT allowlists');
+    expect(context.prompt).toContain('FULL runtime tool set');
+    expect(context.prompt).toContain('Never invent tool names');
+    // Wiring mistakes observed in real runs stay documented.
+    expect(context.prompt).toContain('Common rejected-edge mistakes');
+  });
+
+  it('teaches the artifact versus server-path source contract to the planner', () => {
+    const prompt = assistantSystemPrompt();
+    expect(prompt).toContain('Artifact = saved reusable file');
+    expect(prompt).toContain('Local File = upload from this computer');
+    expect(prompt).toContain('Server File = workspace-scoped server file');
+    expect(prompt).toContain('Artifact pins expect saved artifacts; Read File/Write File use workspace-scoped server paths');
   });
 });
 

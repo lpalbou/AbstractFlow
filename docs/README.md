@@ -17,6 +17,25 @@ VisualFlow JSON and enforced later by Runtime/Core after Gateway publish/start.
 When a schema is active, `data` is the structured object output and `response`
 stays textual for compatibility.
 
+## File-like sources
+
+Flow now teaches one explicit file-like vocabulary across the editor, run modal,
+and authoring docs:
+
+- `Artifact`: a saved Runtime-owned durable payload.
+- `Local File` / `Local Folder`: client-device intake sources. In hosted/browser
+  mode, uploads become artifacts before durable execution.
+- `Server File` / `Server Folder`: user-facing wording for workspace-scoped
+  server paths under Gateway policy. The engineering/model term remains
+  `Workspace File` / `Workspace Folder`.
+
+The canvas reflects that split:
+
+- path-based nodes such as `Read File`, `Write File`, `Read PDF`, `Write PDF`,
+  and `List Folder Files` consume workspace-scoped server paths;
+- artifact-first nodes such as `Artifact`, `Import Server File`, `Read
+  Artifact`, and `Export Artifact` work with durable runtime-owned payloads.
+
 ## Pages
 
 - [Getting started](getting-started.md)

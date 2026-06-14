@@ -55,8 +55,11 @@ before `on_flow_end` if their outputs are part of the requested result.
 - `write_pdf` renders text or Markdown-style report content to real PDF bytes
   using Runtime's permissive PDF writer.
 
-Use `write_file` for Markdown, JSON, and text artifacts. Use `write_pdf` for PDF
-artifacts; do not represent PDF generation by writing Markdown to a `.pdf` path.
+In Gateway-hosted runs, these are workspace-scoped server paths, not browser
+local files. Artifact inputs use the separate `Artifact` / `Local File` /
+`Server File` source model. Use `write_file` for Markdown, JSON, and text
+files. Use `write_pdf` for PDF files; do not represent PDF generation by
+writing Markdown to a `.pdf` path.
 
 ## Structured Output And Switch Cases
 

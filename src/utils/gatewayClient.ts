@@ -93,6 +93,8 @@ export interface GatewayCommonContract {
   };
   workspace?: {
     policy_endpoint?: string;
+    list_files?: GatewayEndpointDescriptor;
+    search_files?: GatewayEndpointDescriptor;
     open_run_directory?: GatewayEndpointDescriptor;
   };
   configuration?: {
@@ -117,6 +119,7 @@ export interface GatewayCommonContract {
     embedding_models?: string;
     vision_provider_models?: string;
     vision_models?: string;
+    vision_adapters?: string;
     tools?: string;
     semantics?: string;
     catalog_contract?: {
@@ -178,6 +181,14 @@ export interface GatewayGeneratedImageContract {
   direct_endpoint?: GatewayEndpointDescriptor & {
     route_available?: boolean;
     configured?: boolean;
+    provider_models_endpoint?: string;
+    provider_models_task?: string;
+    adapter_catalog_endpoint?: string;
+    supports_batch?: boolean;
+    batch_count_field?: string;
+    batch_seed_field?: string;
+    supports_lora_adapters?: boolean;
+    artifact_list_field?: string;
     event_name?: string;
     progress_event_name?: string;
     progress_scope?: string;
@@ -217,6 +228,13 @@ export interface GatewayGeneratedVideoContract {
     configured?: boolean;
     provider_models_endpoint?: string;
     provider_models_task?: string;
+    adapter_catalog_endpoint?: string;
+    supports_batch?: boolean;
+    batch_count_field?: string;
+    batch_seed_field?: string;
+    supports_lora_adapters?: boolean;
+    supports_flow_shift?: boolean;
+    artifact_list_field?: string;
     progress_event_name?: string;
     progress_scope?: string;
     durability?: string;

@@ -21,6 +21,7 @@ describe('gateway input schema helpers', () => {
   it('preserves artifact pin types from gateway metadata', () => {
     expect(gatewayPinTypeToVisualPinType({ id: 'source', type: 'artifact_image' })).toBe('artifact_image');
     expect(gatewayPinTypeToVisualPinType({ id: 'audio', type: 'artifact_audio' })).toBe('artifact_audio');
+    expect(gatewayPinTypeToVisualPinType({ id: 'files', type: 'artifacts_text' })).toBe('artifacts_text');
   });
 
   it('normalizes artifact pin strings into canonical artifact refs', () => {
@@ -44,5 +45,19 @@ describe('gateway input schema helpers', () => {
       run_id: 'run-1',
       content_type: 'image/png',
     });
+  });
+
+  it('normalizes artifact list pin strings into canonical artifact-ref arrays', () => {
+    const normalized = normalizeRunInputData(
+      {
+        files: '[{"artifact_id":"doc-1","run_id":"run-1"},{"$artifact":"doc-2","content_type":"text/plain"}]',
+      },
+      { inputs: [{ id: 'files', type: 'artifacts_text' }] }
+    );
+
+    expect(normalized.inputData.files).toEqual([
+      { $artifact: 'doc-1', artifact_id: 'doc-1', run_id: 'run-1' },
+      { $artifact: 'doc-2', artifact_id: 'doc-2', content_type: 'text/plain' },
+    ]);
   });
 });

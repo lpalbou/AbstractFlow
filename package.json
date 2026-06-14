@@ -1,6 +1,6 @@
 {
   "name": "@abstractframework/flow",
-  "version": "0.3.18",
+  "version": "0.3.19",
   "description": "AbstractFlow visual workflow editor for AbstractFramework",
   "type": "module",
   "author": "Laurent-Philippe Albou",

@@ -18,6 +18,16 @@ export interface GatewayCatalogItem {
   [key: string]: unknown;
 }
 
+export interface GatewayVisionAdapterCatalogItem extends GatewayCatalogItem {
+  source: string;
+  compatible_models?: string[];
+  compatible_tasks?: string[];
+  suggested_target_roles?: string[];
+  weight_name?: string;
+  subfolder?: string;
+  adapter_name?: string;
+}
+
 export interface GatewaySelectOption {
   value: string;
   label: string;
@@ -235,4 +245,35 @@ export function modelOptionsFromGatewayCatalog(
 
 export function stringOptionsFromGatewayCatalog(payload: unknown, legacyKeys: string[] = []): string[] {
   return modelOptionsFromGatewayCatalog(payload, '', legacyKeys).map((option) => option.value);
+}
+
+export function visionAdapterItemsFromGatewayCatalog(payload: unknown): GatewayVisionAdapterCatalogItem[] {
+  const items = gatewayCatalogItems(payload, ['adapters']);
+  const out: GatewayVisionAdapterCatalogItem[] = [];
+  const seen = new Set<string>();
+  for (const item of items) {
+    const raw = isRecord(item.raw) ? item.raw : {};
+    const source =
+      textValue(item.source) ||
+      textValue(raw.source) ||
+      textValue(raw.repo_id) ||
+      textValue(raw.repo) ||
+      textValue(item.id);
+    if (!source) continue;
+    const provider = textValue(item.provider) || textValue(raw.provider);
+    const key = `${normalizeKey(provider)}::${normalizeKey(source)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      ...item,
+      source,
+      compatible_models: stringList(item.compatible_models || raw.compatible_models),
+      compatible_tasks: stringList(item.compatible_tasks || raw.compatible_tasks || item.tasks || raw.tasks),
+      suggested_target_roles: stringList(item.suggested_target_roles || raw.suggested_target_roles),
+      weight_name: textValue(item.weight_name) || textValue(raw.weight_name),
+      subfolder: textValue(item.subfolder) || textValue(raw.subfolder),
+      adapter_name: textValue(item.adapter_name) || textValue(raw.adapter_name),
+    });
+  }
+  return out;
 }

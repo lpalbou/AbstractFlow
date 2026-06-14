@@ -182,7 +182,12 @@ Use exact pin types from the catalog:
 - `json_schema`: JSON Schema objects for structured outputs.
 - `tools`: tool-name allowlists for Agent/LLM/tool nodes.
 - `artifact`, `artifact_image`, `artifact_audio`, `artifact_text`,
-  `artifact_video`: Gateway artifact references.
+  `artifact_video`: saved reusable artifact references.
+- `array`: generic collections. On workflow boundaries such as `On Flow Start`
+  and `On Flow End`, keep the visible type as `array` and use the second
+  selector to choose the item type. Use `array` of `file` when a runner should
+  provide many local files or a local folder from this computer; a selected
+  local folder expands into files with relative paths preserved.
 - `provider_*`, `model_*`: provider/model selectors per capability.
 - `memory`, `assertion`, `assertions`: memory/KG configuration and data.
 - `any`: flexible data pin.
@@ -199,6 +204,9 @@ Connection compatibility beyond exact matches:
 - Artifact pins connect only to compatible modalities (generic artifact
   bridges typed ones). Media node `outputs`/`meta` object pins are not
   artifact refs.
+- File arrays connect to generic `array` workflows. Use `ForEach`,
+  `Array Length`, `Array Map`, `Array Filter`, or `Get Element` to analyze
+  multi-file and folder inputs.
 - Provider pins are nominal and modality-scoped; model pins are nominal —
   typed payload pins do not connect to model pins.
 - `any` connects to everything except execution pins, including model and
@@ -322,10 +330,41 @@ Agent.resp_schema; Tools Allowlist -> Agent.tools; Agent.data -> Break Object
 -> On Flow End; Agent.scratchpad -> Agent Trace Report -> On Flow End
 audit_trace.
 
+Choosing between `llm_call`, `agent`, and direct tool calls — decide per
+step, not per workflow:
+
+- `llm_call`: ONE model pass over inputs already in the graph (classify,
+  rewrite, extract, summarize, route, synthesize a provided transcript). No
+  external information is gathered. Cheapest and most deterministic.
+- `agent`: the step must DISCOVER information or iterate (search the web,
+  read sources, retry, refine across multiple tool calls). One agent per
+  responsibility; give it tools and an authored `system`.
+- `tool_parameters` -> `make_array` -> `tool_calls`: exactly one known tool
+  call with known arguments (deterministic fetch/write); no model needed to
+  decide anything.
+- If the request demands fresh external knowledge (research, news, current
+  facts) inside a step, a bare `llm_call` CANNOT satisfy it — use an `agent`
+  with search/fetch tools there, or return `needs_user` if no suitable tool
+  exists in the inventory.
+
 ### Tools
 
 Use the discovered Gateway tool inventory from the prompt; names must match
 exactly. `recommended_for_request=true` is a relevance hint only.
+
+Tool selection discipline (per agent, least privilege):
+
+- Match each agent's allowlist to ITS role using the inventory's
+  `description`/`when_to_use`: a web-research agent gets search + fetch
+  tools; a file-report agent gets file-write tools; never both "just in
+  case". Different agents in one workflow normally get DIFFERENT allowlists.
+- Leaving `agent.tools` unset gives the agent the FULL runtime tool set at
+  execution time. That is a deliberate broad-access choice, acceptable only
+  for general-purpose assistants — tool-dependent workflows must declare
+  explicit allowlists.
+- Never invent tool names; if the capability a step needs is missing from
+  the inventory, say so via `needs_user` instead of substituting a
+  hallucinated tool.
 
 - `tools_allowlist`: reusable tool-name list; set via `literal` array.
 - `tool_parameters`: builds one tool-call object for a selected tool
@@ -367,15 +406,42 @@ Never use Code to fake PDF generation — use Write PDF.
 
 ### Files vs Artifacts
 
-- `read_file` / `write_file`: execution nodes reading/writing workspace text
-  files (`.md`, `.json`, `.txt`). Write File outputs byte count and
-  `file_path`. Not a PDF generator.
-- `read_pdf` / `write_pdf`: execution nodes for real `.pdf` files; Write PDF
-  renders text/Markdown report content and outputs bytes, sha256,
-  `file_path`.
+Use the same source contract the product UI teaches:
+
+- `Artifact`: saved reusable file data already in AbstractFlow. Artifact pins
+  expect this shape.
+- `Local File`: a file uploaded from this computer. For artifact inputs, the
+  upload becomes a saved artifact before the run.
+- `Local Folder`: a folder chosen from this computer. In hosted Flow, each
+  file is uploaded before the run and the workflow receives an ordered saved
+  file list with preserved relative member paths in artifact provenance.
+- `Server File`: a workspace-scoped server file. For artifact inputs, server
+  import creates a saved artifact snapshot. For file nodes, the flow uses the
+  server path directly.
+
+Node behavior:
+
+- `read_file` / `write_file`: execution nodes reading/writing workspace-scoped
+  server text files (`.md`, `.json`, `.txt`). In Gateway-hosted runs, these
+  paths stay within workspace policy. In local Runtime-only runs without a
+  workspace scope, relative paths fall back to the process working directory.
+  Write File outputs byte count and `file_path`. Not a PDF generator.
+- `read_pdf` / `write_pdf`: execution nodes for real workspace-scoped server
+  `.pdf` files; Write PDF renders text/Markdown report content and outputs
+  bytes, sha256, `file_path`.
 - Expose file paths through On Flow End when the user asked for files.
 - Artifact literal nodes (`template` variants: Text/Image/Voice/Music/Video
-  Artifact) create typed refs for existing uploaded/generated artifacts.
+  Artifact) create typed refs for existing saved artifacts.
+- For one local file input, use an `artifact*` output pin on `On Flow Start`.
+  In the editor this appears as `file`.
+- For many local files or a local folder whose files should be analyzed, use an
+  `array` boundary input with item type `file`.
+- Local Folder in the run form is a source for `array<file>`. It still arrives
+  as files with preserved relative member paths, not as a live folder path
+  string. If the workflow needs a writable live folder path, use `server
+  folder` (`workspace_folder`), not a local-folder upload.
+- To branch on uploaded/imported file kinds, use `Read Artifact` and switch on
+  `content_family` (simple routing) or `content_type` (exact MIME routing).
 
 File pattern: content -> Write File.content; path default ->
 Write File.file_path; exec chain through Write File before On Flow End;
@@ -554,11 +620,10 @@ Report edge as the final report; `Agent.scratchpad -> Agent Trace
 Report.scratchpad` when using trace report; Tools Allowlist wired to
 Agent.tools (or explicit Agent tools) when tools are required.
 
-Markdown artifact requests additionally require a Write File targeting a
-Markdown path, report content into `Write File.content`, Write File on the
-exec path before On Flow End, and `file_path` exposed through On Flow End.
-PDF artifact requests require the same shape with Write PDF and a `.pdf`
-path.
+Markdown file requests additionally require a Write File targeting a Markdown
+path, report content into `Write File.content`, Write File on the exec path
+before On Flow End, and `file_path` exposed through On Flow End. PDF file
+requests require the same shape with Write PDF and a `.pdf` path.
 
 When repairing:
 

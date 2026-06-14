@@ -25,6 +25,8 @@ import { RunSwitcherDropdown } from './RunSwitcherDropdown';
 import { JsonViewer } from './JsonViewer';
 import { KgActiveMemoryPanel } from './KgActiveMemoryPanel';
 import { ArtifactInputField } from './ArtifactInputField';
+import { ArtifactListInputField } from './ArtifactListInputField';
+import { WorkspacePathInputField } from './WorkspacePathInputField';
 import { artifactContentUrl, useArtifactObjectUrl } from './ArtifactPlayer';
 import {
   endpointFromDescriptor,
@@ -43,11 +45,14 @@ import {
 } from '../utils/gatewayCatalog';
 import {
   artifactRefFromUploadResponse,
+  isArtifactListLikePin,
   isArtifactPinType,
+  parseArtifactRefsText,
   parseArtifactRefText,
   type CanonicalArtifactRef,
 } from '../utils/artifactInputs';
 import { extractRunWorkspaceRoot, selectRunWorkspaceRunId } from '../utils/runWorkspace';
+import { displayDataPinTypeLabel } from '../utils/pinTypeOptions';
 import { savedFlowSummariesFromResponse, subflowExecutionLabel } from '../utils/subflowPins';
 import {
   formatProgressSummary,
@@ -1470,6 +1475,11 @@ function getInputTypeForPin(pinType: string): 'text' | 'number' | 'checkbox' | '
     case 'artifact_audio':
     case 'artifact_text':
     case 'artifact_video':
+    case 'artifacts':
+    case 'artifacts_image':
+    case 'artifacts_audio':
+    case 'artifacts_text':
+    case 'artifacts_video':
       return 'textarea';
     default:
       return 'text';
@@ -1481,6 +1491,10 @@ function getPlaceholderForPin(pin: Pin): string {
   switch (pin.type) {
     case 'string':
       return `Enter ${pin.label}...`;
+    case 'workspace_file':
+      return 'mount-or-file/path.ext';
+    case 'workspace_folder':
+      return 'mount-or-folder/path';
     case 'number':
       return '0';
     case 'object':
@@ -1495,6 +1509,12 @@ function getPlaceholderForPin(pin: Pin): string {
     case 'artifact_text':
     case 'artifact_video':
       return '{"$artifact":"...","run_id":"..."}';
+    case 'artifacts':
+    case 'artifacts_image':
+    case 'artifacts_audio':
+    case 'artifacts_text':
+    case 'artifacts_video':
+      return '[{"$artifact":"...","run_id":"..."}]';
     case 'provider':
     case 'provider_text':
     case 'provider_image':
@@ -1512,10 +1532,12 @@ function getPlaceholderForPin(pin: Pin): string {
   }
 }
 
-function displayPinType(type: string | undefined): string {
-  if (type === 'object') return 'json';
-  if (type === 'json_schema') return 'json schema';
-  return type || 'any';
+function displayPinType(pin: Pick<Pin, 'type' | 'schema'> | undefined): string {
+  return displayDataPinTypeLabel(pin);
+}
+
+function isWorkspacePinType(type: string | undefined): type is 'workspace_file' | 'workspace_folder' {
+  return type === 'workspace_file' || type === 'workspace_folder';
 }
 
 type ProviderScope = 'text' | 'image' | 'voice' | 'music';
@@ -2344,7 +2366,7 @@ export function RunFlowModal({
           initialValues[pin.id] = raw;
           return;
         }
-        if (isArtifactPinType(pin.type)) {
+        if (isArtifactPinType(pin.type) || isArtifactListLikePin(pin)) {
           try {
             initialValues[pin.id] = JSON.stringify(raw, null, 2);
             return;
@@ -2584,6 +2606,11 @@ export function RunFlowModal({
       if (isArtifactPinType(pin.type)) {
         const ref = parseArtifactRefText(value);
         if (ref) inputData[pin.id] = ref;
+        return;
+      }
+      if (isArtifactListLikePin(pin)) {
+        const refs = parseArtifactRefsText(value);
+        if (refs.length > 0) inputData[pin.id] = refs;
         return;
       }
 
@@ -6845,6 +6872,9 @@ export function RunFlowModal({
                         </span>
                       </summary>
                       <div className="run-form-section-body">
+                        <p className="run-form-note">
+                          These workspace settings govern Server File imports and Read File/Write File path nodes. Local File uploads become saved artifacts and do not use workspace paths.
+                        </p>
                         <div className="run-form-field">
                           <label className="run-form-label">
                             Access mode
@@ -7009,7 +7039,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({displayPinType(pin.type)})</span>
+                                  <span className="run-form-type">({displayPinType(pin)})</span>
                                 </label>
                                 <ArtifactInputField
                                   pin={pin}
@@ -7028,12 +7058,55 @@ export function RunFlowModal({
                             );
                           }
 
+                          if (isArtifactListLikePin(pin)) {
+                            const artifactValues = parseArtifactRefsText(value);
+                            return (
+                              <div key={pin.id} className="run-form-field">
+                                <label className="run-form-label">
+                                  {pin.label}
+                                  <span className="run-form-type">({displayPinType(pin)})</span>
+                                </label>
+                                <ArtifactListInputField
+                                  pin={pin}
+                                  value={artifactValues}
+                                  sessionId={artifactSessionId}
+                                  gatewayContracts={gatewayContracts}
+                                  disabled={isRunning}
+                                  onChange={(refs: CanonicalArtifactRef[]) =>
+                                    handleFieldChange(pin.id, refs.length > 0 ? JSON.stringify(refs, null, 2) : '')
+                                  }
+                                />
+                              </div>
+                            );
+                          }
+
+                          if (isWorkspacePinType(pin.type)) {
+                            return (
+                              <div key={pin.id} className="run-form-field">
+                                <label className="run-form-label">
+                                  {pin.label}
+                                  <span className="run-form-type">({displayPinType(pin)})</span>
+                                </label>
+                                <WorkspacePathInputField
+                                  kind={pin.type === 'workspace_folder' ? 'folder' : 'file'}
+                                  value={String(value || '')}
+                                  gatewayContracts={gatewayContracts}
+                                  disabled={isRunning}
+                                  workspaceRoot={workspaceRoot}
+                                  workspaceAccessMode={workspaceAccessMode}
+                                  workspaceIgnoredPaths={workspaceIgnoredPaths}
+                                  onChange={(next) => handleFieldChange(pin.id, next)}
+                                />
+                              </div>
+                            );
+                          }
+
                           if (isImageProviderInputPin(pin)) {
                             return (
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({displayPinType(pin.type)})</span>
+                                  <span className="run-form-type">({displayPinType(pin)})</span>
                                 </label>
                                 <AfSelect
                                   value={value}
@@ -7062,7 +7135,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({displayPinType(pin.type)})</span>
+                                  <span className="run-form-type">({displayPinType(pin)})</span>
                                 </label>
                                 <AfSelect
                                   value={value}
@@ -7091,7 +7164,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({displayPinType(pin.type)})</span>
+                                  <span className="run-form-type">({displayPinType(pin)})</span>
                                 </label>
                                 <AfSelect
                                   value={value}
@@ -7120,7 +7193,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({displayPinType(pin.type)})</span>
+                                  <span className="run-form-type">({displayPinType(pin)})</span>
                                 </label>
                                 <AfSelect
                                   value={value}
@@ -7174,7 +7247,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({displayPinType(pin.type)})</span>
+                                  <span className="run-form-type">({displayPinType(pin)})</span>
                                 </label>
                                 <AfSelect
                                   value={value}
@@ -7211,7 +7284,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({displayPinType(pin.type)})</span>
+                                  <span className="run-form-type">({displayPinType(pin)})</span>
                                 </label>
                                 <AfMultiSelect
                                   values={values}
@@ -7235,7 +7308,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({displayPinType(pin.type)})</span>
+                                  <span className="run-form-type">({displayPinType(pin)})</span>
                                 </label>
                                 <AfSelect
                                   value={value}
@@ -7255,7 +7328,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({displayPinType(pin.type)})</span>
+                                  <span className="run-form-type">({displayPinType(pin)})</span>
                                 </label>
                                 <AfSelect
                                   value={value}
@@ -7274,7 +7347,7 @@ export function RunFlowModal({
                               <div key={pin.id} className="run-form-field">
                                 <label className="run-form-label">
                                   {pin.label}
-                                  <span className="run-form-type">({displayPinType(pin.type)})</span>
+                                  <span className="run-form-type">({displayPinType(pin)})</span>
                                 </label>
                                 <ArrayParamEditor
                                   value={value}
@@ -7289,7 +7362,7 @@ export function RunFlowModal({
                             <div key={pin.id} className="run-form-field">
                               <label className="run-form-label">
                                 {pin.label}
-                                <span className="run-form-type">({displayPinType(pin.type)})</span>
+                                <span className="run-form-type">({displayPinType(pin)})</span>
                               </label>
 
                               {inputType === 'textarea' ? (

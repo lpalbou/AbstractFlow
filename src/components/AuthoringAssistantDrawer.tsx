@@ -1107,10 +1107,10 @@ export function computeAuthoringReadiness(
 
   if (requiresMarkdownArtifact) {
     if (!writeFileReady(flow, /\.md\b|markdown/i, endNodes)) {
-      issues.push('Create a Write File node for the Markdown artifact, connect report content to Write File.content, and place it on the execution path before On Flow End.');
+      issues.push('Create a Write File node for the Markdown report file, connect report content to Write File.content, and place it on the execution path before On Flow End.');
     }
     if (!writeFilePathExposed(flow, /\.md\b|markdown/i, endNodes)) {
-      issues.push('Expose the Markdown artifact path through a connected On Flow End input.');
+      issues.push('Expose the Markdown report file path through a connected On Flow End input.');
     }
   }
 
@@ -1240,7 +1240,8 @@ export function assistantSystemPrompt(): string {
     'For research workflows, use execution flow On Flow Start.exec-out -> Agent.exec-in -> On Flow End.exec-in, and build the full scaffold: On Flow Start inputs, Build JSON feeding String Template, Tools Allowlist or Agent.tools, authored Agent.system, Agent Trace Report, and connected On Flow End report, sources/citations, and audit/trace outputs.',
     'Agent.system must be non-empty for Agent nodes you create. Write the role, quality bar, citation/source requirements, iteration strategy, and final output contract there. Do not rely only on Agent.prompt.',
     'For deep research, prefer structured Agent output: a json_schema node for {markdown_report:string,sources:array|object} connected to Agent.resp_schema; extract strings before writing files (Agent.data -> Break Object.markdown_report -> Write File.content). Agent.meta is execution metadata, never research sources. Agent Trace Report is audit output only, never the final report.',
-    'For markdown artifact requests, add a Write File node with a .md file_path default and expose the path through On Flow End. For PDF requests, use Write PDF with a .pdf file_path the same way; never fake PDF generation with Code or Write File.',
+    'Use the same source contract the UI teaches: Artifact = saved reusable file, Local File = upload from this computer, Server File = workspace-scoped server file. Artifact pins expect saved artifacts; Read File/Write File use workspace-scoped server paths.',
+    'For markdown file requests, add a Write File node with a .md file_path default and expose the path through On Flow End. For PDF requests, use Write PDF with a .pdf file_path the same way; never fake PDF generation with Code or Write File.',
     'Do not use Ask User for ordinary workflow input collection; add On Flow Start data pins instead.',
     'Leave workflow provider/model pins blank unless the user explicitly asks to pin them; Gateway defaults are portable. Wiring the model pin dynamically (e.g. from a model pool through a loop item) with provider left blank is valid. Only a half-typed default pair (provider typed but model blank, or the reverse) is flagged.',
     'Do not emit secrets, provider API keys, raw HTML, icon changes, or Save/Publish/Run operations.',
@@ -1998,6 +1999,7 @@ export function acceptanceReviewSystemPrompt(): string {
     'Judge ONLY whether the visible graph implements what the user asked for: node structure (loops, branches, distinct model calls), configured pin defaults, data wiring, and final outputs.',
     'Structural validity is already checked elsewhere; focus on semantic fidelity to the request.',
     'Typical failures to catch: requested multi-participant or multi-model structure collapsed into a single prompt; requested iteration/cycles without any loop or state nodes; requested inputs or outputs missing; requested artifacts not written or not exposed.',
+    'Capability mismatch is a failure: a step that needs fresh external information (research, news, current facts, web sources) implemented as a bare LLM Call with no tools, or an agent whose tool allowlist cannot support its stated role.',
     'Do not invent requirements the user never asked for; cosmetic or stylistic preferences are not findings.',
     'Return ONLY valid JSON. No markdown fences.',
     'JSON schema: {"verdict":"pass"|"fail","unmet":string[],"notes":string}.',

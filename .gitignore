@@ -31,3 +31,4 @@ untracked/
 # Test/cache output
 coverage/
 .eslintcache
+test-results/

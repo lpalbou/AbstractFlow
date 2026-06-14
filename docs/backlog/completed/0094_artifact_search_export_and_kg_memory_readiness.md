@@ -96,7 +96,7 @@ Prefer small Gateway-owned contracts over UI-only path handling. Do not introduc
 
 ## Follow-up amendment
 - Date: 2026-05-28
-- The Run modal export control was removed after product review. The `artifact content` link remains the Run modal open/download affordance, while artifact-to-filesystem writes should be represented as explicit graph-level file/artifact IO nodes. The unresolved `Read File` / `Write File` versus explicit artifact IO-node boundary is tracked in `../proposed/0095_file_nodes_artifact_io_boundary_resolution.md`.
+- The Run modal export control was removed after product review. The `artifact content` link remains the Run modal open/download affordance, while artifact-to-filesystem writes should be represented as explicit graph-level file/artifact IO nodes. The resulting file/artifact boundary work later shipped in `../completed/0095_file_nodes_artifact_io_boundary_resolution.md`.
   - `abstractflow/web/frontend/src/utils/gatewayClient.ts`
   - `abstractflow/web/frontend/src/styles/index.css`
 - Tests:

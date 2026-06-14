@@ -14,21 +14,23 @@ interface PinInfo {
   description: string;
 }
 
-const PIN_INFO: PinInfo[] = [
+export const PIN_INFO: PinInfo[] = [
   { type: 'execution', label: 'Execution', shape: '\u25B7', description: 'Controls flow order' },
   { type: 'string', label: 'String', shape: '\u25CF', description: 'Text data' },
   { type: 'number', label: 'Number', shape: '\u25CF', description: 'Integer or float' },
   { type: 'boolean', label: 'Boolean', shape: '\u25C7', description: 'True/False' },
   { type: 'object', label: 'Object', shape: '\u25CF', description: 'JSON objects' },
   { type: 'json_schema', label: 'JSON Schema', shape: '\u25CF', description: 'JSON Schema object' },
-  { type: 'artifact', label: 'Artifact', shape: '\u25CF', description: 'Generic Gateway artifact reference' },
-  { type: 'artifact_image', label: 'Image Artifact', shape: '\u25CF', description: 'Image artifact reference' },
-  { type: 'artifact_audio', label: 'Audio Artifact', shape: '\u25CF', description: 'Audio, voice, or music artifact reference' },
-  { type: 'artifact_text', label: 'Text Artifact', shape: '\u25CF', description: 'Text or transcript artifact reference' },
-  { type: 'artifact_video', label: 'Video Artifact', shape: '\u25CF', description: 'Video artifact reference' },
+  { type: 'artifact', label: 'File', shape: '\u25CF', description: 'Saved file value' },
+  { type: 'artifact_image', label: 'Image File', shape: '\u25CF', description: 'Durable saved image file reference' },
+  { type: 'artifact_audio', label: 'Audio File', shape: '\u25CF', description: 'Durable saved audio, voice, or music file reference' },
+  { type: 'artifact_text', label: 'Text File', shape: '\u25CF', description: 'Durable saved text or transcript file reference' },
+  { type: 'artifact_video', label: 'Video File', shape: '\u25CF', description: 'Durable saved video file reference' },
+  { type: 'workspace_file', label: 'Server File', shape: '\u25CF', description: 'Live server workspace file path' },
+  { type: 'workspace_folder', label: 'Server Folder', shape: '\u25A0', description: 'Live server workspace folder path' },
   { type: 'assertion', label: 'Assertion', shape: '\u25CF', description: 'KG assertion object' },
   { type: 'assertions', label: 'Assertions', shape: '\u25A0', description: 'KG assertions list (assertion[])' },
-  { type: 'array', label: 'Array', shape: '\u25A0', description: 'Collections' },
+  { type: 'array', label: 'Array', shape: '\u25A0', description: 'Ordered collections; workflow boundaries can specialize arrays by item type' },
   { type: 'tools', label: 'Tools', shape: '\u25A0', description: 'Tool allowlist (string[])' },
   { type: 'provider_text', label: 'Text Provider', shape: '\u25CF', description: 'Text/LLM provider id/name' },
   { type: 'provider_image', label: 'Image Provider', shape: '\u25CF', description: 'Image-generation provider id' },
@@ -38,6 +40,21 @@ const PIN_INFO: PinInfo[] = [
   { type: 'model', label: 'Model', shape: '\u25CF', description: 'Model id/name scoped by the selected provider' },
   { type: 'agent', label: 'Agent', shape: '\u2B22', description: 'Agent reference' },
   { type: 'any', label: 'Any', shape: '\u25CF', description: 'Accepts any type' },
+];
+
+export const PIN_RULES: string[] = [
+  'Execution connects to Execution only',
+  '"Any" type accepts all data types',
+  'Same types always compatible',
+  'Array and Object are interchangeable',
+  'Assertion is compatible with Object',
+  '"Tools" is compatible with Array (specialized string[])',
+  '"Assertions" is compatible with Array (specialized assertion[])',
+  'Providers are modality-scoped; model pins stay generic and are scoped by the selected provider',
+  'File pins are durable saved files and route through artifact-backed nodes',
+  'Use array of file for multiple local files or for local folder contents',
+  'Local Folder in the run form is a source for array<file>, not a live writable folder path',
+  'Server File and Server Folder are live server workspace paths and remain string-compatible for backward compatibility',
 ];
 
 export function PinLegend() {
@@ -71,15 +88,9 @@ export function PinLegend() {
           <div className="pin-legend-rules">
             <strong>Connection Rules:</strong>
             <ul>
-              <li>Execution connects to Execution only</li>
-              <li>"Any" type accepts all data types</li>
-              <li>Same types always compatible</li>
-              <li>Array and Object are interchangeable</li>
-              <li>Assertion is compatible with Object</li>
-              <li>"Tools" is compatible with Array (specialized string[])</li>
-              <li>"Assertions" is compatible with Array (specialized assertion[])</li>
-              <li>Providers are modality-scoped; model pins stay generic and are scoped by the selected provider</li>
-              <li>Artifact pins are modality-scoped; generic Object remains the advanced escape hatch</li>
+              {PIN_RULES.map((rule) => (
+                <li key={rule}>{rule}</li>
+              ))}
             </ul>
           </div>
         </div>

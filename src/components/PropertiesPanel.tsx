@@ -41,6 +41,8 @@ import {
 import {
   modelOptionsFromGatewayCatalog,
   providerOptionsFromGatewayCatalog,
+  visionAdapterItemsFromGatewayCatalog,
+  type GatewayVisionAdapterCatalogItem,
 } from '../utils/gatewayCatalog';
 import {
   modelCatalogScopeForPin,
@@ -64,6 +66,22 @@ import {
   subflowPinPatchForSelectedFlow,
 } from '../utils/subflowPins';
 import { inferSchemaForNodeOutput } from '../utils/outputSchemaInference';
+import {
+  EDITOR_DATA_PIN_TYPES,
+  FLOW_IO_EDITOR_DATA_PIN_TYPES,
+  FLOW_IO_ARRAY_ITEM_TYPES,
+  dataPinTypeLabel,
+  flowIoEditorDisplayPinType,
+  flowIoArrayItemTypeForPin,
+  flowIoArrayItemTypeLabel,
+  flowIoPinPatchForEditorSelection,
+  flowIoPinPatchForArrayItem,
+  flowIoPinTypeLabel,
+  flowBoundaryPinSelectionHint,
+  type EditorDataPinType,
+  type FlowIoEditorDataPinType,
+  type FlowIoArrayItemType,
+} from '../utils/pinTypeOptions';
 import {
   AGENT_META_SCHEMA,
   AGENT_RESULT_SCHEMA,
@@ -94,6 +112,10 @@ const DEFAULT_TTS_QUALITY_PRESETS: AfSelectOption[] = [
   { value: 'high', label: 'high quality' },
 ];
 const GATEWAY_DEFAULT_OPTION: AfSelectOption = { value: '', label: 'Auto (Gateway default)' };
+const FLOW_IO_ARRAY_ITEM_OPTIONS: Array<{ value: FlowIoArrayItemType; label: string }> = FLOW_IO_ARRAY_ITEM_TYPES.map((value) => ({
+  value,
+  label: flowIoArrayItemTypeLabel(value),
+}));
 
 const MEDIA_NODE_TYPES = new Set([
   'generate_image',
@@ -124,6 +146,8 @@ const MEDIA_PIN_DEFAULT_IDS = new Set([
   'music_provider',
   'music_model',
   'format',
+  'seeds',
+  'lora_adapters',
 ]);
 
 function formatValuesFrom(values: unknown, fallback: string[]): string[] {
@@ -159,6 +183,118 @@ function withGatewayDefaultOption(options: AfSelectOption[]): AfSelectOption[] {
   ];
 }
 
+type FlowVisionLoRAAdapter = {
+  source: string;
+  scale?: number;
+  target_role?: string;
+  weight_name?: string;
+  subfolder?: string;
+  adapter_name?: string;
+};
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+function parseSeedListText(value: string): number[] {
+  const text = String(value || '').trim();
+  if (!text) return [];
+  const parts = text
+    .split(/[\n,]/g)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const out: number[] = [];
+  for (const part of parts) {
+    const parsed = Number(part);
+    if (!Number.isFinite(parsed) || !Number.isInteger(parsed)) {
+      throw new Error(`Invalid seed value: ${part}`);
+    }
+    out.push(parsed);
+  }
+  return out;
+}
+
+function seedListTextFrom(value: unknown): string {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (typeof item === 'number' && Number.isFinite(item) ? String(item) : typeof item === 'string' ? item.trim() : ''))
+      .filter(Boolean)
+      .join(', ');
+  }
+  return typeof value === 'string' ? value : '';
+}
+
+function normalizeStoredLoRAAdapters(value: unknown): FlowVisionLoRAAdapter[] {
+  let parsed = value;
+  if (typeof parsed === 'string') {
+    const text = parsed.trim();
+    if (!text) return [];
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      return [];
+    }
+  }
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) parsed = [parsed];
+  if (!Array.isArray(parsed)) return [];
+  const out: FlowVisionLoRAAdapter[] = [];
+  for (const item of parsed) {
+    const record = asRecord(item);
+    if (!record) continue;
+    const source = String(record.source || record.id || '').trim();
+    if (!source) continue;
+    const scaleRaw = record.scale;
+    const scale =
+      scaleRaw === undefined || scaleRaw === null || scaleRaw === ''
+        ? undefined
+        : Number.isFinite(Number(scaleRaw))
+          ? Number(scaleRaw)
+          : undefined;
+    out.push({
+      source,
+      scale,
+      target_role: typeof record.target_role === 'string' && record.target_role.trim() ? record.target_role.trim() : undefined,
+      weight_name: typeof record.weight_name === 'string' && record.weight_name.trim() ? record.weight_name.trim() : undefined,
+      subfolder: typeof record.subfolder === 'string' && record.subfolder.trim() ? record.subfolder.trim() : undefined,
+      adapter_name: typeof record.adapter_name === 'string' && record.adapter_name.trim() ? record.adapter_name.trim() : undefined,
+    });
+  }
+  return out;
+}
+
+function serializeLoRAAdapters(adapters: FlowVisionLoRAAdapter[]): JsonValue[] {
+  return adapters
+    .filter((item) => item && item.source.trim())
+    .map((item) => ({
+      source: item.source.trim(),
+      ...(item.scale !== undefined ? { scale: item.scale } : {}),
+      ...(item.target_role ? { target_role: item.target_role } : {}),
+      ...(item.weight_name ? { weight_name: item.weight_name } : {}),
+      ...(item.subfolder ? { subfolder: item.subfolder } : {}),
+      ...(item.adapter_name ? { adapter_name: item.adapter_name } : {}),
+    }));
+}
+
+function adapterLabelFromCatalogItem(item: GatewayVisionAdapterCatalogItem): string {
+  const label = String(item.label || '').trim();
+  const provider = String(item.provider || '').trim();
+  return label || (provider ? `${provider} / ${item.source}` : item.source);
+}
+
+function adapterRoleOptions(item: GatewayVisionAdapterCatalogItem | undefined, currentValue = ''): AfSelectOption[] {
+  const values = new Set<string>();
+  const out: AfSelectOption[] = [{ value: '', label: 'Auto' }];
+  for (const role of item?.suggested_target_roles || []) {
+    const clean = String(role || '').trim();
+    if (!clean || values.has(clean)) continue;
+    values.add(clean);
+    out.push({ value: clean, label: clean });
+  }
+  const current = String(currentValue || '').trim();
+  if (current && !values.has(current)) out.push({ value: current, label: current });
+  return out;
+}
+
 interface PropertiesPanelProps {
   node: Node<FlowNodeData> | null;
 }
@@ -181,40 +317,6 @@ interface AgentSchemaField {
   type: AgentSchemaFieldType;
   required: boolean;
   itemsType?: Exclude<AgentSchemaFieldType, 'any'>;
-}
-
-type DataPinType = Exclude<FlowNodeData['inputs'][number]['type'], 'execution'>;
-
-const DATA_PIN_TYPES: DataPinType[] = [
-  'string',
-  'number',
-  'boolean',
-  'object',
-  'json_schema',
-  'artifact',
-  'artifact_image',
-  'artifact_audio',
-  'artifact_text',
-  'artifact_video',
-  'memory',
-  'assertion',
-  'assertions',
-  'array',
-  'tools',
-  'provider_text',
-  'provider_image',
-  'provider_voice',
-  'provider_music',
-  'provider',
-  'model',
-  'agent',
-  'any',
-];
-
-function dataPinTypeLabel(type: DataPinType): string {
-  if (type === 'object') return 'json';
-  if (type === 'json_schema') return 'json schema';
-  return type;
 }
 
 function isTextProviderPin(pin: Pin): boolean {
@@ -565,6 +667,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const sttFormatOptions = formatValuesFrom(undefined, DEFAULT_STT_FORMATS);
   const musicFormatOptions = formatValuesFrom(generatedMusicContract?.direct_endpoint?.formats, DEFAULT_MUSIC_FORMATS);
   const gatewayReadiness = getGatewayFlowEditorReadiness(gatewayContracts);
+  const mediaDiscovery = gatewayContracts?.common?.discovery || {};
   const providerDiscoveryEndpoint = gatewayContracts?.common?.discovery?.providers || '';
   const providerModelsEndpoint = gatewayContracts?.common?.discovery?.provider_models || '';
   const voiceCatalogEndpoint = gatewayContracts?.common?.discovery?.voice_voices || '';
@@ -600,6 +703,20 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     typeof imageToVideoContract?.direct_endpoint?.provider_models_task === 'string' && imageToVideoContract.direct_endpoint.provider_models_task.trim()
       ? imageToVideoContract.direct_endpoint.provider_models_task.trim()
       : 'image_to_video';
+  const visionAdaptersEndpoint =
+    mediaDiscovery.vision_adapters ||
+    (typeof generatedImageContract?.direct_endpoint?.adapter_catalog_endpoint === 'string'
+      ? generatedImageContract.direct_endpoint.adapter_catalog_endpoint
+      : '') ||
+    (typeof generatedVideoContract?.direct_endpoint?.adapter_catalog_endpoint === 'string'
+      ? generatedVideoContract.direct_endpoint.adapter_catalog_endpoint
+      : '') ||
+    (typeof imageToVideoContract?.direct_endpoint?.adapter_catalog_endpoint === 'string'
+      ? imageToVideoContract.direct_endpoint.adapter_catalog_endpoint
+      : '') ||
+    (typeof editedImageContract?.direct_endpoint?.adapter_catalog_endpoint === 'string'
+      ? editedImageContract.direct_endpoint.adapter_catalog_endpoint
+      : '');
   const currentImageProviderModelsTask =
     node?.data?.nodeType === 'upscale_image'
       ? upscaledImageProviderModelsTask
@@ -627,6 +744,8 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const [imageModelOptions, setImageModelOptions] = useState<
     Array<{ provider: string; model: string; label: string; catalogTask?: string } & MediaModelParameterMetadata>
   >([]);
+  const [visionAdapterOptions, setVisionAdapterOptions] = useState<GatewayVisionAdapterCatalogItem[]>([]);
+  const [loadingVisionAdapters, setLoadingVisionAdapters] = useState(false);
   const [loadingMediaModels, setLoadingMediaModels] = useState(false);
   const [mediaCatalogRequest, setMediaCatalogRequest] = useState<{
     seq: number;
@@ -1417,7 +1536,104 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     return out;
   }, []);
 
+  const adapterDiscoveryNodeData = node?.data;
+  const adapterDiscoveryDefaults = ((adapterDiscoveryNodeData?.pinDefaults || {}) as Record<string, unknown>);
+  const adapterDiscoveryEffect = ((adapterDiscoveryNodeData?.effectConfig || {}) as Record<string, unknown>);
+  const stringDefaultForAdapterDiscovery = (pinId: string, ...effectKeys: string[]) => {
+    const fromDefault = stringFrom(adapterDiscoveryDefaults[pinId]);
+    if (fromDefault) return fromDefault;
+    for (const key of [pinId, ...effectKeys]) {
+      const value = stringFrom(adapterDiscoveryEffect[key]);
+      if (value) return value;
+    }
+    return '';
+  };
+  const adapterDiscoveryVisionTask =
+    adapterDiscoveryNodeData?.nodeType === 'generate_image'
+      ? generatedImageProviderModelsTask
+      : adapterDiscoveryNodeData?.nodeType === 'edit_image' || adapterDiscoveryNodeData?.nodeType === 'image_to_image'
+        ? editedImageProviderModelsTask
+        : adapterDiscoveryNodeData?.nodeType === 'generate_video' || adapterDiscoveryNodeData?.nodeType === 'text_to_video'
+          ? generatedVideoProviderModelsTask
+          : adapterDiscoveryNodeData?.nodeType === 'image_to_video'
+            ? imageToVideoProviderModelsTask
+            : '';
+  const adapterDiscoveryVisionProvider =
+    adapterDiscoveryNodeData?.nodeType === 'generate_image' ||
+    adapterDiscoveryNodeData?.nodeType === 'edit_image' ||
+    adapterDiscoveryNodeData?.nodeType === 'image_to_image' ||
+    adapterDiscoveryNodeData?.nodeType === 'upscale_image'
+      ? stringDefaultForAdapterDiscovery('image_provider', 'provider')
+      : adapterDiscoveryNodeData?.nodeType === 'generate_video' ||
+          adapterDiscoveryNodeData?.nodeType === 'text_to_video' ||
+          adapterDiscoveryNodeData?.nodeType === 'image_to_video'
+        ? stringDefaultForAdapterDiscovery('video_provider', 'provider')
+        : '';
+  const adapterDiscoveryVisionModel =
+    adapterDiscoveryNodeData?.nodeType === 'generate_image' ||
+    adapterDiscoveryNodeData?.nodeType === 'edit_image' ||
+    adapterDiscoveryNodeData?.nodeType === 'image_to_image' ||
+    adapterDiscoveryNodeData?.nodeType === 'upscale_image'
+      ? stringDefaultForAdapterDiscovery('image_model', 'model')
+      : adapterDiscoveryNodeData?.nodeType === 'generate_video' ||
+          adapterDiscoveryNodeData?.nodeType === 'text_to_video' ||
+          adapterDiscoveryNodeData?.nodeType === 'image_to_video'
+        ? stringDefaultForAdapterDiscovery('video_model', 'model')
+        : '';
+  const adapterDiscoverySupportsLoRAAdapters =
+    adapterDiscoveryNodeData?.nodeType === 'generate_image'
+      ? Boolean(generatedImageContract?.direct_endpoint?.supports_lora_adapters)
+      : adapterDiscoveryNodeData?.nodeType === 'edit_image' || adapterDiscoveryNodeData?.nodeType === 'image_to_image'
+        ? Boolean(editedImageContract?.direct_endpoint?.supports_lora_adapters)
+        : adapterDiscoveryNodeData?.nodeType === 'generate_video' || adapterDiscoveryNodeData?.nodeType === 'text_to_video'
+          ? Boolean(generatedVideoContract?.direct_endpoint?.supports_lora_adapters)
+          : adapterDiscoveryNodeData?.nodeType === 'image_to_video'
+            ? Boolean(imageToVideoContract?.direct_endpoint?.supports_lora_adapters)
+            : false;
 
+  useEffect(() => {
+    if (gatewayCapabilitiesQuery.isLoading) return;
+    if (
+      gatewayCapabilitiesQuery.isError ||
+      !adapterDiscoverySupportsLoRAAdapters ||
+      !visionAdaptersEndpoint ||
+      !adapterDiscoveryVisionTask ||
+      !adapterDiscoveryVisionProvider ||
+      !adapterDiscoveryVisionModel
+    ) {
+      setVisionAdapterOptions([]);
+      setLoadingVisionAdapters(false);
+      return;
+    }
+
+    const query = Object.fromEntries(
+      Object.entries({
+        task: adapterDiscoveryVisionTask,
+        provider: adapterDiscoveryVisionProvider,
+        model: adapterDiscoveryVisionModel,
+      }).filter(([, value]) => typeof value === 'string' && value.trim())
+    );
+
+    setLoadingVisionAdapters(true);
+    gatewayJson<any>(gatewayPath(visionAdaptersEndpoint, {}, query), { timeoutMs: 30_000 })
+      .then((payload) => {
+        setVisionAdapterOptions(visionAdapterItemsFromGatewayCatalog(payload));
+      })
+      .catch(() => {
+        setVisionAdapterOptions([]);
+      })
+      .finally(() => setLoadingVisionAdapters(false));
+  }, [
+    adapterDiscoverySupportsLoRAAdapters,
+    adapterDiscoveryVisionModel,
+    adapterDiscoveryVisionProvider,
+    adapterDiscoveryVisionTask,
+    gatewayCapabilitiesQuery.isError,
+    gatewayCapabilitiesQuery.isLoading,
+    visionAdaptersEndpoint,
+  ]);
+
+  
   if (!node) {
     return (
       <div className="properties-panel empty">
@@ -1554,6 +1770,76 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
       if (value) return value;
     }
     return '';
+  };
+
+  const currentVisionTask =
+    data.nodeType === 'generate_image'
+      ? generatedImageProviderModelsTask
+      : data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
+        ? editedImageProviderModelsTask
+        : data.nodeType === 'generate_video' || data.nodeType === 'text_to_video'
+          ? generatedVideoProviderModelsTask
+          : data.nodeType === 'image_to_video'
+            ? imageToVideoProviderModelsTask
+            : '';
+  const currentVisionProvider =
+    data.nodeType === 'generate_image' ||
+    data.nodeType === 'edit_image' ||
+    data.nodeType === 'image_to_image' ||
+    data.nodeType === 'upscale_image'
+      ? stringDefaultFor('image_provider', 'provider')
+      : data.nodeType === 'generate_video' || data.nodeType === 'text_to_video' || data.nodeType === 'image_to_video'
+        ? stringDefaultFor('video_provider', 'provider')
+        : '';
+  const currentVisionModel =
+    data.nodeType === 'generate_image' ||
+    data.nodeType === 'edit_image' ||
+    data.nodeType === 'image_to_image' ||
+    data.nodeType === 'upscale_image'
+      ? stringDefaultFor('image_model', 'model')
+      : data.nodeType === 'generate_video' || data.nodeType === 'text_to_video' || data.nodeType === 'image_to_video'
+        ? stringDefaultFor('video_model', 'model')
+        : '';
+  const currentMediaLoRAAdapters = normalizeStoredLoRAAdapters(
+    ((data.pinDefaults || {}) as Record<string, unknown>).lora_adapters ??
+      ((data.effectConfig || {}) as Record<string, unknown>).lora_adapters
+  );
+  const currentMediaSeedList = seedListTextFrom(
+    ((data.pinDefaults || {}) as Record<string, unknown>).seeds ??
+      ((data.effectConfig || {}) as Record<string, unknown>).seeds
+  );
+  const mediaSupportsBatch =
+    data.nodeType === 'generate_image'
+      ? Boolean(generatedImageContract?.direct_endpoint?.supports_batch)
+      : data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
+        ? Boolean(editedImageContract?.direct_endpoint?.supports_batch)
+        : data.nodeType === 'generate_video' || data.nodeType === 'text_to_video'
+          ? Boolean(generatedVideoContract?.direct_endpoint?.supports_batch)
+          : data.nodeType === 'image_to_video'
+            ? Boolean(imageToVideoContract?.direct_endpoint?.supports_batch)
+            : false;
+  const mediaSupportsLoRAAdapters =
+    data.nodeType === 'generate_image'
+      ? Boolean(generatedImageContract?.direct_endpoint?.supports_lora_adapters)
+      : data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
+        ? Boolean(editedImageContract?.direct_endpoint?.supports_lora_adapters)
+        : data.nodeType === 'generate_video' || data.nodeType === 'text_to_video'
+          ? Boolean(generatedVideoContract?.direct_endpoint?.supports_lora_adapters)
+        : data.nodeType === 'image_to_video'
+            ? Boolean(imageToVideoContract?.direct_endpoint?.supports_lora_adapters)
+            : false;
+  const updateCurrentMediaLoRAAdapters = (nextAdapters: FlowVisionLoRAAdapter[]) => {
+    const serialized = serializeLoRAAdapters(nextAdapters);
+    patchMediaDefaults(
+      { lora_adapters: serialized.length > 0 ? serialized : undefined },
+      { lora_adapters: serialized.length > 0 ? serialized : undefined }
+    );
+  };
+  const updateCurrentMediaSeedList = (nextSeeds: number[]) => {
+    patchMediaDefaults(
+      { seeds: nextSeeds.length > 0 ? nextSeeds : undefined },
+      { seeds: nextSeeds.length > 0 ? nextSeeds : undefined }
+    );
   };
 
   const providerOptionsForScope = (scope: PinCatalogScope): AfSelectOption[] => {
@@ -2062,7 +2348,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
             .map((pin) => (
               <li key={pin.id} className="pin-info">
                 <span className="pin-name">{pin.label}</span>
-                <span className="pin-type">{dataPinTypeLabel(pin.type as DataPinType)}</span>
+                <span className="pin-type">{dataPinTypeLabel(pin.type)}</span>
               </li>
             ))}
         </ul>
@@ -2076,7 +2362,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
             .map((pin) => (
               <li key={pin.id} className="pin-info">
                 <span className="pin-name">{pin.label}</span>
-                <span className="pin-type">{dataPinTypeLabel(pin.type as DataPinType)}</span>
+                <span className="pin-type">{dataPinTypeLabel(pin.type)}</span>
               </li>
             ))}
         </ul>
@@ -2616,10 +2902,185 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 );
               }
 
+              if (mediaNode && pin.id === 'seeds') {
+                return (
+                  <div key={pin.id} className="property-group">
+                    <label className="property-sublabel">{rowLabel}</label>
+                    <textarea
+                      className="property-input property-textarea"
+                      value={currentMediaSeedList}
+                      placeholder="1234, 1235, 1236"
+                      onChange={(e) => {
+                        const nextText = e.target.value;
+                        if (!nextText.trim()) {
+                          updateCurrentMediaSeedList([]);
+                          return;
+                        }
+                        try {
+                          updateCurrentMediaSeedList(parseSeedListText(nextText));
+                        } catch {
+                          // Keep the stored value valid and ignore malformed edits until the input is corrected.
+                        }
+                      }}
+                      rows={2}
+                    />
+                    <span className="property-hint">
+                      {mediaSupportsBatch
+                        ? 'Comma-separated integer seeds. When present, they define the batch order used by the provider.'
+                        : 'Comma-separated integer seeds. This route does not currently advertise batch generation.'}
+                    </span>
+                  </div>
+                );
+              }
+
+              if (mediaNode && pin.id === 'lora_adapters') {
+                const canBrowseAdapters = Boolean(currentVisionTask && currentVisionProvider && currentVisionModel);
+                const adapterOptions = visionAdapterOptions.map((item) => ({
+                  value: item.source,
+                  label: adapterLabelFromCatalogItem(item),
+                }));
+                return (
+                  <div key={pin.id} className="property-group">
+                    <label className="property-sublabel">{rowLabel}</label>
+                    <div className="array-editor">
+                      {currentMediaLoRAAdapters.map((adapter, index) => {
+                        const catalogItem = visionAdapterOptions.find((item) => item.source === adapter.source);
+                        const nextSourceOptions =
+                          adapter.source && !adapterOptions.some((option) => option.value === adapter.source)
+                            ? [{ value: adapter.source, label: adapter.source }, ...adapterOptions]
+                            : adapterOptions;
+                        return (
+                          <div key={`${adapter.source || 'adapter'}-${index}`} className="object-editor">
+                            <div className="object-field">
+                              <div className="object-key">
+                                <AfSelect
+                                  value={adapter.source}
+                                  options={nextSourceOptions}
+                                  placeholder={loadingVisionAdapters ? 'Loading…' : 'Select adapter…'}
+                                  loading={loadingVisionAdapters && nextSourceOptions.length === 0}
+                                  searchable
+                                  clearable
+                                  allowCustom
+                                  searchPlaceholder="Search adapters…"
+                                  minPopoverWidth={420}
+                                  onOpen={() => {
+                                    if (canBrowseAdapters) return;
+                                  }}
+                                  onChange={(value) => {
+                                    const next = [...currentMediaLoRAAdapters];
+                                    const picked = visionAdapterOptions.find((item) => item.source === value);
+                                    next[index] = {
+                                      ...next[index],
+                                      source: value || '',
+                                      weight_name: picked?.weight_name || next[index]?.weight_name,
+                                      subfolder: picked?.subfolder || next[index]?.subfolder,
+                                      adapter_name: picked?.adapter_name || next[index]?.adapter_name,
+                                      target_role:
+                                        next[index]?.target_role && adapterRoleOptions(picked, next[index]?.target_role).some((option) => option.value === next[index]?.target_role)
+                                          ? next[index]?.target_role
+                                          : undefined,
+                                    };
+                                    updateCurrentMediaLoRAAdapters(next.filter((item) => item.source.trim()));
+                                  }}
+                                />
+                              </div>
+                              <div className="object-type">
+                                <input
+                                  type="number"
+                                  className="property-input"
+                                  value={adapter.scale ?? ''}
+                                  step="0.05"
+                                  placeholder="1.0"
+                                  onChange={(e) => {
+                                    const next = [...currentMediaLoRAAdapters];
+                                    const value = e.target.value;
+                                    next[index] = {
+                                      ...next[index],
+                                      scale: value === '' ? undefined : Number(value),
+                                    };
+                                    updateCurrentMediaLoRAAdapters(next);
+                                  }}
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                className="array-item-remove"
+                                title="Remove adapter"
+                                onClick={() => {
+                                  updateCurrentMediaLoRAAdapters(currentMediaLoRAAdapters.filter((_, itemIndex) => itemIndex !== index));
+                                }}
+                              >
+                                ×
+                              </button>
+                            </div>
+                            <div className="object-field">
+                              <div className="object-key">
+                                <AfSelect
+                                  value={adapter.target_role || ''}
+                                  options={adapterRoleOptions(catalogItem, adapter.target_role)}
+                                  placeholder="Auto role"
+                                  searchable={false}
+                                  clearable
+                                  minPopoverWidth={220}
+                                  onChange={(value) => {
+                                    const next = [...currentMediaLoRAAdapters];
+                                    next[index] = {
+                                      ...next[index],
+                                      target_role: value || undefined,
+                                    };
+                                    updateCurrentMediaLoRAAdapters(next);
+                                  }}
+                                />
+                              </div>
+                              <div className="object-value object-null">
+                                {catalogItem?.adapter_name || catalogItem?.weight_name || catalogItem?.subfolder
+                                  ? [catalogItem?.adapter_name, catalogItem?.weight_name, catalogItem?.subfolder].filter(Boolean).join(' • ')
+                                  : 'Auto-discovered compatible adapter'}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <button
+                        type="button"
+                        className="array-add-button"
+                        disabled={!canBrowseAdapters || visionAdapterOptions.length === 0}
+                        onClick={() => {
+                          const firstAdapter = visionAdapterOptions[0];
+                          updateCurrentMediaLoRAAdapters([
+                            ...currentMediaLoRAAdapters,
+                            {
+                              source: firstAdapter?.source || '',
+                              scale: 1,
+                              weight_name: firstAdapter?.weight_name,
+                              subfolder: firstAdapter?.subfolder,
+                              adapter_name: firstAdapter?.adapter_name,
+                            },
+                          ]);
+                        }}
+                      >
+                        + Add adapter
+                      </button>
+                    </div>
+                    {!mediaSupportsLoRAAdapters ? (
+                      <span className="property-hint">This route does not advertise LoRA adapter support.</span>
+                    ) : !canBrowseAdapters ? (
+                      <span className="property-hint">Pick a provider and model to browse compatible adapters.</span>
+                    ) : loadingVisionAdapters ? (
+                      <span className="property-hint">Loading compatible adapters…</span>
+                    ) : visionAdapterOptions.length === 0 ? (
+                      <span className="property-hint">No compatible adapters discovered for the current provider, model, and task.</span>
+                    ) : (
+                      <span className="property-hint">Adapters are applied in order. Scale and target role are optional per adapter.</span>
+                    )}
+                  </div>
+                );
+              }
+
               if (mediaNode && pin.id === 'format') {
                 const fallback =
-	                  data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image' || data.nodeType === 'upscale_image'
-	                    ? 'png'
+		                  data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image' || data.nodeType === 'upscale_image'
+		                    ? 'png'
 	                    : data.nodeType === 'generate_video' || data.nodeType === 'text_to_video' || data.nodeType === 'image_to_video'
 	                      ? 'mp4'
 	                    : data.nodeType === 'transcribe_audio'
@@ -2791,57 +3252,6 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                       <option value="error">error</option>
                     </select>
                     <span className="property-hint">Controls host styling when rendering this message.</span>
-                  </div>
-                );
-              }
-
-              if (
-                pin.id === 'format' &&
-	                (data.nodeType === 'generate_image' ||
-	                  data.nodeType === 'edit_image' ||
-	                  data.nodeType === 'image_to_image' ||
-	                  data.nodeType === 'upscale_image' ||
-	                  data.nodeType === 'generate_video' ||
-	                  data.nodeType === 'text_to_video' ||
-	                  data.nodeType === 'image_to_video' ||
-	                  data.nodeType === 'generate_voice' ||
-                  data.nodeType === 'generate_music' ||
-                  data.nodeType === 'transcribe_audio')
-              ) {
-                const fallback =
-	                  data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image' || data.nodeType === 'upscale_image'
-	                    ? 'png'
-	                    : data.nodeType === 'generate_video' || data.nodeType === 'text_to_video' || data.nodeType === 'image_to_video'
-	                      ? 'mp4'
-	                    : data.nodeType === 'transcribe_audio'
-	                      ? 'json'
-	                      : 'wav';
-	                const baseOptions =
-	                  data.nodeType === 'generate_image' || data.nodeType === 'edit_image' || data.nodeType === 'image_to_image' || data.nodeType === 'upscale_image'
-	                    ? imageFormatOptions
-	                    : data.nodeType === 'generate_video' || data.nodeType === 'text_to_video' || data.nodeType === 'image_to_video'
-	                      ? videoFormatOptions
-	                    : data.nodeType === 'generate_voice'
-                      ? ttsFormatOptions
-                      : data.nodeType === 'generate_music'
-                        ? musicFormatOptions
-                      : sttFormatOptions;
-                const current = typeof raw === 'string' && raw.trim() ? raw.trim() : fallback;
-                const options = baseOptions.includes(current) ? baseOptions : [current, ...baseOptions];
-                return (
-                  <div key={pin.id} className="property-group">
-                    <label className="property-sublabel">{rowLabel}</label>
-                    <select
-                      className="property-select"
-                      value={current}
-                      onChange={(e) => setPinDefault(pin.id, e.target.value)}
-                    >
-                      {options.map((v) => (
-                        <option key={v} value={v}>
-                          {v}
-                        </option>
-                      ))}
-                    </select>
                   </div>
                 );
               }
@@ -3393,7 +3803,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                       label: p.split('.').slice(-1)[0] || p,
                       type: (schema
                         ? inferPinTypeFromSchema(leafSchema)
-                        : inferPinType(getByPath(sample, p))) as DataPinType,
+                        : inferPinType(getByPath(sample, p))) as EditorDataPinType,
                       ...(leafSchema && typeof leafSchema === 'object'
                         ? { schema: leafSchema as Record<string, unknown> }
                         : {}),
@@ -3472,7 +3882,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
 	              }
               const inferredType = (schema
                 ? inferPinTypeFromSchema(getSchemaByPath(schema, path))
-                : inferPinType(getByPath(sample, path))) as DataPinType;
+                : inferPinType(getByPath(sample, path))) as EditorDataPinType;
               const leafSchema = schema ? getSchemaByPath(schema, path) : undefined;
               const nextPins = [
                 ...existingPins,
@@ -3584,9 +3994,9 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                         <select
                           className="property-select io-pin-type"
                           value={pin.type}
-                          onChange={(e) => updateField(pin.id, { type: e.target.value as DataPinType })}
+                          onChange={(e) => updateField(pin.id, { type: e.target.value as EditorDataPinType })}
                         >
-                          {DATA_PIN_TYPES.map((t) => (
+                          {EDITOR_DATA_PIN_TYPES.map((t) => (
                             <option key={t} value={t}>
                               {dataPinTypeLabel(t)}
                             </option>
@@ -3728,9 +4138,9 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                         <select
                           className="property-select io-pin-type"
                           value={pin.type}
-                          onChange={(e) => updateField(pin.id, { type: e.target.value as DataPinType })}
+                          onChange={(e) => updateField(pin.id, { type: e.target.value as EditorDataPinType })}
                         >
-                          {DATA_PIN_TYPES.map((t) => (
+                          {EDITOR_DATA_PIN_TYPES.map((t) => (
                             <option key={t} value={t}>
                               {dataPinTypeLabel(t)}
                             </option>
@@ -4395,7 +4805,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               let n = 1;
               while (used.has(`param${n}`)) n++;
               const id = `param${n}`;
-              const nextPins = [...data.inputs, { id, label: id, type: 'string' as DataPinType }];
+              const nextPins = [...data.inputs, { id, label: id, type: 'string' as EditorDataPinType }];
               const nextBody = upsertPythonAvailableVariablesComments(
                 currentBody,
                 nextPins.filter((p) => p.type !== 'execution')
@@ -4445,9 +4855,9 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                         <select
                           className="property-select io-pin-type"
                           value={pin.type}
-                          onChange={(e) => updateParam(pin.id, { type: e.target.value as DataPinType })}
+                          onChange={(e) => updateParam(pin.id, { type: e.target.value as EditorDataPinType })}
                         >
-                          {DATA_PIN_TYPES.map((t) => (
+                          {EDITOR_DATA_PIN_TYPES.map((t) => (
                             <option key={t} value={t}>
                               {dataPinTypeLabel(t)}
                             </option>
@@ -5064,18 +5474,43 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                       <div className="schema-field-bottom">
                         <select
                           className="property-select schema-field-type"
-                          value={pin.type}
+                          value={flowIoEditorDisplayPinType(pin)}
                           onChange={(e) =>
-                            updateParam(pin.id, { type: e.target.value as DataPinType })
+                            updateParam(pin.id, flowIoPinPatchForEditorSelection(pin, e.target.value as FlowIoEditorDataPinType))
                           }
                         >
-                          {DATA_PIN_TYPES.map((t) => (
+                          {FLOW_IO_EDITOR_DATA_PIN_TYPES.map((t) => (
                             <option key={t} value={t}>
-                              {dataPinTypeLabel(t)}
+                              {flowIoPinTypeLabel(t)}
                             </option>
                           ))}
                         </select>
+                        {flowIoEditorDisplayPinType(pin) === 'array' ? (
+                          <>
+                            <span className="schema-field-qualifier">of</span>
+                          <select
+                            className="property-select schema-field-items"
+                            value={flowIoArrayItemTypeForPin(pin)}
+                            onChange={(e) =>
+                              updateParam(pin.id, flowIoPinPatchForArrayItem(pin, e.target.value as FlowIoArrayItemType))
+                            }
+                            title="Item type for this array"
+                            aria-label={`Item type for ${pin.id}`}
+                            >
+                              {FLOW_IO_ARRAY_ITEM_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </>
+                        ) : null}
                       </div>
+                      {flowBoundaryPinSelectionHint(pin, 'start') ? (
+                        <span className="property-hint">
+                          {flowBoundaryPinSelectionHint(pin, 'start')}
+                        </span>
+                      ) : null}
                       <div className="io-pin-default">
                         {renderDefaultEditor(pin)}
                       </div>
@@ -5093,6 +5528,9 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 </div>
                 <span className="property-hint">
                   Parameters become initial vars and show up in the Run form.
+                </span>
+                <span className="property-hint">
+                  Use <code>file</code> when the person running the workflow should choose one file from this computer, reuse a saved file, or import a server file. Use <code>array</code> of <code>file</code> when they should choose multiple local files or a local folder whose files become the input. Use <code>server file</code> and <code>server folder</code> only for live server workspace paths. If the workflow needs a writable folder path, use <code>server folder</code>, not a local folder upload.
                 </span>
               </>
             );
@@ -5399,18 +5837,43 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                       <div className="schema-field-bottom">
                         <select
                           className="property-select schema-field-type"
-                          value={pin.type}
+                          value={flowIoEditorDisplayPinType(pin)}
                           onChange={(e) =>
-                            updateOut(pin.id, { type: e.target.value as DataPinType })
+                            updateOut(pin.id, flowIoPinPatchForEditorSelection(pin, e.target.value as FlowIoEditorDataPinType))
                           }
                         >
-                          {DATA_PIN_TYPES.map((t) => (
+                          {FLOW_IO_EDITOR_DATA_PIN_TYPES.map((t) => (
                             <option key={t} value={t}>
-                              {dataPinTypeLabel(t)}
+                              {flowIoPinTypeLabel(t)}
                             </option>
                           ))}
                         </select>
+                        {flowIoEditorDisplayPinType(pin) === 'array' ? (
+                          <>
+                            <span className="schema-field-qualifier">of</span>
+                          <select
+                            className="property-select schema-field-items"
+                            value={flowIoArrayItemTypeForPin(pin)}
+                            onChange={(e) =>
+                              updateOut(pin.id, flowIoPinPatchForArrayItem(pin, e.target.value as FlowIoArrayItemType))
+                            }
+                            title="Item type for this array"
+                            aria-label={`Item type for ${pin.id}`}
+                            >
+                              {FLOW_IO_ARRAY_ITEM_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </>
+                        ) : null}
                       </div>
+                      {flowBoundaryPinSelectionHint(pin, 'end') ? (
+                        <span className="property-hint">
+                          {flowBoundaryPinSelectionHint(pin, 'end')}
+                        </span>
+                      ) : null}
 
                       <div className="io-pin-default">
                         {isInputPinConnected(pin.id) ? (
@@ -5433,6 +5896,9 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                 </div>
                 <span className="property-hint">
                   These pins are exposed as the workflow result (and to parent subflows).
+                </span>
+                <span className="property-hint">
+                  Prefer <code>file</code> for one saved file output. Use <code>array</code> of <code>file</code> for multiple saved files or for folder-derived file outputs. Use <code>server file</code> and <code>server folder</code> only when the consumer should receive a live server path instead of saved files.
                 </span>
               </>
             );

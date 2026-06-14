@@ -66,6 +66,15 @@ import {
 } from '../../utils/pinCatalog';
 import { normalizeVariableName, validateVariableName, variableNameCustomOptionLabel } from '../../utils/variableNames';
 import {
+  artifactListTypeForArrayItemType,
+  dataPinTypeLabel,
+  editorDisplayPinType,
+  fileArrayItemTypeForPin,
+  fileArrayItemTypeLabel,
+  isVarDeclPinType,
+  VAR_DECL_PIN_TYPE_OPTIONS,
+} from '../../utils/pinTypeOptions';
+import {
   defaultSubflowPinPatch,
   savedFlowSummariesFromResponse,
   subflowPinPatchForSelectedFlow,
@@ -540,26 +549,13 @@ const VarDeclInline = memo(function VarDeclInline({
   onChange: (next: { name: string; type: Exclude<PinType, 'execution'>; default: JsonValue }) => void;
 }) {
   const variableNameOptions = useMemo(() => nameOptions.map((value) => ({ value, label: value })), [nameOptions]);
+  const displayVarType = editorDisplayPinType({ type: varType });
+  const fileArrayItemType = fileArrayItemTypeForPin({ type: varType });
 
-  const typeOptions: Array<{ value: string; label: string }> = [
-    { value: 'boolean', label: 'boolean' },
-    { value: 'number', label: 'number' },
-    { value: 'string', label: 'string' },
-    { value: 'provider_text', label: 'provider_text' },
-    { value: 'provider_image', label: 'provider_image' },
-    { value: 'provider_voice', label: 'provider_voice' },
-    { value: 'provider_music', label: 'provider_music' },
-    { value: 'provider', label: 'provider (legacy)' },
-    { value: 'model', label: 'model' },
-    { value: 'model_music', label: 'model_music' },
-    { value: 'object', label: 'json' },
-    { value: 'json_schema', label: 'json schema' },
-    { value: 'assertion', label: 'assertion' },
-    { value: 'assertions', label: 'assertion[]' },
-    { value: 'array', label: 'array' },
-    { value: 'tools', label: 'tools' },
-    { value: 'any', label: 'any' },
-  ];
+  const typeOptions = VAR_DECL_PIN_TYPE_OPTIONS.filter((option) => !String(option.value).startsWith('artifacts')).map((option) => ({
+    value: option.value,
+    label: option.value === 'provider' ? 'provider (legacy)' : dataPinTypeLabel(option.value),
+  }));
 
   const defaultUi = (() => {
     if (varType === 'boolean') {
@@ -617,7 +613,9 @@ const VarDeclInline = memo(function VarDeclInline({
       varType === 'provider_voice' ||
       varType === 'model_voice' ||
       varType === 'provider_music' ||
-      varType === 'model_music'
+      varType === 'model_music' ||
+      varType === 'workspace_file' ||
+      varType === 'workspace_folder'
     ) {
       return (
         <input
@@ -656,7 +654,7 @@ const VarDeclInline = memo(function VarDeclInline({
     }
 
     const preview =
-      varType === 'array'
+      displayVarType === 'array'
         ? '[]'
         : varType === 'object' || varType === 'json_schema'
         ? '{}'
@@ -702,30 +700,57 @@ const VarDeclInline = memo(function VarDeclInline({
         <span className="node-config-label">type</span>
         <AfSelect
           variant="pin"
-          value={varType}
+          value={displayVarType}
           options={typeOptions}
           onChange={(v) => {
             const nextType = (v || 'any') as Exclude<PinType, 'execution'>;
+            const resolvedType =
+              nextType === 'array'
+                ? (artifactListTypeForArrayItemType(fileArrayItemType) as Exclude<PinType, 'execution'>)
+                : nextType;
             const nextDefault =
-              nextType === 'boolean'
+              resolvedType === 'boolean'
                 ? false
-                : nextType === 'number'
+                : resolvedType === 'number'
                   ? 0
-                  : nextType === 'string' || nextType === 'provider' || nextType === 'model'
+                  : resolvedType === 'string' || resolvedType === 'provider' || resolvedType === 'model'
                     ? ''
-                    : nextType === 'tools'
-                      ? []
-                      : nextType === 'assertions'
+                      : resolvedType === 'tools'
                         ? []
-                    : nextType === 'array'
+                      : resolvedType === 'assertions'
+                        ? []
+                    : resolvedType === 'array' || String(resolvedType).startsWith('artifacts')
                       ? []
-                      : nextType === 'object' || nextType === 'json_schema'
+                      : resolvedType === 'object' || resolvedType === 'json_schema'
                         ? {}
                         : null;
-            onChange({ name, type: nextType, default: nextDefault });
+            onChange({ name, type: resolvedType, default: nextDefault });
           }}
         />
       </div>
+
+      {displayVarType === 'array' ? (
+        <div className="node-config-row">
+          <span className="node-config-label">items</span>
+          <AfSelect
+            variant="pin"
+            value={fileArrayItemType}
+            options={[
+              { value: 'any', label: fileArrayItemTypeLabel('any') },
+              { value: 'artifact', label: fileArrayItemTypeLabel('artifact') },
+              { value: 'artifact_image', label: fileArrayItemTypeLabel('artifact_image') },
+              { value: 'artifact_audio', label: fileArrayItemTypeLabel('artifact_audio') },
+              { value: 'artifact_text', label: fileArrayItemTypeLabel('artifact_text') },
+              { value: 'artifact_video', label: fileArrayItemTypeLabel('artifact_video') },
+            ]}
+            onChange={(v) => {
+              const nextItemType = (v || 'any') as Parameters<typeof artifactListTypeForArrayItemType>[0];
+              const nextType = artifactListTypeForArrayItemType(nextItemType) as Exclude<PinType, 'execution'>;
+              onChange({ name, type: nextType, default: [] });
+            }}
+          />
+        </div>
+      ) : null}
 
       <div className="node-config-row">
         <span className="node-config-label">default</span>
@@ -862,29 +887,7 @@ export const BaseNode = memo(function BaseNode({
         if (raw && typeof raw === 'object') {
           const vn = typeof (raw as any).name === 'string' ? String((raw as any).name).trim() : '';
           const t = typeof (raw as any).type === 'string' ? String((raw as any).type).trim() : '';
-          const vt =
-            t === 'boolean' ||
-            t === 'number' ||
-            t === 'string' ||
-            t === 'provider' ||
-            t === 'model' ||
-            t === 'provider_text' ||
-            t === 'model_text' ||
-            t === 'provider_image' ||
-            t === 'model_image' ||
-            t === 'provider_voice' ||
-            t === 'model_voice' ||
-            t === 'provider_music' ||
-            t === 'model_music' ||
-            t === 'object' ||
-            t === 'json_schema' ||
-            t === 'assertion' ||
-            t === 'assertions' ||
-            t === 'array' ||
-            t === 'tools' ||
-            t === 'any'
-              ? (t as Exclude<PinType, 'execution'>)
-              : 'any';
+          const vt = isVarDeclPinType(t) ? t : 'any';
           if (vn) {
             vars.add(vn);
             declaredTypes.set(vn, vt);
@@ -3366,29 +3369,7 @@ export const BaseNode = memo(function BaseNode({
     if (raw && typeof raw === 'object') {
       const name = typeof (raw as any).name === 'string' ? String((raw as any).name).trim() : '';
       const t = typeof (raw as any).type === 'string' ? String((raw as any).type).trim() : '';
-      const type =
-        t === 'boolean' ||
-        t === 'number' ||
-        t === 'string' ||
-        t === 'provider' ||
-        t === 'model' ||
-        t === 'provider_text' ||
-        t === 'model_text' ||
-        t === 'provider_image' ||
-        t === 'model_image' ||
-        t === 'provider_voice' ||
-        t === 'model_voice' ||
-        t === 'provider_music' ||
-        t === 'model_music' ||
-        t === 'object' ||
-        t === 'json_schema' ||
-        t === 'assertion' ||
-        t === 'assertions' ||
-        t === 'array' ||
-        t === 'tools' ||
-        t === 'any'
-          ? (t as Exclude<PinType, 'execution'>)
-          : ('any' as const);
+      const type = isVarDeclPinType(t) ? t : ('any' as const);
       const def = ((raw as any).default as JsonValue | undefined) ?? null;
       return { name, type, default: def };
     }

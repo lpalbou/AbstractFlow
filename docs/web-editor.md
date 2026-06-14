@@ -271,6 +271,57 @@ Unconnected artifact input pins expose a browser upload affordance directly on t
 
 `Listen Voice` waits are handled as Gateway/Runtime waits. Flow only captures audio in the browser, uploads it to Gateway as an audio artifact, and resumes the waiting run with that artifact ref; transcription and downstream execution remain Gateway/Runtime work.
 
+For the vision routes, the Properties drawer now follows the Gateway media
+contract closely:
+
+- `Generate Image`, `Edit Image`, `Generate Video`, and `Image To Video` expose
+  task-filtered provider/model selectors backed by Gateway discovery.
+- Compatible routes expose batch controls through `count` and ordered `seeds`.
+- Compatible routes expose ordered `lora_adapters` stacks with per-adapter
+  scale and optional target role.
+- Batched routes surface plural artifact outputs such as `image_artifacts` and
+  `video_artifacts` alongside the singular compatibility pins.
+
+Flow only shows those editors when the current node contract advertises the
+corresponding support. Provider/model selection remains optional; leaving them
+on `Auto (Gateway default)` keeps the workflow portable across runtimes and
+users.
+
+![Generate Image batch + LoRA authoring](assets/flow-generate-image-batch-lora.png)
+
+## Files, folders, and artifacts
+
+Flow uses one explicit source model for file-like work:
+
+- `Artifact`: a saved Runtime-owned payload that can be reused across runs.
+- `Local File`: a browser upload from this computer. For artifact-style inputs,
+  Flow uploads it to Gateway and stores the resulting artifact ref.
+- `Local Folder`: a browser-selected folder from this computer. In hosted
+  Flow, each file is uploaded to Gateway and the workflow receives an ordered
+  multi-artifact input with preserved relative member paths.
+- `Server File` / `Server Folder`: a file or folder inside the active Gateway
+  workspace scope. The underlying engineering contract is a canonical
+  `Workspace File` / `Workspace Folder` path such as `docs/report.md` or
+  `mount_alias/reports`.
+
+The run modal and node defaults now expose workspace path browsing for
+`Workspace File` / `Workspace Folder` pins, plus artifact-backed local intake
+for one file, many files, or one or more local folders. Typical graph patterns are:
+
+- `List Folder Files` to enumerate a workspace-scoped server folder with family
+  and extension filters.
+- `Import Server File` to snapshot a server file into a durable artifact.
+- `Read Artifact` to inspect text, JSON, or bounded binary projections from any
+  artifact-backed file.
+- `Read Artifact` -> `content_family` / `content_type` -> `Switch` to route
+  image, audio, text, PDF, or other file inputs through different subgraphs.
+- `Export Artifact` to write a durable artifact back into the current server
+  workspace.
+- `ForEach` / array nodes over an `array<file>` input to analyze local files or
+  local-folder contents file by file. `Local Folder` in the run form is a
+  source for `array<file>`, so the workflow still receives files with
+  preserved relative member paths rather than a live folder path.
+
 ## Development
 
 ```bash

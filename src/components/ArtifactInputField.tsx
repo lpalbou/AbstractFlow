@@ -7,6 +7,7 @@ import {
   gatewayJson,
   jsonRequest,
   type GatewayContracts,
+  type GatewayEndpointDescriptor,
 } from '../utils/gatewayClient';
 import {
   artifactAcceptForPin,
@@ -19,6 +20,7 @@ import {
   type CanonicalArtifactRef,
 } from '../utils/artifactInputs';
 import { ArtifactPlayer, artifactContentUrl, artifactPlayerKindFromContent } from './ArtifactPlayer';
+import { WorkspacePathInputField } from './WorkspacePathInputField';
 
 type ArtifactInputFieldProps = {
   pin: Pin;
@@ -34,6 +36,94 @@ type ArtifactInputFieldProps = {
 
 type SourceMode = 'upload' | 'workspace' | 'existing';
 type SearchScope = 'all' | 'session';
+
+type SourceDescriptor = {
+  label: string;
+  summary: string;
+  flowReceives: string;
+  reusable: string;
+  access: string;
+  actionLabel?: string;
+  placeholder?: string;
+};
+
+function endpointDeniedMessage(descriptor: GatewayEndpointDescriptor | null | undefined): string {
+  const record =
+    descriptor && typeof descriptor === 'object'
+      ? (descriptor as Record<string, unknown>)
+      : null;
+  if (record?.available !== false) return '';
+  const denied = typeof record.denied_reason === 'string' ? record.denied_reason.trim() : '';
+  const role = typeof record.required_role === 'string' ? record.required_role.trim() : '';
+  if (denied === 'admin_required' || role === 'admin') {
+    return 'Requires admin/operator workspace access in hosted mode.';
+  }
+  return denied ? `Unavailable: ${denied}.` : 'Unavailable.';
+}
+
+export function artifactSourceDescriptor(
+  mode: SourceMode,
+  descriptors?: {
+    upload?: GatewayEndpointDescriptor | null;
+    import?: GatewayEndpointDescriptor | null;
+  }
+): SourceDescriptor {
+  if (mode === 'existing') {
+    return {
+      label: 'Artifact',
+      summary: 'Use a saved file that is already in AbstractFlow.',
+      flowReceives: 'One file',
+      reusable: 'Yes',
+      access: 'No server workspace path is used',
+    };
+  }
+  if (mode === 'upload') {
+    const denied = endpointDeniedMessage(descriptors?.upload);
+    return {
+      label: 'Local File',
+      summary: 'Choose a file from this computer. A saved copy is created before the run.',
+      flowReceives: 'One file',
+      reusable: 'Yes',
+      access: denied || 'Uses this computer/browser as the source',
+      actionLabel: 'Choose local file',
+    };
+  }
+  const denied = endpointDeniedMessage(descriptors?.import);
+  return {
+    label: 'Server File',
+    summary: 'Choose a file from the run\'s allowed server workspace. A saved copy is created.',
+    flowReceives: 'One file',
+    reusable: 'Yes',
+    access: denied || 'Uses the current run workspace or an allowed server mount',
+    actionLabel: 'Import server file',
+    placeholder: 'workspace-relative/or-mount/path.ext',
+  };
+}
+
+export function artifactSelectionSummary(
+  mode: SourceMode,
+  value: CanonicalArtifactRef
+): Array<{ label: string; value: string }> {
+  const sourceLabel = mode === 'upload' ? 'Local File' : mode === 'workspace' ? 'Server File' : 'Artifact';
+  const access =
+    mode === 'workspace'
+      ? (value.source_path ? `Imported from server path ${value.source_path}` : 'Imported from an allowed server workspace path')
+      : mode === 'upload'
+        ? 'Uploaded from this computer before the run'
+        : 'Reused from saved artifacts';
+  const reference = value.source_path?.trim()
+    ? value.source_path.trim()
+    : value.filename?.trim()
+      ? value.filename.trim()
+      : artifactIdFromRef(value);
+  return [
+    { label: 'Source', value: sourceLabel },
+    { label: 'Workflow gets', value: 'One file' },
+    { label: 'Reusable', value: 'Yes' },
+    { label: 'Access', value: access },
+    { label: 'Reference', value: reference },
+  ];
+}
 
 function refLabel(ref: CanonicalArtifactRef): string {
   return ref.filename || ref.source_path || artifactIdFromRef(ref);
@@ -83,6 +173,7 @@ export function ArtifactInputField({
   workspaceIgnoredPaths = [],
 }: ArtifactInputFieldProps) {
   const [mode, setMode] = useState<SourceMode>('existing');
+  const [selectionSource, setSelectionSource] = useState<SourceMode | null>(null);
   const [workspacePath, setWorkspacePath] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -107,6 +198,8 @@ export function ArtifactInputField({
   const contentAvailable = descriptorEndpointAvailable(contentDescriptor);
   const selectedArtifactId = value ? artifactIdFromRef(value) : '';
   const selectedRunId = value ? artifactOwnerRunId(value) : '';
+  const modeDescriptor = artifactSourceDescriptor(mode, { upload: uploadDescriptor, import: importDescriptor });
+  const selectedSummary = value ? artifactSelectionSummary(selectionSource || 'existing', value) : [];
 
   const filteredItems = useMemo(
     () => items.filter((item) => artifactMatchesPin(item, pin)),
@@ -133,7 +226,7 @@ export function ArtifactInputField({
       const timer = window.setTimeout(() => {
         setLoadingItems(true);
         setError(null);
-        const modality = artifactModalityForPinType(pin.type);
+        const modality = artifactModalityForPinType(pin);
         const query: Record<string, string | number> = {
           scope: searchScope,
           limit: 250,
@@ -215,6 +308,7 @@ export function ArtifactInputField({
       const payload = (await res.json()) as Record<string, unknown>;
       const ref = artifactRefFromUploadResponse(payload);
       if (!ref) throw new Error('Gateway upload did not return an artifact reference');
+      setSelectionSource('upload');
       onChange(ref);
       setItems((prev) => [ref, ...prev.filter((item) => artifactIdFromRef(item) !== artifactIdFromRef(ref))]);
     } catch (err) {
@@ -243,6 +337,7 @@ export function ArtifactInputField({
         await gatewayJson<Record<string, unknown>>(url, { ...jsonRequest(payload, { method: 'POST' }), timeoutMs: 0 })
       );
       if (!ref) throw new Error('Gateway import did not return an artifact reference');
+      setSelectionSource('workspace');
       onChange(ref);
       setItems((prev) => [ref, ...prev.filter((item) => artifactIdFromRef(item) !== artifactIdFromRef(ref))]);
     } catch (err) {
@@ -257,20 +352,26 @@ export function ArtifactInputField({
       ? artifactContentUrl(contentDescriptor, selectedRunId, selectedArtifactId)
       : '';
   const selectedContentType = value?.content_type || undefined;
-  const selectedModality = value?.modality || artifactModalityForPinType(pin.type);
+  const selectedModality = value?.modality || artifactModalityForPinType(pin);
 
   return (
     <div className="artifact-input-field">
-      <div className="artifact-input-tabs" role="tablist" aria-label={`${pin.label} artifact source`}>
-        <button type="button" className={mode === 'existing' ? 'active' : ''} onClick={() => setMode('existing')} disabled={disabled}>
-          Existing
+      <div className="artifact-input-tabs" role="tablist" aria-label={`${pin.label} file source`}>
+        <button type="button" role="tab" aria-selected={mode === 'existing'} className={mode === 'existing' ? 'active' : ''} onClick={() => setMode('existing')} disabled={disabled}>
+          Artifact
         </button>
-        <button type="button" className={mode === 'upload' ? 'active' : ''} onClick={() => setMode('upload')} disabled={disabled}>
-          Upload
+        <button type="button" role="tab" aria-selected={mode === 'upload'} className={mode === 'upload' ? 'active' : ''} onClick={() => setMode('upload')} disabled={disabled}>
+          Local File
         </button>
-        <button type="button" className={mode === 'workspace' ? 'active' : ''} onClick={() => setMode('workspace')} disabled={disabled}>
-          Workspace
+        <button type="button" role="tab" aria-selected={mode === 'workspace'} className={mode === 'workspace' ? 'active' : ''} onClick={() => setMode('workspace')} disabled={disabled}>
+          Server File
         </button>
+      </div>
+      <div className="run-form-note">
+        <strong>{modeDescriptor.label}:</strong> {modeDescriptor.summary}
+      </div>
+      <div className="run-form-note run-form-note-compact">
+        Workflow gets: {modeDescriptor.flowReceives}. Reusable later: {modeDescriptor.reusable}. Access: {modeDescriptor.access}
       </div>
 
       {mode === 'existing' ? (
@@ -282,7 +383,7 @@ export function ArtifactInputField({
                 className="run-form-input"
                 value={searchText}
                 onChange={(event) => setSearchText(event.target.value)}
-                placeholder={`Search ${artifactModalityForPinType(pin.type) === 'artifact' ? '' : `${artifactModalityForPinType(pin.type)} `}artifacts...`}
+                placeholder={`Search ${artifactModalityForPinType(pin) === 'artifact' ? '' : `${artifactModalityForPinType(pin)} `}artifacts...`}
                 disabled={disabled}
               />
               <select
@@ -312,13 +413,14 @@ export function ArtifactInputField({
             disabled={disabled || loadingItems || (!searchAvailable && (!sessionId.trim() || !sessionListAvailable))}
             onChange={(event) => {
               const next = filteredItems.find((item) => artifactIdFromRef(item) === event.target.value) || null;
+              setSelectionSource(next ? 'existing' : null);
               onChange(next);
             }}
           >
-            <option value="">{loadingItems ? 'Loading artifacts...' : 'Select artifact...'}</option>
+            <option value="">{loadingItems ? 'Loading artifacts...' : 'Select saved artifact...'}</option>
             {filteredItems.map((item) => (
               <option key={`${artifactOwnerRunId(item)}:${artifactIdFromRef(item)}`} value={artifactIdFromRef(item)}>
-                {refLabel(item)}
+                {item.source_path && item.source_path !== refLabel(item) ? `${refLabel(item)} (${item.source_path})` : refLabel(item)}
               </option>
             ))}
           </select>
@@ -329,7 +431,7 @@ export function ArtifactInputField({
             ref={fileInputRef}
             type="file"
             className="artifact-input-file"
-            accept={artifactAcceptForPin(pin.type)}
+            accept={artifactAcceptForPin(pin)}
             disabled={disabled || busy || !uploadAvailable || !sessionId.trim()}
             onChange={(event: ChangeEvent<HTMLInputElement>) => {
               const file = event.target.files?.[0] || null;
@@ -343,18 +445,20 @@ export function ArtifactInputField({
             disabled={disabled || busy || !uploadAvailable || !sessionId.trim()}
             onClick={() => fileInputRef.current?.click()}
           >
-            {busy ? 'Working...' : 'Choose file'}
+            {busy ? 'Working...' : modeDescriptor.actionLabel || 'Choose local file'}
           </button>
         </div>
       ) : (
-        <div className="run-form-inline">
-          <input
-            type="text"
-            className="run-form-input"
+        <div className="artifact-input-existing">
+          <WorkspacePathInputField
+            kind="file"
             value={workspacePath}
-            onChange={(event) => setWorkspacePath(event.target.value)}
-            placeholder="workspace/path.ext"
+            onChange={setWorkspacePath}
+            gatewayContracts={gatewayContracts}
             disabled={disabled || busy || !importAvailable || !sessionId.trim()}
+            workspaceRoot={workspaceRoot}
+            workspaceAccessMode={workspaceAccessMode}
+            workspaceIgnoredPaths={workspaceIgnoredPaths}
           />
           <button
             type="button"
@@ -362,18 +466,18 @@ export function ArtifactInputField({
             disabled={disabled || busy || !workspacePath.trim() || !importAvailable || !sessionId.trim()}
             onClick={() => void handleImport()}
           >
-            {busy ? 'Working...' : 'Import'}
+            {busy ? 'Working...' : modeDescriptor.actionLabel || 'Import server file'}
           </button>
         </div>
       )}
 
-      {!sessionId.trim() ? <div className="run-form-note">Set a session id to select artifacts.</div> : null}
+      {!sessionId.trim() ? <div className="run-form-note">Set a session id to create or reuse artifacts.</div> : null}
       {mode === 'existing' && !searchAvailable && !sessionListAvailable ? <div className="run-form-note">Artifact listing is unavailable.</div> : null}
       {mode === 'existing' && searchAvailable && searchScope === 'session' && !sessionId.trim() ? (
         <div className="run-form-note">Set a session id to search session artifacts.</div>
       ) : null}
       {mode === 'upload' && !uploadAvailable ? <div className="run-form-note">Artifact upload is unavailable.</div> : null}
-      {mode === 'workspace' && !importAvailable ? <div className="run-form-note">Workspace import is unavailable.</div> : null}
+      {mode === 'workspace' && !importAvailable ? <div className="run-form-note">{endpointDeniedMessage(importDescriptor) || 'Server file import is unavailable.'}</div> : null}
       {error ? <div className="artifact-input-error">{error}</div> : null}
 
       {value ? (
@@ -381,9 +485,12 @@ export function ArtifactInputField({
           <span className="artifact-id-pill" title={selectedArtifactId}>
             {refLabel(value)}
           </span>
-          <button type="button" className="run-form-action" disabled={disabled} onClick={() => onChange(null)}>
+          <button type="button" className="run-form-action" disabled={disabled} onClick={() => { setSelectionSource(null); onChange(null); }}>
             Clear
           </button>
+          <div className="run-form-note run-form-note-compact">
+            {selectedSummary.map((item) => `${item.label}: ${item.value}`).join(' · ')}
+          </div>
         </div>
       ) : null}
 

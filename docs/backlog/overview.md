@@ -1,37 +1,84 @@
 # AbstractFlow Backlog Overview
 
 ## Snapshot
-- Updated: 2026-06-05
+- Updated: 2026-06-11
 - Planned: 0
-- Proposed: 13
-- Completed: 32
+- Proposed: 15
+- Completed: 39
 - Deprecated: 0
 
 ## Current Priorities
-- The next artifact/file-system design pass
-  should resolve `proposed/0095_file_nodes_artifact_io_boundary_resolution.md`:
-  `Read File` / `Write File` may need to become artifact-aware, or be paired
-  with explicit artifact IO nodes, while keeping Gateway as filesystem policy
-  authority and Runtime as artifact storage/handoff authority.
+- The direct file/folder start-input request is now closed through
+  `completed/0107_local_multifile_and_folder_workflow_inputs.md` and
+  `completed/0109_local_source_input_authoring_and_folder_selection_clarity.md`:
+  users can choose one local file, many local files, or one or more local
+  folders from their own computer, and the authoring/run-modal surfaces now
+  teach that path without exposing the earlier artifact-array jargon.
+- The next file/folder work is optional polish only:
+  `proposed/0110_local_folder_staging_preflight_and_recovery.md` covers
+  preflight summary, relative-path preview, and better large-folder recovery,
+  but it is not required for the core “choose files or folders from this
+  computer to start a workflow” requirement.
+- The next lifecycle/control-plane pass after that should resolve
+  `proposed/0102_artifact_and_session_archive_lifecycle_contract.md` when
+  archive becomes an immediate product feature or operator need: archive must
+  become a first-class indexed lifecycle contract for artifacts and sessions,
+  hidden from ordinary product surfaces by default but still available to
+  Observer/operator retrieval, with explicit recovery UX and without reusing
+  destructive delete.
+- Any future live client-filesystem work must stay outside the hosted
+  `ArtifactRef + WorkspacePath` default. `proposed/0108_future_live_clientfs_capability_plane.md`
+  is not the next file/folder priority; only reopen it if product evidence
+  shows that browser/desktop live local file automation is required beyond
+  launch-time file/folder selection from the client.
 - The online showcase design pass should resolve
   `proposed/0096_github_hosted_gateway_flow_showcase.md`: GitHub Pages can host
   the Flow UI, but Gateway still needs a live backend or operator-started
   Codespace; provider credentials and Gateway auth must remain separated.
 
 ## Planned Ledger
-- None.
+- None at the moment.
 
 ## Proposed Ledger
 - `proposed/0096_github_hosted_gateway_flow_showcase.md`: captures the travel/demo deployment path for light Gateway + Flow, including GitHub Pages limitations, Codespaces as the simplest GitHub-native temporary option, a static UI plus remote-light Gateway option for stable demos, and the credential/auth constraints for user-supplied OpenAI keys.
-- `proposed/0095_file_nodes_artifact_io_boundary_resolution.md`: preserves the unresolved design tension around whether `Read File` / `Write File` should import/export artifacts directly, whether explicit artifact IO nodes are clearer, and how JSON/document/file artifacts should become first-class without conflating Runtime artifact storage with user-authored file trees.
+- `proposed/0102_artifact_and_session_archive_lifecycle_contract.md`: captures the required archive semantics for artifacts and sessions: first-class indexed lifecycle state, explicit `archive_scope` query behavior, transitive session archive behavior, ordinary-surface hiding for agents and replay, and continued operator/Observer access without destructive delete.
+- `proposed/0108_future_live_clientfs_capability_plane.md`: preserves the
+  separate future design space for true mid-run live client-device filesystem
+  operations, and explicitly records that it is not the answer to the already
+  supported “pick local files or folders from the client before run start”
+  workflow.
+- `proposed/0110_local_folder_staging_preflight_and_recovery.md`: optional
+  later polish for larger local folder selections: preflight summary,
+  relative-path preview, progress, and partial-failure recovery. This is not
+  required to satisfy the direct request to let users choose local files and
+  folders to start a workflow.
 
 ## Completed Ledger
+- `completed/0109_local_source_input_authoring_and_folder_selection_clarity.md`:
+  finished the remaining direct user-facing local file/folder workflow gap by
+  harmonizing workflow boundaries around `array`, making the array item type
+  selector available for more than files, keeping `Local Folder` as a source
+  for `array<file>` rather than a fake live folder value, and rewriting the
+  picker copy so users can understand “choose files or folders from this
+  computer” without confusing it with writable folder paths. Validation:
+  targeted Flow frontend tests, frontend build, and `git diff --check`.
+- `completed/0107_local_multifile_and_folder_workflow_inputs.md`: added
+  explicit multi-artifact workflow inputs so hosted Flow users can provide one
+  local file, many local files, or one or more local folders to a run, with
+  run-modal local file/folder intake, ordered artifact-ref arrays, and
+  preserved client-relative member paths. Follow-up `0110` is only optional
+  later polish.
+- `completed/0103_coredoc_terminology_alignment_for_artifact_workspace_and_local_sources.md`: aligned Flow, Gateway, Runtime, and Observer coredoc plus generated `llms` outputs on the accepted `Artifact` / `Workspace File` / `Local File` vocabulary, and refreshed the generated Flow node catalog so the shipped file/artifact node family appears in both human docs and agent context.
+- `completed/0095_file_nodes_artifact_io_boundary_resolution.md`: shipped the first concrete file/folder automation layer on top of the accepted taxonomy: typed workspace file/folder pins, workspace-path browsing, `List Folder Files`, `Import Server File`, `Read Artifact`, `Export Artifact`, shared file-family filtering, canonical hosted file-node outputs, and the supporting Gateway/Runtime/Flow docs.
+- `completed/0106_workspacepath_canonicalization_mount_registry_and_roundtrip_validation.md`: added a shared AbstractCore workspace-path canonicalizer, switched Gateway and Runtime to the same deterministic mounted-path alias contract, proved basename-collision stability, and validated a Gateway search/import/Runtime execution/export round trip plus hosted admin-gating behavior.
+- `completed/0104_abstractflow_node_and_authoring_terminology_alignment.md`: renamed the artifact picker to `Artifact` / `Local File` / `Server File`, added consequence/provenance helper text, rewrote file-node and pin-legend copy, aligned the authoring assistant and generated node catalog with the same vocabulary, and preserved existing artifact-template labels for compatibility.
+- `completed/0105_file_source_contract_and_workspacepath_foundation.md`: landed ADR-0037 for the hosted `Artifact` / `Local File` / `Server File` contract, clarified `WorkspacePath` as the accepted server-path authority model without pretending shared canonicalization already ships, updated root coredoc, and extracted `0106` for the remaining mounted-path implementation gap.
 - `completed/0101_permissive_pdf_document_nodes.md`: added first-class Runtime/Flow `Read PDF` and `Write PDF` VisualFlow nodes backed by permissive `pypdf`/`reportlab`, removed PyMuPDF-family packages and `abstractcore[media]` from Runtime's base PDF path, tightened authoring readiness so Markdown/PDF writers must be on the execution path, and updated Flow/Runtime docs plus LLM context. Validation: Runtime PDF round-trip pytest and focused Flow authoring tests.
 - `completed/0100_authoring_assistant_artifact_readiness_and_persistence.md`: persisted assistant chat/draft/session state across drawer close/reopen, replaced generic `llms-full.txt` planner context with `docs/workflow-authoring-skill.md` plus a generated complete node catalog with pin/config/capability contracts, added validated Code body/event/config authoring commands, hardened duplicate-template and pin-default validation, passed full Gateway tool schemas and graph config into planner context, tightened research readiness so Agent.system is required and Agent.meta/Agent Trace Report cannot masquerade as sources/report content, required real Markdown/PDF Write File artifact paths for matching requests, reduced successful chat output noise, and regenerated `llms-full.txt`. Validation: focused Flow frontend tests, lint, build, and docs generation.
 - `completed/0099_autonomous_authoring_assistant_loop.md`: replaced the authoring assistant's one-shot planner with a Flow-owned iterative loop that starts Gateway `basic-agent` planner runs, reads terminal responses from ledgers, applies validated command batches, recomputes readiness, reflects, and continues until ready or explicitly blocked. It uses advertised Gateway defaults/tool discovery only, rejects malformed JSON instead of extracting partial plans, rejects hidden/deprecated/secret-bearing authoring commands, uses normal Gateway run/ledger routes instead of the console sandbox contract, aligns authored Agent defaults to `max_iterations=50`, and fails closed without local substitute workflows. Validation: Flow frontend lint, tests, and build.
 - `completed/0098_flow_authoring_assistant_drawer.md`: added a Flow-owned conversational authoring assistant drawer that reads `llms-full.txt`, drafts typed edit commands through Gateway's default text model unless pinned, applies validated graph commands with undo, shows prompt size plus Gateway-discovered model context/output limits without truncating chat/docs, and fails closed without graph changes when Gateway defaults, model calls, JSON parsing, or command validation fail. Save/Publish/Run remain existing explicit user actions. Validation: Flow frontend tests, lint, and build.
 - `completed/0097_artifact_pin_upload_voice_wait_and_media_progress.md`: added node-level artifact uploads for unconnected artifact input pins, browser capture/upload/resume for `Listen Voice` waits, stricter execution-pin preview inference, and image/image-edit child-run `abstract.progress` parity. Validation: Flow frontend build, focused Runtime media-node tests, focused Gateway generated-media/voice contract tests, and Core vision endpoint tests.
-- `completed/0094_artifact_search_export_and_kg_memory_readiness.md` from `planned/0094_artifact_search_export_and_kg_memory_readiness.md`: added Gateway artifact search with all/session/run scope, modality/content-type/query/tag filters, Flow artifact picker search with session-list fallback, and KG memory readiness that stays available on fresh resolved stores. An initial Run modal export control was removed in favor of the graph-level file/artifact IO design tracked by `proposed/0095_file_nodes_artifact_io_boundary_resolution.md`. Validation: focused Gateway artifact/capability/default-scan tests, Flow frontend contract tests, and frontend build.
+- `completed/0094_artifact_search_export_and_kg_memory_readiness.md` from `planned/0094_artifact_search_export_and_kg_memory_readiness.md`: added Gateway artifact search with all/session/run scope, modality/content-type/query/tag filters, Flow artifact picker search with session-list fallback, and KG memory readiness that stays available on fresh resolved stores. An initial Run modal export control was removed in favor of the graph-level file/artifact IO design later shipped in `completed/0095_file_nodes_artifact_io_boundary_resolution.md`. Validation: focused Gateway artifact/capability/default-scan tests, Flow frontend contract tests, and frontend build.
 - `completed/0093_artifact_reference_visibility_and_runtime_handoff.md` from `planned/0093_artifact_reference_visibility_and_runtime_handoff.md`: standardized artifact refs at the Gateway/Flow boundary, added session-visible artifact listing, allowed same-session artifact metadata/content access, and validated run-start refs before Runtime handoff. Validation: focused Gateway, Flow frontend contract/build, and Runtime artifact-store tests.
 - `completed/0092_run_modal_artifact_input_picker.md` from `planned/0092_run_modal_artifact_input_picker.md`: added a Run modal artifact input field for generic/image/audio/text/video pins with existing session artifact selection, browser upload, Gateway workspace import, modality filtering, previews, and canonical JSON ref submission. Validation: Flow frontend gateway contract tests and frontend build.
 - `completed/0091_gateway_artifact_import_export_contract.md` from `planned/0091_gateway_artifact_import_export_contract.md`: added advertised Gateway artifact import/export/session-list APIs, shared canonical artifact ref construction, and a public Runtime file-backed artifact content path hook for export. Validation: focused Gateway capabilities/artifact endpoint tests and Runtime artifact-store test.

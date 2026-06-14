@@ -1045,6 +1045,12 @@
   min-width: 140px;
 }
 
+.schema-field-qualifier {
+  font-size: var(--font-size-xxs);
+  color: var(--text-muted);
+  text-transform: lowercase;
+}
+
 .schema-optional {
   display: flex;
   align-items: center;

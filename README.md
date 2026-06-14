@@ -49,6 +49,20 @@ capabilities. During `Listen Voice` waits, Flow records in the browser,
 uploads the captured audio artifact, and resumes the Gateway run; Flow does not
 execute local audio or transcription logic itself.
 
+Vision media nodes now surface Gateway/Core's richer route contract directly in
+authoring:
+
+- task-scoped provider/model discovery for `text_to_image`, `image_to_image`,
+  `text_to_video`, and `image_to_video`
+- batch generation controls with `count` and explicit ordered `seeds`
+- ordered `lora_adapters` stacks for compatible image/video models
+- plural media outputs such as `image_artifacts` and `video_artifacts` when a
+  route returns more than one artifact in one call
+
+The editor keeps those controls in the right-side Properties drawer and only
+surfaces them on nodes whose Gateway contract advertises the corresponding
+support.
+
 File and document workflows can use `Write File` for Markdown/JSON/text paths,
 `Read File` for UTF-8/JSON inputs, `Read PDF` for extracting PDF text/metadata,
 and `Write PDF` for rendering report content to a real PDF path through

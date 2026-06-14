@@ -1,6 +1,11 @@
 import type { Pin } from '../types/flow';
 
 export type ArtifactModality = 'artifact' | 'image' | 'audio' | 'text' | 'video';
+type ArtifactPinKind = 'single' | 'list' | 'none';
+type ArtifactPinLike = string | Pick<Pin, 'type' | 'schema'> | undefined | null;
+
+const SINGLE_ARTIFACT_PIN_TYPES = ['artifact', 'artifact_image', 'artifact_audio', 'artifact_text', 'artifact_video'] as const;
+const LIST_ARTIFACT_PIN_TYPES = ['artifacts', 'artifacts_image', 'artifacts_audio', 'artifacts_text', 'artifacts_video'] as const;
 
 export type CanonicalArtifactRef = {
   $artifact: string;
@@ -24,26 +29,77 @@ function stringFrom(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-export function isArtifactPinType(pinType: string | undefined | null): boolean {
-  return ['artifact', 'artifact_image', 'artifact_audio', 'artifact_text', 'artifact_video'].includes(String(pinType || ''));
+function recordFromSchema(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
 
-export function artifactModalityForPinType(pinType: string | undefined | null): ArtifactModality {
-  switch (String(pinType || '')) {
+function normalizedArtifactPinType(pinLike: ArtifactPinLike): string {
+  if (!pinLike) return '';
+  if (typeof pinLike === 'string') return pinLike;
+  const rawType = String(pinLike.type || '').trim();
+  if (rawType !== 'array') return rawType;
+  const schema = recordFromSchema(pinLike.schema);
+  if (!schema) return rawType;
+  const explicit = stringFrom(schema['x-abstract-type']);
+  if (LIST_ARTIFACT_PIN_TYPES.includes(explicit as (typeof LIST_ARTIFACT_PIN_TYPES)[number])) return explicit;
+  const items = recordFromSchema(schema.items);
+  const itemType = items ? stringFrom(items['x-abstract-type']) : '';
+  if (itemType === 'artifact') return 'artifacts';
+  if (itemType === 'artifact_image') return 'artifacts_image';
+  if (itemType === 'artifact_audio') return 'artifacts_audio';
+  if (itemType === 'artifact_text') return 'artifacts_text';
+  if (itemType === 'artifact_video') return 'artifacts_video';
+  const properties = items ? recordFromSchema(items.properties) : null;
+  const artifactProperty = properties ? recordFromSchema(properties.$artifact) : null;
+  if (stringFrom(artifactProperty?.type) === 'string') {
+    return 'artifacts';
+  }
+  return rawType;
+}
+
+export function isArtifactPinType(pinType: string | undefined | null): boolean {
+  return SINGLE_ARTIFACT_PIN_TYPES.includes(String(pinType || '') as (typeof SINGLE_ARTIFACT_PIN_TYPES)[number]);
+}
+
+export function isArtifactListPinType(pinType: string | undefined | null): boolean {
+  return LIST_ARTIFACT_PIN_TYPES.includes(String(pinType || '') as (typeof LIST_ARTIFACT_PIN_TYPES)[number]);
+}
+
+export function isArtifactListLikePin(pin: Pick<Pin, 'type' | 'schema'> | undefined | null): boolean {
+  return isArtifactListPinType(normalizedArtifactPinType(pin));
+}
+
+export function isArtifactLikePinType(pinType: string | undefined | null): boolean {
+  return isArtifactPinType(pinType) || isArtifactListPinType(pinType);
+}
+
+function artifactPinKind(pinType: ArtifactPinLike): ArtifactPinKind {
+  const normalized = normalizedArtifactPinType(pinType);
+  if (isArtifactPinType(normalized)) return 'single';
+  if (isArtifactListPinType(normalized)) return 'list';
+  return 'none';
+}
+
+export function artifactModalityForPinType(pinType: ArtifactPinLike): ArtifactModality {
+  switch (normalizedArtifactPinType(pinType)) {
     case 'artifact_image':
+    case 'artifacts_image':
       return 'image';
     case 'artifact_audio':
+    case 'artifacts_audio':
       return 'audio';
     case 'artifact_text':
+    case 'artifacts_text':
       return 'text';
     case 'artifact_video':
+    case 'artifacts_video':
       return 'video';
     default:
       return 'artifact';
   }
 }
 
-export function artifactAcceptForPin(pinType: string | undefined | null): string | undefined {
+export function artifactAcceptForPin(pinType: ArtifactPinLike): string | undefined {
   switch (artifactModalityForPinType(pinType)) {
     case 'image':
       return 'image/*';
@@ -128,6 +184,42 @@ export function parseArtifactRefText(raw: string | undefined | null): CanonicalA
   return { $artifact: text, artifact_id: text };
 }
 
+export function normalizeArtifactRefs(values: unknown[]): CanonicalArtifactRef[] {
+  const refs: CanonicalArtifactRef[] = [];
+  const seen = new Set<string>();
+  for (const value of values) {
+    const ref =
+      artifactRefFromRecord(value) ||
+      (typeof value === 'string' ? parseArtifactRefText(value) : null);
+    if (!ref) continue;
+    const key = `${artifactOwnerRunId(ref)}::${artifactIdFromRef(ref)}`;
+    if (!artifactIdFromRef(ref) || seen.has(key)) continue;
+    seen.add(key);
+    refs.push(ref);
+  }
+  return refs;
+}
+
+export function artifactRefsFromValue(value: unknown): CanonicalArtifactRef[] {
+  if (Array.isArray(value)) return normalizeArtifactRefs(value);
+  const single = artifactRefFromRecord(value) || (typeof value === 'string' ? parseArtifactRefText(value) : null);
+  return single ? [single] : [];
+}
+
+export function parseArtifactRefsText(raw: string | undefined | null): CanonicalArtifactRef[] {
+  const text = String(raw || '').trim();
+  if (!text) return [];
+  if (text.startsWith('[')) {
+    try {
+      return artifactRefsFromValue(JSON.parse(text));
+    } catch {
+      return [];
+    }
+  }
+  const single = parseArtifactRefText(text);
+  return single ? [single] : [];
+}
+
 export function artifactModalityFromContentType(contentType: unknown): string {
   const type = stringFrom(contentType).toLowerCase();
   if (type.startsWith('image/')) return 'image';
@@ -137,8 +229,13 @@ export function artifactModalityFromContentType(contentType: unknown): string {
   return 'file';
 }
 
-export function artifactMatchesPin(ref: unknown, pin: Pick<Pin, 'type'>): boolean {
-  const expected = artifactModalityForPinType(pin.type);
+export function artifactMatchesPin(ref: unknown, pin: Pick<Pin, 'type' | 'schema'>): boolean {
+  const kind = artifactPinKind(pin);
+  if (kind === 'list' && Array.isArray(ref)) {
+    const normalized = normalizedArtifactPinType(pin);
+    return ref.every((item) => artifactMatchesPin(item, { type: normalized.replace(/^artifacts/, 'artifact') as Pin['type'] }));
+  }
+  const expected = artifactModalityForPinType(pin);
   if (expected === 'artifact') return true;
   const record = recordFrom(ref);
   const modality = stringFrom(record.modality).toLowerCase() || artifactModalityFromContentType(record.content_type);

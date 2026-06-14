@@ -2995,6 +2995,109 @@ button.primary:hover:not(:disabled) {
   min-width: 92px;
 }
 
+.artifact-source-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.artifact-source-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.artifact-source-card-title {
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.artifact-source-card-summary {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.artifact-source-card-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.artifact-source-card-item {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.artifact-source-card-item strong {
+  font-size: var(--font-size-xxs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.artifact-source-card-item span {
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  line-height: 1.35;
+}
+
+.artifact-inline-label {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.artifact-inline-controls {
+  display: grid;
+  gap: 8px;
+}
+
+.artifact-source-list {
+  display: grid;
+  gap: 8px;
+}
+
+.artifact-item-button {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-primary);
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.artifact-item-button:hover:not(:disabled) {
+  border-color: rgba(94, 234, 212, 0.35);
+  background: rgba(94, 234, 212, 0.08);
+}
+
+.artifact-item-button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.artifact-item-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.artifact-item-sub {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
 .run-form-required {
   margin-left: auto;
   font-size: var(--font-size-xxs);

@@ -230,15 +230,20 @@ const GENERATION_TUNING_INPUTS = [
   'fps',
   'format',
   'seed',
+  'seeds',
+  'count',
   'steps',
   'num_inference_steps',
   'guidance_scale',
+  'guidance_2',
+  'flow_shift',
   'strength',
   'scale',
   'resolution',
   'softness',
   'quantize',
   'vae_tiling',
+  'lora_adapters',
   'negative_prompt',
   'extra',
   'quality_preset',
@@ -377,6 +382,7 @@ const POLICY_BY_NODE_TYPE: Partial<Record<NodeType, NodeDisclosurePolicy>> = {
     compactOutputs: true,
     primaryInputs: ['prompt'],
     primaryOutputs: ['image_artifact'],
+    advancedOutputs: ['image_artifacts'],
     advancedInputs: [...PROVIDER_MODEL_INPUTS, ...GENERATION_TUNING_INPUTS],
     diagnosticOutputs: MEDIA_DIAGNOSTIC_OUTPUTS,
   },
@@ -385,6 +391,7 @@ const POLICY_BY_NODE_TYPE: Partial<Record<NodeType, NodeDisclosurePolicy>> = {
     compactOutputs: true,
     primaryInputs: ['prompt', 'image_artifact'],
     primaryOutputs: ['image_artifact'],
+    advancedOutputs: ['image_artifacts'],
     advancedInputs: ['mask_artifact', ...PROVIDER_MODEL_INPUTS, ...GENERATION_TUNING_INPUTS],
     diagnosticOutputs: MEDIA_DIAGNOSTIC_OUTPUTS,
   },
@@ -393,6 +400,7 @@ const POLICY_BY_NODE_TYPE: Partial<Record<NodeType, NodeDisclosurePolicy>> = {
     compactOutputs: true,
     primaryInputs: ['prompt', 'source_image'],
     primaryOutputs: ['image_artifact'],
+    advancedOutputs: ['image_artifacts'],
     advancedInputs: ['mask_artifact', ...PROVIDER_MODEL_INPUTS, ...GENERATION_TUNING_INPUTS],
     diagnosticOutputs: MEDIA_DIAGNOSTIC_OUTPUTS,
   },
@@ -409,6 +417,7 @@ const POLICY_BY_NODE_TYPE: Partial<Record<NodeType, NodeDisclosurePolicy>> = {
     compactOutputs: true,
     primaryInputs: ['prompt'],
     primaryOutputs: ['video_artifact'],
+    advancedOutputs: ['video_artifacts'],
     advancedInputs: [...PROVIDER_MODEL_INPUTS, ...GENERATION_TUNING_INPUTS],
     diagnosticOutputs: MEDIA_DIAGNOSTIC_OUTPUTS,
   },
@@ -417,6 +426,7 @@ const POLICY_BY_NODE_TYPE: Partial<Record<NodeType, NodeDisclosurePolicy>> = {
     compactOutputs: true,
     primaryInputs: ['prompt'],
     primaryOutputs: ['video_artifact'],
+    advancedOutputs: ['video_artifacts'],
     advancedInputs: [...PROVIDER_MODEL_INPUTS, ...GENERATION_TUNING_INPUTS],
     diagnosticOutputs: MEDIA_DIAGNOSTIC_OUTPUTS,
   },
@@ -425,6 +435,7 @@ const POLICY_BY_NODE_TYPE: Partial<Record<NodeType, NodeDisclosurePolicy>> = {
     compactOutputs: true,
     primaryInputs: ['prompt', 'source_image'],
     primaryOutputs: ['video_artifact'],
+    advancedOutputs: ['video_artifacts'],
     advancedInputs: [...PROVIDER_MODEL_INPUTS, ...GENERATION_TUNING_INPUTS],
     diagnosticOutputs: MEDIA_DIAGNOSTIC_OUTPUTS,
   },
@@ -1041,6 +1052,30 @@ function classifyPin(args: {
   return 'unmanaged';
 }
 
+function isBatchArtifactOutputPin(nodeType: NodeType | string, pinId: string): boolean {
+  if (pinId === 'image_artifacts') {
+    return nodeType === 'generate_image' || nodeType === 'edit_image' || nodeType === 'image_to_image';
+  }
+  if (pinId === 'video_artifacts') {
+    return nodeType === 'generate_video' || nodeType === 'text_to_video' || nodeType === 'image_to_video';
+  }
+  return false;
+}
+
+function hasConfiguredBatchGeneration(data: FlowNodeData | undefined, nodeType: NodeType | string): boolean {
+  if (!data || !MEDIA_NODE_TYPES.has(String(nodeType))) return false;
+  const countValues = currentConfiguredValues({ data, pinId: 'count' });
+  for (const value of countValues) {
+    const count = typeof value === 'number' ? value : Number(value);
+    if (Number.isFinite(count) && count > 1) return true;
+  }
+  const seedValues = currentConfiguredValues({ data, pinId: 'seeds' });
+  for (const value of seedValues) {
+    if (Array.isArray(value) && value.length > 1) return true;
+  }
+  return false;
+}
+
 function decidePinVisibility<TPin extends PinLike>(args: {
   nodeType: NodeType | string;
   data?: FlowNodeData;
@@ -1071,6 +1106,14 @@ function decidePinVisibility<TPin extends PinLike>(args: {
       className: schemaActive ? 'primary' : 'advanced',
       reason: schemaActive ? 'configured' : 'unsupported',
     };
+  }
+
+  if (
+    args.direction === 'output' &&
+    isBatchArtifactOutputPin(args.nodeType, args.pin.id) &&
+    hasConfiguredBatchGeneration(args.data, args.nodeType)
+  ) {
+    return { pinId: args.pin.id, direction: args.direction, visible: true, className: 'advanced', reason: 'configured' };
   }
 
   const isUnsupportedThinkingPin =

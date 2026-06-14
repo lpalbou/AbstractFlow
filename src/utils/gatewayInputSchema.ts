@@ -78,6 +78,10 @@ function isArtifactVisualType(value: string): boolean {
   return ['artifact', 'artifact_image', 'artifact_audio', 'artifact_text', 'artifact_video'].includes(value);
 }
 
+function isArtifactListVisualType(value: string): boolean {
+  return ['artifacts', 'artifacts_image', 'artifacts_audio', 'artifacts_text', 'artifacts_video'].includes(value);
+}
+
 function coerceArtifactRef(value: unknown): unknown {
   if (isRecord(value)) {
     const raw = value.$artifact ?? value.artifact_id;
@@ -98,6 +102,26 @@ function coerceArtifactRef(value: unknown): unknown {
   return { $artifact: text, artifact_id: text };
 }
 
+function coerceArtifactRefList(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => coerceArtifactRef(item));
+  }
+  if (typeof value === 'string') {
+    const text = value.trim();
+    if (!text) return [];
+    if (text.startsWith('[')) {
+      const parsed = parseJsonish(text, []);
+      if (Array.isArray(parsed)) return parsed.map((item) => coerceArtifactRef(item));
+    }
+    const single = coerceArtifactRef(text);
+    return single ? [single] : [];
+  }
+  if (isRecord(value)) {
+    return [coerceArtifactRef(value)];
+  }
+  return value;
+}
+
 function coerceValue(value: unknown, pin: GatewayInputPin): unknown {
   const visualType = typeof pin.type === 'string' ? pin.type.trim().toLowerCase() : '';
   const jsonType = schemaType(pin.schema).toLowerCase();
@@ -107,7 +131,10 @@ function coerceValue(value: unknown, pin: GatewayInputPin): unknown {
   if (isArtifactVisualType(target)) {
     return coerceArtifactRef(value);
   }
-  if (target === 'string' || isProviderOrModelVisualType(target)) {
+  if (isArtifactListVisualType(target)) {
+    return coerceArtifactRefList(value);
+  }
+  if (target === 'string' || target === 'workspace_file' || target === 'workspace_folder' || isProviderOrModelVisualType(target)) {
     return typeof value === 'string' ? value : String(value);
   }
   if (target === 'number' || target === 'integer') {
@@ -206,6 +233,13 @@ export function gatewayPinTypeToVisualPinType(pin: GatewayInputPin): PinType {
     raw === 'artifact_audio' ||
     raw === 'artifact_text' ||
     raw === 'artifact_video' ||
+    raw === 'artifacts' ||
+    raw === 'artifacts_image' ||
+    raw === 'artifacts_audio' ||
+    raw === 'artifacts_text' ||
+    raw === 'artifacts_video' ||
+    raw === 'workspace_file' ||
+    raw === 'workspace_folder' ||
     raw === 'agent' ||
     raw === 'any'
   ) {

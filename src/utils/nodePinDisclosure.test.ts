@@ -172,6 +172,20 @@ describe('node pin disclosure policy', () => {
     expect(result.hiddenCount).toBeGreaterThan(1);
   });
 
+  it('surfaces plural media outputs when batch generation is configured', () => {
+    const data = nodeData('generate_image');
+    data.pinDefaults = {
+      ...(data.pinDefaults || {}),
+      count: 2,
+      seeds: [101, 102],
+    };
+    const result = disclosure(data);
+
+    expect(ids(result.inputPins)).toContain('count');
+    expect(ids(result.inputPins)).toContain('seeds');
+    expect(ids(result.outputPins)).toContain('image_artifacts');
+  });
+
   it('leaves unlisted small transform nodes unchanged', () => {
     const data = nodeData('add');
     const result = disclosure(data);

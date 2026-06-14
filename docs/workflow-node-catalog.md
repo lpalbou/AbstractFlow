@@ -7,11 +7,23 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 
 ## Visible Authoring Templates
 
+### artifacts / Artifact
+
+- Node type: `literal_json`
+- Document node: `{"id":"<unique_id>","type":"literal_json","template":"Artifact"}`
+- Utility: Saved artifact reference object for any runtime-owned file or payload. Use this with Read Artifact or artifact-aware media/file nodes.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: select with `"template": "Artifact"`; literal value with `literal`
+- Inputs: none
+- Outputs: `value` artifact (artifact)
+- Default config: none
+
 ### artifacts / Image Artifact
 
 - Node type: `literal_json`
 - Document node: `{"id":"<unique_id>","type":"literal_json","template":"Image Artifact"}`
-- Utility: Artifact reference object for an image Gateway artifact. Wire this into Edit Image image_artifact or mask_artifact.
+- Utility: Saved artifact reference object for an image artifact. Wire this into Edit Image image_artifact or mask_artifact.
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: select with `"template": "Image Artifact"`; literal value with `literal`
@@ -29,7 +41,7 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 
 - Node type: `literal_json`
 - Document node: `{"id":"<unique_id>","type":"literal_json","template":"Music Artifact"}`
-- Utility: Artifact reference object for a music/audio Gateway artifact.
+- Utility: Saved artifact reference object for a music/audio artifact.
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: select with `"template": "Music Artifact"`; literal value with `literal`
@@ -47,7 +59,7 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 
 - Node type: `literal_json`
 - Document node: `{"id":"<unique_id>","type":"literal_json","template":"Text Artifact"}`
-- Utility: Artifact reference object for a text/plain Gateway artifact. Paste an uploaded or generated artifact id into $artifact.
+- Utility: Saved artifact reference object for a text/plain artifact. Paste an uploaded, imported, or generated artifact id into $artifact.
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: select with `"template": "Text Artifact"`; literal value with `literal`
@@ -65,7 +77,7 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 
 - Node type: `literal_json`
 - Document node: `{"id":"<unique_id>","type":"literal_json","template":"Video Artifact"}`
-- Utility: Artifact reference object for a video Gateway artifact.
+- Utility: Saved artifact reference object for a video artifact.
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: select with `"template": "Video Artifact"`; literal value with `literal`
@@ -83,7 +95,7 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 
 - Node type: `literal_json`
 - Document node: `{"id":"<unique_id>","type":"literal_json","template":"Voice Artifact"}`
-- Utility: Artifact reference object for a speech/audio Gateway artifact.
+- Utility: Saved artifact reference object for a speech/audio artifact.
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: select with `"template": "Voice Artifact"`; literal value with `literal`
@@ -1265,8 +1277,8 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Gateway capability: edited_image
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `prompt` string: Instruction for the image edit.; `image_artifact` artifact_image: Source image artifact ref. Wire from Generate Image, or use an uploaded/selected artifact.; `mask_artifact` artifact_image: Optional mask artifact ref.; `image_provider` provider_image (provider): Optional image edit provider/backend.; `image_model` model (model): Optional image edit model id for the selected provider.; `format` string: png, jpg, or webp.; `seed` number; `steps` number; `guidance_scale` number (guidance); `strength` number: Optional edit strength for image-to-image backends.; `negative_prompt` string (negative); `extra` object: Optional provider-specific image edit options.
-- Outputs: `exec-out` execution; `image_artifact` artifact_image: Artifact ref for the edited image.; `artifact_ref` artifact; `artifact_id` string; `content_type` string; `outputs` object; `meta` object; `success` boolean
+- Inputs: `exec-in` execution; `prompt` string: Instruction for the image edit.; `image_artifact` artifact_image: Source image artifact ref. Wire from Generate Image, or use an uploaded/selected artifact.; `mask_artifact` artifact_image: Optional mask artifact ref.; `image_provider` provider_image (provider): Optional image edit provider/backend.; `image_model` model (model): Optional image edit model id for the selected provider.; `format` string: png, jpg, or webp.; `seed` number; `steps` number; `guidance_scale` number (guidance); `guidance_2` number: Optional second-stage guidance for models that expose it.; `count` number: Optional number of edited images to generate in one call.; `seeds` array: Optional explicit batch seeds. When provided, their length defines the batch size unless count is also set.; `lora_adapters` array: Optional ordered LoRA adapter stack for compatible image-edit models.; `strength` number: Optional edit strength for image-to-image backends.; `negative_prompt` string (negative); `extra` object: Optional provider-specific image edit options.
+- Outputs: `exec-out` execution; `image_artifact` artifact_image: Artifact ref for the edited image.; `image_artifacts` artifacts_image: Ordered artifact refs for batched image editing.; `artifact_ref` artifact; `artifact_id` string; `content_type` string; `outputs` object; `meta` object; `success` boolean
 - Default config: {
   "pinDefaults": {
     "format": "png",
@@ -1282,8 +1294,8 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Gateway capability: generated_image
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `prompt` string: Image prompt.; `image_provider` provider_image (provider): Optional image provider/backend.; `image_model` model (model): Optional image model id for the selected image provider.; `width` number; `height` number; `format` string: png, jpg, or webp.; `seed` number; `steps` number; `guidance_scale` number (guidance); `negative_prompt` string (negative)
-- Outputs: `exec-out` execution; `image_artifact` artifact_image: Artifact ref for the generated image.; `artifact_ref` artifact; `artifact_id` string; `content_type` string; `outputs` object; `meta` object; `success` boolean
+- Inputs: `exec-in` execution; `prompt` string: Image prompt.; `image_provider` provider_image (provider): Optional image provider/backend.; `image_model` model (model): Optional image model id for the selected image provider.; `width` number; `height` number; `format` string: png, jpg, or webp.; `seed` number; `steps` number; `guidance_scale` number (guidance); `guidance_2` number: Optional second-stage guidance for models that expose it.; `count` number: Optional number of images to generate in one call.; `seeds` array: Optional explicit batch seeds. When provided, their length defines the batch size unless count is also set.; `lora_adapters` array: Optional ordered LoRA adapter stack for compatible image models.; `negative_prompt` string (negative)
+- Outputs: `exec-out` execution; `image_artifact` artifact_image: Artifact ref for the generated image.; `image_artifacts` artifacts_image: Ordered artifact refs for batched image generation.; `artifact_ref` artifact; `artifact_id` string; `content_type` string; `outputs` object; `meta` object; `success` boolean
 - Default config: {
   "pinDefaults": {
     "format": "png",
@@ -1315,8 +1327,8 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Gateway capability: generated_video
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `prompt` string: Video prompt.; `video_provider` provider_video (provider): Optional video provider/backend.; `video_model` model (model): Optional video model id for the selected video provider.; `width` number; `height` number; `frames` number; `fps` number; `format` string: mp4, mov, or gif.; `seed` number; `steps` number; `guidance_scale` number (guidance); `negative_prompt` string (negative); `extra` object: Optional provider-specific video-generation options.
-- Outputs: `exec-out` execution; `video_artifact` artifact_video: Artifact ref for the generated video.; `artifact_ref` artifact; `artifact_id` string; `content_type` string; `outputs` object; `meta` object; `success` boolean
+- Inputs: `exec-in` execution; `prompt` string: Video prompt.; `video_provider` provider_video (provider): Optional video provider/backend.; `video_model` model (model): Optional video model id for the selected video provider.; `width` number; `height` number; `frames` number; `fps` number; `format` string: mp4, mov, or gif.; `seed` number; `steps` number; `guidance_scale` number (guidance); `guidance_2` number: Optional second-stage guidance for dual-transformer video models.; `count` number: Optional number of videos to generate in one call.; `seeds` array: Optional explicit batch seeds. When provided, their length defines the batch size unless count is also set.; `flow_shift` number: Optional flow-shift control for compatible video models.; `lora_adapters` array: Optional ordered LoRA adapter stack for compatible video models.; `negative_prompt` string (negative); `extra` object: Optional provider-specific video-generation options.
+- Outputs: `exec-out` execution; `video_artifact` artifact_video: Artifact ref for the generated video.; `video_artifacts` artifacts_video: Ordered artifact refs for batched video generation.; `artifact_ref` artifact; `artifact_id` string; `content_type` string; `outputs` object; `meta` object; `success` boolean
 - Default config: {
   "pinDefaults": {
     "format": "mp4",
@@ -1355,8 +1367,8 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Gateway capability: image_to_video
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `prompt` string: Instruction for the image-to-video generation.; `source_image` artifact_image: Source image artifact ref.; `video_provider` provider_video (provider): Optional image-to-video provider/backend.; `video_model` model (model): Optional image-to-video model id for the selected provider.; `width` number; `height` number; `frames` number; `fps` number; `format` string: mp4, mov, or gif.; `seed` number; `steps` number; `guidance_scale` number (guidance); `strength` number: Optional conditioning strength for image-to-video backends.; `negative_prompt` string (negative); `extra` object: Optional provider-specific image-to-video options.
-- Outputs: `exec-out` execution; `video_artifact` artifact_video: Artifact ref for the generated video.; `artifact_ref` artifact; `artifact_id` string; `content_type` string; `outputs` object; `meta` object; `success` boolean
+- Inputs: `exec-in` execution; `prompt` string: Instruction for the image-to-video generation.; `source_image` artifact_image: Source image artifact ref.; `video_provider` provider_video (provider): Optional image-to-video provider/backend.; `video_model` model (model): Optional image-to-video model id for the selected provider.; `width` number; `height` number; `frames` number; `fps` number; `format` string: mp4, mov, or gif.; `seed` number; `steps` number; `guidance_scale` number (guidance); `guidance_2` number: Optional second-stage guidance for dual-transformer video models.; `count` number: Optional number of videos to generate in one call.; `seeds` array: Optional explicit batch seeds. When provided, their length defines the batch size unless count is also set.; `flow_shift` number: Optional flow-shift control for compatible video models.; `lora_adapters` array: Optional ordered LoRA adapter stack for compatible video models.; `strength` number: Optional conditioning strength for image-to-video backends.; `negative_prompt` string (negative); `extra` object: Optional provider-specific image-to-video options.
+- Outputs: `exec-out` execution; `video_artifact` artifact_video: Artifact ref for the generated video.; `video_artifacts` artifacts_video: Ordered artifact refs for batched image-to-video generation.; `artifact_ref` artifact; `artifact_id` string; `content_type` string; `outputs` object; `meta` object; `success` boolean
 - Default config: {
   "pinDefaults": {
     "format": "mp4",
@@ -1419,6 +1431,42 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
     "softness": 0.25
   }
 }
+
+### memory / Export Artifact
+
+- Node type: `export_artifact`
+- Document node: `{"id":"<unique_id>","type":"export_artifact"}`
+- Utility: Write an Artifact payload to a workspace-scoped server file path.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `artifact` artifact; `file_path` workspace_file
+- Outputs: `exec-out` execution; `artifact_id` string; `file_path` workspace_file; `bytes` number; `sha256` string; `content_type` string
+- Default config: none
+
+### memory / Import Server File
+
+- Node type: `import_workspace_file`
+- Document node: `{"id":"<unique_id>","type":"import_workspace_file"}`
+- Utility: Snapshot a workspace-scoped server file into a runtime-owned Artifact for reuse across downstream steps and future runs.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `file_path` workspace_file; `content_type` string: Optional MIME override when the filename extension is misleading.
+- Outputs: `exec-out` execution; `artifact` artifact; `artifact_ref` artifact; `artifact_id` string; `content_type` string; `size_bytes` number; `source_path` workspace_file
+- Default config: none
+
+### memory / List Folder Files
+
+- Node type: `list_folder_files`
+- Document node: `{"id":"<unique_id>","type":"list_folder_files"}`
+- Utility: List files inside a workspace-scoped server folder, with optional family and extension filters.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `folder_path` workspace_folder; `recursive` boolean: When true, recurse into subfolders.; `family` string: Optional family filter: any | image | video | audio | document | text | code | json | archive | other.; `extensions` array: Optional list of file extensions without dots.; `include_directories` boolean: When true, include folder entries in the structured results.; `limit` number: Maximum number of returned entries. Default: 500.; `max_depth` number: Optional recursive depth limit. Use 0 for unlimited depth.
+- Outputs: `exec-out` execution; `folder_path` workspace_folder; `files` array; `entries` array; `count` number; `truncated` boolean
+- Default config: none
 
 ### memory / MemAct Compose
 
@@ -1528,52 +1576,64 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Outputs: `exec-out` execution; `success` boolean: Whether the tag operation succeeded.; `rendered` string: Human-readable result string.
 - Default config: none
 
+### memory / Read Artifact
+
+- Node type: `read_artifact`
+- Document node: `{"id":"<unique_id>","type":"read_artifact"}`
+- Utility: Read any Artifact payload and expose bounded text, JSON, or base64 projections plus content metadata.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `artifact` artifact
+- Outputs: `exec-out` execution; `artifact` artifact; `artifact_ref` artifact; `artifact_id` string; `content_type` string; `content_family` string; `size_bytes` number; `filename` string; `source_path` string; `content` any; `text` string; `json` object; `binary_base64` string; `is_binary` boolean; `warnings` array; `truncated` boolean
+- Default config: none
+
 ### memory / Read File
 
 - Node type: `read_file`
 - Document node: `{"id":"<unique_id>","type":"read_file"}`
-- Utility: Read a file from disk and output its content.
+- Utility: Read a workspace-scoped server file path and output UTF-8 text or JSON content. In Gateway-hosted runs, access stays within the allowed workspace policy.
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `file_path` string
-- Outputs: `exec-out` execution; `content` any
+- Inputs: `exec-in` execution; `file_path` workspace_file
+- Outputs: `exec-out` execution; `content` any; `file_path` workspace_file
 - Default config: none
 
 ### memory / Read PDF
 
 - Node type: `read_pdf`
 - Document node: `{"id":"<unique_id>","type":"read_pdf"}`
-- Utility: Extract text and metadata from a PDF file using the Runtime permissive PDF reader.
+- Utility: Extract text and metadata from a workspace-scoped server PDF path using the Runtime permissive PDF reader.
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `file_path` string; `page_start` number: Optional 1-based first page to read.; `page_end` number: Optional 1-based last page to read.; `max_chars` number: Optional explicit text limit. If used, output warnings include #TRUNCATION.
-- Outputs: `exec-out` execution; `content` string; `pages` number; `processed_pages` number; `metadata` object; `warnings` array; `truncated` boolean; `file_path` string; `content_type` string
+- Inputs: `exec-in` execution; `file_path` workspace_file; `page_start` number: Optional 1-based first page to read.; `page_end` number: Optional 1-based last page to read.; `max_chars` number: Optional explicit text limit. If used, output warnings include #TRUNCATION.
+- Outputs: `exec-out` execution; `content` string; `pages` number; `processed_pages` number; `metadata` object; `warnings` array; `truncated` boolean; `file_path` workspace_file; `content_type` string
 - Default config: none
 
 ### memory / Write File
 
 - Node type: `write_file`
 - Document node: `{"id":"<unique_id>","type":"write_file"}`
-- Utility: Write content to a file on disk (creates parent folders if needed).
+- Utility: Write content to a workspace-scoped server file path (creates parent folders if needed). In local Runtime-only runs without workspace scope, relative paths fall back to the process working directory.
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `file_path` string; `content` any
-- Outputs: `exec-out` execution; `bytes` number; `file_path` string
+- Inputs: `exec-in` execution; `file_path` workspace_file; `content` any
+- Outputs: `exec-out` execution; `bytes` number; `file_path` workspace_file
 - Default config: none
 
 ### memory / Write PDF
 
 - Node type: `write_pdf`
 - Document node: `{"id":"<unique_id>","type":"write_pdf"}`
-- Utility: Render text or Markdown-style report content to a real PDF file using the Runtime permissive PDF writer.
+- Utility: Render text or Markdown-style report content to a real workspace-scoped server PDF path using the Runtime permissive PDF writer.
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `file_path` string; `content` any; `title` string: Optional PDF document title.
-- Outputs: `exec-out` execution; `bytes` number; `file_path` string; `sha256` string; `content_type` string
+- Inputs: `exec-in` execution; `file_path` workspace_file; `content` any; `title` string: Optional PDF document title.
+- Outputs: `exec-out` execution; `bytes` number; `file_path` workspace_file; `sha256` string; `content_type` string
 - Default config: none
 
 ### schema / Add Schema Fields

@@ -1715,43 +1715,14 @@ export const useFlowStore = create<FlowState>((set, get) => ({
               ]
             : data.nodeType === 'generate_music'
               ? (getNodeTemplate('generate_music')?.inputs || [])
-            : data.nodeType === 'upscale_image' || data.nodeType === 'generate_video' || data.nodeType === 'text_to_video' || data.nodeType === 'image_to_video'
+            : data.nodeType === 'generate_image' ||
+              data.nodeType === 'edit_image' ||
+              data.nodeType === 'image_to_image' ||
+              data.nodeType === 'upscale_image' ||
+              data.nodeType === 'generate_video' ||
+              data.nodeType === 'text_to_video' ||
+              data.nodeType === 'image_to_video'
               ? (getNodeTemplate(data.nodeType)?.inputs || [])
-            : data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
-              ? [
-                  { id: 'exec-in', label: '', type: 'execution' as const },
-                  { id: 'prompt', label: 'prompt', type: 'string' as const, description: 'Instruction for the image edit.' },
-                  {
-                    id: data.nodeType === 'image_to_image' ? 'source_image' : 'image_artifact',
-                    label: data.nodeType === 'image_to_image' ? 'source_image' : 'image_artifact',
-                    type: 'artifact_image' as const,
-                    description: 'Source image artifact ref. Wire from Generate Image, or use an uploaded/selected artifact.',
-                  },
-                  { id: 'mask_artifact', label: 'mask_artifact', type: 'artifact_image' as const, description: 'Optional mask artifact ref.' },
-                  { id: 'image_provider', label: 'provider', type: 'provider_image' as const, description: 'Optional image edit provider/backend.' },
-                  { id: 'image_model', label: 'model', type: 'model' as const, description: 'Optional image edit model id for the selected provider.' },
-                  { id: 'format', label: 'format', type: 'string' as const, description: 'png, jpg, or webp.' },
-                  { id: 'seed', label: 'seed', type: 'number' as const },
-                  { id: 'steps', label: 'steps', type: 'number' as const },
-                  { id: 'guidance_scale', label: 'guidance', type: 'number' as const },
-                  { id: 'strength', label: 'strength', type: 'number' as const, description: 'Optional edit strength.' },
-                  { id: 'negative_prompt', label: 'negative', type: 'string' as const },
-                  { id: 'extra', label: 'extra', type: 'object' as const, description: 'Optional provider-specific image edit options.' },
-                ]
-            : data.nodeType === 'generate_image'
-              ? [
-                  { id: 'exec-in', label: '', type: 'execution' as const },
-                  { id: 'prompt', label: 'prompt', type: 'string' as const, description: 'Image prompt.' },
-                  { id: 'image_provider', label: 'provider', type: 'provider_image' as const, description: 'Optional image provider/backend. Legacy provider pins are treated as an image provider fallback.' },
-                  { id: 'image_model', label: 'model', type: 'model' as const, description: 'Optional image model id for the selected image provider.' },
-                  { id: 'width', label: 'width', type: 'number' as const },
-                  { id: 'height', label: 'height', type: 'number' as const },
-                  { id: 'format', label: 'format', type: 'string' as const, description: 'png, jpg, or webp.' },
-                  { id: 'seed', label: 'seed', type: 'number' as const },
-                  { id: 'steps', label: 'steps', type: 'number' as const },
-                  { id: 'guidance_scale', label: 'guidance', type: 'number' as const },
-                  { id: 'negative_prompt', label: 'negative', type: 'string' as const },
-                ]
               : data.nodeType === 'transcribe_audio'
                 ? [
                     { id: 'exec-in', label: '', type: 'execution' as const },
