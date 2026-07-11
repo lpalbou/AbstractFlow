@@ -55,11 +55,25 @@ export function MarkdownRenderer({ markdown, className }: MarkdownRendererProps)
     const raw = marked.parse(md, { gfm: true, breaks: true, renderer }) as string;
 
     // Sanitize aggressively; allow our `data-*` attrs for code blocks.
-    return DOMPurify.sanitize(raw, {
+    const sanitized = DOMPurify.sanitize(raw, {
       USE_PROFILES: { html: true },
       ADD_TAGS: ['button'],
       ADD_ATTR: ['data-lang', 'data-md-copy'],
     });
+
+    // Links open in a new tab (backlog 0116): same-tab navigation ejects the
+    // user from the SPA and destroys run-modal state. Applied post-sanitize on
+    // a detached tree so target/rel survive DOMPurify's attribute policy.
+    // Fragment-only links (#anchor) stay same-document.
+    const container = document.createElement('div');
+    container.innerHTML = sanitized;
+    for (const anchor of Array.from(container.querySelectorAll('a[href]'))) {
+      const href = anchor.getAttribute('href') || '';
+      if (href.startsWith('#')) continue;
+      anchor.setAttribute('target', '_blank');
+      anchor.setAttribute('rel', 'noopener noreferrer');
+    }
+    return container.innerHTML;
   }, [markdown]);
 
   useEffect(() => {

@@ -265,7 +265,7 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `use_context` boolean: When true, include this run's active context messages (context.messages) as agent history. If the pin is not connected, the node checkbox is used. Default: false.; `context` object: Optional explicit context object for the agent (e.g. {messages:[...]}). If provided, context.messages overrides the inherited run context messages.; `memory` memory: Memory configuration object (KG/span/session controls). If set, overrides this node’s recall/ingest behavior; if unset, runtime defaults apply.; `provider` provider_text: Text/LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider.; `model` model: Text/LLM model id/name. If unset, uses the node’s configured model.; `system` string: Optional system prompt for this agent instance (high priority instructions).; `prompt` string: User prompt/task string for the agent to solve.; `tools` tools: Allowlist of tool names this agent can call (defense-in-depth; runtime still enforces allowlists).; `prompt_cache_binding` any: Advanced: durable exact-reuse prompt-cache binding from Gateway blocs. Accepts a binding object or binding_id string; this does not create or load blocs during the run.; `max_iterations` number: Maximum internal ReAct iterations (safety cap). Higher values allow more tool-use steps.; `max_in_tokens` number: Optional per-agent input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for the agent sub-run.; `temperature` number: Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature.; `seed` number: Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed.; `thinking` string: Reasoning/thinking control for supported models. If unset, uses the Gateway/runtime default.; `resp_schema` json_schema: Optional JSON Schema object (type=object) the final answer must conform to.
+- Inputs: `exec-in` execution; `use_context` boolean: When true, include this run's active context messages (context.messages) as agent history. If the pin is not connected, the node checkbox is used. Default: false.; `context` object: Optional explicit context object for the agent (e.g. {messages:[...]}). If provided, context.messages overrides the inherited run context messages.; `memory` memory: Memory configuration object (KG/span/session controls). If set, overrides this node’s recall/ingest behavior; if unset, runtime defaults apply.; `provider` provider_text: Text/LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider.; `model` model: Text/LLM model id/name. If unset, uses the node’s configured model.; `system` string: Optional system prompt for this agent instance (high priority instructions).; `prompt` string: User prompt/task string for the agent to solve.; `tools` tools: Allowlist of tool names this agent can call (defense-in-depth; runtime still enforces allowlists).; `prompt_cache_binding` any: Advanced: durable exact-reuse prompt-cache binding from Gateway blocs. Accepts a binding object or binding_id string; this does not create or load blocs during the run.; `max_iterations` number: Maximum internal ReAct iterations (safety cap). Higher values allow more tool-use steps.; `max_in_tokens` number: Optional per-agent input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for the agent sub-run.; `max_output_tokens` number: Optional output token cap for the agent sub-run (max_output_tokens). When set, bounds each LLM response the agent generates.; `temperature` number: Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature.; `seed` number: Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed.; `thinking` string: Reasoning/thinking control for supported models. If unset, uses the Gateway/runtime default.; `resp_schema` json_schema: Optional JSON Schema object (type=object) the final answer must conform to.
 - Outputs: `exec-out` execution; `response` string: Final response text. When resp_schema is provided, the structured object is also exposed on data.; `data` object: Structured response object matching resp_schema. Visible by default when a response schema is configured.; `success` boolean: True if the Agent node completed successfully.; `meta` object: Host-facing meta envelope (schema=abstractcode.agent.v1.meta). Includes provider/model and lightweight execution metadata.; `scratchpad` object: Runtime-owned execution trace/scratchpad for observability (LLM/tool steps, timings). Includes best-effort tool_calls/tool_results extracted post-run.
 - Default config: {
   "pinDefaults": {
@@ -323,7 +323,7 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `use_context` boolean: When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false.; `context` object: Optional explicit context object for this call (e.g. {messages:[...]}). If provided, context.messages overrides inherited run context messages.; `memory` memory: Memory configuration object (KG/span/session controls). If set, overrides this call’s recall behavior; if unset, runtime defaults apply.; `provider` provider_text: Text/LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider.; `model` model: Text/LLM model id/name. If unset, uses the node’s configured model.; `system` string: Optional system prompt for this single call.; `prompt` string: User prompt/content for this single call.; `tools` tools: Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node).; `prompt_cache_binding` any: Advanced: durable exact-reuse prompt-cache binding from Gateway blocs. Accepts a binding object or binding_id string; this does not create or load blocs during the run.; `max_in_tokens` number: Optional per-call input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for this call.; `temperature` number: Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature.; `seed` number: Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed.; `thinking` string: Reasoning/thinking control for supported models. If unset, uses the Gateway/runtime default.; `resp_schema` json_schema: Optional JSON Schema object (type=object) the assistant content must conform to.
+- Inputs: `exec-in` execution; `use_context` boolean: When true, include this run's active context messages (context.messages) in the LLM request. If the pin is not connected, the node checkbox is used. Default: false.; `context` object: Optional explicit context object for this call (e.g. {messages:[...]}). If provided, context.messages overrides inherited run context messages.; `memory` memory: Memory configuration object (KG/span/session controls). If set, overrides this call’s recall behavior; if unset, runtime defaults apply.; `provider` provider_text: Text/LLM provider id (e.g. LMStudio). If unset, uses the node’s configured provider.; `model` model: Text/LLM model id/name. If unset, uses the node’s configured model.; `system` string: Optional system prompt for this single call.; `prompt` string: User prompt/content for this single call.; `tools` tools: Allowlist of tools exposed to the model as ToolSpecs (model may request tool calls; execution is done via a Tool Calls node).; `prompt_cache_binding` any: Advanced: durable exact-reuse prompt-cache binding from Gateway blocs. Accepts a binding object or binding_id string; this does not create or load blocs during the run.; `max_in_tokens` number: Optional per-call input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for this call.; `max_output_tokens` number: Optional output token cap for this call (max_output_tokens). When set, bounds the assistant response length.; `temperature` number: Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature.; `seed` number: Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed.; `thinking` string: Reasoning/thinking control for supported models. If unset, uses the Gateway/runtime default.; `resp_schema` json_schema: Optional JSON Schema object (type=object) the assistant content must conform to.
 - Outputs: `exec-out` execution; `response` string: Assistant text content (best-effort). For tool calls, content may be empty.; `data` object: Structured assistant output object matching resp_schema. Visible by default when a response schema is configured.; `success` boolean: True if the LLM call completed successfully.; `meta` object: Host-facing meta envelope (schema=abstractflow.llm_call.v1.meta). Includes provider/model, usage, trace ids, and lightweight execution metadata.; `tool_calls` array: Normalized tool call requests. This pin exists to make wiring into Tool Calls / Emit Event nodes simpler.
 - Default config: none
 
@@ -948,6 +948,114 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Outputs: `exec-out` execution
 - Default config: none
 
+### files / Export Artifact
+
+- Node type: `export_artifact`
+- Document node: `{"id":"<unique_id>","type":"export_artifact"}`
+- Utility: Write an Artifact payload to a workspace-scoped server file path.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `artifact` artifact; `file_path` workspace_file
+- Outputs: `exec-out` execution; `artifact_id` string; `file_path` workspace_file; `bytes` number; `sha256` string; `content_type` string
+- Default config: none
+
+### files / Import Server File
+
+- Node type: `import_workspace_file`
+- Document node: `{"id":"<unique_id>","type":"import_workspace_file"}`
+- Utility: Snapshot a workspace-scoped server file into a runtime-owned Artifact for reuse across downstream steps and future runs.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `file_path` workspace_file; `content_type` string: Optional MIME override when the filename extension is misleading.
+- Outputs: `exec-out` execution; `artifact` artifact; `artifact_ref` artifact; `artifact_id` string; `content_type` string; `size_bytes` number; `source_path` workspace_file
+- Default config: none
+
+### files / List Folder Files
+
+- Node type: `list_folder_files`
+- Document node: `{"id":"<unique_id>","type":"list_folder_files"}`
+- Utility: List files inside a workspace-scoped server folder, with optional family and extension filters.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `folder_path` workspace_folder; `recursive` boolean: When true, recurse into subfolders.; `family` string: Optional family filter: any | image | video | audio | document | text | code | json | archive | other.; `extensions` array: Optional list of file extensions without dots.; `include_directories` boolean: When true, include folder entries in the structured results.; `limit` number: Maximum number of returned entries. Default: 500.; `max_depth` number: Optional recursive depth limit. Use 0 for unlimited depth.
+- Outputs: `exec-out` execution; `folder_path` workspace_folder; `files` array; `entries` array; `count` number; `truncated` boolean
+- Default config: none
+
+### files / Read Artifact
+
+- Node type: `read_artifact`
+- Document node: `{"id":"<unique_id>","type":"read_artifact"}`
+- Utility: Read any Artifact payload and expose bounded text, JSON, or base64 projections plus content metadata.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `artifact` artifact
+- Outputs: `exec-out` execution; `artifact` artifact; `artifact_ref` artifact; `artifact_id` string; `content_type` string; `content_family` string; `size_bytes` number; `filename` string; `source_path` string; `content` any; `text` string; `json` object; `binary_base64` string; `is_binary` boolean; `warnings` array; `truncated` boolean
+- Default config: none
+
+### files / Read File
+
+- Node type: `read_file`
+- Document node: `{"id":"<unique_id>","type":"read_file"}`
+- Utility: Read a workspace-scoped server file path and output UTF-8 text or JSON content. In Gateway-hosted runs, access stays within the allowed workspace policy.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `file_path` workspace_file
+- Outputs: `exec-out` execution; `content` any; `file_path` workspace_file
+- Default config: none
+
+### files / Read PDF
+
+- Node type: `read_pdf`
+- Document node: `{"id":"<unique_id>","type":"read_pdf"}`
+- Utility: Extract text and metadata from a workspace-scoped server PDF path using the Runtime permissive PDF reader.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `file_path` workspace_file; `page_start` number: Optional 1-based first page to read.; `page_end` number: Optional 1-based last page to read.; `max_chars` number: Optional explicit text limit. If used, output warnings include #TRUNCATION.
+- Outputs: `exec-out` execution; `content` string; `pages` number; `processed_pages` number; `metadata` object; `warnings` array; `truncated` boolean; `file_path` workspace_file; `content_type` string
+- Default config: none
+
+### files / Write DOCX
+
+- Node type: `write_docx`
+- Document node: `{"id":"<unique_id>","type":"write_docx"}`
+- Utility: Render text or Markdown-style report content to a workspace-scoped DOCX document using the Runtime stdlib DOCX writer.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `file_path` workspace_file; `content` any; `title` string: Optional DOCX document title.
+- Outputs: `exec-out` execution; `bytes` number; `file_path` workspace_file; `sha256` string; `content_type` string
+- Default config: none
+
+### files / Write File
+
+- Node type: `write_file`
+- Document node: `{"id":"<unique_id>","type":"write_file"}`
+- Utility: Write content to a workspace-scoped server file path (creates parent folders if needed). In local Runtime-only runs without workspace scope, relative paths fall back to the process working directory.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `file_path` workspace_file; `content` any
+- Outputs: `exec-out` execution; `bytes` number; `file_path` workspace_file
+- Default config: none
+
+### files / Write PDF
+
+- Node type: `write_pdf`
+- Document node: `{"id":"<unique_id>","type":"write_pdf"}`
+- Utility: Render text or Markdown-style report content to a real workspace-scoped server PDF path using the Runtime permissive PDF writer.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `file_path` workspace_file; `content` any; `title` string: Optional PDF document title.
+- Outputs: `exec-out` execution; `bytes` number; `file_path` workspace_file; `sha256` string; `content_type` string
+- Default config: none
+
 ### literals / JSON Schema
 
 - Node type: `json_schema`
@@ -1432,42 +1540,6 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
   }
 }
 
-### memory / Export Artifact
-
-- Node type: `export_artifact`
-- Document node: `{"id":"<unique_id>","type":"export_artifact"}`
-- Utility: Write an Artifact payload to a workspace-scoped server file path.
-- Gateway capability: none
-- Dynamic pin policy: template pins only
-- Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `artifact` artifact; `file_path` workspace_file
-- Outputs: `exec-out` execution; `artifact_id` string; `file_path` workspace_file; `bytes` number; `sha256` string; `content_type` string
-- Default config: none
-
-### memory / Import Server File
-
-- Node type: `import_workspace_file`
-- Document node: `{"id":"<unique_id>","type":"import_workspace_file"}`
-- Utility: Snapshot a workspace-scoped server file into a runtime-owned Artifact for reuse across downstream steps and future runs.
-- Gateway capability: none
-- Dynamic pin policy: template pins only
-- Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `file_path` workspace_file; `content_type` string: Optional MIME override when the filename extension is misleading.
-- Outputs: `exec-out` execution; `artifact` artifact; `artifact_ref` artifact; `artifact_id` string; `content_type` string; `size_bytes` number; `source_path` workspace_file
-- Default config: none
-
-### memory / List Folder Files
-
-- Node type: `list_folder_files`
-- Document node: `{"id":"<unique_id>","type":"list_folder_files"}`
-- Utility: List files inside a workspace-scoped server folder, with optional family and extension filters.
-- Gateway capability: none
-- Dynamic pin policy: template pins only
-- Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `folder_path` workspace_folder; `recursive` boolean: When true, recurse into subfolders.; `family` string: Optional family filter: any | image | video | audio | document | text | code | json | archive | other.; `extensions` array: Optional list of file extensions without dots.; `include_directories` boolean: When true, include folder entries in the structured results.; `limit` number: Maximum number of returned entries. Default: 500.; `max_depth` number: Optional recursive depth limit. Use 0 for unlimited depth.
-- Outputs: `exec-out` execution; `folder_path` workspace_folder; `files` array; `entries` array; `count` number; `truncated` boolean
-- Default config: none
-
 ### memory / MemAct Compose
 
 - Node type: `memact_compose`
@@ -1574,78 +1646,6 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Authorable config: input defaults with `pin_defaults`
 - Inputs: `exec-in` execution; `span_id` string: Target span_id (artifact id). Also accepts a 1-based span index as a string/number in some hosts.; `scope` string: Which span index to tag: run | session | global | all. (all tags every matching record across run+session+global; indices are not allowed with all.); `tags` object: Key/value tags to set (values must be strings). Reserved key "kind" is ignored.; `merge` boolean: When true, merges with existing tags. When false, replaces the tag dict. Default: true.
 - Outputs: `exec-out` execution; `success` boolean: Whether the tag operation succeeded.; `rendered` string: Human-readable result string.
-- Default config: none
-
-### memory / Read Artifact
-
-- Node type: `read_artifact`
-- Document node: `{"id":"<unique_id>","type":"read_artifact"}`
-- Utility: Read any Artifact payload and expose bounded text, JSON, or base64 projections plus content metadata.
-- Gateway capability: none
-- Dynamic pin policy: template pins only
-- Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `artifact` artifact
-- Outputs: `exec-out` execution; `artifact` artifact; `artifact_ref` artifact; `artifact_id` string; `content_type` string; `content_family` string; `size_bytes` number; `filename` string; `source_path` string; `content` any; `text` string; `json` object; `binary_base64` string; `is_binary` boolean; `warnings` array; `truncated` boolean
-- Default config: none
-
-### memory / Read File
-
-- Node type: `read_file`
-- Document node: `{"id":"<unique_id>","type":"read_file"}`
-- Utility: Read a workspace-scoped server file path and output UTF-8 text or JSON content. In Gateway-hosted runs, access stays within the allowed workspace policy.
-- Gateway capability: none
-- Dynamic pin policy: template pins only
-- Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `file_path` workspace_file
-- Outputs: `exec-out` execution; `content` any; `file_path` workspace_file
-- Default config: none
-
-### memory / Read PDF
-
-- Node type: `read_pdf`
-- Document node: `{"id":"<unique_id>","type":"read_pdf"}`
-- Utility: Extract text and metadata from a workspace-scoped server PDF path using the Runtime permissive PDF reader.
-- Gateway capability: none
-- Dynamic pin policy: template pins only
-- Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `file_path` workspace_file; `page_start` number: Optional 1-based first page to read.; `page_end` number: Optional 1-based last page to read.; `max_chars` number: Optional explicit text limit. If used, output warnings include #TRUNCATION.
-- Outputs: `exec-out` execution; `content` string; `pages` number; `processed_pages` number; `metadata` object; `warnings` array; `truncated` boolean; `file_path` workspace_file; `content_type` string
-- Default config: none
-
-### memory / Write DOCX
-
-- Node type: `write_docx`
-- Document node: `{"id":"<unique_id>","type":"write_docx"}`
-- Utility: Render text or Markdown-style report content to a workspace-scoped DOCX document using the Runtime stdlib DOCX writer.
-- Gateway capability: none
-- Dynamic pin policy: template pins only
-- Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `file_path` workspace_file; `content` any; `title` string: Optional DOCX document title.
-- Outputs: `exec-out` execution; `bytes` number; `file_path` workspace_file; `sha256` string; `content_type` string
-- Default config: none
-
-### memory / Write File
-
-- Node type: `write_file`
-- Document node: `{"id":"<unique_id>","type":"write_file"}`
-- Utility: Write content to a workspace-scoped server file path (creates parent folders if needed). In local Runtime-only runs without workspace scope, relative paths fall back to the process working directory.
-- Gateway capability: none
-- Dynamic pin policy: template pins only
-- Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `file_path` workspace_file; `content` any
-- Outputs: `exec-out` execution; `bytes` number; `file_path` workspace_file
-- Default config: none
-
-### memory / Write PDF
-
-- Node type: `write_pdf`
-- Document node: `{"id":"<unique_id>","type":"write_pdf"}`
-- Utility: Render text or Markdown-style report content to a real workspace-scoped server PDF path using the Runtime permissive PDF writer.
-- Gateway capability: none
-- Dynamic pin policy: template pins only
-- Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `file_path` workspace_file; `content` any; `title` string: Optional PDF document title.
-- Outputs: `exec-out` execution; `bytes` number; `file_path` workspace_file; `sha256` string; `content_type` string
 - Default config: none
 
 ### schema / Add Schema Fields

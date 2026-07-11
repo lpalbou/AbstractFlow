@@ -5,7 +5,7 @@
  * Shows execution progress and results.
  */
 
-import { useState, useCallback, useMemo, useEffect, useRef, type DragEvent, type FormEvent, type MouseEvent } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef, type DragEvent, type FormEvent, type MouseEvent, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { useFlowStore } from '../hooks/useFlow';
@@ -29,7 +29,7 @@ import { KgActiveMemoryPanel } from './KgActiveMemoryPanel';
 import { ArtifactInputField } from './ArtifactInputField';
 import { ArtifactListInputField } from './ArtifactListInputField';
 import { WorkspacePathInputField } from './WorkspacePathInputField';
-import { artifactContentUrl, useArtifactObjectUrl } from './ArtifactPlayer';
+import { artifactContentUrl, useArtifactObjectUrl, ImageLightbox } from './ArtifactPlayer';
 import {
   endpointFromDescriptor,
   descriptorEndpointAvailable,
@@ -54,6 +54,8 @@ import {
   type CanonicalArtifactRef,
 } from '../utils/artifactInputs';
 import { extractRunWorkspaceRoot, selectRunWorkspaceRunId } from '../utils/runWorkspace';
+import { extractFollowUpPromptText } from '../utils/followUpInputs';
+import { buildEmitEventCommandPayload, parseEventWaitKey } from '../utils/eventComposer';
 import { actOnlyRefLabel, collectActOnlyRefs } from '../utils/actOnlyRefs';
 import { displayDataPinTypeLabel } from '../utils/pinTypeOptions';
 import { savedFlowSummariesFromResponse, subflowExecutionLabel } from '../utils/subflowPins';
@@ -134,6 +136,8 @@ interface RunFlowModalProps {
   onResume?: (
     response: string | { response?: string; approved?: boolean; reason?: string; runId?: string; waitKey?: string; [key: string]: unknown }
   ) => void | Promise<void>;
+  // Send-event composer (backlog 0111): posts a gateway emit_event command.
+  onEmitEvent?: (runId: string, payload: Record<string, unknown>) => Promise<void>;
   onPause?: () => void;
   onResumeRun?: () => void;
   onCancelRun?: () => void;
@@ -187,6 +191,93 @@ function createRunModalSessionId(): string {
       ? crypto.randomUUID()
       : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
   return `abstractflow-run-${random}`;
+}
+
+/** Short, human-scannable session/run id (keeps the tail so a copy stays
+ * recognizable without exposing the whole opaque string in the UI). */
+function shortSessionLabel(id: string): string {
+  const s = String(id || '').trim();
+  if (!s) return '';
+  if (s.length <= 14) return s;
+  return `${s.slice(0, 8)}…${s.slice(-4)}`;
+}
+
+function CopyIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="9" y="9" width="11" height="11" rx="2" />
+      <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+    </svg>
+  );
+}
+
+/** Stroke-SVG glyphs matching the toolbar icon language (24x24 viewBox,
+ * currentColor stroke) — sized by their wrapping CSS class. */
+function PlaySolidGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true" focusable="false">
+      <polygon points="6.5 4 20 12 6.5 20" />
+    </svg>
+  );
+}
+
+function SectionGlyph({ children }: { children: ReactNode }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      {children}
+    </svg>
+  );
+}
+
+function SlidersGlyph() {
+  return (
+    <SectionGlyph>
+      <path d="M4 21v-7" />
+      <path d="M4 10V3" />
+      <path d="M12 21v-9" />
+      <path d="M12 8V3" />
+      <path d="M20 21v-5" />
+      <path d="M20 12V3" />
+      <path d="M1.5 14h5" />
+      <path d="M9.5 8h5" />
+      <path d="M17.5 16h5" />
+    </SectionGlyph>
+  );
+}
+
+function FolderShieldGlyph() {
+  return (
+    <SectionGlyph>
+      <path d="M21 18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4.5L12 6.5H19a2 2 0 0 1 2 2z" />
+    </SectionGlyph>
+  );
+}
+
+function ZapGlyph() {
+  return (
+    <SectionGlyph>
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10" />
+    </SectionGlyph>
+  );
+}
+
+function DatabaseGlyph() {
+  return (
+    <SectionGlyph>
+      <ellipse cx="12" cy="5" rx="8" ry="3" />
+      <path d="M4 5v14c0 1.66 3.58 3 8 3s8-1.34 8-3V5" />
+      <path d="M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3" />
+    </SectionGlyph>
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -546,6 +637,9 @@ type GeneratedImagePreview = {
   width?: number;
   height?: number;
   format?: string;
+  // Multi-image outputs (backlog 0116): every image item of the step's
+  // output, in order. Present only when more than one image exists.
+  galleryItems?: Array<{ artifactId: string; src: string; fallbackSrcs?: string[] }>;
 };
 
 type GeneratedAudioPreview = {
@@ -724,6 +818,31 @@ function extractGeneratedImagePreview(
     ...artifactRunScopeValues(runScope),
   ].filter((value, index, values) => value && values.indexOf(value) === index);
   if (!runCandidates.length) return null;
+
+  // Multi-image outputs (backlog 0116): collect EVERY image item's artifact id
+  // with the same per-item resolution rules, so the card can show a gallery
+  // instead of silently dropping all but the first image. The PRIMARY
+  // artifact always leads the gallery — when it came from a payload field
+  // outside outputs.image, it must stay reachable (review P2-5).
+  const galleryArtifactIds: string[] = [artifactId];
+  for (const item of imageItems) {
+    const itemRecord = asRecord(item);
+    const itemArtifactRaw = itemRecord?.artifact_ref ?? itemRecord?.image_artifact ?? itemRecord?.artifact ?? item;
+    const itemArtifact = asRecord(itemArtifactRaw);
+    const itemId =
+      (itemArtifact && typeof itemArtifact.artifact_id === 'string' && itemArtifact.artifact_id.trim()) ||
+      (itemArtifact && typeof itemArtifact.$artifact === 'string' && itemArtifact.$artifact.trim()) ||
+      (typeof itemArtifactRaw === 'string' && itemArtifactRaw.trim() ? itemArtifactRaw.trim() : '');
+    if (itemId && !galleryArtifactIds.includes(itemId)) galleryArtifactIds.push(itemId);
+  }
+  const galleryItems =
+    galleryArtifactIds.length > 1
+      ? galleryArtifactIds.map((id) => ({
+          artifactId: id,
+          src: artifactContentUrl(artifactContentDescriptor, runCandidates[0], id),
+          fallbackSrcs: runCandidates.slice(1).map((candidate) => artifactContentUrl(artifactContentDescriptor, candidate, id)),
+        }))
+      : undefined;
   const imageProvider =
     (imageRaw && typeof imageRaw.media_provider === 'string' && imageRaw.media_provider.trim()) ||
     (typeof generatedRecord?.media_provider === 'string' && generatedRecord.media_provider.trim()) ||
@@ -754,6 +873,7 @@ function extractGeneratedImagePreview(
     width: typeof payloadRaw.width === 'number' ? payloadRaw.width : typeof generatedRecord?.width === 'number' ? generatedRecord.width : undefined,
     height: typeof payloadRaw.height === 'number' ? payloadRaw.height : typeof generatedRecord?.height === 'number' ? generatedRecord.height : undefined,
     format: typeof payloadRaw.format === 'string' ? payloadRaw.format : typeof generatedRecord?.format === 'string' ? generatedRecord.format : undefined,
+    galleryItems,
   };
 }
 
@@ -1024,6 +1144,29 @@ function extractGeneratedTextPreview(value: unknown, step: { id: string; nodeTyp
   };
 }
 
+function GalleryThumb({
+  item,
+  active,
+  onSelect,
+}: {
+  item: { artifactId: string; src: string; fallbackSrcs?: string[] };
+  active: boolean;
+  onSelect: () => void;
+}) {
+  // No forced content type: thumbs render whatever image type the blob is.
+  const { objectUrl } = useArtifactObjectUrl(item.src, undefined, item.fallbackSrcs, item.artifactId);
+  return (
+    <button
+      type="button"
+      className={active ? 'run-gallery-thumb active' : 'run-gallery-thumb'}
+      title={item.artifactId}
+      onClick={onSelect}
+    >
+      {objectUrl ? <img src={objectUrl} alt={item.artifactId} /> : <span className="run-gallery-thumb-loading" />}
+    </button>
+  );
+}
+
 function GeneratedImageCard({
   preview,
   compact = false,
@@ -1031,8 +1174,25 @@ function GeneratedImageCard({
   preview: GeneratedImagePreview;
   compact?: boolean;
 }) {
-  const { objectUrl, loading, error } = useArtifactObjectUrl(preview.src, preview.contentType || 'image/png', preview.fallbackSrcs);
-  const displayUrl = objectUrl || preview.src;
+  // Multi-image outputs (backlog 0116): the gallery lists every image item;
+  // the selected one renders as the main image with lightbox zoom.
+  const galleryItems = preview.galleryItems && preview.galleryItems.length > 1 ? preview.galleryItems : null;
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  // One clamped index for BOTH the main image and the thumb highlight, so a
+  // stale index can never render an image with no highlighted thumb.
+  const clampedIndex = galleryItems ? Math.min(activeIndex, galleryItems.length - 1) : 0;
+  const activeItem = galleryItems ? galleryItems[clampedIndex] : null;
+  const mainSrc = activeItem?.src ?? preview.src;
+  const mainFallbacks = activeItem ? activeItem.fallbackSrcs : preview.fallbackSrcs;
+  const mainArtifactId = activeItem?.artifactId ?? preview.artifactId;
+  const { objectUrl, loading, error } = useArtifactObjectUrl(
+    mainSrc,
+    preview.contentType || 'image/png',
+    mainFallbacks,
+    mainArtifactId
+  );
+  const displayUrl = objectUrl || mainSrc;
   return (
     <div className={`run-generated-image ${compact ? 'run-generated-artifact-card' : ''}`}>
       {loading ? (
@@ -1040,12 +1200,26 @@ function GeneratedImageCard({
       ) : error ? (
         <div className="run-details-error">{error}</div>
       ) : (
-        <img
-          src={displayUrl}
-          alt={preview.prompt || preview.artifactId}
-          className="run-generated-image-img"
-        />
+        <>
+          <button type="button" className="artifact-player-zoom" title="Click to zoom" onClick={() => setLightboxOpen(true)}>
+            <img
+              src={displayUrl}
+              alt={preview.prompt || mainArtifactId}
+              className="run-generated-image-img"
+            />
+          </button>
+          {lightboxOpen ? (
+            <ImageLightbox src={displayUrl} alt={preview.prompt || mainArtifactId} onClose={() => setLightboxOpen(false)} />
+          ) : null}
+        </>
       )}
+      {galleryItems ? (
+        <div className="run-gallery-strip" aria-label={`${galleryItems.length} generated images`}>
+          {galleryItems.map((item, idx) => (
+            <GalleryThumb key={item.artifactId} item={item} active={idx === clampedIndex} onSelect={() => setActiveIndex(idx)} />
+          ))}
+        </div>
+      ) : null}
       <div className="run-output-meta">
         {preview.prompt && !compact ? (
           <div>
@@ -1066,12 +1240,15 @@ function GeneratedImageCard({
         ) : null}
         <div>
           <span className="run-output-meta-key">Artifact</span>
-          <span className="run-output-meta-val">{preview.artifactId}</span>
+          <span className="run-output-meta-val">
+            {mainArtifactId}
+            {galleryItems ? ` (${Math.min(activeIndex + 1, galleryItems.length)} of ${galleryItems.length})` : ''}
+          </span>
         </div>
         <div>
           <span className="run-output-meta-key">Open</span>
           <span className="run-output-meta-val">
-            <a className="run-output-link" href={displayUrl} target="_blank" rel="noreferrer" download={`${preview.artifactId}.${preview.format || 'png'}`}>
+            <a className="run-output-link" href={displayUrl} target="_blank" rel="noreferrer" download={`${mainArtifactId}.${preview.format || 'png'}`}>
               artifact content
             </a>
           </span>
@@ -1676,6 +1853,7 @@ export function RunFlowModal({
   isWaiting = false,
   waitingInfo = null,
   onResume,
+  onEmitEvent,
   onPause,
   onResumeRun,
   onCancelRun,
@@ -1857,15 +2035,28 @@ export function RunFlowModal({
   const [workspaceIgnoredPathsText, setWorkspaceIgnoredPathsText] = useState('');
   const [showIgnoredPaths, setShowIgnoredPaths] = useState(false);
   const [sessionIdOverride, setSessionIdOverride] = useState('');
+  const [showSessionEdit, setShowSessionEdit] = useState(false);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
+  // Live-follow (backlog 0115): auto-select the newest step only while armed.
+  // One manual selection disarms following so mid-run inspection is possible;
+  // the "Follow live" pill re-arms it.
+  const [followLive, setFollowLive] = useState(true);
+  const stepsListRef = useRef<HTMLDivElement | null>(null);
+  const lastFollowedStepIdRef = useRef<string | null>(null);
   const [progressClockMs, setProgressClockMs] = useState(() => Date.now());
   const lastAutoTerminalStepIdRef = useRef<string | null>(null);
   const [rawJsonOpen, setRawJsonOpen] = useState(false);
+  const [failuresExpanded, setFailuresExpanded] = useState(false);
   // Nested subflow observability: folded by default; per-step expansion keyed by the
   // parent step id (stable across this modal's event stream).
   const [expandedSubflows, setExpandedSubflows] = useState<Record<string, boolean>>({});
   const [resumeDraft, setResumeDraft] = useState('');
   const [resumeSubmitting, setResumeSubmitting] = useState(false);
+  // Send-event composer (backlog 0111): test/steer event parks in place.
+  const [eventDraft, setEventDraft] = useState('{}');
+  const [eventDurable, setEventDurable] = useState(false);
+  const [eventSending, setEventSending] = useState(false);
+  const [eventSendNote, setEventSendNote] = useState<string | null>(null);
   const [voiceWaitRecording, setVoiceWaitRecording] = useState(false);
   const [voiceWaitBusy, setVoiceWaitBusy] = useState(false);
   const [voiceWaitError, setVoiceWaitError] = useState<string | null>(null);
@@ -4092,7 +4283,10 @@ export function RunFlowModal({
     return null;
   }, [steps]);
 
-  // Keep selection valid; default to last step.
+  // Keep selection valid; default to last step. When the user has DISARMED
+  // live following, a vanished selection (e.g. a synthetic sequence id that
+  // regrouped) must not become an undisarmed auto-follow to the newest step
+  // (review P2-8) — clear the pane instead and let the user re-pick.
   useEffect(() => {
     if (!isOpen) return;
     if (steps.length === 0) {
@@ -4100,36 +4294,113 @@ export function RunFlowModal({
       return;
     }
     if (selectedStepId && displayStepById.has(selectedStepId)) return;
+    if (!followLive && selectedStepId) {
+      setSelectedStepId(null);
+      return;
+    }
     setSelectedStepId(steps[steps.length - 1].id);
-  }, [displayStepById, isOpen, selectedStepId, steps]);
+  }, [displayStepById, followLive, isOpen, selectedStepId, steps]);
 
   useEffect(() => {
     lastAutoTerminalStepIdRef.current = null;
+    lastFollowedStepIdRef.current = null;
+    // A new run re-arms live following (the disarm is a per-run inspection
+    // choice, not a durable preference).
+    setFollowLive(true);
   }, [rootRunId]);
+
+  const scrollStepIntoView = useCallback((stepId: string) => {
+    const container = stepsListRef.current;
+    if (!container) return;
+    const row = container.querySelector(`[data-step-id="${CSS.escape(stepId)}"]`);
+    if (row && typeof (row as HTMLElement).scrollIntoView === 'function') {
+      (row as HTMLElement).scrollIntoView({ block: 'nearest' });
+    }
+  }, []);
+
+  // Manual selection disarms live following (backlog 0115): the user asked to
+  // look at THIS step; new events must not steal the details pane.
+  const selectStepManually = useCallback(
+    (stepId: string) => {
+      setFollowLive(false);
+      setSelectedStepId(stepId);
+    },
+    []
+  );
+
+  // Expand every collapsed ancestor of a step so a programmatic jump (failure
+  // panel, follow) actually reveals the target row, then select + scroll.
+  const jumpToStep = useCallback(
+    (stepId: string) => {
+      const id = String(stepId || '').trim();
+      if (!id) return;
+      const path: string[] = [];
+      const findPath = (nodes: StepTreeNode[], trail: string[]): boolean => {
+        for (const n of nodes) {
+          const nextTrail = [...trail, n.stepId];
+          if (n.stepId === id) {
+            path.push(...trail);
+            return true;
+          }
+          if (n.children && n.children.length > 0 && findPath(n.children, nextTrail)) return true;
+          const branchNodes = n.sequenceBranches?.flatMap((b) => b.nodes) || [];
+          if (branchNodes.length > 0 && findPath(branchNodes, nextTrail)) return true;
+        }
+        return false;
+      };
+      findPath(displayStepTree, []);
+      if (path.length > 0) {
+        setExpandedSubflows((prev) => {
+          const next = { ...prev };
+          let changed = false;
+          for (const ancestor of path) {
+            if (next[ancestor] !== true) {
+              next[ancestor] = true;
+              changed = true;
+            }
+          }
+          return changed ? next : prev;
+        });
+      }
+      selectStepManually(id);
+      // Scroll after the expansion has rendered the row.
+      requestAnimationFrame(() => scrollStepIntoView(id));
+    },
+    [displayStepTree, scrollStepIntoView, selectStepManually]
+  );
 
   // When a run finishes, land the details pane on the terminal On Flow End step.
   // This is separate from live following so a user can inspect another completed
-  // step after the automatic terminal selection has happened once.
+  // step after the automatic terminal selection has happened once. A user who
+  // DISARMED following (manually pinned a step mid-run) keeps their place —
+  // completion must not steal the selection either (0115, review P1-3).
   useEffect(() => {
     if (!isOpen) return;
+    if (!followLive) return;
     if (isRunning || isWaiting) return;
     if (!completedTerminalStep) return;
     if (!displayStepById.has(completedTerminalStep.id)) return;
     if (lastAutoTerminalStepIdRef.current === completedTerminalStep.id) return;
     lastAutoTerminalStepIdRef.current = completedTerminalStep.id;
     setSelectedStepId(completedTerminalStep.id);
-  }, [completedTerminalStep, displayStepById, isOpen, isRunning, isWaiting]);
+  }, [completedTerminalStep, displayStepById, followLive, isOpen, isRunning, isWaiting]);
 
-  // Follow the live execution: when new steps arrive during a run (or waiting),
-  // auto-select the latest step so the user always sees what's happening.
+  // Follow the live execution while armed: when new steps arrive during a run
+  // (or waiting), auto-select the latest step so the user sees what's
+  // happening. Disarmed by any manual selection (backlog 0115).
   useEffect(() => {
     if (!isOpen) return;
+    if (!followLive) return;
     if (!(isRunning || isWaiting)) return;
     if (steps.length === 0) return;
     const last = steps[steps.length - 1];
     if (!last) return;
     setSelectedStepId(last.id);
-  }, [isOpen, isRunning, isWaiting, steps]);
+    if (lastFollowedStepIdRef.current !== last.id) {
+      lastFollowedStepIdRef.current = last.id;
+      scrollStepIntoView(last.id);
+    }
+  }, [followLive, isOpen, isRunning, isWaiting, scrollStepIntoView, steps]);
 
   const selectedStep = useMemo(() => {
     if (!selectedStepId) return null;
@@ -4446,6 +4717,36 @@ export function RunFlowModal({
     if (selectedStep.nodeType === 'agent') return derivedAgentOutput;
     return null;
   }, [derivedAgentOutput, selectedStep]);
+
+  // Failure forensics (backlog 0115): the inputs that caused a failed step.
+  // Full ledger records (including effect.payload) ride trace_update events;
+  // surface the failing effect's payload beside the error so diagnosis does
+  // not require reading raw ledgers.
+  const failedStepEffectPayload = useMemo(() => {
+    if (!selectedStep || selectedStep.status !== 'failed') return null;
+    const rid = typeof selectedStep.runId === 'string' ? selectedStep.runId : '';
+    const sid = typeof selectedStep.runtimeStepId === 'string' ? selectedStep.runtimeStepId : '';
+    const nid = typeof selectedStep.nodeId === 'string' ? selectedStep.nodeId : '';
+    for (let i = traceEvents.length - 1; i >= 0; i--) {
+      const ev = traceEvents[i];
+      if (ev.type !== 'trace_update') continue;
+      if (rid && ev.runId && ev.runId !== rid) continue;
+      const recs = Array.isArray(ev.steps) ? ev.steps : [];
+      for (let j = recs.length - 1; j >= 0; j--) {
+        const rec = recs[j] as Record<string, unknown> | null;
+        if (!rec || typeof rec !== 'object') continue;
+        const recStepId = typeof rec.step_id === 'string' ? rec.step_id : '';
+        const recNodeId = typeof rec.node_id === 'string' ? rec.node_id : '';
+        const matchesStep = Boolean(sid && recStepId && recStepId === sid);
+        const matchesNode = Boolean(!sid && nid && recNodeId === nid && rec.status === 'failed');
+        if (!matchesStep && !matchesNode) continue;
+        const effect = rec.effect && typeof rec.effect === 'object' ? (rec.effect as Record<string, unknown>) : null;
+        const payload = effect?.payload;
+        return payload != null && typeof payload === 'object' ? payload : null;
+      }
+    }
+    return null;
+  }, [selectedStep, traceEvents]);
 
   // Act-only act-frames ($act_only typed refs, frozen seam spec): rendered as
   // chips — the act without the words. Flow never resolves these refs.
@@ -4807,15 +5108,10 @@ export function RunFlowModal({
     }
   }, []);
 
-  const extractFollowUpPrompt = useCallback((input: Record<string, unknown> | null): string => {
-    if (!input) return '';
-    const candidates = ['prompt', 'message', 'task', 'query', 'question'];
-    for (const key of candidates) {
-      const v = input[key];
-      if (typeof v === 'string' && v.trim()) return v.trim();
-    }
-    return '';
-  }, []);
+  const extractFollowUpPrompt = useCallback(
+    (input: Record<string, unknown> | null): string => extractFollowUpPromptText(input),
+    []
+  );
 
   const extractFollowUpAnswer = useCallback((value: unknown): string => {
     if (value == null) return '';
@@ -5618,9 +5914,65 @@ export function RunFlowModal({
     return { title: String(effectType).toUpperCase(), meta: '', preview: '' };
   };
 
+  const waitingKeyRef = useRef(waitingKey);
   useEffect(() => {
+    waitingKeyRef.current = waitingKey;
     setResumeSubmitting(false);
+    setEventDraft('{}');
+    setEventDurable(false);
+    setEventSending(false);
+    setEventSendNote(null);
   }, [waitingKey]);
+
+  // Send-event composer (backlog 0111).
+  const parsedEventKey = useMemo(() => parseEventWaitKey(waitingPayload?.waitKey), [waitingPayload?.waitKey]);
+  const eventDraftValid = useMemo(() => {
+    try {
+      const value = JSON.parse(eventDraft || '{}') as unknown;
+      return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+    } catch {
+      return false;
+    }
+  }, [eventDraft]);
+
+  const submitEventSend = async () => {
+    if (!onEmitEvent || !parsedEventKey || eventSending) return;
+    const rid = typeof waitingPayload?.runId === 'string' ? waitingPayload.runId.trim() : '';
+    if (!rid) {
+      setEventSendNote('This wait carries no run id — cannot route the event command.');
+      return;
+    }
+    let payloadObj: Record<string, unknown>;
+    try {
+      const value = JSON.parse(eventDraft || '{}') as unknown;
+      if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        setEventSendNote('Payload must be a JSON object.');
+        return;
+      }
+      payloadObj = value as Record<string, unknown>;
+    } catch {
+      setEventSendNote('Payload is not valid JSON.');
+      return;
+    }
+    setEventSending(true);
+    setEventSendNote(null);
+    // Guard against stale notes: if the user switches to another wait while
+    // the command is in flight, the resolving promise must not write its
+    // note onto the newly selected park's composer.
+    const keyAtSend = waitingKey;
+    try {
+      await onEmitEvent(rid, buildEmitEventCommandPayload(parsedEventKey, payloadObj, { durable: eventDurable }));
+      if (waitingKeyRef.current !== keyAtSend) return;
+      // Honest status: the command was accepted; the visible confirmation is
+      // the park resuming in the timeline (only key-matching runs wake).
+      setEventSendNote('Event command sent. If the key matches, this park resumes.');
+    } catch (error) {
+      if (waitingKeyRef.current !== keyAtSend) return;
+      setEventSendNote(error instanceof Error ? error.message : 'Failed to send event');
+    } finally {
+      if (waitingKeyRef.current === keyAtSend) setEventSending(false);
+    }
+  };
 
   const submitResumeValue = async (response: string, event?: MouseEvent<HTMLButtonElement> | FormEvent) => {
     event?.preventDefault();
@@ -5629,7 +5981,18 @@ export function RunFlowModal({
     if (!response) return;
     setResumeSubmitting(true);
     try {
-      await onResume?.(response);
+      // Resume identity (backlog 0115): the selected step's wait carries
+      // runId + waitKey from the ledger. Passing BOTH lets inspected runs
+      // (post-reload, live refs gone) resume; a bare string would silently
+      // dead-end in resumeFlow's live-ref fallback. Partial identity is
+      // never sent — the fallback then resolves both halves consistently.
+      const runId = typeof waitingPayload?.runId === 'string' && waitingPayload.runId.trim() ? waitingPayload.runId.trim() : '';
+      const waitKey = typeof waitingPayload?.waitKey === 'string' && waitingPayload.waitKey.trim() ? waitingPayload.waitKey.trim() : '';
+      if (runId && waitKey) {
+        await onResume?.({ response, runId, waitKey });
+      } else {
+        await onResume?.(response);
+      }
     } catch (error) {
       setResumeSubmitting(false);
       console.error('Failed to resume waiting run:', error);
@@ -5707,18 +6070,25 @@ export function RunFlowModal({
       setResumeSubmitting(true);
       setVoiceWaitError(null);
       try {
+        // Resume identity (0115, review P1-2): voice waits carry the same
+        // runId/waitKey the text paths thread — without it, inspected-run
+        // voice resumes dead-end in the live-ref fallback. Both-or-neither.
+        const runId = typeof waitingPayload?.runId === 'string' && waitingPayload.runId.trim() ? waitingPayload.runId.trim() : '';
+        const waitKey = typeof waitingPayload?.waitKey === 'string' && waitingPayload.waitKey.trim() ? waitingPayload.waitKey.trim() : '';
+        const identity = runId && waitKey ? { runId, waitKey } : {};
         await onResume?.({
           audio_artifact: ref,
           artifact_ref: ref,
           artifact_id: ref.$artifact,
           response: '',
+          ...identity,
         });
       } catch (error) {
         setResumeSubmitting(false);
         setVoiceWaitError(error instanceof Error ? error.message : 'Failed to resume with captured audio.');
       }
     },
-    [onResume, resumeSubmitting]
+    [onResume, resumeSubmitting, waitingPayload?.runId, waitingPayload?.waitKey]
   );
 
   const startVoiceWaitRecording = useCallback(async () => {
@@ -5863,7 +6233,12 @@ export function RunFlowModal({
             </button>
           </div>
           <div className="run-modal-titlebar-title">
-            <h3>▶ {runTitle}</h3>
+            <h3>
+              <span className="run-title-glyph">
+                <PlaySolidGlyph />
+              </span>
+              {runTitle}
+            </h3>
             <span className="run-modal-flow-name">{runSubtitle}</span>
           </div>
           <div className="run-modal-titlebar-right">
@@ -5986,12 +6361,12 @@ export function RunFlowModal({
                 <div className="run-failures-panel">
                   <div className="run-failures-title">Failures detected</div>
                   <div className="run-failures-list">
-                    {failureSummary.slice(0, 5).map(({ step, snippet, shortRunId }) => (
+                    {(failuresExpanded ? failureSummary : failureSummary.slice(0, 5)).map(({ step, snippet, shortRunId }) => (
                       <button
                         key={step.id}
                         type="button"
                         className="run-failures-item"
-                        onClick={() => setSelectedStepId(step.id)}
+                        onClick={() => jumpToStep(step.id)}
                         title={step.error || snippet}
                       >
                         <span className="run-failures-node">{step.nodeLabel || step.nodeId || 'node'}</span>
@@ -6000,13 +6375,51 @@ export function RunFlowModal({
                       </button>
                     ))}
                     {failureSummary.length > 5 ? (
-                      <div className="run-failures-more">+{failureSummary.length - 5} more failures</div>
+                      <button
+                        type="button"
+                        className="run-failures-more"
+                        onClick={() => setFailuresExpanded((prev) => !prev)}
+                      >
+                        {failuresExpanded ? 'Show fewer failures' : `+${failureSummary.length - 5} more failures`}
+                      </button>
                     ) : null}
                   </div>
                 </div>
               ) : null}
 
-              <div className="run-steps-list">
+              {(isRunning || isWaiting) &&
+              steps.length > 0 &&
+              // Inspected runs in a terminal state can still derive stale
+              // waiting-like flags (e.g. an unresolved approval on a cancelled
+              // run) — a "Following live" pill on a dead run lies (review
+              // P2-7).
+              !(runSummary && ['completed', 'failed', 'cancelled'].includes(String(runSummary.status || '').toLowerCase())) ? (
+                <div className="run-follow-row">
+                  {followLive ? (
+                    <span className="run-follow-pill active" title="New steps auto-select. Click any step to inspect it without losing your place.">
+                      Following live
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="run-follow-pill"
+                      title="Re-arm live following: auto-select the newest step as the run progresses."
+                      onClick={() => {
+                        setFollowLive(true);
+                        const last = steps[steps.length - 1];
+                        if (last) {
+                          setSelectedStepId(last.id);
+                          scrollStepIntoView(last.id);
+                        }
+                      }}
+                    >
+                      Follow live
+                    </button>
+                  )}
+                </div>
+              ) : null}
+
+              <div className="run-steps-list" ref={stepsListRef}>
                 {displayStepTree.length === 0 ? (
                   <div className="run-steps-empty">No execution events yet.</div>
                 ) : (
@@ -6059,7 +6472,8 @@ export function RunFlowModal({
                             <button
                               type="button"
                               className={selected ? 'run-step selected' : 'run-step'}
-                              onClick={() => setSelectedStepId(s.id)}
+                              data-step-id={s.id}
+                              onClick={() => selectStepManually(s.id)}
                             >
                               <div className="run-step-border" style={{ background: color }} />
                               <div className="run-step-main">
@@ -6105,14 +6519,14 @@ export function RunFlowModal({
                                         {durationLabel}
                                       </span>
                                     ) : null}
-                                    {startedAtLabel ? (
-                                      <span className="run-step-time" title={`Started at ${startedAtLabel}`}>
-                                        {startedAtLabel}
-                                      </span>
-                                    ) : null}
                                   </span>
                                 </div>
                                 <div className="run-step-meta">
+                                  {startedAtLabel ? (
+                                    <span className="run-step-time" title={`Started at ${startedAtLabel}`}>
+                                      {startedAtLabel}
+                                    </span>
+                                  ) : null}
                                   <span className="run-step-type" style={{ background: bg, borderColor: color }}>
                                     {s.nodeType || 'node'}
                                   </span>
@@ -6424,10 +6838,51 @@ export function RunFlowModal({
                               . No input required.
                             </>
                           )}
+                          {waitingPayload?.waitKey ? (
+                            <button
+                              type="button"
+                              className="run-event-key-copy"
+                              title="Copy event key"
+                              onClick={() => copyToClipboard(waitingPayload?.waitKey || '')}
+                            >
+                              Copy key
+                            </button>
+                          ) : null}
                         </div>
                         {waitDeadlineLabel ? (
                           <div className="run-waiting-deadline" title={waitingPayload?.until || ''}>
                             {waitDeadlineLabel}
+                          </div>
+                        ) : null}
+                        {onEmitEvent && parsedEventKey ? (
+                          <div className="run-event-composer">
+                            <div className="run-event-composer-title">
+                              Send event <code>{parsedEventKey.name}</code> ({parsedEventKey.scope} scope)
+                            </div>
+                            <textarea
+                              className="run-waiting-textarea run-event-composer-payload"
+                              value={eventDraft}
+                              onChange={(e) => setEventDraft(e.target.value)}
+                              placeholder='{"key": "value"}'
+                              rows={3}
+                              spellCheck={false}
+                            />
+                            <div className="run-waiting-actions run-event-composer-actions">
+                              <label className="run-event-composer-durable" title="Also append to durable mailboxes declaring this event name (survives busy listeners)">
+                                <input type="checkbox" checked={eventDurable} onChange={(e) => setEventDurable(e.target.checked)} />
+                                durable
+                              </label>
+                              <button
+                                type="button"
+                                className="modal-button primary"
+                                onClick={submitEventSend}
+                                disabled={eventSending || !eventDraftValid}
+                                title={eventDraftValid ? 'Post the emit_event command' : 'Payload must be a JSON object'}
+                              >
+                                {eventSending ? 'Sending…' : 'Send event'}
+                              </button>
+                            </div>
+                            {eventSendNote ? <div className="run-event-composer-note">{eventSendNote}</div> : null}
                           </div>
                         ) : null}
                       </div>
@@ -6479,7 +6934,15 @@ export function RunFlowModal({
                       </div>
                     )
                   ) : selectedStep.status === 'failed' && selectedStep.error ? (
-                    <div className="run-details-error">{selectedStep.error}</div>
+                    <>
+                      <div className="run-details-error">{selectedStep.error}</div>
+                      {failedStepEffectPayload != null ? (
+                        <div className="run-failed-payload">
+                          <div className="run-failed-payload-title">Inputs (effect payload)</div>
+                          <JsonViewer value={failedStepEffectPayload} collapseAfterDepth={2} />
+                        </div>
+                      ) : null}
+                    </>
                   ) : resolvedStepOutput != null ? (
                     <>
                       {subflowTracePanel}
@@ -6656,7 +7119,7 @@ export function RunFlowModal({
                           {generatedImagePreview ? (
                             <div className="run-output-section">
                               <div className="run-output-title">Generated image</div>
-                              <GeneratedImageCard preview={generatedImagePreview} />
+                              <GeneratedImageCard key={selectedStep?.id || generatedImagePreview.artifactId} preview={generatedImagePreview} />
                             </div>
                           ) : null}
 
@@ -6925,16 +7388,24 @@ export function RunFlowModal({
                         </div>
                       ) : null}
 
-                      <details
-                        className="run-raw-details"
-                        open={rawJsonOpen}
-                        onToggle={(e) => setRawJsonOpen((e.currentTarget as HTMLDetailsElement).open)}
-                      >
-                        <summary>Debug JSON</summary>
-                        {rawJsonOpen ? (
-                          <JsonViewer key={selectedStep.id} value={resolvedStepOutput} collapseAfterDepth={99} />
-                        ) : null}
-                      </details>
+                      {/* Debug JSON is the raw-output escape hatch. Suppress it
+                          when the Preview above already renders the SAME object as
+                          a JsonViewer (generic JSON preview) — showing two
+                          identical JSON trees is pure noise (user report). It stays
+                          for non-JSON previews and media steps where the raw object
+                          genuinely differs from what is shown. */}
+                      {showGenericOutputPreview && outputPreview?.previewIsJson ? null : (
+                        <details
+                          className="run-raw-details"
+                          open={rawJsonOpen}
+                          onToggle={(e) => setRawJsonOpen((e.currentTarget as HTMLDetailsElement).open)}
+                        >
+                          <summary>Debug JSON</summary>
+                          {rawJsonOpen ? (
+                            <JsonViewer key={selectedStep.id} value={resolvedStepOutput} collapseAfterDepth={99} />
+                          ) : null}
+                        </details>
+                      )}
                     </>
                   ) : isImplicitFlowEndStep ? (
                     <>
@@ -7032,7 +7503,10 @@ export function RunFlowModal({
                     {/* Card 1: File System Access (collapsible) */}
                     <details className="run-form-section run-form-filesystem">
                       <summary className="run-form-section-summary">
-                        <span className="run-form-section-title">File System Access</span>
+                        <span className="run-form-section-title">
+                          <span className="run-form-section-icon"><FolderShieldGlyph /></span>
+                          File System Access
+                        </span>
                         <span className="run-form-section-meta">
                           {workspaceAccessMode}
                           {ignoredPathsCount > 0 ? ` · ${ignoredPathsCount} ignored` : ''}
@@ -7164,36 +7638,27 @@ export function RunFlowModal({
                       </div>
                     </details>
 
-                    {/* Card 2: Workflow Parameters */}
-                    <div className="run-form-section">
+                    {/* Workflow Parameters — the primary launch card (leads the
+                        view via CSS order; infrastructure cards follow). */}
+                    <div className="run-form-section run-form-params">
                       <div className="run-form-section-header">
-                        <div className="run-form-section-title">Workflow Parameters</div>
+                        <div className="run-form-section-title">
+                          <span className="run-form-section-icon"><SlidersGlyph /></span>
+                          Workflow Parameters
+                        </div>
+                        <span className="run-form-section-actions run-form-section-meta">
+                          {visibleFormInputPins.length > 0
+                            ? `${visibleFormInputPins.length} input${visibleFormInputPins.length === 1 ? '' : 's'}`
+                            : 'no inputs'}
+                        </span>
                       </div>
                       <div className="run-form-section-body">
-                        {!sessionPinId ? (
-                          <div className="run-form-field">
-                            <label className="run-form-label">
-                              Session ID
-                              <span className="run-form-type">(session_id)</span>
-                              <span className="run-form-note">optional</span>
-                            </label>
-                            <input
-                              type="text"
-                              className="run-form-input"
-                              value={sessionIdOverride}
-                              onChange={(e) => setSessionIdOverride(e.target.value)}
-                              placeholder={derivedSessionId || 'Reuse a session id for follow-ups'}
-                              disabled={isRunning}
-                            />
-                            <p className="run-form-note">
-                              Reuse the same session id to continue context on Follow Up. Leave blank to use the default tab session.
-                            </p>
-                          </div>
-                        ) : null}
                         {visibleFormInputPins.length === 0 ? (
-                          <p className="run-form-note">
-                            This flow has no input parameters. Click Run to execute.
-                          </p>
+                          <div className="run-form-empty">
+                            <span className="run-form-empty-icon"><PlaySolidGlyph /></span>
+                            <span className="run-form-empty-title">This flow has no input parameters</span>
+                            <span className="run-form-empty-sub">Press Run to execute it as-is.</span>
+                          </div>
                         ) : null}
 
                         {visibleFormInputPins.map(pin => {
@@ -7608,13 +8073,57 @@ export function RunFlowModal({
                             </div>
                           );
                         })}
+
+                        {/* Compact session control (user report): the session id
+                            is plumbing, not a parameter — show a copy chip, hide
+                            the editable field behind an explicit toggle for
+                            follow-up reuse. */}
+                        {!sessionPinId ? (
+                          <div className="run-form-session">
+                            <span className="run-form-session-label">Session</span>
+                            <code className="run-form-session-id" title={sessionIdOverride || derivedSessionId}>
+                              {shortSessionLabel(sessionIdOverride || derivedSessionId) || '—'}
+                            </code>
+                            <button
+                              type="button"
+                              className="run-form-icon-button"
+                              title="Copy session id"
+                              aria-label="Copy session id"
+                              onClick={() => copyToClipboard(sessionIdOverride || derivedSessionId)}
+                            >
+                              <CopyIcon />
+                            </button>
+                            <button
+                              type="button"
+                              className="run-form-session-edit"
+                              onClick={() => setShowSessionEdit((prev) => !prev)}
+                              disabled={isRunning}
+                              aria-expanded={showSessionEdit}
+                            >
+                              {showSessionEdit ? 'Done' : 'Change'}
+                            </button>
+                            {showSessionEdit ? (
+                              <input
+                                type="text"
+                                className="run-form-input run-form-session-input"
+                                value={sessionIdOverride}
+                                onChange={(e) => setSessionIdOverride(e.target.value)}
+                                placeholder={derivedSessionId || 'Reuse a session id for follow-ups'}
+                                disabled={isRunning}
+                              />
+                            ) : null}
+                          </div>
+                        ) : null}
                       </div>
                     </div>
 
                     {promptCacheSessionLifecycle ? (
                       <details className="run-form-section">
                         <summary className="run-form-section-summary">
-                          <span className="run-form-section-title">Session prompt cache (volatile)</span>
+                          <span className="run-form-section-title">
+                            <span className="run-form-section-icon"><ZapGlyph /></span>
+                            Session prompt cache (volatile)
+                          </span>
                           <span className="run-form-section-meta">
                             {promptCacheHeaderStatus}
                           </span>
@@ -7691,7 +8200,10 @@ export function RunFlowModal({
 
                     <details className="run-form-section">
                       <summary className="run-form-section-summary">
-                        <span className="run-form-section-title">Durable prompt cache (exact reuse)</span>
+                        <span className="run-form-section-title">
+                          <span className="run-form-section-icon"><DatabaseGlyph /></span>
+                          Durable prompt cache (exact reuse)
+                        </span>
                         <span className="run-form-section-meta">
                           {durableBlocStatus}
                         </span>
@@ -7963,13 +8475,14 @@ export function RunFlowModal({
                       </button>
                       <button
                         type="button"
-                        className="modal-button primary"
+                        className="modal-button primary run-cta"
                         onClick={handleSubmit}
                         disabled={
                           !entryNode ||
                           (workspaceRootRequired && !workspaceRoot.trim() && !(workspaceRandom && executionWorkspaceQuery.isError))
                         }
                       >
+                        <span className="run-cta-icon"><PlaySolidGlyph /></span>
                         Run
                       </button>
                     </>
@@ -7991,7 +8504,7 @@ export function RunFlowModal({
                   {hasCompletedRun && onNewRun && (
                     <button
                       type="button"
-                      className="modal-button primary"
+                      className="modal-button primary run-cta"
                       onClick={() => {
                         if (workspaceRandom) {
                           setWorkspaceRoot('');
@@ -8006,6 +8519,7 @@ export function RunFlowModal({
                         onNewRun();
                       }}
                     >
+                      <span className="run-cta-icon"><PlaySolidGlyph /></span>
                       New Run
                     </button>
                   )}

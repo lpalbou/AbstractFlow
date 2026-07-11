@@ -256,6 +256,13 @@ const CORE_NODES: NodeTemplate[] = [
 		        description:
 		          "Optional per-agent input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for the agent sub-run.",
 		      },
+		      {
+		        id: 'max_output_tokens',
+		        label: 'max_output_tokens',
+		        type: 'number',
+		        description:
+		          'Optional output token cap for the agent sub-run (max_output_tokens). When set, bounds each LLM response the agent generates.',
+		      },
 		      { id: 'temperature', label: 'temperature', type: 'number', description: 'Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature.' },
 		      { id: 'seed', label: 'seed', type: 'number', description: 'Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed.' },
 		      { id: 'thinking', label: 'thinking', type: 'string', description: 'Reasoning/thinking control for supported models. If unset, uses the Gateway/runtime default.' },
@@ -370,6 +377,13 @@ const CORE_NODES: NodeTemplate[] = [
 		        type: 'number',
 		        description:
 		          "Optional per-call input token budget (max_input_tokens). When set, overrides the run's default _limits.max_input_tokens for this call.",
+		      },
+		      {
+		        id: 'max_output_tokens',
+		        label: 'max_output_tokens',
+		        type: 'number',
+		        description:
+		          'Optional output token cap for this call (max_output_tokens). When set, bounds the assistant response length.',
 		      },
 		      { id: 'temperature', label: 'temperature', type: 'number', description: 'Sampling temperature (0 = deterministic). If unset, uses the node’s configured temperature.' },
 		      { id: 'seed', label: 'seed', type: 'number', description: 'Seed for deterministic sampling (-1 = random/unset). If unset, uses the node’s configured seed.' },
@@ -1605,9 +1619,10 @@ const ARTIFACT_LITERAL_NODES: NodeTemplate[] = [
   },
 ];
 
-// Memory nodes - Durable memory operations + file/artifact IO.
-// These nodes have execution pins and represent side effects.
-const MEMORY_NODES: NodeTemplate[] = [
+// File nodes - workspace file + artifact IO side effects.
+// Split from the Memory category (2026-07-11 review): files and memory are
+// distinct concepts the palette must teach separately.
+const FILE_NODES: NodeTemplate[] = [
   {
     type: 'read_file',
     icon: '&#x1F4C4;', // Page facing up
@@ -1623,7 +1638,7 @@ const MEMORY_NODES: NodeTemplate[] = [
       { id: 'content', label: 'content', type: 'any' },
       { id: 'file_path', label: 'file_path', type: 'workspace_file' },
     ],
-    category: 'memory',
+    category: 'files',
   },
   {
     type: 'write_file',
@@ -1641,7 +1656,7 @@ const MEMORY_NODES: NodeTemplate[] = [
       { id: 'bytes', label: 'bytes', type: 'number' },
       { id: 'file_path', label: 'file_path', type: 'workspace_file' },
     ],
-    category: 'memory',
+    category: 'files',
   },
   {
     type: 'read_pdf',
@@ -1667,7 +1682,7 @@ const MEMORY_NODES: NodeTemplate[] = [
       { id: 'file_path', label: 'file_path', type: 'workspace_file' },
       { id: 'content_type', label: 'content_type', type: 'string' },
     ],
-    category: 'memory',
+    category: 'files',
   },
   {
     type: 'write_pdf',
@@ -1688,7 +1703,7 @@ const MEMORY_NODES: NodeTemplate[] = [
       { id: 'sha256', label: 'sha256', type: 'string' },
       { id: 'content_type', label: 'content_type', type: 'string' },
     ],
-    category: 'memory',
+    category: 'files',
   },
   {
     type: 'write_docx',
@@ -1709,7 +1724,7 @@ const MEMORY_NODES: NodeTemplate[] = [
       { id: 'sha256', label: 'sha256', type: 'string' },
       { id: 'content_type', label: 'content_type', type: 'string' },
     ],
-    category: 'memory',
+    category: 'files',
   },
   {
     type: 'list_folder_files',
@@ -1735,7 +1750,7 @@ const MEMORY_NODES: NodeTemplate[] = [
       { id: 'count', label: 'count', type: 'number' },
       { id: 'truncated', label: 'truncated', type: 'boolean' },
     ],
-    category: 'memory',
+    category: 'files',
   },
   {
     type: 'import_workspace_file',
@@ -1757,7 +1772,7 @@ const MEMORY_NODES: NodeTemplate[] = [
       { id: 'size_bytes', label: 'size_bytes', type: 'number' },
       { id: 'source_path', label: 'source_path', type: 'workspace_file' },
     ],
-    category: 'memory',
+    category: 'files',
   },
   {
     type: 'read_artifact',
@@ -1787,7 +1802,7 @@ const MEMORY_NODES: NodeTemplate[] = [
       { id: 'warnings', label: 'warnings', type: 'array' },
       { id: 'truncated', label: 'truncated', type: 'boolean' },
     ],
-    category: 'memory',
+    category: 'files',
   },
   {
     type: 'export_artifact',
@@ -1808,8 +1823,13 @@ const MEMORY_NODES: NodeTemplate[] = [
       { id: 'sha256', label: 'sha256', type: 'string' },
       { id: 'content_type', label: 'content_type', type: 'string' },
     ],
-    category: 'memory',
+    category: 'files',
   },
+];
+
+// Memory nodes - durable memory operations (notes, recall, KG, compaction).
+// These nodes have execution pins and represent side effects.
+const MEMORY_NODES: NodeTemplate[] = [
   {
     type: 'memory_note',
     icon: '&#x1F4DD;', // Memo
@@ -2113,6 +2133,11 @@ export const NODE_CATEGORIES: Record<string, NodeCategory> = {
     label: 'Media',
     icon: '&#x1F3A8;', // Palette/media
     nodes: MEDIA_NODES,
+  },
+  files: {
+    label: 'Files',
+    icon: '&#x1F4C1;', // Folder
+    nodes: FILE_NODES,
   },
   memory: {
     label: 'Memory',

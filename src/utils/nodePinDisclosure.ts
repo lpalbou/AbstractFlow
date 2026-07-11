@@ -294,6 +294,7 @@ const LLM_AGENT_ADVANCED_INPUTS = [
   'prompt_cache_binding',
   'max_iterations',
   'max_in_tokens',
+  'max_output_tokens',
   'temperature',
   'seed',
   'thinking',
@@ -500,7 +501,7 @@ const POLICY_BY_NODE_TYPE: Partial<Record<NodeType, NodeDisclosurePolicy>> = {
   wait_event: {
     compactInputs: true,
     primaryInputs: ['event_key'],
-    advancedInputs: ['prompt', 'choices', 'allow_free_text'],
+    advancedInputs: ['prompt', 'choices', 'allow_free_text', 'until', 'details'],
   },
   wait_until: {
     compactInputs: true,

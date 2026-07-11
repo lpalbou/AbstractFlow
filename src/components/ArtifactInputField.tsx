@@ -498,7 +498,7 @@ export function ArtifactInputField({
         <ArtifactPlayer
           src={previewSrc}
           contentType={selectedContentType}
-          kind={artifactPlayerKindFromContent(selectedContentType, selectedModality)}
+          kind={artifactPlayerKindFromContent(selectedContentType, selectedModality, value?.filename)}
           label={value?.filename || selectedArtifactId}
           downloadName={value?.filename || selectedArtifactId}
           compact

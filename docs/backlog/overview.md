@@ -1,11 +1,26 @@
 # AbstractFlow Backlog Overview
 
 ## Snapshot
-- Updated: 2026-06-11
+- Updated: 2026-07-11
 - Planned: 0
-- Proposed: 15
-- Completed: 39
+- Proposed: 40
+- Completed: 45
 - Deprecated: 0
+
+## 2026-07-11 general review wave
+A seven-agent adversarial review (3 authoring/usability, 3 design/UX, 1
+competitive researcher) produced items 0111-0141. Items 0111-0116 were the
+top-3-per-group implementation picks — ALL SIX IMPLEMENTED, adversarially
+reviewed (2 fable5 implementation reviewers; all P1s and most P2s fixed
+same-day), and moved to completed/ with reports. Proposed 0117-0141 preserve
+every other ranked finding. Review evidence (file:line) is embedded in each
+item's "Current code reality".
+
+- Group 1 (authoring, completed): 0111 run-modal event interaction, 0112
+  assistant transport cost overhaul, 0113 catalog parity + Files taxonomy.
+- Group 2 (design/UX, completed): 0114 design token integrity + interaction
+  states, 0115 run-modal live inspection + failure forensics, 0116 universal
+  artifact previewer.
 
 ## Current Priorities
 - The direct file/folder start-input request is now closed through
@@ -39,6 +54,57 @@
 ## Planned Ledger
 - None at the moment.
 
+## Proposed Ledger (2026-07-11 review wave)
+- `proposed/0117_effect_error_branch_retry_timeout.md`: error exec-branch +
+  retry/timeout pins on effect nodes (cross-repo with runtime).
+- `proposed/0118_async_subflow_fanout_and_honest_parallel.md`: async subflow +
+  Gather; honest Parallel description.
+- `proposed/0119_event_webhook_schedule_triggers_start_runs.md`: gateway
+  trigger registry so events/webhooks/schedules START runs.
+- `proposed/0120_first_class_mailbox_durable_emit_drain_reply.md`: durable pin
+  on emit_event; drain_inbox/reply_to_event nodes; structured wait keys.
+- `proposed/0121_regex_and_aggregation_node_pack.md`: regex match/extract/
+  replace/split; sum/min/max/avg; array sort/slice/reverse.
+- `proposed/0122_assistant_test_run_loop_and_fix_entrypoints.md`: build-run-fix
+  loop, fix-with-assistant buttons, lightweight Q&A path.
+- `proposed/0123_file_operations_completeness_pack.md`: append/copy/move/
+  delete/find/CSV nodes; read_file caps.
+- `proposed/0124_author_visible_memory_inspector_semantic_recall_kv.md`: memory
+  panel UI, semantic recall, exact-key KV, stack-convergence note.
+- `proposed/0125_partial_execution_and_pinned_data.md`: run-to-node + pinned
+  mock data (top competitive gap).
+- `proposed/0126_last_run_values_on_canvas.md`: node badges + pin hover values
+  from ledger data.
+- `proposed/0127_canvas_undo_redo.md`: bounded snapshot stack, Ctrl+Z/redo.
+- `proposed/0128_drag_off_pin_quick_add.md`: type-filtered node menu on wire
+  release (extends 0089).
+- `proposed/0129_sticky_notes_and_frames.md`: canvas documentation primitives.
+- `proposed/0130_flow_evaluation_datasets.md`: datasets + scoring + run
+  comparison over the existing run path.
+- `proposed/0131_theme_safe_chrome_sweep.md`: light-theme correctness for
+  hardcoded-dark chrome.
+- `proposed/0132_node_icon_language_and_pin_palette.md`: one SVG icon language;
+  softened pin/wire palette; legend=canvas.
+- `proposed/0133_global_assets_library_and_upload_unification.md`: assets
+  modal + one robust upload path (fixes follow-up 30s timeout drift).
+- `proposed/0134_run_page_scale_export_and_history_findability.md`: run URL
+  identity, virtualization, export, history facets.
+- `proposed/0135_open_workspace_outputs_from_run_modal.md`: workspace file
+  outputs become open/preview/download chips.
+- `proposed/0136_big_output_tooling_and_streaming_text.md`: virtualized JSON,
+  search, labeled truncation, YAML/CSV views, streaming-text ask to runtime.
+- `proposed/0137_template_gallery_via_gateway_catalog.md`: gallery with
+  tags/capability filters/preview.
+- `proposed/0138_waits_actionable_everywhere_and_approval_visibility.md`:
+  reason-aware notifications, toolbar wait badge, Approve All revoke +
+  timeline markers, subrun-attach fix.
+- `proposed/0139_faithful_follow_up_context.md`: editable context preview,
+  complete seed, single history mechanism, durable threads.
+- `proposed/0140_react_loop_template_and_reusable_groups.md`: insertable
+  canvas templates, clipboard with edges, reusable groups.
+- `proposed/0141_component_decomposition_for_oversized_surfaces.md`:
+  incremental extraction plan for the 8k/6.8k/6k/3.5k-line surfaces.
+
 ## Proposed Ledger
 - `proposed/0096_github_hosted_gateway_flow_showcase.md`: captures the travel/demo deployment path for light Gateway + Flow, including GitHub Pages limitations, Codespaces as the simplest GitHub-native temporary option, a static UI plus remote-light Gateway option for stable demos, and the credential/auth constraints for user-supplied OpenAI keys.
 - `proposed/0102_artifact_and_session_archive_lifecycle_contract.md`: captures the required archive semantics for artifacts and sessions: first-class indexed lifecycle state, explicit `archive_scope` query behavior, transitive session archive behavior, ordinary-surface hiding for agents and replay, and continued operator/Observer access without destructive delete.
@@ -54,6 +120,37 @@
   folders to start a workflow.
 
 ## Completed Ledger
+- `completed/0111_run_modal_event_interaction_surface.md` (2026-07-11, from
+  planned/): send-event composer on event parks (evt: key parse/compose
+  verified against the gateway contract), received-event envelope surfaced as
+  the park step's result, copy-key affordance. Validation: eventComposer +
+  ledgerEvents tests, full vitest/tsc/build, adversarial fable5 review.
+- `completed/0112_authoring_assistant_transport_cost_overhaul.md` (2026-07-11,
+  from planned/): byte-stable context block on the SYSTEM message
+  (review-corrected placement — runtime grounding envelopes make user-prompt
+  prefixes uncacheable), sessionless planner/review runs (kills quadratic
+  replay AND per-cycle orphan owner runs), 500k cumulative-usage note,
+  honest context meter. Validation: prefix-stability tests, full gates.
+- `completed/0113_catalog_parity_and_files_taxonomy.md` (2026-07-11, from
+  planned/): max_output_tokens pins on llm_call/agent (+ legacy-flow
+  migration after review), wait_event until/details advanced folding, Files
+  palette category split from Memory, catalog + llms-full regenerated.
+- `completed/0114_design_token_integrity_and_interaction_states.md`
+  (2026-07-11, from planned/): missing tokens defined (accent-primary/
+  secondary/border-color), fallback reconciliation, outline-based
+  focus-visible ring (review-corrected vs box-shadow conflicts), calm base
+  hover, reduced-motion gates, token-integrity regression test.
+- `completed/0115_run_modal_live_inspection_and_failure_forensics.md`
+  (2026-07-11, from planned/): follow-live disarm/re-arm (three disarm leaks
+  closed post-review incl. terminal-landing steal), failure jump
+  expand+scroll, failed-step effect payloads, resume identity threading
+  (ask_user/choice/voice; explicit identity honored past live-run paused
+  state), follow-up prompt-key fidelity (shared tested helper).
+- `completed/0116_universal_artifact_previewer.md` (2026-07-11, from
+  planned/): inline PDF (typed blobs)/text/markdown previews with labeled
+  truncation + 25MB honest-refusal guard, image lightbox, multi-image
+  gallery (per-step keyed, primary always reachable), markdown links
+  new-tab except fragments.
 - `completed/0109_local_source_input_authoring_and_folder_selection_clarity.md`:
   finished the remaining direct user-facing local file/folder workflow gap by
   harmonizing workflow boundaries around `array`, making the array item type

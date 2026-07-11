@@ -119,6 +119,12 @@ function resumePayloadResult(rec: LedgerRecord): Record<string, unknown> | undef
     ? (payload.payload as Record<string, unknown>)
     : null;
   if (!userPayload) return undefined;
+  // Event parks (backlog 0111): the resume payload IS the event envelope that
+  // woke the park — any non-empty payload is the honest visible content.
+  // User waits keep the narrower rule (only recognized reply keys surface).
+  if (waitReason === 'event') {
+    return Object.keys(userPayload).length > 0 ? userPayload : undefined;
+  }
   const hasVisibleOutput =
     userPayload.audio_artifact != null ||
     userPayload.artifact_ref != null ||

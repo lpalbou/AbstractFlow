@@ -780,11 +780,15 @@ describe('AuthoringAssistantDrawer language and follow-up question contract', ()
   it('anchors the language directive at the request site and marks replayed history as non-authoritative', () => {
     // Regression: with a French prior conversation replayed in the prompt,
     // an English follow-up request still produced French labels. The active
-    // request must carry the language rule next to its own text.
+    // request must carry the language rule next to its own text. Anchoring is
+    // ADJACENCY, not prompt position — the 2026-06-10 live A/B proved block
+    // position irrelevant, and cache-first ordering (backlog 0112) moved the
+    // request block to the end of the prompt.
     const flow = toVisualFlow('Untitled Flow', [], []);
-    const readiness = computeAuthoringReadiness(flow, 'Build a discussion workflow.', {});
+    const request = 'Build a discussion workflow.';
+    const readiness = computeAuthoringReadiness(flow, request, {});
     const context = buildGatewayPromptContext(
-      'Build a discussion workflow.',
+      request,
       flow,
       null,
       [
@@ -794,9 +798,50 @@ describe('AuthoringAssistantDrawer language and follow-up question contract', ()
       { readiness, tools: { text: 'No tools discovered.', selectedTools: 0, totalTools: 0 }, preflightOptions: {} }
     );
     expect(context.prompt).toContain('in the language of THIS request');
-    expect(context.prompt).toContain('the USER REQUEST above controls the language');
-    // The directive precedes the replayed (possibly other-language) history.
-    expect(context.prompt.indexOf('language of THIS request')).toBeLessThan(context.prompt.indexOf('Crée un workflow'));
+    expect(context.prompt).toContain('the USER REQUEST section controls the language');
+    // The directive sits directly beside the request text (same block).
+    const directiveIdx = context.prompt.indexOf('language of THIS request');
+    const requestIdx = context.prompt.lastIndexOf(request);
+    expect(directiveIdx).toBeGreaterThan(-1);
+    expect(requestIdx).toBeGreaterThan(directiveIdx);
+    expect(requestIdx - directiveIdx).toBeLessThan(220);
+    // The history block is labeled historical/non-authoritative.
+    expect(context.prompt).toContain('historical context only');
+  });
+
+  it('keeps the stable prompt prefix byte-identical across cycles (backlog 0112 cache contract)', () => {
+    const flow = toVisualFlow('Untitled Flow', [], []);
+    const tools = { text: 'No tools discovered.', selectedTools: 0, totalTools: 0 };
+    const first = buildGatewayPromptContext('Build a research workflow.', flow, null, [], {
+      readiness: computeAuthoringReadiness(flow, 'Build a research workflow.', {}),
+      tools,
+      preflightOptions: {},
+      cycleNotes: ['This is the first planning cycle for this turn.'],
+    });
+
+    // A later cycle: different request framing, mutated graph (renamed flow),
+    // prior conversation, new cycle notes — all volatile inputs change.
+    const mutatedFlow = toVisualFlow('Research Flow v2', [], []);
+    const second = buildGatewayPromptContext('Now add a PDF report step.', mutatedFlow, null, [
+      { id: 'u1', role: 'user', content: 'Build a research workflow.' },
+    ], {
+      readiness: computeAuthoringReadiness(mutatedFlow, 'Now add a PDF report step.', {}),
+      tools,
+      preflightOptions: {},
+      cycleNotes: ['Cycle 1 applied 1 change.'],
+    });
+
+    expect(first.stablePrefixChars).toBeGreaterThan(1000);
+    expect(first.stablePrefixChars).toBe(second.stablePrefixChars);
+    // The stable block is BYTE-IDENTICAL across cycles — it rides the SYSTEM
+    // message on the wire (the runtime prepends a volatile grounding envelope
+    // to user prompts, so only system content can be prefix-cache-stable).
+    expect(first.stablePrefix).toBe(second.stablePrefix);
+    expect(first.prompt).toBe(`${first.stablePrefix}\n${first.volatileSuffix}`);
+    // Volatile content lives strictly in the volatile block.
+    expect(first.stablePrefix).not.toContain('Build a research workflow.');
+    expect(second.volatileSuffix).toContain('Now add a PDF report step.');
+    expect(second.volatileSuffix).toContain('CURRENT WORKFLOW DOCUMENT');
   });
 
   it('instructs the model to ask the user instead of stalling in the loop', () => {

@@ -138,6 +138,26 @@ export function fromVisualFlow(flow: VisualFlow): {
       }
     }
 
+    // LLM Call + Agent nodes: add the max_output_tokens input pin (runtime
+    // honors the key; backlog 0113) for legacy flows — saved inputs override
+    // the template on load, so without this migration only newly dropped
+    // nodes would show the pin.
+    if (data.nodeType === 'llm_call' || data.nodeType === 'agent') {
+      const inputs = Array.isArray(data.inputs) ? data.inputs : [];
+      const hasMaxOut = inputs.some((p) => p.id === 'max_output_tokens');
+      if (!hasMaxOut && inputs.length > 0) {
+        const nextInputs = [...inputs];
+        const maxOutPin = { id: 'max_output_tokens', label: 'max_output_tokens', type: 'number' as const };
+        const anchorIdx = nextInputs.findIndex((p) => p.id === 'max_in_tokens');
+        if (anchorIdx >= 0) {
+          nextInputs.splice(anchorIdx + 1, 0, maxOutPin);
+        } else {
+          nextInputs.push(maxOutPin);
+        }
+        (data as any).inputs = nextInputs;
+      }
+    }
+
     // Wait Event node: add host UX metadata pins (prompt/choices/allow_free_text) for legacy flows.
     if (data.nodeType === 'wait_event') {
       const inputs = Array.isArray(data.inputs) ? data.inputs : [];

@@ -1257,3 +1257,17 @@
     0 0 0 2px rgba(103, 184, 255, 0.75),
     0 0 18px rgba(103, 184, 255, 0.35);
 }
+
+/* Reduced-motion (backlog 0114): the executing pulse and the edge dash march
+   are infinite loops; status stays visible through color/border without
+   motion for users who ask for calm. */
+@media (prefers-reduced-motion: reduce) {
+  .flow-node.executing,
+  .exec-view-node.executing {
+    animation: none;
+  }
+
+  .react-flow__edge.animated .react-flow__edge-path {
+    animation: none;
+  }
+}

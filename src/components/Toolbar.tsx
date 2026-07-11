@@ -33,6 +33,7 @@ import {
 } from './ToolbarIcons';
 import { closeOpenNodes, createLedgerMappingState, mapLedgerRecordToEvents, type LedgerRecord } from '../utils/ledgerEvents';
 import { mapGatewayRunSummary } from '../utils/gatewayRuns';
+import { pickFollowUpPromptKey } from '../utils/followUpInputs';
 import { extractPendingApprovalWait, extractReplayTraceEvents } from '../utils/runHistoryReplay';
 import type { ExecutionEvent, FlowRunResult, VisualFlow, RunHistoryResponse, RunSummary } from '../types/flow';
 import { computeRunPreflightIssues } from '../utils/preflight';
@@ -714,6 +715,7 @@ export function Toolbar({
     isPaused,
     waitingInfo,
     resumeFlow,
+    emitEvent,
     runFlow,
     runPublishedFlow,
     pauseRun,
@@ -1100,7 +1102,11 @@ export function Toolbar({
           ? payload.inputDataDefaults
           : {};
       const nextInputData: Record<string, unknown> = { ...baseDefaults };
-      nextInputData.prompt = payload.message;
+      // Prompt-key fidelity (backlog 0115): write the follow-up message to the
+      // SAME key the prior run's prompt was read from (task/query/...), not a
+      // hardcoded `prompt` — otherwise a task-keyed flow re-runs the old task
+      // with the new message parked in an unused key.
+      nextInputData[pickFollowUpPromptKey(baseDefaults)] = payload.message;
       if (sessionId) nextInputData.sessionId = sessionId;
 
       const context: Record<string, unknown> = {};
@@ -1520,6 +1526,7 @@ export function Toolbar({
         runWorkflowId={viewing ? inspectedRun?.workflow_id || flowId || null : runWorkflowId}
         gatewayContracts={gatewayContracts}
         onResume={resumeFlow}
+        onEmitEvent={emitEvent}
         onPause={() => pauseRun(inspectedRun?.run_id)}
         onResumeRun={() => resumeRun(inspectedRun?.run_id)}
         onCancelRun={() => cancelRun(inspectedRun?.run_id)}

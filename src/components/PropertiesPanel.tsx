@@ -537,7 +537,7 @@ function ArtifactLiteralPanel({
         <ArtifactPlayer
           src={previewSrc}
           contentType={contentType}
-          kind={artifactPlayerKindFromContent(contentType, config.modality)}
+          kind={artifactPlayerKindFromContent(contentType, config.modality, filename)}
           label={filename}
           downloadName={filename}
           compact

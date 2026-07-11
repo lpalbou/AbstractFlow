@@ -109,6 +109,13 @@ const AUTHORING_MAX_EMPTY_CYCLES = 2;
 const AUTHORING_MAX_REPEATED_BATCHES = 2;
 /** Per-turn budget of reply-language correction retries (model can drift languages even at temperature 0). */
 const AUTHORING_MAX_LANGUAGE_RETRIES = 2;
+/**
+ * Cumulative per-turn token usage that triggers ONE labeled observability
+ * note (backlog 0112). Declared tunable, never a cap: the loop is never
+ * stopped or throttled on cost — the note exists so an expensive turn is
+ * visible while it happens instead of at the bill.
+ */
+const AUTHORING_TURN_TOKEN_WARN_THRESHOLD = 500_000;
 const ASSISTANT_INITIAL_CONTENT =
   '**Assistant**\nDescribe the workflow you want. I will run autonomous Gateway planning cycles, apply validated command batches to the draft canvas, then report what changed. Save and Run remain explicit.';
 
@@ -121,6 +128,16 @@ interface DocsContext {
 
 interface GatewayPromptContext {
   prompt: string;
+  /** The stable (cacheable) context block — skill + catalog + tools.
+   * Byte-identical across cycles within a turn (backlog 0112). Sent on the
+   * SYSTEM message: the runtime prepends a volatile grounding envelope
+   * (second-resolution datetime) to every USER prompt, so only the system
+   * message can carry a wire-stable prefix (review finding). */
+  stablePrefix: string;
+  /** The volatile per-cycle block — conversation, brief, document, request. */
+  volatileSuffix: string;
+  /** Byte length of stablePrefix (prefix-stability tests). */
+  stablePrefixChars: number;
   docsSections: number;
   catalogTemplates: number;
   graphChars: number;
@@ -414,13 +431,18 @@ function saveAssistantDraft(workflowKey: string, draft: string): void {
 }
 
 /**
- * Session policy: ONE durable Gateway session per workflow conversation
- * (scoped by workflow storage key, never shared across workflows), reset by
- * Clear Chat. The gateway basic-agent keeps durable memory keyed by
- * session_id and replays prior exchanges into the model context, so the
- * prompt anchors the language directive at the active request site — replayed
- * history (possibly in another language) must not dictate the output
- * language.
+ * Session policy (revised 2026-07-11, backlog 0112): the per-workflow durable
+ * session id remains the CONVERSATION identity (scoped by workflow storage
+ * key, rotated by Clear Chat) for client-side storage scoping — but planner
+ * runs are SESSIONLESS. The gateway basic-agent replays session history into
+ * the model context; with a shared session, cycle N carried cycles 1..N-1's
+ * full prompts+responses — quadratic in-turn token growth for context the
+ * client already provides explicitly (conversation block, cycle notes,
+ * current document). Session-carrying starts also mint a persistent
+ * __session_memory__ owner run per new session server-side, so per-cycle
+ * derived sessions would leave one orphan run per cycle. Continuity across
+ * turns lives in the client-persisted conversation, which the prompt
+ * includes; the language directive stays anchored at the active request site.
  */
 function loadAssistantSessionId(workflowKey: string): string {
   try {
@@ -456,6 +478,13 @@ function saveAssistantSessionId(workflowKey: string, sessionId: string): void {
     // Ignore storage failures.
   }
 }
+
+/* Planner runs are SESSIONLESS (backlog 0112, review-corrected): a derived
+ * per-cycle session id was the first design, but every session-carrying run
+ * start mints a persistent __session_memory__ owner run server-side — one
+ * orphan per cycle. Omitting session_id avoids both the replay cost and the
+ * orphan runs; the per-workflow session id remains the CONVERSATION identity
+ * for storage scoping and Clear Chat semantics only. */
 
 /** Per-workflow persisted state of the authoring status card (plan/activity feed). */
 export interface PersistedActivityState {
@@ -1325,16 +1354,13 @@ export function buildGatewayPromptContext(
     'VALIDATOR REPAIR FEEDBACK:',
     repairFeedbackText(context.repairAttempts),
   ].join('\n');
-  const prompt = [
-    // The language directive sits at the request site because replayed
-    // conversation history may be in a different language; without an
-    // anchored rule the model tends to continue in the history's language.
-    'USER REQUEST (the active instruction; write the workflow name, node labels, prompts, and your reply in the language of THIS request):',
-    request,
-    '',
-    'RECENT ASSISTANT CONVERSATION (historical context only; earlier turns may use a different language — the USER REQUEST above controls the language):',
-    history,
-    '',
+  // Cache-first ordering (backlog 0112): the large stable context (skill,
+  // catalog, tools) is byte-identical across cycles within a turn (asserted
+  // by tests) and rides the SYSTEM message — the runtime prepends a volatile
+  // grounding envelope to every USER prompt, so a user-prompt prefix can
+  // never be wire-stable (adversarial review finding). No content is
+  // dropped: this is placement only (ADR-0026 forbids lossy compaction).
+  const stablePrefix = [
     'ABSTRACTFLOW AUTHORING SKILL:',
     docs.text,
     '',
@@ -1344,14 +1370,29 @@ export function buildGatewayPromptContext(
     'AVAILABLE GATEWAY TOOLS:',
     context.tools.text,
     '',
+  ].join('\n');
+  const volatileSuffix = [
+    'RECENT ASSISTANT CONVERSATION (historical context only; earlier turns may use a different language — the USER REQUEST section controls the language):',
+    history,
+    '',
     'AUTHORING BRIEF:',
     authoringBrief,
     '',
     'CURRENT WORKFLOW DOCUMENT (the document you re-emit in full, with your changes; omissions are deletions):',
     graph,
+    '',
+    // The language directive stays anchored at the request site (2026-06-10
+    // lesson: an anchored rule beats replayed-history language signals; the
+    // A/B showed block position itself is irrelevant).
+    'USER REQUEST (the active instruction; write the workflow name, node labels, prompts, and your reply in the language of THIS request):',
+    request,
   ].join('\n');
+  const prompt = `${stablePrefix}\n${volatileSuffix}`;
   return {
     prompt,
+    stablePrefix,
+    volatileSuffix,
+    stablePrefixChars: stablePrefix.length,
     docsSections: docs.selectedSections,
     catalogTemplates: catalog.selectedTemplates,
     graphChars: graph.length,
@@ -1915,7 +1956,6 @@ async function runGatewayPlannerText(args: {
   prompt: string;
   systemPrompt: string;
   contracts: GatewayContracts | null;
-  sessionId: string;
   context: Record<string, unknown>;
   onStatus: (summary: PlannerRunStatus) => void;
   isCancelled?: () => boolean;
@@ -1941,9 +1981,11 @@ async function runGatewayPlannerText(args: {
     {
       bundle_id: 'basic-agent',
       input_data: inputData,
-      // One durable session per workflow conversation (see
-      // loadAssistantSessionId); Clear Chat rotates it.
-      session_id: args.sessionId,
+      // NO session id (backlog 0112 + adversarial review): the loop passes
+      // ALL context explicitly, so gateway session replay is pure redundant
+      // cost — and every session-carrying start mints a persistent
+      // __session_memory__ owner run server-side (one orphan per cycle).
+      // Sessionless starts default to the run's own id with no owner run.
       run_lifecycle: buildDraftRunMetadata({ flowId: 'authoring-assistant' }) as unknown as Record<string, unknown>,
     },
     args.contracts
@@ -1960,7 +2002,6 @@ async function runGatewayAuthoringPlanner(args: {
   prompt: GatewayPromptContext;
   systemPrompt: string;
   contracts: GatewayContracts | null;
-  sessionId: string;
   docsBadge: string;
   readiness: AuthoringReadiness;
   tools: ToolsContext;
@@ -1970,10 +2011,13 @@ async function runGatewayAuthoringPlanner(args: {
 }): Promise<string> {
   return runGatewayPlannerText({
     assistantModel: args.assistantModel,
-    prompt: args.prompt.prompt,
-    systemPrompt: args.systemPrompt,
+    // Wire placement (backlog 0112, review-corrected): the byte-stable
+    // context block rides the SYSTEM message (never envelope-mutated by the
+    // runtime), so provider prefix caches can actually hit; the user prompt
+    // carries only the volatile per-cycle block.
+    prompt: args.prompt.volatileSuffix,
+    systemPrompt: `${args.systemPrompt}\n\n${args.prompt.stablePrefix}`,
     contracts: args.contracts,
-    sessionId: args.sessionId,
     context: {
       source: 'abstractflow_authoring_assistant',
       authoring_skill_checksum: args.docsBadge,
@@ -2560,6 +2604,7 @@ export function AuthoringAssistantDrawer({
     // feeds the footer, and stage transitions restart the per-stage ticker.
     let progressCycle = 0;
     let turnUsage = emptyUsage();
+    let turnUsageWarned = false;
     const setProgress = (
       stage: AuthoringProgressStage,
       label: string,
@@ -2684,7 +2729,10 @@ export function AuthoringAssistantDrawer({
 	              prompt: reviewPrompt,
 	              systemPrompt: acceptanceReviewSystemPrompt(),
 	              contracts: gatewayContracts,
-	              sessionId: plannerSessionIdRef.current,
+	              // Sessionless (backlog 0112): the reviewer must not inherit
+	              // the author's replayed claims (independence), review turns
+	              // must not bloat later planner cycles, and session-carrying
+	              // starts mint orphan owner runs server-side.
 	              context: { source: 'abstractflow_authoring_acceptance_review', prompt_chars: reviewPrompt.length },
 	              onStatus: () => undefined,
 	              isCancelled: () => cancelRequestedRef.current,
@@ -2709,6 +2757,14 @@ export function AuthoringAssistantDrawer({
 	        }
 	        const reviewUsage = await collectPlannerRunUsage(activePlannerRunRef.current, gatewayContracts);
 	        if (reviewUsage.calls > 0) turnUsage = addUsage(turnUsage, reviewUsage);
+	        if (!turnUsageWarned && turnUsage.inputTokens + turnUsage.outputTokens > AUTHORING_TURN_TOKEN_WARN_THRESHOLD) {
+	          turnUsageWarned = true;
+	          logActivity(
+	            'info',
+	            `Cumulative turn usage crossed ${formatTokenCount(AUTHORING_TURN_TOKEN_WARN_THRESHOLD)} tokens (${formatUsage(turnUsage)}). The loop continues; this is a cost observability note.`,
+	            cycleNum
+	          );
+	        }
 	        const review = parseAcceptanceReview(raw);
 	        if (!review) {
 	          aggregateWarnings.push("#FALLBACK acceptance review returned malformed JSON; completion accepted on the author model's claim alone.");
@@ -2780,8 +2836,14 @@ export function AuthoringAssistantDrawer({
         let retryNote = '';
         while (true) {
           if (cancelRequestedRef.current) throw new AuthoringInterruptedError();
+          // Retry notes ride the VOLATILE block (the wire user prompt);
+          // `prompt` stays in sync for size labels and failure reports.
           const attemptPrompt = retryNote
-            ? { ...prompt, prompt: `${prompt.prompt}\n\nRESPONSE FORMAT CORRECTION:\n${retryNote}` }
+            ? {
+                ...prompt,
+                prompt: `${prompt.prompt}\n\nRESPONSE FORMAT CORRECTION:\n${retryNote}`,
+                volatileSuffix: `${prompt.volatileSuffix}\n\nRESPONSE FORMAT CORRECTION:\n${retryNote}`,
+              }
             : prompt;
           const requestSize = `${formatEstimatedTokens(attemptPrompt.prompt + systemPrompt)} (${Math.round((attemptPrompt.prompt.length + systemPrompt.length) / 1000)}k chars)`;
           setProgress(
@@ -2797,7 +2859,9 @@ export function AuthoringAssistantDrawer({
             'model',
             `Sending plan request (${requestSize} — ${cyclePurpose})${retryNote ? ' [retry]' : ''}`,
             cycle,
-            `SYSTEM PROMPT (${systemPrompt.length} chars):\n${systemPrompt}\n\nUSER PROMPT (${attemptPrompt.prompt.length} chars):\n${attemptPrompt.prompt}`
+            // Mirror the ACTUAL wire placement (0112): stable context rides
+            // the system message; the user prompt is the volatile block.
+            `SYSTEM PROMPT (${systemPrompt.length + attemptPrompt.stablePrefix.length} chars, incl. stable context block):\n${systemPrompt}\n\n${attemptPrompt.stablePrefix}\n\nUSER PROMPT (${attemptPrompt.volatileSuffix.length} chars):\n${attemptPrompt.volatileSuffix}`
           );
           const attemptStartedAt = Date.now();
           try {
@@ -2806,7 +2870,6 @@ export function AuthoringAssistantDrawer({
               prompt: attemptPrompt,
               systemPrompt,
               contracts: gatewayContracts,
-              sessionId: plannerSessionIdRef.current,
               docsBadge,
               readiness,
               tools,
@@ -2852,6 +2915,17 @@ export function AuthoringAssistantDrawer({
           // cumulative totals surface in the status footer.
           const cycleUsage = await collectPlannerRunUsage(activePlannerRunRef.current, gatewayContracts);
           if (cycleUsage.calls > 0) turnUsage = addUsage(turnUsage, cycleUsage);
+          // Cumulative-cost honesty (backlog 0112): one labeled, non-blocking
+          // note when a turn crosses the threshold — observability only, the
+          // loop never stops on cost (declared tunable, not a cap).
+          if (!turnUsageWarned && turnUsage.inputTokens + turnUsage.outputTokens > AUTHORING_TURN_TOKEN_WARN_THRESHOLD) {
+            turnUsageWarned = true;
+            logActivity(
+              'info',
+              `Cumulative turn usage crossed ${formatTokenCount(AUTHORING_TURN_TOKEN_WARN_THRESHOLD)} tokens (${formatUsage(turnUsage)}). The loop continues; this is a cost observability note.`,
+              cycle
+            );
+          }
           const attemptElapsed = formatElapsed((Date.now() - attemptStartedAt) / 1000);
           logActivity(
             'model',
@@ -3304,11 +3378,14 @@ export function AuthoringAssistantDrawer({
     <div className="authoring-assistant">
       {contextUsagePercent !== null && (draft.trim() || busy) ? (
         <div className="assistant-topbar" aria-label="Assistant context usage">
-          <div className="assistant-context-usage">
+          <div
+            className="assistant-context-usage"
+            title="Client-side estimate of the next request's prompt size vs the model context window. Gateway-side additions (agent scaffolding) are not included."
+          >
             <div className="assistant-context-usage-track">
               <div className="assistant-context-usage-fill" style={{ width: `${contextUsagePercent}%` }} />
             </div>
-            <span>Context {contextUsagePercent}%</span>
+            <span>Context {contextUsagePercent}% est.</span>
           </div>
         </div>
       ) : null}

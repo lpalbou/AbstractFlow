@@ -8,6 +8,109 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- 2026-07-11 run-modal visual pass ("quiet card, loud state"): a visible
+  aesthetic upgrade of the run experience, theme-safe across all 16 themes.
+  - Launch view: the Workflow Parameters card leads with an accent-tinted
+    header, a sliders glyph, and an input-count chip; collapsed
+    infrastructure cards (File System Access, prompt caches) calm down
+    (secondary title color, hover reveal) and their text `+`/`-` affordance
+    is replaced by a rotating border-drawn chevron; card order is now
+    Parameters -> File System Access -> caches; inputs get an 8px radius,
+    hover border, and an accent focus glow; the "no parameters" note became
+    an intentional empty state (dashed panel + play glyph); the Run/New Run
+    buttons became a gradient accent CTA with a play icon and press motion.
+  - Execution view: step status is now a pill vocabulary with a leading
+    state dot — running=info (was warning, which collided with WAITING),
+    waiting=warning, OK=success, failed=error; the spinner runs on
+    currentColor so it is visible on light themes; step rows show the full
+    node label (status/duration moved right, timestamp chip into the meta
+    row) and get accent-tinted selection + motion-timed hovers (the old
+    white-alpha hover/selected states were invisible on light themes);
+    metric badges (duration/tokens/throughput/provider/model/tool/...)
+    rebuilt on theme hues via color-mix (the old pale hardcoded text was
+    unreadable on light themes); think/act/observe agent stage pills are
+    tinted per stage (info/warning/success) via a `data-stage` attribute in
+    monitor-flow's AgentCyclesPanel; the tool-approval panel gained a
+    warning frame + pulsing dot (reduced-motion aware); JSON syntax colors,
+    code blocks, markdown blocks, generated-artifact plates, warning/failure
+    panels, and the JSON-viewer sticky toolbar all moved from hardcoded
+    dark-only rgba to theme tokens; the dark titlebar/minibar hardcode their
+    own light text (theme text tokens went near-black on light themes there)
+    and the `▶` text glyph became a stroke play icon.
+  - New screenshot harness `scripts/runmodal_check.html` +
+    `runmodal_check_main.tsx` + `runmodal_check_shot.mjs` renders the real
+    RunFlowModal (launch + synthetic execution timeline) in any theme for
+    visual verification without a gateway.
+- 2026-07-11 general review wave, group 1 (authoring) top picks implemented
+  (backlog `planned/0111`-`0113`; the full seven-agent adversarial review is
+  recorded as backlog items 0111-0141):
+  - Run-modal send-event composer (0111): event parks now offer a "Send
+    event" composer — event key parsed from the wait (`evt:` scheme via
+    `src/utils/eventComposer.ts`, unit-tested), JSON payload editor with
+    validation, optional `durable` mailbox delivery, posting the existing
+    gateway `emit_event` command. Received events became visible: an event
+    park's resume now surfaces the full waking envelope as the step result
+    (`ledgerEvents.ts` event-reason passthrough, tested); user-wait resumes
+    keep the narrow visibility rule. Copy-key affordance on park cards.
+  - Authoring assistant transport overhaul (0112, adversarial-review
+    corrected): the stable ~21k-token context (skill, catalog, tools) is
+    byte-identical across cycles (tested) and rides the SYSTEM message —
+    the runtime prepends a volatile grounding envelope to every user
+    prompt, so only system content can form a wire-stable prefix for
+    provider caches (the review caught the user-prompt placement as a
+    cache-defeating claim). Planner cycles and acceptance reviews now run
+    SESSIONLESS instead of on the shared durable session: this ends the
+    quadratic in-turn replay cost AND avoids minting one persistent
+    session-memory owner run per cycle server-side (review finding). The
+    per-workflow session id remains the conversation identity; Clear Chat
+    semantics unchanged. One labeled, non-blocking cumulative-usage note
+    past 500k tokens/turn (checked after planner AND review usage); the
+    context meter is labeled as a client estimate. Language anchoring
+    stays at the request site (adjacency asserted by test — the
+    2026-06-10 A/B proved block position irrelevant).
+  - Catalog parity + Files taxonomy (0113): `llm_call` and `agent` templates
+    now declare the `max_output_tokens` pin the runtime already honors
+    (advanced disclosure, tested); `wait_event.until/details` fold as
+    advanced pins; the nine file/artifact IO nodes moved from the "Memory"
+    palette category to a new "Files" category (files and memory are
+    distinct concepts); node catalog + llms-full regenerated.
+- 2026-07-11 general review wave, group 2 (design/UX) top picks implemented
+  (backlog `planned/0114`-`0116`):
+  - Design token integrity (0114): `--accent-primary`, `--accent-secondary`,
+    and `--border-color` — referenced ~20 times but never defined, silently
+    collapsing hover/warning states — are now defined at the app layer over
+    ui-kit tokens; drifted success/error fallback literals reconciled to the
+    theme values; a global `:focus-visible` ring (`--focus-ring`) makes
+    keyboard focus visible on every control; the base button hover calmed to
+    a subtle overlay (brand accent reserved for `.primary` variants — no
+    more red-flashing Copy buttons); infinite executing/dash/blink
+    animations gated behind `prefers-reduced-motion`. A token-integrity test
+    (`src/utils/cssTokens.test.ts`) resolves every no-fallback `var()`
+    reference against app CSS + ui-kit theme + TSX-set properties so
+    undefined tokens can never ship silently again.
+  - Run-modal live inspection + failure forensics (0115): live runs no
+    longer steal the selected step — auto-follow disarms on any manual
+    selection and a "Follow live" pill re-arms it (scroll-into-view on
+    follow); the failure panel jump expands collapsed ancestors and scrolls
+    to the step; "+N more failures" expands; failed steps render the
+    failing effect's input payload beside the error (from trace records);
+    ask_user resumes pass the wait's `runId`+`waitKey` so resuming from an
+    inspected (post-reload) run works instead of silently dead-ending;
+    follow-up messages are injected into the same prompt-like key the prior
+    run used (`src/utils/followUpInputs.ts`, shared by extraction and
+    injection, tested) instead of a hardcoded `prompt` key that silently
+    re-ran the old task on task/query-keyed flows.
+  - Universal artifact previewer (0116): PDFs preview inline (iframe on the
+    blob URL) with separate Open/Download actions instead of a forced
+    download; text artifacts render inline (markdown through the markdown
+    renderer) with a labeled `#TRUNCATION` clamp at 200k chars; images zoom
+    in a dependency-free lightbox (Escape/click-out closes); multi-image
+    outputs render every image as a thumbnail gallery with per-image
+    selection (previously only the first image showed); markdown links open
+    in a new tab (`rel="noopener noreferrer"`) so rendered answers stop
+    ejecting users from the SPA; preview-kind resolution is a tested pure
+    helper (`src/utils/artifactPreview.ts`) honoring content type over
+    extension, with extensions speaking only for information-free types.
 - Honest rendering for event-wait parks in the run modal (visit seam-spec
   0013 client half). Event waits (`reason=event`) no longer invent a
   "Please respond:" question: plain parks render as

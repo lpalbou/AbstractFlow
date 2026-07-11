@@ -26,6 +26,21 @@
   /* Layout */
   --sidebar-width: 240px;
   --right-drawer-rail-width: 44px;
+
+  /* App-layer token bridge (backlog 0114).
+     These names are referenced across the app stylesheets but were never
+     defined anywhere, so color-mix()/var() consumers silently collapsed to
+     transparent/currentColor. Map them once onto the ui-kit theme tokens. */
+  --accent-primary: var(--accent);
+  --accent-secondary: #ff4778;
+  --border-color: var(--ui-border-1);
+
+  /* Interaction tokens (backlog 0114): one focus ring + motion scale.
+     The ring is an OUTLINE (not box-shadow) so component box-shadows of any
+     specificity can never mask keyboard focus (review P2-12). */
+  --focus-ring: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  --motion-fast: 120ms;
+  --motion-base: 160ms;
 }
 
 /* Body */
@@ -408,11 +423,11 @@ body,
 }
 
 .assistant-run-status-dot.done {
-  background: var(--success, #30a46c);
+  background: var(--success, #27ae60);
 }
 
 .assistant-run-status-dot.blocked {
-  background: var(--error, #e5484d);
+  background: var(--error, #e74c3c);
 }
 
 .assistant-run-status-label {
@@ -445,9 +460,9 @@ body,
 .assistant-stop-button {
   flex: 0 0 auto;
   padding: 3px 10px;
-  border: 1px solid color-mix(in srgb, var(--error, #e5484d) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--error, #e74c3c) 55%, transparent);
   border-radius: 6px;
-  background: color-mix(in srgb, var(--error, #e5484d) 12%, transparent);
+  background: color-mix(in srgb, var(--error, #e74c3c) 12%, transparent);
   color: var(--text-primary);
   font-size: var(--font-size-xs);
   font-weight: 600;
@@ -456,8 +471,8 @@ body,
 }
 
 .assistant-stop-button:hover:not(:disabled):not(.disabled) {
-  background: color-mix(in srgb, var(--error, #e5484d) 22%, transparent);
-  border-color: var(--error, #e5484d);
+  background: color-mix(in srgb, var(--error, #e74c3c) 22%, transparent);
+  border-color: var(--error, #e74c3c);
 }
 
 .assistant-stop-button:disabled,
@@ -526,11 +541,11 @@ body,
 }
 
 .assistant-activity-entry.apply .assistant-activity-text {
-  color: color-mix(in srgb, var(--success, #30a46c) 80%, var(--text-primary));
+  color: color-mix(in srgb, var(--success, #27ae60) 80%, var(--text-primary));
 }
 
 .assistant-activity-entry.error .assistant-activity-text {
-  color: color-mix(in srgb, var(--error, #e5484d) 80%, var(--text-primary));
+  color: color-mix(in srgb, var(--error, #e74c3c) 80%, var(--text-primary));
 }
 
 .assistant-activity-entry.review .assistant-activity-text {
@@ -651,8 +666,8 @@ body,
 }
 
 .assistant-run-status.blocked {
-  border-color: color-mix(in srgb, var(--error, #e5484d) 32%, transparent);
-  background: color-mix(in srgb, var(--error, #e5484d) 8%, transparent);
+  border-color: color-mix(in srgb, var(--error, #e74c3c) 32%, transparent);
+  background: color-mix(in srgb, var(--error, #e74c3c) 8%, transparent);
   color: var(--text-primary);
 }
 
@@ -768,12 +783,12 @@ body,
 }
 
 .assistant-actions button.danger {
-  background: color-mix(in srgb, var(--error, #e5484d) 80%, var(--bg-primary));
+  background: color-mix(in srgb, var(--error, #e74c3c) 80%, var(--bg-primary));
   color: #fff;
 }
 
 .assistant-actions button.danger:hover:not(:disabled) {
-  background: var(--error, #e5484d);
+  background: var(--error, #e74c3c);
 }
 
 @media (max-width: 720px) {
@@ -983,6 +998,20 @@ select:focus {
   border-color: var(--accent);
 }
 
+/* Keyboard focus visibility (backlog 0114): one ring for every focusable
+   control. Mouse focus keeps the quieter border-tint above; keyboard focus
+   (:focus-visible) must always be findable. Outline-based so it composes
+   with (never loses to) component box-shadows. */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+button:focus-visible,
+[role='button']:focus-visible,
+a:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 1px;
+}
+
 input::placeholder,
 textarea::placeholder {
   color: var(--text-muted);
@@ -1006,8 +1035,11 @@ button {
   transition: background 0.2s;
 }
 
+/* Calm base hover (backlog 0114): unstyled utility buttons brighten subtly.
+   Brand accent on hover is reserved for explicit primary/action variants —
+   the old global accent flood made every Copy/Close button flash brand red. */
 button:hover:not(:disabled) {
-  background: var(--accent);
+  background: color-mix(in srgb, var(--text-primary) 12%, var(--bg-tertiary));
 }
 
 button:disabled {
@@ -1020,7 +1052,7 @@ button.primary {
 }
 
 button.primary:hover:not(:disabled) {
-  background: #ff6b81;
+  background: color-mix(in srgb, var(--accent) 82%, white);
 }
 
 /* AbstractFlow custom select (searchable popover) */
@@ -2068,8 +2100,9 @@ button.primary:hover:not(:disabled) {
 
 .run-modal-footer {
   flex: 0 0 auto;
-  padding: 14px 24px 18px;
-  border-top: 1px solid var(--bg-tertiary);
+  padding: 14px 24px 16px;
+  border-top: 1px solid var(--ui-border-1);
+  background: color-mix(in srgb, var(--text-primary) 2%, transparent);
 }
 
 .run-modal-footer-actions {
@@ -2078,6 +2111,46 @@ button.primary:hover:not(:disabled) {
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+/* Primary launch action: the one loud element on the launch form. */
+.modal-button.run-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 22px;
+  border-radius: 10px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, white), var(--accent));
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--accent) 30%, transparent);
+  transition: box-shadow var(--motion-fast), transform var(--motion-fast), filter var(--motion-fast);
+}
+
+.modal-button.run-cta:hover:not(:disabled) {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 78%, white), var(--accent));
+  box-shadow: 0 3px 14px color-mix(in srgb, var(--accent) 40%, transparent);
+  transform: translateY(-1px);
+}
+
+.modal-button.run-cta:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 1px 6px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.modal-button.run-cta:disabled {
+  box-shadow: none;
+}
+
+.run-cta-icon {
+  display: inline-flex;
+  width: 12px;
+  height: 12px;
+}
+
+.run-cta-icon svg {
+  width: 100%;
+  height: 100%;
 }
 
 .run-modal-footer-left,
@@ -2127,7 +2200,7 @@ button.primary:hover:not(:disabled) {
 
 .run-followup-label {
   font-size: var(--font-size-sm);
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-secondary);
 }
 
 .run-followup-textarea {
@@ -2140,19 +2213,20 @@ button.primary:hover:not(:disabled) {
 }
 
 .run-followup-drop {
-  border: 1px dashed var(--bg-tertiary);
+  border: 1px dashed color-mix(in srgb, var(--text-primary) 18%, transparent);
   border-radius: 10px;
   padding: 14px;
   text-align: center;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--ui-surface-1);
   display: flex;
   flex-direction: column;
   gap: 6px;
+  transition: border-color var(--motion-fast), background var(--motion-fast);
 }
 
 .run-followup-drop.is-active {
   border-color: var(--accent);
-  background: rgba(64, 153, 255, 0.08);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
 .run-followup-drop-title {
@@ -2161,7 +2235,7 @@ button.primary:hover:not(:disabled) {
 
 .run-followup-drop-subtitle {
   font-size: var(--font-size-xs);
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-muted);
 }
 
 .run-followup-attach input[type='file'] {
@@ -2189,9 +2263,9 @@ button.primary:hover:not(:disabled) {
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
-  border: 1px solid var(--bg-tertiary);
+  border: 1px solid var(--ui-border-1);
   border-radius: 8px;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--ui-surface-1);
 }
 
 .run-followup-file-name {
@@ -2203,7 +2277,7 @@ button.primary:hover:not(:disabled) {
 
 .run-followup-file-meta {
   font-size: var(--font-size-xs);
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-muted);
 }
 
 .run-followup-file-remove {
@@ -2224,11 +2298,12 @@ button.primary:hover:not(:disabled) {
   gap: 10px;
 }
 
+/* Tool approval is a decision point: warning-tinted frame + pulsing dot. */
 .run-approval-panel {
-  border: 1px solid var(--bg-tertiary);
-  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--warning) 40%, transparent);
+  border-radius: 12px;
   padding: 12px;
-  background: rgba(0, 0, 0, 0.18);
+  background: color-mix(in srgb, var(--warning) 6%, transparent);
   margin-bottom: 12px;
 }
 
@@ -2243,6 +2318,34 @@ button.primary:hover:not(:disabled) {
   font-weight: 700;
   font-size: var(--font-size-md);
   color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.run-approval-title::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--warning);
+  flex: 0 0 auto;
+  animation: run-approval-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes run-approval-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .run-approval-title::before {
+    animation: none;
+  }
 }
 
 .run-approval-meta {
@@ -2261,10 +2364,10 @@ button.primary:hover:not(:disabled) {
 }
 
 .run-approval-tool {
-  border: 1px solid var(--bg-tertiary);
+  border: 1px solid var(--ui-border-1);
   border-radius: 10px;
   padding: 10px;
-  background: rgba(0, 0, 0, 0.12);
+  background: var(--ui-surface-1);
 }
 
 .run-approval-tool-title {
@@ -2492,6 +2595,14 @@ button.primary:hover:not(:disabled) {
   overflow: hidden;
 }
 
+/* The minibar is dark glass in every theme (like the titlebar), so badges
+   inside it keep their own light-on-dark colors instead of theme tokens. */
+.run-minibar .run-metric-badge {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(235, 240, 250, 0.92);
+}
+
 .run-minibar-effect {
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
@@ -2553,11 +2664,36 @@ button.primary:hover:not(:disabled) {
   background: rgba(231, 76, 60, 0.16);
 }
 
+/* The titlebar is intentionally dark in every theme, so its text/icon colors
+   are hardcoded light — theme text tokens would go near-black in light themes. */
 .run-modal-titlebar h3 {
   margin: 0;
   font-size: var(--font-size-lg);
   line-height: 1.2;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(236, 241, 255, 0.96);
+}
+
+.run-title-glyph {
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+  color: rgba(140, 190, 255, 0.95);
+  flex: 0 0 auto;
+}
+
+.run-title-glyph svg {
+  width: 100%;
+  height: 100%;
+}
+
+.run-modal-titlebar .run-modal-flow-name {
+  background: rgba(0, 0, 0, 0.28);
+  color: rgba(214, 224, 245, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.10);
 }
 
 .run-modal-flow-name {
@@ -2782,6 +2918,20 @@ button.primary:hover:not(:disabled) {
   gap: 16px;
 }
 
+/* Launch-view ordering (UX wave): lead with the workflow's own parameters —
+   what the user actually fills in — and push infrastructure (file-system
+   access, prompt caching) below it. The DOM order is unchanged; only the
+   visual order is reflowed, so no large JSX move is needed. */
+.run-form-fields > .run-form-section {
+  order: 3;
+}
+.run-form-fields > .run-form-section.run-form-params {
+  order: 1;
+}
+.run-form-fields > .run-form-filesystem {
+  order: 2;
+}
+
 .run-form-field {
   display: flex;
   flex-direction: column;
@@ -2790,9 +2940,10 @@ button.primary:hover:not(:disabled) {
 
 .run-form-section {
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--ui-border-1);
+  background: var(--ui-surface-1);
   overflow: hidden;
+  transition: border-color var(--motion-base);
 }
 
 .run-form-section-summary,
@@ -2803,8 +2954,119 @@ button.primary:hover:not(:disabled) {
   padding: 12px 14px;
 }
 
+/* Launch hierarchy: the params card is what the user fills in — give it an
+   accent presence; collapsed infrastructure cards stay calm and secondary. */
+.run-form-section.run-form-params {
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--border-color));
+}
+
+.run-form-params > .run-form-section-header {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 8%, transparent), transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 14%, transparent);
+  padding: 13px 14px;
+}
+
+.run-form-params .run-form-section-title {
+  font-size: var(--font-size-md);
+  font-weight: 700;
+}
+
+.run-form-params .run-form-section-title .run-form-section-icon {
+  color: var(--accent);
+}
+
+.run-form-params .run-form-section-body {
+  padding-top: 12px;
+}
+
+.run-form-section-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  color: var(--text-muted);
+  flex: 0 0 auto;
+}
+
+.run-form-section-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Compact session control (backlog UX wave): session id is plumbing, shown as
+   a copyable chip rather than a full labeled input. */
+.run-form-session {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color);
+}
+
+.run-form-session-label {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.run-form-session-id {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 2px 8px;
+}
+
+.run-form-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.run-form-icon-button:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--text-primary) 10%, transparent);
+}
+
+.run-form-session-edit {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  padding: 2px 4px;
+  cursor: pointer;
+}
+
+.run-form-session-edit:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: transparent;
+  text-decoration: underline;
+}
+
+.run-form-session-input {
+  flex: 1 1 100%;
+  margin-top: 6px;
+}
+
 .run-form-section-summary {
   cursor: pointer;
+  transition: background var(--motion-fast);
+}
+
+.run-form-section-summary:hover {
+  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
 }
 
 .run-form-section-summary::marker {
@@ -2815,15 +3077,26 @@ button.primary:hover:not(:disabled) {
   display: none;
 }
 
+/* Border-drawn chevron: points right when collapsed, rotates down on open.
+   Uses currentColor so it follows the summary text through every theme. */
 .run-form-section-summary::after {
-  content: '+';
+  content: '';
+  width: 7px;
+  height: 7px;
   margin-left: 10px;
-  font-weight: 700;
-  color: var(--text-muted);
+  flex: 0 0 auto;
+  border-right: 1.8px solid var(--text-muted);
+  border-bottom: 1.8px solid var(--text-muted);
+  transform: rotate(-45deg);
+  transition: transform var(--motion-fast), border-color var(--motion-fast);
 }
 
-.run-form-section[open] .run-form-section-summary::after {
-  content: '-';
+.run-form-section[open] > .run-form-section-summary::after {
+  transform: rotate(45deg);
+}
+
+.run-form-section-summary:hover::after {
+  border-color: var(--text-primary);
 }
 
 .run-form-section-title {
@@ -2832,6 +3105,16 @@ button.primary:hover:not(:disabled) {
   gap: 8px;
   font-size: var(--font-size-sm);
   font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Collapsed infrastructure cards read secondary until engaged. */
+details.run-form-section:not([open]) > .run-form-section-summary .run-form-section-title {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+details.run-form-section:not([open]) > .run-form-section-summary:hover .run-form-section-title {
   color: var(--text-primary);
 }
 
@@ -2886,6 +3169,18 @@ button.primary:hover:not(:disabled) {
 .run-form-input {
   padding: 10px 12px;
   font-size: var(--font-size-base);
+  border-radius: 8px;
+  border-color: var(--ui-border-1);
+  transition: border-color var(--motion-fast), box-shadow var(--motion-fast);
+}
+
+.run-form-input:hover:not(:disabled):not([readonly]) {
+  border-color: var(--ui-border-2);
+}
+
+.run-form-input:focus {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
 .run-form-input:disabled {
@@ -2893,7 +3188,7 @@ button.primary:hover:not(:disabled) {
 }
 
 .run-form-input[readonly] {
-  background: rgba(255, 255, 255, 0.03);
+  background: color-mix(in srgb, var(--text-primary) 3%, transparent);
 }
 
 .run-form-inline {
@@ -2910,32 +3205,71 @@ button.primary:hover:not(:disabled) {
 .run-form-inline-checkbox {
   padding: 8px 10px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--ui-border-1);
+  background: var(--ui-surface-1);
+  transition: background var(--motion-fast), border-color var(--motion-fast);
 }
 
 .run-form-inline-checkbox:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+  border-color: var(--ui-border-2);
 }
 
 .run-form-action {
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--ui-border-1);
+  background: var(--ui-surface-2);
   color: var(--text-primary);
   padding: 6px 10px;
   font-size: var(--font-size-xs);
   font-weight: 600;
   cursor: pointer;
+  transition: background var(--motion-fast), border-color var(--motion-fast);
 }
 
 .run-form-action:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--text-primary) 9%, transparent);
+  border-color: var(--ui-border-2);
 }
 
 .run-form-action:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* Empty-parameters state: intentional, not broken. */
+.run-form-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 22px 16px;
+  border: 1px dashed color-mix(in srgb, var(--text-primary) 16%, transparent);
+  border-radius: 10px;
+  text-align: center;
+}
+
+.run-form-empty-icon {
+  width: 22px;
+  height: 22px;
+  color: var(--text-muted);
+  opacity: 0.9;
+}
+
+.run-form-empty-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.run-form-empty-title {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.run-form-empty-sub {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
 }
 
 .artifact-input-field {
@@ -3118,9 +3452,9 @@ button.primary:hover:not(:disabled) {
   text-transform: uppercase;
   padding: 2px 8px;
   border-radius: 999px;
-  border: 1px solid rgba(233, 69, 96, 0.5);
-  background: rgba(233, 69, 96, 0.12);
-  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--error-border);
+  background: var(--error-subtle);
+  color: color-mix(in srgb, var(--error) 70%, var(--text-primary));
 }
 
 .run-form-tooltip {
@@ -3133,9 +3467,9 @@ button.primary:hover:not(:disabled) {
   font-size: var(--font-size-xs);
   font-weight: 700;
   line-height: 1;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--ui-border-2);
+  background: var(--ui-surface-2);
+  color: var(--text-secondary);
   cursor: help;
   user-select: none;
 }
@@ -3440,11 +3774,11 @@ button.primary:hover:not(:disabled) {
 }
 
 .run-result.success .run-result-header {
-  background: rgba(39, 174, 96, 0.1);
+  background: var(--success-subtle);
 }
 
 .run-result.error .run-result-header {
-  background: rgba(231, 76, 60, 0.1);
+  background: var(--error-subtle);
 }
 
 .run-result-icon {
@@ -3489,7 +3823,7 @@ button.primary:hover:not(:disabled) {
 .run-modal-execution {
   flex: 1;
   display: grid;
-  grid-template-columns: 360px 1fr;
+  grid-template-columns: 380px 1fr;
   gap: 16px;
   min-height: 0;
   margin-bottom: 16px;
@@ -3497,8 +3831,8 @@ button.primary:hover:not(:disabled) {
 
 .run-steps,
 .run-details {
-  border: 1px solid var(--bg-tertiary);
-  border-radius: 10px;
+  border: 1px solid var(--ui-border-1);
+  border-radius: 12px;
   background: var(--bg-primary);
   overflow: hidden;
   min-height: 0;
@@ -3509,12 +3843,12 @@ button.primary:hover:not(:disabled) {
 .run-steps-header,
 .run-details-header {
   padding: 12px 14px;
-  border-bottom: 1px solid var(--bg-tertiary);
+  border-bottom: 1px solid var(--ui-border-1);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--ui-surface-2);
 }
 
 .run-steps-title,
@@ -3537,6 +3871,9 @@ button.primary:hover:not(:disabled) {
   gap: 6px;
 }
 
+/* Metric badges: one hue per metric family, derived from theme tokens with
+   color-mix so every theme (incl. the 6 light ones) keeps readable contrast.
+   Text mixes the hue toward --text-primary: light themes darken, dark lighten. */
 .run-metric-badge {
   display: inline-block;
   vertical-align: middle;
@@ -3546,8 +3883,8 @@ button.primary:hover:not(:disabled) {
   font-size: var(--font-size-xxs);
   padding: 2px 6px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--ui-pill-border);
+  background: var(--ui-pill-bg);
   color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
@@ -3555,57 +3892,57 @@ button.primary:hover:not(:disabled) {
 }
 
 .run-metric-badge.metric-duration {
-  border-color: rgba(52, 152, 219, 0.35);
-  background: rgba(52, 152, 219, 0.10);
-  color: rgba(200, 232, 255, 0.95);
+  border-color: color-mix(in srgb, var(--info) 35%, transparent);
+  background: color-mix(in srgb, var(--info) 10%, transparent);
+  color: color-mix(in srgb, var(--info) 55%, var(--text-primary));
 }
 
 .run-metric-badge.metric-tokens {
-  border-color: rgba(155, 89, 182, 0.35);
-  background: rgba(155, 89, 182, 0.10);
-  color: rgba(245, 220, 255, 0.95);
+  border-color: color-mix(in srgb, color-mix(in srgb, var(--info) 45%, var(--accent)) 40%, transparent);
+  background: color-mix(in srgb, color-mix(in srgb, var(--info) 45%, var(--accent)) 10%, transparent);
+  color: color-mix(in srgb, color-mix(in srgb, var(--info) 45%, var(--accent)) 55%, var(--text-primary));
 }
 
 .run-metric-badge.metric-throughput {
-  border-color: rgba(39, 174, 96, 0.35);
-  background: rgba(39, 174, 96, 0.10);
-  color: rgba(210, 255, 230, 0.95);
+  border-color: color-mix(in srgb, var(--success) 35%, transparent);
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+  color: color-mix(in srgb, var(--success) 55%, var(--text-primary));
 }
 
 .run-metric-badge.metric-benchmark {
-  border-color: rgba(243, 156, 18, 0.35);
-  background: rgba(243, 156, 18, 0.10);
-  color: rgba(255, 235, 200, 0.95);
+  border-color: color-mix(in srgb, var(--warning) 35%, transparent);
+  background: color-mix(in srgb, var(--warning) 10%, transparent);
+  color: color-mix(in srgb, var(--warning) 55%, var(--text-primary));
 }
 
 .run-metric-badge.metric-provider {
-  border-color: rgba(233, 69, 96, 0.35);
-  background: rgba(233, 69, 96, 0.10);
-  color: rgba(255, 220, 225, 0.95);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: color-mix(in srgb, var(--accent) 55%, var(--text-primary));
 }
 
 .run-metric-badge.metric-model {
-  border-color: rgba(52, 235, 210, 0.35);
-  background: rgba(52, 235, 210, 0.10);
-  color: rgba(200, 255, 250, 0.95);
+  border-color: color-mix(in srgb, color-mix(in srgb, var(--info) 45%, var(--success)) 40%, transparent);
+  background: color-mix(in srgb, color-mix(in srgb, var(--info) 45%, var(--success)) 10%, transparent);
+  color: color-mix(in srgb, color-mix(in srgb, var(--info) 45%, var(--success)) 55%, var(--text-primary));
 }
 
 .run-metric-badge.metric-depth {
-  border-color: rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(235, 235, 235, 0.9);
+  border-color: var(--ui-border-2);
+  background: var(--ui-surface-2);
+  color: var(--text-secondary);
 }
 
 .run-metric-badge.metric-number {
-  border-color: rgba(0, 255, 0, 0.25);
-  background: rgba(0, 255, 0, 0.08);
-  color: rgba(220, 255, 220, 0.95);
+  border-color: color-mix(in srgb, var(--success) 30%, transparent);
+  background: color-mix(in srgb, var(--success) 8%, transparent);
+  color: color-mix(in srgb, var(--success) 50%, var(--text-primary));
 }
 
 .run-metric-badge.metric-bool {
-  border-color: rgba(255, 0, 0, 0.25);
-  background: rgba(255, 0, 0, 0.08);
-  color: rgba(255, 220, 220, 0.95);
+  border-color: color-mix(in srgb, var(--error) 30%, transparent);
+  background: color-mix(in srgb, var(--error) 8%, transparent);
+  color: color-mix(in srgb, var(--error) 50%, var(--text-primary));
 }
 
 .run-step-metrics {
@@ -3615,17 +3952,26 @@ button.primary:hover:not(:disabled) {
   margin-left: 4px;
 }
 
+/* Spinner inherits currentColor: inside the RUNNING pill it spins info-blue,
+   standalone it follows the surrounding text — visible on light themes too. */
 .run-spinner {
   width: 12px;
   height: 12px;
-  border: 2px solid rgba(255, 255, 255, 0.18);
-  border-top-color: var(--accent);
+  flex: 0 0 auto;
+  border: 2px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-top-color: currentColor;
   border-radius: 50%;
   animation: run-spin 0.9s linear infinite;
 }
 
+.run-steps-subtitle .run-spinner {
+  color: var(--info);
+}
+
 .run-step-status.running {
-  color: var(--warning);
+  color: color-mix(in srgb, var(--info) 60%, var(--text-primary));
+  border-color: color-mix(in srgb, var(--info) 40%, transparent);
+  background: color-mix(in srgb, var(--info) 10%, transparent);
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -3634,12 +3980,18 @@ button.primary:hover:not(:disabled) {
 .run-working {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px;
-  border: 1px dashed rgba(255, 255, 255, 0.18);
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--info) 28%, transparent);
   border-radius: 10px;
   color: var(--text-secondary);
-  background: rgba(255, 255, 255, 0.02);
+  background: color-mix(in srgb, var(--info) 6%, transparent);
+}
+
+.run-working > .run-spinner {
+  color: var(--info);
+  width: 16px;
+  height: 16px;
 }
 
 .run-working-title {
@@ -3654,10 +4006,10 @@ button.primary:hover:not(:disabled) {
 }
 
 .run-subflow-live {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
+  border: 1px solid var(--ui-border-1);
+  border-radius: 12px;
   padding: 12px;
-  background: rgba(0, 0, 0, 0.12);
+  background: var(--ui-surface-1);
 }
 
 .run-subflow-live-header {
@@ -3697,32 +4049,35 @@ button.primary:hover:not(:disabled) {
   width: 22px;
   height: 22px;
   border-radius: 7px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.03);
-  color: rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--ui-border-1);
+  background: var(--ui-surface-2);
+  color: var(--text-secondary);
   padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  transition: background var(--motion-fast), color var(--motion-fast);
 }
 
 .run-subflow-live-copy:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.9);
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  color: var(--text-primary);
 }
 
 .run-subflow-live-open {
   padding: 6px 10px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--ui-border-1);
+  background: var(--ui-surface-2);
+  color: var(--text-primary);
   cursor: pointer;
+  transition: background var(--motion-fast), border-color var(--motion-fast);
 }
 
 .run-subflow-live-open:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.07);
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  border-color: var(--ui-border-2);
 }
 
 .run-subflow-live-steps {
@@ -3737,8 +4092,8 @@ button.primary:hover:not(:disabled) {
   gap: 10px;
   padding: 8px 10px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--ui-border-1);
+  background: var(--ui-surface-1);
 }
 
 .run-subflow-live-step-status {
@@ -3754,7 +4109,7 @@ button.primary:hover:not(:disabled) {
 }
 
 .run-subflow-live-step-status.running {
-  color: var(--warning);
+  color: var(--info);
 }
 
 .run-subflow-live-step-status.waiting {
@@ -3776,10 +4131,10 @@ button.primary:hover:not(:disabled) {
 }
 
 .agent-trace-panel {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
+  border: 1px solid var(--ui-border-1);
+  border-radius: 12px;
   padding: 12px;
-  background: rgba(0, 0, 0, 0.12);
+  background: var(--ui-surface-1);
 }
 
 .agent-trace-header {
@@ -3813,33 +4168,36 @@ button.primary:hover:not(:disabled) {
   width: 20px;
   height: 20px;
   border-radius: 7px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.03);
-  color: rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--ui-border-1);
+  background: var(--ui-surface-2);
+  color: var(--text-secondary);
   padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  transition: background var(--motion-fast), color var(--motion-fast);
 }
 
 .agent-trace-copy:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.9);
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  color: var(--text-primary);
 }
 
 .agent-trace-open {
   padding: 6px 10px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--ui-border-1);
+  background: var(--ui-surface-2);
+  color: var(--text-primary);
   cursor: pointer;
   font-size: var(--font-size-sm);
+  transition: background var(--motion-fast), border-color var(--motion-fast);
 }
 
 .agent-trace-open:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.07);
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  border-color: var(--ui-border-2);
 }
 
 .agent-trace-badges {
@@ -3850,9 +4208,16 @@ button.primary:hover:not(:disabled) {
 }
 
 .run-metric-badge.metric-tool {
-  border-color: rgba(52, 152, 219, 0.35);
-  background: rgba(52, 152, 219, 0.10);
-  color: rgba(200, 232, 255, 0.95);
+  border-color: color-mix(in srgb, var(--info) 35%, transparent);
+  background: color-mix(in srgb, var(--info) 10%, transparent);
+  color: color-mix(in srgb, var(--info) 55%, var(--text-primary));
+}
+
+.run-metric-badge.metric-artifact,
+.run-metric-badge.metric-status {
+  border-color: color-mix(in srgb, color-mix(in srgb, var(--info) 45%, var(--success)) 40%, transparent);
+  background: color-mix(in srgb, color-mix(in srgb, var(--info) 45%, var(--success)) 10%, transparent);
+  color: color-mix(in srgb, color-mix(in srgb, var(--info) 45%, var(--success)) 55%, var(--text-primary));
 }
 
 .agent-trace-empty {
@@ -3883,9 +4248,9 @@ button.primary:hover:not(:disabled) {
 }
 
 .agent-cycle {
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--ui-border-1);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--ui-surface-1);
   overflow: hidden;
 }
 
@@ -3898,6 +4263,11 @@ button.primary:hover:not(:disabled) {
   gap: 10px;
   flex-wrap: wrap;
   user-select: none;
+  transition: background var(--motion-fast);
+}
+
+.agent-cycle-summary:hover {
+  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
 }
 
 .agent-cycle-summary::-webkit-details-marker {
@@ -3945,11 +4315,33 @@ button.primary:hover:not(:disabled) {
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--ui-pill-border);
+  background: var(--ui-pill-bg);
   color: var(--text-secondary);
   padding: 3px 8px;
   border-radius: 999px;
+}
+
+/* Agentic observability: tint the think → act → observe loop so each stage
+   is recognizable at a glance (think=info, act=warning, observe=success).
+   The `.agent-trace-panel` prefix outranks monitor-flow's own stylesheet
+   regardless of import order. */
+.agent-trace-panel .agent-cycle-stage[data-stage='think'] {
+  border-color: color-mix(in srgb, var(--info) 35%, transparent);
+  background: color-mix(in srgb, var(--info) 10%, transparent);
+  color: color-mix(in srgb, var(--info) 55%, var(--text-primary));
+}
+
+.agent-trace-panel .agent-cycle-stage[data-stage='act'] {
+  border-color: color-mix(in srgb, var(--warning) 35%, transparent);
+  background: color-mix(in srgb, var(--warning) 10%, transparent);
+  color: color-mix(in srgb, var(--warning) 55%, var(--text-primary));
+}
+
+.agent-trace-panel .agent-cycle-stage[data-stage='observe'] {
+  border-color: color-mix(in srgb, var(--success) 35%, transparent);
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+  color: color-mix(in srgb, var(--success) 55%, var(--text-primary));
 }
 
 .agent-trace-preview-inline {
@@ -3975,9 +4367,9 @@ button.primary:hover:not(:disabled) {
 }
 
 .agent-observe-result {
-  border: 1px solid var(--bg-tertiary);
+  border: 1px solid var(--ui-border-1);
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--ui-surface-1);
   overflow: hidden;
 }
 
@@ -4022,9 +4414,9 @@ button.primary:hover:not(:disabled) {
 }
 
 .agent-trace-entry {
-  border: 1px solid var(--bg-tertiary);
+  border: 1px solid var(--ui-border-1);
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--ui-surface-1);
   overflow: hidden;
 }
 
@@ -4037,6 +4429,11 @@ button.primary:hover:not(:disabled) {
   gap: 10px;
   flex-wrap: wrap;
   user-select: none;
+  transition: background var(--motion-fast);
+}
+
+.agent-trace-summary:hover {
+  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
 }
 
 .agent-trace-summary::-webkit-details-marker {
@@ -4054,8 +4451,10 @@ button.primary:hover:not(:disabled) {
   color: var(--success);
 }
 
+/* Running is activity (info), waiting is attention (warning) — the two must
+   not share a color or the timeline reads wrong. */
 .agent-trace-status.running {
-  color: var(--warning);
+  color: var(--info);
 }
 
 .agent-trace-status.waiting {
@@ -4108,24 +4507,26 @@ button.primary:hover:not(:disabled) {
 }
 
 .agent-trace-tab {
-  border: 1px solid var(--bg-tertiary);
-  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--ui-border-1);
+  background: transparent;
   color: var(--text-secondary);
   font-size: var(--font-size-xs);
   padding: 4px 8px;
   border-radius: 999px;
   cursor: pointer;
+  transition: background var(--motion-fast), border-color var(--motion-fast), color var(--motion-fast);
 }
 
 .agent-trace-tab:hover {
-  border-color: rgba(255, 255, 255, 0.25);
+  border-color: var(--ui-border-2);
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
   color: var(--text-primary);
 }
 
 .agent-trace-tab.active {
-  border-color: rgba(255, 255, 255, 0.35);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: color-mix(in srgb, var(--accent) 45%, var(--text-primary));
 }
 
 @keyframes run-spin {
@@ -4152,17 +4553,18 @@ button.primary:hover:not(:disabled) {
 .run-details-parent-link {
   font-size: var(--font-size-xs);
   color: var(--text-primary);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--ui-border-2);
+  background: var(--ui-surface-2);
   padding: 3px 8px;
   border-radius: 999px;
   white-space: nowrap;
   cursor: pointer;
+  transition: background var(--motion-fast), border-color var(--motion-fast);
 }
 
 .run-details-parent-link:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.3);
+  background: color-mix(in srgb, var(--text-primary) 9%, transparent);
+  border-color: color-mix(in srgb, var(--text-primary) 30%, transparent);
 }
 
 .run-details-parent-link:active {
@@ -4172,9 +4574,9 @@ button.primary:hover:not(:disabled) {
 .run-warnings-panel {
   margin: 0 8px 8px;
   padding: 10px;
-  border: 1px solid rgba(255, 200, 120, 0.35);
+  border: 1px solid var(--warning-border);
   border-radius: 10px;
-  background: rgba(255, 200, 80, 0.08);
+  background: var(--warning-subtle);
 }
 
 .run-warnings-title {
@@ -4192,9 +4594,9 @@ button.primary:hover:not(:disabled) {
 
 .run-warnings-item {
   padding: 8px 10px;
-  border: 1px solid rgba(255, 200, 120, 0.35);
+  border: 1px solid var(--warning-border);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--ui-surface-2);
   color: var(--text-primary);
   font-size: var(--font-size-xs);
   white-space: pre-wrap;
@@ -4209,9 +4611,9 @@ button.primary:hover:not(:disabled) {
 .run-failures-panel {
   margin: 0 8px 8px;
   padding: 10px;
-  border: 1px solid rgba(255, 120, 120, 0.35);
+  border: 1px solid var(--error-border);
   border-radius: 10px;
-  background: rgba(255, 80, 80, 0.08);
+  background: var(--error-subtle);
 }
 
 .run-failures-title {
@@ -4233,17 +4635,18 @@ button.primary:hover:not(:disabled) {
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
-  border: 1px solid rgba(255, 120, 120, 0.35);
+  border: 1px solid var(--error-border);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--ui-surface-2);
   color: var(--text-primary);
   text-align: left;
   cursor: pointer;
+  transition: background var(--motion-fast), border-color var(--motion-fast);
 }
 
 .run-failures-item:hover {
-  border-color: rgba(255, 140, 140, 0.55);
-  background: rgba(255, 255, 255, 0.07);
+  border-color: color-mix(in srgb, var(--error) 55%, transparent);
+  background: color-mix(in srgb, var(--text-primary) 7%, transparent);
 }
 
 .run-failures-node {
@@ -4265,6 +4668,112 @@ button.primary:hover:not(:disabled) {
   font-size: var(--font-size-xs);
   color: var(--text-muted);
   margin-top: 2px;
+  background: transparent;
+  border: none;
+  padding: 4px 2px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.run-failures-more:hover:not(:disabled) {
+  background: transparent;
+  color: var(--text-primary);
+  text-decoration: underline;
+}
+
+/* Live-follow pill (backlog 0115): shows whether the timeline auto-selects
+   new steps; clicking the inactive pill re-arms following. */
+.run-follow-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 8px;
+}
+
+.run-follow-pill {
+  font-size: var(--font-size-xs);
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background var(--motion-fast), color var(--motion-fast), border-color var(--motion-fast);
+}
+
+.run-follow-pill:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--text-primary) 10%, transparent);
+  color: var(--text-primary);
+}
+
+.run-follow-pill.active {
+  border-color: color-mix(in srgb, var(--success) 55%, transparent);
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+  color: var(--success);
+  cursor: default;
+}
+
+/* Send-event composer on event parks (backlog 0111). */
+.run-event-composer {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.run-event-composer-title {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.run-event-composer-payload {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+}
+
+.run-event-composer-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.run-event-composer-durable {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.run-event-composer-note {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+.run-event-key-copy {
+  margin-left: 8px;
+  padding: 2px 8px;
+  font-size: var(--font-size-xs);
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+}
+
+/* Failure forensics (backlog 0115): the failing effect's input payload. */
+.run-failed-payload {
+  margin-top: 10px;
+}
+
+.run-failed-payload-title {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
 }
 
 .run-steps-list {
@@ -4285,21 +4794,28 @@ button.primary:hover:not(:disabled) {
 .run-step {
   display: flex;
   gap: 10px;
-  border: 1px solid var(--bg-tertiary);
+  border: 1px solid var(--ui-border-1);
   border-radius: 10px;
   padding: 10px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--ui-surface-1);
   cursor: pointer;
   text-align: left;
+  transition: border-color var(--motion-fast), background var(--motion-fast);
 }
 
 .run-step:hover {
-  border-color: rgba(255, 255, 255, 0.25);
+  border-color: var(--ui-border-2);
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
 }
 
+/* Selection must be unmistakable in every theme: accent border + tint. */
 .run-step.selected {
-  border-color: rgba(255, 255, 255, 0.35);
-  background: rgba(255, 255, 255, 0.05);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+.run-step.selected:hover {
+  border-color: color-mix(in srgb, var(--accent) 70%, transparent);
 }
 
 .run-step-tree-item {
@@ -4311,7 +4827,7 @@ button.primary:hover:not(:disabled) {
 .run-step-children {
   margin-left: 14px;
   padding-left: 10px;
-  border-left: 1px solid rgba(255, 255, 255, 0.10);
+  border-left: 1px solid color-mix(in srgb, var(--text-primary) 14%, transparent);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -4320,7 +4836,7 @@ button.primary:hover:not(:disabled) {
 .run-sequence-branches {
   margin-left: 14px;
   padding-left: 10px;
-  border-left: 1px solid rgba(255, 255, 255, 0.10);
+  border-left: 1px solid color-mix(in srgb, var(--text-primary) 14%, transparent);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -4340,7 +4856,7 @@ button.primary:hover:not(:disabled) {
   left: -10px;
   top: 20px;
   width: 14px;
-  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  border-top: 1px solid color-mix(in srgb, var(--text-primary) 16%, transparent);
 }
 
 .run-sequence-branch-body {
@@ -4350,11 +4866,11 @@ button.primary:hover:not(:disabled) {
 
 .run-sequence-branch-empty {
   padding: 7px 10px;
-  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border: 1px dashed color-mix(in srgb, var(--text-primary) 14%, transparent);
   border-radius: 8px;
   font-size: var(--font-size-xs);
   color: var(--text-muted);
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--ui-surface-1);
 }
 
 .run-step-border {
@@ -4391,18 +4907,19 @@ button.primary:hover:not(:disabled) {
   align-items: center;
   justify-content: center;
   border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--ui-border-1);
+  background: var(--ui-surface-2);
   color: var(--text-secondary);
   font-size: var(--font-size-sm);
   line-height: 1;
   user-select: none;
+  transition: background var(--motion-fast), border-color var(--motion-fast), color var(--motion-fast);
 }
 
 .run-step-toggle:hover {
-  border-color: rgba(233, 69, 96, 0.45);
-  background: rgba(233, 69, 96, 0.14);
-  color: rgba(255, 220, 225, 0.98);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: color-mix(in srgb, var(--accent) 55%, var(--text-primary));
 }
 
 .run-step-index {
@@ -4446,11 +4963,11 @@ button.primary:hover:not(:disabled) {
 .run-step-time {
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
-  color: rgba(255, 255, 255, 0.62);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-secondary);
+  border: 1px solid var(--ui-pill-border);
   padding: 2px 7px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--ui-pill-bg);
   white-space: nowrap;
 }
 
@@ -4468,23 +4985,55 @@ button.primary:hover:not(:disabled) {
   flex: 0 0 auto;
 }
 
+/* Status pills: the run's state vocabulary. A leading dot + tinted pill makes
+   state scannable at a glance (running=info, waiting=warning, ok=success,
+   failed=error) and stays legible across light and dark themes. */
 .run-step-status {
-  font-size: var(--font-size-xs);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-xxs);
+  font-weight: 700;
   color: var(--text-secondary);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--ui-pill-border);
+  background: var(--ui-pill-bg);
+  white-space: nowrap;
+}
+
+.run-step-status::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  flex: 0 0 auto;
+}
+
+/* The RUNNING pill's spinner replaces the static dot. */
+.run-step-status.running::before {
+  display: none;
 }
 
 .run-step-status.completed {
-  color: var(--success);
+  color: color-mix(in srgb, var(--success) 60%, var(--text-primary));
+  border-color: color-mix(in srgb, var(--success) 40%, transparent);
+  background: color-mix(in srgb, var(--success) 10%, transparent);
 }
 
 .run-step-status.failed {
-  color: var(--error);
+  color: color-mix(in srgb, var(--error) 60%, var(--text-primary));
+  border-color: color-mix(in srgb, var(--error) 40%, transparent);
+  background: color-mix(in srgb, var(--error) 10%, transparent);
 }
 
 .run-step-status.waiting {
-  color: var(--warning);
+  color: color-mix(in srgb, var(--warning) 60%, var(--text-primary));
+  border-color: color-mix(in srgb, var(--warning) 40%, transparent);
+  background: color-mix(in srgb, var(--warning) 10%, transparent);
 }
 
 .run-step-error,
@@ -4551,9 +5100,9 @@ button.primary:hover:not(:disabled) {
   min-height: 18px;
   padding: 2px 7px;
   border-radius: 999px;
-  border: 1px solid rgba(80, 227, 194, 0.24);
-  background: rgba(80, 227, 194, 0.08);
-  color: rgba(226, 244, 241, 0.86);
+  border: 1px solid color-mix(in srgb, var(--success) 26%, transparent);
+  background: color-mix(in srgb, var(--success) 8%, transparent);
+  color: color-mix(in srgb, var(--success) 45%, var(--text-primary));
   font-size: var(--font-size-xs);
   line-height: 1.1;
   white-space: nowrap;
@@ -4563,13 +5112,13 @@ button.primary:hover:not(:disabled) {
   height: 4px;
   border-radius: 999px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--text-primary) 10%, transparent);
 }
 
 .run-step-progress-fill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, rgba(0, 210, 255, 0.9), rgba(80, 227, 194, 0.9));
+  background: linear-gradient(90deg, var(--info), color-mix(in srgb, var(--info) 40%, var(--success)));
 }
 
 .run-step-progress-track.indeterminate .run-step-progress-fill {
@@ -4621,10 +5170,10 @@ button.primary:hover:not(:disabled) {
 }
 
 .run-details-metrics {
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--ui-border-1);
   border-radius: 10px;
   padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--ui-surface-1);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -4660,8 +5209,8 @@ button.primary:hover:not(:disabled) {
   margin: 0;
   padding: 12px;
   border-radius: 10px;
-  border: 1px solid var(--bg-tertiary);
-  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--ui-code-block-border);
+  background: var(--ui-code-block-bg);
   color: var(--text-primary);
   white-space: pre-wrap;
   word-break: break-word;
@@ -4680,20 +5229,23 @@ button.primary:hover:not(:disabled) {
   white-space: inherit;
 }
 
+/* JSON syntax colors derive from theme hues mixed toward the theme's text
+   color, so they read on dark AND light backgrounds (the old fixed VS-Code
+   dark palette washed out on the light themes). */
 .json-token.key {
-  color: #9cdcfe; /* VS Code-like JSON key */
+  color: color-mix(in srgb, var(--info) 62%, var(--text-primary));
 }
 .json-token.string {
-  color: #ce9178;
+  color: color-mix(in srgb, var(--warning) 55%, var(--text-primary));
 }
 .json-token.number {
-  color: #b5cea8;
+  color: color-mix(in srgb, var(--success) 55%, var(--text-primary));
 }
 .json-token.boolean {
-  color: #569cd6;
+  color: color-mix(in srgb, var(--accent) 55%, var(--text-primary));
 }
 .json-token.null {
-  color: #569cd6;
+  color: color-mix(in srgb, var(--accent) 55%, var(--text-primary));
   opacity: 0.9;
   font-style: italic;
 }
@@ -4717,7 +5269,11 @@ button.primary:hover:not(:disabled) {
   gap: 6px;
   margin-bottom: 8px;
   padding-bottom: 6px;
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--bg-primary) 92%, transparent),
+    transparent
+  );
 }
 
 .json-viewer__copy,
@@ -4904,20 +5460,21 @@ button.primary:hover:not(:disabled) {
   width: 24px;
   height: 24px;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--ui-border-1);
+  background: var(--ui-surface-2);
+  color: var(--text-secondary);
   padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   flex: 0 0 auto;
+  transition: background var(--motion-fast), color var(--motion-fast);
 }
 
 .run-param-copy:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.07);
-  color: rgba(255, 255, 255, 0.92);
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  color: var(--text-primary);
 }
 
 .run-param-link {
@@ -4926,19 +5483,20 @@ button.primary:hover:not(:disabled) {
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--ui-surface-1);
+  border: 1px solid var(--ui-border-1);
   border-radius: 10px;
   padding: 6px 10px;
   text-align: left;
   cursor: pointer;
   white-space: pre-wrap;
   word-break: break-word;
+  transition: background var(--motion-fast), border-color var(--motion-fast);
 }
 
 .run-param-link:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.14);
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+  border-color: var(--ui-border-2);
 }
 
 .run-param-text {
@@ -5032,8 +5590,8 @@ button.primary:hover:not(:disabled) {
   max-height: 420px;
   object-fit: contain;
   border-radius: 8px;
-  border: 1px solid var(--bg-tertiary);
-  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--ui-border-1);
+  background: var(--ui-code-block-bg);
 }
 
 .run-generated-audio {
@@ -5059,8 +5617,8 @@ button.primary:hover:not(:disabled) {
   width: min(100%, 720px);
   max-height: 420px;
   border-radius: 8px;
-  border: 1px solid var(--bg-tertiary);
-  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--ui-border-1);
+  background: var(--ui-code-block-bg);
 }
 
 .run-generated-text {
@@ -5075,23 +5633,24 @@ button.primary:hover:not(:disabled) {
   overflow: auto;
   padding: 10px 12px;
   border-radius: 10px;
-  border: 1px solid rgba(0, 210, 255, 0.16);
-  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid color-mix(in srgb, var(--info) 20%, transparent);
+  background: var(--ui-code-block-bg);
 }
 
 .run-artifact-copy {
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid color-mix(in srgb, var(--info) 35%, transparent);
   border-radius: 999px;
   padding: 2px 8px;
-  background: rgba(52, 152, 219, 0.14);
-  color: rgba(220, 238, 255, 0.95);
+  background: color-mix(in srgb, var(--info) 12%, transparent);
+  color: color-mix(in srgb, var(--info) 55%, var(--text-primary));
   font-size: var(--font-size-xxs);
   font-weight: 800;
   cursor: pointer;
+  transition: background var(--motion-fast);
 }
 
 .run-artifact-copy:hover {
-  background: rgba(52, 152, 219, 0.24);
+  background: color-mix(in srgb, var(--info) 22%, transparent);
 }
 
 .run-generated-artifact-grid {
@@ -5107,9 +5666,9 @@ button.primary:hover:not(:disabled) {
   min-width: 0;
   overflow: hidden;
   padding: 12px;
-  border: 1px solid var(--bg-tertiary);
+  border: 1px solid var(--ui-border-1);
   border-radius: 12px;
-  background: rgba(9, 12, 26, 0.32);
+  background: var(--ui-surface-1);
 }
 
 .run-generated-artifact-card .run-generated-image-img {
@@ -5133,10 +5692,10 @@ button.primary:hover:not(:disabled) {
 }
 
 .run-trace-step {
-  border: 1px solid var(--bg-tertiary);
+  border: 1px solid var(--ui-border-1);
   border-radius: 10px;
   padding: 10px;
-  background: rgba(0, 0, 0, 0.18);
+  background: var(--ui-surface-1);
 }
 
 .run-trace-top {
@@ -5192,10 +5751,10 @@ button.primary:hover:not(:disabled) {
 }
 
 .run-raw-details {
-  border: 1px solid var(--bg-tertiary);
+  border: 1px solid var(--ui-border-1);
   border-radius: 10px;
   padding: 10px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--ui-surface-1);
 }
 
 .run-raw-details summary {
@@ -5219,8 +5778,8 @@ button.primary:hover:not(:disabled) {
   font-size: var(--font-size-md);
   padding: 10px 12px;
   border-radius: 10px;
-  border: 1px solid rgba(231, 76, 60, 0.35);
-  background: rgba(231, 76, 60, 0.08);
+  border: 1px solid var(--error-border);
+  background: var(--error-subtle);
 }
 
 .run-final {
@@ -5309,10 +5868,10 @@ button.primary:hover:not(:disabled) {
 }
 
 .run-waiting-tool {
-  border: 1px solid var(--bg-tertiary);
+  border: 1px solid var(--ui-border-1);
   border-radius: 10px;
   padding: 10px;
-  background: rgba(0, 0, 0, 0.18);
+  background: var(--ui-surface-1);
 }
 
 .run-waiting-tool-title {
@@ -5323,10 +5882,10 @@ button.primary:hover:not(:disabled) {
 
 /* Markdown rendering (Ask User / Answer User) */
 .run-details-markdown {
-  border: 1px solid var(--bg-tertiary);
+  border: 1px solid var(--ui-border-1);
   border-radius: 10px;
   padding: 12px;
-  background: rgba(0, 0, 0, 0.18);
+  background: var(--ui-surface-1);
 }
 
 .markdown-body {
@@ -5383,15 +5942,15 @@ button.primary:hover:not(:disabled) {
 }
 
 .markdown-body th {
-  background: rgba(255, 255, 255, 0.05);
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
   color: var(--text-primary);
 }
 
 .markdown-body code {
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--ui-code-bg);
+  border: 1px solid var(--ui-code-border);
   padding: 1px 4px;
   border-radius: 6px;
 }
@@ -5400,8 +5959,8 @@ button.primary:hover:not(:disabled) {
   margin: 8px 0;
   padding: 0;
   border-radius: 10px;
-  border: 1px solid var(--bg-tertiary);
-  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--ui-code-block-border);
+  background: var(--ui-code-block-bg);
   overflow: auto;
 }
 
@@ -5422,8 +5981,8 @@ button.primary:hover:not(:disabled) {
   justify-content: space-between;
   gap: 10px;
   padding: 8px 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--ui-border-1);
+  background: var(--ui-surface-2);
   font-size: var(--font-size-xs);
   color: var(--text-secondary);
 }
@@ -5438,14 +5997,15 @@ button.primary:hover:not(:disabled) {
 .md-code-copy {
   padding: 6px 10px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--ui-surface-2);
+  border: 1px solid var(--ui-border-1);
   color: var(--text-primary);
+  transition: background var(--motion-fast), border-color var(--motion-fast);
 }
 
 .md-code-copy:hover {
-  background: rgba(233, 69, 96, 0.22);
-  border-color: rgba(233, 69, 96, 0.45);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
 .run-waiting-choices {
@@ -5457,22 +6017,24 @@ button.primary:hover:not(:disabled) {
 .run-waiting-choice {
   padding: 8px 10px;
   border-radius: 10px;
-  border: 1px solid var(--bg-tertiary);
-  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--ui-border-1);
+  background: var(--ui-surface-1);
   color: var(--text-primary);
   cursor: pointer;
+  transition: background var(--motion-fast), border-color var(--motion-fast);
 }
 
 .run-waiting-choice:hover {
-  border-color: rgba(255, 255, 255, 0.25);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
 .run-waiting-textarea {
   width: 100%;
   padding: 10px 12px;
   border-radius: 10px;
-  border: 1px solid var(--bg-tertiary);
-  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--ui-border-1);
+  background: var(--bg-primary);
   color: var(--text-primary);
   resize: vertical;
 }
@@ -5486,9 +6048,9 @@ button.primary:hover:not(:disabled) {
   display: grid;
   gap: 12px;
   padding: 12px;
-  border: 1px solid var(--bg-tertiary);
+  border: 1px solid var(--ui-border-1);
   border-radius: 10px;
-  background: rgba(0, 0, 0, 0.18);
+  background: var(--ui-surface-1);
 }
 
 .run-voice-wait-status {
@@ -5504,17 +6066,17 @@ button.primary:hover:not(:disabled) {
   height: 10px;
   border-radius: 999px;
   background: var(--text-muted);
-  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.04);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--text-primary) 5%, transparent);
 }
 
 .run-voice-wait-status span.recording {
   background: var(--danger);
-  box-shadow: 0 0 0 4px rgba(231, 76, 60, 0.18);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--danger) 18%, transparent);
 }
 
 .run-voice-wait-status span.busy {
   background: var(--accent-primary);
-  box-shadow: 0 0 0 4px rgba(25, 211, 184, 0.16);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-primary) 16%, transparent);
 }
 
 .run-voice-wait-actions {
@@ -5532,8 +6094,8 @@ button.primary:hover:not(:disabled) {
   margin-top: 8px;
   padding: 10px 12px;
   border-radius: 6px;
-  border: 1px solid var(--bg-tertiary);
-  background: rgba(155, 89, 182, 0.12);
+  border: 1px solid color-mix(in srgb, var(--info) 25%, transparent);
+  background: color-mix(in srgb, var(--info) 8%, transparent);
   color: var(--text-primary);
   white-space: pre-wrap;
   word-break: break-word;

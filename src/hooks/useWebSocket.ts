@@ -997,11 +997,20 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
       const info = waitingInfoRef.current;
       let rid = info?.runId || runIdRef.current;
       let waitKey = info?.waitKey;
+      // Explicit identity (backlog 0115): a payload carrying BOTH runId and
+      // waitKey targets that exact wait — inspected/historical runs included.
+      let explicitIdentity = false;
       if (response && typeof response === 'object') {
-        if (typeof response.runId === 'string' && response.runId.trim()) rid = response.runId.trim();
-        if (typeof response.waitKey === 'string' && response.waitKey.trim()) waitKey = response.waitKey.trim();
+        const payloadRunId = typeof response.runId === 'string' && response.runId.trim() ? response.runId.trim() : '';
+        const payloadWaitKey = typeof response.waitKey === 'string' && response.waitKey.trim() ? response.waitKey.trim() : '';
+        if (payloadRunId) rid = payloadRunId;
+        if (payloadWaitKey) waitKey = payloadWaitKey;
+        explicitIdentity = Boolean(payloadRunId && payloadWaitKey);
       }
-      if (!rid || !waitKey || isPaused) return;
+      if (!rid || !waitKey) return;
+      // The live run's paused state must not silently swallow a resume aimed
+      // at a DIFFERENT (inspected) run (review P2-6).
+      if (isPaused && !explicitIdentity) return;
       try {
         const payload =
           typeof response === 'string'
@@ -1016,13 +1025,29 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
           type: 'resume',
           payload: { wait_key: waitKey, payload },
         });
-        setIsWaiting(false);
-        setWaitingInfo(null);
+        // Only clear the LIVE wait state when the live run is what resumed;
+        // resuming an inspected run must not blank an unrelated live wait.
+        if (!explicitIdentity || rid === runIdRef.current) {
+          setIsWaiting(false);
+          setWaitingInfo(null);
+        }
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Failed to resume');
       }
     },
     [isPaused, submitCommand]
+  );
+
+  // Send-event surface (backlog 0111): posts the existing gateway emit_event
+  // command against a run (the command routes by run id; the wait key inside
+  // the payload decides which parked runs actually wake).
+  const emitEvent = useCallback(
+    async (targetRunId: string, payload: Record<string, unknown>) => {
+      const rid = String(targetRunId || '').trim() || runIdRef.current;
+      if (!rid) throw new Error('No run id to route the event command through');
+      await submitCommand({ runId: rid, type: 'emit_event', payload });
+    },
+    [submitCommand]
   );
 
   const pauseRun = useCallback(
@@ -1091,6 +1116,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
     runFlow,
     runPublishedFlow,
     resumeFlow,
+    emitEvent,
     pauseRun,
     resumeRun,
     cancelRun,

@@ -129,6 +129,31 @@ describe('node pin disclosure policy', () => {
     expect(ids(result.inputPins)).toEqual(['exec-in', 'system', 'prompt', 'tools']);
   });
 
+  it('folds max_output_tokens away until authored, then keeps it visible (0113)', () => {
+    for (const type of ['llm_call', 'agent'] as const) {
+      const data = nodeData(type);
+      expect(ids(disclosure(data).inputPins)).not.toContain('max_output_tokens');
+
+      data.pinDefaults = { ...(data.pinDefaults || {}), max_output_tokens: 2048 };
+      expect(ids(disclosure(data).inputPins)).toContain('max_output_tokens');
+    }
+  });
+
+  it('folds wait_event until/details as advanced pins (0113)', () => {
+    const data = nodeData('wait_event');
+    const collapsed = disclosure(data);
+    expect(ids(collapsed.inputPins)).toEqual(['exec-in', 'event_key']);
+    expect(ids(collapsed.inputPins)).not.toContain('until');
+    expect(ids(collapsed.inputPins)).not.toContain('details');
+
+    const connected = disclosure(data, { input: ['until'] });
+    expect(ids(connected.inputPins)).toContain('until');
+
+    const expanded = disclosure(data, { expanded: true });
+    expect(ids(expanded.inputPins)).toContain('until');
+    expect(ids(expanded.inputPins)).toContain('details');
+  });
+
   it('keeps explicit LLM provider and model overrides visible', () => {
     const data = nodeData('llm_call');
     data.effectConfig = { provider: 'lmstudio', model: 'qwen/qwen3.6-35b-a3b' };

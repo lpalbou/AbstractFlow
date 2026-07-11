@@ -92,14 +92,29 @@ plan/result summaries (so pending plan items survive across turns), and applied
 cycles within a turn carry one-line notes of the model's own next steps. The
 visible graph remains the source of applied draft state.
 
-Session policy: one durable Gateway session per workflow conversation. The
-session id is scoped to the workflow storage key (never shared across
-workflows), follows a draft when it is promoted to a saved flow, and is
-rotated by Clear Chat — so gateway-side agent memory restarts together with
-the visible conversation. Because the gateway agent replays session memory
-into the model context, the prompt anchors a language directive at the request
-site and marks replayed conversation as historical, so the active request —
-not session history in another language — controls the output language.
+Session policy (revised 2026-07-11, backlog 0112): the per-workflow session id
+remains the conversation identity — scoped to the workflow storage key (never
+shared across workflows), following a draft when it is promoted to a saved
+flow, and rotated by Clear Chat — but planner runs are SESSIONLESS. The
+gateway agent replays session memory into the model context; with a shared
+session, cycle N re-billed cycles 1..N-1's prompts and responses even though
+the client prompt already carries the conversation, cycle notes, and current
+document explicitly. Session-carrying run starts also mint a persistent
+session-memory owner run per new session server-side, so per-cycle derived
+sessions would leave one orphan run per cycle — omitting the session id
+avoids both. Continuity across turns lives in the client-persisted
+conversation block. The prompt still anchors a language directive at the
+request site and marks replayed conversation as historical, so the active
+request — not history in another language — controls the output language.
+
+Prompt placement is cache-first (backlog 0112): the large stable context
+(authoring skill, node catalog, gateway tool schemas) is byte-identical
+across cycles within a turn and rides the SYSTEM message — the runtime
+prepends a volatile grounding envelope (with a second-resolution timestamp)
+to every user prompt, so only system content can form a wire-stable prefix
+for provider caches. The user prompt carries the volatile block
+(conversation, authoring brief, current document, the active request).
+Nothing is dropped — placement only (ADR-0026 forbids lossy compaction).
 
 Plan responses are parsed tolerantly: the JSON object is extracted even when the
 model wraps it in markdown fences or surrounding prose. A planner response that

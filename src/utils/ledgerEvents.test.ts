@@ -78,6 +78,55 @@ describe('mapLedgerRecordToEvents — wait passthrough (seam-spec D3 contract)',
   });
 });
 
+describe('mapLedgerRecordToEvents — event-park resume payload visibility (backlog 0111)', () => {
+  function resumeRecord(waitReason: string, payload: Record<string, unknown>): LedgerRecord {
+    return {
+      run_id: 'run-1',
+      step_id: 'step-2',
+      node_id: 'park',
+      status: 'completed',
+      started_at: '2026-07-10T08:00:00+00:00',
+      ended_at: '2026-07-10T08:00:01+00:00',
+      effect: { type: 'resume', payload: { wait_reason: waitReason, payload } },
+      result: { resumed: true },
+    };
+  }
+
+  it('surfaces the full event envelope that woke an event park', () => {
+    const envelope = {
+      event_id: 'ev-1',
+      name: 'agent-inbox',
+      scope: 'global',
+      payload: { kind: 'note', body: 'hello resident' },
+      emitter: { source: 'external', client_id: 'cli-1' },
+    };
+    const events = mapLedgerRecordToEvents(resumeRecord('event', envelope), createLedgerMappingState());
+    const complete = events.find((ev) => ev.type === 'node_complete');
+    expect(complete).toBeDefined();
+    expect(complete?.result).toEqual(envelope);
+  });
+
+  it('keeps the narrow visibility rule for user-wait resumes', () => {
+    // Internal bookkeeping payloads without recognized reply keys stay
+    // suppressed for user waits (approval resumes etc. are not step outputs).
+    const events = mapLedgerRecordToEvents(
+      resumeRecord('user', { approved: true, auto_approved: true }),
+      createLedgerMappingState()
+    );
+    const complete = events.find((ev) => ev.type === 'node_complete');
+    expect(complete?.result).toBeUndefined();
+  });
+
+  it('still surfaces recognized user replies', () => {
+    const events = mapLedgerRecordToEvents(
+      resumeRecord('user', { response: 'yes, continue' }),
+      createLedgerMappingState()
+    );
+    const complete = events.find((ev) => ev.type === 'node_complete');
+    expect(complete?.result).toEqual({ response: 'yes, continue' });
+  });
+});
+
 describe('mapLedgerRecordToEvents — node anchoring (0013 addendum ruling)', () => {
   it('drops records without a node_id (spec-mandated records must be node-anchored)', () => {
     const state = createLedgerMappingState();

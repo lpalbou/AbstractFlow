@@ -148,8 +148,10 @@
 }
 
 .palette-node-status.unavailable {
-  border-color: rgba(255, 71, 120, 0.35);
-  color: var(--accent-primary);
+  /* Unavailable is an ERROR state, not a brand accent — in cyan-accent
+     themes the accent would stop reading as "something is wrong". */
+  border-color: color-mix(in srgb, var(--error, #e74c3c) 35%, transparent);
+  color: var(--error, #e74c3c);
 }
 
 .palette-node-status.checking {
@@ -414,6 +416,127 @@
 .artifact-player-error {
   color: var(--error);
   border-color: rgba(239, 68, 68, 0.4);
+}
+
+/* Universal previewer additions (backlog 0116) */
+.artifact-player-pdf {
+  width: 100%;
+  height: 420px;
+  border: 1px solid var(--bg-tertiary);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.artifact-player-text {
+  max-height: 320px;
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid var(--bg-tertiary);
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-primary);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.artifact-player-text.markdown {
+  font-family: var(--font-sans);
+  white-space: normal;
+}
+
+.artifact-player-truncation {
+  font-size: var(--font-size-xs);
+  color: var(--warning, #f39c12);
+}
+
+.artifact-player-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.artifact-player-zoom {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.artifact-player-zoom:hover:not(:disabled) {
+  background: transparent;
+}
+
+.artifact-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.82);
+  cursor: zoom-out;
+}
+
+.artifact-lightbox-img {
+  max-width: 92vw;
+  max-height: 92vh;
+  object-fit: contain;
+  border-radius: 6px;
+  cursor: default;
+}
+
+.artifact-lightbox-close {
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  font-size: 20px;
+  line-height: 1;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}
+
+.run-gallery-strip {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 4px 0;
+}
+
+.run-gallery-thumb {
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+
+.run-gallery-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.run-gallery-thumb.active {
+  border-color: var(--accent);
+}
+
+.run-gallery-thumb-loading {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.06);
 }
 
 /* Pins List */
@@ -1168,4 +1291,11 @@
 .schema-choice-add-button:hover {
   border-color: rgba(0, 255, 255, 0.52);
   background: rgba(0, 255, 255, 0.18);
+}
+
+/* Reduced-motion (backlog 0114): status blink becomes a steady state dot. */
+@media (prefers-reduced-motion: reduce) {
+  .status-dot.running {
+    animation: none;
+  }
 }
