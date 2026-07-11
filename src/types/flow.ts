@@ -187,6 +187,7 @@ export type NodeType =
   | 'write_file'
   | 'read_pdf'
   | 'write_pdf'
+  | 'write_docx'
   | 'read_artifact'
   | 'list_folder_files'
   | 'import_workspace_file'
@@ -473,6 +474,9 @@ export interface ExecutionEvent {
   allow_free_text?: boolean;
   wait_key?: string;
   reason?: string;
+  // Optional deadline (ISO timestamp) carried by deadline-bearing waits
+  // (e.g. WAIT_EVENT with an idle timeout — frozen seam spec D3).
+  until?: string;
   details?: Record<string, unknown>;
 }
 

@@ -83,6 +83,9 @@ function extractWaitInfo(rec: LedgerRecord) {
     prompt: normalizeString(waitObj.prompt) || undefined,
     choices: Array.isArray(waitObj.choices) ? (waitObj.choices as string[]) : undefined,
     allowFreeText: waitObj.allow_free_text !== false,
+    // Deadline-bearing waits (WAIT_EVENT with an idle timeout, WAIT_UNTIL)
+    // carry `until` beside `wait_key` — pass it through for honest rendering.
+    until: normalizeString(waitObj.until) || undefined,
     isPause,
     subRunId: subRunId || undefined,
     details: detailObj || undefined,
@@ -228,6 +231,7 @@ export function mapLedgerRecordToEvents(rec: LedgerRecord, state: LedgerMappingS
         allow_free_text: waitInfo.allowFreeText,
         wait_key: waitInfo.waitKey || undefined,
         reason: waitInfo.reason || undefined,
+        until: waitInfo.until,
         details: waitInfo.details,
       });
       if (waitInfo.subRunId) {

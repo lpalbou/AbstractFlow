@@ -254,11 +254,14 @@ export function visionAdapterItemsFromGatewayCatalog(payload: unknown): GatewayV
   for (const item of items) {
     const raw = isRecord(item.raw) ? item.raw : {};
     const source =
+      textValue(item.adapter) ||
+      textValue(raw.adapter) ||
+      textValue(item.id) ||
+      textValue(raw.id) ||
       textValue(item.source) ||
       textValue(raw.source) ||
       textValue(raw.repo_id) ||
-      textValue(raw.repo) ||
-      textValue(item.id);
+      textValue(raw.repo);
     if (!source) continue;
     const provider = textValue(item.provider) || textValue(raw.provider);
     const key = `${normalizeKey(provider)}::${normalizeKey(source)}`;

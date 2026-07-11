@@ -54,12 +54,15 @@ before `on_flow_end` if their outputs are part of the requested result.
   permissive PDF reader.
 - `write_pdf` renders text or Markdown-style report content to real PDF bytes
   using Runtime's permissive PDF writer.
+- `write_docx` renders text or Markdown-style report content to a real `.docx`
+  document using Runtime's standard-library DOCX writer.
 
 In Gateway-hosted runs, these are workspace-scoped server paths, not browser
 local files. Artifact inputs use the separate `Artifact` / `Local File` /
 `Server File` source model. Use `write_file` for Markdown, JSON, and text
-files. Use `write_pdf` for PDF files; do not represent PDF generation by
-writing Markdown to a `.pdf` path.
+files. Use `write_pdf` for PDF files and `write_docx` for Word-compatible
+documents; do not represent PDF/DOCX generation by writing Markdown to a
+`.pdf` or `.docx` path.
 
 ## Structured Output And Switch Cases
 

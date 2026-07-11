@@ -26,6 +26,8 @@ Thumbs.db
 # Local scratch/runtime data
 runtime/
 flows/
+!examples/flows/
+!examples/flows/dp-*.json
 untracked/
 
 # Test/cache output

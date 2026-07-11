@@ -176,7 +176,7 @@ and authoring docs:
 The canvas reflects that split:
 
 - path-based nodes such as `Read File`, `Write File`, `Read PDF`, `Write PDF`,
-  and `List Folder Files` consume workspace-scoped server paths;
+  `Write DOCX`, and `List Folder Files` consume workspace-scoped server paths;
 - artifact-first nodes such as `Artifact`, `Import Server File`, `Read
   Artifact`, and `Export Artifact` work with durable runtime-owned payloads.
 
@@ -186,6 +186,7 @@ The canvas reflects that split:
 - [Web editor](web-editor.md)
 - [Workflow authoring skill](workflow-authoring-skill.md)
 - [Workflow node catalog](workflow-node-catalog.md)
+- [Production research workflow](dp-research.md)
 - [Architecture](architecture.md)
 - [API and contracts](api.md)
 - [VisualFlow JSON](visualflow.md)
@@ -459,11 +460,12 @@ These checks apply only when the request's deliverable is researched content
 coupled to a workflow/report deliverable in the same sentence); an incidental
 mention of "research" — such as "discussion, research, and deepening of ideas"
 — does not force the research scaffold onto an unrelated workflow.
-When a request asks for Markdown/PDF artifacts, the assistant must create
-an executable `Write File` node for Markdown and an executable `Write PDF` node
-for PDF. `Write PDF` renders report text or Markdown-style content to real PDF
-bytes in Runtime and exposes the resulting path through `On Flow End`. Generic
-`Write File` and sandbox Code are not treated as PDF generation.
+When a request asks for Markdown/PDF/DOCX artifacts, the assistant must create
+an executable `Write File` node for Markdown, an executable `Write PDF` node for
+PDF, and an executable `Write DOCX` node for DOCX. `Write PDF` and `Write DOCX`
+render report text or Markdown-style content to real document bytes in Runtime
+and expose the resulting paths through `On Flow End`. Generic `Write File` and
+sandbox Code are not treated as document generation.
 
 Tool-dependent requests use Gateway's advertised tool inventory and exact tool
 names. If Gateway defaults, advertised discovery endpoints, the planner run,
@@ -1041,6 +1043,9 @@ Node behavior:
 - `read_pdf` / `write_pdf`: execution nodes for real workspace-scoped server
   `.pdf` files; Write PDF renders text/Markdown report content and outputs
   bytes, sha256, `file_path`.
+- `write_docx`: execution node for real workspace-scoped server `.docx` files;
+  Write DOCX renders text/Markdown report content and outputs bytes, sha256,
+  `file_path`.
 - Expose file paths through On Flow End when the user asked for files.
 - Artifact literal nodes (`template` variants: Text/Image/Voice/Music/Video
   Artifact) create typed refs for existing saved artifacts.
@@ -1058,8 +1063,9 @@ Node behavior:
 File pattern: content -> Write File.content; path default ->
 Write File.file_path; exec chain through Write File before On Flow End;
 Write File.file_path -> On Flow End `markdown_path`/`report_path`. Same shape
-for Write PDF with a `.pdf` path -> `pdf_path`. Do not claim an asset exists
-unless the graph creates and exposes it.
+for Write PDF with a `.pdf` path -> `pdf_path` and Write DOCX with a `.docx`
+path -> `docx_path`. Do not claim an asset exists unless the graph creates and
+exposes it.
 
 ### Data, JSON, And Prompt Building
 
@@ -2209,11 +2215,11 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 
 - Node type: `wait_event`
 - Document node: `{"id":"<unique_id>","type":"wait_event"}`
-- Utility: Pause the workflow until an event matching event_key is received, then resume with event_data. Optional pins (prompt/choices/allow_free_text) enable durable “ask + wait” UX for hosts like AbstractCode.
+- Utility: Pause the workflow until an event matching event_key is received, then resume with event_data. Optional pins (prompt/choices/allow_free_text) enable durable “ask + wait” UX for hosts like AbstractCode. Optional `until` (ISO timestamp, normalized to UTC) adds a durable idle deadline: if no event arrives in time the wait resumes with {"timed_out": true} in event_data. Optional `details` (object) rides the ledger wait record so clients can render the park honestly (e.g. {"kind": "visitor_message"} renders a message composer).
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `event_key` string; `prompt` string; `choices` array; `allow_free_text` boolean
+- Inputs: `exec-in` execution; `event_key` string; `prompt` string; `choices` array; `allow_free_text` boolean; `until` string: Optional idle deadline (ISO timestamp; runtime-normalized to UTC). Past-deadline resume carries {"timed_out": true}.; `details` object: Optional wait metadata carried into the ledger wait record (e.g. {"kind": "visitor_message"}); lets clients render the park honestly.
 - Outputs: `exec-out` execution; `event_data` object
 - Default config: none
 
@@ -2893,6 +2899,18 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Outputs: `exec-out` execution; `content` string; `pages` number; `processed_pages` number; `metadata` object; `warnings` array; `truncated` boolean; `file_path` workspace_file; `content_type` string
 - Default config: none
 
+### memory / Write DOCX
+
+- Node type: `write_docx`
+- Document node: `{"id":"<unique_id>","type":"write_docx"}`
+- Utility: Render text or Markdown-style report content to a workspace-scoped DOCX document using the Runtime stdlib DOCX writer.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `file_path` workspace_file; `content` any; `title` string: Optional DOCX document title.
+- Outputs: `exec-out` execution; `bytes` number; `file_path` workspace_file; `sha256` string; `content_type` string
+- Default config: none
+
 ### memory / Write File
 
 - Node type: `write_file`
@@ -3289,12 +3307,15 @@ before `on_flow_end` if their outputs are part of the requested result.
   permissive PDF reader.
 - `write_pdf` renders text or Markdown-style report content to real PDF bytes
   using Runtime's permissive PDF writer.
+- `write_docx` renders text or Markdown-style report content to a real `.docx`
+  document using Runtime's standard-library DOCX writer.
 
 In Gateway-hosted runs, these are workspace-scoped server paths, not browser
 local files. Artifact inputs use the separate `Artifact` / `Local File` /
 `Server File` source model. Use `write_file` for Markdown, JSON, and text
-files. Use `write_pdf` for PDF files; do not represent PDF generation by
-writing Markdown to a `.pdf` path.
+files. Use `write_pdf` for PDF files and `write_docx` for Word-compatible
+documents; do not represent PDF/DOCX generation by writing Markdown to a
+`.pdf` or `.docx` path.
 
 ## Structured Output And Switch Cases
 
@@ -3460,6 +3481,59 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Added
+- Honest rendering for event-wait parks in the run modal (visit seam-spec
+  0013 client half). Event waits (`reason=event`) no longer invent a
+  "Please respond:" question: plain parks render as
+  "Parked — waiting for events on `<wait_key>`" with no input affordance,
+  while waits marked `details.kind="visitor_message"` render a chat-style
+  composer ("Waiting for your message." + Send) that resumes with
+  `{text: …}` — the payload key the shipped visit workflow's ROUTE node
+  reads (`abstractruntime/identity/visit_workflow.py`). Deadline-bearing
+  waits (`until` beside `wait_key`, the runtime's WAIT_EVENT idle timeout)
+  show the idle deadline with relative time. The ledger mapper
+  (`src/utils/ledgerEvents.ts`) now passes `until` through, and new
+  contract tests (`src/utils/ledgerEvents.test.ts`) pin the wait
+  passthrough plus the node-anchored record ruling (records without
+  `run_id`+`node_id` are dropped by contract, per the 0013 clarifications
+  addendum).
+- Act-only act-frame chips (`src/utils/actOnlyRefs.ts` + run modal): step
+  outputs carrying `$act_only` typed refs (diary-class tools under the G1
+  privacy rule — "the book's words never rest outside the book") render as
+  chips showing the ACT (tool, entry id, one-line gist, reason) with an
+  explicit note that content stays in the entity's book. Recognition is
+  parse-based on the frozen ref shape (lone `$act_only` top-level key,
+  exact JSON), never regex; Flow never resolves refs (rendering is a pure
+  read). Pinned by `src/utils/actOnlyRefs.test.ts`.
+- Added `examples/flows/event-inbox-react-agent.json`: a resident ReAct agent
+  (LLM + while loop + code drain, no Agent node) driven by an open event
+  channel instead of any specific hub. It declares an `events_mailbox` run
+  var, parks durably on `wait_event` (`evt:global:global:<mailbox>`) when
+  idle, and drains its `events_inbox` run var with a `seq` cursor at every
+  cycle boundary — so events posted by anyone via the gateway `emit_event`
+  command (`durable: true`) interleave into the very next loop cycle, even
+  mid-burst. `{kind: "stop"}` ends the resident; burst budgets flush with a
+  labeled `#FALLBACK` report. Generalizes the agora example (agora becomes
+  one producer). See `docs/guide/event-inbox-agent.md` at the repo root;
+  scripted tests in
+  `abstractruntime/tests/test_visualflow_event_inbox_react_agent.py`.
+- Added `examples/flows/agora-react-agent.json`: a hand-built ReAct agent
+  (`llm_call` + `while` loop + `tool_calls`, no Agent node) that participates
+  in an agora agent-to-agent hub. It bootstraps its inbox deterministically
+  (`call_tool: agora_check_inbox`), puts the hub's priority envelopes
+  (critical / blocked / open+escalated / to_me / reply_to_me) in front of the
+  model every cycle, replies where an answer is owed (`status=reply` +
+  `reply_to`), acks handled cursors, and ends with a plain-text report.
+  Requires the runtime's env-gated `agora` toolset (`AGORA_API_KEY`); see
+  `docs/guide/agora-workflow-agent.md` at the repo root and the scripted test
+  `abstractruntime/tests/test_visualflow_agora_react_agent.py`.
+- Added the `dp-` production research workflow family sources under
+  `examples/flows/dp-*.json`, plus a generator script that packs
+  `dp-research@0.1.0.flow` for Gateway. The root graph uses an enforced
+  `For(max_review_rounds)` investigate/review loop and timestamped exports.
+- Added first-class `Write DOCX` authoring metadata so workflows can export
+  Markdown/report content through Runtime's native DOCX node.
 
 ## [0.3.19] - 2026-06-14
 

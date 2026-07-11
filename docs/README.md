@@ -32,7 +32,7 @@ and authoring docs:
 The canvas reflects that split:
 
 - path-based nodes such as `Read File`, `Write File`, `Read PDF`, `Write PDF`,
-  and `List Folder Files` consume workspace-scoped server paths;
+  `Write DOCX`, and `List Folder Files` consume workspace-scoped server paths;
 - artifact-first nodes such as `Artifact`, `Import Server File`, `Read
   Artifact`, and `Export Artifact` work with durable runtime-owned payloads.
 
@@ -42,6 +42,7 @@ The canvas reflects that split:
 - [Web editor](web-editor.md)
 - [Workflow authoring skill](workflow-authoring-skill.md)
 - [Workflow node catalog](workflow-node-catalog.md)
+- [Production research workflow](dp-research.md)
 - [Architecture](architecture.md)
 - [API and contracts](api.md)
 - [VisualFlow JSON](visualflow.md)

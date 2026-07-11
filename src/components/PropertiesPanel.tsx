@@ -3,12 +3,14 @@
  */
 
 import React, { useCallback, useEffect, useState, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import type { Node } from 'reactflow';
 import toast from 'react-hot-toast';
 import type { FlowNodeData, JsonValue, ProviderInfo, VisualFlow, Pin } from '../types/flow';
 import { RECALL_LEVEL_OPTIONS } from '../types/recall';
 import { useFlowStore } from '../hooks/useFlow';
 import { useGatewayCapabilities, gatewayContractsFromCapabilities } from '../hooks/useGatewayCapabilities';
+import { useVisionAdapterCatalog } from '../hooks/useVisionAdapterCatalog';
 import { useSemanticsRegistry } from '../hooks/useSemantics';
 import { CodeEditorModal } from './CodeEditorModal';
 import ProviderModelsPanel from './ProviderModelsPanel';
@@ -41,8 +43,6 @@ import {
 import {
   modelOptionsFromGatewayCatalog,
   providerOptionsFromGatewayCatalog,
-  visionAdapterItemsFromGatewayCatalog,
-  type GatewayVisionAdapterCatalogItem,
 } from '../utils/gatewayCatalog';
 import {
   modelCatalogScopeForPin,
@@ -51,6 +51,8 @@ import {
   type PinCatalogScope,
 } from '../utils/pinCatalog';
 import { TEXT_OUTPUT_CAPABILITY_ROUTE } from '../utils/capabilityRoutes';
+import { thinkingOptionsFromModelCapabilities } from '../utils/thinkingControls';
+import { RESEARCH_EFFORT_OPTIONS, isResearchEffortPin, normalizeResearchEffort } from '../utils/researchEffort';
 import { insertModelResidencyStep, modelResidencyTaskUnsupportedReason } from '../utils/modelResidencyGraph';
 import {
   applyImagePinDefaultPatch,
@@ -59,6 +61,14 @@ import {
 } from '../utils/mediaModelParams';
 import { normalizeEnumValues } from '../utils/jsonSchemaEditor';
 import { structuredResponseSchemaFromGraph } from '../utils/structuredOutputs';
+import {
+  adapterRoleOptions,
+  mergeLoRAAdapterSelection,
+  normalizeStoredLoRAAdapters,
+  serializeLoRAAdapters,
+  visionAdapterSourceOptions,
+  type FlowVisionLoRAAdapter,
+} from '../utils/visionLora';
 import {
   defaultSubflowPinPatch,
   savedFlowOptions,
@@ -98,14 +108,6 @@ const DEFAULT_VIDEO_FORMATS = ['mp4', 'mov', 'gif'];
 const DEFAULT_TTS_FORMATS = ['wav', 'mp3'];
 const DEFAULT_STT_FORMATS = ['json', 'text', 'verbose_json', 'srt', 'vtt'];
 const DEFAULT_MUSIC_FORMATS = ['wav', 'mp3', 'flac'];
-const THINKING_OPTIONS = [
-  { value: '', label: 'Auto (Gateway default)' },
-  { value: 'off', label: 'Off' },
-  { value: 'low', label: 'Low' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'high', label: 'High' },
-  { value: 'xhigh', label: 'XHigh' },
-];
 const DEFAULT_TTS_QUALITY_PRESETS: AfSelectOption[] = [
   { value: 'low', label: 'low latency' },
   { value: 'standard', label: 'standard' },
@@ -183,19 +185,6 @@ function withGatewayDefaultOption(options: AfSelectOption[]): AfSelectOption[] {
   ];
 }
 
-type FlowVisionLoRAAdapter = {
-  source: string;
-  scale?: number;
-  target_role?: string;
-  weight_name?: string;
-  subfolder?: string;
-  adapter_name?: string;
-};
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
-}
-
 function parseSeedListText(value: string): number[] {
   const text = String(value || '').trim();
   if (!text) return [];
@@ -222,77 +211,6 @@ function seedListTextFrom(value: unknown): string {
       .join(', ');
   }
   return typeof value === 'string' ? value : '';
-}
-
-function normalizeStoredLoRAAdapters(value: unknown): FlowVisionLoRAAdapter[] {
-  let parsed = value;
-  if (typeof parsed === 'string') {
-    const text = parsed.trim();
-    if (!text) return [];
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      return [];
-    }
-  }
-  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) parsed = [parsed];
-  if (!Array.isArray(parsed)) return [];
-  const out: FlowVisionLoRAAdapter[] = [];
-  for (const item of parsed) {
-    const record = asRecord(item);
-    if (!record) continue;
-    const source = String(record.source || record.id || '').trim();
-    if (!source) continue;
-    const scaleRaw = record.scale;
-    const scale =
-      scaleRaw === undefined || scaleRaw === null || scaleRaw === ''
-        ? undefined
-        : Number.isFinite(Number(scaleRaw))
-          ? Number(scaleRaw)
-          : undefined;
-    out.push({
-      source,
-      scale,
-      target_role: typeof record.target_role === 'string' && record.target_role.trim() ? record.target_role.trim() : undefined,
-      weight_name: typeof record.weight_name === 'string' && record.weight_name.trim() ? record.weight_name.trim() : undefined,
-      subfolder: typeof record.subfolder === 'string' && record.subfolder.trim() ? record.subfolder.trim() : undefined,
-      adapter_name: typeof record.adapter_name === 'string' && record.adapter_name.trim() ? record.adapter_name.trim() : undefined,
-    });
-  }
-  return out;
-}
-
-function serializeLoRAAdapters(adapters: FlowVisionLoRAAdapter[]): JsonValue[] {
-  return adapters
-    .filter((item) => item && item.source.trim())
-    .map((item) => ({
-      source: item.source.trim(),
-      ...(item.scale !== undefined ? { scale: item.scale } : {}),
-      ...(item.target_role ? { target_role: item.target_role } : {}),
-      ...(item.weight_name ? { weight_name: item.weight_name } : {}),
-      ...(item.subfolder ? { subfolder: item.subfolder } : {}),
-      ...(item.adapter_name ? { adapter_name: item.adapter_name } : {}),
-    }));
-}
-
-function adapterLabelFromCatalogItem(item: GatewayVisionAdapterCatalogItem): string {
-  const label = String(item.label || '').trim();
-  const provider = String(item.provider || '').trim();
-  return label || (provider ? `${provider} / ${item.source}` : item.source);
-}
-
-function adapterRoleOptions(item: GatewayVisionAdapterCatalogItem | undefined, currentValue = ''): AfSelectOption[] {
-  const values = new Set<string>();
-  const out: AfSelectOption[] = [{ value: '', label: 'Auto' }];
-  for (const role of item?.suggested_target_roles || []) {
-    const clean = String(role || '').trim();
-    if (!clean || values.has(clean)) continue;
-    values.add(clean);
-    out.push({ value: clean, label: clean });
-  }
-  const current = String(currentValue || '').trim();
-  if (current && !values.has(current)) out.push({ value: current, label: current });
-  return out;
 }
 
 interface PropertiesPanelProps {
@@ -667,9 +585,9 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const sttFormatOptions = formatValuesFrom(undefined, DEFAULT_STT_FORMATS);
   const musicFormatOptions = formatValuesFrom(generatedMusicContract?.direct_endpoint?.formats, DEFAULT_MUSIC_FORMATS);
   const gatewayReadiness = getGatewayFlowEditorReadiness(gatewayContracts);
-  const mediaDiscovery = gatewayContracts?.common?.discovery || {};
   const providerDiscoveryEndpoint = gatewayContracts?.common?.discovery?.providers || '';
   const providerModelsEndpoint = gatewayContracts?.common?.discovery?.provider_models || '';
+  const modelCapabilitiesEndpoint = gatewayContracts?.common?.discovery?.model_capabilities || '';
   const voiceCatalogEndpoint = gatewayContracts?.common?.discovery?.voice_voices || '';
   const ttsModelsEndpoint = gatewayContracts?.common?.discovery?.audio_speech_models || '';
   const sttModelsEndpoint = gatewayContracts?.common?.discovery?.audio_transcription_models || '';
@@ -703,20 +621,6 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     typeof imageToVideoContract?.direct_endpoint?.provider_models_task === 'string' && imageToVideoContract.direct_endpoint.provider_models_task.trim()
       ? imageToVideoContract.direct_endpoint.provider_models_task.trim()
       : 'image_to_video';
-  const visionAdaptersEndpoint =
-    mediaDiscovery.vision_adapters ||
-    (typeof generatedImageContract?.direct_endpoint?.adapter_catalog_endpoint === 'string'
-      ? generatedImageContract.direct_endpoint.adapter_catalog_endpoint
-      : '') ||
-    (typeof generatedVideoContract?.direct_endpoint?.adapter_catalog_endpoint === 'string'
-      ? generatedVideoContract.direct_endpoint.adapter_catalog_endpoint
-      : '') ||
-    (typeof imageToVideoContract?.direct_endpoint?.adapter_catalog_endpoint === 'string'
-      ? imageToVideoContract.direct_endpoint.adapter_catalog_endpoint
-      : '') ||
-    (typeof editedImageContract?.direct_endpoint?.adapter_catalog_endpoint === 'string'
-      ? editedImageContract.direct_endpoint.adapter_catalog_endpoint
-      : '');
   const currentImageProviderModelsTask =
     node?.data?.nodeType === 'upscale_image'
       ? upscaledImageProviderModelsTask
@@ -744,8 +648,6 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
   const [imageModelOptions, setImageModelOptions] = useState<
     Array<{ provider: string; model: string; label: string; catalogTask?: string } & MediaModelParameterMetadata>
   >([]);
-  const [visionAdapterOptions, setVisionAdapterOptions] = useState<GatewayVisionAdapterCatalogItem[]>([]);
-  const [loadingVisionAdapters, setLoadingVisionAdapters] = useState(false);
   const [loadingMediaModels, setLoadingMediaModels] = useState(false);
   const [mediaCatalogRequest, setMediaCatalogRequest] = useState<{
     seq: number;
@@ -863,6 +765,46 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
             );
           })()))
   );
+  const selectedTextModelForThinking = (() => {
+    const n = node?.data;
+    if (!n) return '';
+
+    const fromConfig =
+      n.nodeType === 'agent'
+        ? n.agentConfig?.model
+        : n.nodeType === 'llm_call'
+          ? n.effectConfig?.model
+          : undefined;
+    if (typeof fromConfig === 'string' && fromConfig.trim()) return fromConfig.trim();
+
+    if (n.nodeType === 'on_flow_start' || n.nodeType === 'on_flow_end') {
+      const pins = n.nodeType === 'on_flow_start' ? n.outputs : n.inputs;
+      const modelPin = pins.find((pin) => modelCatalogScopeForPin(pin, pins, n.nodeType) === 'text');
+      const raw = modelPin && n.pinDefaults ? (n.pinDefaults as any)[modelPin.id] : undefined;
+      return typeof raw === 'string' && raw.trim() ? raw.trim() : '';
+    }
+
+    const raw = n.pinDefaults?.model;
+    return typeof raw === 'string' && raw.trim() ? raw.trim() : '';
+  })();
+  const thinkingCapabilitiesQuery = useQuery({
+    queryKey: ['model-capabilities', modelCapabilitiesEndpoint, selectedTextModelForThinking],
+    queryFn: () =>
+      gatewayJson<Record<string, unknown>>(
+        gatewayPath(modelCapabilitiesEndpoint, {}, { model_name: selectedTextModelForThinking })
+      ),
+    enabled:
+      Boolean(selectedTextModelForThinking) &&
+      Boolean(modelCapabilitiesEndpoint) &&
+      !gatewayCapabilitiesQuery.isLoading &&
+      !gatewayCapabilitiesQuery.isError,
+    staleTime: 30_000,
+  });
+  const thinkingOptions = thinkingOptionsFromModelCapabilities(
+    thinkingCapabilitiesQuery.data,
+    selectedTextModelForThinking
+  );
+  const thinkingSupported = thinkingOptions.length > 0;
 
   useEffect(() => {
     setShowCodeEditor(false);
@@ -1580,58 +1522,19 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           adapterDiscoveryNodeData?.nodeType === 'image_to_video'
         ? stringDefaultForAdapterDiscovery('video_model', 'model')
         : '';
-  const adapterDiscoverySupportsLoRAAdapters =
-    adapterDiscoveryNodeData?.nodeType === 'generate_image'
-      ? Boolean(generatedImageContract?.direct_endpoint?.supports_lora_adapters)
-      : adapterDiscoveryNodeData?.nodeType === 'edit_image' || adapterDiscoveryNodeData?.nodeType === 'image_to_image'
-        ? Boolean(editedImageContract?.direct_endpoint?.supports_lora_adapters)
-        : adapterDiscoveryNodeData?.nodeType === 'generate_video' || adapterDiscoveryNodeData?.nodeType === 'text_to_video'
-          ? Boolean(generatedVideoContract?.direct_endpoint?.supports_lora_adapters)
-          : adapterDiscoveryNodeData?.nodeType === 'image_to_video'
-            ? Boolean(imageToVideoContract?.direct_endpoint?.supports_lora_adapters)
-            : false;
-
-  useEffect(() => {
-    if (gatewayCapabilitiesQuery.isLoading) return;
-    if (
-      gatewayCapabilitiesQuery.isError ||
-      !adapterDiscoverySupportsLoRAAdapters ||
-      !visionAdaptersEndpoint ||
-      !adapterDiscoveryVisionTask ||
-      !adapterDiscoveryVisionProvider ||
-      !adapterDiscoveryVisionModel
-    ) {
-      setVisionAdapterOptions([]);
-      setLoadingVisionAdapters(false);
-      return;
-    }
-
-    const query = Object.fromEntries(
-      Object.entries({
-        task: adapterDiscoveryVisionTask,
-        provider: adapterDiscoveryVisionProvider,
-        model: adapterDiscoveryVisionModel,
-      }).filter(([, value]) => typeof value === 'string' && value.trim())
-    );
-
-    setLoadingVisionAdapters(true);
-    gatewayJson<any>(gatewayPath(visionAdaptersEndpoint, {}, query), { timeoutMs: 30_000 })
-      .then((payload) => {
-        setVisionAdapterOptions(visionAdapterItemsFromGatewayCatalog(payload));
-      })
-      .catch(() => {
-        setVisionAdapterOptions([]);
-      })
-      .finally(() => setLoadingVisionAdapters(false));
-  }, [
-    adapterDiscoverySupportsLoRAAdapters,
-    adapterDiscoveryVisionModel,
-    adapterDiscoveryVisionProvider,
-    adapterDiscoveryVisionTask,
-    gatewayCapabilitiesQuery.isError,
-    gatewayCapabilitiesQuery.isLoading,
-    visionAdaptersEndpoint,
-  ]);
+  const {
+    adapterItems: visionAdapterOptions,
+    canBrowse: canBrowseVisionAdapters,
+    isLoading: loadingVisionAdapters,
+  } = useVisionAdapterCatalog({
+    nodeType: adapterDiscoveryNodeData?.nodeType || '',
+    gatewayContracts,
+    capabilitiesLoading: gatewayCapabilitiesQuery.isLoading,
+    capabilitiesError: gatewayCapabilitiesQuery.isError,
+    provider: adapterDiscoveryVisionProvider,
+    model: adapterDiscoveryVisionModel,
+    enabled: Boolean(adapterDiscoveryVisionTask),
+  });
 
   
   if (!node) {
@@ -1772,34 +1675,6 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
     return '';
   };
 
-  const currentVisionTask =
-    data.nodeType === 'generate_image'
-      ? generatedImageProviderModelsTask
-      : data.nodeType === 'edit_image' || data.nodeType === 'image_to_image'
-        ? editedImageProviderModelsTask
-        : data.nodeType === 'generate_video' || data.nodeType === 'text_to_video'
-          ? generatedVideoProviderModelsTask
-          : data.nodeType === 'image_to_video'
-            ? imageToVideoProviderModelsTask
-            : '';
-  const currentVisionProvider =
-    data.nodeType === 'generate_image' ||
-    data.nodeType === 'edit_image' ||
-    data.nodeType === 'image_to_image' ||
-    data.nodeType === 'upscale_image'
-      ? stringDefaultFor('image_provider', 'provider')
-      : data.nodeType === 'generate_video' || data.nodeType === 'text_to_video' || data.nodeType === 'image_to_video'
-        ? stringDefaultFor('video_provider', 'provider')
-        : '';
-  const currentVisionModel =
-    data.nodeType === 'generate_image' ||
-    data.nodeType === 'edit_image' ||
-    data.nodeType === 'image_to_image' ||
-    data.nodeType === 'upscale_image'
-      ? stringDefaultFor('image_model', 'model')
-      : data.nodeType === 'generate_video' || data.nodeType === 'text_to_video' || data.nodeType === 'image_to_video'
-        ? stringDefaultFor('video_model', 'model')
-        : '';
   const currentMediaLoRAAdapters = normalizeStoredLoRAAdapters(
     ((data.pinDefaults || {}) as Record<string, unknown>).lora_adapters ??
       ((data.effectConfig || {}) as Record<string, unknown>).lora_adapters
@@ -2934,30 +2809,23 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               }
 
               if (mediaNode && pin.id === 'lora_adapters') {
-                const canBrowseAdapters = Boolean(currentVisionTask && currentVisionProvider && currentVisionModel);
-                const adapterOptions = visionAdapterOptions.map((item) => ({
-                  value: item.source,
-                  label: adapterLabelFromCatalogItem(item),
-                }));
+                const canBrowseAdapters = canBrowseVisionAdapters;
+                const adapterOptions = visionAdapterSourceOptions(visionAdapterOptions, currentMediaLoRAAdapters);
                 return (
                   <div key={pin.id} className="property-group">
                     <label className="property-sublabel">{rowLabel}</label>
                     <div className="array-editor">
                       {currentMediaLoRAAdapters.map((adapter, index) => {
                         const catalogItem = visionAdapterOptions.find((item) => item.source === adapter.source);
-                        const nextSourceOptions =
-                          adapter.source && !adapterOptions.some((option) => option.value === adapter.source)
-                            ? [{ value: adapter.source, label: adapter.source }, ...adapterOptions]
-                            : adapterOptions;
                         return (
                           <div key={`${adapter.source || 'adapter'}-${index}`} className="object-editor">
                             <div className="object-field">
                               <div className="object-key">
                                 <AfSelect
                                   value={adapter.source}
-                                  options={nextSourceOptions}
+                                  options={adapterOptions}
                                   placeholder={loadingVisionAdapters ? 'Loading…' : 'Select adapter…'}
-                                  loading={loadingVisionAdapters && nextSourceOptions.length === 0}
+                                  loading={loadingVisionAdapters && adapterOptions.length === 0}
                                   searchable
                                   clearable
                                   allowCustom
@@ -2967,20 +2835,15 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                                     if (canBrowseAdapters) return;
                                   }}
                                   onChange={(value) => {
-                                    const next = [...currentMediaLoRAAdapters];
-                                    const picked = visionAdapterOptions.find((item) => item.source === value);
-                                    next[index] = {
-                                      ...next[index],
-                                      source: value || '',
-                                      weight_name: picked?.weight_name || next[index]?.weight_name,
-                                      subfolder: picked?.subfolder || next[index]?.subfolder,
-                                      adapter_name: picked?.adapter_name || next[index]?.adapter_name,
-                                      target_role:
-                                        next[index]?.target_role && adapterRoleOptions(picked, next[index]?.target_role).some((option) => option.value === next[index]?.target_role)
-                                          ? next[index]?.target_role
-                                          : undefined,
-                                    };
-                                    updateCurrentMediaLoRAAdapters(next.filter((item) => item.source.trim()));
+                                    const nextSources = currentMediaLoRAAdapters.map((item) => item.source);
+                                    nextSources[index] = value || '';
+                                    updateCurrentMediaLoRAAdapters(
+                                      mergeLoRAAdapterSelection(
+                                        currentMediaLoRAAdapters,
+                                        nextSources.filter((item) => item.trim()),
+                                        visionAdapterOptions
+                                      )
+                                    );
                                   }}
                                 />
                               </div>
@@ -3047,16 +2910,13 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
                         disabled={!canBrowseAdapters || visionAdapterOptions.length === 0}
                         onClick={() => {
                           const firstAdapter = visionAdapterOptions[0];
-                          updateCurrentMediaLoRAAdapters([
-                            ...currentMediaLoRAAdapters,
-                            {
-                              source: firstAdapter?.source || '',
-                              scale: 1,
-                              weight_name: firstAdapter?.weight_name,
-                              subfolder: firstAdapter?.subfolder,
-                              adapter_name: firstAdapter?.adapter_name,
-                            },
-                          ]);
+                          updateCurrentMediaLoRAAdapters(
+                            mergeLoRAAdapterSelection(
+                              currentMediaLoRAAdapters,
+                              [...currentMediaLoRAAdapters.map((item) => item.source), firstAdapter?.source || ''],
+                              visionAdapterOptions
+                            )
+                          );
                         }}
                       >
                         + Add adapter
@@ -4274,24 +4134,30 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
             <span className="property-hint">-1 = random/unset; {'>=0'} = deterministic (provider permitting)</span>
           </div>
 
-          <div className="property-group">
-            <label className="property-sublabel">Reasoning</label>
-            {thinkingPinConnected ? (
-              <span className="property-hint">Provided by connected pin.</span>
-            ) : (
-              <select
-                className="property-select"
-                value={data.agentConfig?.thinking || ''}
-                onChange={(e) => updateAgentConfig({ thinking: e.target.value || undefined })}
-              >
-                {THINKING_OPTIONS.map((option) => (
-                  <option key={option.value || 'auto'} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
+          {thinkingSupported ? (
+            <div className="property-group">
+              <label className="property-sublabel">Reasoning</label>
+              {thinkingPinConnected ? (
+                <span className="property-hint">Provided by connected pin.</span>
+              ) : (
+                <select
+                  className="property-select"
+                  value={
+                    thinkingOptions.some((option) => option.value === data.agentConfig?.thinking)
+                      ? data.agentConfig?.thinking || ''
+                      : ''
+                  }
+                  onChange={(e) => updateAgentConfig({ thinking: e.target.value || undefined })}
+                >
+                  {thinkingOptions.map((option) => (
+                    <option key={option.value || 'auto'} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          ) : null}
 
           <div className="property-group">
             <label className="property-sublabel">Max iterations</label>
@@ -5133,7 +4999,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           <label className="property-label">Flow Start Parameters</label>
 
           {(() => {
-            const params = data.outputs.filter((p) => p.type !== 'execution');
+            const params = data.outputs.filter((p) => p.type !== 'execution' && (p.id !== 'thinking' || thinkingSupported));
 
             const used = new Set(data.outputs.map((p) => p.id));
 
@@ -5146,6 +5012,35 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               const raw = data.pinDefaults ? (data.pinDefaults as any)[pin.id] : undefined;
               const defaultHint = `Default value for ${pin.id}`;
               const providerScope = providerCatalogScopeForPin(pin, data.nodeType);
+
+              if (isResearchEffortPin(pin.id)) {
+                return (
+                  <AfSelect
+                    value={normalizeResearchEffort(raw)}
+                    options={RESEARCH_EFFORT_OPTIONS}
+                    placeholder="Standard search"
+                    searchable={false}
+                    clearable={false}
+                    minPopoverWidth={220}
+                    onChange={(v) => setPinDefault(pin.id, normalizeResearchEffort(v))}
+                  />
+                );
+              }
+
+              if (pin.id === 'thinking') {
+                const value = typeof raw === 'string' && thinkingOptions.some((option) => option.value === raw) ? raw : '';
+                return (
+                  <AfSelect
+                    value={value}
+                    options={thinkingOptions}
+                    placeholder="Auto (Gateway default)"
+                    searchable={false}
+                    clearable={false}
+                    minPopoverWidth={220}
+                    onChange={(v) => setPinDefault(pin.id, v || undefined)}
+                  />
+                );
+              }
 
               if (providerScope) {
                 const value = typeof raw === 'string' ? raw : '';
@@ -5544,7 +5439,7 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
           <label className="property-label">Flow Outputs</label>
 
           {(() => {
-            const outs = data.inputs.filter((p) => p.type !== 'execution');
+            const outs = data.inputs.filter((p) => p.type !== 'execution' && (p.id !== 'thinking' || thinkingSupported));
             const used = new Set(data.inputs.map((p) => p.id));
 
             const toolOptions = toolSpecs
@@ -5556,6 +5451,35 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
               const raw = data.pinDefaults ? (data.pinDefaults as any)[pin.id] : undefined;
               const defaultHint = `Default value for ${pin.id}`;
               const providerScope = providerCatalogScopeForPin(pin, data.nodeType);
+
+              if (isResearchEffortPin(pin.id)) {
+                return (
+                  <AfSelect
+                    value={normalizeResearchEffort(raw)}
+                    options={RESEARCH_EFFORT_OPTIONS}
+                    placeholder="Standard search"
+                    searchable={false}
+                    clearable={false}
+                    minPopoverWidth={220}
+                    onChange={(v) => setPinDefault(pin.id, normalizeResearchEffort(v))}
+                  />
+                );
+              }
+
+              if (pin.id === 'thinking') {
+                const value = typeof raw === 'string' && thinkingOptions.some((option) => option.value === raw) ? raw : '';
+                return (
+                  <AfSelect
+                    value={value}
+                    options={thinkingOptions}
+                    placeholder="Auto (Gateway default)"
+                    searchable={false}
+                    clearable={false}
+                    minPopoverWidth={220}
+                    onChange={(v) => setPinDefault(pin.id, v || undefined)}
+                  />
+                );
+              }
 
               if (providerScope) {
                 const value = typeof raw === 'string' ? raw : '';
@@ -6446,24 +6370,30 @@ export function PropertiesPanel({ node }: PropertiesPanelProps) {
             <span className="property-hint">-1 = random/unset; {'>=0'} = deterministic (provider permitting)</span>
           </div>
 
-          <div className="property-group">
-            <label className="property-sublabel">Reasoning</label>
-            {thinkingPinConnected ? (
-              <span className="property-hint">Provided by connected pin.</span>
-            ) : (
-              <select
-                className="property-select"
-                value={data.effectConfig?.thinking || ''}
-                onChange={(e) => updateLlmCallEffectConfig({ thinking: e.target.value || undefined })}
-              >
-                {THINKING_OPTIONS.map((option) => (
-                  <option key={option.value || 'auto'} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
+          {thinkingSupported ? (
+            <div className="property-group">
+              <label className="property-sublabel">Reasoning</label>
+              {thinkingPinConnected ? (
+                <span className="property-hint">Provided by connected pin.</span>
+              ) : (
+                <select
+                  className="property-select"
+                  value={
+                    thinkingOptions.some((option) => option.value === data.effectConfig?.thinking)
+                      ? data.effectConfig?.thinking || ''
+                      : ''
+                  }
+                  onChange={(e) => updateLlmCallEffectConfig({ thinking: e.target.value || undefined })}
+                >
+                  {thinkingOptions.map((option) => (
+                    <option key={option.value || 'auto'} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          ) : null}
 
           <div className="property-group">
             <label className="property-sublabel">Tools (optional)</label>

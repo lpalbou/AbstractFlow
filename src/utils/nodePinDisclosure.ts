@@ -1,6 +1,7 @@
 import type { FlowNodeData, NodeType, Pin } from '../types/flow';
 import { createNodeData, getNodeTemplate } from '../types/nodes';
 import { hasStructuredResponseSchema, isStructuredResponseDataPin } from './structuredOutputs';
+import { modelNameLooksThinkingCapable } from './thinkingControls';
 
 export type PinDisclosureDirection = 'input' | 'output';
 
@@ -299,19 +300,6 @@ const LLM_AGENT_ADVANCED_INPUTS = [
   'resp_schema',
 ];
 
-const THINKING_MODEL_PATTERNS = [
-  /\bo[134](?:[-.]|$)/i,
-  /\bgpt[-_.]?5/i,
-  /\bgpt[-_.]?oss/i,
-  /\bclaude.*(?:4|opus|sonnet|haiku)/i,
-  /\bdeepseek.*(?:r1|v4)/i,
-  /\bqwen3\b/i,
-  /\bqwen3[.-]/i,
-  /\bthinking\b/i,
-  /\breasoning\b/i,
-  /\bseed[-_.]?oss\b/i,
-];
-
 const MEMORY_SCOPE_INPUTS = [
   'scope',
   'recall_level',
@@ -578,6 +566,11 @@ const POLICY_BY_NODE_TYPE: Partial<Record<NodeType, NodeDisclosurePolicy>> = {
     primaryInputs: ['file_path', 'content'],
     advancedInputs: ['title'],
   },
+  write_docx: {
+    compactInputs: true,
+    primaryInputs: ['file_path', 'content'],
+    advancedInputs: ['title'],
+  },
   concat: {
     compactInputs: true,
     primaryInputs: ['a', 'b'],
@@ -840,12 +833,6 @@ function selectedReasoningModel(data: FlowNodeData | undefined, nodeType: NodeTy
     if (text) return text;
   }
   return '';
-}
-
-function modelNameLooksThinkingCapable(modelName: string): boolean {
-  const clean = String(modelName || '').trim();
-  if (!clean) return false;
-  return THINKING_MODEL_PATTERNS.some((pattern) => pattern.test(clean));
 }
 
 function supportsThinkingFromData(data: FlowNodeData | undefined, nodeType: NodeType | string, hint?: ThinkingSupportHint): boolean {

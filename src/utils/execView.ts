@@ -61,6 +61,7 @@ const IO_TYPES = new Set([
   'write_file',
   'read_pdf',
   'write_pdf',
+  'write_docx',
   'model_residency',
 ]);
 // Event-ish types that do not match the on_*/wait_*/emit_* prefixes.

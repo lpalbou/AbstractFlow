@@ -147,7 +147,7 @@ const EVENT_NODES: NodeTemplate[] = [
     icon: '&#x1F514;', // Bell
     label: 'Wait Event',
     description:
-      'Pause the workflow until an event matching event_key is received, then resume with event_data. Optional pins (prompt/choices/allow_free_text) enable durable “ask + wait” UX for hosts like AbstractCode.',
+      'Pause the workflow until an event matching event_key is received, then resume with event_data. Optional pins (prompt/choices/allow_free_text) enable durable “ask + wait” UX for hosts like AbstractCode. Optional `until` (ISO timestamp, normalized to UTC) adds a durable idle deadline: if no event arrives in time the wait resumes with {"timed_out": true} in event_data. Optional `details` (object) rides the ledger wait record so clients can render the park honestly (e.g. {"kind": "visitor_message"} renders a message composer).',
     headerColor: '#C0392B',
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
@@ -155,6 +155,11 @@ const EVENT_NODES: NodeTemplate[] = [
       { id: 'prompt', label: 'prompt', type: 'string' },
       { id: 'choices', label: 'choices', type: 'array' },
       { id: 'allow_free_text', label: 'allow_free_text', type: 'boolean' },
+      // Pin ids match the runtime effect payload spelling exactly
+      // (visualflow_compiler create_wait_event_handler passthrough);
+      // friendlier labels would need a template-layer mapping — avoided.
+      { id: 'until', label: 'until', type: 'string', description: 'Optional idle deadline (ISO timestamp; runtime-normalized to UTC). Past-deadline resume carries {"timed_out": true}.' },
+      { id: 'details', label: 'details', type: 'object', description: 'Optional wait metadata carried into the ledger wait record (e.g. {"kind": "visitor_message"}); lets clients render the park honestly.' },
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
@@ -1675,6 +1680,27 @@ const MEMORY_NODES: NodeTemplate[] = [
       { id: 'file_path', label: 'file_path', type: 'workspace_file' },
       { id: 'content', label: 'content', type: 'any' },
       { id: 'title', label: 'title', type: 'string', description: 'Optional PDF document title.' },
+    ],
+    outputs: [
+      { id: 'exec-out', label: '', type: 'execution' },
+      { id: 'bytes', label: 'bytes', type: 'number' },
+      { id: 'file_path', label: 'file_path', type: 'workspace_file' },
+      { id: 'sha256', label: 'sha256', type: 'string' },
+      { id: 'content_type', label: 'content_type', type: 'string' },
+    ],
+    category: 'memory',
+  },
+  {
+    type: 'write_docx',
+    icon: '&#x1F4D8;', // Blue book
+    label: 'Write DOCX',
+    description: 'Render text or Markdown-style report content to a workspace-scoped DOCX document using the Runtime stdlib DOCX writer.',
+    headerColor: '#16A085',
+    inputs: [
+      { id: 'exec-in', label: '', type: 'execution' },
+      { id: 'file_path', label: 'file_path', type: 'workspace_file' },
+      { id: 'content', label: 'content', type: 'any' },
+      { id: 'title', label: 'title', type: 'string', description: 'Optional DOCX document title.' },
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },

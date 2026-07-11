@@ -429,6 +429,9 @@ Node behavior:
 - `read_pdf` / `write_pdf`: execution nodes for real workspace-scoped server
   `.pdf` files; Write PDF renders text/Markdown report content and outputs
   bytes, sha256, `file_path`.
+- `write_docx`: execution node for real workspace-scoped server `.docx` files;
+  Write DOCX renders text/Markdown report content and outputs bytes, sha256,
+  `file_path`.
 - Expose file paths through On Flow End when the user asked for files.
 - Artifact literal nodes (`template` variants: Text/Image/Voice/Music/Video
   Artifact) create typed refs for existing saved artifacts.
@@ -446,8 +449,9 @@ Node behavior:
 File pattern: content -> Write File.content; path default ->
 Write File.file_path; exec chain through Write File before On Flow End;
 Write File.file_path -> On Flow End `markdown_path`/`report_path`. Same shape
-for Write PDF with a `.pdf` path -> `pdf_path`. Do not claim an asset exists
-unless the graph creates and exposes it.
+for Write PDF with a `.pdf` path -> `pdf_path` and Write DOCX with a `.docx`
+path -> `docx_path`. Do not claim an asset exists unless the graph creates and
+exposes it.
 
 ### Data, JSON, And Prompt Building
 

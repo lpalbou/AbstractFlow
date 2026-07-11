@@ -1757,6 +1757,11 @@ button.primary:hover:not(:disabled) {
   color: rgba(39, 174, 96, 0.95);
 }
 
+.flow-library-badge.bundled {
+  border-color: rgba(86, 156, 214, 0.5);
+  color: rgba(134, 190, 255, 0.95);
+}
+
 .flow-library-item-sub {
   display: flex;
   align-items: baseline;
@@ -1913,6 +1918,13 @@ button.primary:hover:not(:disabled) {
   line-height: 1.4;
   white-space: pre-wrap;
   padding-right: 30px; /* make room for the edit icon */
+}
+
+.flow-library-readonly-note {
+  margin-top: 10px;
+  color: rgba(134, 190, 255, 0.86);
+  font-size: var(--font-size-sm);
+  line-height: 1.35;
 }
 
 .flow-library-edit-icon {
@@ -5239,6 +5251,55 @@ button.primary:hover:not(:disabled) {
 .run-waiting-prompt {
   font-size: var(--font-size-md);
   color: var(--text-primary);
+}
+
+/* Deadline line under parked/visitor waits (WAIT_EVENT idle timeout). */
+.run-waiting-deadline {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* Act-only act-frame chips ($act_only refs): the act, never the words. */
+.run-act-only-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.run-act-only-chip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+}
+
+.run-act-only-chip-label {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+}
+
+.run-act-only-chip-gist {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.run-act-only-chip-reason {
+  font-size: var(--font-size-xs, 11px);
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.run-act-only-note {
+  margin-top: 6px;
+  font-size: var(--font-size-xs, 11px);
+  color: var(--text-secondary);
+  font-style: italic;
 }
 
 .run-waiting-tools {

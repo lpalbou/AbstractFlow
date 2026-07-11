@@ -1,0 +1,1536 @@
+{
+  "id": "dp-render",
+  "name": "dp-render",
+  "description": "Final report and audit object renderer.",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": -900,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Start research request",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "request",
+            "label": "What should be researched?",
+            "type": "string"
+          },
+          {
+            "id": "viewpoint",
+            "label": "Viewpoint or angle",
+            "type": "string"
+          },
+          {
+            "id": "effort",
+            "label": "Effort",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "Provider (optional)",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "Model (optional)",
+            "type": "model"
+          },
+          {
+            "id": "plan",
+            "label": "plan",
+            "type": "object"
+          },
+          {
+            "id": "investigation",
+            "label": "investigation",
+            "type": "object"
+          },
+          {
+            "id": "adversarial_review",
+            "label": "adversarial_review",
+            "type": "object"
+          },
+          {
+            "id": "review_rounds_completed",
+            "label": "review_rounds_completed",
+            "type": "number"
+          }
+        ],
+        "pinDefaults": {
+          "effort": "standard",
+          "provider": "",
+          "model": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "derive_settings",
+      "type": "code",
+      "position": {
+        "x": -640,
+        "y": -160
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Derive effort settings",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "effort",
+            "label": "effort",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "effort_text = str(effort or \"standard\").strip().lower().replace(\"_\", \" \").replace(\"-\", \" \")\nif effort_text in (\"quick\", \"quick search\", \"quick report\", \"fast\", \"fast search\", \"brief\", \"brief search\"):\n    effort_key = \"quick\"\nelif effort_text in (\"thorough\", \"thorough search\", \"thorough report\", \"deep\", \"deep research\", \"exhaustive\"):\n    effort_key = \"thorough\"\nelse:\n    effort_key = \"standard\"\n\nprofiles = {\n    \"quick\": {\n        \"effort\": \"quick\",\n        \"effort_preset\": \"Quick search\",\n        \"audience\": \"Technical decision-maker\",\n        \"quality_profile\": \"Fast, source-grounded answer with concise adversarial gap check\",\n        \"max_iterations\": 3,\n        \"deadline_minutes\": 8,\n        \"max_sources\": 12,\n        \"max_review_rounds\": 1,\n        \"source_policy\": \"Prefer primary or highly authoritative sources. Fetch before citing. Stop once the core answer is supported.\",\n        \"citation_policy\": \"Cite decisive claims and flag uncertainty instead of over-searching.\",\n        \"output_prefix\": \"reports/dp-quick-research\",\n        \"report_title\": \"Quick Research Brief\",\n        \"include_images\": False,\n    },\n    \"standard\": {\n        \"effort\": \"standard\",\n        \"effort_preset\": \"Standard search\",\n        \"audience\": \"Technical decision-maker\",\n        \"quality_profile\": \"Balanced research with adversarial review, source ledger, and evidence checks\",\n        \"max_iterations\": 6,\n        \"deadline_minutes\": 20,\n        \"max_sources\": 28,\n        \"max_review_rounds\": 2,\n        \"source_policy\": \"Prefer primary, recent, authoritative sources. Fetch before citing and compare at least one contrary source when useful.\",\n        \"citation_policy\": \"Every important factual claim needs a source id or an explicit limitation.\",\n        \"output_prefix\": \"reports/dp-standard-research\",\n        \"report_title\": \"Research Report\",\n        \"include_images\": True,\n    },\n    \"thorough\": {\n        \"effort\": \"thorough\",\n        \"effort_preset\": \"Thorough search\",\n        \"audience\": \"Technical decision-maker\",\n        \"quality_profile\": \"SOTA deep research with independent adversarial review, provenance, and strict evidence audit\",\n        \"max_iterations\": 10,\n        \"deadline_minutes\": 45,\n        \"max_sources\": 64,\n        \"max_review_rounds\": 3,\n        \"source_policy\": \"Prefer primary, recent, authoritative sources. Fetch before citing, triangulate important claims, and actively seek disconfirming evidence.\",\n        \"citation_policy\": \"Every non-obvious factual claim needs a source id or limitation. Distinguish primary evidence from commentary.\",\n        \"output_prefix\": \"reports/dp-thorough-research\",\n        \"report_title\": \"Deep Research Report\",\n        \"include_images\": True,\n    },\n}\n\nprofile = dict(profiles[effort_key])\nprovider_text = str(provider or \"\").strip()\nmodel_text = str(model or \"\").strip()\nif (provider_text and not model_text) or (model_text and not provider_text):\n    raise ValueError(\"provider and model must both be set, or both left blank for Gateway/Core defaults\")\nprofile[\"provider\"] = provider_text\nprofile[\"model\"] = model_text\n\nreturn profile"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "input_json",
+      "type": "make_object",
+      "position": {
+        "x": -520,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "make_object",
+        "label": "Build JSON",
+        "icon": "{}",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "request",
+            "label": "What should be researched?",
+            "type": "string"
+          },
+          {
+            "id": "viewpoint",
+            "label": "Viewpoint or angle",
+            "type": "string"
+          },
+          {
+            "id": "effort",
+            "label": "Effort",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "Provider (optional)",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "Model (optional)",
+            "type": "model"
+          },
+          {
+            "id": "settings",
+            "label": "settings",
+            "type": "object"
+          },
+          {
+            "id": "plan",
+            "label": "plan",
+            "type": "object"
+          },
+          {
+            "id": "investigation",
+            "label": "investigation",
+            "type": "object"
+          },
+          {
+            "id": "adversarial_review",
+            "label": "adversarial_review",
+            "type": "object"
+          },
+          {
+            "id": "review_rounds_completed",
+            "label": "review_rounds_completed",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "prompt_json",
+      "type": "stringify_json",
+      "position": {
+        "x": -160,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "stringify_json",
+        "label": "Stringify JSON",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          },
+          {
+            "id": "mode",
+            "label": "mode",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "mode": "beautify"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_provider",
+      "type": "get",
+      "position": {
+        "x": -160,
+        "y": -220
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get provider",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "provider",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_model",
+      "type": "get",
+      "position": {
+        "x": -160,
+        "y": -120
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get model",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "model",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "writer",
+      "type": "llm_call",
+      "position": {
+        "x": 220,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Render report package",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "system": "You are the final research report writer. Produce two separate outputs: a rigorous human-readable Markdown report, and machine-readable audit objects. In report_markdown, write like a professional article or research brief: use prose, clear headings, concise lists only when useful, and inline source citations such as [src_001] next to supported claims. End report_markdown with a ## References section listing each cited source with title, URL or path, source type, fetched status, and evidence quality. Do not include visible sections named Evidence Table, Evidence Matrix, or Claim-Evidence Matrix, and do not dump audit tables into the report body. Do not include a separate Citations, Source IDs, Sources Cited, or Bibliography section; ## References is the only source-list section. Keep source_ledger and claim_evidence_matrix only as machine-readable audit outputs. If a comparison table is genuinely useful for the reader, use a valid multiline Markdown table with a separator row. Do not cite a source that was not fetched or otherwise available in the source ledger. If evidence is missing, say so in plain language.",
+          "temperature": 0.1,
+          "resp_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "report_markdown",
+              "research_run_manifest",
+              "source_ledger",
+              "claim_evidence_matrix",
+              "iteration_log",
+              "adversarial_review_summary",
+              "limitations",
+              "warnings",
+              "export_status"
+            ],
+            "properties": {
+              "report_markdown": {
+                "type": "string"
+              },
+              "research_run_manifest": {
+                "type": "object"
+              },
+              "source_ledger": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "required": [
+                    "source_id",
+                    "title",
+                    "url_or_path",
+                    "source_type",
+                    "fetched",
+                    "evidence_quality",
+                    "relevance",
+                    "fetched_at"
+                  ],
+                  "properties": {
+                    "source_id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "url_or_path": {
+                      "type": "string"
+                    },
+                    "source_type": {
+                      "type": "string"
+                    },
+                    "fetched": {
+                      "type": "boolean"
+                    },
+                    "evidence_quality": {
+                      "type": "string"
+                    },
+                    "relevance": {
+                      "type": "string"
+                    },
+                    "fetched_at": {
+                      "type": "string"
+                    },
+                    "content_hash": {
+                      "type": "string"
+                    },
+                    "rejected_reason": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "claim_evidence_matrix": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "required": [
+                    "claim_id",
+                    "claim",
+                    "evidence_source_ids",
+                    "confidence",
+                    "status"
+                  ],
+                  "properties": {
+                    "claim_id": {
+                      "type": "string"
+                    },
+                    "claim": {
+                      "type": "string"
+                    },
+                    "evidence_source_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "confidence": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "iteration_log": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "required": [
+                    "round_index",
+                    "queries",
+                    "new_findings",
+                    "review_guidance_used",
+                    "remaining_gaps",
+                    "continue_reason"
+                  ],
+                  "properties": {
+                    "round_index": {
+                      "type": "number"
+                    },
+                    "queries": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "new_findings": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "review_guidance_used": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "remaining_gaps": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "continue_reason": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "adversarial_review_summary": {
+                "type": "string"
+              },
+              "limitations": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "warnings": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "export_status": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "normalize_report_markdown",
+      "type": "code",
+      "position": {
+        "x": 620,
+        "y": -160
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Normalize user-facing report",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "report_markdown",
+            "label": "report_markdown",
+            "type": "string"
+          },
+          {
+            "id": "source_ledger",
+            "label": "source_ledger",
+            "type": "array"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "def _as_text(value):\n    if value is None:\n        return \"\"\n    return str(value).strip()\n\n\ndef _source_list(value):\n    if isinstance(value, list):\n        return value\n    if isinstance(value, dict):\n        nested = value.get(\"source_ledger\") or value.get(\"sources\") or value.get(\"items\")\n        if isinstance(nested, list):\n            return nested\n    return []\n\n\ndef _heading_title(line):\n    stripped = str(line or \"\").strip()\n    if not stripped.startswith(\"#\"):\n        return \"\"\n    count = 0\n    while count < len(stripped) and stripped[count] == \"#\":\n        count = count + 1\n    if count < 1 or count > 6:\n        return \"\"\n    if count >= len(stripped) or stripped[count] not in (\" \", \"\\t\"):\n        return \"\"\n    return stripped[count:].strip().strip(\"#\").strip().lower()\n\n\ndef _is_blocked_heading(title, remove_references):\n    compact = \" \".join(\n        str(title or \"\").strip(\" :.;\").replace(\"-\", \" \").replace(\"_\", \" \").replace(\"/\", \" \").split()\n    )\n    if bool(remove_references) and compact == \"references\":\n        return True\n    return compact in (\n        \"evidence table\",\n        \"evidence matrix\",\n        \"bibliography\",\n        \"claim evidence matrix\",\n        \"citation index\",\n        \"citation ids\",\n        \"citation list\",\n        \"citations\",\n        \"citations source ids\",\n        \"citations and source ids\",\n        \"source ids\",\n        \"source id list\",\n        \"source index\",\n        \"source list\",\n        \"sources cited\",\n        \"works cited\",\n    )\n\n\ndef _has_references_heading(text):\n    for line in str(text or \"\").split(\"\\n\"):\n        if _heading_title(line) == \"references\":\n            return True\n    return False\n\n\ndef _remove_blocked_sections(text, remove_references):\n    kept = []\n    skip = False\n    for line in str(text or \"\").split(\"\\n\"):\n        title = _heading_title(line)\n        if title:\n            if _is_blocked_heading(title, remove_references):\n                skip = True\n                continue\n            if skip:\n                skip = False\n        if not skip:\n            kept.append(line)\n    return \"\\n\".join(kept)\n\n\ndef _reference_line(source):\n    if not isinstance(source, dict):\n        return \"\"\n    source_id = _as_text(source.get(\"source_id\") or source.get(\"id\"))\n    if not source_id:\n        return \"\"\n    title = _as_text(source.get(\"title\")) or \"Untitled source\"\n    url_or_path = _as_text(source.get(\"url_or_path\") or source.get(\"url\") or source.get(\"path\"))\n    source_type = _as_text(source.get(\"source_type\") or source.get(\"type\"))\n    fetched = source.get(\"fetched\")\n    quality = _as_text(source.get(\"evidence_quality\") or source.get(\"quality\"))\n    parts = [f\"- [{source_id}] {title}\"]\n    if url_or_path:\n        parts.append(url_or_path)\n    details = []\n    if source_type:\n        details.append(f\"type: {source_type}\")\n    if fetched is not None:\n        details.append(f\"fetched: {bool(fetched)}\")\n    if quality:\n        details.append(f\"evidence quality: {quality}\")\n    line = \". \".join(parts)\n    if details:\n        line = f\"{line} ({'; '.join(details)})\"\n    return line\n\n\nsources = _source_list(source_ledger)\ntext = _as_text(report_markdown).replace(\"\\r\\n\", \"\\n\").replace(\"\\r\", \"\\n\")\ntext = _remove_blocked_sections(text, bool(sources))\nwhile \"\\n\\n\\n\" in text:\n    text = text.replace(\"\\n\\n\\n\", \"\\n\\n\")\ntext = text.strip()\n\nif sources:\n    references = [_reference_line(source) for source in sources]\n    references = [line for line in references if line]\n    if references:\n        text = f\"{text}\\n\\n## References\\n\" + \"\\n\".join(references)\n\nif not text:\n    text = \"# Research Report\\n\\nNo report content was produced.\\n\"\n\nreturn text.rstrip() + \"\\n\""
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 1800,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Finish",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "report_markdown",
+            "label": "report_markdown",
+            "type": "string"
+          },
+          {
+            "id": "research_run_manifest",
+            "label": "research_run_manifest",
+            "type": "object"
+          },
+          {
+            "id": "source_ledger",
+            "label": "source_ledger",
+            "type": "array"
+          },
+          {
+            "id": "claim_evidence_matrix",
+            "label": "claim_evidence_matrix",
+            "type": "array"
+          },
+          {
+            "id": "iteration_log",
+            "label": "iteration_log",
+            "type": "array"
+          },
+          {
+            "id": "adversarial_review_summary",
+            "label": "adversarial_review_summary",
+            "type": "string"
+          },
+          {
+            "id": "limitations",
+            "label": "limitations",
+            "type": "array"
+          },
+          {
+            "id": "warnings",
+            "label": "warnings",
+            "type": "array"
+          },
+          {
+            "id": "export_status",
+            "label": "export_status",
+            "type": "object"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_report_markdown",
+      "type": "get",
+      "position": {
+        "x": 620,
+        "y": 504
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get report_markdown",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "report_markdown",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_research_run_manifest",
+      "type": "get",
+      "position": {
+        "x": 620,
+        "y": 540
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get research_run_manifest",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "research_run_manifest",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_source_ledger",
+      "type": "get",
+      "position": {
+        "x": 620,
+        "y": 576
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get source_ledger",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "source_ledger",
+          "default": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_claim_evidence_matrix",
+      "type": "get",
+      "position": {
+        "x": 620,
+        "y": 612
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get claim_evidence_matrix",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "claim_evidence_matrix",
+          "default": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_iteration_log",
+      "type": "get",
+      "position": {
+        "x": 620,
+        "y": 648
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get iteration_log",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "iteration_log",
+          "default": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_adversarial_review_summary",
+      "type": "get",
+      "position": {
+        "x": 620,
+        "y": 684
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get adversarial_review_summary",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "adversarial_review_summary",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_limitations",
+      "type": "get",
+      "position": {
+        "x": 620,
+        "y": 720
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get limitations",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "limitations",
+          "default": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_warnings",
+      "type": "get",
+      "position": {
+        "x": 620,
+        "y": 756
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get warnings",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "warnings",
+          "default": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_export_status",
+      "type": "get",
+      "position": {
+        "x": 620,
+        "y": 792
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get export_status",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "export_status",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-exec-out-derive_settings-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "derive_settings",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-derive_settings-exec-out-writer-exec-in",
+      "source": "derive_settings",
+      "sourceHandle": "exec-out",
+      "target": "writer",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-start-effort-derive_settings-effort",
+      "source": "start",
+      "sourceHandle": "effort",
+      "target": "derive_settings",
+      "targetHandle": "effort",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-derive_settings-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "derive_settings",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-derive_settings-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "derive_settings",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-derive_settings-output-input_json-settings",
+      "source": "derive_settings",
+      "sourceHandle": "output",
+      "target": "input_json",
+      "targetHandle": "settings",
+      "animated": false
+    },
+    {
+      "id": "e-derive_settings-output-get_provider-object",
+      "source": "derive_settings",
+      "sourceHandle": "output",
+      "target": "get_provider",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-derive_settings-output-get_model-object",
+      "source": "derive_settings",
+      "sourceHandle": "output",
+      "target": "get_model",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-input_json-result-prompt_json-value",
+      "source": "input_json",
+      "sourceHandle": "result",
+      "target": "prompt_json",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-prompt_json-result-writer-prompt",
+      "source": "prompt_json",
+      "sourceHandle": "result",
+      "target": "writer",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-get_provider-value-writer-provider",
+      "source": "get_provider",
+      "sourceHandle": "value",
+      "target": "writer",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-get_model-value-writer-model",
+      "source": "get_model",
+      "sourceHandle": "value",
+      "target": "writer",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-writer-exec-out-end-exec-in",
+      "source": "writer",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-writer-meta-end-meta",
+      "source": "writer",
+      "sourceHandle": "meta",
+      "target": "end",
+      "targetHandle": "meta",
+      "animated": false
+    },
+    {
+      "id": "e-writer-data-get_report_markdown-object",
+      "source": "writer",
+      "sourceHandle": "data",
+      "target": "get_report_markdown",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-get_report_markdown-value-normalize_report_markdown-report_markdown",
+      "source": "get_report_markdown",
+      "sourceHandle": "value",
+      "target": "normalize_report_markdown",
+      "targetHandle": "report_markdown",
+      "animated": false
+    },
+    {
+      "id": "e-writer-data-get_research_run_manifest-object",
+      "source": "writer",
+      "sourceHandle": "data",
+      "target": "get_research_run_manifest",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-get_research_run_manifest-value-end-research_run_manifest",
+      "source": "get_research_run_manifest",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "research_run_manifest",
+      "animated": false
+    },
+    {
+      "id": "e-writer-data-get_source_ledger-object",
+      "source": "writer",
+      "sourceHandle": "data",
+      "target": "get_source_ledger",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-get_source_ledger-value-normalize_report_markdown-source_ledger",
+      "source": "get_source_ledger",
+      "sourceHandle": "value",
+      "target": "normalize_report_markdown",
+      "targetHandle": "source_ledger",
+      "animated": false
+    },
+    {
+      "id": "e-get_source_ledger-value-end-source_ledger",
+      "source": "get_source_ledger",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "source_ledger",
+      "animated": false
+    },
+    {
+      "id": "e-writer-data-get_claim_evidence_matrix-object",
+      "source": "writer",
+      "sourceHandle": "data",
+      "target": "get_claim_evidence_matrix",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-get_claim_evidence_matrix-value-end-claim_evidence_matrix",
+      "source": "get_claim_evidence_matrix",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "claim_evidence_matrix",
+      "animated": false
+    },
+    {
+      "id": "e-writer-data-get_iteration_log-object",
+      "source": "writer",
+      "sourceHandle": "data",
+      "target": "get_iteration_log",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-get_iteration_log-value-end-iteration_log",
+      "source": "get_iteration_log",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "iteration_log",
+      "animated": false
+    },
+    {
+      "id": "e-writer-data-get_adversarial_review_summary-object",
+      "source": "writer",
+      "sourceHandle": "data",
+      "target": "get_adversarial_review_summary",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-get_adversarial_review_summary-value-end-adversarial_review_summary",
+      "source": "get_adversarial_review_summary",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "adversarial_review_summary",
+      "animated": false
+    },
+    {
+      "id": "e-writer-data-get_limitations-object",
+      "source": "writer",
+      "sourceHandle": "data",
+      "target": "get_limitations",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-get_limitations-value-end-limitations",
+      "source": "get_limitations",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "limitations",
+      "animated": false
+    },
+    {
+      "id": "e-writer-data-get_warnings-object",
+      "source": "writer",
+      "sourceHandle": "data",
+      "target": "get_warnings",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-get_warnings-value-end-warnings",
+      "source": "get_warnings",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "warnings",
+      "animated": false
+    },
+    {
+      "id": "e-writer-data-get_export_status-object",
+      "source": "writer",
+      "sourceHandle": "data",
+      "target": "get_export_status",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-get_export_status-value-end-export_status",
+      "source": "get_export_status",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "export_status",
+      "animated": false
+    },
+    {
+      "id": "e-normalize_report_markdown-output-end-report_markdown",
+      "source": "normalize_report_markdown",
+      "sourceHandle": "output",
+      "target": "end",
+      "targetHandle": "report_markdown",
+      "animated": false
+    },
+    {
+      "id": "e-start-request-input_json-request",
+      "source": "start",
+      "sourceHandle": "request",
+      "target": "input_json",
+      "targetHandle": "request",
+      "animated": false
+    },
+    {
+      "id": "e-start-viewpoint-input_json-viewpoint",
+      "source": "start",
+      "sourceHandle": "viewpoint",
+      "target": "input_json",
+      "targetHandle": "viewpoint",
+      "animated": false
+    },
+    {
+      "id": "e-start-effort-input_json-effort",
+      "source": "start",
+      "sourceHandle": "effort",
+      "target": "input_json",
+      "targetHandle": "effort",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-input_json-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "input_json",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-input_json-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "input_json",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-plan-input_json-plan",
+      "source": "start",
+      "sourceHandle": "plan",
+      "target": "input_json",
+      "targetHandle": "plan",
+      "animated": false
+    },
+    {
+      "id": "e-start-investigation-input_json-investigation",
+      "source": "start",
+      "sourceHandle": "investigation",
+      "target": "input_json",
+      "targetHandle": "investigation",
+      "animated": false
+    },
+    {
+      "id": "e-start-adversarial_review-input_json-adversarial_review",
+      "source": "start",
+      "sourceHandle": "adversarial_review",
+      "target": "input_json",
+      "targetHandle": "adversarial_review",
+      "animated": false
+    },
+    {
+      "id": "e-start-review_rounds_completed-input_json-review_rounds_completed",
+      "source": "start",
+      "sourceHandle": "review_rounds_completed",
+      "target": "input_json",
+      "targetHandle": "review_rounds_completed",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-06-29T15:52:29.716548+00:00",
+  "updated_at": "2026-06-29T15:52:29.716548+00:00"
+}

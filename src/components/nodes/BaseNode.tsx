@@ -18,6 +18,7 @@ import { useFlowStore } from '../../hooks/useFlow';
 import { useModels, useProviders } from '../../hooks/useProviders';
 import { TEXT_OUTPUT_CAPABILITY_ROUTE } from '../../utils/capabilityRoutes';
 import { useGatewayCapabilities, gatewayContractsFromCapabilities } from '../../hooks/useGatewayCapabilities';
+import { useVisionAdapterCatalog } from '../../hooks/useVisionAdapterCatalog';
 import { useTools } from '../../hooks/useTools';
 import { collectCustomEventNames } from '../../utils/events';
 import {
@@ -50,6 +51,7 @@ import {
   type ModelResidencyOperation,
 } from '../../utils/modelResidencyGraph';
 import { getNodePinDisclosure, isMediaPresentationNode } from '../../utils/nodePinDisclosure';
+import { DEFAULT_THINKING_OPTIONS, thinkingOptionsFromModelCapabilities } from '../../utils/thinkingControls';
 import { hasJsonSchemaPinDefault, isJsonSchemaInputPin } from '../../utils/jsonSchemaPins';
 import {
   applyImagePinDefaultPatch,
@@ -85,6 +87,12 @@ import { CodeEditorModal } from '../CodeEditorModal';
 import { JsonLiteralNodeEditorModal } from '../JsonLiteralNodeEditorModal';
 import { JsonSchemaPinEditorModal } from '../JsonSchemaPinEditorModal';
 import { type JsonSchema } from '../../schemas/known_json_schemas';
+import {
+  mergeLoRAAdapterSelection,
+  normalizeStoredLoRAAdapters,
+  serializeLoRAAdapters,
+  visionAdapterSourceOptions,
+} from '../../utils/visionLora';
 
 type SelectOption = { value: string; label: string };
 type MediaModelOption = {
@@ -127,14 +135,6 @@ const DEFAULT_TTS_QUALITY_PRESETS: SelectOption[] = [
 const OPENAI_TTS_FORMATS = ['mp3', 'opus', 'aac', 'flac', 'wav', 'pcm'];
 const DEFAULT_STT_FORMATS = ['json', 'text', 'verbose_json', 'srt', 'vtt'];
 const DEFAULT_MUSIC_FORMATS = ['wav', 'mp3', 'flac'];
-const DEFAULT_THINKING_OPTIONS: SelectOption[] = [
-  { value: '', label: 'Auto (Gateway default)' },
-  { value: 'off', label: 'off' },
-  { value: 'low', label: 'low' },
-  { value: 'medium', label: 'medium' },
-  { value: 'high', label: 'high' },
-  { value: 'xhigh', label: 'xhigh' },
-];
 const ANSWER_USER_LEVEL_OPTIONS: SelectOption[] = [
   { value: 'message', label: 'message' },
   { value: 'warning', label: 'warning' },
@@ -223,61 +223,6 @@ function withGatewayDefaultOption(options: SelectOption[]): SelectOption[] {
     GATEWAY_DEFAULT_SELECT_OPTION,
     ...options.filter((option) => option.value.trim() !== ''),
   ];
-}
-
-function stringListFrom(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const item of value) {
-    const text = typeof item === 'string' ? item.trim() : '';
-    if (!text || seen.has(text)) continue;
-    seen.add(text);
-    out.push(text);
-  }
-  return out;
-}
-
-function recordFrom(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
-}
-
-function modelNameLooksThinkingCapable(modelName: string): boolean {
-  const clean = String(modelName || '').trim();
-  if (!clean) return false;
-  return [
-    /\bo[134](?:[-.]|$)/i,
-    /\bgpt[-_.]?5/i,
-    /\bgpt[-_.]?oss/i,
-    /\bclaude.*(?:4|opus|sonnet|haiku)/i,
-    /\bdeepseek.*(?:r1|v4)/i,
-    /\bqwen3\b/i,
-    /\bqwen3[.-]/i,
-    /\bthinking\b/i,
-    /\breasoning\b/i,
-    /\bseed[-_.]?oss\b/i,
-  ].some((pattern) => pattern.test(clean));
-}
-
-function thinkingOptionsFromModelCapabilities(payload: unknown, modelName: string): SelectOption[] {
-  const response = recordFrom(payload);
-  const caps = recordFrom(response?.capabilities) || response;
-  const levels = stringListFrom(caps?.reasoning_levels || caps?.thinking_levels);
-  const support =
-    caps?.thinking_support === true ||
-    caps?.thinking_budget === true ||
-    typeof caps?.thinking_control_mode === 'string' ||
-    levels.length > 0;
-
-  if (levels.length > 0) {
-    return [
-      { value: '', label: 'Auto (Gateway default)' },
-      ...levels.map((value) => ({ value, label: value })),
-    ];
-  }
-
-  if (support || modelNameLooksThinkingCapable(modelName)) return DEFAULT_THINKING_OPTIONS;
-  return [];
 }
 
 function mergeSelectOptions(current: SelectOption[], incoming: SelectOption[]): SelectOption[] {
@@ -828,7 +773,7 @@ export const BaseNode = memo(function BaseNode({
     [modelCapabilitiesQuery.data, selectedTextModelForThinking]
   );
   const effectiveThinkingOptions = thinkingOptions.length > 0 ? thinkingOptions : DEFAULT_THINKING_OPTIONS;
-  const thinkingSupported = thinkingOptions.length > 0 || Boolean(selectedThinkingValue);
+  const thinkingSupported = thinkingOptions.length > 0;
   const artifactUploadInputsRef = useRef<Record<string, HTMLInputElement | null>>({});
   const [artifactUploadBusyPins, setArtifactUploadBusyPins] = useState<Record<string, true>>({});
   const loopProgress = (data.nodeType === 'loop' || data.nodeType === 'for')
@@ -1582,6 +1527,27 @@ export const BaseNode = memo(function BaseNode({
   const currentVisionProviderModelsTask = isVideoNode ? currentVideoProviderModelsTask : currentImageProviderModelsTask;
   const visionProviderModelsEndpoint = mediaDiscovery.vision_provider_models || '';
   const visionModelsEndpoint = mediaDiscovery.vision_models || '';
+  const effectConfigValues = (data.effectConfig || {}) as Record<string, unknown>;
+  const currentMediaLoRAAdapters = useMemo(
+    () => normalizeStoredLoRAAdapters((data.pinDefaults || {}).lora_adapters ?? effectConfigValues.lora_adapters),
+    [data.pinDefaults, effectConfigValues]
+  );
+  const currentVisionProvider = isVideoNode ? selectedVideoProvider : selectedImageProvider;
+  const currentVisionModel = isVideoNode ? selectedVideoModel : selectedImageModel;
+  const currentVisionProviderPinId = isVideoNode ? 'video_provider' : 'image_provider';
+  const currentVisionModelPinId = isVideoNode ? 'video_model' : 'image_model';
+  const visionProviderPinConnected = connectedInputPinIds.has(currentVisionProviderPinId);
+  const visionModelPinConnected = connectedInputPinIds.has(currentVisionModelPinId);
+  const visionLoRAEligibleNode = isGenerateImageNode || isEditImageNode || isGenerateVideoNode || isImageToVideoNode;
+  const visionAdapterCatalog = useVisionAdapterCatalog({
+    nodeType: data.nodeType,
+    gatewayContracts,
+    capabilitiesLoading: mediaCapabilitiesQuery.isLoading,
+    capabilitiesError: mediaCapabilitiesQuery.isError,
+    provider: currentVisionProvider,
+    model: currentVisionModel,
+    enabled: visionLoRAEligibleNode && !visionProviderPinConnected && !visionModelPinConnected,
+  });
 
   const [mediaCatalogQueue, setMediaCatalogQueue] = useState<MediaCatalogRequest[]>([]);
   const [activeMediaCatalogRequest, setActiveMediaCatalogRequest] = useState<MediaCatalogRequest | null>(null);
@@ -2926,6 +2892,26 @@ export const BaseNode = memo(function BaseNode({
     [data.effectConfig, id, updateNodeData]
   );
 
+  const setCurrentMediaLoRAAdapters = useCallback(
+    (nextAdapters: ReturnType<typeof normalizeStoredLoRAAdapters>) => {
+      const serialized = serializeLoRAAdapters(nextAdapters);
+      const nextDefaults = { ...(data.pinDefaults || {}) } as Record<string, JsonValue>;
+      const nextEffect = { ...(data.effectConfig || {}) } as Record<string, unknown>;
+      if (serialized.length > 0) {
+        nextDefaults.lora_adapters = serialized;
+        nextEffect.lora_adapters = serialized;
+      } else {
+        delete nextDefaults.lora_adapters;
+        delete nextEffect.lora_adapters;
+      }
+      updateNodeData(id, {
+        pinDefaults: nextDefaults,
+        effectConfig: nextEffect as FlowNodeData['effectConfig'],
+      });
+    },
+    [data.effectConfig, data.pinDefaults, id, updateNodeData]
+  );
+
   const setImageProviderSelection = useCallback(
     (provider: string | null | undefined) => {
       const clean = provider ? normalizeMediaProvider(provider) : '';
@@ -4261,6 +4247,7 @@ export const BaseNode = memo(function BaseNode({
 	                  const isVideoProviderPin = isVideoNode && pin.id === 'video_provider';
 	                  const isVideoModelPin = isVideoNode && pin.id === 'video_model';
 	                  const isVideoFormatPin = isVideoNode && pin.id === 'format';
+                  const isVisionLoRAPin = visionLoRAEligibleNode && pin.id === 'lora_adapters';
 	                  const isTtsProviderPin = isGenerateVoiceNode && pin.id === 'tts_provider';
                   const isTtsModelPin = isGenerateVoiceNode && pin.id === 'tts_model';
                   const isTtsFormatPin = isGenerateVoiceNode && pin.id === 'format';
@@ -4294,6 +4281,7 @@ export const BaseNode = memo(function BaseNode({
                       isVideoProviderPin ||
                       isVideoModelPin ||
                       isVideoFormatPin ||
+                      isVisionLoRAPin ||
                       isTtsProviderPin ||
                       isTtsModelPin ||
                       isTtsFormatPin ||
@@ -4942,6 +4930,49 @@ export const BaseNode = memo(function BaseNode({
 	                    />
 	                  );
 	                }
+
+                if (isVisionLoRAPin && !connected) {
+                  const adapterOptions = visionAdapterSourceOptions(visionAdapterCatalog.adapterItems, currentMediaLoRAAdapters);
+                  const selectedAdapterSources = currentMediaLoRAAdapters.map((item) => item.source);
+                  const blockedByConnectedPins = visionProviderPinConnected || visionModelPinConnected;
+                  const blockedByMissingRoute = !currentVisionProvider || !currentVisionModel;
+                  const adapterDisabled =
+                    !visionAdapterCatalog.supportsLoRAAdapters ||
+                    blockedByConnectedPins ||
+                    blockedByMissingRoute ||
+                    (visionAdapterCatalog.isLoading && adapterOptions.length === 0);
+                  const adapterPlaceholder = !visionAdapterCatalog.supportsLoRAAdapters
+                    ? 'Not supported'
+                    : blockedByConnectedPins
+                      ? 'Provider/model from pin…'
+                      : blockedByMissingRoute
+                        ? 'Pick provider/model…'
+                        : visionAdapterCatalog.isLoading
+                          ? 'Loading…'
+                          : adapterOptions.length === 0
+                            ? 'No adapters'
+                            : 'Select…';
+                  controls.push(
+                    <AfMultiSelect
+                      key="vision-lora-adapters"
+                      variant="pin"
+                      values={selectedAdapterSources}
+                      placeholder={adapterPlaceholder}
+                      options={adapterOptions}
+                      disabled={adapterDisabled}
+                      loading={visionAdapterCatalog.isLoading && adapterOptions.length === 0}
+                      searchable
+                      searchPlaceholder="Search adapters…"
+                      clearable
+                      minPopoverWidth={420}
+                      onChange={(values) => {
+                        setCurrentMediaLoRAAdapters(
+                          mergeLoRAAdapterSelection(currentMediaLoRAAdapters, values, visionAdapterCatalog.adapterItems)
+                        );
+                      }}
+                    />
+                  );
+                }
 
 	                if (isTtsProviderPin && !connected) {
                   controls.push(

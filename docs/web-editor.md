@@ -193,11 +193,12 @@ These checks apply only when the request's deliverable is researched content
 coupled to a workflow/report deliverable in the same sentence); an incidental
 mention of "research" — such as "discussion, research, and deepening of ideas"
 — does not force the research scaffold onto an unrelated workflow.
-When a request asks for Markdown/PDF artifacts, the assistant must create
-an executable `Write File` node for Markdown and an executable `Write PDF` node
-for PDF. `Write PDF` renders report text or Markdown-style content to real PDF
-bytes in Runtime and exposes the resulting path through `On Flow End`. Generic
-`Write File` and sandbox Code are not treated as PDF generation.
+When a request asks for Markdown/PDF/DOCX artifacts, the assistant must create
+an executable `Write File` node for Markdown, an executable `Write PDF` node for
+PDF, and an executable `Write DOCX` node for DOCX. `Write PDF` and `Write DOCX`
+render report text or Markdown-style content to real document bytes in Runtime
+and expose the resulting paths through `On Flow End`. Generic `Write File` and
+sandbox Code are not treated as document generation.
 
 Tool-dependent requests use Gateway's advertised tool inventory and exact tool
 names. If Gateway defaults, advertised discovery endpoints, the planner run,

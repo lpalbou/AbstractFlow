@@ -928,11 +928,11 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 
 - Node type: `wait_event`
 - Document node: `{"id":"<unique_id>","type":"wait_event"}`
-- Utility: Pause the workflow until an event matching event_key is received, then resume with event_data. Optional pins (prompt/choices/allow_free_text) enable durable “ask + wait” UX for hosts like AbstractCode.
+- Utility: Pause the workflow until an event matching event_key is received, then resume with event_data. Optional pins (prompt/choices/allow_free_text) enable durable “ask + wait” UX for hosts like AbstractCode. Optional `until` (ISO timestamp, normalized to UTC) adds a durable idle deadline: if no event arrives in time the wait resumes with {"timed_out": true} in event_data. Optional `details` (object) rides the ledger wait record so clients can render the park honestly (e.g. {"kind": "visitor_message"} renders a message composer).
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `event_key` string; `prompt` string; `choices` array; `allow_free_text` boolean
+- Inputs: `exec-in` execution; `event_key` string; `prompt` string; `choices` array; `allow_free_text` boolean; `until` string: Optional idle deadline (ISO timestamp; runtime-normalized to UTC). Past-deadline resume carries {"timed_out": true}.; `details` object: Optional wait metadata carried into the ledger wait record (e.g. {"kind": "visitor_message"}); lets clients render the park honestly.
 - Outputs: `exec-out` execution; `event_data` object
 - Default config: none
 
@@ -1610,6 +1610,18 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Authorable config: input defaults with `pin_defaults`
 - Inputs: `exec-in` execution; `file_path` workspace_file; `page_start` number: Optional 1-based first page to read.; `page_end` number: Optional 1-based last page to read.; `max_chars` number: Optional explicit text limit. If used, output warnings include #TRUNCATION.
 - Outputs: `exec-out` execution; `content` string; `pages` number; `processed_pages` number; `metadata` object; `warnings` array; `truncated` boolean; `file_path` workspace_file; `content_type` string
+- Default config: none
+
+### memory / Write DOCX
+
+- Node type: `write_docx`
+- Document node: `{"id":"<unique_id>","type":"write_docx"}`
+- Utility: Render text or Markdown-style report content to a workspace-scoped DOCX document using the Runtime stdlib DOCX writer.
+- Gateway capability: none
+- Dynamic pin policy: template pins only
+- Authorable config: input defaults with `pin_defaults`
+- Inputs: `exec-in` execution; `file_path` workspace_file; `content` any; `title` string: Optional DOCX document title.
+- Outputs: `exec-out` execution; `bytes` number; `file_path` workspace_file; `sha256` string; `content_type` string
 - Default config: none
 
 ### memory / Write File

@@ -88,7 +88,7 @@ interface FlowState {
   setLoopProgress: (nodeId: string, index: number, total: number) => void;
   setPreflightIssues: (issues: Array<{ id: string; nodeId: string; nodeLabel: string; message: string }>) => void;
   clearPreflightIssues: () => void;
-  loadFlow: (flow: VisualFlow) => void;
+  loadFlow: (flow: VisualFlow) => VisualFlow;
   getFlow: () => VisualFlow;
   clearFlow: () => void;
 }
@@ -1580,7 +1580,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         data = { ...data, pinDefaults: nextDefaults, inputs: [...canonicalInputs, ...extras] };
       }
 
-      if (data.nodeType === 'read_pdf' || data.nodeType === 'write_pdf') {
+      if (data.nodeType === 'read_pdf' || data.nodeType === 'write_pdf' || data.nodeType === 'write_docx') {
         const existingInputs = Array.isArray(data.inputs) ? data.inputs : [];
         const byId = new Map(existingInputs.map((p) => [p.id, p] as const));
         const used = new Set<string>();
@@ -2287,6 +2287,34 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     }
     nodeIdCounter = maxNodeId;
 
+    const nodesWithRoutes = withMultiEntryRouteData(nodes, displayEdges);
+    const entryNode = inferEntryNode(nodes, displayEdges);
+    const visualNodes = nodesWithRoutes.map((n) => ({
+      id: n.id,
+      type: n.data.nodeType,
+      position: n.position,
+      data: n.data,
+    }));
+    const visualEdges = displayEdges
+      .filter((e) => !isRouteOverrideEdge(e))
+      .map((e) => ({
+        id: e.id,
+        source: e.source,
+        sourceHandle: e.sourceHandle || '',
+        target: e.target,
+        targetHandle: e.targetHandle || '',
+        animated: e.animated,
+      }));
+    const canonicalFlow = normalizeLegacyMusicCompatVisualFlow(visualNodes, visualEdges);
+    const loadedFlow: VisualFlow = {
+      id: flow.id,
+      name: flow.name,
+      interfaces: Array.isArray(flow.interfaces) ? flow.interfaces : [],
+      nodes: canonicalFlow.nodes,
+      edges: canonicalFlow.edges,
+      entryNode,
+    };
+
     set({
       flowId: flow.id,
       draftInstanceId: newDraftInstanceId(),
@@ -2297,6 +2325,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       selectedNode: null,
       selectedEdge: null,
     });
+    return loadedFlow;
   },
 
   // Get flow for saving

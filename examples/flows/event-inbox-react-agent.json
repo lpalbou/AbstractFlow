@@ -1,0 +1,1009 @@
+{
+  "id": "event-inbox-react-agent",
+  "name": "event-inbox-react-agent",
+  "description": "A resident ReAct agent (LLM + while loop, no Agent node) driven by an open event channel instead of any specific hub. It declares a named mailbox (events_mailbox var), parks durably on wait_event when idle, and drains its events_inbox run var with a seq cursor at EVERY cycle boundary - so events posted by anyone (humans, bridges, other agents) via the gateway emit_event command with durable:true interleave into the very next loop cycle, even mid-burst. A payload {kind: 'stop'} ends the resident. Agora, Telegram, cron, or a human are all just producers.",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": { "x": -2880.0, "y": 0.0 },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "RESIDENT WAKES",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "provider", "label": "provider", "type": "provider" },
+          { "id": "model", "label": "model", "type": "model" },
+          { "id": "temperature", "label": "temperature", "type": "number" },
+          { "id": "mailbox", "label": "mailbox", "type": "string", "description": "Open event channel name. Producers post to it via the gateway emit_event command (scope=global, name=<mailbox>, durable=true)." },
+          { "id": "task", "label": "task", "type": "string", "description": "Standing instruction applied to every burst of work." },
+          { "id": "tools", "label": "tools", "type": "array", "description": "Tool allowlist for bursts (names resolved against the runtime tool registry). Empty = conversational resident." },
+          { "id": "max_burst_cycles", "label": "max_burst_cycles", "type": "number", "description": "Cycle budget per burst before a forced #FALLBACK report." }
+        ],
+        "pinDefaults": {
+          "temperature": 0.2,
+          "mailbox": "agent-inbox",
+          "task": "You are on call. Handle each incoming event appropriately: answer questions, perform requested work with your tools, and report concisely.",
+          "tools": [],
+          "max_burst_cycles": 12
+        }
+      }
+    },
+    {
+      "id": "init-mailbox",
+      "type": "set_var",
+      "position": { "x": -2624.0, "y": 0.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Declare mailbox",
+        "icon": "&#x1F4EE;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "pinDefaults": { "name": "events_mailbox" }
+      }
+    },
+    {
+      "id": "init-stopped",
+      "type": "set_var",
+      "position": { "x": -2432.0, "y": 0.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Init stopped",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "pinDefaults": { "name": "stopped", "value": false }
+      }
+    },
+    {
+      "id": "init-cursor",
+      "type": "set_var",
+      "position": { "x": -2240.0, "y": 0.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Init cursor",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "pinDefaults": { "name": "cursor", "value": 0 }
+      }
+    },
+    {
+      "id": "init-trace",
+      "type": "set_var",
+      "position": { "x": -2048.0, "y": 0.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Init trace",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "pinDefaults": { "name": "trace", "value": "" }
+      }
+    },
+    {
+      "id": "init-burst",
+      "type": "set_var",
+      "position": { "x": -1856.0, "y": 0.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Init in_burst",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "pinDefaults": { "name": "in_burst", "value": false }
+      }
+    },
+    {
+      "id": "init-bcycles",
+      "type": "set_var",
+      "position": { "x": -1664.0, "y": 0.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Init burst_cycles",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "pinDefaults": { "name": "burst_cycles", "value": 0 }
+      }
+    },
+    {
+      "id": "mk-wait-key",
+      "type": "concat",
+      "position": { "x": -2624.0, "y": 256.0 },
+      "data": {
+        "nodeType": "concat",
+        "label": "Wait key",
+        "icon": "&#x1F511;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          { "id": "a", "label": "a", "type": "string" },
+          { "id": "b", "label": "b", "type": "string" }
+        ],
+        "outputs": [ { "id": "result", "label": "result", "type": "string" } ],
+        "concatConfig": { "separator": "" },
+        "pinDefaults": { "a": "evt:global:global:" }
+      }
+    },
+    {
+      "id": "loop",
+      "type": "while",
+      "position": { "x": -1440.0, "y": 0.0 },
+      "data": {
+        "nodeType": "while",
+        "label": "RESIDENT LOOP",
+        "icon": "&#x267B;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "condition", "label": "condition", "type": "boolean" }
+        ],
+        "outputs": [
+          { "id": "loop", "label": "loop", "type": "execution" },
+          { "id": "done", "label": "done", "type": "execution" },
+          { "id": "item", "label": "item", "type": "any" },
+          { "id": "index", "label": "index", "type": "number" }
+        ]
+      }
+    },
+    {
+      "id": "get-stopped",
+      "type": "get_var",
+      "position": { "x": -1760.0, "y": 256.0 },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get stopped",
+        "icon": "&#x1F4D6;",
+        "headerColor": "#8E44AD",
+        "inputs": [ { "id": "name", "label": "name", "type": "string" } ],
+        "outputs": [ { "id": "value", "label": "value", "type": "any" } ],
+        "pinDefaults": { "name": "stopped" }
+      }
+    },
+    {
+      "id": "not-stopped",
+      "type": "not",
+      "position": { "x": -1600.0, "y": 256.0 },
+      "data": {
+        "nodeType": "not",
+        "label": "Not",
+        "icon": "&#x1F500;",
+        "headerColor": "#E74C3C",
+        "inputs": [ { "id": "value", "label": "value", "type": "boolean" } ],
+        "outputs": [ { "id": "result", "label": "result", "type": "boolean" } ]
+      }
+    },
+    {
+      "id": "gv-inbox",
+      "type": "get_var",
+      "position": { "x": -1440.0, "y": 384.0 },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get events_inbox",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#8E44AD",
+        "inputs": [ { "id": "name", "label": "name", "type": "string" } ],
+        "outputs": [ { "id": "value", "label": "value", "type": "any" } ],
+        "pinDefaults": { "name": "events_inbox" }
+      }
+    },
+    {
+      "id": "gv-cursor",
+      "type": "get_var",
+      "position": { "x": -1440.0, "y": 512.0 },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get cursor",
+        "icon": "&#x1F4D6;",
+        "headerColor": "#8E44AD",
+        "inputs": [ { "id": "name", "label": "name", "type": "string" } ],
+        "outputs": [ { "id": "value", "label": "value", "type": "any" } ],
+        "pinDefaults": { "name": "cursor" }
+      }
+    },
+    {
+      "id": "gv-inburst",
+      "type": "get_var",
+      "position": { "x": -1440.0, "y": 640.0 },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get in_burst",
+        "icon": "&#x1F4D6;",
+        "headerColor": "#8E44AD",
+        "inputs": [ { "id": "name", "label": "name", "type": "string" } ],
+        "outputs": [ { "id": "value", "label": "value", "type": "any" } ],
+        "pinDefaults": { "name": "in_burst" }
+      }
+    },
+    {
+      "id": "gv-bcycles",
+      "type": "get_var",
+      "position": { "x": -1440.0, "y": 768.0 },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get burst_cycles",
+        "icon": "&#x1F4D6;",
+        "headerColor": "#8E44AD",
+        "inputs": [ { "id": "name", "label": "name", "type": "string" } ],
+        "outputs": [ { "id": "value", "label": "value", "type": "any" } ],
+        "pinDefaults": { "name": "burst_cycles" }
+      }
+    },
+    {
+      "id": "gv-trace",
+      "type": "get_var",
+      "position": { "x": -1440.0, "y": 896.0 },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get trace",
+        "icon": "&#x1F4D6;",
+        "headerColor": "#8E44AD",
+        "inputs": [ { "id": "name", "label": "name", "type": "string" } ],
+        "outputs": [ { "id": "value", "label": "value", "type": "any" } ],
+        "pinDefaults": { "name": "trace" }
+      }
+    },
+    {
+      "id": "drain",
+      "type": "code",
+      "position": { "x": -1184.0, "y": 0.0 },
+      "data": {
+        "nodeType": "code",
+        "label": "DRAIN MAILBOX",
+        "icon": "&#x1F4E8;",
+        "headerColor": "#2ECC71",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "inbox", "label": "inbox", "type": "array" },
+          { "id": "cursor", "label": "cursor", "type": "number" },
+          { "id": "in_burst", "label": "in_burst", "type": "boolean" },
+          { "id": "burst_cycles", "label": "burst_cycles", "type": "number" },
+          { "id": "max_burst", "label": "max_burst", "type": "number" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "output", "label": "output", "type": "object" }
+        ],
+        "functionName": "transform",
+        "code": "def transform(_input):\n    inbox = _input.get(\"inbox\") or []\n    try:\n        cursor = int(_input.get(\"cursor\") or 0)\n    except Exception:\n        cursor = 0\n    in_burst = bool(_input.get(\"in_burst\"))\n    try:\n        burst_cycles = int(_input.get(\"burst_cycles\") or 0)\n    except Exception:\n        burst_cycles = 0\n    try:\n        max_burst = int(_input.get(\"max_burst\") or 12)\n    except Exception:\n        max_burst = 12\n\n    fresh = []\n    new_cursor = cursor\n    for e in inbox:\n        if not isinstance(e, dict):\n            continue\n        try:\n            seq_i = int(e.get(\"seq\"))\n        except Exception:\n            continue\n        if seq_i > cursor:\n            fresh.append(e)\n            if seq_i > new_cursor:\n                new_cursor = seq_i\n\n    stop = False\n    lines = []\n    for e in fresh:\n        p = e.get(\"payload\") or {}\n        if not isinstance(p, dict):\n            p = {\"value\": p}\n        kind = str(p.get(\"kind\") or \"message\")\n        if kind == \"stop\":\n            stop = True\n        emitter = e.get(\"emitter\") or {}\n        if not isinstance(emitter, dict):\n            emitter = {}\n        src = str(p.get(\"from\") or emitter.get(\"client_id\") or \"unknown\")\n        prio = str(p.get(\"priority\") or \"normal\")\n        body = str(p.get(\"body\") or p.get(\"value\") or \"\")\n        lines.append(\"- [seq \" + str(e.get(\"seq\")) + \" | from \" + src + \" | kind \" + kind + \" | priority \" + prio + \" | at \" + str(e.get(\"emitted_at\") or \"?\") + \"] \" + body)\n\n    events_text = \"\\n\".join(lines) if lines else \"(no new events)\"\n\n    if stop:\n        mode = \"stop\"\n    elif fresh:\n        mode = \"work\"\n    elif in_burst and burst_cycles >= max_burst:\n        mode = \"flush\"\n    elif in_burst:\n        mode = \"work\"\n    else:\n        mode = \"park\"\n\n    return {\n        \"mode\": mode,\n        \"new_cursor\": new_cursor,\n        \"events_text\": events_text,\n        \"has_events\": bool(fresh),\n    }\n"
+      }
+    },
+    {
+      "id": "drain-parts",
+      "type": "break_object",
+      "position": { "x": -960.0, "y": 256.0 },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Split drain",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [ { "id": "object", "label": "object", "type": "object" } ],
+        "outputs": [
+          { "id": "mode", "label": "mode", "type": "string" },
+          { "id": "new_cursor", "label": "new_cursor", "type": "number" },
+          { "id": "events_text", "label": "events_text", "type": "string" }
+        ],
+        "breakConfig": { "selectedPaths": ["mode", "new_cursor", "events_text"] }
+      }
+    },
+    {
+      "id": "route",
+      "type": "switch",
+      "position": { "x": -960.0, "y": 0.0 },
+      "data": {
+        "nodeType": "switch",
+        "label": "MODE",
+        "icon": "&#x1F500;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "case:work", "label": "work", "type": "execution" },
+          { "id": "case:park", "label": "park", "type": "execution" },
+          { "id": "case:flush", "label": "flush", "type": "execution" },
+          { "id": "case:stop", "label": "stop", "type": "execution" },
+          { "id": "default", "label": "default", "type": "execution" }
+        ],
+        "switchConfig": {
+          "cases": [
+            { "id": "work", "value": "work" },
+            { "id": "park", "value": "park" },
+            { "id": "flush", "value": "flush" },
+            { "id": "stop", "value": "stop" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "park",
+      "type": "wait_event",
+      "position": { "x": -704.0, "y": -256.0 },
+      "data": {
+        "nodeType": "wait_event",
+        "label": "SLEEP UNTIL EVENT",
+        "icon": "&#x1F634;",
+        "headerColor": "#34495E",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "event_key", "label": "event_key", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "event_data", "label": "event_data", "type": "object" }
+        ]
+      }
+    },
+    {
+      "id": "stop-set",
+      "type": "set_var",
+      "position": { "x": -704.0, "y": -448.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Mark stopped",
+        "icon": "&#x1F6D1;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "pinDefaults": { "name": "stopped", "value": true }
+      }
+    },
+    {
+      "id": "flush-msg",
+      "type": "concat",
+      "position": { "x": -704.0, "y": 640.0 },
+      "data": {
+        "nodeType": "concat",
+        "label": "Flush message",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          { "id": "a", "label": "a", "type": "string" },
+          { "id": "b", "label": "b", "type": "string" }
+        ],
+        "outputs": [ { "id": "result", "label": "result", "type": "string" } ],
+        "concatConfig": { "separator": "" },
+        "pinDefaults": { "a": "#FALLBACK: burst budget exhausted before a final report; going back to sleep. Partial work trace:\n" }
+      }
+    },
+    {
+      "id": "flush-report",
+      "type": "answer_user",
+      "position": { "x": -512.0, "y": 640.0 },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Flush report",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "message", "label": "message", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "message", "label": "message", "type": "string" }
+        ]
+      }
+    },
+    {
+      "id": "flush-r1",
+      "type": "set_var",
+      "position": { "x": -320.0, "y": 640.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "End burst",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "pinDefaults": { "name": "in_burst", "value": false }
+      }
+    },
+    {
+      "id": "flush-r2",
+      "type": "set_var",
+      "position": { "x": -128.0, "y": 640.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Reset burst cycles",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "pinDefaults": { "name": "burst_cycles", "value": 0 }
+      }
+    },
+    {
+      "id": "flush-r3",
+      "type": "set_var",
+      "position": { "x": 64.0, "y": 640.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Clear trace",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "pinDefaults": { "name": "trace", "value": "" }
+      }
+    },
+    {
+      "id": "set-cursor",
+      "type": "set_var",
+      "position": { "x": -704.0, "y": 0.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Advance cursor",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "pinDefaults": { "name": "cursor" }
+      }
+    },
+    {
+      "id": "prompt-vars",
+      "type": "make_object",
+      "position": { "x": -704.0, "y": 256.0 },
+      "data": {
+        "nodeType": "make_object",
+        "label": "Prompt variables",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "task", "label": "task", "type": "string" },
+          { "id": "events", "label": "events", "type": "string" },
+          { "id": "trace", "label": "trace", "type": "string" }
+        ],
+        "outputs": [ { "id": "result", "label": "result", "type": "object" } ]
+      }
+    },
+    {
+      "id": "prompt-text",
+      "type": "string_template",
+      "position": { "x": -544.0, "y": 256.0 },
+      "data": {
+        "nodeType": "string_template",
+        "label": "Cycle prompt",
+        "icon": "&#x1F4C4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "template", "label": "template", "type": "string" },
+          { "id": "vars", "label": "vars", "type": "object" }
+        ],
+        "outputs": [ { "id": "result", "label": "result", "type": "string" } ],
+        "pinDefaults": {
+          "template": "STANDING TASK: {{task}}\n\nNEW EVENTS (arrived since your previous cycle; may redirect or extend your current work):\n{{events}}\n\nWORK TRACE (this burst so far; empty means the burst just started):\n{{trace}}\n\nDecide your next step now. Either call tools to act, or reply with plain text = your burst report (afterwards you sleep until the next event)."
+        }
+      }
+    },
+    {
+      "id": "react-llm",
+      "type": "llm_call",
+      "position": { "x": -320.0, "y": 0.0 },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "REASON + ACT",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "provider", "label": "provider", "type": "provider" },
+          { "id": "model", "label": "model", "type": "model" },
+          { "id": "temperature", "label": "temperature", "type": "number" },
+          { "id": "system", "label": "system", "type": "string" },
+          { "id": "prompt", "label": "prompt", "type": "string" },
+          { "id": "tools", "label": "tools", "type": "tools" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "response", "label": "response", "type": "string" },
+          { "id": "result", "label": "result", "type": "object" }
+        ],
+        "pinDefaults": {
+          "system": "You are a resident event-driven agent: a long-lived worker attached to an open event channel (your mailbox). Anyone may post events there - humans, bridges to other systems, other agents. You are woken when events arrive, you work in short bursts of cycles, and you sleep when done. Rules:\n- Events are listed with seq, from, kind, priority, timestamp, and body. Never invent events.\n- NEW EVENTS can arrive in the middle of a burst (they appear at your next cycle). Read them FIRST: they may correct, redirect, reprioritize, or extend what you are doing. Acknowledge redirections in your work.\n- Use tool calls to act when tools are available. If you have no tools, do the best cognitive work you can (answer, plan, summarize).\n- When the burst's work is complete, reply with plain text and NO tool calls: that is your burst report. Be concise and factual: what came in, what you did, what remains.\n- You never end your own residency; a stop event does. If an event asks you to stop, say so in your report; the channel owner sends the stop control.",
+          "tools": []
+        },
+        "effectConfig": {}
+      }
+    },
+    {
+      "id": "llm-parts",
+      "type": "break_object",
+      "position": { "x": -64.0, "y": 256.0 },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Split LLM result",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [ { "id": "object", "label": "object", "type": "object" } ],
+        "outputs": [
+          { "id": "content", "label": "content", "type": "string" },
+          { "id": "tool_calls", "label": "tool_calls", "type": "array" }
+        ],
+        "breakConfig": { "selectedPaths": ["content", "tool_calls"] }
+      }
+    },
+    {
+      "id": "wants-tools",
+      "type": "has_tools",
+      "position": { "x": 96.0, "y": 256.0 },
+      "data": {
+        "nodeType": "has_tools",
+        "label": "Wants tools?",
+        "icon": "&#x1F50D;",
+        "headerColor": "#E74C3C",
+        "inputs": [ { "id": "array", "label": "array", "type": "array" } ],
+        "outputs": [ { "id": "result", "label": "result", "type": "boolean" } ]
+      }
+    },
+    {
+      "id": "act-or-report",
+      "type": "if",
+      "position": { "x": -64.0, "y": 0.0 },
+      "data": {
+        "nodeType": "if",
+        "label": "Act or report",
+        "icon": "&#x2753;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "condition", "label": "condition", "type": "boolean" }
+        ],
+        "outputs": [
+          { "id": "true", "label": "true", "type": "execution" },
+          { "id": "false", "label": "false", "type": "execution" }
+        ]
+      }
+    },
+    {
+      "id": "exec-tools",
+      "type": "tool_calls",
+      "position": { "x": 160.0, "y": -128.0 },
+      "data": {
+        "nodeType": "tool_calls",
+        "label": "ACT",
+        "icon": "&#x1F528;",
+        "headerColor": "#16A085",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "tool_calls", "label": "tool_calls", "type": "array" },
+          { "id": "allowed_tools", "label": "allowed_tools", "type": "array" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "results", "label": "results", "type": "array" },
+          { "id": "success", "label": "success", "type": "boolean" }
+        ]
+      }
+    },
+    {
+      "id": "calls-json",
+      "type": "stringify_json",
+      "position": { "x": 160.0, "y": 384.0 },
+      "data": {
+        "nodeType": "stringify_json",
+        "label": "Calls to text",
+        "icon": "&#x1F5C2;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "value", "label": "value", "type": "any" },
+          { "id": "mode", "label": "mode", "type": "string" }
+        ],
+        "outputs": [ { "id": "result", "label": "result", "type": "string" } ],
+        "pinDefaults": { "mode": "minified" }
+      }
+    },
+    {
+      "id": "obs-fmt",
+      "type": "format_tool_results",
+      "position": { "x": 352.0, "y": 384.0 },
+      "data": {
+        "nodeType": "format_tool_results",
+        "label": "Observations",
+        "icon": "&#x1F4CB;",
+        "headerColor": "#3498DB",
+        "inputs": [ { "id": "results", "label": "results", "type": "array" } ],
+        "outputs": [ { "id": "result", "label": "result", "type": "string" } ]
+      }
+    },
+    {
+      "id": "trace-vars",
+      "type": "make_object",
+      "position": { "x": 544.0, "y": 384.0 },
+      "data": {
+        "nodeType": "make_object",
+        "label": "Trace variables",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "trace", "label": "trace", "type": "string" },
+          { "id": "cycle", "label": "cycle", "type": "number" },
+          { "id": "events", "label": "events", "type": "string" },
+          { "id": "calls", "label": "calls", "type": "string" },
+          { "id": "obs", "label": "obs", "type": "string" }
+        ],
+        "outputs": [ { "id": "result", "label": "result", "type": "object" } ]
+      }
+    },
+    {
+      "id": "trace-text",
+      "type": "string_template",
+      "position": { "x": 704.0, "y": 384.0 },
+      "data": {
+        "nodeType": "string_template",
+        "label": "Append to trace",
+        "icon": "&#x1F4C4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "template", "label": "template", "type": "string" },
+          { "id": "vars", "label": "vars", "type": "object" }
+        ],
+        "outputs": [ { "id": "result", "label": "result", "type": "string" } ],
+        "pinDefaults": {
+          "template": "{{trace}}--- burst cycle {{cycle}} ---\nEVENTS SEEN: {{events}}\nACTIONS: {{calls}}\nOBSERVATIONS:\n{{obs}}\n"
+        }
+      }
+    },
+    {
+      "id": "save-trace",
+      "type": "set_var",
+      "position": { "x": 416.0, "y": -128.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Save trace",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "pinDefaults": { "name": "trace" }
+      }
+    },
+    {
+      "id": "mark-burst",
+      "type": "set_var",
+      "position": { "x": 608.0, "y": -128.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Mark in_burst",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "pinDefaults": { "name": "in_burst", "value": true }
+      }
+    },
+    {
+      "id": "inc-bcycles",
+      "type": "add",
+      "position": { "x": 608.0, "y": 96.0 },
+      "data": {
+        "nodeType": "add",
+        "label": "cycles + 1",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          { "id": "a", "label": "a", "type": "number" },
+          { "id": "b", "label": "b", "type": "number" }
+        ],
+        "outputs": [ { "id": "result", "label": "result", "type": "number" } ],
+        "pinDefaults": { "b": 1 }
+      }
+    },
+    {
+      "id": "save-bcycles",
+      "type": "set_var",
+      "position": { "x": 800.0, "y": -128.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Save burst_cycles",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "pinDefaults": { "name": "burst_cycles" }
+      }
+    },
+    {
+      "id": "report",
+      "type": "answer_user",
+      "position": { "x": 160.0, "y": 96.0 },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Burst report",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "message", "label": "message", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "message", "label": "message", "type": "string" }
+        ]
+      }
+    },
+    {
+      "id": "rep-r1",
+      "type": "set_var",
+      "position": { "x": 352.0, "y": 96.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "End burst",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "pinDefaults": { "name": "in_burst", "value": false }
+      }
+    },
+    {
+      "id": "rep-r2",
+      "type": "set_var",
+      "position": { "x": 544.0, "y": 96.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Reset burst cycles",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "pinDefaults": { "name": "burst_cycles", "value": 0 }
+      }
+    },
+    {
+      "id": "rep-r3",
+      "type": "set_var",
+      "position": { "x": 736.0, "y": 96.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Clear trace",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "pinDefaults": { "name": "trace", "value": "" }
+      }
+    },
+    {
+      "id": "bye",
+      "type": "answer_user",
+      "position": { "x": -1184.0, "y": -256.0 },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Goodbye",
+        "icon": "&#x1F44B;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "message", "label": "message", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "message", "label": "message", "type": "string" }
+        ],
+        "pinDefaults": { "message": "Resident event agent stopped by stop event." }
+      }
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": { "x": -960.0, "y": -256.0 },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "RESIDENT ENDS",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "answer", "label": "answer", "type": "string" }
+        ],
+        "outputs": []
+      }
+    }
+  ],
+  "edges": [
+    { "id": "x1", "source": "start", "sourceHandle": "exec-out", "target": "init-mailbox", "targetHandle": "exec-in", "animated": true },
+    { "id": "x2", "source": "init-mailbox", "sourceHandle": "exec-out", "target": "init-stopped", "targetHandle": "exec-in", "animated": true },
+    { "id": "x3", "source": "init-stopped", "sourceHandle": "exec-out", "target": "init-cursor", "targetHandle": "exec-in", "animated": true },
+    { "id": "x4", "source": "init-cursor", "sourceHandle": "exec-out", "target": "init-trace", "targetHandle": "exec-in", "animated": true },
+    { "id": "x5", "source": "init-trace", "sourceHandle": "exec-out", "target": "init-burst", "targetHandle": "exec-in", "animated": true },
+    { "id": "x6", "source": "init-burst", "sourceHandle": "exec-out", "target": "init-bcycles", "targetHandle": "exec-in", "animated": true },
+    { "id": "x7", "source": "init-bcycles", "sourceHandle": "exec-out", "target": "loop", "targetHandle": "exec-in", "animated": true },
+    { "id": "x8", "source": "loop", "sourceHandle": "loop", "target": "drain", "targetHandle": "exec-in", "animated": true },
+    { "id": "x9", "source": "drain", "sourceHandle": "exec-out", "target": "route", "targetHandle": "exec-in", "animated": true },
+    { "id": "x10", "source": "route", "sourceHandle": "case:stop", "target": "stop-set", "targetHandle": "exec-in", "animated": true },
+    { "id": "x11", "source": "route", "sourceHandle": "case:park", "target": "park", "targetHandle": "exec-in", "animated": true },
+    { "id": "x12", "source": "route", "sourceHandle": "default", "target": "park", "targetHandle": "exec-in", "animated": true },
+    { "id": "x13", "source": "route", "sourceHandle": "case:flush", "target": "flush-report", "targetHandle": "exec-in", "animated": true },
+    { "id": "x14", "source": "flush-report", "sourceHandle": "exec-out", "target": "flush-r1", "targetHandle": "exec-in", "animated": true },
+    { "id": "x15", "source": "flush-r1", "sourceHandle": "exec-out", "target": "flush-r2", "targetHandle": "exec-in", "animated": true },
+    { "id": "x16", "source": "flush-r2", "sourceHandle": "exec-out", "target": "flush-r3", "targetHandle": "exec-in", "animated": true },
+    { "id": "x17", "source": "route", "sourceHandle": "case:work", "target": "set-cursor", "targetHandle": "exec-in", "animated": true },
+    { "id": "x18", "source": "set-cursor", "sourceHandle": "exec-out", "target": "react-llm", "targetHandle": "exec-in", "animated": true },
+    { "id": "x19", "source": "react-llm", "sourceHandle": "exec-out", "target": "act-or-report", "targetHandle": "exec-in", "animated": true },
+    { "id": "x20", "source": "act-or-report", "sourceHandle": "true", "target": "exec-tools", "targetHandle": "exec-in", "animated": true },
+    { "id": "x21", "source": "exec-tools", "sourceHandle": "exec-out", "target": "save-trace", "targetHandle": "exec-in", "animated": true },
+    { "id": "x22", "source": "save-trace", "sourceHandle": "exec-out", "target": "mark-burst", "targetHandle": "exec-in", "animated": true },
+    { "id": "x23", "source": "mark-burst", "sourceHandle": "exec-out", "target": "save-bcycles", "targetHandle": "exec-in", "animated": true },
+    { "id": "x24", "source": "act-or-report", "sourceHandle": "false", "target": "report", "targetHandle": "exec-in", "animated": true },
+    { "id": "x25", "source": "report", "sourceHandle": "exec-out", "target": "rep-r1", "targetHandle": "exec-in", "animated": true },
+    { "id": "x26", "source": "rep-r1", "sourceHandle": "exec-out", "target": "rep-r2", "targetHandle": "exec-in", "animated": true },
+    { "id": "x27", "source": "rep-r2", "sourceHandle": "exec-out", "target": "rep-r3", "targetHandle": "exec-in", "animated": true },
+    { "id": "x28", "source": "loop", "sourceHandle": "done", "target": "bye", "targetHandle": "exec-in", "animated": true },
+    { "id": "x29", "source": "bye", "sourceHandle": "exec-out", "target": "end", "targetHandle": "exec-in", "animated": true },
+    { "id": "d1", "source": "start", "sourceHandle": "mailbox", "target": "init-mailbox", "targetHandle": "value" },
+    { "id": "d2", "source": "start", "sourceHandle": "mailbox", "target": "mk-wait-key", "targetHandle": "b" },
+    { "id": "d3", "source": "get-stopped", "sourceHandle": "value", "target": "not-stopped", "targetHandle": "value" },
+    { "id": "d4", "source": "not-stopped", "sourceHandle": "result", "target": "loop", "targetHandle": "condition" },
+    { "id": "d5", "source": "gv-inbox", "sourceHandle": "value", "target": "drain", "targetHandle": "inbox" },
+    { "id": "d6", "source": "gv-cursor", "sourceHandle": "value", "target": "drain", "targetHandle": "cursor" },
+    { "id": "d7", "source": "gv-inburst", "sourceHandle": "value", "target": "drain", "targetHandle": "in_burst" },
+    { "id": "d8", "source": "gv-bcycles", "sourceHandle": "value", "target": "drain", "targetHandle": "burst_cycles" },
+    { "id": "d9", "source": "start", "sourceHandle": "max_burst_cycles", "target": "drain", "targetHandle": "max_burst" },
+    { "id": "d10", "source": "drain", "sourceHandle": "output", "target": "drain-parts", "targetHandle": "object" },
+    { "id": "d11", "source": "drain-parts", "sourceHandle": "mode", "target": "route", "targetHandle": "value" },
+    { "id": "d12", "source": "mk-wait-key", "sourceHandle": "result", "target": "park", "targetHandle": "event_key" },
+    { "id": "d13", "source": "gv-trace", "sourceHandle": "value", "target": "flush-msg", "targetHandle": "b" },
+    { "id": "d14", "source": "flush-msg", "sourceHandle": "result", "target": "flush-report", "targetHandle": "message" },
+    { "id": "d15", "source": "drain-parts", "sourceHandle": "new_cursor", "target": "set-cursor", "targetHandle": "value" },
+    { "id": "d16", "source": "start", "sourceHandle": "task", "target": "prompt-vars", "targetHandle": "task" },
+    { "id": "d17", "source": "drain-parts", "sourceHandle": "events_text", "target": "prompt-vars", "targetHandle": "events" },
+    { "id": "d18", "source": "gv-trace", "sourceHandle": "value", "target": "prompt-vars", "targetHandle": "trace" },
+    { "id": "d19", "source": "prompt-vars", "sourceHandle": "result", "target": "prompt-text", "targetHandle": "vars" },
+    { "id": "d20", "source": "prompt-text", "sourceHandle": "result", "target": "react-llm", "targetHandle": "prompt" },
+    { "id": "d21", "source": "start", "sourceHandle": "provider", "target": "react-llm", "targetHandle": "provider" },
+    { "id": "d22", "source": "start", "sourceHandle": "model", "target": "react-llm", "targetHandle": "model" },
+    { "id": "d23", "source": "start", "sourceHandle": "temperature", "target": "react-llm", "targetHandle": "temperature" },
+    { "id": "d24", "source": "start", "sourceHandle": "tools", "target": "react-llm", "targetHandle": "tools" },
+    { "id": "d25", "source": "react-llm", "sourceHandle": "result", "target": "llm-parts", "targetHandle": "object" },
+    { "id": "d26", "source": "llm-parts", "sourceHandle": "tool_calls", "target": "wants-tools", "targetHandle": "array" },
+    { "id": "d27", "source": "wants-tools", "sourceHandle": "result", "target": "act-or-report", "targetHandle": "condition" },
+    { "id": "d28", "source": "llm-parts", "sourceHandle": "tool_calls", "target": "exec-tools", "targetHandle": "tool_calls" },
+    { "id": "d29", "source": "start", "sourceHandle": "tools", "target": "exec-tools", "targetHandle": "allowed_tools" },
+    { "id": "d30", "source": "llm-parts", "sourceHandle": "tool_calls", "target": "calls-json", "targetHandle": "value" },
+    { "id": "d31", "source": "exec-tools", "sourceHandle": "results", "target": "obs-fmt", "targetHandle": "results" },
+    { "id": "d32", "source": "gv-trace", "sourceHandle": "value", "target": "trace-vars", "targetHandle": "trace" },
+    { "id": "d33", "source": "gv-bcycles", "sourceHandle": "value", "target": "trace-vars", "targetHandle": "cycle" },
+    { "id": "d34", "source": "drain-parts", "sourceHandle": "events_text", "target": "trace-vars", "targetHandle": "events" },
+    { "id": "d35", "source": "calls-json", "sourceHandle": "result", "target": "trace-vars", "targetHandle": "calls" },
+    { "id": "d36", "source": "obs-fmt", "sourceHandle": "result", "target": "trace-vars", "targetHandle": "obs" },
+    { "id": "d37", "source": "trace-vars", "sourceHandle": "result", "target": "trace-text", "targetHandle": "vars" },
+    { "id": "d38", "source": "trace-text", "sourceHandle": "result", "target": "save-trace", "targetHandle": "value" },
+    { "id": "d39", "source": "gv-bcycles", "sourceHandle": "value", "target": "inc-bcycles", "targetHandle": "a" },
+    { "id": "d40", "source": "inc-bcycles", "sourceHandle": "result", "target": "save-bcycles", "targetHandle": "value" },
+    { "id": "d41", "source": "react-llm", "sourceHandle": "response", "target": "report", "targetHandle": "message" },
+    { "id": "d42", "source": "bye", "sourceHandle": "message", "target": "end", "targetHandle": "answer" }
+  ],
+  "entryNode": "start"
+}

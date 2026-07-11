@@ -7,6 +7,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Honest rendering for event-wait parks in the run modal (visit seam-spec
+  0013 client half). Event waits (`reason=event`) no longer invent a
+  "Please respond:" question: plain parks render as
+  "Parked — waiting for events on `<wait_key>`" with no input affordance,
+  while waits marked `details.kind="visitor_message"` render a chat-style
+  composer ("Waiting for your message." + Send) that resumes with
+  `{text: …}` — the payload key the shipped visit workflow's ROUTE node
+  reads (`abstractruntime/identity/visit_workflow.py`). Deadline-bearing
+  waits (`until` beside `wait_key`, the runtime's WAIT_EVENT idle timeout)
+  show the idle deadline with relative time. The ledger mapper
+  (`src/utils/ledgerEvents.ts`) now passes `until` through, and new
+  contract tests (`src/utils/ledgerEvents.test.ts`) pin the wait
+  passthrough plus the node-anchored record ruling (records without
+  `run_id`+`node_id` are dropped by contract, per the 0013 clarifications
+  addendum).
+- `Wait Event` node: optional `until` and `details` input pins (D3
+  follow-through, paired with the runtime's compiler passthrough). `until`
+  gives a visual park a durable idle deadline (ISO timestamp, runtime
+  normalizes to UTC; a passed deadline resumes with `{"timed_out": true}`
+  in `event_data`); `details` rides the ledger wait record so clients can
+  render the park honestly (e.g. `{"kind": "visitor_message"}` renders the
+  message composer). Pin ids match the runtime effect payload spelling
+  exactly so no mapping layer exists to drift. Node catalog + llms docs
+  regenerated.
+- Act-only act-frame chips (`src/utils/actOnlyRefs.ts` + run modal): step
+  outputs carrying `$act_only` typed refs (diary-class tools under the G1
+  privacy rule — "the book's words never rest outside the book") render as
+  chips showing the ACT (tool, entry id, one-line gist, reason) with an
+  explicit note that content stays in the entity's book. Recognition is
+  parse-based on the frozen ref shape (lone `$act_only` top-level key,
+  exact JSON), never regex; Flow never resolves refs (rendering is a pure
+  read). Pinned by `src/utils/actOnlyRefs.test.ts`.
+- Added `examples/flows/event-inbox-react-agent.json`: a resident ReAct agent
+  (LLM + while loop + code drain, no Agent node) driven by an open event
+  channel instead of any specific hub. It declares an `events_mailbox` run
+  var, parks durably on `wait_event` (`evt:global:global:<mailbox>`) when
+  idle, and drains its `events_inbox` run var with a `seq` cursor at every
+  cycle boundary — so events posted by anyone via the gateway `emit_event`
+  command (`durable: true`) interleave into the very next loop cycle, even
+  mid-burst. `{kind: "stop"}` ends the resident; burst budgets flush with a
+  labeled `#FALLBACK` report. Generalizes the agora example (agora becomes
+  one producer). See `docs/guide/event-inbox-agent.md` at the repo root;
+  scripted tests in
+  `abstractruntime/tests/test_visualflow_event_inbox_react_agent.py`.
+- Added `examples/flows/agora-react-agent.json`: a hand-built ReAct agent
+  (`llm_call` + `while` loop + `tool_calls`, no Agent node) that participates
+  in an agora agent-to-agent hub. It bootstraps its inbox deterministically
+  (`call_tool: agora_check_inbox`), puts the hub's priority envelopes
+  (critical / blocked / open+escalated / to_me / reply_to_me) in front of the
+  model every cycle, replies where an answer is owed (`status=reply` +
+  `reply_to`), acks handled cursors, and ends with a plain-text report.
+  Requires the runtime's env-gated `agora` toolset (`AGORA_API_KEY`); see
+  `docs/guide/agora-workflow-agent.md` at the repo root and the scripted test
+  `abstractruntime/tests/test_visualflow_agora_react_agent.py`.
+- Added the `dp-` production research workflow family sources under
+  `examples/flows/dp-*.json`, plus a generator script that packs
+  `dp-research@0.1.0.flow` for Gateway. The root graph uses an enforced
+  `For(max_review_rounds)` investigate/review loop and timestamped exports.
+- Added first-class `Write DOCX` authoring metadata so workflows can export
+  Markdown/report content through Runtime's native DOCX node.
+
 ## [0.3.19] - 2026-06-14
 
 ### Changed

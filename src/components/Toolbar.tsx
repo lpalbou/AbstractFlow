@@ -36,6 +36,8 @@ import { mapGatewayRunSummary } from '../utils/gatewayRuns';
 import { extractPendingApprovalWait, extractReplayTraceEvents } from '../utils/runHistoryReplay';
 import type { ExecutionEvent, FlowRunResult, VisualFlow, RunHistoryResponse, RunSummary } from '../types/flow';
 import { computeRunPreflightIssues } from '../utils/preflight';
+import { getBundledRunTarget, listBundledFlows, mergeFlowCatalogs } from '../utils/bundledFlows';
+import type { PublishedBundleTarget } from '../utils/workflowBundles';
 import { useGatewayCapabilities, gatewayContractsFromCapabilities } from '../hooks/useGatewayCapabilities';
 import {
   endpointFromDescriptor,
@@ -275,6 +277,7 @@ export function Toolbar({
   const [runResult, setRunResult] = useState<FlowRunResult | null>(null);
   const [executionEvents, setExecutionEvents] = useState<ExecutionEvent[]>([]);
   const [traceEvents, setTraceEvents] = useState<ExecutionEvent[]>([]);
+  const [loadedBundledRunTarget, setLoadedBundledRunTarget] = useState<PublishedBundleTarget | null>(null);
   const [threadRootRunId, setThreadRootRunId] = useState<string | null>(null);
   const [runWorkflowId, setRunWorkflowId] = useState<string | null>(null);
   const threadRootRunIdRef = useRef<string | null>(null);
@@ -292,8 +295,12 @@ export function Toolbar({
   const [savedFlowSignature, setSavedFlowSignature] = useState(() => flowSignatureFor(getFlow()));
   const savedFlowIdentityRef = useRef<string | null>(flowId || null);
   const hasUnsavedChanges = !isEmptyFlow && currentFlowSignature !== savedFlowSignature;
+  const runnableFlowId = flowId || loadedBundledRunTarget?.flowId || '';
+  const loadedBundledTargetDirty = Boolean(loadedBundledRunTarget && hasUnsavedChanges);
   const saveDisabledReason = visualflowCrudUnavailable
     ? saveUnavailableReason
+    : loadedBundledRunTarget
+      ? 'Bundled workflow families are read-only; run the shipped bundle or create an editable family copy separately'
     : isEmptyFlow
       ? 'Add at least one node before saving'
       : !hasUnsavedChanges
@@ -528,73 +535,120 @@ export function Toolbar({
     queryFn: () => listFlows(gatewayContracts),
     enabled: showFlowLibrary && !visualflowCrudUnavailable && !gatewayCapabilitiesQuery.isLoading,
   });
+  const bundledFlows = useMemo(() => listBundledFlows(), []);
+  const flowLibraryCatalog = useMemo(
+    () => mergeFlowCatalogs(flowsQuery.data || [], bundledFlows),
+    [bundledFlows, flowsQuery.data]
+  );
+  const bundledFlowIdSet = useMemo(
+    () => new Set(flowLibraryCatalog.bundledFlowIds),
+    [flowLibraryCatalog.bundledFlowIds]
+  );
 
   // Handle loading a flow
   const handleLoadFlow = useCallback(
     async (selectedFlowId: string) => {
       try {
+        if (bundledFlowIdSet.has(selectedFlowId)) {
+          const bundled = flowLibraryCatalog.flows.find((f) => f.id === selectedFlowId);
+          if (!bundled) throw new Error('Bundled flow is unavailable');
+          const target = getBundledRunTarget(bundled.id);
+          const loaded = loadFlow(bundled);
+          setFlowId(null);
+          setLoadedBundledRunTarget(target);
+          setSavedFlowSignature(flowSignatureFor(loaded));
+          setShowFlowLibrary(false);
+          toast.success(
+            target
+              ? `Loaded bundled "${bundled.name}" as ${target.bundleRef}`
+              : `Loaded bundled "${bundled.name}" as an unsaved draft`
+          );
+          return;
+        }
         const flow = await fetchFlow(selectedFlowId, gatewayContracts);
-        loadFlow(flow);
-        setSavedFlowSignature(flowSignatureFor(flow));
+        const loaded = loadFlow(flow);
+        setLoadedBundledRunTarget(null);
+        setSavedFlowSignature(flowSignatureFor(loaded));
         setShowFlowLibrary(false);
         toast.success(`Loaded "${flow.name}"`);
       } catch (error) {
         toast.error('Failed to load flow');
       }
     },
-    [gatewayContracts, loadFlow]
+    [bundledFlowIdSet, flowLibraryCatalog.flows, gatewayContracts, loadFlow, setFlowId]
   );
 
   const handleRenameFlow = useCallback(
     async (id: string, nextName: string) => {
+      if (bundledFlowIdSet.has(id)) {
+        toast.error('Bundled flows are read-only. Load or duplicate first.');
+        return;
+      }
       const name = nextName.trim();
       if (!name) return;
       const updated = await renameFlow(id, name, gatewayContracts);
       if (flowId && id === flowId) {
+        const loaded = loadFlow(updated);
         setFlowName(updated.name);
-        setSavedFlowSignature(flowSignatureFor(updated));
+        setLoadedBundledRunTarget(null);
+        setSavedFlowSignature(flowSignatureFor(loaded));
       }
       queryClient.invalidateQueries({ queryKey: ['flows'] });
       toast.success('Renamed');
     },
-    [flowId, gatewayContracts, queryClient, setFlowName]
+    [bundledFlowIdSet, flowId, gatewayContracts, loadFlow, queryClient, setFlowName]
   );
 
   const handleUpdateDescription = useCallback(
     async (id: string, nextDescription: string) => {
+      if (bundledFlowIdSet.has(id)) {
+        toast.error('Bundled flows are read-only. Load or duplicate first.');
+        return;
+      }
       const updated = await updateFlowDescription(id, nextDescription, gatewayContracts);
       // If we are currently editing that flow, keep the in-editor description in sync by reloading.
       if (flowId && id === flowId) {
+        setLoadedBundledRunTarget(null);
         // We only have the flow name in store; description lives in the saved flow object.
         // Loading is the simplest way to keep all metadata consistent.
-        loadFlow(updated);
-        setSavedFlowSignature(flowSignatureFor(updated));
+        const loaded = loadFlow(updated);
+        setSavedFlowSignature(flowSignatureFor(loaded));
       }
       queryClient.invalidateQueries({ queryKey: ['flows'] });
       toast.success('Description updated');
     },
-    [flowId, gatewayContracts, loadFlow, queryClient]
+    [bundledFlowIdSet, flowId, gatewayContracts, loadFlow, queryClient]
   );
 
   const handleUpdateInterfaces = useCallback(
     async (id: string, nextInterfaces: string[]) => {
+      if (bundledFlowIdSet.has(id)) {
+        toast.error('Bundled flows are read-only. Load or duplicate first.');
+        return;
+      }
       const updated = await updateFlowInterfaces(id, nextInterfaces, gatewayContracts);
       if (flowId && id === flowId) {
-        loadFlow(updated);
-        setSavedFlowSignature(flowSignatureFor(updated));
+        setLoadedBundledRunTarget(null);
+        const loaded = loadFlow(updated);
+        setSavedFlowSignature(flowSignatureFor(loaded));
       }
       queryClient.invalidateQueries({ queryKey: ['flows'] });
       toast.success('Interfaces updated');
     },
-    [flowId, gatewayContracts, loadFlow, queryClient]
+    [bundledFlowIdSet, flowId, gatewayContracts, loadFlow, queryClient]
   );
 
   const handleDeleteFlow = useCallback(
     async (id: string) => {
+      if (bundledFlowIdSet.has(id)) {
+        toast.error('Bundled flows are read-only. Load or duplicate first.');
+        return;
+      }
       await deleteFlow(id, gatewayContracts);
       if (flowId && id === flowId) {
         // Keep the current graph but mark it as unsaved.
         setFlowId(null);
+        setLoadedBundledRunTarget(null);
         setSavedFlowSignature('');
         toast.success('Deleted (editor is now unsaved)');
       } else {
@@ -602,23 +656,28 @@ export function Toolbar({
       }
       queryClient.invalidateQueries({ queryKey: ['flows'] });
     },
-    [flowId, gatewayContracts, queryClient, setFlowId]
+    [bundledFlowIdSet, flowId, gatewayContracts, queryClient, setFlowId]
   );
 
   const handleDuplicateFlow = useCallback(
     async (id: string) => {
-      const all = flowsQuery.data || [];
+      if (visualflowCrudUnavailable) {
+        toast.error(saveUnavailableReason);
+        return;
+      }
+      const all = flowLibraryCatalog.flows;
       const src = all.find((f) => f.id === id);
       if (!src) return;
       const base = (src.name || 'Untitled').trim() || 'Untitled';
       const created = await duplicateFlow(src, `${base} (copy)`, gatewayContracts);
       queryClient.invalidateQueries({ queryKey: ['flows'] });
-      loadFlow(created);
-      setSavedFlowSignature(flowSignatureFor(created));
+      const loaded = loadFlow(created);
+      setLoadedBundledRunTarget(null);
+      setSavedFlowSignature(flowSignatureFor(loaded));
       setShowFlowLibrary(false);
       toast.success(`Duplicated as "${created.name}"`);
     },
-    [flowsQuery.data, gatewayContracts, loadFlow, queryClient]
+    [flowLibraryCatalog.flows, gatewayContracts, loadFlow, queryClient, saveUnavailableReason, visualflowCrudUnavailable]
   );
 
   // Save mutation
@@ -632,6 +691,7 @@ export function Toolbar({
       if (savedId) {
         setFlowId(savedId);
       }
+      setLoadedBundledRunTarget(null);
       const savedSnapshot: VisualFlow = {
         ...variables.flow,
         id: savedId || variables.flow.id,
@@ -655,6 +715,7 @@ export function Toolbar({
     waitingInfo,
     resumeFlow,
     runFlow,
+    runPublishedFlow,
     pauseRun,
     resumeRun,
     cancelRun,
@@ -664,12 +725,12 @@ export function Toolbar({
     setAutoApproveForSession,
     setAutoApproveForRunRoot,
   } = useWebSocket({
-    flowId: flowId || '',
+    flowId: runnableFlowId,
     onEvent: (event) => {
       console.log('Execution event:', event);
       if (event.type === 'flow_start') {
         const actualRunId = typeof event.runId === 'string' ? event.runId.trim() : '';
-        if (actualRunId && flowId) setRunWorkflowId((prev) => prev || flowId);
+        if (actualRunId && runnableFlowId) setRunWorkflowId((prev) => prev || runnableFlowId);
         const pendingThreadId = followUpPendingThreadRef.current;
         const isFollowUp = Boolean(pendingThreadId);
         const resolvedThreadId = pendingThreadId || threadRootRunIdRef.current || actualRunId;
@@ -766,6 +827,10 @@ export function Toolbar({
       toast.error(saveUnavailableReason);
       return;
     }
+    if (loadedBundledRunTarget) {
+      toast.error('Bundled workflow families are read-only; run the shipped bundle instead of saving the root flow alone.');
+      return;
+    }
     if (isEmptyFlow) {
       toast.error('Add at least one node before saving');
       return;
@@ -779,7 +844,7 @@ export function Toolbar({
       return;
     }
     saveMutation.mutate({ flow, existingFlowId: flowId });
-  }, [flowId, getFlow, hasUnsavedChanges, isEmptyFlow, saveMutation, saveUnavailableReason, visualflowCrudUnavailable]);
+  }, [flowId, getFlow, hasUnsavedChanges, isEmptyFlow, loadedBundledRunTarget, saveMutation, saveUnavailableReason, visualflowCrudUnavailable]);
 
   // Cmd/Ctrl+S saves the flow. Always intercept so the browser "Save page"
   // dialog never appears inside the editor, even when there is nothing to save.
@@ -808,8 +873,8 @@ export function Toolbar({
 
   // Handle Run - open modal
   const handleRun = useCallback(() => {
-    if (!flowId) {
-      toast.error('Please save the flow first');
+    if (!runnableFlowId) {
+      toast.error('Please save the flow first or load a runnable bundled workflow');
       return;
     }
     if (visualflowRunUnavailable) {
@@ -824,7 +889,11 @@ export function Toolbar({
       return;
     }
     if (hasUnsavedChanges) {
-      toast.error('Save the flow before running current changes');
+      toast.error(
+        loadedBundledRunTarget
+          ? 'Bundled workflow families run from the shipped bundle; reload it before running after local edits.'
+          : 'Save the flow before running current changes'
+      );
       return;
     }
     const issues = computeRunPreflightIssues(nodes, edges, {
@@ -851,7 +920,9 @@ export function Toolbar({
     hasUnsavedChanges,
     inspectedRun,
     isRunning,
+    loadedBundledRunTarget,
     nodes,
+    runnableFlowId,
     runResult,
     setPreflightIssues,
     traceEvents.length,
@@ -867,7 +938,7 @@ export function Toolbar({
   }, []);
 
   useEffect(() => {
-    const nextFlowId = flowId || null;
+    const nextFlowId = runnableFlowId || null;
     if (activeFlowIdRef.current === nextFlowId) return;
     activeFlowIdRef.current = nextFlowId;
     setShowRunModal(false);
@@ -879,11 +950,11 @@ export function Toolbar({
     setTraceEvents([]);
     setRunWorkflowId(null);
     resetThreadState();
-  }, [flowId, resetThreadState]);
+  }, [runnableFlowId, resetThreadState]);
 
   // Handle run from modal
   const handleRunExecute = useCallback((inputData: Record<string, unknown>) => {
-    if (!flowId) return;
+    if (!runnableFlowId) return;
     setIsRunning(true);
     setInspectedRun(null);
     setInspectedEvents([]);
@@ -891,10 +962,15 @@ export function Toolbar({
     setRunResult(null);
     setExecutionEvents([]);
     setTraceEvents([]);
-    setRunWorkflowId(flowId);
+    const target = loadedBundledRunTarget;
+    setRunWorkflowId(target?.flowId || flowId);
     resetThreadState();
+    if (target) {
+      void runPublishedFlow(target, inputData);
+      return;
+    }
     runFlow(inputData);
-  }, [flowId, resetThreadState, runFlow, setIsRunning]);
+  }, [flowId, loadedBundledRunTarget, resetThreadState, runFlow, runPublishedFlow, runnableFlowId, setIsRunning]);
 
   // Handle modal close
   const handleRunModalClose = useCallback(() => {
@@ -1111,6 +1187,7 @@ export function Toolbar({
         const text = await file.text();
         const flow = JSON.parse(text) as VisualFlow;
         loadFlow(flow);
+        setLoadedBundledRunTarget(null);
         setSavedFlowSignature('');
         toast.success('Flow imported!');
       } catch (err) {
@@ -1132,23 +1209,32 @@ export function Toolbar({
       toast.error(saveUnavailableReason);
       return;
     }
+    if (loadedBundledRunTarget) {
+      toast.error('Bundled workflow families cannot be duplicated as one standalone flow because they include companion subflows.');
+      return;
+    }
     const flow = getFlow();
     const base = (flow.name || 'Untitled').trim() || 'Untitled';
     try {
       const created = await duplicateFlow(flow, `${base} (copy)`, gatewayContracts);
       queryClient.invalidateQueries({ queryKey: ['flows'] });
-      loadFlow(created);
-      setSavedFlowSignature(flowSignatureFor(created));
+      const loaded = loadFlow(created);
+      setLoadedBundledRunTarget(null);
+      setSavedFlowSignature(flowSignatureFor(loaded));
       toast.success(`Duplicated as "${created.name}"`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Duplicate failed';
       toast.error(msg);
     }
-  }, [gatewayContracts, getFlow, loadFlow, queryClient, saveUnavailableReason, visualflowCrudUnavailable]);
+  }, [gatewayContracts, getFlow, loadFlow, loadedBundledRunTarget, queryClient, saveUnavailableReason, visualflowCrudUnavailable]);
 
   const handlePublish = useCallback(() => {
     if (!flowId) {
       toast.error('Please save the flow first');
+      return;
+    }
+    if (loadedBundledRunTarget) {
+      toast.error('Bundled workflow families are already shipped as WorkflowBundles.');
       return;
     }
     if (visualflowPublishUnavailable) {
@@ -1156,7 +1242,7 @@ export function Toolbar({
       return;
     }
     setShowPublishModal(true);
-  }, [flowId, visualflowPublishHint, visualflowPublishUnavailable]);
+  }, [flowId, loadedBundledRunTarget, visualflowPublishHint, visualflowPublishUnavailable]);
 
   const handleLifecycle = useCallback(() => {
     if (!flowId) {
@@ -1166,9 +1252,11 @@ export function Toolbar({
     setShowLifecycleModal(true);
   }, [flowId]);
 
-  const needsSaveFirst = !flowId;
+  const needsSaveFirst = !runnableFlowId;
   const runTooltip = visualflowRunUnavailable
     ? visualflowRunHint || 'Gateway cannot run VisualFlows'
+    : loadedBundledTargetDirty
+      ? 'Reload the bundled workflow before running; local edits cannot run as the shipped bundle'
     : needsSaveFirst
       ? 'Save the flow first to run it'
       : isRunning
@@ -1176,10 +1264,16 @@ export function Toolbar({
         : 'Run flow';
   const publishTooltip = visualflowPublishUnavailable
     ? visualflowPublishHint || 'Gateway cannot publish VisualFlows'
+    : loadedBundledRunTarget
+      ? 'Bundled workflow families are already shipped as WorkflowBundles'
     : needsSaveFirst
       ? 'Save the flow first to publish it'
       : 'Publish as WorkflowBundle (.flow)';
-  const lifecycleTooltip = needsSaveFirst ? 'Save the flow first' : 'Bundle lifecycle on gateway';
+  const lifecycleTooltip = loadedBundledRunTarget
+    ? 'Bundled workflow families use their shipped bundle lifecycle'
+    : needsSaveFirst
+      ? 'Save the flow first'
+      : 'Bundle lifecycle on gateway';
   const historyTooltip = runHistoryUnavailable
     ? runHistoryHint
     : needsSaveFirst
@@ -1215,17 +1309,23 @@ export function Toolbar({
             tooltip={saveDisabledReason}
             label="Save Flow"
             onClick={handleSave}
-            disabled={saveMutation.isPending || visualflowCrudUnavailable || isEmptyFlow || !hasUnsavedChanges}
+            disabled={saveMutation.isPending || visualflowCrudUnavailable || Boolean(loadedBundledRunTarget) || isEmptyFlow || !hasUnsavedChanges}
             className={hasUnsavedChanges ? 'save-button dirty' : 'save-button'}
           >
             <IconSave />
             {hasUnsavedChanges ? <span className="save-dirty-dot" aria-hidden="true" /> : null}
           </ToolbarAction>
           <ToolbarAction
-            tooltip={visualflowCrudUnavailable ? saveUnavailableReason : 'Duplicate this flow'}
+            tooltip={
+              loadedBundledRunTarget
+                ? 'Bundled workflow families cannot be duplicated as one standalone flow'
+                : visualflowCrudUnavailable
+                  ? saveUnavailableReason
+                  : 'Duplicate this flow'
+            }
             label="Duplicate Flow"
             onClick={handleDuplicateCurrent}
-            disabled={visualflowCrudUnavailable}
+            disabled={visualflowCrudUnavailable || Boolean(loadedBundledRunTarget)}
           >
             <IconCopy />
           </ToolbarAction>
@@ -1247,7 +1347,7 @@ export function Toolbar({
             tooltip={runTooltip}
             label={isRunning ? 'Open current run' : 'Run flow'}
             onClick={handleRun}
-            disabled={!flowId || visualflowRunUnavailable}
+            disabled={!runnableFlowId || visualflowRunUnavailable || loadedBundledTargetDirty}
             iconOnly={false}
             className="primary run-button"
           >
@@ -1258,7 +1358,7 @@ export function Toolbar({
             tooltip={historyTooltip}
             label="Open run history"
             onClick={() => setShowRunHistory(true)}
-            disabled={!flowId || runHistoryUnavailable}
+            disabled={!runnableFlowId || runHistoryUnavailable}
           >
             <IconHistory />
           </ToolbarAction>
@@ -1270,7 +1370,7 @@ export function Toolbar({
             tooltip={publishTooltip}
             label="Publish WorkflowBundle"
             onClick={handlePublish}
-            disabled={isRunning || !flowId || visualflowPublishUnavailable}
+            disabled={isRunning || !flowId || Boolean(loadedBundledRunTarget) || visualflowPublishUnavailable}
           >
             <IconPackage />
           </ToolbarAction>
@@ -1278,7 +1378,7 @@ export function Toolbar({
             tooltip={lifecycleTooltip}
             label="Lifecycle on gateway"
             onClick={handleLifecycle}
-            disabled={isRunning || !flowId}
+            disabled={isRunning || !flowId || Boolean(loadedBundledRunTarget)}
           >
             <IconLifecycle />
           </ToolbarAction>
@@ -1361,6 +1461,7 @@ export function Toolbar({
                   setShowNewFlowModal(false);
                   clearRunState();
                   clearFlow();
+                  setLoadedBundledRunTarget(null);
                   setSavedFlowSignature(flowSignatureFor({ name: 'Untitled Flow', description: '', interfaces: [], nodes: [], edges: [] }));
                   toast.success('Created new flow');
                 }}
@@ -1430,7 +1531,7 @@ export function Toolbar({
 
       <RunHistoryModal
         isOpen={showRunHistory}
-        workflowId={flowId || ''}
+        workflowId={runnableFlowId || ''}
         workflowName={flowName}
         gatewayContracts={gatewayContracts}
         onClose={() => setShowRunHistory(false)}
@@ -1440,9 +1541,11 @@ export function Toolbar({
       <FlowLibraryModal
         isOpen={showFlowLibrary}
         currentFlowId={flowId}
-        flows={flowsQuery.data || []}
-        isLoading={flowsQuery.isLoading}
-        error={flowsQuery.error}
+        flows={flowLibraryCatalog.flows}
+        readonlyFlowIds={flowLibraryCatalog.bundledFlowIds}
+        bundledRunTargetIds={flowLibraryCatalog.bundledRunTargetIds}
+        isLoading={flowsQuery.isLoading && flowLibraryCatalog.flows.length === 0}
+        error={flowLibraryCatalog.flows.length === 0 ? flowsQuery.error : null}
         onClose={() => setShowFlowLibrary(false)}
         onRefresh={() => flowsQuery.refetch()}
         onLoadFlow={handleLoadFlow}

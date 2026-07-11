@@ -19,6 +19,8 @@ import AfSelect from './inputs/AfSelect';
 import AfMultiSelect from './inputs/AfMultiSelect';
 import { useProviders, useModels } from '../hooks/useProviders';
 import { TEXT_OUTPUT_CAPABILITY_ROUTE } from '../utils/capabilityRoutes';
+import { thinkingOptionsFromModelCapabilities } from '../utils/thinkingControls';
+import { RESEARCH_EFFORT_OPTIONS, isResearchEffortPin, normalizeResearchEffort } from '../utils/researchEffort';
 import { useTools } from '../hooks/useTools';
 import { useExecutionWorkspace } from '../hooks/useExecutionWorkspace';
 import { RunSwitcherDropdown } from './RunSwitcherDropdown';
@@ -52,6 +54,7 @@ import {
   type CanonicalArtifactRef,
 } from '../utils/artifactInputs';
 import { extractRunWorkspaceRoot, selectRunWorkspaceRunId } from '../utils/runWorkspace';
+import { actOnlyRefLabel, collectActOnlyRefs } from '../utils/actOnlyRefs';
 import { displayDataPinTypeLabel } from '../utils/pinTypeOptions';
 import { savedFlowSummariesFromResponse, subflowExecutionLabel } from '../utils/subflowPins';
 import {
@@ -2083,6 +2086,25 @@ export function RunFlowModal({
   const models = Array.isArray(modelsQuery.data) ? modelsQuery.data : [];
 
   const discovery = gatewayContracts?.common?.discovery || {};
+  const modelCapabilitiesEndpoint = discovery.model_capabilities || '';
+  const thinkingCapabilitiesQuery = useQuery({
+    queryKey: ['model-capabilities', modelCapabilitiesEndpoint, selectedModel],
+    queryFn: () =>
+      gatewayJson<Record<string, unknown>>(
+        gatewayPath(modelCapabilitiesEndpoint, {}, { model_name: selectedModel })
+      ),
+    enabled: isOpen && Boolean(selectedModel) && Boolean(modelCapabilitiesEndpoint),
+    staleTime: 30_000,
+  });
+  const thinkingOptions = useMemo(
+    () => thinkingOptionsFromModelCapabilities(thinkingCapabilitiesQuery.data, selectedModel),
+    [selectedModel, thinkingCapabilitiesQuery.data]
+  );
+  const thinkingSupported = thinkingOptions.length > 0;
+  const visibleFormInputPins = useMemo(
+    () => formInputPins.filter((pin) => pin.id !== 'thinking' || thinkingSupported),
+    [formInputPins, thinkingSupported]
+  );
   const generatedMusicContract =
     gatewayContracts?.flow_editor?.media?.generated_music || gatewayContracts?.assistant?.media?.generated_music;
   const visionProviderModelsEndpoint = discovery.vision_provider_models || '';
@@ -2596,7 +2618,7 @@ export function RunFlowModal({
     // Build input data from form values
     const inputData: Record<string, unknown> = {};
 
-    formInputPins.forEach(pin => {
+    visibleFormInputPins.forEach(pin => {
       if (pin.type === 'tools') {
         inputData[pin.id] = Array.isArray(toolsValues[pin.id]) ? toolsValues[pin.id] : [];
         return;
@@ -2642,6 +2664,13 @@ export function RunFlowModal({
           inputData[pin.id] = value;
       }
     });
+
+    if (
+      formInputPins.some((pin) => pin.id === 'thinking') &&
+      !visibleFormInputPins.some((pin) => pin.id === 'thinking')
+    ) {
+      inputData.thinking = undefined;
+    }
 
     const workspaceValue = String(workspaceRoot || '').trim();
     if (workspaceValue) {
@@ -2694,6 +2723,7 @@ export function RunFlowModal({
     formValues,
     onRun,
     toolsValues,
+    visibleFormInputPins,
     workspaceAccessMode,
     workspaceIgnoredPaths,
     workspaceInputEnabled,
@@ -2733,6 +2763,7 @@ export function RunFlowModal({
       allowFreeText: boolean;
       waitKey?: string;
       reason?: string;
+      until?: string;
       runId?: string;
       details?: Record<string, unknown>;
     };
@@ -3214,12 +3245,17 @@ export function RunFlowModal({
         const isSubworkflowWait = reason?.toLowerCase() === 'subworkflow';
         const status: StepStatus = isSubworkflowWait ? 'running' : 'waiting';
         // Subworkflow waits do not include user prompts; avoid default prompt text.
+        // Event parks (wait_event) are not questions either: only explicit prompts
+        // render for them — the generic "Please respond:" default is reserved for
+        // user-input waits (ask_user), where a question is genuinely pending.
+        const isEventReasonWait = reason?.toLowerCase() === 'event';
         const waiting = {
-          prompt: isSubworkflowWait ? '' : ev.prompt || 'Please respond:',
+          prompt: isSubworkflowWait ? '' : ev.prompt || (isEventReasonWait ? '' : 'Please respond:'),
           choices: Array.isArray(ev.choices) ? ev.choices : [],
           allowFreeText: isSubworkflowWait ? false : ev.allow_free_text !== false,
           waitKey: ev.wait_key,
           reason,
+          until: typeof ev.until === 'string' && ev.until.trim() ? ev.until.trim() : undefined,
           runId: evRunId || ev.runId,
           details: ev.details && typeof ev.details === 'object' ? (ev.details as Record<string, unknown>) : undefined,
         };
@@ -4211,6 +4247,32 @@ export function RunFlowModal({
   const isToolApprovalWait = approvalMode === 'approval_required' || approvalKind === 'tool_approval';
   const showWaitingPanel = Boolean(waitingPayload) && selectedStep?.status === 'waiting';
   const isSubworkflowWait = waitingReasonRaw.trim().toLowerCase() === 'subworkflow';
+  // Event waits are parks, not questions (frozen seam spec, 0013 addendum):
+  // details.kind="visitor_message" marks the one event wait that IS a
+  // conversation turn (a visitor composer); every other event wait renders as
+  // an honest "parked" state instead of a fake prompt.
+  const isEventWait = waitingReasonRaw.trim().toLowerCase() === 'event';
+  const isVisitorMessageWait = isEventWait && approvalKind === 'visitor_message';
+  const isEventParkWait = isEventWait && !isVisitorMessageWait && !isToolApprovalWait;
+  const waitDeadlineLabel = useMemo(() => {
+    const raw = typeof waitingPayload?.until === 'string' ? waitingPayload.until.trim() : '';
+    if (!raw) return '';
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return '';
+    const abs = d.toLocaleString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+      day: '2-digit',
+      month: 'short',
+    });
+    const deltaMs = d.getTime() - Date.now();
+    if (deltaMs <= 0) return `Idle deadline passed (${abs}) — the wait resolves as a timeout.`;
+    const mins = Math.round(deltaMs / 60000);
+    const rel = mins >= 120 ? `${Math.round(mins / 60)}h` : mins >= 2 ? `${mins}min` : `${Math.max(1, Math.round(deltaMs / 1000))}s`;
+    return `Idle timeout at ${abs} (~${rel} left)`;
+  }, [waitingPayload?.until]);
   const selectedResidencyResultStatus =
     selectedStep?.nodeType === 'model_residency' ? residencyResultStatusInfo(selectedStep.output) : null;
   const selectedDurationLabel =
@@ -4384,6 +4446,10 @@ export function RunFlowModal({
     if (selectedStep.nodeType === 'agent') return derivedAgentOutput;
     return null;
   }, [derivedAgentOutput, selectedStep]);
+
+  // Act-only act-frames ($act_only typed refs, frozen seam spec): rendered as
+  // chips — the act without the words. Flow never resolves these refs.
+  const actOnlyRefs = useMemo(() => collectActOnlyRefs(resolvedStepOutput), [resolvedStepOutput]);
 
   const generatedImagePreview = useMemo(
     () => extractGeneratedImagePreview(resolvedStepOutput, [selectedStep?.runId, rootRunId], artifactContentDescriptor),
@@ -5574,6 +5640,28 @@ export function RunFlowModal({
 
   const submitChoiceResume = (choice: string, event?: MouseEvent<HTMLButtonElement>) => submitResumeValue(choice, event);
 
+  // Visitor-message waits (visit seam-spec, details.kind="visitor_message")
+  // resume with {text: ...}: the shipped visit workflow's ROUTE node reads
+  // resume["text"] (abstractruntime identity/visit_workflow.py), not the
+  // ask_user {response} convention.
+  const submitVisitorMessage = async (event?: MouseEvent<HTMLButtonElement> | FormEvent) => {
+    event?.preventDefault();
+    event?.stopPropagation();
+    const text = resumeDraft.trim();
+    if (resumeSubmitting || !text) return;
+    setResumeSubmitting(true);
+    try {
+      await onResume?.({
+        text,
+        runId: waitingPayload?.runId,
+        waitKey: waitingPayload?.waitKey,
+      });
+    } catch (error) {
+      setResumeSubmitting(false);
+      console.error('Failed to send visitor message:', error);
+    }
+  };
+
   const isVoiceInputWait = useMemo(() => {
     const details = waitingPayload?.details && typeof waitingPayload.details === 'object'
       ? (waitingPayload.details as Record<string, unknown>)
@@ -6286,6 +6374,63 @@ export function RunFlowModal({
                           {voiceWaitError ? <div className="run-waiting-error">{voiceWaitError}</div> : null}
                         </div>
                       </div>
+                    ) : isVisitorMessageWait ? (
+                      <div className="run-waiting">
+                        <div className="run-waiting-prompt">
+                          <MarkdownRenderer
+                            markdown={(waitingPayload?.prompt || 'Waiting for your message.').trim()}
+                          />
+                        </div>
+                        {waitDeadlineLabel ? (
+                          <div className="run-waiting-deadline" title={waitingPayload?.until || ''}>
+                            {waitDeadlineLabel}
+                          </div>
+                        ) : null}
+                        {(waitingPayload?.allowFreeText ?? true) && (
+                          <div className="run-waiting-input">
+                            <textarea
+                              className="run-waiting-textarea"
+                              value={resumeDraft}
+                              onChange={(e) => setResumeDraft(e.target.value)}
+                              placeholder="Type your message…"
+                              rows={3}
+                            />
+                            <div className="run-waiting-actions">
+                              <button
+                                type="button"
+                                className="modal-button primary"
+                                onClick={submitVisitorMessage}
+                                disabled={!resumeDraft.trim() || resumeSubmitting}
+                              >
+                                {resumeSubmitting ? 'Sending…' : 'Send'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : isEventParkWait ? (
+                      <div className="run-waiting">
+                        <div className="run-waiting-prompt">
+                          {(waitingPayload?.prompt || '').trim() ? (
+                            <MarkdownRenderer markdown={(waitingPayload?.prompt || '').trim()} />
+                          ) : (
+                            <>
+                              Parked — waiting for events
+                              {waitingPayload?.waitKey ? (
+                                <>
+                                  {' '}on <code>{waitingPayload.waitKey}</code>
+                                </>
+                              ) : null}
+                              . No input required.
+                            </>
+                          )}
+                        </div>
+                        {waitDeadlineLabel ? (
+                          <div className="run-waiting-deadline" title={waitingPayload?.until || ''}>
+                            {waitDeadlineLabel}
+                          </div>
+                        ) : null}
+                      </div>
                     ) : (
                       <div className="run-waiting">
                         <div className="run-waiting-prompt">
@@ -6528,6 +6673,28 @@ export function RunFlowModal({
                             <div className="run-output-section">
                               <div className="run-output-title">Generated video</div>
                               <GeneratedVideoCard preview={generatedVideoPreview} instanceKey={selectedStep.id} />
+                            </div>
+                          ) : null}
+
+                          {actOnlyRefs.length ? (
+                            <div className="run-output-section">
+                              <div className="run-output-title">Act-only tool acts</div>
+                              <div className="run-act-only-chips">
+                                {actOnlyRefs.map((ref, idx) => (
+                                  <div key={`${ref.tool}:${ref.entry_id || idx}`} className="run-act-only-chip">
+                                    <span className="run-act-only-chip-label">{actOnlyRefLabel(ref)}</span>
+                                    {ref.gist ? <span className="run-act-only-chip-gist">{ref.gist}</span> : null}
+                                    {ref.reason ? (
+                                      <span className="run-act-only-chip-reason" title={ref.reason}>
+                                        why: {ref.reason}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="run-act-only-note">
+                                Content stays at its source — only the act is recorded here.
+                              </div>
                             </div>
                           ) : null}
 
@@ -7023,13 +7190,13 @@ export function RunFlowModal({
                             </p>
                           </div>
                         ) : null}
-                        {formInputPins.length === 0 ? (
+                        {visibleFormInputPins.length === 0 ? (
                           <p className="run-form-note">
                             This flow has no input parameters. Click Run to execute.
                           </p>
                         ) : null}
 
-                        {formInputPins.map(pin => {
+                        {visibleFormInputPins.map(pin => {
                           const inputType = getInputTypeForPin(pin.type);
                           const value = formValues[pin.id] || '';
 
@@ -7273,6 +7440,50 @@ export function RunFlowModal({
                                   onChange={(v) => {
                                     handleFieldChange(pin.id, v);
                                   }}
+                                />
+                              </div>
+                            );
+                          }
+
+                          if (isResearchEffortPin(pin.id)) {
+                            const current = normalizeResearchEffort(value);
+                            return (
+                              <div key={pin.id} className="run-form-field">
+                                <label className="run-form-label">
+                                  {pin.label}
+                                  <span className="run-form-type">({displayPinType(pin)})</span>
+                                </label>
+                                <AfSelect
+                                  value={current}
+                                  placeholder="Standard search"
+                                  options={RESEARCH_EFFORT_OPTIONS}
+                                  searchable={false}
+                                  clearable={false}
+                                  disabled={isRunning}
+                                  minPopoverWidth={220}
+                                  onChange={(v) => handleFieldChange(pin.id, normalizeResearchEffort(v))}
+                                />
+                              </div>
+                            );
+                          }
+
+                          if (pin.id === 'thinking') {
+                            const current = thinkingOptions.some((option) => option.value === value) ? value : '';
+                            return (
+                              <div key={pin.id} className="run-form-field">
+                                <label className="run-form-label">
+                                  {pin.label}
+                                  <span className="run-form-type">({displayPinType(pin)})</span>
+                                </label>
+                                <AfSelect
+                                  value={current}
+                                  placeholder="Auto (Gateway default)"
+                                  options={thinkingOptions}
+                                  disabled={!thinkingSupported}
+                                  searchable={false}
+                                  clearable={false}
+                                  minPopoverWidth={220}
+                                  onChange={(v) => handleFieldChange(pin.id, v)}
                                 />
                               </div>
                             );

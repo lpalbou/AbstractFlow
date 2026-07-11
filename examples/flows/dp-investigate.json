@@ -1,0 +1,978 @@
+{
+  "id": "dp-investigate",
+  "name": "dp-investigate",
+  "description": "Evidence gathering and bounded investigation.",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": -900,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Start research request",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "request",
+            "label": "What should be researched?",
+            "type": "string"
+          },
+          {
+            "id": "viewpoint",
+            "label": "Viewpoint or angle",
+            "type": "string"
+          },
+          {
+            "id": "effort",
+            "label": "Effort",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "Provider (optional)",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "Model (optional)",
+            "type": "model"
+          },
+          {
+            "id": "plan",
+            "label": "plan",
+            "type": "object"
+          },
+          {
+            "id": "prior_investigation",
+            "label": "prior_investigation",
+            "type": "object"
+          },
+          {
+            "id": "adversarial_review",
+            "label": "adversarial_review",
+            "type": "object"
+          },
+          {
+            "id": "round_index",
+            "label": "round_index",
+            "type": "number"
+          },
+          {
+            "id": "total_rounds",
+            "label": "total_rounds",
+            "type": "number"
+          }
+        ],
+        "pinDefaults": {
+          "effort": "standard",
+          "provider": "",
+          "model": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "derive_settings",
+      "type": "code",
+      "position": {
+        "x": -640,
+        "y": -160
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Derive effort settings",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "effort",
+            "label": "effort",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "effort_text = str(effort or \"standard\").strip().lower().replace(\"_\", \" \").replace(\"-\", \" \")\nif effort_text in (\"quick\", \"quick search\", \"quick report\", \"fast\", \"fast search\", \"brief\", \"brief search\"):\n    effort_key = \"quick\"\nelif effort_text in (\"thorough\", \"thorough search\", \"thorough report\", \"deep\", \"deep research\", \"exhaustive\"):\n    effort_key = \"thorough\"\nelse:\n    effort_key = \"standard\"\n\nprofiles = {\n    \"quick\": {\n        \"effort\": \"quick\",\n        \"effort_preset\": \"Quick search\",\n        \"audience\": \"Technical decision-maker\",\n        \"quality_profile\": \"Fast, source-grounded answer with concise adversarial gap check\",\n        \"max_iterations\": 3,\n        \"deadline_minutes\": 8,\n        \"max_sources\": 12,\n        \"max_review_rounds\": 1,\n        \"source_policy\": \"Prefer primary or highly authoritative sources. Fetch before citing. Stop once the core answer is supported.\",\n        \"citation_policy\": \"Cite decisive claims and flag uncertainty instead of over-searching.\",\n        \"output_prefix\": \"reports/dp-quick-research\",\n        \"report_title\": \"Quick Research Brief\",\n        \"include_images\": False,\n    },\n    \"standard\": {\n        \"effort\": \"standard\",\n        \"effort_preset\": \"Standard search\",\n        \"audience\": \"Technical decision-maker\",\n        \"quality_profile\": \"Balanced research with adversarial review, source ledger, and evidence checks\",\n        \"max_iterations\": 6,\n        \"deadline_minutes\": 20,\n        \"max_sources\": 28,\n        \"max_review_rounds\": 2,\n        \"source_policy\": \"Prefer primary, recent, authoritative sources. Fetch before citing and compare at least one contrary source when useful.\",\n        \"citation_policy\": \"Every important factual claim needs a source id or an explicit limitation.\",\n        \"output_prefix\": \"reports/dp-standard-research\",\n        \"report_title\": \"Research Report\",\n        \"include_images\": True,\n    },\n    \"thorough\": {\n        \"effort\": \"thorough\",\n        \"effort_preset\": \"Thorough search\",\n        \"audience\": \"Technical decision-maker\",\n        \"quality_profile\": \"SOTA deep research with independent adversarial review, provenance, and strict evidence audit\",\n        \"max_iterations\": 10,\n        \"deadline_minutes\": 45,\n        \"max_sources\": 64,\n        \"max_review_rounds\": 3,\n        \"source_policy\": \"Prefer primary, recent, authoritative sources. Fetch before citing, triangulate important claims, and actively seek disconfirming evidence.\",\n        \"citation_policy\": \"Every non-obvious factual claim needs a source id or limitation. Distinguish primary evidence from commentary.\",\n        \"output_prefix\": \"reports/dp-thorough-research\",\n        \"report_title\": \"Deep Research Report\",\n        \"include_images\": True,\n    },\n}\n\nprofile = dict(profiles[effort_key])\nprovider_text = str(provider or \"\").strip()\nmodel_text = str(model or \"\").strip()\nif (provider_text and not model_text) or (model_text and not provider_text):\n    raise ValueError(\"provider and model must both be set, or both left blank for Gateway/Core defaults\")\nprofile[\"provider\"] = provider_text\nprofile[\"model\"] = model_text\n\nreturn profile"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "input_json",
+      "type": "make_object",
+      "position": {
+        "x": -520,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "make_object",
+        "label": "Build JSON",
+        "icon": "{}",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "request",
+            "label": "What should be researched?",
+            "type": "string"
+          },
+          {
+            "id": "viewpoint",
+            "label": "Viewpoint or angle",
+            "type": "string"
+          },
+          {
+            "id": "effort",
+            "label": "Effort",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "Provider (optional)",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "Model (optional)",
+            "type": "model"
+          },
+          {
+            "id": "settings",
+            "label": "settings",
+            "type": "object"
+          },
+          {
+            "id": "plan",
+            "label": "plan",
+            "type": "object"
+          },
+          {
+            "id": "prior_investigation",
+            "label": "prior_investigation",
+            "type": "object"
+          },
+          {
+            "id": "adversarial_review",
+            "label": "adversarial_review",
+            "type": "object"
+          },
+          {
+            "id": "round_index",
+            "label": "round_index",
+            "type": "number"
+          },
+          {
+            "id": "total_rounds",
+            "label": "total_rounds",
+            "type": "number"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "prompt_json",
+      "type": "stringify_json",
+      "position": {
+        "x": -160,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "stringify_json",
+        "label": "Stringify JSON",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          },
+          {
+            "id": "mode",
+            "label": "mode",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "string"
+          }
+        ],
+        "pinDefaults": {
+          "mode": "beautify"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_provider",
+      "type": "get",
+      "position": {
+        "x": -160,
+        "y": -260
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get provider",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "provider",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_model",
+      "type": "get",
+      "position": {
+        "x": -160,
+        "y": -160
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get model",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "model",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_max_iterations",
+      "type": "get",
+      "position": {
+        "x": -160,
+        "y": 40
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get max_iterations",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "max_iterations",
+          "default": 6
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "researcher",
+      "type": "agent",
+      "position": {
+        "x": 220,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "agent",
+        "label": "Investigate with evidence tools",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "tools"
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "system": "You are the evidence-gathering agent in a controlled research workflow. Use only the supplied read-only tools. For every source: search, fetch or skim, record source id, URL/path, timestamp if available, evidence quality, and rejection reason if rejected. Each investigation pass must use the latest adversarial_review input, build on prior_investigation, and write an iteration_log entry explaining what changed, which reviewer guidance was used, what is still weak, what the user would care about, and whether another pass is worth the budget. Never use shell, write, edit, email, or admin tools.",
+          "tools": [
+            "web_search",
+            "fetch_url",
+            "skim_websearch",
+            "skim_url",
+            "read_file",
+            "skim_files"
+          ],
+          "temperature": 0.1,
+          "resp_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "answer_hypotheses",
+              "source_ledger",
+              "iteration_log",
+              "claim_candidates",
+              "open_questions",
+              "limitations",
+              "warnings"
+            ],
+            "properties": {
+              "answer_hypotheses": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "source_ledger": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "required": [
+                    "source_id",
+                    "title",
+                    "url_or_path",
+                    "source_type",
+                    "fetched",
+                    "evidence_quality",
+                    "relevance",
+                    "fetched_at"
+                  ],
+                  "properties": {
+                    "source_id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "url_or_path": {
+                      "type": "string"
+                    },
+                    "source_type": {
+                      "type": "string"
+                    },
+                    "fetched": {
+                      "type": "boolean"
+                    },
+                    "evidence_quality": {
+                      "type": "string"
+                    },
+                    "relevance": {
+                      "type": "string"
+                    },
+                    "fetched_at": {
+                      "type": "string"
+                    },
+                    "content_hash": {
+                      "type": "string"
+                    },
+                    "rejected_reason": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "iteration_log": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "required": [
+                    "round_index",
+                    "queries",
+                    "new_findings",
+                    "review_guidance_used",
+                    "remaining_gaps",
+                    "continue_reason"
+                  ],
+                  "properties": {
+                    "round_index": {
+                      "type": "number"
+                    },
+                    "queries": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "new_findings": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "review_guidance_used": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "remaining_gaps": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "continue_reason": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "claim_candidates": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "required": [
+                    "claim_id",
+                    "claim",
+                    "evidence_source_ids",
+                    "confidence",
+                    "status"
+                  ],
+                  "properties": {
+                    "claim_id": {
+                      "type": "string"
+                    },
+                    "claim": {
+                      "type": "string"
+                    },
+                    "evidence_source_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "confidence": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "open_questions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "limitations": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "warnings": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 1800,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Finish",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "investigation",
+            "label": "investigation",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-exec-out-derive_settings-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "derive_settings",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-derive_settings-exec-out-researcher-exec-in",
+      "source": "derive_settings",
+      "sourceHandle": "exec-out",
+      "target": "researcher",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-start-effort-derive_settings-effort",
+      "source": "start",
+      "sourceHandle": "effort",
+      "target": "derive_settings",
+      "targetHandle": "effort",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-derive_settings-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "derive_settings",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-derive_settings-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "derive_settings",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-derive_settings-output-input_json-settings",
+      "source": "derive_settings",
+      "sourceHandle": "output",
+      "target": "input_json",
+      "targetHandle": "settings",
+      "animated": false
+    },
+    {
+      "id": "e-derive_settings-output-get_provider-object",
+      "source": "derive_settings",
+      "sourceHandle": "output",
+      "target": "get_provider",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-derive_settings-output-get_model-object",
+      "source": "derive_settings",
+      "sourceHandle": "output",
+      "target": "get_model",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-derive_settings-output-get_max_iterations-object",
+      "source": "derive_settings",
+      "sourceHandle": "output",
+      "target": "get_max_iterations",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-input_json-result-prompt_json-value",
+      "source": "input_json",
+      "sourceHandle": "result",
+      "target": "prompt_json",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-prompt_json-result-researcher-prompt",
+      "source": "prompt_json",
+      "sourceHandle": "result",
+      "target": "researcher",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-get_provider-value-researcher-provider",
+      "source": "get_provider",
+      "sourceHandle": "value",
+      "target": "researcher",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-get_model-value-researcher-model",
+      "source": "get_model",
+      "sourceHandle": "value",
+      "target": "researcher",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-get_max_iterations-value-researcher-max_iterations",
+      "source": "get_max_iterations",
+      "sourceHandle": "value",
+      "target": "researcher",
+      "targetHandle": "max_iterations",
+      "animated": false
+    },
+    {
+      "id": "e-researcher-exec-out-end-exec-in",
+      "source": "researcher",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-researcher-data-end-investigation",
+      "source": "researcher",
+      "sourceHandle": "data",
+      "target": "end",
+      "targetHandle": "investigation",
+      "animated": false
+    },
+    {
+      "id": "e-researcher-scratchpad-end-scratchpad",
+      "source": "researcher",
+      "sourceHandle": "scratchpad",
+      "target": "end",
+      "targetHandle": "scratchpad",
+      "animated": false
+    },
+    {
+      "id": "e-researcher-meta-end-meta",
+      "source": "researcher",
+      "sourceHandle": "meta",
+      "target": "end",
+      "targetHandle": "meta",
+      "animated": false
+    },
+    {
+      "id": "e-start-request-input_json-request",
+      "source": "start",
+      "sourceHandle": "request",
+      "target": "input_json",
+      "targetHandle": "request",
+      "animated": false
+    },
+    {
+      "id": "e-start-viewpoint-input_json-viewpoint",
+      "source": "start",
+      "sourceHandle": "viewpoint",
+      "target": "input_json",
+      "targetHandle": "viewpoint",
+      "animated": false
+    },
+    {
+      "id": "e-start-effort-input_json-effort",
+      "source": "start",
+      "sourceHandle": "effort",
+      "target": "input_json",
+      "targetHandle": "effort",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-input_json-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "input_json",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-input_json-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "input_json",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-plan-input_json-plan",
+      "source": "start",
+      "sourceHandle": "plan",
+      "target": "input_json",
+      "targetHandle": "plan",
+      "animated": false
+    },
+    {
+      "id": "e-start-prior_investigation-input_json-prior_investigation",
+      "source": "start",
+      "sourceHandle": "prior_investigation",
+      "target": "input_json",
+      "targetHandle": "prior_investigation",
+      "animated": false
+    },
+    {
+      "id": "e-start-adversarial_review-input_json-adversarial_review",
+      "source": "start",
+      "sourceHandle": "adversarial_review",
+      "target": "input_json",
+      "targetHandle": "adversarial_review",
+      "animated": false
+    },
+    {
+      "id": "e-start-round_index-input_json-round_index",
+      "source": "start",
+      "sourceHandle": "round_index",
+      "target": "input_json",
+      "targetHandle": "round_index",
+      "animated": false
+    },
+    {
+      "id": "e-start-total_rounds-input_json-total_rounds",
+      "source": "start",
+      "sourceHandle": "total_rounds",
+      "target": "input_json",
+      "targetHandle": "total_rounds",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-06-29T15:52:29.716448+00:00",
+  "updated_at": "2026-06-29T15:52:29.716448+00:00"
+}

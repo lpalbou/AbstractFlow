@@ -1,0 +1,774 @@
+{
+  "id": "agora-react-agent",
+  "name": "agora-react-agent",
+  "description": "Hand-built ReAct agent (LLM + while loop, no Agent node) that participates in an agora hub: it bootstraps its inbox deterministically, triages envelopes by the hub's priority signals (critical, blocked/open obligations, escalation, to_me/reply_to_me), reads context, replies where an answer is owed, acks handled traffic, and reports what it did. Requires the gateway/runtime environment to enable the agora toolset (AGORA_API_KEY + optional AGORA_URL).",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": { "x": -2400.0, "y": 0.0 },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "AGORA AGENT WAKES",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "provider", "label": "provider", "type": "provider" },
+          { "id": "model", "label": "model", "type": "model" },
+          { "id": "temperature", "label": "temperature", "type": "number" },
+          { "id": "channel", "label": "channel", "type": "string", "description": "Home agora channel this agent watches and reports to." },
+          { "id": "task", "label": "task", "type": "string", "description": "Standing instruction for this wake cycle." },
+          { "id": "max_iterations", "label": "max_iterations", "type": "number", "description": "Upper bound on ReAct cycles before the agent must conclude." }
+        ],
+        "pinDefaults": {
+          "temperature": 0.2,
+          "channel": "assembly",
+          "task": "Check your agora inbox, triage by priority, handle what you can (read context where needed, reply where an answer is owed, ack what you handled), then report what you did and what you left for others.",
+          "max_iterations": 8
+        }
+      }
+    },
+    {
+      "id": "init-scratch",
+      "type": "set_var",
+      "position": { "x": -2144.0, "y": 0.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Init trace",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "pinDefaults": { "name": "scratch", "value": "" }
+      }
+    },
+    {
+      "id": "init-done",
+      "type": "set_var",
+      "position": { "x": -1952.0, "y": 0.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Init done flag",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "pinDefaults": { "name": "done", "value": false }
+      }
+    },
+    {
+      "id": "init-iter",
+      "type": "set_var",
+      "position": { "x": -1760.0, "y": 0.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Init cycle counter",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "pinDefaults": { "name": "iter", "value": 0 }
+      }
+    },
+    {
+      "id": "init-final",
+      "type": "set_var",
+      "position": { "x": -1568.0, "y": 0.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Init final answer",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "pinDefaults": { "name": "final", "value": "" }
+      }
+    },
+    {
+      "id": "inbox-bootstrap",
+      "type": "call_tool",
+      "position": { "x": -1376.0, "y": 0.0 },
+      "data": {
+        "nodeType": "call_tool",
+        "label": "BOOTSTRAP: CHECK INBOX",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "tool_call", "label": "tool_call", "type": "object" },
+          { "id": "allowed_tools", "label": "allowed_tools", "type": "array" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "result", "label": "result", "type": "any" },
+          { "id": "success", "label": "success", "type": "boolean" }
+        ],
+        "pinDefaults": {
+          "tool_call": { "name": "agora_check_inbox", "arguments": { "wait_seconds": 0 }, "call_id": "bootstrap-inbox" },
+          "allowed_tools": ["agora_check_inbox"]
+        }
+      }
+    },
+    {
+      "id": "inbox-json",
+      "type": "stringify_json",
+      "position": { "x": -1376.0, "y": 224.0 },
+      "data": {
+        "nodeType": "stringify_json",
+        "label": "Inbox to text",
+        "icon": "&#x1F5C2;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "value", "label": "value", "type": "any" },
+          { "id": "mode", "label": "mode", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "result", "label": "result", "type": "string" }
+        ],
+        "pinDefaults": { "mode": "beautify" }
+      }
+    },
+    {
+      "id": "loop",
+      "type": "while",
+      "position": { "x": -1120.0, "y": 0.0 },
+      "data": {
+        "nodeType": "while",
+        "label": "REACT LOOP",
+        "icon": "&#x267B;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "condition", "label": "condition", "type": "boolean" }
+        ],
+        "outputs": [
+          { "id": "loop", "label": "loop", "type": "execution" },
+          { "id": "done", "label": "done", "type": "execution" },
+          { "id": "item", "label": "item", "type": "any" },
+          { "id": "index", "label": "index", "type": "number" }
+        ]
+      }
+    },
+    {
+      "id": "get-done",
+      "type": "get_var",
+      "position": { "x": -1568.0, "y": 320.0 },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get done flag",
+        "icon": "&#x1F4D6;",
+        "headerColor": "#8E44AD",
+        "inputs": [ { "id": "name", "label": "name", "type": "string" } ],
+        "outputs": [ { "id": "value", "label": "value", "type": "any" } ],
+        "pinDefaults": { "name": "done" }
+      }
+    },
+    {
+      "id": "not-done",
+      "type": "not",
+      "position": { "x": -1408.0, "y": 320.0 },
+      "data": {
+        "nodeType": "not",
+        "label": "Not",
+        "icon": "&#x1F500;",
+        "headerColor": "#E74C3C",
+        "inputs": [ { "id": "value", "label": "value", "type": "boolean" } ],
+        "outputs": [ { "id": "result", "label": "result", "type": "boolean" } ]
+      }
+    },
+    {
+      "id": "get-iter",
+      "type": "get_var",
+      "position": { "x": -1568.0, "y": 448.0 },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get cycle counter",
+        "icon": "&#x1F4D6;",
+        "headerColor": "#8E44AD",
+        "inputs": [ { "id": "name", "label": "name", "type": "string" } ],
+        "outputs": [ { "id": "value", "label": "value", "type": "any" } ],
+        "pinDefaults": { "name": "iter" }
+      }
+    },
+    {
+      "id": "lt-max",
+      "type": "compare",
+      "position": { "x": -1408.0, "y": 448.0 },
+      "data": {
+        "nodeType": "compare",
+        "label": "iter < max",
+        "icon": "&#x2696;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          { "id": "a", "label": "a", "type": "any" },
+          { "id": "op", "label": "op", "type": "string" },
+          { "id": "b", "label": "b", "type": "any" }
+        ],
+        "outputs": [ { "id": "result", "label": "result", "type": "boolean" } ],
+        "pinDefaults": { "op": "<" }
+      }
+    },
+    {
+      "id": "cond",
+      "type": "and",
+      "position": { "x": -1248.0, "y": 384.0 },
+      "data": {
+        "nodeType": "and",
+        "label": "Keep looping?",
+        "icon": "&#x1F517;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          { "id": "a", "label": "a", "type": "boolean" },
+          { "id": "b", "label": "b", "type": "boolean" }
+        ],
+        "outputs": [ { "id": "result", "label": "result", "type": "boolean" } ]
+      }
+    },
+    {
+      "id": "get-scratch",
+      "type": "get_var",
+      "position": { "x": -960.0, "y": 288.0 },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get trace",
+        "icon": "&#x1F4D6;",
+        "headerColor": "#8E44AD",
+        "inputs": [ { "id": "name", "label": "name", "type": "string" } ],
+        "outputs": [ { "id": "value", "label": "value", "type": "any" } ],
+        "pinDefaults": { "name": "scratch" }
+      }
+    },
+    {
+      "id": "prompt-vars",
+      "type": "make_object",
+      "position": { "x": -800.0, "y": 224.0 },
+      "data": {
+        "nodeType": "make_object",
+        "label": "Prompt variables",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "task", "label": "task", "type": "string" },
+          { "id": "channel", "label": "channel", "type": "string" },
+          { "id": "inbox", "label": "inbox", "type": "string" },
+          { "id": "scratch", "label": "scratch", "type": "string" }
+        ],
+        "outputs": [ { "id": "result", "label": "result", "type": "object" } ]
+      }
+    },
+    {
+      "id": "prompt-text",
+      "type": "string_template",
+      "position": { "x": -640.0, "y": 224.0 },
+      "data": {
+        "nodeType": "string_template",
+        "label": "Cycle prompt",
+        "icon": "&#x1F4C4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "template", "label": "template", "type": "string" },
+          { "id": "vars", "label": "vars", "type": "object" }
+        ],
+        "outputs": [ { "id": "result", "label": "result", "type": "string" } ],
+        "pinDefaults": {
+          "template": "TASK: {{task}}\nHOME CHANNEL: {{channel}}\n\nINBOX SNAPSHOT (envelopes fetched at wake; fields include channel, seq, sender, status, urgency, effective_urgency, escalated, critical, to_me, reply_to_me, title, body, body_bytes, reply_to, id):\n{{inbox}}\n\nACTION TRACE (your tool calls and observations from previous cycles of this run; empty on the first cycle):\n{{scratch}}\n\nDecide your next step now. Either call tools (read context, reply, ack, re-check inbox), or — when the work is done — answer with your final report as plain text and make no tool calls."
+        }
+      }
+    },
+    {
+      "id": "react-llm",
+      "type": "llm_call",
+      "position": { "x": -448.0, "y": 0.0 },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "REASON + ACT",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "provider", "label": "provider", "type": "provider" },
+          { "id": "model", "label": "model", "type": "model" },
+          { "id": "temperature", "label": "temperature", "type": "number" },
+          { "id": "system", "label": "system", "type": "string" },
+          { "id": "prompt", "label": "prompt", "type": "string" },
+          { "id": "tools", "label": "tools", "type": "tools" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "response", "label": "response", "type": "string" },
+          { "id": "result", "label": "result", "type": "object" }
+        ],
+        "pinDefaults": {
+          "system": "You are an agora-connected ReAct agent: an addressable participant on an agent-to-agent messaging hub, woken to triage and handle hub traffic. You work in cycles: think briefly, then either call tools or finish with a plain-text report.\n\nRules:\n- Use tool calls for every hub interaction. Never invent envelopes, messages, agents, or ids.\n- Triage priority, highest first: critical; status=blocked; status=open with escalated=true; to_me or reply_to_me; status=open; fyi.\n- status open or blocked means a sender is waiting: answer with agora_post_message using status='reply' and reply_to=<message id>. For dm:* channels answer with agora_send_dm (peer = the sender's agent id).\n- If an envelope's body is null (not inlined), fetch it with agora_read_message — or agora_read_channel for surrounding context — before answering.\n- After handling messages, acknowledge with agora_ack_inbox, passing each channel's highest seq you actually processed. Never ack traffic you did not read.\n- Be factual and concise in posts; one consolidated reply beats many small ones. Do not spam channels.\n- If the inbox is empty or nothing needs you, do not force actions: say so in your final report.\n- When nothing useful remains, respond WITHOUT tool calls: a short report of what arrived, what you did (ids you replied to, cursors you acked), and what you deliberately left for others.",
+          "tools": [
+            "agora_whoami",
+            "agora_check_inbox",
+            "agora_ack_inbox",
+            "agora_read_channel",
+            "agora_read_message",
+            "agora_post_message",
+            "agora_send_dm"
+          ]
+        },
+        "effectConfig": {}
+      }
+    },
+    {
+      "id": "break-result",
+      "type": "break_object",
+      "position": { "x": -192.0, "y": 224.0 },
+      "data": {
+        "nodeType": "break_object",
+        "label": "Split LLM result",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [ { "id": "object", "label": "object", "type": "object" } ],
+        "outputs": [
+          { "id": "content", "label": "content", "type": "string" },
+          { "id": "tool_calls", "label": "tool_calls", "type": "array" }
+        ],
+        "breakConfig": { "selectedPaths": ["content", "tool_calls"] }
+      }
+    },
+    {
+      "id": "has-calls",
+      "type": "has_tools",
+      "position": { "x": -32.0, "y": 224.0 },
+      "data": {
+        "nodeType": "has_tools",
+        "label": "Wants tools?",
+        "icon": "&#x1F50D;",
+        "headerColor": "#E74C3C",
+        "inputs": [ { "id": "array", "label": "array", "type": "array" } ],
+        "outputs": [ { "id": "result", "label": "result", "type": "boolean" } ]
+      }
+    },
+    {
+      "id": "route",
+      "type": "if",
+      "position": { "x": -192.0, "y": 0.0 },
+      "data": {
+        "nodeType": "if",
+        "label": "Act or conclude",
+        "icon": "&#x2753;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "condition", "label": "condition", "type": "boolean" }
+        ],
+        "outputs": [
+          { "id": "true", "label": "true", "type": "execution" },
+          { "id": "false", "label": "false", "type": "execution" }
+        ]
+      }
+    },
+    {
+      "id": "exec-tools",
+      "type": "tool_calls",
+      "position": { "x": 64.0, "y": -96.0 },
+      "data": {
+        "nodeType": "tool_calls",
+        "label": "ACT ON AGORA",
+        "icon": "&#x1F528;",
+        "headerColor": "#16A085",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "tool_calls", "label": "tool_calls", "type": "array" },
+          { "id": "allowed_tools", "label": "allowed_tools", "type": "array" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "results", "label": "results", "type": "array" },
+          { "id": "success", "label": "success", "type": "boolean" }
+        ],
+        "effectConfig": {
+          "allowed_tools": [
+            "agora_whoami",
+            "agora_check_inbox",
+            "agora_ack_inbox",
+            "agora_read_channel",
+            "agora_read_message",
+            "agora_post_message",
+            "agora_send_dm"
+          ]
+        }
+      }
+    },
+    {
+      "id": "calls-json",
+      "type": "stringify_json",
+      "position": { "x": 64.0, "y": 224.0 },
+      "data": {
+        "nodeType": "stringify_json",
+        "label": "Calls to text",
+        "icon": "&#x1F5C2;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "value", "label": "value", "type": "any" },
+          { "id": "mode", "label": "mode", "type": "string" }
+        ],
+        "outputs": [ { "id": "result", "label": "result", "type": "string" } ],
+        "pinDefaults": { "mode": "minified" }
+      }
+    },
+    {
+      "id": "fmt-results",
+      "type": "format_tool_results",
+      "position": { "x": 256.0, "y": 96.0 },
+      "data": {
+        "nodeType": "format_tool_results",
+        "label": "Observations",
+        "icon": "&#x1F4CB;",
+        "headerColor": "#3498DB",
+        "inputs": [ { "id": "results", "label": "results", "type": "array" } ],
+        "outputs": [ { "id": "result", "label": "result", "type": "string" } ]
+      }
+    },
+    {
+      "id": "trace-vars",
+      "type": "make_object",
+      "position": { "x": 416.0, "y": 224.0 },
+      "data": {
+        "nodeType": "make_object",
+        "label": "Trace variables",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "scratch", "label": "scratch", "type": "string" },
+          { "id": "iter", "label": "iter", "type": "number" },
+          { "id": "calls", "label": "calls", "type": "string" },
+          { "id": "obs", "label": "obs", "type": "string" }
+        ],
+        "outputs": [ { "id": "result", "label": "result", "type": "object" } ]
+      }
+    },
+    {
+      "id": "trace-text",
+      "type": "string_template",
+      "position": { "x": 576.0, "y": 224.0 },
+      "data": {
+        "nodeType": "string_template",
+        "label": "Append to trace",
+        "icon": "&#x1F4C4;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          { "id": "template", "label": "template", "type": "string" },
+          { "id": "vars", "label": "vars", "type": "object" }
+        ],
+        "outputs": [ { "id": "result", "label": "result", "type": "string" } ],
+        "pinDefaults": {
+          "template": "{{scratch}}\n--- cycle {{iter}} ---\nACTIONS: {{calls}}\nOBSERVATIONS:\n{{obs}}\n"
+        }
+      }
+    },
+    {
+      "id": "save-scratch",
+      "type": "set_var",
+      "position": { "x": 448.0, "y": -96.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Save trace",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "pinDefaults": { "name": "scratch" }
+      }
+    },
+    {
+      "id": "inc-iter",
+      "type": "add",
+      "position": { "x": 576.0, "y": 96.0 },
+      "data": {
+        "nodeType": "add",
+        "label": "iter + 1",
+        "icon": "&#x2795;",
+        "headerColor": "#E74C3C",
+        "inputs": [
+          { "id": "a", "label": "a", "type": "number" },
+          { "id": "b", "label": "b", "type": "number" }
+        ],
+        "outputs": [ { "id": "result", "label": "result", "type": "number" } ],
+        "pinDefaults": { "b": 1 }
+      }
+    },
+    {
+      "id": "save-iter",
+      "type": "set_var",
+      "position": { "x": 704.0, "y": -96.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Save cycle counter",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "pinDefaults": { "name": "iter" }
+      }
+    },
+    {
+      "id": "save-final",
+      "type": "set_var",
+      "position": { "x": 64.0, "y": 416.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Save final report",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "pinDefaults": { "name": "final" }
+      }
+    },
+    {
+      "id": "mark-done",
+      "type": "set_var",
+      "position": { "x": 256.0, "y": 416.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Mark done",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "pinDefaults": { "name": "done", "value": true }
+      }
+    },
+    {
+      "id": "get-final",
+      "type": "get_var",
+      "position": { "x": -768.0, "y": -224.0 },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get final report",
+        "icon": "&#x1F4D6;",
+        "headerColor": "#8E44AD",
+        "inputs": [ { "id": "name", "label": "name", "type": "string" } ],
+        "outputs": [ { "id": "value", "label": "value", "type": "any" } ],
+        "pinDefaults": { "name": "final" }
+      }
+    },
+    {
+      "id": "final-empty",
+      "type": "is_empty_string",
+      "position": { "x": -928.0, "y": -352.0 },
+      "data": {
+        "nodeType": "is_empty_string",
+        "label": "No report?",
+        "icon": "&#x2696;",
+        "headerColor": "#E74C3C",
+        "inputs": [ { "id": "text", "label": "text", "type": "string" } ],
+        "outputs": [ { "id": "result", "label": "result", "type": "boolean" } ]
+      }
+    },
+    {
+      "id": "route-final",
+      "type": "if",
+      "position": { "x": -960.0, "y": -224.0 },
+      "data": {
+        "nodeType": "if",
+        "label": "Report or fallback",
+        "icon": "&#x2753;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "condition", "label": "condition", "type": "boolean" }
+        ],
+        "outputs": [
+          { "id": "true", "label": "true", "type": "execution" },
+          { "id": "false", "label": "false", "type": "execution" }
+        ]
+      }
+    },
+    {
+      "id": "fallback-final",
+      "type": "set_var",
+      "position": { "x": -928.0, "y": -480.0 },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Fallback report",
+        "icon": "&#x1F4DD;",
+        "headerColor": "#8E44AD",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "name", "label": "name", "type": "string" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "value", "label": "value", "type": "any" }
+        ],
+        "pinDefaults": {
+          "name": "final",
+          "value": "#FALLBACK: iteration budget exhausted before the agent produced a final report. Hub actions from earlier cycles (replies/acks) still happened; inspect the run's action trace for what was done."
+        }
+      }
+    },
+    {
+      "id": "get-iter-final",
+      "type": "get_var",
+      "position": { "x": -768.0, "y": -96.0 },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get cycles used",
+        "icon": "&#x1F4D6;",
+        "headerColor": "#8E44AD",
+        "inputs": [ { "id": "name", "label": "name", "type": "string" } ],
+        "outputs": [ { "id": "value", "label": "value", "type": "any" } ],
+        "pinDefaults": { "name": "iter" }
+      }
+    },
+    {
+      "id": "final-answer",
+      "type": "answer_user",
+      "position": { "x": -608.0, "y": -224.0 },
+      "data": {
+        "nodeType": "answer_user",
+        "label": "Report",
+        "icon": "&#x1F4AC;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "message", "label": "message", "type": "string" }
+        ],
+        "outputs": [
+          { "id": "exec-out", "label": "", "type": "execution" },
+          { "id": "message", "label": "message", "type": "string" }
+        ]
+      }
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": { "x": -416.0, "y": -224.0 },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "AGENT SLEEPS",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          { "id": "exec-in", "label": "", "type": "execution" },
+          { "id": "answer", "label": "answer", "type": "string" },
+          { "id": "iterations", "label": "iterations", "type": "number" }
+        ],
+        "outputs": []
+      }
+    }
+  ],
+  "edges": [
+    { "id": "x1", "source": "start", "sourceHandle": "exec-out", "target": "init-scratch", "targetHandle": "exec-in", "animated": true },
+    { "id": "x2", "source": "init-scratch", "sourceHandle": "exec-out", "target": "init-done", "targetHandle": "exec-in", "animated": true },
+    { "id": "x3", "source": "init-done", "sourceHandle": "exec-out", "target": "init-iter", "targetHandle": "exec-in", "animated": true },
+    { "id": "x4", "source": "init-iter", "sourceHandle": "exec-out", "target": "init-final", "targetHandle": "exec-in", "animated": true },
+    { "id": "x5", "source": "init-final", "sourceHandle": "exec-out", "target": "inbox-bootstrap", "targetHandle": "exec-in", "animated": true },
+    { "id": "x6", "source": "inbox-bootstrap", "sourceHandle": "exec-out", "target": "loop", "targetHandle": "exec-in", "animated": true },
+    { "id": "x7", "source": "loop", "sourceHandle": "loop", "target": "react-llm", "targetHandle": "exec-in", "animated": true },
+    { "id": "x8", "source": "react-llm", "sourceHandle": "exec-out", "target": "route", "targetHandle": "exec-in", "animated": true },
+    { "id": "x9", "source": "route", "sourceHandle": "true", "target": "exec-tools", "targetHandle": "exec-in", "animated": true },
+    { "id": "x10", "source": "exec-tools", "sourceHandle": "exec-out", "target": "save-scratch", "targetHandle": "exec-in", "animated": true },
+    { "id": "x11", "source": "save-scratch", "sourceHandle": "exec-out", "target": "save-iter", "targetHandle": "exec-in", "animated": true },
+    { "id": "x12", "source": "route", "sourceHandle": "false", "target": "save-final", "targetHandle": "exec-in", "animated": true },
+    { "id": "x13", "source": "save-final", "sourceHandle": "exec-out", "target": "mark-done", "targetHandle": "exec-in", "animated": true },
+    { "id": "x14", "source": "loop", "sourceHandle": "done", "target": "route-final", "targetHandle": "exec-in", "animated": true },
+    { "id": "x14b", "source": "route-final", "sourceHandle": "true", "target": "fallback-final", "targetHandle": "exec-in", "animated": true },
+    { "id": "x14c", "source": "fallback-final", "sourceHandle": "exec-out", "target": "final-answer", "targetHandle": "exec-in", "animated": true },
+    { "id": "x14d", "source": "route-final", "sourceHandle": "false", "target": "final-answer", "targetHandle": "exec-in", "animated": true },
+    { "id": "x15", "source": "final-answer", "sourceHandle": "exec-out", "target": "end", "targetHandle": "exec-in", "animated": true },
+    { "id": "d1", "source": "inbox-bootstrap", "sourceHandle": "result", "target": "inbox-json", "targetHandle": "value" },
+    { "id": "d2", "source": "get-done", "sourceHandle": "value", "target": "not-done", "targetHandle": "value" },
+    { "id": "d3", "source": "not-done", "sourceHandle": "result", "target": "cond", "targetHandle": "a" },
+    { "id": "d4", "source": "get-iter", "sourceHandle": "value", "target": "lt-max", "targetHandle": "a" },
+    { "id": "d5", "source": "start", "sourceHandle": "max_iterations", "target": "lt-max", "targetHandle": "b" },
+    { "id": "d6", "source": "lt-max", "sourceHandle": "result", "target": "cond", "targetHandle": "b" },
+    { "id": "d7", "source": "cond", "sourceHandle": "result", "target": "loop", "targetHandle": "condition" },
+    { "id": "d8", "source": "start", "sourceHandle": "task", "target": "prompt-vars", "targetHandle": "task" },
+    { "id": "d9", "source": "start", "sourceHandle": "channel", "target": "prompt-vars", "targetHandle": "channel" },
+    { "id": "d10", "source": "inbox-json", "sourceHandle": "result", "target": "prompt-vars", "targetHandle": "inbox" },
+    { "id": "d11", "source": "get-scratch", "sourceHandle": "value", "target": "prompt-vars", "targetHandle": "scratch" },
+    { "id": "d12", "source": "prompt-vars", "sourceHandle": "result", "target": "prompt-text", "targetHandle": "vars" },
+    { "id": "d13", "source": "prompt-text", "sourceHandle": "result", "target": "react-llm", "targetHandle": "prompt" },
+    { "id": "d14", "source": "start", "sourceHandle": "provider", "target": "react-llm", "targetHandle": "provider" },
+    { "id": "d15", "source": "start", "sourceHandle": "model", "target": "react-llm", "targetHandle": "model" },
+    { "id": "d16", "source": "start", "sourceHandle": "temperature", "target": "react-llm", "targetHandle": "temperature" },
+    { "id": "d17", "source": "react-llm", "sourceHandle": "result", "target": "break-result", "targetHandle": "object" },
+    { "id": "d18", "source": "break-result", "sourceHandle": "tool_calls", "target": "has-calls", "targetHandle": "array" },
+    { "id": "d19", "source": "has-calls", "sourceHandle": "result", "target": "route", "targetHandle": "condition" },
+    { "id": "d20", "source": "break-result", "sourceHandle": "tool_calls", "target": "exec-tools", "targetHandle": "tool_calls" },
+    { "id": "d21", "source": "break-result", "sourceHandle": "tool_calls", "target": "calls-json", "targetHandle": "value" },
+    { "id": "d22", "source": "exec-tools", "sourceHandle": "results", "target": "fmt-results", "targetHandle": "results" },
+    { "id": "d23", "source": "get-scratch", "sourceHandle": "value", "target": "trace-vars", "targetHandle": "scratch" },
+    { "id": "d24", "source": "get-iter", "sourceHandle": "value", "target": "trace-vars", "targetHandle": "iter" },
+    { "id": "d25", "source": "calls-json", "sourceHandle": "result", "target": "trace-vars", "targetHandle": "calls" },
+    { "id": "d26", "source": "fmt-results", "sourceHandle": "result", "target": "trace-vars", "targetHandle": "obs" },
+    { "id": "d27", "source": "trace-vars", "sourceHandle": "result", "target": "trace-text", "targetHandle": "vars" },
+    { "id": "d28", "source": "trace-text", "sourceHandle": "result", "target": "save-scratch", "targetHandle": "value" },
+    { "id": "d29", "source": "get-iter", "sourceHandle": "value", "target": "inc-iter", "targetHandle": "a" },
+    { "id": "d30", "source": "inc-iter", "sourceHandle": "result", "target": "save-iter", "targetHandle": "value" },
+    { "id": "d31", "source": "react-llm", "sourceHandle": "response", "target": "save-final", "targetHandle": "value" },
+    { "id": "d31b", "source": "get-final", "sourceHandle": "value", "target": "final-empty", "targetHandle": "text" },
+    { "id": "d31c", "source": "final-empty", "sourceHandle": "result", "target": "route-final", "targetHandle": "condition" },
+    { "id": "d32", "source": "get-final", "sourceHandle": "value", "target": "final-answer", "targetHandle": "message" },
+    { "id": "d33", "source": "get-final", "sourceHandle": "value", "target": "end", "targetHandle": "answer" },
+    { "id": "d34", "source": "get-iter-final", "sourceHandle": "value", "target": "end", "targetHandle": "iterations" }
+  ],
+  "entryNode": "start"
+}

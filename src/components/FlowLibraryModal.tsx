@@ -7,6 +7,8 @@ export interface FlowLibraryModalProps {
   isOpen: boolean;
   currentFlowId: string | null;
   flows?: VisualFlow[];
+  readonlyFlowIds?: string[];
+  bundledRunTargetIds?: string[];
   isLoading?: boolean;
   error?: unknown;
   onClose: () => void;
@@ -103,6 +105,8 @@ export function FlowLibraryModal({
   isOpen,
   currentFlowId,
   flows,
+  readonlyFlowIds,
+  bundledRunTargetIds,
   isLoading,
   error,
   onClose,
@@ -127,6 +131,9 @@ export function FlowLibraryModal({
   const [isEditingInterfaces, setIsEditingInterfaces] = useState(false);
   const [interfacesDraft, setInterfacesDraft] = useState<string[]>([]);
   const [isDeleteConfirm, setIsDeleteConfirm] = useState(false);
+
+  const readonlyFlowIdSet = useMemo(() => new Set(readonlyFlowIds || []), [readonlyFlowIds]);
+  const bundledRunTargetIdSet = useMemo(() => new Set(bundledRunTargetIds || []), [bundledRunTargetIds]);
 
   const normalizedFlows = useMemo(() => {
     const all = Array.isArray(flows) ? flows : [];
@@ -160,6 +167,8 @@ export function FlowLibraryModal({
     if (!selectedFlowId) return null;
     return (flows || []).find((f) => f.id === selectedFlowId) || null;
   }, [flows, selectedFlowId]);
+  const selectedFlowReadonly = Boolean(selectedFlow && readonlyFlowIdSet.has(selectedFlow.id));
+  const selectedFlowBundleTarget = Boolean(selectedFlow && bundledRunTargetIdSet.has(selectedFlow.id));
 
   // Initialize selection on open / data changes
   useEffect(() => {
@@ -246,7 +255,7 @@ export function FlowLibraryModal({
   }, [selectedFlowId]);
 
   const beginRename = useCallback(() => {
-    if (!selectedFlow) return;
+    if (!selectedFlow || selectedFlowReadonly) return;
     setIsRenaming(true);
     setRenameDraft(selectedFlow.name || '');
     setIsDeleteConfirm(false);
@@ -255,10 +264,10 @@ export function FlowLibraryModal({
     setIsEditingInterfaces(false);
     setInterfacesDraft([]);
     window.setTimeout(() => searchRef.current?.blur(), 0);
-  }, [selectedFlow]);
+  }, [selectedFlow, selectedFlowReadonly]);
 
   const commitRename = useCallback(async () => {
-    if (!selectedFlow) return;
+    if (!selectedFlow || selectedFlowReadonly) return;
     const next = renameDraft.trim();
     if (!next || next === selectedFlow.name) {
       setIsRenaming(false);
@@ -266,10 +275,10 @@ export function FlowLibraryModal({
     }
     await onRenameFlow(selectedFlow.id, next);
     setIsRenaming(false);
-  }, [onRenameFlow, renameDraft, selectedFlow]);
+  }, [onRenameFlow, renameDraft, selectedFlow, selectedFlowReadonly]);
 
   const beginEditDescription = useCallback(() => {
-    if (!selectedFlow) return;
+    if (!selectedFlow || selectedFlowReadonly) return;
     setIsEditingDescription(true);
     setDescriptionDraft(selectedFlow.description || '');
     setIsDeleteConfirm(false);
@@ -278,10 +287,10 @@ export function FlowLibraryModal({
     setIsEditingInterfaces(false);
     setInterfacesDraft([]);
     window.setTimeout(() => searchRef.current?.blur(), 0);
-  }, [selectedFlow]);
+  }, [selectedFlow, selectedFlowReadonly]);
 
   const commitDescription = useCallback(async () => {
-    if (!selectedFlow) return;
+    if (!selectedFlow || selectedFlowReadonly) return;
     const next = descriptionDraft.trim();
     const current = (selectedFlow.description || '').trim();
     if (next === current) {
@@ -290,10 +299,10 @@ export function FlowLibraryModal({
     }
     await onUpdateDescription(selectedFlow.id, descriptionDraft);
     setIsEditingDescription(false);
-  }, [descriptionDraft, onUpdateDescription, selectedFlow]);
+  }, [descriptionDraft, onUpdateDescription, selectedFlow, selectedFlowReadonly]);
 
   const beginEditInterfaces = useCallback(() => {
-    if (!selectedFlow) return;
+    if (!selectedFlow || selectedFlowReadonly) return;
     setIsEditingInterfaces(true);
     setInterfacesDraft(normalizeInterfaces(selectedFlow.interfaces));
     setIsDeleteConfirm(false);
@@ -302,10 +311,10 @@ export function FlowLibraryModal({
     setIsEditingDescription(false);
     setDescriptionDraft('');
     window.setTimeout(() => searchRef.current?.blur(), 0);
-  }, [selectedFlow]);
+  }, [selectedFlow, selectedFlowReadonly]);
 
   const commitInterfaces = useCallback(async () => {
-    if (!selectedFlow) return;
+    if (!selectedFlow || selectedFlowReadonly) return;
     const next = normalizeInterfaces(interfacesDraft);
     const current = normalizeInterfaces(selectedFlow.interfaces);
     if (JSON.stringify(next) === JSON.stringify(current)) {
@@ -314,16 +323,16 @@ export function FlowLibraryModal({
     }
     await onUpdateInterfaces(selectedFlow.id, next);
     setIsEditingInterfaces(false);
-  }, [interfacesDraft, onUpdateInterfaces, selectedFlow]);
+  }, [interfacesDraft, onUpdateInterfaces, selectedFlow, selectedFlowReadonly]);
 
   const handleDelete = useCallback(async () => {
-    if (!selectedFlow) return;
+    if (!selectedFlow || selectedFlowReadonly) return;
     if (!isDeleteConfirm) {
       setIsDeleteConfirm(true);
       return;
     }
     await onDeleteFlow(selectedFlow.id);
-  }, [isDeleteConfirm, onDeleteFlow, selectedFlow]);
+  }, [isDeleteConfirm, onDeleteFlow, selectedFlow, selectedFlowReadonly]);
 
   const handleDuplicate = useCallback(async () => {
     if (!selectedFlow) return;
@@ -385,6 +394,8 @@ export function FlowLibraryModal({
               normalizedFlows.map((flow) => {
                 const isSelected = flow.id === selectedFlowId;
                 const isCurrent = Boolean(currentFlowId && flow.id === currentFlowId);
+                const isReadonly = readonlyFlowIdSet.has(flow.id);
+                const isBundleTarget = bundledRunTargetIdSet.has(flow.id);
                 const metaUpdated = formatDateTime(flow.updated_at) || formatDateTime(flow.created_at);
 
                 return (
@@ -400,6 +411,11 @@ export function FlowLibraryModal({
                       <div className="flow-library-item-name">{flow.name || flow.id}</div>
                       <div className="flow-library-item-badges">
                         {isCurrent ? <span className="flow-library-badge current">current</span> : null}
+                        {isBundleTarget ? (
+                          <span className="flow-library-badge bundled">bundle</span>
+                        ) : isReadonly ? (
+                          <span className="flow-library-badge bundled">bundled</span>
+                        ) : null}
                         <span className="flow-library-badge">{flow.nodes.length}n</span>
                         <span className="flow-library-badge">{flow.edges.length}e</span>
                       </div>
@@ -438,15 +454,22 @@ export function FlowLibraryModal({
                     ) : (
                       <div className="flow-library-preview-name-row">
                         <div className="flow-library-preview-name">{selectedFlow.name}</div>
-                        <button
-                          type="button"
-                          className="flow-library-edit-icon"
-                          onClick={beginRename}
-                          aria-label="Edit flow name"
-                          title="Edit name"
-                        >
-                          <EditIcon />
-                        </button>
+                        {selectedFlowBundleTarget ? (
+                          <span className="flow-library-badge bundled">bundle</span>
+                        ) : selectedFlowReadonly ? (
+                          <span className="flow-library-badge bundled">bundled</span>
+                        ) : null}
+                        {!selectedFlowReadonly ? (
+                          <button
+                            type="button"
+                            className="flow-library-edit-icon"
+                            onClick={beginRename}
+                            aria-label="Edit flow name"
+                            title="Edit name"
+                          >
+                            <EditIcon />
+                          </button>
+                        ) : null}
                       </div>
                     )}
                     <div className="flow-library-preview-id">{selectedFlow.id}</div>
@@ -472,7 +495,7 @@ export function FlowLibraryModal({
                     <span className="flow-library-preview-key">Interfaces</span>
                     <span className="flow-library-preview-val flow-library-preview-inline">
                       <span>{renderInterfaces(normalizeInterfaces(selectedFlow.interfaces))}</span>
-                      {!isRenaming && !isEditingDescription && !isEditingInterfaces ? (
+                      {!selectedFlowReadonly && !isRenaming && !isEditingDescription && !isEditingInterfaces ? (
                         <button
                           type="button"
                           className="flow-library-edit-icon meta"
@@ -567,18 +590,27 @@ export function FlowLibraryModal({
                     />
                   ) : (
                     <>
-                      <button
-                        type="button"
-                        className="flow-library-edit-icon desc"
-                        onClick={beginEditDescription}
-                        aria-label="Edit flow description"
-                        title="Edit description"
-                      >
-                        <EditIcon />
-                      </button>
+                      {!selectedFlowReadonly ? (
+                        <button
+                          type="button"
+                          className="flow-library-edit-icon desc"
+                          onClick={beginEditDescription}
+                          aria-label="Edit flow description"
+                          title="Edit description"
+                        >
+                          <EditIcon />
+                        </button>
+                      ) : null}
                       <div className="flow-library-preview-desc-text">
                         {selectedFlow.description?.trim() ? selectedFlow.description.trim() : 'No description.'}
                       </div>
+                      {selectedFlowReadonly ? (
+                        <div className="flow-library-readonly-note">
+                          {selectedFlowBundleTarget
+                            ? 'Bundled workflow family. Load it to run the shipped bundle; it cannot be duplicated as one standalone flow because it has companion subflows.'
+                            : 'Bundled example. Load it as an unsaved draft or duplicate it into Gateway storage to edit.'}
+                        </div>
+                      ) : null}
                     </>
                   )}
                 </div>
@@ -623,17 +655,29 @@ export function FlowLibraryModal({
                       >
                         Load
                       </button>
-                      <button type="button" className="modal-button" onClick={handleDuplicate}>
-                        Duplicate
-                      </button>
                       <button
                         type="button"
-                        className={`modal-button ${isDeleteConfirm ? 'danger' : ''}`}
-                        onClick={handleDelete}
-                        title={isDeleteConfirm ? 'Click again to confirm delete' : 'Delete flow'}
+                        className="modal-button"
+                        onClick={handleDuplicate}
+                        disabled={selectedFlowBundleTarget}
+                        title={
+                          selectedFlowBundleTarget
+                            ? 'This bundled workflow family must run from its shipped bundle'
+                            : 'Duplicate flow'
+                        }
                       >
-                        {isDeleteConfirm ? 'Confirm Delete' : 'Delete'}
+                        Duplicate
                       </button>
+                      {!selectedFlowReadonly ? (
+                        <button
+                          type="button"
+                          className={`modal-button ${isDeleteConfirm ? 'danger' : ''}`}
+                          onClick={handleDelete}
+                          title={isDeleteConfirm ? 'Click again to confirm delete' : 'Delete flow'}
+                        >
+                          {isDeleteConfirm ? 'Confirm Delete' : 'Delete'}
+                        </button>
+                      ) : null}
                     </>
                   )}
                 </div>

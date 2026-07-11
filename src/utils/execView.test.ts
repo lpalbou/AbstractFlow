@@ -36,6 +36,7 @@ describe('execNodeFamily', () => {
     expect(execNodeFamily('agent')).toBe('generative');
     expect(execNodeFamily('generate_image')).toBe('media');
     expect(execNodeFamily('write_pdf')).toBe('io');
+    expect(execNodeFamily('write_docx')).toBe('io');
     expect(execNodeFamily('tool_calls')).toBe('io');
     expect(execNodeFamily('memory_note')).toBe('memory');
     expect(execNodeFamily('subflow')).toBe('subflow');
