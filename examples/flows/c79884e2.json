@@ -1,7 +1,7 @@
 {
   "id": "c79884e2",
   "name": "multi-model-response",
-  "description": "",
+  "description": "Multi-model ensemble: three LLM calls answer the same query, then a fourth synthesizes their responses into one comprehensive final answer.",
   "nodes": [
     {
       "id": "node-1",

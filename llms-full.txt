@@ -359,14 +359,29 @@ plan/result summaries (so pending plan items survive across turns), and applied
 cycles within a turn carry one-line notes of the model's own next steps. The
 visible graph remains the source of applied draft state.
 
-Session policy: one durable Gateway session per workflow conversation. The
-session id is scoped to the workflow storage key (never shared across
-workflows), follows a draft when it is promoted to a saved flow, and is
-rotated by Clear Chat — so gateway-side agent memory restarts together with
-the visible conversation. Because the gateway agent replays session memory
-into the model context, the prompt anchors a language directive at the request
-site and marks replayed conversation as historical, so the active request —
-not session history in another language — controls the output language.
+Session policy (revised 2026-07-11, backlog 0112): the per-workflow session id
+remains the conversation identity — scoped to the workflow storage key (never
+shared across workflows), following a draft when it is promoted to a saved
+flow, and rotated by Clear Chat — but planner runs are SESSIONLESS. The
+gateway agent replays session memory into the model context; with a shared
+session, cycle N re-billed cycles 1..N-1's prompts and responses even though
+the client prompt already carries the conversation, cycle notes, and current
+document explicitly. Session-carrying run starts also mint a persistent
+session-memory owner run per new session server-side, so per-cycle derived
+sessions would leave one orphan run per cycle — omitting the session id
+avoids both. Continuity across turns lives in the client-persisted
+conversation block. The prompt still anchors a language directive at the
+request site and marks replayed conversation as historical, so the active
+request — not history in another language — controls the output language.
+
+Prompt placement is cache-first (backlog 0112): the large stable context
+(authoring skill, node catalog, gateway tool schemas) is byte-identical
+across cycles within a turn and rides the SYSTEM message — the runtime
+prepends a volatile grounding envelope (with a second-resolution timestamp)
+to every user prompt, so only system content can form a wire-stable prefix
+for provider caches. The user prompt carries the volatile block
+(conversation, authoring brief, current document, the active request).
+Nothing is dropped — placement only (ADR-0026 forbids lossy compaction).
 
 Plan responses are parsed tolerantly: the JSON object is extracted even when the
 model wraps it in markdown fences or surrounding prose. A planner response that
@@ -681,9 +696,12 @@ Node fields:
   `concat_separator` (Concat).
 - `position`: optional; omit it and existing nodes stay where the user put
   them while new nodes are auto-laid-out by execution depth.
-- `agent_config` / `effect_config` / `subflow_id` appear in the serialized
-  current document as read-only context; do not author them — use
-  `pin_defaults` instead.
+- `agent_config` / `effect_config` appear in the serialized current document
+  as read-only context; do not author them — use `pin_defaults` instead.
+- `subflow_ref` (subflow nodes): the SAVED workflow id this node executes —
+  AUTHORABLE. See "Composing Workflows (Subflow)". The serialized
+  `subflow_interface` block beside it is read-only context showing the
+  referenced workflow's data pins so you can wire edges correctly.
 
 Edges are `"sourceNode.sourcePin -> targetNode.targetPin"` strings.
 
@@ -694,10 +712,20 @@ Ownership semantics:
 - Anything you omit is DELETED. Nodes and edges absent from your document are
   removed from the canvas. Never label a node "unused" or ask the user to
   remove anything — omit it and it is gone.
+- MASS-DELETION GUARD: a document that omits MANY existing nodes at once is
+  refused as a likely truncated emission and nothing is applied. If a large
+  teardown is genuinely intended, re-emit the same document plus a top-level
+  `"confirm_deletions": ["node-id", ...]` listing every omitted node id.
 - Values shown as `<redacted>` are secrets; re-emit them verbatim or omit
   them. Never invent replacements.
 - Re-emitting an unchanged document changes nothing and counts as a stalled
   cycle.
+- Changing a dynamic pin's TYPE is supported: re-emit the pin with the same
+  id and the new type; the editor retypes it in place and drops
+  now-incompatible edges with named warnings. Dynamic pins also accept
+  optional `description` and `schema` (JSON-schema fragment; e.g.
+  `{"type":"array","items":{"type":"string","x-abstract-type":"file"}}` for a
+  multi-file boundary input).
 
 ## Authoring Loop
 
@@ -932,7 +960,9 @@ research, planning, multi-source synthesis):
   requirements, iteration strategy, final output contract.
 - `prompt` carries the concrete task (usually from String Template).
 - `tools` from Tools Allowlist or discovered runtime tool names.
-- `max_iterations` 50 for deep iterative work unless the user asks smaller.
+- `max_iterations` 50 for deep iterative work unless the user asks smaller
+  (an explicit workflow choice — the unset default is 20; the workflow's
+  authored value is authoritative at any number).
 - `resp_schema` when downstream needs structured fields; wire `agent.data` ->
   Break Object. `agent.response` is final text. `agent.scratchpad` is for
   audit/trace only. `agent.meta` is execution metadata — never sources,
@@ -1222,6 +1252,37 @@ On Flow End; optional Markdown/CSV file outputs.
 Ask User only when the workflow must pause mid-execution; On Flow Start inputs
 for normal parameters; Answer User for host-visible messages; Wait Event for
 durable external waits.
+
+### Composing Workflows (Subflow)
+
+Workflows compose: a `subflow` node executes another SAVED workflow as one
+step, with the child's On Flow Start outputs becoming the node's data inputs
+and its On Flow End inputs becoming the node's data outputs. Composition is
+how complex systems stay modular — build the reusable piece as its own
+workflow, then reference it.
+
+- Reference by SAVED id: `{"id": "run-analysis", "type": "subflow",
+  "subflow_ref": "3af1b2c9"}`. The AVAILABLE WORKFLOWS section of your context
+  is the pick-time catalog: per saved workflow it lists the id, name, purpose
+  (description), and the full boundary contract — inputs (with types,
+  required/default status, and pin descriptions) and outputs. Choose the
+  composition target by that contract and plan edges against exactly those
+  pins. Reference ids from that list only; a name is not an id; an unknown
+  reference is refused with the available list.
+- The editor patches the node's pins from the referenced workflow's boundary
+  when the reference is set; wire edges to the pins shown in the serialized
+  `subflow_interface` context. `inherit_context: true` passes the parent's
+  conversation context into the child.
+- Per-item composition: ForEach.item -> the subflow node's matching input,
+  inside the loop body.
+- Dependencies must be SAVED before they can be referenced. When the request
+  needs a workflow that does not exist yet ("create workflow2, then create
+  workflow1 that uses workflow2"), say so in your reply and build the
+  dependency FIRST (ask the user to save it, or author it in its own
+  conversation) — then reference its saved id. Never invent an id.
+- Self-reference and reference cycles are refused in assistant authoring
+  (recursion needs a designed base case; the Properties panel remains the
+  manual path for deliberate recursion).
 
 ## Validation And Repair
 
@@ -1556,7 +1617,7 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Outputs: `exec-out` execution; `response` string: Final response text. When resp_schema is provided, the structured object is also exposed on data.; `data` object: Structured response object matching resp_schema. Visible by default when a response schema is configured.; `success` boolean: True if the Agent node completed successfully.; `meta` object: Host-facing meta envelope (schema=abstractcode.agent.v1.meta). Includes provider/model and lightweight execution metadata.; `scratchpad` object: Runtime-owned execution trace/scratchpad for observability (LLM/tool steps, timings). Includes best-effort tool_calls/tool_results extracted post-run.
 - Default config: {
   "pinDefaults": {
-    "max_iterations": 50
+    "max_iterations": 20
   }
 }
 
@@ -3141,8 +3202,9 @@ recomputes preflight/readiness issues, and continues until the graph is ready
 or explicitly blocked. Nodes and edges omitted from the document are deleted
 (removal is implicit; deletions remain undoable via Undo Turn). Research,
 news, job-search, and deep-research requests are checked for a multi-step
-scaffold: start inputs, prompt building, explicit tools, an Agent with the
-standard `max_iterations=50` setting, and end outputs.
+scaffold: start inputs, prompt building, explicit tools, an Agent with an
+explicit `max_iterations >= 50` budget (a deliberate workflow choice for deep
+iterative work; the unset default is 20), and end outputs.
 
 Model output is restricted to the document JSON. The editor refuses changes
 that would embed secrets, create unknown templates, bypass connection
@@ -3483,6 +3545,248 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- 2026-07-12 authoring-assistant overhaul (operator directive: better
+  visuals/realtime information/user-facing messages + complex-workflow
+  capability, composition, and a build→test loop; designs from five
+  adversarial audits):
+  - Workflow COMPOSITION (stage 1): `subflow_ref` is now authorable in the
+    workflow document — the diff resolves it against the saved-workflow
+    list (unknown refs refused with the available ids; name-shaped refs
+    redirected to the id; self-references and reference cycles refused
+    naming the manual Properties-panel recursion path) and compiles to a
+    new `set_subflow` command that patches the node's pins from the child's
+    boundary via the existing `subflowPinPatchForSelectedFlow` machinery.
+    The serializer emits a read-only `subflow_interface` context block so
+    the model can wire edges correctly, and the prompt carries an
+    AVAILABLE WORKFLOWS section. New skill-doc section
+    "Composing Workflows (Subflow)". The catalog is a PICK-TIME contract
+    surface (follow-up, same day): per saved workflow it lists id, name,
+    purpose (flow description), and the boundary contract — inputs with
+    types/required-or-default/pin descriptions, and outputs — derived
+    client-side from the full graphs the visualflows collection already
+    returns (`workflowContractSummary`); the same fetch now seeds the
+    subflow graph cache, so cycle detection covers the whole library and
+    `set_subflow` pin patching needs no second fetch. The current flow is
+    listed but marked non-referenceable.
+  - Mass-deletion guard: a document omitting more than max(3, 20%) of
+    existing nodes is refused whole (truncation-shaped emission) with a
+    `confirm_deletions` repair path — deliberate teardowns stay
+    expressible, accidental graph wipes cannot happen.
+  - Dynamic-pin upgrades: same-id type changes compile to a new
+    `update_pin` command (in-place retype; incompatible edges dropped with
+    named warnings — the previously documented-but-unimplementable repair),
+    and pins round-trip `description` + `schema` (e.g. array-of-file
+    boundary inputs).
+  - Draft TEST loop (stage 1): a consented "Test run" card in the drawer —
+    entry-pin input form (required detection from pin defaults), draft
+    publish + isolated-session run (`assistant-test:<workflow>` session,
+    `draft_test`/ephemeral lifecycle), live tool-approval and ask-user
+    surfacing with Approve/Deny/reply (subworkflow waits followed to the
+    owning descendant run), wall-clock watchdog with cancel, and a
+    structured verdict report (failed steps with node labels + verbatim
+    errors + `#TRUNCATION`-labeled input previews). The report feeds the
+    NEXT planning turn as a `LAST TEST RUN` prompt section (consume-once),
+    closing the build→test→fix loop. Mechanics in
+    `src/utils/draftTestRun.ts` (+ tests).
+  - General structural readiness floor (all workflows, each check
+    satisfiable by wiring or omitting): unreachable execution nodes (the
+    runtime silently drops them), loop nodes without a body / while without
+    a condition, subflow nodes without a referenced workflow (previously an
+    opaque publish-time 400), On Flow End with declared-but-unwired data
+    pins, on_schedule without a schedule.
+
+### Changed
+- 2026-07-12 assistant message contract (the maintainer's complaint:
+  "dumping the list of changes is not really useful"): turn messages are
+  OUTCOME-FIRST — model-authored headline (≤12 words), capability-level
+  "What changed" bullets (new `changes_summary` plan field; fallback is a
+  one-line verb-bucket summary, never a per-command dump), "Check next"
+  steps, every aggregated warning rendered VERBATIM as a ⚠ caveat line
+  (never "N notes recorded" — includes #FALLBACK review-skips and stall
+  explanations), an explicit verification line when the acceptance review
+  passed, and a stats footer (changes · cycles · duration · tokens).
+  Process narration (How It Works / How To Test / What To Expect / Workflow
+  Plan + short repair/readiness forms) folds into one collapsed "Turn
+  report" details block. needs_user renders question-first with neutral
+  (not error) styling; cycle-cap exhaustion is a PAUSED message with
+  continue/raise-cap guidance, not a failure; failures are three lines
+  (what/why/try) with full forensics moved to the activity payload
+  inspector. Welcome message rewritten user-first.
+- 2026-07-12 assistant visual system: drawer header with flow name + state
+  pill (idle/running/waiting/done/failed — needs_user/stall/interrupt wear
+  warning, never error); stage chips (PLANNING=info/APPLYING=warning/
+  CHECKING=success); "Cycle N/MAX" header with a cycle-budget progress
+  track; live model-declared plan strip (steps + next, no invented
+  checkmarks); activity feed with glyph marks (shape+color, never color
+  alone), a new 'notice' kind for routine self-corrections (amber, not
+  red), sticky cycle headers, 32vh height while running, and a
+  scroll-trap-free payload inspector; theme-token message surfaces (the
+  white-alpha bubbles were invisible on all 6 light themes) with turn
+  separators carrying outcome stats; user messages render literal (never
+  parsed as markdown); Monaco code colorize follows the app theme
+  (light themes get 'vs'); reduced-motion gates on spinner/pulse.
+  Component extraction: the 3.6k-line drawer split into
+  `src/components/assistant/` (status card, message list, composer, test
+  card, messages/activity/settings modules).
+- 2026-07-12 runtime contract note: the visual `llm_call` executor dropped
+  provider+model from the effect when only one resolved (the taught
+  model-pool pattern silently ran on gateway defaults). Runtime fixed it
+  same-turn (forward-independently, abstractruntime `5578779`); preflight's
+  pairing rule now cites the runtime pin file
+  (`tests/test_visual_llm_call_partial_override.py`).
+
+### Fixed
+- 2026-07-12 post-implementation adversarial round (fixes shipped with the
+  wave; full findings in backlog 0143): branch-aware reachability for the
+  unreachable-node readiness check (loop/if/switch/sequence bodies are
+  reachable — an exec-out-only walk flagged every non-linear workflow);
+  second-approval surfacing + honest `needs_interactive_input` watchdog
+  verdicts in the test loop; ask_user prompts read from the wait's real
+  top-level field; nested-redacted pin defaults no longer break the
+  document round-trip; in-flight test approvals stay reachable during
+  authoring turns and Clear Chat stops/clears the test state;
+  needs_user-with-changes keeps the model's question; break_object same-id
+  retype re-emits; test reports walk the full run tree; follow-live
+  autoscroll wired to the activity log (scroll up to read without yanking,
+  Follow ↓ re-arms).
+- 2026-07-11 basic-agent sync + ruled iteration defaults (maintainer ruling,
+  agora commons c726: "the workflow decides" — a bundle pinDefault is
+  authoritative design; source and shipped bundle must be in sync at
+  max_iterations=20; any agent max_iterations DEFAULT is 20, not 50):
+  - `examples/flows/81795ea9.json`: on_flow_start pinDefaults
+    max_iterations 5 -> 20, reverting an accidental drift introduced by an
+    unrelated 2026-01-30 commit (`2658f45`). The source (with its newer
+    memory pin) is authoritative; both shipped bundle artifacts
+    (`abstractgateway/flows/bundles/basic-agent.flow` and
+    `basic-agent@0.0.1.flow`) were repacked from it — byte-identical flow
+    payloads, `abstractcode.agent.v1` interface intact.
+  - Agent max_iterations editor defaults 50 -> 20: template seed
+    (`src/types/nodes.ts`), legacy-flow backfill (`src/utils/serialization.ts`
+    — which now also skips edge-connected pins: writing a dead default
+    churned saved bytes and desynced packed bundles from source for zero
+    runtime behavior), pin-disclosure display map
+    (`src/utils/nodePinDisclosure.ts`). Deep-research guidance
+    (`AuthoringAssistantDrawer`, `docs/architecture.md`,
+    `docs/workflow-authoring-skill.md`) now presents `max_iterations >= 50`
+    as the recipe's explicit workflow choice, never "the default".
+    Generated docs (`docs/workflow-node-catalog.md`, `llms-full.txt`)
+    regenerated. Regression pins in
+    `src/utils/agentIterationDefaults.test.ts` (seed=20, backfill=20,
+    explicit values preserved at any number, no backfill when the pin is
+    edge-connected).
+
+### Added
+- 2026-07-11 `scripts/build_basic_agent_bundle.py` (pack | check): rebuilds
+  the shipped basic-agent bundles from `examples/flows/` and audits
+  source/shipped SYNC — byte-identity per flow file, manifest flow-set
+  completeness (checked against a temp pack through the real packer, so a
+  tampered manifest dropping a reachable subflow fails), loadability through
+  `open_workflow_bundle`, interface declaration, and the ruled
+  max_iterations pin. Publish-time refusal replaces commit archaeology for
+  the January drift class.
+- 2026-07-11 run-modal visual pass ("quiet card, loud state"): a visible
+  aesthetic upgrade of the run experience, theme-safe across all 16 themes.
+  - Launch view: the Workflow Parameters card leads with an accent-tinted
+    header, a sliders glyph, and an input-count chip; collapsed
+    infrastructure cards (File System Access, prompt caches) calm down
+    (secondary title color, hover reveal) and their text `+`/`-` affordance
+    is replaced by a rotating border-drawn chevron; card order is now
+    Parameters -> File System Access -> caches; inputs get an 8px radius,
+    hover border, and an accent focus glow; the "no parameters" note became
+    an intentional empty state (dashed panel + play glyph); the Run/New Run
+    buttons became a gradient accent CTA with a play icon and press motion.
+  - Execution view: step status is now a pill vocabulary with a leading
+    state dot — running=info (was warning, which collided with WAITING),
+    waiting=warning, OK=success, failed=error; the spinner runs on
+    currentColor so it is visible on light themes; step rows show the full
+    node label (status/duration moved right, timestamp chip into the meta
+    row) and get accent-tinted selection + motion-timed hovers (the old
+    white-alpha hover/selected states were invisible on light themes);
+    metric badges (duration/tokens/throughput/provider/model/tool/...)
+    rebuilt on theme hues via color-mix (the old pale hardcoded text was
+    unreadable on light themes); think/act/observe agent stage pills are
+    tinted per stage (info/warning/success) via a `data-stage` attribute in
+    monitor-flow's AgentCyclesPanel; the tool-approval panel gained a
+    warning frame + pulsing dot (reduced-motion aware); JSON syntax colors,
+    code blocks, markdown blocks, generated-artifact plates, warning/failure
+    panels, and the JSON-viewer sticky toolbar all moved from hardcoded
+    dark-only rgba to theme tokens; the dark titlebar/minibar hardcode their
+    own light text (theme text tokens went near-black on light themes there)
+    and the `▶` text glyph became a stroke play icon.
+  - New screenshot harness `scripts/runmodal_check.html` +
+    `runmodal_check_main.tsx` + `runmodal_check_shot.mjs` renders the real
+    RunFlowModal (launch + synthetic execution timeline) in any theme for
+    visual verification without a gateway.
+- 2026-07-11 general review wave, group 1 (authoring) top picks implemented
+  (backlog `planned/0111`-`0113`; the full seven-agent adversarial review is
+  recorded as backlog items 0111-0141):
+  - Run-modal send-event composer (0111): event parks now offer a "Send
+    event" composer — event key parsed from the wait (`evt:` scheme via
+    `src/utils/eventComposer.ts`, unit-tested), JSON payload editor with
+    validation, optional `durable` mailbox delivery, posting the existing
+    gateway `emit_event` command. Received events became visible: an event
+    park's resume now surfaces the full waking envelope as the step result
+    (`ledgerEvents.ts` event-reason passthrough, tested); user-wait resumes
+    keep the narrow visibility rule. Copy-key affordance on park cards.
+  - Authoring assistant transport overhaul (0112, adversarial-review
+    corrected): the stable ~21k-token context (skill, catalog, tools) is
+    byte-identical across cycles (tested) and rides the SYSTEM message —
+    the runtime prepends a volatile grounding envelope to every user
+    prompt, so only system content can form a wire-stable prefix for
+    provider caches (the review caught the user-prompt placement as a
+    cache-defeating claim). Planner cycles and acceptance reviews now run
+    SESSIONLESS instead of on the shared durable session: this ends the
+    quadratic in-turn replay cost AND avoids minting one persistent
+    session-memory owner run per cycle server-side (review finding). The
+    per-workflow session id remains the conversation identity; Clear Chat
+    semantics unchanged. One labeled, non-blocking cumulative-usage note
+    past 500k tokens/turn (checked after planner AND review usage); the
+    context meter is labeled as a client estimate. Language anchoring
+    stays at the request site (adjacency asserted by test — the
+    2026-06-10 A/B proved block position irrelevant).
+  - Catalog parity + Files taxonomy (0113): `llm_call` and `agent` templates
+    now declare the `max_output_tokens` pin the runtime already honors
+    (advanced disclosure, tested); `wait_event.until/details` fold as
+    advanced pins; the nine file/artifact IO nodes moved from the "Memory"
+    palette category to a new "Files" category (files and memory are
+    distinct concepts); node catalog + llms-full regenerated.
+- 2026-07-11 general review wave, group 2 (design/UX) top picks implemented
+  (backlog `planned/0114`-`0116`):
+  - Design token integrity (0114): `--accent-primary`, `--accent-secondary`,
+    and `--border-color` — referenced ~20 times but never defined, silently
+    collapsing hover/warning states — are now defined at the app layer over
+    ui-kit tokens; drifted success/error fallback literals reconciled to the
+    theme values; a global `:focus-visible` ring (`--focus-ring`) makes
+    keyboard focus visible on every control; the base button hover calmed to
+    a subtle overlay (brand accent reserved for `.primary` variants — no
+    more red-flashing Copy buttons); infinite executing/dash/blink
+    animations gated behind `prefers-reduced-motion`. A token-integrity test
+    (`src/utils/cssTokens.test.ts`) resolves every no-fallback `var()`
+    reference against app CSS + ui-kit theme + TSX-set properties so
+    undefined tokens can never ship silently again.
+  - Run-modal live inspection + failure forensics (0115): live runs no
+    longer steal the selected step — auto-follow disarms on any manual
+    selection and a "Follow live" pill re-arms it (scroll-into-view on
+    follow); the failure panel jump expands collapsed ancestors and scrolls
+    to the step; "+N more failures" expands; failed steps render the
+    failing effect's input payload beside the error (from trace records);
+    ask_user resumes pass the wait's `runId`+`waitKey` so resuming from an
+    inspected (post-reload) run works instead of silently dead-ending;
+    follow-up messages are injected into the same prompt-like key the prior
+    run used (`src/utils/followUpInputs.ts`, shared by extraction and
+    injection, tested) instead of a hardcoded `prompt` key that silently
+    re-ran the old task on task/query-keyed flows.
+  - Universal artifact previewer (0116): PDFs preview inline (iframe on the
+    blob URL) with separate Open/Download actions instead of a forced
+    download; text artifacts render inline (markdown through the markdown
+    renderer) with a labeled `#TRUNCATION` clamp at 200k chars; images zoom
+    in a dependency-free lightbox (Escape/click-out closes); multi-image
+    outputs render every image as a thumbnail gallery with per-image
+    selection (previously only the first image showed); markdown links open
+    in a new tab (`rel="noopener noreferrer"`) so rendered answers stop
+    ejecting users from the SPA; preview-kind resolution is a tested pure
+    helper (`src/utils/artifactPreview.ts`) honoring content type over
+    extension, with extensions speaking only for information-free types.
 - Honest rendering for event-wait parks in the run modal (visit seam-spec
   0013 client half). Event waits (`reason=event`) no longer invent a
   "Please respond:" question: plain parks render as

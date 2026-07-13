@@ -106,7 +106,7 @@ const VIDEO_DEFAULT_PIN_VALUES = {
 const DEFAULT_PIN_VALUES_BY_NODE_TYPE: Record<string, PinValueMap> = {
   agent: {
     use_context: false,
-    max_iterations: 50,
+    max_iterations: 20,
   },
   llm_call: {
     use_context: false,

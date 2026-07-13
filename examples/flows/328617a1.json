@@ -1,7 +1,7 @@
 {
   "id": "328617a1",
   "name": "Untitled Flow",
-  "description": "",
+  "description": "Scratch skeleton: On Flow Start, an Agent node, and On Flow End left completely unwired; does nothing yet.",
   "interfaces": [
     "abstractcode.agent.v1"
   ],

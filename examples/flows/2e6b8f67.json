@@ -1,7 +1,7 @@
 {
   "id": "2e6b8f67",
   "name": "check-emails",
-  "description": "",
+  "description": "Email digest agent: calls list_emails with credentials embedded in the prompt to fetch the last 24 hours of messages and returns a digest prioritized by urgency.",
   "interfaces": [],
   "nodes": [
     {

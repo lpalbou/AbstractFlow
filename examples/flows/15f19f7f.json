@@ -1,7 +1,7 @@
 {
   "id": "15f19f7f",
   "name": "ac-update-status",
-  "description": "",
+  "description": "Helper: emits a host-visible status update event (used by agent workflows to report progress mid-run).",
   "interfaces": [],
   "nodes": [
     {

@@ -1,7 +1,7 @@
 {
   "id": "81795ea9",
   "name": "basic-agent",
-  "description": "",
+  "description": "The framework default agent: one Agent node with tools, memory, and status updates via the ac-update-status helper. Runnable by chat hosts (AbstractCode, entity phases, gateway agency loops) through the abstractcode.agent.v1 contract.",
   "interfaces": [
     "abstractcode.agent.v1"
   ],
@@ -108,7 +108,7 @@
             "web_search",
             "write_file"
           ],
-          "max_iterations": 5
+          "max_iterations": 20
         }
       },
       "label": null,

@@ -1,7 +1,7 @@
 {
   "id": "61e7c1a4",
   "name": "keywords",
-  "description": "",
+  "description": "Interactive memory REPL: prompts for input in a loop - '/mem tag:sentence' stores a tagged note, plain text queries stored memory, and '/q' exits.",
   "interfaces": [],
   "nodes": [
     {

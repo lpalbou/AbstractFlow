@@ -1,7 +1,7 @@
 {
   "id": "42f5bc43",
   "name": "agent-observability",
-  "description": "",
+  "description": "Scratch/test flow: a single agent restricted to list_files runs the fixed task 'list the local files'.",
   "nodes": [
     {
       "id": "node-1",

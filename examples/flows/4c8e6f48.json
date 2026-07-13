@@ -1,7 +1,7 @@
 {
   "id": "4c8e6f48",
   "name": "test-search",
-  "description": "",
+  "description": "Scratch/test loop for manual tool-calling: an LLM (search_files allowlist) proposes tool calls that are executed and echoed each iteration until max_search is reached or a call fails.",
   "nodes": [
     {
       "id": "node-1",

@@ -1,7 +1,7 @@
 {
   "id": "88199678",
   "name": "reliable-agent-v3",
-  "description": "",
+  "description": "Answer-then-review pipeline: a web agent answers, a reviewer LLM judges completeness, and if tasks are missing the flow recurses into itself to continue. Variant of reliable-agent-v2 using recursion instead of a second agent.",
   "interfaces": [],
   "nodes": [
     {

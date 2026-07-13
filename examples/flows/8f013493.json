@@ -1,7 +1,7 @@
 {
   "id": "8f013493",
   "name": "recursive-flow",
-  "description": "",
+  "description": "Recursion demo: decrements the input number and calls itself until it reaches zero, then reports the final number.",
   "interfaces": [],
   "nodes": [
     {

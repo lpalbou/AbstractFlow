@@ -1,7 +1,7 @@
 {
   "id": "30b61203",
   "name": "memory-test",
-  "description": "",
+  "description": "Memory/context probe: memorizes a fact about the user, then asks 'who am i?' three ways - an in-context LLM call, a context-free call, and the memory-sub subflow without inherited context - to see which recalls it.",
   "nodes": [
     {
       "id": "node-1",

@@ -1,7 +1,7 @@
 {
   "id": "2c3b2671",
   "name": "web-summary",
-  "description": "",
+  "description": "Web research agent restricted to web_search/fetch_url: iteratively searches and reads sources for the query, then answers with references cited in the text.",
   "nodes": [
     {
       "id": "node-1",

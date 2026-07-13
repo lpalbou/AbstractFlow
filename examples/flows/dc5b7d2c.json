@@ -1,7 +1,7 @@
 {
   "id": "dc5b7d2c",
   "name": "expert-coder",
-  "description": "",
+  "description": "Enriches the prompt via the request-enricher subflow, then an autonomous coding agent (file/exec tools, 25 iterations) implements and launches it; the default prompt asks for a procedural R-Type clone.",
   "interfaces": [],
   "nodes": [
     {

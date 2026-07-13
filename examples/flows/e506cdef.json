@@ -1,7 +1,7 @@
 {
   "id": "e506cdef",
   "name": "today-news",
-  "description": "",
+  "description": "Daily-news agent: injects the current system date into the prompt, has a web agent (web_search/fetch_url) look up today's news, and reports both the answer and a beautified agent trace report.",
   "interfaces": [],
   "nodes": [
     {

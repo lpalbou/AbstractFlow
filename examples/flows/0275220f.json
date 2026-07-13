@@ -1,7 +1,7 @@
 {
   "id": "0275220f",
   "name": "identify",
-  "description": "",
+  "description": "Iterates over the provider's model catalog and asks each model to identify itself with one LLM call per model.",
   "nodes": [
     {
       "id": "node-1",

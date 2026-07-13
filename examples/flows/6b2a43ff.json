@@ -1,7 +1,7 @@
 {
   "id": "6b2a43ff",
   "name": "auto-task-scheduler",
-  "description": "",
+  "description": "Task-decomposition scheduler: an LLM splits the request into schema-typed tasks (description, tools, priority), then an autonomous agent executes each task in sequence with per-task results reported.",
   "interfaces": [],
   "nodes": [
     {

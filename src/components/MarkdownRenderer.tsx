@@ -2,6 +2,24 @@ import { useEffect, useMemo, useRef } from 'react';
 import DOMPurify from 'dompurify';
 import { marked } from 'marked';
 import { useMonaco } from '@monaco-editor/react';
+import { THEME_SPECS } from '@abstractframework/ui-kit';
+
+/**
+ * Pick the Monaco colorize theme from the applied app theme class
+ * (theme-<id> on the document root). Light themes previously got dark-palette
+ * tokens over a light code-block surface — pale yellows on near-white.
+ */
+function monacoThemeForAppTheme(): 'vs' | 'vs-dark' {
+  try {
+    const classes = Array.from(document.documentElement.classList);
+    const themeClass = classes.find((entry) => entry.startsWith('theme-'));
+    const themeId = themeClass ? themeClass.slice('theme-'.length) : 'dark';
+    const spec = THEME_SPECS.find((entry) => entry.id === themeId);
+    return spec?.group === 'light' ? 'vs' : 'vs-dark';
+  } catch {
+    return 'vs-dark';
+  }
+}
 
 export interface MarkdownRendererProps {
   markdown: string;
@@ -81,11 +99,11 @@ export function MarkdownRenderer({ markdown, className }: MarkdownRendererProps)
     if (!root) return;
     if (!monaco) return;
 
-    // Ensure syntax highlighting matches the app's dark UI.
-    // Without this, Monaco can default to the light theme ("vs"), producing black tokens
-    // that are unreadable on our dark code block background.
+    // Match syntax highlighting to the applied app theme: light themes get
+    // 'vs', dark themes 'vs-dark'. (Monaco's theme is global; the code editor
+    // modal sets its own theme when it opens.)
     try {
-      monaco.editor.setTheme('vs-dark');
+      monaco.editor.setTheme(monacoThemeForAppTheme());
     } catch {
       // Ignore: theme setting is best-effort.
     }

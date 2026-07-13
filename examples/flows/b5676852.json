@@ -1,7 +1,7 @@
 {
   "id": "b5676852",
   "name": "ac-llm",
-  "description": "",
+  "description": "abstractcode.agent.v1 entrypoint backed by a single in-context LLM call instead of an agent loop; maps the prompt straight to the response.",
   "interfaces": [
     "abstractcode.agent.v1"
   ],

@@ -12,8 +12,10 @@ import {
   normalizeMaxCycles,
   assistantSystemPrompt,
   assistantWorkflowStorageKey,
+  authoringFailureDetailText,
   authoringFailureMarkdown,
   AuthoringInterruptedError,
+  availableWorkflowsText,
   buildAcceptanceReviewPrompt,
   buildGatewayPromptContext,
   computeAuthoringReadiness,
@@ -220,6 +222,38 @@ describe('AuthoringAssistantDrawer progress labels', () => {
   });
 });
 
+describe('available workflows catalog (pick-time contracts)', () => {
+  it('renders id, purpose, and the input/output contract per workflow', () => {
+    const text = availableWorkflowsText(
+      [
+        {
+          id: 'wf2-id',
+          name: 'Sentiment',
+          description: 'Classifies text sentiment.',
+          inputs: [
+            { id: 'text', type: 'string', description: 'Text to analyze', required: true },
+            { id: 'depth', type: 'number', required: false, defaultValue: 2 },
+          ],
+          outputs: [{ id: 'sentiment', type: 'string' }],
+        },
+        { id: 'root-id', name: 'Main', inputs: [], outputs: [] },
+      ],
+      'root-id'
+    );
+    expect(text).toContain('- wf2-id · Sentiment');
+    expect(text).toContain('purpose: Classifies text sentiment.');
+    expect(text).toContain('text (string, required) — Text to analyze');
+    expect(text).toContain('depth (number, default 2)');
+    expect(text).toContain('outputs: sentiment (string)');
+    // The current flow is listed but marked non-referenceable.
+    expect(text).toContain('root-id · Main (THIS workflow — not referenceable, recursion refused)');
+  });
+
+  it('states the empty catalog honestly', () => {
+    expect(availableWorkflowsText([], null)).toContain('None saved yet');
+  });
+});
+
 describe('AuthoringAssistantDrawer interruption', () => {
   it('marks user stops with a dedicated error type distinct from failures', () => {
     const error = new AuthoringInterruptedError();
@@ -230,12 +264,12 @@ describe('AuthoringAssistantDrawer interruption', () => {
 });
 
 describe('AuthoringAssistantDrawer failure report', () => {
-  it('includes the returned plan, attempted commands, validator details, and candidate graph', () => {
-    const markdown = authoringFailureMarkdown('Command plan rejected by the graph validator: connect refused invalid edge a.out -> b.in', false, {
+  it('keeps chat to cause/effect/action and moves forensics to the activity detail payload', () => {
+    const failureContext = {
       cycle: 2,
       modelNote: 'Assistant model: Gateway default (lmstudio / qwen).',
       plan: {
-        status: 'continue',
+        status: 'continue' as const,
         reply: 'I will build a research workflow.',
         workflowSteps: ['Collect a query', 'Build a prompt', 'Run the agent'],
         commands: [
@@ -270,16 +304,33 @@ describe('AuthoringAssistantDrawer failure report', () => {
         touchedNodeIds: ['start'],
         snapshot: { flowName: 'Untitled Flow', flowInterfaces: [], nodes: [], edges: [] },
       },
-    });
+    };
 
-    expect(markdown).toContain('**Planner Reply**');
-    expect(markdown).toContain('Collect a query');
-    expect(markdown).toContain('"action":"connect"');
-    expect(markdown).toContain('**Validator Errors**');
-    expect(markdown).toContain('Input pin value already connected');
-    expect(markdown).toContain('**Candidate Graph Before Rejection**');
-    expect(markdown).toContain('start (on_flow_start)');
-    expect(markdown).toContain('Expose a report output.');
+    // Chat: three short lines — what failed, what the draft kept, what to try.
+    const markdown = authoringFailureMarkdown(
+      'Command plan rejected by the graph validator: connect refused invalid edge a.out -> b.in',
+      false
+    );
+    expect(markdown).toContain('**Authoring failed**');
+    expect(markdown).toContain('Command plan rejected by the graph validator');
+    expect(markdown).toContain('The workflow draft is unchanged.');
+    expect(markdown).toContain('Try:');
+    // The dumps are OUT of chat (the maintainer's complaint).
+    expect(markdown).not.toContain('"action":"connect"');
+    expect(markdown).not.toContain('Candidate Graph');
+
+    // Activity detail payload: full forensics, verbatim.
+    const detail = authoringFailureDetailText(
+      failureContext as unknown as Parameters<typeof authoringFailureDetailText>[0]
+    );
+    expect(detail).toContain('PLANNER REPLY');
+    expect(detail).toContain('Collect a query');
+    expect(detail).toContain('"action":"connect"');
+    expect(detail).toContain('VALIDATOR ERRORS');
+    expect(detail).toContain('Input pin value already connected');
+    expect(detail).toContain('CANDIDATE GRAPH BEFORE REJECTION');
+    expect(detail).toContain('start (on_flow_start)');
+    expect(detail).toContain('Expose a report output.');
   });
 });
 
@@ -439,6 +490,40 @@ describe('AuthoringAssistantDrawer readiness', () => {
       {}
     );
     expect(readiness.issues.filter((issue) => /provider/i.test(issue))).toEqual([]);
+    // Reachability floor: nodes fed through BRANCH exec handles (loop/done,
+    // true/false, case:*, then:N) are reachable — an exec-out-only walk
+    // flagged every non-linear workflow (adversarial review F1; the
+    // 2026-06-10 unsatisfiable-check class).
+    expect(readiness.issues.filter((issue) => /not reachable/i.test(issue))).toEqual([]);
+  });
+
+  it('flags genuinely unreachable execution nodes but never branch-fed ones', () => {
+    const result = applyFlowAuthoringCommands({
+      flowName: 'Untitled Flow',
+      flowInterfaces: [],
+      nodes: [],
+      edges: [],
+      commands: [
+        { action: 'add_node', id: 'start', nodeType: 'on_flow_start' },
+        { action: 'add_node', id: 'ploop', nodeType: 'loop' },
+        { action: 'add_node', id: 'llm', nodeType: 'llm_call' },
+        { action: 'add_node', id: 'end', nodeType: 'on_flow_end' },
+        // Dangling side-effect node: exec pins, wired to nothing.
+        { action: 'add_node', id: 'orphan', nodeType: 'write_file' },
+        { action: 'connect', source: 'start', sourceHandle: 'exec-out', target: 'ploop', targetHandle: 'exec-in' },
+        { action: 'connect', source: 'ploop', sourceHandle: 'loop', target: 'llm', targetHandle: 'exec-in' },
+        { action: 'connect', source: 'ploop', sourceHandle: 'done', target: 'end', targetHandle: 'exec-in' },
+      ],
+    });
+    expect(result.errors).toEqual([]);
+    const readiness = computeAuthoringReadiness(
+      toVisualFlow(result.flowName, result.nodes, result.edges),
+      'Loop over items.',
+      {}
+    );
+    const unreachable = readiness.issues.filter((issue) => /not reachable/i.test(issue));
+    expect(unreachable).toHaveLength(1);
+    expect(unreachable[0]).toContain('orphan');
   });
 
   it('flags a half-typed provider/model default pair with the current values', () => {

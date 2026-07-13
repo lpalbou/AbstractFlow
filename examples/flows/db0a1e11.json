@@ -1,7 +1,7 @@
 {
   "id": "db0a1e11",
   "name": "ac-agent",
-  "description": "",
+  "description": "abstractcode.agent.v1 entrypoint: passes the prompt and settings to a single Agent node and returns its response, result, meta, and scratchpad.",
   "interfaces": [
     "abstractcode.agent.v1"
   ],

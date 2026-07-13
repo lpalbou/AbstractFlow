@@ -1,7 +1,7 @@
 {
   "id": "5872c419",
   "name": "has-next-steps-backup",
-  "description": "",
+  "description": "Backup copy of has-next-steps: an LLM evaluator checks whether an agent response stopped early with declared next steps, returning has_next_steps plus a re-prompt message to push the agent to continue.",
   "interfaces": [],
   "nodes": [
     {

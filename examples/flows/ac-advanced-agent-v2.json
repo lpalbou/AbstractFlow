@@ -1,7 +1,7 @@
 {
   "id": "33853f39",
   "name": "ac-advanced-agent-v2",
-  "description": "",
+  "description": "Runnable agent (v2) composed from subflows: recursive-answer engine plus refreshed preparation/finalization helpers.",
   "interfaces": [
     "abstractcode.agent.v1"
   ],

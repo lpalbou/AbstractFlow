@@ -1,7 +1,7 @@
 {
   "id": "4b68bc1f",
   "name": "react-agent-as-flow",
-  "description": "",
+  "description": "Plan-and-execute pipeline: an LLM decomposes the query into @@-separated tasks, then a coding agent executes each task in sequence, accumulating a scratchpad and warning on failed steps.",
   "nodes": [
     {
       "id": "node-1",

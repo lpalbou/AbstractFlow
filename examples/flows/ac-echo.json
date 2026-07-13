@@ -1,7 +1,7 @@
 {
   "id": "ac-echo",
   "name": "AbstractCode Echo Service",
-  "description": "",
+  "description": "Minimal runnable-agent example: echoes the prompt back through the agent.v1 contract, with status updates via the ac-update-status helper.",
   "interfaces": [
     "abstractcode.agent.v1"
   ],

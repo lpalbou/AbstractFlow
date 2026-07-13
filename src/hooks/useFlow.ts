@@ -62,7 +62,10 @@ interface FlowState {
   setFlowInterfaces: (interfaces: string[]) => void;
   setNodes: (nodes: Node<FlowNodeData>[]) => void;
   setEdges: (edges: Edge[]) => void;
-  applyAuthoringCommands: (commands: unknown[], options?: { allowDestructive?: boolean }) => FlowAuthoringApplyResult;
+  applyAuthoringCommands: (
+    commands: unknown[],
+    options?: { allowDestructive?: boolean; resolvedSubflows?: Map<string, VisualFlow> }
+  ) => FlowAuthoringApplyResult;
   restoreAuthoringSnapshot: (snapshot: FlowAuthoringSnapshot) => void;
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
@@ -203,6 +206,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       edges: state.edges,
       commands,
       allowDestructive: options?.allowDestructive,
+      resolvedSubflows: options?.resolvedSubflows,
     });
     // Non-atomic by design: keep every command that validated even when others
     // failed. Atomic rejection made the planner reference phantom nodes from

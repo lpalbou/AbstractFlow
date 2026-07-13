@@ -1,7 +1,7 @@
 {
   "id": "1e884e22",
   "name": "multi-models",
-  "description": "",
+  "description": "Scratch flow: fetches the provider's model catalog and iterates over it; the loop body is left empty.",
   "nodes": [
     {
       "id": "node-1",

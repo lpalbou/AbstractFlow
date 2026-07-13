@@ -1,7 +1,7 @@
 {
   "id": "5e39c372",
   "name": "react",
-  "description": "",
+  "description": "Variant of ralph: one promise-gated ReAct pass where the LLM either outputs the exact <promise> statement or requests tools, recursing through the ralph subflow to continue; a failed tool ends the run with an error.",
   "interfaces": [
     "abstractcode.agent.v1"
   ],

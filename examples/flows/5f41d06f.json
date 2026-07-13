@@ -1,7 +1,7 @@
 {
   "id": "5f41d06f",
   "name": "reliable-agent-v2",
-  "description": "",
+  "description": "Answer-then-review pipeline: a web agent answers the query, a reviewer LLM judges completeness (schema-enforced), and if incomplete a second agent works the missing tasks before returning.",
   "interfaces": [],
   "nodes": [
     {

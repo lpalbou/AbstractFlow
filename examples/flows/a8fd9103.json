@@ -1,7 +1,7 @@
 {
   "id": "a8fd9103",
   "name": "benchmark2",
-  "description": "",
+  "description": "Benchmark: iterates over every model in the provider catalog, asks each to write a 10-sentence story, and reports each response's sentence count. Variant of benchmark driven by the live model list instead of parallel calls.",
   "nodes": [
     {
       "id": "node-1",

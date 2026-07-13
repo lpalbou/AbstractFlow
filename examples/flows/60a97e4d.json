@@ -1,8 +1,10 @@
 {
   "id": "60a97e4d",
   "name": "recursive-answer",
-  "description": "",
-  "interfaces": [],
+  "description": "Self-correcting agent: a worker agent executes the tasks, a reviewer LLM checks completeness, and the flow recurses into itself with remaining tasks until done or iterations run out; a final LLM writes the report.",
+  "interfaces": [
+    "abstractcode.agent.v1"
+  ],
   "nodes": [
     {
       "id": "node-1",

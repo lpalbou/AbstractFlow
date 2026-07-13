@@ -1,7 +1,7 @@
 {
   "id": "707865fb",
   "name": "structured-output",
-  "description": "",
+  "description": "Scratch/test flow for structured output: one LLM call on the query with a JSON schema enforcing content, notes, and tasks fields.",
   "nodes": [
     {
       "id": "node-1",

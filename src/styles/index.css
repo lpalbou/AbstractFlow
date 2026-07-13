@@ -34,6 +34,9 @@
   --accent-primary: var(--accent);
   --accent-secondary: #ff4778;
   --border-color: var(--ui-border-1);
+  /* Text on strong (saturated) fills — dark themes and light themes both
+     need light text over an 80% error/accent fill. */
+  --on-strong: #fff;
 
   /* Interaction tokens (backlog 0114): one focus ring + motion scale.
      The ring is an OUTLINE (not box-shadow) so component box-shadows of any
@@ -339,11 +342,9 @@ body,
 .assistant-context-usage-fill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--accent-primary) 88%, transparent),
-    color-mix(in srgb, var(--accent-secondary, #ff4778) 82%, transparent)
-  );
+  /* Accent-only fill: the old gradient into a pink no theme defines read as
+     decoration; the meter's semantics live in the percentage text. */
+  background: color-mix(in srgb, var(--accent-primary) 80%, transparent);
   transition: width 180ms ease;
 }
 
@@ -422,12 +423,21 @@ body,
   background: var(--text-muted);
 }
 
-.assistant-run-status-dot.done {
+.assistant-run-status-dot.state-done {
   background: var(--success, #27ae60);
 }
 
-.assistant-run-status-dot.blocked {
+.assistant-run-status-dot.state-failed {
   background: var(--error, #e74c3c);
+}
+
+.assistant-run-status-dot.state-waiting {
+  background: var(--warning, #f39c12);
+}
+
+.assistant-run-status-dot.state-idle,
+.assistant-run-status-dot.state-running {
+  background: var(--text-muted);
 }
 
 .assistant-run-status-label {
@@ -454,6 +464,16 @@ body,
 @keyframes assistant-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .assistant-run-spinner {
+    animation: none;
+  }
+
+  .assistant-state-pill.running::before {
+    animation: none;
   }
 }
 
@@ -490,8 +510,8 @@ body,
   padding: 6px 7px;
   border-radius: 6px;
   background: color-mix(in srgb, var(--bg-primary) 65%, transparent);
-  font-family: 'SFMono-Regular', Menlo, Monaco, Consolas, monospace;
-  font-size: 10.5px;
+  font-family: var(--font-mono, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace);
+  font-size: var(--font-size-xxs, 10.5px);
   line-height: 1.45;
 }
 
@@ -503,15 +523,22 @@ body,
   color: var(--text-secondary);
 }
 
-/* Planning-cycle divider rows make iteration boundaries scannable. */
+/* Planning-cycle divider rows: sticky group headers so a fast-scrolling log
+   never loses which cycle you are inside; hairlines are neutral (accent is
+   reserved for selection/CTA). */
 .assistant-activity-cycle {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 8px;
   margin: 4px 0 2px;
-  color: color-mix(in srgb, var(--accent-primary) 80%, var(--text-primary));
+  padding: 1px 0;
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--bg-primary) 92%, transparent);
   font-weight: 700;
-  font-size: 10px;
+  font-size: var(--font-size-xxs, 10px);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -521,7 +548,7 @@ body,
   content: '';
   flex: 1 1 auto;
   height: 1px;
-  background: color-mix(in srgb, var(--accent-primary) 30%, transparent);
+  background: var(--border-color);
 }
 
 .assistant-activity-cycle::before {
@@ -567,7 +594,7 @@ body,
   gap: 5px;
   cursor: pointer;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: var(--font-size-xxs, 10px);
   user-select: none;
 }
 
@@ -589,17 +616,33 @@ body,
 .assistant-activity-detail-body {
   margin: 4px 0 2px;
   padding: 6px;
-  max-height: 240px;
+  max-height: min(48vh, 420px);
   overflow: auto;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  font-family: Menlo, Monaco, Consolas, monospace;
-  font-size: 10px;
+  font-family: var(--font-mono, Menlo, Monaco, Consolas, monospace);
+  font-size: var(--font-size-xxs, 10px);
   line-height: 1.4;
   color: var(--text-secondary);
-  background: color-mix(in srgb, var(--bg-secondary, #0d1117) 70%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent-primary) 14%, transparent);
+  background: color-mix(in srgb, var(--bg-secondary) 70%, transparent);
+  border: 1px solid var(--border-color);
   border-radius: 4px;
+}
+
+/* Follow-live re-arm pill: appears when the reader scrolled up while new
+   activity keeps arriving. */
+.assistant-follow-pill {
+  position: sticky;
+  bottom: 4px;
+  align-self: flex-end;
+  padding: 2px 9px;
+  border: 1px solid color-mix(in srgb, var(--info, #3498db) 45%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--info, #3498db) 14%, var(--bg-primary));
+  color: var(--text-primary);
+  font-size: var(--font-size-xxs, 10px);
+  font-weight: 700;
+  cursor: pointer;
 }
 
 /* Live in-flight ticker pinned at the bottom of the activity log: a
@@ -659,16 +702,422 @@ body,
   }
 }
 
-.assistant-run-status.active {
-  border-color: color-mix(in srgb, var(--accent-primary) 30%, transparent);
-  background: color-mix(in srgb, var(--accent-primary) 7%, transparent);
+/* Status-card tint follows the one pill state machine: running=info,
+   waiting=warning (a question is not a crash), failed=error, done=success. */
+.assistant-run-status.state-running {
+  border-color: color-mix(in srgb, var(--info, #3498db) 30%, transparent);
+  background: color-mix(in srgb, var(--info, #3498db) 7%, transparent);
   color: var(--text-primary);
 }
 
-.assistant-run-status.blocked {
+.assistant-run-status.state-waiting {
+  border-color: color-mix(in srgb, var(--warning, #f39c12) 32%, transparent);
+  background: color-mix(in srgb, var(--warning, #f39c12) 8%, transparent);
+  color: var(--text-primary);
+}
+
+.assistant-run-status.state-failed {
   border-color: color-mix(in srgb, var(--error, #e74c3c) 32%, transparent);
   background: color-mix(in srgb, var(--error, #e74c3c) 8%, transparent);
   color: var(--text-primary);
+}
+
+.assistant-run-status.state-done {
+  border-color: color-mix(in srgb, var(--success, #27ae60) 30%, transparent);
+  background: color-mix(in srgb, var(--success, #27ae60) 6%, transparent);
+  color: var(--text-primary);
+}
+
+/* While the loop runs, the activity feed is the live surface: give it real
+   height instead of the resting keyhole. */
+.assistant-run-status.state-running .assistant-activity-log {
+  max-height: clamp(160px, 32vh, 380px);
+}
+
+/* Expanding a payload inspector must not create a scroll-in-scroll trap. */
+.assistant-activity-log:has(details[open]) {
+  max-height: none;
+}
+
+/* Drawer header: identity + current flow + the state pill. */
+.assistant-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+
+.assistant-header-title {
+  flex: 0 0 auto;
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.assistant-header-flow {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+.assistant-state-pill {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: var(--font-size-xxs, 10px);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid color-mix(in srgb, var(--pill-hue, var(--text-muted)) 40%, transparent);
+  background: color-mix(in srgb, var(--pill-hue, var(--text-muted)) 10%, transparent);
+  color: color-mix(in srgb, var(--pill-hue, var(--text-muted)) 60%, var(--text-primary));
+}
+
+.assistant-state-pill::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.assistant-state-pill.idle { --pill-hue: var(--text-muted); }
+.assistant-state-pill.running { --pill-hue: var(--info, #3498db); }
+.assistant-state-pill.waiting { --pill-hue: var(--warning, #f39c12); }
+.assistant-state-pill.done { --pill-hue: var(--success, #27ae60); }
+.assistant-state-pill.failed { --pill-hue: var(--error, #e74c3c); }
+
+.assistant-state-pill.running::before {
+  animation: assistant-pill-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes assistant-pill-pulse {
+  50% { opacity: 0.35; }
+}
+
+/* In-flight stage chip: blue=thinking, amber=mutating the canvas,
+   green=verifying — glanceable without reading the label. */
+.assistant-stage-chip {
+  flex: 0 0 auto;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: var(--font-size-xxs, 10px);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  border: 1px solid color-mix(in srgb, var(--chip-hue, var(--info)) 40%, transparent);
+  background: color-mix(in srgb, var(--chip-hue, var(--info)) 10%, transparent);
+  color: color-mix(in srgb, var(--chip-hue, var(--info)) 60%, var(--text-primary));
+}
+
+.assistant-stage-chip.info { --chip-hue: var(--info, #3498db); }
+.assistant-stage-chip.warning { --chip-hue: var(--warning, #f39c12); }
+.assistant-stage-chip.success { --chip-hue: var(--success, #27ae60); }
+
+/* Cycle budget: a thin track under the header, width = cycle/max. */
+.assistant-cycle-budget {
+  height: 3px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  overflow: hidden;
+}
+
+.assistant-cycle-budget-fill {
+  height: 100%;
+  background: color-mix(in srgb, var(--info, #3498db) 55%, transparent);
+  transition: width 240ms ease;
+}
+
+/* Model-declared plan strip: declared steps + declared next step only —
+   never invented done/pending checkmarks. */
+.assistant-plan-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 4px;
+}
+
+.assistant-plan-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px 2px 4px;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  font-size: var(--font-size-xxs, 10px);
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
+}
+
+.assistant-plan-step-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--info, #3498db) 18%, transparent);
+  color: color-mix(in srgb, var(--info, #3498db) 70%, var(--text-primary));
+  font-weight: 700;
+}
+
+.assistant-plan-next {
+  flex-basis: 100%;
+  font-size: var(--font-size-xxs, 10px);
+  color: color-mix(in srgb, var(--info, #3498db) 60%, var(--text-primary));
+}
+
+/* Activity glyph column: shape + color, never color alone. */
+.assistant-activity-mark {
+  flex: 0 0 12px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.assistant-activity-mark.tone-info { color: var(--info, #3498db); }
+.assistant-activity-mark.tone-success { color: var(--success, #27ae60); }
+.assistant-activity-mark.tone-error { color: var(--error, #e74c3c); }
+.assistant-activity-mark.tone-warning { color: var(--warning, #f39c12); }
+.assistant-activity-mark.tone-muted { color: var(--text-muted); }
+
+/* Turn separators give the transcript a visible rhythm and carry the
+   outcome once the turn completes. */
+.assistant-turn-separator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  font-size: var(--font-size-xxs, 10px);
+  letter-spacing: 0.04em;
+}
+
+.assistant-turn-separator::before,
+.assistant-turn-separator::after {
+  content: '';
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--border-color);
+}
+
+/* User prose renders literal (never parsed as markdown). */
+.assistant-user-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+
+/* Draft test-run card: consented test execution + verdict. */
+.assistant-test-card {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 10px 10px;
+  padding: 9px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--text-primary) 3%, transparent);
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+.assistant-test-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.assistant-test-title {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.assistant-test-note {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: var(--font-size-xxs, 10px);
+}
+
+.assistant-test-run,
+.assistant-test-approve {
+  padding: 3px 10px;
+  border: 1px solid color-mix(in srgb, var(--success, #27ae60) 45%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--success, #27ae60) 12%, transparent);
+  color: var(--text-primary);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.assistant-test-run:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.assistant-test-stop,
+.assistant-test-deny {
+  padding: 3px 10px;
+  border: 1px solid color-mix(in srgb, var(--error, #e74c3c) 45%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--error, #e74c3c) 10%, transparent);
+  color: var(--text-primary);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.assistant-test-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.assistant-test-input-row {
+  display: grid;
+  grid-template-columns: minmax(90px, 34%) 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.assistant-test-input-label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+.assistant-test-required {
+  color: var(--error, #e74c3c);
+}
+
+.assistant-test-input-type {
+  color: var(--text-muted);
+  font-size: var(--font-size-xxs, 10px);
+}
+
+.assistant-test-input-row input {
+  min-width: 0;
+}
+
+.assistant-test-wait {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 7px 8px;
+  border: 1px solid color-mix(in srgb, var(--warning, #f39c12) 40%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--warning, #f39c12) 8%, transparent);
+  color: var(--text-primary);
+}
+
+.assistant-test-wait-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.assistant-test-wait-actions input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.assistant-test-report {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--tone-hue, var(--border-color));
+}
+
+.assistant-test-report.tone-success {
+  --tone-hue: color-mix(in srgb, var(--success, #27ae60) 40%, transparent);
+  background: color-mix(in srgb, var(--success, #27ae60) 7%, transparent);
+}
+
+.assistant-test-report.tone-warning {
+  --tone-hue: color-mix(in srgb, var(--warning, #f39c12) 40%, transparent);
+  background: color-mix(in srgb, var(--warning, #f39c12) 7%, transparent);
+}
+
+.assistant-test-report.tone-error {
+  --tone-hue: color-mix(in srgb, var(--error, #e74c3c) 40%, transparent);
+  background: color-mix(in srgb, var(--error, #e74c3c) 7%, transparent);
+}
+
+.assistant-test-report-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.assistant-test-verdict {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.assistant-test-meta {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.assistant-test-open-run {
+  border: none;
+  background: none;
+  padding: 0;
+  color: color-mix(in srgb, var(--accent-primary) 70%, var(--text-primary));
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: inherit;
+}
+
+.assistant-test-error,
+.assistant-test-step {
+  color: color-mix(in srgb, var(--error, #e74c3c) 75%, var(--text-primary));
+  overflow-wrap: anywhere;
+}
+
+.assistant-test-outputs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.assistant-test-output-row {
+  overflow-wrap: anywhere;
+}
+
+.assistant-test-output-row span {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.assistant-test-hint {
+  color: var(--text-muted);
+  font-size: var(--font-size-xxs, 10px);
 }
 
 .assistant-run-status-footer span,
@@ -690,12 +1139,14 @@ body,
   overflow-x: hidden;
 }
 
+/* Message surfaces ride theme tokens (white-alpha over a light theme's white
+   background made messages invisible — the recorded worst defect class). */
 .assistant-message {
   max-width: 100%;
-  padding: 10px 11px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.035);
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
   color: var(--text-primary);
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -705,34 +1156,62 @@ body,
   align-self: flex-end;
   width: fit-content;
   max-width: 92%;
-  background: rgba(0, 210, 255, 0.10);
-  border-color: rgba(0, 210, 255, 0.22);
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+  border-color: color-mix(in srgb, var(--accent-primary) 28%, transparent);
+  border-radius: 12px 12px 4px 12px;
 }
 
 .assistant-message.assistant {
   align-self: stretch;
-}
-
-.assistant-message.pending {
-  color: var(--text-secondary);
-  font-size: var(--font-size-sm);
+  border-radius: 12px 12px 12px 4px;
 }
 
 .assistant-markdown {
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-md, 13px);
+  line-height: 1.55;
 }
 
 .assistant-markdown h1,
 .assistant-markdown h2,
-.assistant-markdown h3,
-.assistant-markdown h4 {
+.assistant-markdown h3 {
   margin: 8px 0 5px;
   font-size: var(--font-size-base);
+}
+
+/* Section labels inside turn messages: quiet uppercase labels, not shouts. */
+.assistant-markdown h4 {
+  margin: 12px 0 4px;
+  font-size: var(--font-size-xxs, 10px);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 .assistant-markdown ul,
 .assistant-markdown ol {
   margin-left: 16px;
+}
+
+/* The collapsed "Turn report" block inside assistant messages. */
+.assistant-markdown details {
+  margin-top: 10px;
+  border-top: 1px solid var(--border-color);
+  padding-top: 6px;
+}
+
+.assistant-markdown details summary {
+  cursor: pointer;
+  font-size: var(--font-size-xxs, 10px);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.assistant-markdown details summary:hover {
+  color: var(--text-primary);
 }
 
 .assistant-input-area {
@@ -742,7 +1221,7 @@ body,
   gap: 8px;
   padding: 10px;
   border-top: 1px solid var(--bg-tertiary);
-  background: rgba(0, 0, 0, 0.12);
+  background: color-mix(in srgb, var(--bg-primary) 55%, transparent);
 }
 
 .assistant-input-area textarea {
@@ -784,7 +1263,7 @@ body,
 
 .assistant-actions button.danger {
   background: color-mix(in srgb, var(--error, #e74c3c) 80%, var(--bg-primary));
-  color: #fff;
+  color: var(--on-strong, #fff);
 }
 
 .assistant-actions button.danger:hover:not(:disabled) {
@@ -1634,9 +2113,9 @@ button.primary:hover:not(:disabled) {
 
 /* Flow Library (SOTA load/manage UX) */
 .flow-library-modal {
-  width: min(980px, 94vw);
+  width: min(1020px, 94vw);
   max-width: 94vw;
-  height: min(72vh, 720px);
+  height: min(76vh, 760px);
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -1651,58 +2130,80 @@ button.primary:hover:not(:disabled) {
 
 .flow-library-title h3 {
   margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .flow-library-subtitle {
-  margin-top: 6px;
+  margin-top: 5px;
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
 }
 
 .flow-library-link {
   background: transparent;
   border: none;
-  color: rgba(233, 69, 96, 0.9);
+  padding: 2px 6px;
+  margin: -2px 0;
+  border-radius: 6px;
+  color: var(--text-secondary);
   cursor: pointer;
   font-weight: 600;
+  font-size: var(--font-size-xs);
+  transition: color 120ms ease, background 120ms ease;
 }
 
 .flow-library-link:hover {
-  text-decoration: underline;
+  color: var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
 }
 
 .flow-library-controls {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex: 1;
   justify-content: flex-end;
 }
 
 .flow-library-search {
-  width: min(460px, 44vw);
-  padding: 10px 12px;
-  border-radius: 10px;
+  width: min(380px, 34vw);
+  min-width: 150px;
+  flex: 0 1 auto;
+  padding: 8px 14px;
+  border-radius: 999px;
   border: 1px solid var(--bg-tertiary);
-  background: rgba(255, 255, 255, 0.03);
+  background: color-mix(in srgb, var(--text-primary) 3%, transparent);
   color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.flow-library-search::placeholder {
+  color: var(--text-muted);
 }
 
 .flow-library-search:focus {
   outline: none;
-  border-color: rgba(233, 69, 96, 0.6);
-  box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.18);
+  border-color: color-mix(in srgb, var(--accent-primary) 40%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-primary) 10%, transparent);
 }
 
 .flow-library-sort {
-  padding: 10px 12px;
-  border-radius: 10px;
+  flex: 0 0 auto;
+}
+
+.flow-library-sort {
+  padding: 8px 12px;
+  border-radius: 999px;
   border: 1px solid var(--bg-tertiary);
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--text-primary);
+  background: color-mix(in srgb, var(--text-primary) 3%, transparent);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
 }
 
 .flow-library-body {
@@ -1716,43 +2217,63 @@ button.primary:hover:not(:disabled) {
 .flow-library-list {
   min-height: 0;
   overflow: auto;
-  border: 1px solid var(--bg-tertiary);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.02);
-  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--text-primary) 7%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg-primary) 35%, transparent);
+  padding: 8px;
 }
 
+.flow-library-list::-webkit-scrollbar,
+.flow-library-preview::-webkit-scrollbar {
+  width: 10px;
+}
+
+.flow-library-list::-webkit-scrollbar-thumb,
+.flow-library-preview::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text-primary) 14%, transparent);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+.flow-library-list::-webkit-scrollbar-track,
+.flow-library-preview::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Rows are quiet list lines, not stacked card slabs: rest = transparent,
+   hover = soft fill, selected = accent-tinted fill with ONE hairline border
+   (the old border + ring double-stroke read heavy, not premium). */
 .flow-library-item {
   width: 100%;
   text-align: left;
   border: 1px solid transparent;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.02);
-  padding: 12px 12px;
+  background: transparent;
+  padding: 9px 12px;
   cursor: pointer;
   color: var(--text-primary);
-  transition: background 120ms ease, border-color 120ms ease, transform 60ms ease;
+  transition: background 120ms ease, border-color 120ms ease;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 5px;
 }
 
 .flow-library-item + .flow-library-item {
-  margin-top: 8px;
+  margin-top: 2px;
 }
 
 .flow-library-item:hover {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
 }
 
 .flow-library-item:active {
-  transform: translateY(1px);
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
 }
 
 .flow-library-item.selected {
-  border-color: rgba(233, 69, 96, 0.6);
-  box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.14);
+  background: color-mix(in srgb, var(--accent-primary) 9%, transparent);
+  border-color: color-mix(in srgb, var(--accent-primary) 38%, transparent);
 }
 
 .flow-library-item-top {
@@ -1763,35 +2284,39 @@ button.primary:hover:not(:disabled) {
 }
 
 .flow-library-item-name {
-  font-weight: 700;
+  font-weight: 600;
   font-size: var(--font-size-base);
-  letter-spacing: 0.2px;
+  letter-spacing: 0.1px;
 }
 
 .flow-library-item-badges {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
 }
 
+/* Quiet tinted pills: hue-tinted fill + hairline, no heavy outlines. */
 .flow-library-badge {
   font-family: var(--font-mono);
   font-size: var(--font-size-xxs);
-  padding: 2px 7px;
+  line-height: 1.5;
+  padding: 1px 7px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(0, 0, 0, 0.22);
-  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 14%, transparent);
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+  color: var(--text-secondary);
 }
 
 .flow-library-badge.current {
-  border-color: rgba(39, 174, 96, 0.55);
-  color: rgba(39, 174, 96, 0.95);
+  border-color: color-mix(in srgb, var(--success, #27ae60) 40%, transparent);
+  background: color-mix(in srgb, var(--success, #27ae60) 10%, transparent);
+  color: color-mix(in srgb, var(--success, #27ae60) 80%, var(--text-primary));
 }
 
 .flow-library-badge.bundled {
-  border-color: rgba(86, 156, 214, 0.5);
-  color: rgba(134, 190, 255, 0.95);
+  border-color: color-mix(in srgb, var(--info, #3498db) 35%, transparent);
+  background: color-mix(in srgb, var(--info, #3498db) 9%, transparent);
+  color: color-mix(in srgb, var(--info, #3498db) 75%, var(--text-primary));
 }
 
 .flow-library-item-sub {
@@ -1812,20 +2337,20 @@ button.primary:hover:not(:disabled) {
 .flow-library-item-updated {
   font-family: var(--font-mono);
   font-size: var(--font-size-xxs);
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--text-muted);
   white-space: nowrap;
 }
 
 .flow-library-preview {
   min-height: 0;
   overflow: auto;
-  border: 1px solid var(--bg-tertiary);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.02);
-  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--text-primary) 7%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg-primary) 35%, transparent);
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .flow-library-preview-name-row {
@@ -1844,15 +2369,15 @@ button.primary:hover:not(:disabled) {
 .flow-library-preview-id {
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-muted);
   margin-top: 4px;
 }
 
 .flow-library-preview-meta {
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--text-primary) 7%, transparent);
+  padding-top: 12px;
   display: grid;
-  gap: 8px;
+  gap: 9px;
 }
 
 .flow-library-preview-row {
@@ -1864,11 +2389,15 @@ button.primary:hover:not(:disabled) {
 }
 
 .flow-library-preview-key {
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-muted);
+  font-size: var(--font-size-xxs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
 }
 
 .flow-library-preview-val {
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
 }
@@ -1886,10 +2415,10 @@ button.primary:hover:not(:disabled) {
 }
 
 .flow-library-interfaces-editor {
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 10px;
-  background: rgba(255, 255, 255, 0.02);
+  background: color-mix(in srgb, var(--text-primary) 2%, transparent);
   display: grid;
   gap: 10px;
 }
@@ -1898,7 +2427,7 @@ button.primary:hover:not(:disabled) {
   display: flex;
   gap: 10px;
   align-items: flex-start;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
   font-size: var(--font-size-sm);
 }
 
@@ -1916,21 +2445,21 @@ button.primary:hover:not(:disabled) {
 }
 
 .flow-library-interface-desc {
-  color: rgba(255, 255, 255, 0.62);
+  color: var(--text-muted);
   font-size: var(--font-size-sm);
   line-height: 1.35;
 }
 
 .flow-library-interfaces-hint {
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--bg-tertiary);
   padding-top: 10px;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
   font-size: var(--font-size-sm);
 }
 
 .flow-library-interfaces-hint-title {
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.86);
+  color: var(--text-primary);
   margin-bottom: 6px;
 }
 
@@ -1954,7 +2483,7 @@ button.primary:hover:not(:disabled) {
 
 .flow-library-readonly-note {
   margin-top: 10px;
-  color: rgba(134, 190, 255, 0.86);
+  color: color-mix(in srgb, var(--info, #3498db) 70%, var(--text-primary));
   font-size: var(--font-size-sm);
   line-height: 1.35;
 }
@@ -1967,8 +2496,8 @@ button.primary:hover:not(:disabled) {
   height: 26px;
   border-radius: 8px;
   border: 1px solid transparent;
-  background: rgba(255, 255, 255, 0.02);
-  color: rgba(255, 255, 255, 0.72);
+  background: color-mix(in srgb, var(--text-primary) 2%, transparent);
+  color: var(--text-secondary);
   cursor: pointer;
   padding: 0;
   flex: 0 0 auto;
@@ -1976,9 +2505,9 @@ button.primary:hover:not(:disabled) {
 }
 
 .flow-library-edit-icon:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.9);
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+  border-color: var(--border-color);
+  color: var(--text-primary);
 }
 
 .flow-library-edit-icon:focus {
@@ -1987,8 +2516,8 @@ button.primary:hover:not(:disabled) {
 
 .flow-library-edit-icon:focus-visible {
   outline: none;
-  border-color: rgba(233, 69, 96, 0.6);
-  box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.18);
+  border-color: color-mix(in srgb, var(--accent-primary) 60%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-primary) 18%, transparent);
 }
 
 .flow-library-edit-icon svg {
@@ -2003,6 +2532,8 @@ button.primary:hover:not(:disabled) {
 
 .flow-library-preview-actions {
   margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--text-primary) 7%, transparent);
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -2013,15 +2544,15 @@ button.primary:hover:not(:disabled) {
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid var(--bg-tertiary);
-  background: rgba(255, 255, 255, 0.03);
+  background: color-mix(in srgb, var(--text-primary) 3%, transparent);
   color: var(--text-primary);
   font-weight: 700;
 }
 
 .flow-library-rename:focus {
   outline: none;
-  border-color: rgba(233, 69, 96, 0.6);
-  box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.18);
+  border-color: color-mix(in srgb, var(--accent-primary) 60%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-primary) 18%, transparent);
 }
 
 .flow-library-description {
@@ -2030,7 +2561,7 @@ button.primary:hover:not(:disabled) {
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid var(--bg-tertiary);
-  background: rgba(255, 255, 255, 0.03);
+  background: color-mix(in srgb, var(--text-primary) 3%, transparent);
   color: var(--text-primary);
   font-family: var(--font-mono);
   line-height: 1.35;
@@ -2038,14 +2569,14 @@ button.primary:hover:not(:disabled) {
 
 .flow-library-description:focus {
   outline: none;
-  border-color: rgba(233, 69, 96, 0.6);
-  box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.18);
+  border-color: color-mix(in srgb, var(--accent-primary) 60%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-primary) 18%, transparent);
 }
 
 .modal-button.danger {
-  border-color: rgba(231, 76, 60, 0.55);
-  background: rgba(231, 76, 60, 0.88);
-  color: rgba(255, 255, 255, 0.96);
+  border-color: color-mix(in srgb, var(--error, #e74c3c) 55%, transparent);
+  background: color-mix(in srgb, var(--error, #e74c3c) 88%, var(--bg-primary));
+  color: var(--on-strong, #fff);
 }
 
 .flow-library-empty {
@@ -2055,12 +2586,288 @@ button.primary:hover:not(:disabled) {
 
 .flow-library-empty-title {
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
   margin-bottom: 4px;
 }
 
 .flow-library-empty-sub {
   font-size: var(--font-size-sm);
+}
+
+/* Family grouping (backlog 0144): view toggle, disclosure rows, badges. */
+/* Segmented control: inset track, raised active thumb (surface + shadow),
+   not an accent-tinted text box. */
+.flow-library-view-toggle {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  border: 1px solid color-mix(in srgb, var(--text-primary) 8%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-primary) 55%, transparent);
+}
+
+.flow-library-view-option {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 5px 14px;
+  border-radius: 999px;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 120ms ease, background 120ms ease;
+}
+
+.flow-library-view-option:hover {
+  color: var(--text-secondary);
+}
+
+.flow-library-view-option.active {
+  background: color-mix(in srgb, var(--text-primary) 10%, var(--bg-secondary));
+  color: var(--text-primary);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--bg-primary) 60%, transparent);
+}
+
+/* Indentation is data-driven: child rows shift by depth without nesting DOM.
+   width:auto (the rows are divs now, not buttons) so depth margins never
+   overflow the scroll container. */
+.flow-library-item {
+  width: auto;
+  margin-left: calc(var(--flow-row-depth, 0) * 22px);
+}
+
+/* Children read as SUBORDINATE, not shifted peers: tree rail + lighter name. */
+.flow-library-item.child {
+  padding-top: 6px;
+  padding-bottom: 6px;
+  border-left: 2px solid color-mix(in srgb, var(--info, #3498db) 30%, transparent);
+  border-top-left-radius: 4px;
+  border-bottom-left-radius: 4px;
+}
+
+.flow-library-item.child:not(.selected):not(:hover) {
+  background: transparent;
+}
+
+.flow-library-item.child .flow-library-item-name {
+  font-weight: 500;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.flow-library-item.child.selected .flow-library-item-name {
+  color: var(--text-primary);
+}
+
+.flow-library-item.missing {
+  cursor: default;
+  border-color: color-mix(in srgb, var(--error, #e74c3c) 35%, transparent);
+  background: color-mix(in srgb, var(--error, #e74c3c) 6%, transparent);
+}
+
+.flow-library-item.cycle-leaf {
+  cursor: default;
+  color: var(--text-muted);
+  font-style: italic;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+/* The chevron is the ONLY affordance revealing families — it must look
+   pressable at rest, not like a bullet. */
+.flow-library-disclosure {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: transform 120ms ease, background 120ms ease;
+}
+
+.flow-library-disclosure:hover {
+  background: color-mix(in srgb, var(--text-primary) 12%, transparent);
+  color: var(--text-primary);
+}
+
+.flow-library-disclosure.open {
+  transform: rotate(90deg);
+}
+
+.flow-library-disclosure-spacer {
+  flex: 0 0 auto;
+  width: 22px;
+}
+
+.flow-library-item-name {
+  flex: 1 1 auto;
+  /* Never let a wide badge rail erase the name entirely. */
+  min-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Short-id disambiguator for same-name flows (three dp-research copies). */
+.flow-library-item-id-hint {
+  margin-left: 8px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xxs);
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+/* Badge rail never wraps: the NAME truncates first, badges stay one line;
+   overflow fades out instead of amputating pills mid-glyph. The fade zone is
+   RESERVED via padding-right so a rail that FITS never enters it (operator
+   report: the last badge was fading even without overflow). */
+.flow-library-item-badges {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  /* overflow:hidden clips at the PADDING box: fitting badges stop at the
+     content edge (before the fade), overflowing ones slide under it. */
+  padding-right: 14px;
+  mask-image: linear-gradient(to right, black calc(100% - 14px), transparent);
+}
+
+.flow-library-badge {
+  flex: 0 0 auto;
+}
+
+.flow-library-subtitle {
+  white-space: nowrap;
+}
+
+.flow-library-badge.runnable {
+  border-color: color-mix(in srgb, var(--success, #27ae60) 40%, transparent);
+  background: color-mix(in srgb, var(--success, #27ae60) 10%, transparent);
+  color: color-mix(in srgb, var(--success, #27ae60) 80%, var(--text-primary));
+}
+
+.flow-library-badge.family {
+  border-color: color-mix(in srgb, var(--info, #3498db) 35%, transparent);
+  background: color-mix(in srgb, var(--info, #3498db) 9%, transparent);
+  color: color-mix(in srgb, var(--info, #3498db) 80%, var(--text-primary));
+}
+
+/* A second rendered instance of the SELECTED flow (shared helpers): quiet
+   same-flow mark, never a second selection ring. */
+.flow-library-item.same-flow {
+  border-color: color-mix(in srgb, var(--accent-primary) 30%, transparent);
+  border-style: dashed;
+}
+
+/* The subflows badge doubles as an expand control (users try to click it). */
+.flow-library-badge.family.clickable {
+  cursor: pointer;
+}
+
+.flow-library-badge.family.clickable:hover {
+  background: color-mix(in srgb, var(--info, #3498db) 14%, transparent);
+}
+
+.flow-library-badge.shared {
+  border-color: color-mix(in srgb, var(--warning, #f39c12) 38%, transparent);
+  background: color-mix(in srgb, var(--warning, #f39c12) 9%, transparent);
+  color: color-mix(in srgb, var(--warning, #f39c12) 80%, var(--text-primary));
+}
+
+.flow-library-badge.recursive,
+.flow-library-badge.cycle {
+  border-color: color-mix(in srgb, var(--warning, #f39c12) 34%, transparent);
+  background: color-mix(in srgb, var(--warning, #f39c12) 8%, transparent);
+  color: color-mix(in srgb, var(--warning, #f39c12) 78%, var(--text-primary));
+}
+
+.flow-library-badge.missing {
+  border-color: color-mix(in srgb, var(--error, #e74c3c) 42%, transparent);
+  background: color-mix(in srgb, var(--error, #e74c3c) 10%, transparent);
+  color: color-mix(in srgb, var(--error, #e74c3c) 82%, var(--text-primary));
+}
+
+.flow-library-item-desc.empty {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.flow-library-item-context {
+  font-size: var(--font-size-xxs);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.flow-library-family {
+  border: 1px solid color-mix(in srgb, var(--text-primary) 7%, transparent);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--text-primary) 2%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.flow-library-family-title {
+  font-size: var(--font-size-xxs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.flow-library-family-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.flow-library-family-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* Family links are LINKS, not pills — the pill language belongs to the
+   non-interactive badges sitting in the same panel. */
+.flow-library-family-link {
+  border: none;
+  background: none;
+  padding: 0;
+  color: color-mix(in srgb, var(--accent-primary) 75%, var(--text-primary));
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+}
+
+.flow-library-family-link:hover {
+  text-decoration-style: solid;
+}
+
+.flow-library-family-missing {
+  color: color-mix(in srgb, var(--error, #e74c3c) 80%, var(--text-primary));
+  font-size: var(--font-size-xs);
+}
+
+.flow-library-delete-warning {
+  flex-basis: 100%;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--error, #e74c3c) 40%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--error, #e74c3c) 8%, transparent);
+  color: var(--text-primary);
+  font-size: var(--font-size-xs);
 }
 
 .error-text {
@@ -4310,39 +5117,13 @@ details.run-form-section:not([open]) > .run-form-section-summary:hover .run-form
   gap: 10px;
 }
 
-.agent-cycle-stage {
-  font-size: var(--font-size-xs);
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  border: 1px solid var(--ui-pill-border);
-  background: var(--ui-pill-bg);
-  color: var(--text-secondary);
-  padding: 3px 8px;
-  border-radius: 999px;
-}
-
-/* Agentic observability: tint the think → act → observe loop so each stage
-   is recognizable at a glance (think=info, act=warning, observe=success).
-   The `.agent-trace-panel` prefix outranks monitor-flow's own stylesheet
-   regardless of import order. */
-.agent-trace-panel .agent-cycle-stage[data-stage='think'] {
-  border-color: color-mix(in srgb, var(--info) 35%, transparent);
-  background: color-mix(in srgb, var(--info) 10%, transparent);
-  color: color-mix(in srgb, var(--info) 55%, var(--text-primary));
-}
-
-.agent-trace-panel .agent-cycle-stage[data-stage='act'] {
-  border-color: color-mix(in srgb, var(--warning) 35%, transparent);
-  background: color-mix(in srgb, var(--warning) 10%, transparent);
-  color: color-mix(in srgb, var(--warning) 55%, var(--text-primary));
-}
-
-.agent-trace-panel .agent-cycle-stage[data-stage='observe'] {
-  border-color: color-mix(in srgb, var(--success) 35%, transparent);
-  background: color-mix(in srgb, var(--success) 10%, transparent);
-  color: color-mix(in srgb, var(--success) 55%, var(--text-primary));
-}
+/* The base .agent-cycle-stage pill AND the per-stage think/act/observe tints
+   now live in monitor-flow's own agent_cycles.css (imported by AgentCyclesPanel),
+   so every consumer (this run modal, observer, abstractcode) renders the loop
+   identically from one source (uic ruling, dm:flow--uic seq 3 — option 2). Its
+   text mix is 45%/55% for AA contrast on pastel-accent themes; flow no longer
+   carries a competing higher-specificity copy. Flow-only polish
+   (hover/transition, metric badges, cycle surface) stays below. */
 
 .agent-trace-preview-inline {
   font-size: var(--font-size-sm);

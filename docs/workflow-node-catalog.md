@@ -269,7 +269,7 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 - Outputs: `exec-out` execution; `response` string: Final response text. When resp_schema is provided, the structured object is also exposed on data.; `data` object: Structured response object matching resp_schema. Visible by default when a response schema is configured.; `success` boolean: True if the Agent node completed successfully.; `meta` object: Host-facing meta envelope (schema=abstractcode.agent.v1.meta). Includes provider/model and lightweight execution metadata.; `scratchpad` object: Runtime-owned execution trace/scratchpad for observability (LLM/tool steps, timings). Includes best-effort tool_calls/tool_results extracted post-run.
 - Default config: {
   "pinDefaults": {
-    "max_iterations": 50
+    "max_iterations": 20
   }
 }
 

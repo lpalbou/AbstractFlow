@@ -1,7 +1,7 @@
 {
   "id": "2a35a3ac",
   "name": "code-structure",
-  "description": "",
+  "description": "Generates a JSON-LD graph describing the structure of the provided code with an LLM; when double_check is set, a second LLM reviews and fixes the graph before returning it.",
   "nodes": [
     {
       "id": "node-1",

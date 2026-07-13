@@ -1,7 +1,7 @@
 {
   "id": "395d3a26",
   "name": "deep-research-v2",
-  "description": "",
+  "description": "Deep research with inline clarification: an LLM drafts follow-up questions for the user when enabled, then a web agent researches iteratively and returns a structured markdown report; otherwise the agent researches directly.",
   "nodes": [
     {
       "id": "node-1",

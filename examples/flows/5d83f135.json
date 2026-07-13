@@ -1,7 +1,7 @@
 {
   "id": "5d83f135",
   "name": "Untitled Flow",
-  "description": "",
+  "description": "Scratch skeleton: unconnected On Flow Start and On Flow End carrying the abstractcode.agent.v1 pin set; no logic yet.",
   "interfaces": [
     "abstractcode.agent.v1"
   ],

@@ -1,7 +1,7 @@
 {
   "id": "ddc466f4",
   "name": "test-memory-llm (copy)",
-  "description": "",
+  "description": "Copy of test-memory-llm reworked around an Agent node: loops five times with hand-built context (variables plus Make Context and injected messages), memorizing outputs to probe agent context handling.",
   "interfaces": [],
   "nodes": [
     {

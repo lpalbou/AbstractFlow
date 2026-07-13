@@ -1,7 +1,7 @@
 {
   "id": "851b6ea8",
   "name": "test-memory-llm",
-  "description": "",
+  "description": "Scratch/test flow: loops a context-free LLM call five times while hand-building conversation context through variables and Make Context, memorizing outputs to compare manual context against runtime memory.",
   "interfaces": [],
   "nodes": [
     {

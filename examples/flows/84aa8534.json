@@ -1,7 +1,7 @@
 {
   "id": "84aa8534",
   "name": "ralph-agent",
-  "description": "",
+  "description": "RALPH-loop coding agent: keeps re-prompting an autonomous agent with random user-style nudges in a while loop until its answer contains the exact <promise> completion statement, then emits a trace report.",
   "interfaces": [
     "abstractcode.agent.v1"
   ],

@@ -1,7 +1,7 @@
 {
   "id": "91f50635",
   "name": "enricher-planner-agent",
-  "description": "",
+  "description": "Agent pipeline with host status updates: enriches the prompt, plans tasks via the request-planner subflow, then runs the main agent once per planned task in a loop.",
   "interfaces": [
     "abstractcode.agent.v1"
   ],

@@ -1,7 +1,7 @@
 {
   "id": "e2b570be",
   "name": "scheduler",
-  "description": "",
+  "description": "Map/reduce scheduler experiment: a scheduler agent decomposes the request into identical small tasks sharing a system prompt and tools, then a loop runs a small agent per task; an unwired LLM/tool-calls pair remains parked.",
   "interfaces": [],
   "nodes": [
     {

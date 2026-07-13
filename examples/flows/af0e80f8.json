@@ -1,7 +1,7 @@
 {
   "id": "af0e80f8",
   "name": "smart-selector",
-  "description": "",
+  "description": "Classifier step: one LLM call picks the best option among CHOICES given RULES and the REQUEST, returning the choice and a 0-1 confidence score.",
   "interfaces": [],
   "nodes": [
     {

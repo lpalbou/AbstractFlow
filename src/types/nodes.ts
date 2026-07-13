@@ -2226,8 +2226,11 @@ export function createNodeData(template: NodeTemplate): FlowNodeData {
     headerColor: template.headerColor,
     inputs: [...template.inputs],
     outputs: [...template.outputs],
-    // Default pin values for input-driven nodes
-    ...(template.type === 'agent' && { pinDefaults: { max_iterations: 50 } }),
+    // Default pin values for input-driven nodes.
+    // max_iterations default is 20 (maintainer ruling 2026-07-11: the workflow
+    // decides — an explicit pin is authoritative design; 20 is only the seed
+    // when the author has not chosen).
+    ...(template.type === 'agent' && { pinDefaults: { max_iterations: 20 } }),
     ...(template.type === 'model_residency' && {
       pinDefaults: {
         operation: 'load',

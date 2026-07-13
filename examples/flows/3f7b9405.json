@@ -1,7 +1,7 @@
 {
   "id": "3f7b9405",
   "name": "expert-coder (copy)",
-  "description": "",
+  "description": "Copy of expert-coder: enriches the prompt via the request-enricher subflow, then an autonomous coding agent (file/exec tools, 25 iterations) implements it; the default prompt asks for a procedural 3D R-Type clone.",
   "interfaces": [],
   "nodes": [
     {

@@ -1,7 +1,7 @@
 {
   "id": "b16c5a46",
   "name": "basic-react-test-chat",
-  "description": "",
+  "description": "Build-then-chat test: a coding agent executes the prompt (default: an R-Type clone), then a loop lets the user discuss or fix the result with a second agent seeded from the first agent's trace report; '/q' exits.",
   "interfaces": [],
   "nodes": [
     {

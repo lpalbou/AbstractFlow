@@ -1,7 +1,7 @@
 {
   "id": "87962987",
   "name": "ralph",
-  "description": "",
+  "description": "Hand-built recursive ReAct loop: each pass the LLM either outputs the exact <promise> completion statement to finish or requests tools whose results feed a recursive call into this same flow; a failed tool ends the run.",
   "interfaces": [
     "abstractcode.agent.v1"
   ],

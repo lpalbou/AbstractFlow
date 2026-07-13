@@ -1,7 +1,7 @@
 {
   "id": "07d4b8d9",
   "name": "test-kg",
-  "description": "",
+  "description": "Scratch/test flow: a single knowledge-graph query for one hardcoded subject (ex:mnemosyne-sophia) across all scopes.",
   "interfaces": [],
   "nodes": [
     {

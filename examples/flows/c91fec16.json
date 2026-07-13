@@ -1,7 +1,7 @@
 {
   "id": "c91fec16",
   "name": "ralph-agent-v2",
-  "description": "",
+  "description": "Variant of ralph-agent: the promise-gated while loop stitches context manually between iterations - appending assistant/user messages and formatted tool results - with runtime context inheritance off.",
   "interfaces": [
     "abstractcode.agent.v1"
   ],

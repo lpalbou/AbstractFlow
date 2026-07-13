@@ -1,7 +1,7 @@
 {
   "id": "2d26aee4",
   "name": "2-pass-response",
-  "description": "",
+  "description": "Two-pass answer: a first agent (file tools) resolves the query, then a second agent performs a critical review given the query, the first analysis, and its scratchpad.",
   "interfaces": [],
   "nodes": [
     {

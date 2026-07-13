@@ -131,9 +131,17 @@ export function fromVisualFlow(flow: VisualFlow): {
       const defaultsRaw = data.pinDefaults && typeof data.pinDefaults === 'object' ? data.pinDefaults : null;
       const hasDefault = Boolean(defaultsRaw && Object.prototype.hasOwnProperty.call(defaultsRaw, 'max_iterations'));
       const hasConfig = typeof data.agentConfig?.max_iterations === 'number';
-      if (!hasDefault && !hasConfig) {
+      // When the pin is edge-connected the workflow already decides through
+      // the graph — a pin default would be dead weight that churns saved
+      // bytes (and desyncs packed bundles from source for no behavior).
+      const maxPinConnected = flowEdges.some(
+        (edge) => edge.target === vn.id && edge.targetHandle === 'max_iterations'
+      );
+      if (!hasDefault && !hasConfig && !maxPinConnected) {
         const nextDefaults: Record<string, any> = { ...(defaultsRaw || {}) };
-        nextDefaults.max_iterations = 50;
+        // Ruled default (2026-07-11): 20 when the workflow author has not
+        // chosen; an explicit workflow value is authoritative at any number.
+        nextDefaults.max_iterations = 20;
         data = { ...data, pinDefaults: nextDefaults };
       }
     }

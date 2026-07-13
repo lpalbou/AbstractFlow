@@ -1,7 +1,7 @@
 {
   "id": "67eb9673",
   "name": "test",
-  "description": "",
+  "description": "Scratch/test chat loop: a web agent answers the request, the user is asked for a reply, and the flow either ends with the response or recurses into itself for another round.",
   "interfaces": [],
   "nodes": [
     {

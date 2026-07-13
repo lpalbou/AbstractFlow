@@ -1,7 +1,7 @@
 {
   "id": "462808d4",
   "name": "agent-semantics",
-  "description": "",
+  "description": "Semantic-extraction agent: web-searches the prompt and returns findings as subject-predicate-object triples enforced by a JSON schema; alternate rule and schema versions sit unwired for experimentation.",
   "interfaces": [
     "abstractcode.agent.v1"
   ],

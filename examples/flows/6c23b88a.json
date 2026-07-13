@@ -1,7 +1,7 @@
 {
   "id": "6c23b88a",
   "name": "ralph-simple",
-  "description": "",
+  "description": "Simplified RALPH loop: runs the agent once and, unless the response contains the exact <promise> completion statement, recurses into itself asking the agent to double-check and finish the work.",
   "interfaces": [
     "abstractcode.agent.v1"
   ],

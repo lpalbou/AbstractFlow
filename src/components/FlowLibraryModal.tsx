@@ -1,7 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { VisualFlow } from '../types/flow';
-
-type SortMode = 'recent' | 'name_asc' | 'name_desc';
+import {
+  KNOWN_INTERFACES,
+  buildFlowFamilyIndex,
+  knownInterface,
+  normalizeInterfaces,
+} from '../utils/flowFamilies';
+import {
+  buildLibraryRows,
+  type LibrarySortMode,
+  type LibraryViewMode,
+} from '../utils/flowLibraryRows';
+import { FlowLibraryList } from './FlowLibraryList';
 
 export interface FlowLibraryModalProps {
   isOpen: boolean;
@@ -21,45 +31,9 @@ export interface FlowLibraryModalProps {
   onDeleteFlow: (flowId: string) => Promise<void> | void;
 }
 
-const KNOWN_INTERFACES: Array<{ id: string; label: string; description: string }> = [
-  {
-    id: 'abstractcode.agent.v1',
-    label: 'RunnableFlow (v1)',
-    description:
-      'Runnable workflow contract for chat-like clients (AbstractCode, AbstractObserver, etc). Exposes host-configurable provider/model/prompt inputs.',
-  },
-];
-
-function normalizeInterfaces(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  const out: string[] = [];
-  for (const item of value) {
-    if (typeof item !== 'string') continue;
-    const trimmed = item.trim();
-    if (!trimmed) continue;
-    if (!out.includes(trimmed)) out.push(trimmed);
-  }
-  return out;
-}
-
 function renderInterfaces(interfaces: string[]): string {
   if (!interfaces.length) return '—';
-  const labels: string[] = [];
-  for (const iid of interfaces) {
-    const known = KNOWN_INTERFACES.find((x) => x.id === iid);
-    labels.push(known ? known.label : iid);
-  }
-  return labels.join(', ');
-}
-
-function safeLower(value: unknown): string {
-  return (typeof value === 'string' ? value : String(value ?? '')).toLowerCase();
-}
-
-function parseIsoMs(value: unknown): number {
-  if (typeof value !== 'string' || !value) return 0;
-  const t = Date.parse(value);
-  return Number.isFinite(t) ? t : 0;
+  return interfaces.map((iid) => knownInterface(iid)?.label || iid).join(', ');
 }
 
 function formatDateTime(value: unknown): string {
@@ -83,13 +57,7 @@ function EditIcon({ size = 14 }: { size?: number }) {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <path
-        d="M12 20h9"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <path d="M12 20h9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       <path
         d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"
         stroke="currentColor"
@@ -119,10 +87,18 @@ export function FlowLibraryModal({
   onDeleteFlow,
 }: FlowLibraryModalProps) {
   const searchRef = useRef<HTMLInputElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
 
   const [query, setQuery] = useState('');
-  const [sortMode, setSortMode] = useState<SortMode>('recent');
+  const [sortMode, setSortMode] = useState<LibrarySortMode>('recent');
+  const [viewMode, setViewMode] = useState<LibraryViewMode>('all');
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
   const [selectedFlowId, setSelectedFlowId] = useState<string | null>(null);
+  // Instance selection: shared helpers render N rows for one flow; keyboard
+  // nav and the selection ring anchor on the clicked INSTANCE, the preview
+  // on the flow (adversarial finding: id-anchored nav teleported to the
+  // first rendered copy).
+  const [selectedRowKey, setSelectedRowKey] = useState<string | null>(null);
 
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameDraft, setRenameDraft] = useState('');
@@ -135,72 +111,167 @@ export function FlowLibraryModal({
   const readonlyFlowIdSet = useMemo(() => new Set(readonlyFlowIds || []), [readonlyFlowIds]);
   const bundledRunTargetIdSet = useMemo(() => new Set(bundledRunTargetIds || []), [bundledRunTargetIds]);
 
-  const normalizedFlows = useMemo(() => {
-    const all = Array.isArray(flows) ? flows : [];
-    const q = query.trim().toLowerCase();
-    const filtered = q
-      ? all.filter((f) => {
-          const hay = `${f.name ?? ''}\n${f.description ?? ''}\n${f.id ?? ''}`.toLowerCase();
-          return hay.includes(q);
-        })
-      : all;
-
-    const sorted = [...filtered];
-    if (sortMode === 'name_asc') {
-      sorted.sort((a, b) => safeLower(a.name).localeCompare(safeLower(b.name)));
-    } else if (sortMode === 'name_desc') {
-      sorted.sort((a, b) => safeLower(b.name).localeCompare(safeLower(a.name)));
-    } else {
-      // recent (fallback): updated_at desc, then created_at desc, then name asc
-      sorted.sort((a, b) => {
-        const au = parseIsoMs(a.updated_at) || parseIsoMs(a.created_at);
-        const bu = parseIsoMs(b.updated_at) || parseIsoMs(b.created_at);
-        if (bu !== au) return bu - au;
-        return safeLower(a.name).localeCompare(safeLower(b.name));
-      });
+  const allFlows = useMemo(() => (Array.isArray(flows) ? flows : []), [flows]);
+  const familyIndex = useMemo(() => buildFlowFamilyIndex(allFlows), [allFlows]);
+  const flowById = useMemo(() => new Map(allFlows.map((flow) => [flow.id, flow])), [allFlows]);
+  // Same-name collisions are real in live libraries (saved iteration copies):
+  // surface the short id so "three dp-research" is self-explanatory.
+  const duplicateNames = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const flow of allFlows) {
+      const name = (flow.name || '').trim();
+      if (!name) continue;
+      counts.set(name, (counts.get(name) || 0) + 1);
     }
+    return new Set(Array.from(counts.entries()).filter(([, n]) => n > 1).map(([name]) => name));
+  }, [allFlows]);
 
-    return sorted;
-  }, [flows, query, sortMode]);
+  const rowsResult = useMemo(
+    () => buildLibraryRows(allFlows, familyIndex, { query, viewMode, sortMode, expandedIds: expandedKeys }),
+    [allFlows, familyIndex, query, viewMode, sortMode, expandedKeys]
+  );
+  const rows = rowsResult.rows;
+  /**
+   * Rows carrying a real selectable flow, in visible order — the keyboard
+   * space. Cycle leaves are excluded: they alias an ANCESTOR's flow id, so
+   * navigating onto one snapped the selection back up the list (adversarial
+   * finding: ArrowDown oscillated and rows below became unreachable).
+   */
+  const navigableRows = useMemo(() => rows.filter((row) => row.flow && row.kind !== 'cycle'), [rows]);
 
   const selectedFlow = useMemo(() => {
     if (!selectedFlowId) return null;
-    return (flows || []).find((f) => f.id === selectedFlowId) || null;
-  }, [flows, selectedFlowId]);
+    return flowById.get(selectedFlowId) || null;
+  }, [flowById, selectedFlowId]);
   const selectedFlowReadonly = Boolean(selectedFlow && readonlyFlowIdSet.has(selectedFlow.id));
   const selectedFlowBundleTarget = Boolean(selectedFlow && bundledRunTargetIdSet.has(selectedFlow.id));
 
-  // Initialize selection on open / data changes
+  /** Family facts of the selection for the preview + delete warning. */
+  const selectedUsedBy = useMemo(() => {
+    if (!selectedFlow) return [] as VisualFlow[];
+    return (familyIndex.inboundBy.get(selectedFlow.id) || [])
+      .map((id) => flowById.get(id))
+      .filter((flow): flow is VisualFlow => Boolean(flow))
+      .sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id));
+  }, [familyIndex, flowById, selectedFlow]);
+  const selectedUses = useMemo(() => {
+    if (!selectedFlow) return [] as { flow?: VisualFlow; id: string }[];
+    return (familyIndex.refs.get(selectedFlow.id) || [])
+      .filter((id) => id !== selectedFlow.id)
+      .map((id) => ({ id, flow: flowById.get(id) }))
+      .sort((a, b) => (a.flow?.name || a.id).localeCompare(b.flow?.name || b.id));
+  }, [familyIndex, flowById, selectedFlow]);
+
+  // Initialize selection on open / data changes. A selection that leaves the
+  // VISIBLE set through the view toggle re-initializes (list and preview must
+  // agree); during an active query the selection may legitimately be hidden.
   useEffect(() => {
     if (!isOpen) return;
-    if (!normalizedFlows.length) {
+    if (navigableRows.length === 0) {
       setSelectedFlowId(null);
+      setSelectedRowKey(null);
       return;
     }
+    const visibleIds = new Set(navigableRows.map((row) => row.flow?.id));
     setSelectedFlowId((prev) => {
-      if (prev && normalizedFlows.some((f) => f.id === prev)) return prev;
-      if (currentFlowId && normalizedFlows.some((f) => f.id === currentFlowId)) return currentFlowId;
-      return normalizedFlows[0].id;
+      if (prev && (visibleIds.has(prev) || (query.trim() && flowById.has(prev)))) return prev;
+      const fallback =
+        currentFlowId && visibleIds.has(currentFlowId) ? currentFlowId : navigableRows[0].flow?.id || null;
+      if (fallback !== prev) setSelectedRowKey(null);
+      return fallback;
     });
-  }, [isOpen, normalizedFlows, currentFlowId]);
+  }, [isOpen, navigableRows, flowById, currentFlowId, query]);
 
-  // Focus search on open
+  // Focus search on open.
   useEffect(() => {
     if (!isOpen) return;
     window.setTimeout(() => searchRef.current?.focus(), 0);
   }, [isOpen]);
 
-  // Keyboard navigation (SOTA: fast library-like navigation)
+  // Clearing the query reveals the selection: expand the full ANCESTOR PATH
+  // down to it (expansion keys are paths — a bare parent id only opens
+  // top-level parents, which left depth-2 helpers invisible after search).
+  const prevQueryRef = useRef(query);
+  useEffect(() => {
+    const prev = prevQueryRef.current;
+    prevQueryRef.current = query;
+    if (!prev.trim() || query.trim() || !selectedFlowId) return;
+    if (familyIndex.firstLevelIds.has(selectedFlowId)) return;
+    // Walk up inboundBy to a first-level ancestor (prefer one; bail on cycles).
+    const chain: string[] = [];
+    let cursor: string | undefined = selectedFlowId;
+    const seen = new Set<string>();
+    while (cursor && !seen.has(cursor)) {
+      seen.add(cursor);
+      if (familyIndex.firstLevelIds.has(cursor)) break;
+      const parents: string[] = familyIndex.inboundBy.get(cursor) || [];
+      const next = parents.find((id) => familyIndex.firstLevelIds.has(id)) || parents[0];
+      if (!next) break;
+      chain.unshift(cursor);
+      cursor = next;
+    }
+    if (!cursor || !familyIndex.firstLevelIds.has(cursor)) return;
+    // Expand root + every intermediate path key (the selected leaf itself
+    // does not need expanding).
+    setExpandedKeys((prevKeys) => {
+      const next = new Set(prevKeys);
+      let pathKey = cursor as string;
+      next.add(pathKey);
+      for (const id of chain.slice(0, -1)) {
+        pathKey = `${pathKey}>${id}`;
+        next.add(pathKey);
+      }
+      return next;
+    });
+  }, [query, selectedFlowId, familyIndex]);
+
+  // Keep the selected row visible when the SELECTION changes (not on every
+  // rows-identity change — expanding an unrelated family must not snap the
+  // scroll back to the selection).
+  useEffect(() => {
+    if (!isOpen || !selectedFlowId) return;
+    const selector = selectedRowKey
+      ? `[data-row-key="${CSS.escape(selectedRowKey)}"]`
+      : `[data-flow-id="${CSS.escape(selectedFlowId)}"]`;
+    const el = listRef.current?.querySelector(selector);
+    (el as HTMLElement | null)?.scrollIntoView({ block: 'nearest' });
+  }, [isOpen, selectedFlowId, selectedRowKey]);
+
+  const toggleExpand = useCallback((rowKey: string) => {
+    let opened = false;
+    setExpandedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(rowKey)) next.delete(rowKey);
+      else {
+        next.add(rowKey);
+        opened = true;
+      }
+      return next;
+    });
+    // When a family OPENS near the bottom of the viewport its children land
+    // below the fold — nudge the parent upward so the unfolded family is
+    // actually visible (the whole point of expanding).
+    if (opened) {
+      window.requestAnimationFrame(() => {
+        const el = listRef.current?.querySelector(`[data-row-key="${CSS.escape(rowKey)}"]`);
+        (el as HTMLElement | null)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      });
+    }
+  }, []);
+
+  // Keyboard navigation over VISIBLE rows: Up/Down move, Right expands,
+  // Left collapses (or jumps to the parent), Enter loads, "/" focuses search.
   useEffect(() => {
     if (!isOpen) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        // While an editor is open, Escape cancels THAT edit (the input's own
+        // handler); closing the whole modal in the same keypress lost work.
+        if (isRenaming || isEditingDescription || isEditingInterfaces) return;
         e.preventDefault();
         onClose();
         return;
       }
-
-      // "/" focuses search (common UX in command palettes / libs)
       if (e.key === '/' && !e.metaKey && !e.ctrlKey && !e.altKey) {
         const active = document.activeElement as HTMLElement | null;
         const isTyping =
@@ -213,22 +284,55 @@ export function FlowLibraryModal({
           return;
         }
       }
+      if (isRenaming || isEditingDescription || isEditingInterfaces) return;
+      if (navigableRows.length === 0) return;
 
-      if (isRenaming || isEditingDescription || isEditingInterfaces) return; // do not hijack keys while editing
-      if (!normalizedFlows.length) return;
+      // Anchor on the selected INSTANCE when known; fall back to the first
+      // row of the selected flow.
+      const idx = selectedRowKey
+        ? navigableRows.findIndex((row) => row.key === selectedRowKey)
+        : navigableRows.findIndex((row) => row.flow?.id === selectedFlowId);
+      const selectedRow = idx >= 0 ? navigableRows[idx] : null;
 
-      const idx = normalizedFlows.findIndex((f) => f.id === selectedFlowId);
+      const selectRowAt = (next: number) => {
+        const row = navigableRows[next];
+        if (!row?.flow) return;
+        setSelectedFlowId(row.flow.id);
+        setSelectedRowKey(row.key);
+      };
 
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        const next = idx < 0 ? 0 : Math.min(normalizedFlows.length - 1, idx + 1);
-        setSelectedFlowId(normalizedFlows[next]?.id || null);
+        selectRowAt(idx < 0 ? 0 : Math.min(navigableRows.length - 1, idx + 1));
         return;
       }
       if (e.key === 'ArrowUp') {
         e.preventDefault();
-        const next = idx < 0 ? 0 : Math.max(0, idx - 1);
-        setSelectedFlowId(normalizedFlows[next]?.id || null);
+        selectRowAt(idx < 0 ? 0 : Math.max(0, idx - 1));
+        return;
+      }
+      if (e.key === 'ArrowRight') {
+        if (selectedRow?.expandable && !selectedRow.expanded) {
+          e.preventDefault();
+          toggleExpand(selectedRow.key);
+        }
+        return;
+      }
+      if (e.key === 'ArrowLeft') {
+        if (selectedRow?.expandable && selectedRow.expanded) {
+          e.preventDefault();
+          toggleExpand(selectedRow.key);
+          return;
+        }
+        if (selectedRow?.parentId) {
+          e.preventDefault();
+          setSelectedFlowId(selectedRow.parentId);
+          // The parent's row key is this row's path minus the last segment.
+          const parentKey = selectedRow.key.includes('>')
+            ? selectedRow.key.slice(0, selectedRow.key.lastIndexOf('>'))
+            : null;
+          setSelectedRowKey(parentKey);
+        }
         return;
       }
       if (e.key === 'Enter') {
@@ -240,10 +344,31 @@ export function FlowLibraryModal({
     };
 
     window.addEventListener('keydown', onKeyDown, { capture: true });
-    return () => window.removeEventListener('keydown', onKeyDown, { capture: true } as any);
-  }, [isOpen, isRenaming, isEditingDescription, isEditingInterfaces, normalizedFlows, onClose, onLoadFlow, selectedFlowId]);
+    return () => window.removeEventListener('keydown', onKeyDown, { capture: true } as never);
+  }, [
+    isOpen,
+    isRenaming,
+    isEditingDescription,
+    isEditingInterfaces,
+    navigableRows,
+    onClose,
+    onLoadFlow,
+    selectedFlowId,
+    selectedRowKey,
+    toggleExpand,
+  ]);
 
-  // Reset destructive UI when selection changes
+  // Destructive/edit state must not survive a close/reopen (a pre-armed
+  // "Confirm Delete" firing on the first click after reopen).
+  useEffect(() => {
+    if (isOpen) return;
+    setIsDeleteConfirm(false);
+    setIsRenaming(false);
+    setIsEditingDescription(false);
+    setIsEditingInterfaces(false);
+  }, [isOpen]);
+
+  // Reset destructive UI when selection changes.
   useEffect(() => {
     setIsDeleteConfirm(false);
     setIsRenaming(false);
@@ -317,7 +442,10 @@ export function FlowLibraryModal({
     if (!selectedFlow || selectedFlowReadonly) return;
     const next = normalizeInterfaces(interfacesDraft);
     const current = normalizeInterfaces(selectedFlow.interfaces);
-    if (JSON.stringify(next) === JSON.stringify(current)) {
+    // Set comparison: uncheck+recheck reorders the draft; an order-only
+    // "change" must not fire a PUT (it bumped updated_at and resorted Recent).
+    const sameSet = next.length === current.length && next.every((id) => current.includes(id));
+    if (sameSet) {
       setIsEditingInterfaces(false);
       return;
     }
@@ -339,7 +467,22 @@ export function FlowLibraryModal({
     await onDuplicateFlow(selectedFlow.id);
   }, [onDuplicateFlow, selectedFlow]);
 
+  const jumpToFlow = useCallback((flowId: string) => {
+    setSelectedFlowId(flowId);
+    setSelectedRowKey(null);
+  }, []);
+
+  const selectRow = useCallback((flowId: string, rowKey: string) => {
+    setSelectedFlowId(flowId);
+    setSelectedRowKey(rowKey);
+  }, []);
+
   if (!isOpen) return null;
+
+  const executableToggleTitle =
+    'Runnable = declares a framework-executable interface (today: Runnable agent v1). Helpers and drafts stay visible in All.';
+  const shownCount = navigableRows.length;
+  const filtering = Boolean(query.trim()) || viewMode === 'executable';
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -349,7 +492,9 @@ export function FlowLibraryModal({
             <h3>Flow Library</h3>
             <div className="flow-library-subtitle">
               <span className="flow-library-count">
-                {normalizedFlows.length} flow{normalizedFlows.length === 1 ? '' : 's'}
+                {rowsResult.totalCount} flow{rowsResult.totalCount === 1 ? '' : 's'} ·{' '}
+                {rowsResult.topLevelCount} top-level · {rowsResult.executableCount} runnable
+                {filtering ? ` · ${shownCount} shown` : ''}
               </span>
               {onRefresh ? (
                 <button type="button" className="flow-library-link" onClick={onRefresh}>
@@ -360,17 +505,38 @@ export function FlowLibraryModal({
           </div>
 
           <div className="flow-library-controls">
+            <div className="flow-library-view-toggle" role="tablist" aria-label="Library view" title={executableToggleTitle}>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={viewMode === 'all'}
+                className={`flow-library-view-option ${viewMode === 'all' ? 'active' : ''}`}
+                onClick={() => setViewMode('all')}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={viewMode === 'executable'}
+                className={`flow-library-view-option ${viewMode === 'executable' ? 'active' : ''}`}
+                onClick={() => setViewMode('executable')}
+              >
+                Runnable
+              </button>
+            </div>
             <input
               ref={searchRef}
               className="flow-library-search"
-              placeholder="Search flows…  (press / to focus)"
+              placeholder="Search name, description, id…  ( / )"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
             <select
               className="flow-library-sort"
               value={sortMode}
-              onChange={(e) => setSortMode(e.target.value as SortMode)}
+              onChange={(e) => setSortMode(e.target.value as LibrarySortMode)}
+              aria-label="Sort flows"
             >
               <option value="recent">Recent</option>
               <option value="name_asc">Name (A–Z)</option>
@@ -380,55 +546,43 @@ export function FlowLibraryModal({
         </div>
 
         <div className="flow-library-body">
-          <div className="flow-library-list">
+          <div className="flow-library-list" ref={listRef}>
             {isLoading ? (
               <div className="flow-library-empty">Loading flows…</div>
             ) : error ? (
               <div className="flow-library-empty error-text">Failed to load flows</div>
-            ) : normalizedFlows.length === 0 ? (
+            ) : rows.length === 0 ? (
               <div className="flow-library-empty">
                 <div className="flow-library-empty-title">No flows found</div>
-                <div className="flow-library-empty-sub">Try a different search query.</div>
+                <div className="flow-library-empty-sub">
+                  {viewMode === 'executable' ? (
+                    <>
+                      No runnable workflows match.{' '}
+                      <button type="button" className="flow-library-link" onClick={() => setViewMode('all')}>
+                        Show all flows
+                      </button>
+                    </>
+                  ) : (
+                    'Try a different search query.'
+                  )}
+                </div>
               </div>
             ) : (
-              normalizedFlows.map((flow) => {
-                const isSelected = flow.id === selectedFlowId;
-                const isCurrent = Boolean(currentFlowId && flow.id === currentFlowId);
-                const isReadonly = readonlyFlowIdSet.has(flow.id);
-                const isBundleTarget = bundledRunTargetIdSet.has(flow.id);
-                const metaUpdated = formatDateTime(flow.updated_at) || formatDateTime(flow.created_at);
-
-                return (
-                  <button
-                    key={flow.id}
-                    type="button"
-                    className={`flow-library-item ${isSelected ? 'selected' : ''}`}
-                    onClick={() => setSelectedFlowId(flow.id)}
-                    onDoubleClick={() => onLoadFlow(flow.id)}
-                    title="Double click to load"
-                  >
-                    <div className="flow-library-item-top">
-                      <div className="flow-library-item-name">{flow.name || flow.id}</div>
-                      <div className="flow-library-item-badges">
-                        {isCurrent ? <span className="flow-library-badge current">current</span> : null}
-                        {isBundleTarget ? (
-                          <span className="flow-library-badge bundled">bundle</span>
-                        ) : isReadonly ? (
-                          <span className="flow-library-badge bundled">bundled</span>
-                        ) : null}
-                        <span className="flow-library-badge">{flow.nodes.length}n</span>
-                        <span className="flow-library-badge">{flow.edges.length}e</span>
-                      </div>
-                    </div>
-                    <div className="flow-library-item-sub">
-                      <span className="flow-library-item-desc">
-                        {flow.description?.trim() ? flow.description.trim() : '—'}
-                      </span>
-                      {metaUpdated ? <span className="flow-library-item-updated">{metaUpdated}</span> : null}
-                    </div>
-                  </button>
-                );
-              })
+              <FlowLibraryList
+                rows={rows}
+                selectedFlowId={selectedFlowId}
+                selectedRowKey={selectedRowKey}
+                currentFlowId={currentFlowId}
+                readonlyFlowIds={readonlyFlowIdSet}
+                bundledRunTargetIds={bundledRunTargetIdSet}
+                selfReferencingIds={familyIndex.selfReferencingIds}
+                cyclePromotedIds={familyIndex.cyclePromotedIds}
+                duplicateNames={duplicateNames}
+                hideRunnableBadge={viewMode === 'executable'}
+                onSelect={selectRow}
+                onLoad={onLoadFlow}
+                onToggleExpand={toggleExpand}
+              />
             )}
           </div>
 
@@ -511,62 +665,104 @@ export function FlowLibraryModal({
 
                   {isEditingInterfaces ? (
                     <div className="flow-library-interfaces-editor">
-                      {KNOWN_INTERFACES.map((iface) => {
-                        const checked = interfacesDraft.includes(iface.id);
-                        return (
-                          <label key={iface.id} className="flow-library-interface-option">
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={(e) => {
-                                const on = e.target.checked;
-                                setInterfacesDraft((prev) => {
-                                  const base = normalizeInterfaces(prev);
-                                  if (on) {
-                                    if (!base.includes(iface.id)) base.push(iface.id);
-                                    return base;
-                                  }
-                                  return base.filter((x) => x !== iface.id);
-                                });
-                              }}
-                            />
-                            <div className="flow-library-interface-copy">
-                              <div className="flow-library-interface-label">{iface.label}</div>
-                              <div className="flow-library-interface-desc">{iface.description}</div>
-                            </div>
-                          </label>
-                        );
-                      })}
+                      {KNOWN_INTERFACES.filter((iface) => iface.class !== 'domain' || interfacesDraft.includes(iface.id)).map(
+                        (iface) => {
+                          const checked = interfacesDraft.includes(iface.id);
+                          return (
+                            <label key={iface.id} className="flow-library-interface-option">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={(e) => {
+                                  const on = e.target.checked;
+                                  setInterfacesDraft((prev) => {
+                                    const base = normalizeInterfaces(prev);
+                                    if (on) {
+                                      if (!base.includes(iface.id)) base.push(iface.id);
+                                      return base;
+                                    }
+                                    return base.filter((x) => x !== iface.id);
+                                  });
+                                }}
+                              />
+                              <div className="flow-library-interface-copy">
+                                <div className="flow-library-interface-label">{iface.label}</div>
+                                <div className="flow-library-interface-desc">{iface.description}</div>
+                              </div>
+                            </label>
+                          );
+                        }
+                      )}
 
-	                      <div className="flow-library-interfaces-hint">
-	                        <div className="flow-library-interfaces-hint-title">RunnableFlow (v1) requirements</div>
-	                        <div className="flow-library-interfaces-hint-body">
-	                          <div>
-	                            On Flow Start (required): <code>provider</code> (provider)
-	                          </div>
-	                          <div>
-	                            On Flow Start (required): <code>model</code> (model)
-	                          </div>
-	                          <div>
-	                            On Flow Start (required): <code>prompt</code> (string)
-	                          </div>
-	                          <div>
-	                            On Flow End (required): <code>response</code> (string)
-	                          </div>
-	                          <div>
-	                            On Flow End (required): <code>success</code> (boolean)
-	                          </div>
-	                          <div>
-	                            On Flow End (required): <code>meta</code> (object)
-	                          </div>
-	                          <div style={{ marginTop: 6 }}>
-	                            <em>Tip:</em> When you enable this interface, the editor will auto-add the required pins.
-	                          </div>
-	                        </div>
-	                      </div>
+                      <div className="flow-library-interfaces-hint">
+                        <div className="flow-library-interfaces-hint-title">Runnable agent (v1) contract</div>
+                        <div className="flow-library-interfaces-hint-body">
+                          <div>
+                            On Flow Start outputs: <code>provider</code> (provider), <code>model</code> (model),{' '}
+                            <code>prompt</code> (string)
+                          </div>
+                          <div>
+                            On Flow End inputs: <code>response</code> (string), <code>success</code> (boolean),{' '}
+                            <code>meta</code> (object)
+                          </div>
+                          <div style={{ marginTop: 6 }}>
+                            <em>Note:</em> declaring the interface does NOT add these pins — wire them on the canvas
+                            yourself, or hosts that start this workflow will bind inputs to nothing and read empty
+                            outputs.
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   ) : null}
                 </div>
+
+                {selectedUses.length > 0 || selectedUsedBy.length > 0 ? (
+                  <div className="flow-library-family">
+                    <div className="flow-library-family-title">Family</div>
+                    {selectedUses.length > 0 ? (
+                      <div className="flow-library-family-row">
+                        <span className="flow-library-preview-key">Uses</span>
+                        <span className="flow-library-family-links">
+                          {selectedUses.map((entry) =>
+                            entry.flow ? (
+                              <button
+                                key={entry.id}
+                                type="button"
+                                className="flow-library-family-link"
+                                onClick={() => jumpToFlow(entry.id)}
+                                title={`Select ${entry.flow.name || entry.id}`}
+                              >
+                                {entry.flow.name || entry.id}
+                              </button>
+                            ) : (
+                              <span key={entry.id} className="flow-library-family-missing" title="Referenced workflow not found">
+                                {entry.id} (missing)
+                              </span>
+                            )
+                          )}
+                        </span>
+                      </div>
+                    ) : null}
+                    {selectedUsedBy.length > 0 ? (
+                      <div className="flow-library-family-row">
+                        <span className="flow-library-preview-key">Used by</span>
+                        <span className="flow-library-family-links">
+                          {selectedUsedBy.map((parent) => (
+                            <button
+                              key={parent.id}
+                              type="button"
+                              className="flow-library-family-link"
+                              onClick={() => jumpToFlow(parent.id)}
+                              title={`Select ${parent.name || parent.id}`}
+                            >
+                              {parent.name || parent.id}
+                            </button>
+                          ))}
+                        </span>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
 
                 <div className="flow-library-preview-desc">
                   {isEditingDescription ? (
@@ -581,7 +777,6 @@ export function FlowLibraryModal({
                           setIsEditingDescription(false);
                           setDescriptionDraft('');
                         }
-                        // Ctrl/Cmd+Enter to save (common editor shortcut)
                         if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
                           commitDescription();
                         }
@@ -648,11 +843,7 @@ export function FlowLibraryModal({
                     </>
                   ) : (
                     <>
-                      <button
-                        type="button"
-                        className="modal-button primary"
-                        onClick={() => onLoadFlow(selectedFlow.id)}
-                      >
+                      <button type="button" className="modal-button primary" onClick={() => onLoadFlow(selectedFlow.id)}>
                         Load
                       </button>
                       <button
@@ -663,7 +854,9 @@ export function FlowLibraryModal({
                         title={
                           selectedFlowBundleTarget
                             ? 'This bundled workflow family must run from its shipped bundle'
-                            : 'Duplicate flow'
+                            : selectedUses.length > 0
+                              ? 'Duplicate flow (references shared subflows — they are not copied)'
+                              : 'Duplicate flow'
                         }
                       >
                         Duplicate
@@ -673,13 +866,30 @@ export function FlowLibraryModal({
                           type="button"
                           className={`modal-button ${isDeleteConfirm ? 'danger' : ''}`}
                           onClick={handleDelete}
-                          title={isDeleteConfirm ? 'Click again to confirm delete' : 'Delete flow'}
+                          title={
+                            isDeleteConfirm
+                              ? 'Click again to confirm delete'
+                              : selectedUsedBy.length > 0
+                                ? `Delete flow — used by ${selectedUsedBy.map((parent) => parent.name || parent.id).join(', ')}`
+                                : 'Delete flow'
+                          }
                         >
-                          {isDeleteConfirm ? 'Confirm Delete' : 'Delete'}
+                          {isDeleteConfirm
+                            ? selectedUsedBy.length > 0
+                              ? `Confirm — breaks ${selectedUsedBy.length} parent${selectedUsedBy.length === 1 ? '' : 's'}`
+                              : 'Confirm Delete'
+                            : 'Delete'}
                         </button>
                       ) : null}
                     </>
                   )}
+                  {isDeleteConfirm && selectedUsedBy.length > 0 ? (
+                    <div className="flow-library-delete-warning">
+                      Deleting breaks the subflow reference in:{' '}
+                      {selectedUsedBy.map((parent) => parent.name || parent.id).join(', ')}. Those workflows will fail
+                      to run or publish until re-wired.
+                    </div>
+                  ) : null}
                 </div>
               </>
             ) : (

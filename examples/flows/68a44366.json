@@ -1,7 +1,7 @@
 {
   "id": "68a44366",
   "name": "memory-sub",
-  "description": "",
+  "description": "Helper subflow: one in-context LLM call that briefly answers the query; used by memory-test to check whether conversation context crosses subflow boundaries.",
   "nodes": [
     {
       "id": "node-1",

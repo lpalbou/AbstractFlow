@@ -1,7 +1,7 @@
 {
   "id": "d6f30991",
   "name": "reliable-agent",
-  "description": "",
+  "description": "Answer-then-review loop: a web agent answers, a reviewer LLM returns remaining tasks (@@-separated), and the loop re-runs while tasks remain. First of the reliable-agent family.",
   "nodes": [
     {
       "id": "node-1",

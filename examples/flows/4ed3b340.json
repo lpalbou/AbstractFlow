@@ -1,7 +1,7 @@
 {
   "id": "4ed3b340",
   "name": "planner-enricher",
-  "description": "",
+  "description": "Combined enricher and planner step: one schema-enforced LLM call rewrites the prompt into an enriched_request plus an array of actionable tasks, emitting a host status event while it runs.",
   "interfaces": [],
   "nodes": [
     {

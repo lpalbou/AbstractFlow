@@ -1,7 +1,7 @@
 {
   "id": "85228163",
   "name": "python-test",
-  "description": "",
+  "description": "Scratch/test flow: a Python code node adds the two number inputs and reports the sum.",
   "nodes": [
     {
       "id": "node-1",

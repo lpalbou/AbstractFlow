@@ -12,6 +12,31 @@ export interface SavedFlowSummary {
   name: string;
 }
 
+/** One boundary pin of a workflow's public contract. */
+export interface WorkflowContractPin {
+  id: string;
+  type: string;
+  description?: string;
+  /** Inputs only: no pin default means the caller must supply a value. */
+  required?: boolean;
+  /** Inputs only: the entry pin's default value, when one exists. */
+  defaultValue?: unknown;
+}
+
+/**
+ * A saved workflow's pick-time contract: identity, purpose, and boundary
+ * (On Flow Start outputs = inputs; On Flow End inputs = outputs). This is
+ * what a composer needs BEFORE referencing a workflow — the post-reference
+ * `subflow_interface` context arrives too late to drive the choice.
+ */
+export interface WorkflowContractSummary {
+  id: string;
+  name: string;
+  description?: string;
+  inputs: WorkflowContractPin[];
+  outputs: WorkflowContractPin[];
+}
+
 export type SubflowLabelData = {
   nodeType?: unknown;
   label?: unknown;
@@ -30,6 +55,54 @@ export function savedFlowSummariesFromResponse(value: unknown): SavedFlowSummary
       return typeof record.id === 'string' && typeof record.name === 'string';
     })
     .map((flow) => ({ id: flow.id, name: flow.name }));
+}
+
+/** Derive a workflow's pick-time contract from its full graph. */
+export function workflowContractSummary(flow: VisualFlow): WorkflowContractSummary {
+  const start = findFlowStartNode(flow);
+  const end = findFlowEndNode(flow);
+  const startDefaults = (start?.data?.pinDefaults || {}) as Record<string, unknown>;
+  const inputs: WorkflowContractPin[] = (start?.data?.outputs || [])
+    .filter((pin) => pin.type !== 'execution')
+    .map((pin) => {
+      const hasDefault = Object.prototype.hasOwnProperty.call(startDefaults, pin.id);
+      return {
+        id: pin.id,
+        type: pin.type,
+        ...(pin.description ? { description: pin.description } : {}),
+        required: !hasDefault,
+        ...(hasDefault ? { defaultValue: startDefaults[pin.id] } : {}),
+      };
+    });
+  const outputs: WorkflowContractPin[] = (end?.data?.inputs || [])
+    .filter((pin) => pin.type !== 'execution')
+    .map((pin) => ({
+      id: pin.id,
+      type: pin.type,
+      ...(pin.description ? { description: pin.description } : {}),
+    }));
+  return {
+    id: flow.id,
+    name: flow.name,
+    ...(typeof flow.description === 'string' && flow.description.trim()
+      ? { description: flow.description.trim() }
+      : {}),
+    inputs,
+    outputs,
+  };
+}
+
+/**
+ * Full saved workflows from the collection response (the endpoint returns
+ * complete graphs; the summary helper above deliberately drops them).
+ */
+export function savedFlowGraphsFromResponse(value: unknown): VisualFlow[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((flow): flow is VisualFlow => {
+    if (!flow || typeof flow !== 'object') return false;
+    const record = flow as Record<string, unknown>;
+    return typeof record.id === 'string' && typeof record.name === 'string' && Array.isArray(record.nodes);
+  });
 }
 
 export function savedFlowOptions(flows: SavedFlowSummary[], currentFlowId: string | null | undefined) {

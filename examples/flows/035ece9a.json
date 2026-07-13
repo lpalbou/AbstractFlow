@@ -1,7 +1,7 @@
 {
   "id": "035ece9a",
   "name": "test-memory-agent",
-  "description": "",
+  "description": "Scratch/test flow: loops an agent writing one sentence per iteration (five rounds), then dumps the accumulated conversation context to inspect how agent turns land in shared memory.",
   "interfaces": [],
   "nodes": [
     {

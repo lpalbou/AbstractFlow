@@ -34,6 +34,8 @@ export interface AuthoringPinSpec {
   type: string;
   label?: string;
   description?: string;
+  /** Optional JSON-schema fragment (x-abstract-type/items) for boundary pins (e.g. array of file). */
+  schema?: Record<string, unknown>;
 }
 
 export interface AuthoringDocumentNode {
@@ -69,7 +71,16 @@ export interface AuthoringDocumentNode {
   /** Read-only context (Properties-panel owned); the diff ignores these. */
   agent_config?: Record<string, JsonValue>;
   effect_config?: Record<string, JsonValue>;
+  /**
+   * Subflow node: the saved workflow this node executes (AUTHORABLE — the
+   * composition seam). The diff resolves it against the saved-workflow list
+   * and refuses unknown references loudly with suggestions.
+   */
+  subflow_ref?: string;
+  /** Legacy read-only spelling; accepted on parse as an alias of subflow_ref. */
   subflow_id?: string;
+  /** Read-only: the referenced workflow's boundary interface (serializer-only). */
+  subflow_interface?: { inputs: AuthoringPinSpec[]; outputs: AuthoringPinSpec[] };
 }
 
 export interface AuthoringDocument {
@@ -77,12 +88,28 @@ export interface AuthoringDocument {
   nodes: AuthoringDocumentNode[];
   /** Edge list as "sourceNode.sourcePin -> targetNode.targetPin" strings. */
   edges: string[];
+  /**
+   * Deletion confirmation: when a document omits MANY existing nodes at once
+   * (a truncation-shaped emission), the diff refuses the implied mass
+   * deletion unless the ids are explicitly confirmed here.
+   */
+  confirm_deletions?: string[];
 }
 
 export interface AuthoringDocumentDiff {
   commands: unknown[];
   /** Document-level issues (malformed edges, type changes, unknown references). */
   errors: string[];
+}
+
+/** Context the diff needs to resolve cross-workflow references. */
+export interface AuthoringDiffContext {
+  /** Saved workflows the editor knows about (id + name), for subflow_ref resolution. */
+  savedFlows?: { id: string; name: string }[];
+  /** Full graphs of saved workflows, when already fetched (enables cycle checks + pin patching downstream). */
+  resolvedSubflows?: Map<string, VisualFlow>;
+  /** The current flow's saved id (drafts have none). Used to refuse self-reference. */
+  currentFlowId?: string | null;
 }
 
 const DYNAMIC_INPUT_NODE_TYPES = new Set<string>(['on_flow_end', 'concat', 'string_template', 'make_object']);
@@ -167,6 +194,10 @@ function visibleTemplateCount(nodeType: string): number {
 function pinSpec(pin: Pin): AuthoringPinSpec {
   const spec: AuthoringPinSpec = { id: pin.id, type: pin.type };
   if (pin.label && pin.label !== pin.id) spec.label = pin.label;
+  if (pin.description) spec.description = pin.description;
+  if (pin.schema && Object.keys(pin.schema).length > 0) {
+    spec.schema = JSON.parse(JSON.stringify(pin.schema)) as Record<string, unknown>;
+  }
   return spec;
 }
 
@@ -234,7 +265,21 @@ export function flowToAuthoringDocument(flow: VisualFlow): AuthoringDocument {
     if (agentConfig) doc.agent_config = redactValue(agentConfig, 'agent_config') as Record<string, JsonValue>;
     const effectConfig = jsonRecord(data.effectConfig);
     if (effectConfig) doc.effect_config = redactValue(effectConfig, 'effect_config') as Record<string, JsonValue>;
-    if (data.subflowId) doc.subflow_id = data.subflowId;
+    if (nodeType === 'subflow') {
+      // subflow_ref is AUTHORABLE (composition seam); the interface block is
+      // serializer-only context so the model knows which edges are legal
+      // into/out of this node (subflow pins are patched from the child flow
+      // and are not dynamic-pin authorable).
+      if (data.subflowId) doc.subflow_ref = data.subflowId;
+      const interfaceInputs = dataPins(data.inputs).filter((pin) => pin.id !== 'inherit_context' && pin.id !== 'inheritContext');
+      const interfaceOutputs = dataPins(data.outputs);
+      if (interfaceInputs.length > 0 || interfaceOutputs.length > 0) {
+        doc.subflow_interface = {
+          inputs: interfaceInputs.map(pinSpec),
+          outputs: interfaceOutputs.map(pinSpec),
+        };
+      }
+    }
     return doc;
   });
 
@@ -280,6 +325,8 @@ function pinSpecsFrom(raw: unknown): AuthoringPinSpec[] | undefined {
     if (label) spec.label = label;
     const description = cleanText(record.description, 600);
     if (description) spec.description = description;
+    const schema = asRecord(record.schema);
+    if (schema && Object.keys(schema).length > 0) spec.schema = schema;
     out.push(spec);
   }
   return out;
@@ -289,6 +336,7 @@ interface NormalizedDocument {
   flowName: string;
   nodes: AuthoringDocumentNode[];
   edges: { source: string; sourceHandle: string; target: string; targetHandle: string }[];
+  confirmDeletions: Set<string>;
   errors: string[];
 }
 
@@ -314,9 +362,14 @@ function normalizeDocument(raw: unknown, currentNodeIds: Set<string>): Normalize
   const errors: string[] = [];
   const record = asRecord(raw);
   if (!record) {
-    return { flowName: '', nodes: [], edges: [], errors: ['graph document must be a JSON object'] };
+    return { flowName: '', nodes: [], edges: [], confirmDeletions: new Set(), errors: ['graph document must be a JSON object'] };
   }
   const flowName = cleanText(firstDefined(record, ['flow_name', 'flowName', 'name']), 120);
+  const confirmDeletions = new Set<string>(
+    (Array.isArray(record.confirm_deletions) ? record.confirm_deletions : [])
+      .map((item) => cleanText(item, 120))
+      .filter(Boolean)
+  );
 
   const nodes: AuthoringDocumentNode[] = [];
   const rawNodes = Array.isArray(record.nodes) ? record.nodes : [];
@@ -377,6 +430,11 @@ function normalizeDocument(raw: unknown, currentNodeIds: Set<string>): Normalize
     if (toolParameters) node.tool_parameters = toolParameters as Record<string, JsonValue>;
     const separator = firstDefined(nodeRecord, ['concat_separator', 'concatSeparator', 'separator']);
     if (typeof separator === 'string') node.concat_separator = separator;
+    const subflowRef = cleanText(
+      firstDefined(nodeRecord, ['subflow_ref', 'subflowRef', 'subflow_id', 'subflowId', 'workflow_id', 'workflowId']),
+      160
+    );
+    if (subflowRef) node.subflow_ref = subflowRef;
     nodes.push(node);
   }
 
@@ -422,7 +480,7 @@ function normalizeDocument(raw: unknown, currentNodeIds: Set<string>): Normalize
     edges.push({ source: source.node, sourceHandle: source.handle, target: target.node, targetHandle: target.handle });
   }
 
-  return { flowName, nodes, edges, errors };
+  return { flowName, nodes, edges, confirmDeletions, errors };
 }
 
 // ---------------------------------------------------------------------------
@@ -487,6 +545,11 @@ function pinDefaultsCommands(
   for (const [pin, value] of Object.entries(docDefaults || {})) {
     if (isRedacted(value)) continue; // Round-tripped redaction; never write back.
     if (deepEqual(currentDefaults[pin], value)) continue;
+    // A verbatim re-emit of a default containing NESTED redacted values
+    // (e.g. headers.Authorization) matches the REDACTED current, not the
+    // raw one — without this compare the diff emitted an unappliable
+    // set_pin_default every cycle (round-trip invariant violation).
+    if (deepEqual(redactValue(currentDefaults[pin] ?? null, pin), value)) continue;
     commands.push({ action: 'set_pin_default', nodeId, pin, value });
   }
   return commands;
@@ -502,7 +565,7 @@ function templateForDocNode(node: AuthoringDocumentNode): NodeTemplate | undefin
   return getNodeTemplate(node.type as NodeType) || candidates[0];
 }
 
-/** Pin-list diff for dynamic-pin nodes: additions and removals against a base pin list. */
+/** Pin-list diff for dynamic-pin nodes: additions, removals, and in-place updates against a base pin list. */
 function dynamicPinCommands(
   nodeId: string,
   side: 'input' | 'output',
@@ -513,15 +576,39 @@ function dynamicPinCommands(
   const commands: unknown[] = [];
   const docIds = new Set(docPins.map((pin) => pin.id));
   const baseDataPins = basePins.filter((pin) => pin.type !== 'execution');
-  const baseIds = new Set(baseDataPins.map((pin) => pin.id));
+  const baseIds = new Map(baseDataPins.map((pin) => [pin.id, pin]));
   for (const pin of docPins) {
-    if (baseIds.has(pin.id)) continue;
+    const existing = baseIds.get(pin.id);
+    if (existing) {
+      // Same id, changed shape: retype/redoc IN PLACE. The previous contract
+      // (id-only diff) silently ignored type changes, making the documented
+      // "change the pin type" repair unimplementable — the model re-emitted
+      // the pin, zero commands compiled, and the turn stalled.
+      const typeChanged = pin.type !== existing.type;
+      const descriptionChanged = pin.description !== undefined && pin.description !== (existing.description || '');
+      const schemaChanged = pin.schema !== undefined && !deepEqual(pin.schema, existing.schema ?? {});
+      if (typeChanged || descriptionChanged || schemaChanged) {
+        commands.push({
+          action: 'update_pin',
+          nodeId,
+          id: pin.id,
+          side,
+          ...(typeChanged ? { pinType: pin.type } : {}),
+          ...(pin.label ? { label: pin.label } : {}),
+          ...(descriptionChanged ? { description: pin.description } : {}),
+          ...(schemaChanged ? { schema: pin.schema } : {}),
+        });
+      }
+      continue;
+    }
     commands.push({
       action: side === 'input' ? 'add_input_pin' : 'add_output_pin',
       nodeId,
       id: pin.id,
       ...(pin.label ? { label: pin.label } : {}),
       pinType: pin.type,
+      ...(pin.description ? { description: pin.description } : {}),
+      ...(pin.schema ? { schema: pin.schema } : {}),
     });
   }
   for (const pin of baseDataPins) {
@@ -553,7 +640,9 @@ function eventConfigCommands(
   for (const key of ['name', 'scope', 'channel', 'agentFilter', 'schedule', 'recurrent', 'description'] as const) {
     const docValue = docEvent[key] ?? (key === 'agentFilter' ? docEvent.agent_filter : undefined);
     if (docValue === undefined) continue;
+    if (isRedacted(docValue)) continue; // Round-tripped redaction; never write back.
     if (deepEqual(currentEvent[key], docValue)) continue;
+    if (deepEqual(redactValue((currentEvent[key] ?? null) as JsonValue, key), docValue)) continue;
     changed[key] = docValue;
   }
   if (Object.keys(changed).length === 0) return [];
@@ -588,12 +677,17 @@ function nodeStructureCommands(
   const commands: unknown[] = [];
   if (node.type === 'break_object') {
     if (node.outputs !== undefined) {
-      const currentOutputs = dataPins(basePins.outputs).map((pin) => pin.id);
+      const currentDataPins = dataPins(basePins.outputs);
+      const currentOutputs = currentDataPins.map((pin) => pin.id);
       const docOutputs = node.outputs.map((pin) => pin.id);
-      if (!deepEqual(docOutputs, currentOutputs)) {
-        if (node.outputs.length > 0) {
-          commands.push({ action: 'set_break_paths', nodeId: node.id, paths: breakPathsFromSpecs(node.outputs) });
-        }
+      // Type changes on same-id paths must also re-emit (the documented
+      // "change the pin type" repair — an id-only compare made it a no-op).
+      const typeChanged = node.outputs.some((spec) => {
+        const current = currentDataPins.find((pin) => pin.id === spec.id);
+        return current !== undefined && current.type !== spec.type;
+      });
+      if ((!deepEqual(docOutputs, currentOutputs) || typeChanged) && node.outputs.length > 0) {
+        commands.push({ action: 'set_break_paths', nodeId: node.id, paths: breakPathsFromSpecs(node.outputs) });
       }
     }
   } else {
@@ -635,11 +729,99 @@ function nodeStructureCommands(
 }
 
 /**
+ * Deletion budget: a document omitting MANY existing nodes at once is far
+ * more likely a truncated/partial emission than a deliberate teardown
+ * (observed failure shape: output-cap truncation at scale). Deliberate mass
+ * deletion stays expressible via explicit `confirm_deletions`.
+ */
+function deletionBudget(currentNodeCount: number): number {
+  return Math.max(3, Math.ceil(currentNodeCount * 0.2));
+}
+
+/** Subflow ids referenced by a flow's subflow nodes. */
+function referencedSubflowIds(flow: VisualFlow): string[] {
+  const ids: string[] = [];
+  for (const node of flow.nodes) {
+    const data = node.data as { nodeType?: unknown; subflowId?: unknown };
+    if (data?.nodeType === 'subflow' && typeof data.subflowId === 'string' && data.subflowId.trim()) {
+      ids.push(data.subflowId.trim());
+    }
+  }
+  return ids;
+}
+
+/**
+ * Validate one subflow reference in the assistant lane. Returns an error
+ * string (refusal) or null (acceptable). Self-reference and reference cycles
+ * are refused HERE deliberately even though the runtime supports designed
+ * recursion — an LLM asserting a base case is not evidence of one; the
+ * manual Properties-panel path (which labels recursion explicitly) stays
+ * available and is named in the refusal.
+ */
+export function validateSubflowReference(
+  ref: string,
+  context: AuthoringDiffContext
+): string | null {
+  const savedFlows = context.savedFlows;
+  if (savedFlows && !savedFlows.some((flowSummary) => flowSummary.id === ref)) {
+    const byName = savedFlows.find((flowSummary) => flowSummary.name.toLowerCase() === ref.toLowerCase());
+    if (byName) {
+      return (
+        `subflow_ref "${ref}" matches a workflow NAME; reference workflows by their saved id — use "${byName.id}" (${byName.name}).`
+      );
+    }
+    const available = savedFlows.slice(0, 15).map((flowSummary) => `${flowSummary.id} (${flowSummary.name})`).join(', ');
+    return (
+      `subflow_ref "${ref}" does not match any saved workflow. Available: ${available || 'none — save the dependency first'}. ` +
+      'A subflow can only reference a SAVED workflow; finish and save the dependency before referencing it.'
+    );
+  }
+  if (context.currentFlowId && ref === context.currentFlowId) {
+    return (
+      `subflow_ref "${ref}" is this workflow itself — a self-reference creates recursion, which needs a designed base ` +
+      'case. Wire recursion manually in the Properties panel if intended.'
+    );
+  }
+  // Cycle walk over the graphs we have. Unfetched children end the walk —
+  // resolution is best-effort by construction, never a false refusal.
+  const resolved = context.resolvedSubflows;
+  if (resolved && context.currentFlowId) {
+    const target = context.currentFlowId;
+    const seen = new Set<string>();
+    const path: string[] = [ref];
+    const walk = (id: string): boolean => {
+      if (id === target) return true;
+      if (seen.has(id)) return false;
+      seen.add(id);
+      const child = resolved.get(id);
+      if (!child) return false;
+      for (const childRef of referencedSubflowIds(child)) {
+        path.push(childRef);
+        if (walk(childRef)) return true;
+        path.pop();
+      }
+      return false;
+    };
+    if (walk(ref)) {
+      return (
+        `subflow_ref "${ref}" creates a reference cycle back to this workflow (${[target, ...path].join(' -> ')}). ` +
+        'Recursive workflows need a designed base case; wire recursion manually in the Properties panel if intended.'
+      );
+    }
+  }
+  return null;
+}
+
+/**
  * Compile a model-emitted authoring document into the existing command batch.
  * Nodes/edges absent from the document are deleted (full document ownership);
  * pin defaults merge per key; positions of existing nodes are preserved.
  */
-export function diffAuthoringDocument(flow: VisualFlow, rawDocument: unknown): AuthoringDocumentDiff {
+export function diffAuthoringDocument(
+  flow: VisualFlow,
+  rawDocument: unknown,
+  context: AuthoringDiffContext = {}
+): AuthoringDocumentDiff {
   const currentIds = new Set(flow.nodes.map((node) => node.id));
   const document = normalizeDocument(rawDocument, currentIds);
   const errors = [...document.errors];
@@ -653,13 +835,35 @@ export function diffAuthoringDocument(flow: VisualFlow, rawDocument: unknown): A
   const docById = new Map(document.nodes.map((node) => [node.id, node]));
 
   // Deletions first (computed, emitted last via ordering rank): nodes absent
-  // from the document are removed; their edges go with them.
+  // from the document are removed; their edges go with them. Mass deletions
+  // beyond the budget require explicit confirmation.
   const deletedNodeIds = new Set<string>();
+  const impliedDeletions: string[] = [];
   for (const node of flow.nodes) {
-    if (!docById.has(node.id)) {
-      deletedNodeIds.add(node.id);
-      commands.push({ action: 'delete_node', nodeId: node.id });
-    }
+    if (!docById.has(node.id)) impliedDeletions.push(node.id);
+  }
+  const unconfirmed = impliedDeletions.filter((id) => !document.confirmDeletions.has(id));
+  if (impliedDeletions.length > deletionBudget(flow.nodes.length) && unconfirmed.length > 0) {
+    // A truncation-shaped document also carries a truncated EDGE list, so
+    // applying any of it (deletes, disconnects, "new" duplicates) would
+    // corrupt the graph. Refuse the whole batch with the repair instruction.
+    return {
+      commands: [],
+      errors: [
+        ...errors,
+        `your document omits ${impliedDeletions.length} of ${flow.nodes.length} existing nodes (${impliedDeletions
+          .slice(0, 12)
+          .join(', ')}${impliedDeletions.length > 12 ? ', …' : ''}). If this mass deletion is intentional, re-emit the ` +
+          `same document with "confirm_deletions": [${impliedDeletions.slice(0, 3).map((id) => JSON.stringify(id)).join(', ')}${
+            impliedDeletions.length > 3 ? ', …' : ''
+          }] listing every omitted node id. If it was accidental (e.g. a truncated document), re-emit the FULL document ` +
+          'including those nodes. Nothing was applied.',
+      ],
+    };
+  }
+  for (const id of impliedDeletions) {
+    deletedNodeIds.add(id);
+    commands.push({ action: 'delete_node', nodeId: id });
   }
 
   // New + changed nodes.
@@ -692,6 +896,11 @@ export function diffAuthoringDocument(flow: VisualFlow, rawDocument: unknown): A
       commands.push(addCommand);
       const basePins = { inputs: template?.inputs || [], outputs: template?.outputs || [] };
       commands.push(...nodeStructureCommands(node, null, basePins));
+      if (node.type === 'subflow' && node.subflow_ref) {
+        const refusal = validateSubflowReference(node.subflow_ref, context);
+        if (refusal) errors.push(refusal);
+        else commands.push({ action: 'set_subflow', nodeId: node.id, subflowId: node.subflow_ref });
+      }
       continue;
     }
 
@@ -735,6 +944,11 @@ export function diffAuthoringDocument(flow: VisualFlow, rawDocument: unknown): A
         outputs: current.data.outputs || [],
       })
     );
+    if (node.type === 'subflow' && node.subflow_ref && node.subflow_ref !== (current.data.subflowId || '')) {
+      const refusal = validateSubflowReference(node.subflow_ref, context);
+      if (refusal) errors.push(refusal);
+      else commands.push({ action: 'set_subflow', nodeId: node.id, subflowId: node.subflow_ref });
+    }
   }
 
   // Edge diff. Removed pins' edges are cleaned by remove_pin itself; deleted

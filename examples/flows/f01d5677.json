@@ -1,7 +1,7 @@
 {
   "id": "f01d5677",
   "name": "reproducibility",
-  "description": "",
+  "description": "Scratch flow: a single LLM call writing a 7-sentence sci-fi pitch at temperature 1 with a fixed seed, for reproducibility checks.",
   "interfaces": [],
   "nodes": [
     {

@@ -1,7 +1,7 @@
 {
   "id": "9d2256b1",
   "name": "basic",
-  "description": "",
+  "description": "Minimal web agent: passes the request to a single agent with web_search/fetch_url and returns its response.",
   "interfaces": [],
   "nodes": [
     {

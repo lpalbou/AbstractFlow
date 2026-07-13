@@ -3,9 +3,16 @@
 ## Snapshot
 - Updated: 2026-07-11
 - Planned: 0
-- Proposed: 40
+- Proposed: 41
 - Completed: 45
 - Deprecated: 0
+
+## 2026-07-11 entity-agency Phase-B precondition audit
+Item 0142 captures the adversary-verified audit of flow's Phase-B guarantee
+("basic-agent published + interfaces in the listing payload"): the shipped
+bundle vs source drift (max_iterations 20/5/50 three-way disagreement), the
+missing repack path, and the per-phase entity workflow picker contract. Build
+gated on the entity-agency + entity-config-object sign-offs (agora c713).
 
 ## 2026-07-11 general review wave
 A seven-agent adversarial review (3 authoring/usability, 3 design/UX, 1

@@ -8,6 +8,221 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- 2026-07-12 Flow Library premium pass (operator screenshot review round 2):
+  - basic-agent (81795ea9) and its ac-update-status helper (15f19f7f) join
+    the bundled catalog with a `basic-agent@0.0.1` run target — the
+    framework default agent was invisible in the library (and the Runnable
+    view) because only `dp-*` was globbed into `bundledFlows.ts`.
+  - Badge rail fade fixed: the fade zone is reserved with padding so badges
+    that FIT no longer fade at the right border; only true overflow slides
+    under the mask (operator report on the `bundle`/`bundled` pills).
+  - Same-name disambiguation: when several flows share a name (saved
+    iteration copies of dp-research), rows show a muted short-id hint and
+    lookup context lines dedupe parent names ("in dp-research", not
+    "in dp-research, dp-research").
+  - Visual refinement toward a calmer, premium read: rows are quiet list
+    lines (transparent rest state, soft hover fill, single accent hairline +
+    tint when selected — the border+ring double stroke is gone), badges are
+    hue-tinted pills, segmented All/Runnable control with a raised active
+    thumb, pill search field with softened focus ring, uppercase micro-label
+    keys in the preview panel, hairline-separated action bar, themed thin
+    scrollbars, larger modal (1020px/76vh).
+  - Expanding a family near the bottom of the list now scrolls the parent to
+    the top so the unfolded children are actually visible.
+  - `scripts/library_preview_shot.mjs`: puppeteer-core screenshot suite over
+    the library preview harness (6 states, dark+light) — chrome headless CLI
+    on macOS hangs against IPv6-only vite binds; the script pins
+    `127.0.0.1` and waits for the harness ready flag.
+- 2026-07-12 Flow Library family grouping + executable view (operator
+  green-light on backlog 0144; built with headless-render iteration and two
+  fable5 adversaries; uic recruited via the hub for the kit halves):
+  - Families are DERIVED from the subflow reference graph
+    (`src/utils/flowFamilies.ts`): first-level = normalized non-empty
+    `interfaces` OR zero external inbound; self-references never bury a flow
+    (`recursive` badge); interface-less cycles promote whole (`cycle` badge —
+    invariant: no flow is ever unreachable); dangling refs render as
+    error-toned `missing` child rows (the publish-time 400 surfaced at
+    authoring time). Shared helpers render under EVERY parent with a
+    `shared ×N` badge — rows are views, the preview is the entity.
+  - All/Executable view toggle: executable = declares an ENTRYPOINT-class
+    interface (local class facet on the known-interfaces list — today
+    `abstractcode.agent.v1`; the gateway-served registry is the planned
+    retirement path). The All view keeps every flow searchable.
+  - Search flattens (lookup mode) and matches descriptions; helper hits
+    carry an "in <parents>" context subtitle; clearing the query reveals the
+    selection by expanding its first parent.
+  - Preview panel gains a Family section (Uses / Used by with jump links);
+    Delete warns naming the parents it would break; Duplicate notes that
+    shared subflows are referenced, not copied; the false "editor will
+    auto-add the required pins" interface hint (a lost 0.3.0 feature) now
+    states honestly that pins must be wired on the canvas.
+  - Keyboard nav over VISIBLE rows (Up/Down/Right-expand/Left-collapse-or-
+    parent/Enter-load); library CSS tokenized (white-alpha literals removed;
+    light themes verified by screenshot).
+  - Dev harness `library-preview.html` + `src/preview/libraryPreview.tsx`
+    renders the modal with the dp- family + pathological fixtures for
+    chrome-headless iteration (`?view/q/expand/select/theme` params).
+  - Corpus annotation: every example flow now carries a description
+    (capability-level, derived from each graph); `recursive-answer`
+    (60a97e4d) now declares `abstractcode.agent.v1` (its boundary satisfies
+    the full contract — the nine other candidates missing success/meta pins
+    were deliberately NOT declared). basic-agent bundles repacked via the
+    sync-audited script after its source description landed.
+  - Post-build adversarial fold (two fable5 reviewers, correctness + visual):
+    instance-keyed selection (a shared helper's N rows anchor keyboard nav
+    and the ring on the CLICKED instance; other copies get a quiet dashed
+    same-flow mark), cycle leaves excluded from keyboard nav (id-aliasing
+    trapped ArrowDown), nested-helper reveal expands the full ancestor path,
+    stale selection re-inits when the runnable toggle filters it out,
+    Escape cancels an open editor without closing the modal, interface saves
+    compare as sets (uncheck+recheck no longer fires a spurious PUT),
+    delete-confirm disarms on close, collapsed parents surface a
+    "N missing" badge, node/edge count pills left the list (preview keeps
+    them), the runnable badge drops its ▶ and hides in the Runnable view,
+    tree rail + chip chevron make hierarchy pre-attentive, and every
+    remaining hardcoded color in the library CSS moved to theme tokens
+    (verified by light/latte screenshots). Derivation verified against all
+    147 corpus flows (9-parent shared helper, diamond, 7 self-refs,
+    dangling refs — zero unreachable flows).
+- 2026-07-12 authoring-assistant overhaul (operator directive: better
+  visuals/realtime information/user-facing messages + complex-workflow
+  capability, composition, and a build→test loop; designs from five
+  adversarial audits):
+  - Workflow COMPOSITION (stage 1): `subflow_ref` is now authorable in the
+    workflow document — the diff resolves it against the saved-workflow
+    list (unknown refs refused with the available ids; name-shaped refs
+    redirected to the id; self-references and reference cycles refused
+    naming the manual Properties-panel recursion path) and compiles to a
+    new `set_subflow` command that patches the node's pins from the child's
+    boundary via the existing `subflowPinPatchForSelectedFlow` machinery.
+    The serializer emits a read-only `subflow_interface` context block so
+    the model can wire edges correctly, and the prompt carries an
+    AVAILABLE WORKFLOWS section. New skill-doc section
+    "Composing Workflows (Subflow)". The catalog is a PICK-TIME contract
+    surface (follow-up, same day): per saved workflow it lists id, name,
+    purpose (flow description), and the boundary contract — inputs with
+    types/required-or-default/pin descriptions, and outputs — derived
+    client-side from the full graphs the visualflows collection already
+    returns (`workflowContractSummary`); the same fetch now seeds the
+    subflow graph cache, so cycle detection covers the whole library and
+    `set_subflow` pin patching needs no second fetch. The current flow is
+    listed but marked non-referenceable.
+  - Mass-deletion guard: a document omitting more than max(3, 20%) of
+    existing nodes is refused whole (truncation-shaped emission) with a
+    `confirm_deletions` repair path — deliberate teardowns stay
+    expressible, accidental graph wipes cannot happen.
+  - Dynamic-pin upgrades: same-id type changes compile to a new
+    `update_pin` command (in-place retype; incompatible edges dropped with
+    named warnings — the previously documented-but-unimplementable repair),
+    and pins round-trip `description` + `schema` (e.g. array-of-file
+    boundary inputs).
+  - Draft TEST loop (stage 1): a consented "Test run" card in the drawer —
+    entry-pin input form (required detection from pin defaults), draft
+    publish + isolated-session run (`assistant-test:<workflow>` session,
+    `draft_test`/ephemeral lifecycle), live tool-approval and ask-user
+    surfacing with Approve/Deny/reply (subworkflow waits followed to the
+    owning descendant run), wall-clock watchdog with cancel, and a
+    structured verdict report (failed steps with node labels + verbatim
+    errors + `#TRUNCATION`-labeled input previews). The report feeds the
+    NEXT planning turn as a `LAST TEST RUN` prompt section (consume-once),
+    closing the build→test→fix loop. Mechanics in
+    `src/utils/draftTestRun.ts` (+ tests).
+  - General structural readiness floor (all workflows, each check
+    satisfiable by wiring or omitting): unreachable execution nodes (the
+    runtime silently drops them), loop nodes without a body / while without
+    a condition, subflow nodes without a referenced workflow (previously an
+    opaque publish-time 400), On Flow End with declared-but-unwired data
+    pins, on_schedule without a schedule.
+
+### Changed
+- 2026-07-12 assistant message contract (the maintainer's complaint:
+  "dumping the list of changes is not really useful"): turn messages are
+  OUTCOME-FIRST — model-authored headline (≤12 words), capability-level
+  "What changed" bullets (new `changes_summary` plan field; fallback is a
+  one-line verb-bucket summary, never a per-command dump), "Check next"
+  steps, every aggregated warning rendered VERBATIM as a ⚠ caveat line
+  (never "N notes recorded" — includes #FALLBACK review-skips and stall
+  explanations), an explicit verification line when the acceptance review
+  passed, and a stats footer (changes · cycles · duration · tokens).
+  Process narration (How It Works / How To Test / What To Expect / Workflow
+  Plan + short repair/readiness forms) folds into one collapsed "Turn
+  report" details block. needs_user renders question-first with neutral
+  (not error) styling; cycle-cap exhaustion is a PAUSED message with
+  continue/raise-cap guidance, not a failure; failures are three lines
+  (what/why/try) with full forensics moved to the activity payload
+  inspector. Welcome message rewritten user-first.
+- 2026-07-12 assistant visual system: drawer header with flow name + state
+  pill (idle/running/waiting/done/failed — needs_user/stall/interrupt wear
+  warning, never error); stage chips (PLANNING=info/APPLYING=warning/
+  CHECKING=success); "Cycle N/MAX" header with a cycle-budget progress
+  track; live model-declared plan strip (steps + next, no invented
+  checkmarks); activity feed with glyph marks (shape+color, never color
+  alone), a new 'notice' kind for routine self-corrections (amber, not
+  red), sticky cycle headers, 32vh height while running, and a
+  scroll-trap-free payload inspector; theme-token message surfaces (the
+  white-alpha bubbles were invisible on all 6 light themes) with turn
+  separators carrying outcome stats; user messages render literal (never
+  parsed as markdown); Monaco code colorize follows the app theme
+  (light themes get 'vs'); reduced-motion gates on spinner/pulse.
+  Component extraction: the 3.6k-line drawer split into
+  `src/components/assistant/` (status card, message list, composer, test
+  card, messages/activity/settings modules).
+- 2026-07-12 runtime contract note: the visual `llm_call` executor dropped
+  provider+model from the effect when only one resolved (the taught
+  model-pool pattern silently ran on gateway defaults). Runtime fixed it
+  same-turn (forward-independently, abstractruntime `5578779`); preflight's
+  pairing rule now cites the runtime pin file
+  (`tests/test_visual_llm_call_partial_override.py`).
+
+### Fixed
+- 2026-07-12 post-implementation adversarial round (fixes shipped with the
+  wave; full findings in backlog 0143): branch-aware reachability for the
+  unreachable-node readiness check (loop/if/switch/sequence bodies are
+  reachable — an exec-out-only walk flagged every non-linear workflow);
+  second-approval surfacing + honest `needs_interactive_input` watchdog
+  verdicts in the test loop; ask_user prompts read from the wait's real
+  top-level field; nested-redacted pin defaults no longer break the
+  document round-trip; in-flight test approvals stay reachable during
+  authoring turns and Clear Chat stops/clears the test state;
+  needs_user-with-changes keeps the model's question; break_object same-id
+  retype re-emits; test reports walk the full run tree; follow-live
+  autoscroll wired to the activity log (scroll up to read without yanking,
+  Follow ↓ re-arms).
+- 2026-07-11 basic-agent sync + ruled iteration defaults (maintainer ruling,
+  agora commons c726: "the workflow decides" — a bundle pinDefault is
+  authoritative design; source and shipped bundle must be in sync at
+  max_iterations=20; any agent max_iterations DEFAULT is 20, not 50):
+  - `examples/flows/81795ea9.json`: on_flow_start pinDefaults
+    max_iterations 5 -> 20, reverting an accidental drift introduced by an
+    unrelated 2026-01-30 commit (`2658f45`). The source (with its newer
+    memory pin) is authoritative; both shipped bundle artifacts
+    (`abstractgateway/flows/bundles/basic-agent.flow` and
+    `basic-agent@0.0.1.flow`) were repacked from it — byte-identical flow
+    payloads, `abstractcode.agent.v1` interface intact.
+  - Agent max_iterations editor defaults 50 -> 20: template seed
+    (`src/types/nodes.ts`), legacy-flow backfill (`src/utils/serialization.ts`
+    — which now also skips edge-connected pins: writing a dead default
+    churned saved bytes and desynced packed bundles from source for zero
+    runtime behavior), pin-disclosure display map
+    (`src/utils/nodePinDisclosure.ts`). Deep-research guidance
+    (`AuthoringAssistantDrawer`, `docs/architecture.md`,
+    `docs/workflow-authoring-skill.md`) now presents `max_iterations >= 50`
+    as the recipe's explicit workflow choice, never "the default".
+    Generated docs (`docs/workflow-node-catalog.md`, `llms-full.txt`)
+    regenerated. Regression pins in
+    `src/utils/agentIterationDefaults.test.ts` (seed=20, backfill=20,
+    explicit values preserved at any number, no backfill when the pin is
+    edge-connected).
+
+### Added
+- 2026-07-11 `scripts/build_basic_agent_bundle.py` (pack | check): rebuilds
+  the shipped basic-agent bundles from `examples/flows/` and audits
+  source/shipped SYNC — byte-identity per flow file, manifest flow-set
+  completeness (checked against a temp pack through the real packer, so a
+  tampered manifest dropping a reachable subflow fails), loadability through
+  `open_workflow_bundle`, interface declaration, and the ruled
+  max_iterations pin. Publish-time refusal replaces commit archaeology for
+  the January drift class.
 - 2026-07-11 run-modal visual pass ("quiet card, loud state"): a visible
   aesthetic upgrade of the run experience, theme-safe across all 16 themes.
   - Launch view: the Workflow Parameters card leads with an accent-tinted

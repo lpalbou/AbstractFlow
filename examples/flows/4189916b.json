@@ -1,7 +1,7 @@
 {
   "id": "4189916b",
   "name": "advanced-agent",
-  "description": "",
+  "description": "Agent pipeline with host status updates: enriches the request, pauses to ask the user accept/deny on the enriched version, plans tasks, then a ReAct agent executes the request plus the joined tasks.",
   "interfaces": [
     "abstractcode.agent.v1"
   ],

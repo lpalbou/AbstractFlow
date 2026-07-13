@@ -1,7 +1,7 @@
 {
   "id": "31eae641",
   "name": "ralph-agent-v3",
-  "description": "",
+  "description": "RALPH-loop coding agent v3: promise-gated while loop that re-prompts the agent with random nudges until it outputs the exact <promise> statement, then reports the answer plus the stringified conversation context.",
   "interfaces": [
     "abstractcode.agent.v1"
   ],

@@ -1,7 +1,7 @@
 {
   "id": "4050e15e",
   "name": "benchmark",
-  "description": "",
+  "description": "Benchmark: fires the same 10-sentence story prompt at seven parallel LLM calls, then splits each response on periods and reports its sentence count.",
   "nodes": [
     {
       "id": "node-1",

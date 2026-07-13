@@ -1,7 +1,7 @@
 {
   "id": "07935658",
   "name": "ac-basic",
-  "description": "",
+  "description": "Empty abstractcode.agent.v1 skeleton: On Flow Start and On Flow End with nothing wired between them.",
   "interfaces": [
     "abstractcode.agent.v1"
   ],

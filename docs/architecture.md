@@ -100,8 +100,9 @@ recomputes preflight/readiness issues, and continues until the graph is ready
 or explicitly blocked. Nodes and edges omitted from the document are deleted
 (removal is implicit; deletions remain undoable via Undo Turn). Research,
 news, job-search, and deep-research requests are checked for a multi-step
-scaffold: start inputs, prompt building, explicit tools, an Agent with the
-standard `max_iterations=50` setting, and end outputs.
+scaffold: start inputs, prompt building, explicit tools, an Agent with an
+explicit `max_iterations >= 50` budget (a deliberate workflow choice for deep
+iterative work; the unset default is 20), and end outputs.
 
 Model output is restricted to the document JSON. The editor refuses changes
 that would embed secrets, create unknown templates, bypass connection

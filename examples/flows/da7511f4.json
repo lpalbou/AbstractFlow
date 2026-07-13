@@ -1,7 +1,7 @@
 {
   "id": "da7511f4",
   "name": "deep-research",
-  "description": "",
+  "description": "Deep-research flow: refines the query via the clarify-query subflow, then a web agent (web_search/fetch_url) iteratively searches and reads at least min_sources sources and returns a structured, referenced report.",
   "nodes": [
     {
       "id": "node-2",

@@ -1,7 +1,7 @@
 {
   "id": "3fb80ad4",
   "name": "test-triples",
-  "description": "",
+  "description": "Scratch/test harness for the ltm-ai-kg-extract-triples subflow: extracts triples from a test text and prints the raw output.",
   "interfaces": [],
   "nodes": [
     {

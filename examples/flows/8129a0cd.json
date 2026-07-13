@@ -1,7 +1,7 @@
 {
   "id": "8129a0cd",
   "name": "critical-answer",
-  "description": "",
+  "description": "Three-stage answer refinement: one LLM infers the intent and context behind the query, a second drafts a direct answer, and a third critiques and delivers the final revised answer.",
   "nodes": [
     {
       "id": "node-1",

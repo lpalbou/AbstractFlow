@@ -1,7 +1,7 @@
 {
   "id": "ac-advanced-agent",
   "name": "AbstractCode Advanced Agent",
-  "description": "",
+  "description": "Runnable agent composed from subflows: delegates the whole turn to the recursive-answer engine (task decomposition + recursion) plus a preparation helper.",
   "interfaces": [
     "abstractcode.agent.v1"
   ],

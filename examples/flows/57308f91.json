@@ -1,7 +1,7 @@
 {
   "id": "57308f91",
   "name": "enriched-agent",
-  "description": "",
+  "description": "Agent wrapper: enriches the prompt via the request-enricher subflow, runs a ReAct agent on the enriched request, and reports host status updates throughout.",
   "interfaces": [
     "abstractcode.agent.v1"
   ],

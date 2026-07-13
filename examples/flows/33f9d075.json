@@ -1,7 +1,7 @@
 {
   "id": "33f9d075",
   "name": "Untitled Flow",
-  "description": "",
+  "description": "Scratch flow: routes the request into a single agent with web_search/fetch_url and returns its response (same shape as the basic example).",
   "interfaces": [],
   "nodes": [
     {

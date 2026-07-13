@@ -1,7 +1,7 @@
 {
   "id": "db535990",
   "name": "agent-semantics",
-  "description": "",
+  "description": "Semantic-extraction agent: a web agent instructed to return findings as subject-predicate-object triples via a response schema; wired with a placeholder schema. Simpler variant of agent-semantics (462808d4).",
   "interfaces": [],
   "nodes": [
     {

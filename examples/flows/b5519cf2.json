@@ -1,7 +1,7 @@
 {
   "id": "b5519cf2",
   "name": "agent-scratchpad",
-  "description": "",
+  "description": "Scratch/test flow: runs one file-reading agent on the query and prints its response followed by the raw scratchpad, to inspect what the agent recorded.",
   "interfaces": [],
   "nodes": [
     {

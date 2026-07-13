@@ -1,7 +1,7 @@
 {
   "id": "051b6c9b",
   "name": "debate-topic",
-  "description": "",
+  "description": "Stages a five-turn debate between two LLM personas on the given topic over shared context, memorizing the topic, then a third LLM concludes with each speaker's conclusions and perspectives.",
   "interfaces": [],
   "nodes": [
     {

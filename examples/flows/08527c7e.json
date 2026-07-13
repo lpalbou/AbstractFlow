@@ -1,7 +1,7 @@
 {
   "id": "08527c7e",
   "name": "memory-tests-compact",
-  "description": "",
+  "description": "Memory-compaction test: an LLM writes a multi-page story saved to story.md, then conversation memory is compacted into a back-cover-style summary and a note is memorized, with results reported to the user.",
   "interfaces": [],
   "nodes": [
     {

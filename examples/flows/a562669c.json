@@ -1,7 +1,7 @@
 {
   "id": "a562669c",
   "name": "answer-with-review",
-  "description": "",
+  "description": "Two-pass answer: one LLM answers the query, then a second call critically reviews that answer for mistakes and inconsistencies and delivers the final version.",
   "interfaces": [],
   "nodes": [
     {

@@ -67,9 +67,12 @@ Node fields:
   `concat_separator` (Concat).
 - `position`: optional; omit it and existing nodes stay where the user put
   them while new nodes are auto-laid-out by execution depth.
-- `agent_config` / `effect_config` / `subflow_id` appear in the serialized
-  current document as read-only context; do not author them — use
-  `pin_defaults` instead.
+- `agent_config` / `effect_config` appear in the serialized current document
+  as read-only context; do not author them — use `pin_defaults` instead.
+- `subflow_ref` (subflow nodes): the SAVED workflow id this node executes —
+  AUTHORABLE. See "Composing Workflows (Subflow)". The serialized
+  `subflow_interface` block beside it is read-only context showing the
+  referenced workflow's data pins so you can wire edges correctly.
 
 Edges are `"sourceNode.sourcePin -> targetNode.targetPin"` strings.
 
@@ -80,10 +83,20 @@ Ownership semantics:
 - Anything you omit is DELETED. Nodes and edges absent from your document are
   removed from the canvas. Never label a node "unused" or ask the user to
   remove anything — omit it and it is gone.
+- MASS-DELETION GUARD: a document that omits MANY existing nodes at once is
+  refused as a likely truncated emission and nothing is applied. If a large
+  teardown is genuinely intended, re-emit the same document plus a top-level
+  `"confirm_deletions": ["node-id", ...]` listing every omitted node id.
 - Values shown as `<redacted>` are secrets; re-emit them verbatim or omit
   them. Never invent replacements.
 - Re-emitting an unchanged document changes nothing and counts as a stalled
   cycle.
+- Changing a dynamic pin's TYPE is supported: re-emit the pin with the same
+  id and the new type; the editor retypes it in place and drops
+  now-incompatible edges with named warnings. Dynamic pins also accept
+  optional `description` and `schema` (JSON-schema fragment; e.g.
+  `{"type":"array","items":{"type":"string","x-abstract-type":"file"}}` for a
+  multi-file boundary input).
 
 ## Authoring Loop
 
@@ -318,7 +331,9 @@ research, planning, multi-source synthesis):
   requirements, iteration strategy, final output contract.
 - `prompt` carries the concrete task (usually from String Template).
 - `tools` from Tools Allowlist or discovered runtime tool names.
-- `max_iterations` 50 for deep iterative work unless the user asks smaller.
+- `max_iterations` 50 for deep iterative work unless the user asks smaller
+  (an explicit workflow choice — the unset default is 20; the workflow's
+  authored value is authoritative at any number).
 - `resp_schema` when downstream needs structured fields; wire `agent.data` ->
   Break Object. `agent.response` is final text. `agent.scratchpad` is for
   audit/trace only. `agent.meta` is execution metadata — never sources,
@@ -608,6 +623,37 @@ On Flow End; optional Markdown/CSV file outputs.
 Ask User only when the workflow must pause mid-execution; On Flow Start inputs
 for normal parameters; Answer User for host-visible messages; Wait Event for
 durable external waits.
+
+### Composing Workflows (Subflow)
+
+Workflows compose: a `subflow` node executes another SAVED workflow as one
+step, with the child's On Flow Start outputs becoming the node's data inputs
+and its On Flow End inputs becoming the node's data outputs. Composition is
+how complex systems stay modular — build the reusable piece as its own
+workflow, then reference it.
+
+- Reference by SAVED id: `{"id": "run-analysis", "type": "subflow",
+  "subflow_ref": "3af1b2c9"}`. The AVAILABLE WORKFLOWS section of your context
+  is the pick-time catalog: per saved workflow it lists the id, name, purpose
+  (description), and the full boundary contract — inputs (with types,
+  required/default status, and pin descriptions) and outputs. Choose the
+  composition target by that contract and plan edges against exactly those
+  pins. Reference ids from that list only; a name is not an id; an unknown
+  reference is refused with the available list.
+- The editor patches the node's pins from the referenced workflow's boundary
+  when the reference is set; wire edges to the pins shown in the serialized
+  `subflow_interface` context. `inherit_context: true` passes the parent's
+  conversation context into the child.
+- Per-item composition: ForEach.item -> the subflow node's matching input,
+  inside the loop body.
+- Dependencies must be SAVED before they can be referenced. When the request
+  needs a workflow that does not exist yet ("create workflow2, then create
+  workflow1 that uses workflow2"), say so in your reply and build the
+  dependency FIRST (ask the user to save it, or author it in its own
+  conversation) — then reference its saved id. Never invent an id.
+- Self-reference and reference cycles are refused in assistant authoring
+  (recursion needs a designed base case; the Properties panel remains the
+  manual path for deliberate recursion).
 
 ## Validation And Repair
 

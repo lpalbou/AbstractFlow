@@ -1,7 +1,7 @@
 {
   "id": "8dfdea6b",
   "name": "ac-advanced-agent",
-  "description": "",
+  "description": "abstractcode.agent.v1 entrypoint: enriches and plans the prompt via the planner-enricher subflow, then delegates execution to the recursive-answer subflow and returns its result.",
   "interfaces": [
     "abstractcode.agent.v1"
   ],

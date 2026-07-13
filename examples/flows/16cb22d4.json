@@ -1,7 +1,7 @@
 {
   "id": "16cb22d4",
   "name": "refactoring",
-  "description": "",
+  "description": "Runs a code agent with read-only analysis tools (list, read, search, analyze) on the prompt and reports the response plus the joined scratchpad messages.",
   "interfaces": [
     "abstractcode.agent.v1"
   ],

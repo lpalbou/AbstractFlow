@@ -1,7 +1,7 @@
 {
   "id": "b991bd18",
   "name": "clarify-query",
-  "description": "",
+  "description": "Query-clarification step: when follow_up is set, an LLM drafts up to five clarifying questions, asks the user, and returns the query combined with questions and answers; otherwise the query passes through unchanged.",
   "nodes": [
     {
       "id": "node-1",

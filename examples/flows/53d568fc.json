@@ -1,7 +1,7 @@
 {
   "id": "53d568fc",
   "name": "react",
-  "description": "",
+  "description": "Hand-built ReAct loop from primitives: while iterations remain, an in-context LLM call either requests tools (each executed via Call Tool) or ends the loop by answering without tools.",
   "interfaces": [
     "abstractcode.agent.v1"
   ],

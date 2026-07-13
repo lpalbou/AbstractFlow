@@ -74,6 +74,13 @@ function artifactInputPresent(edges: Edge[], node: Node<FlowNodeData>, ...handle
  * The rule now fires only for half-typed DEFAULTS (one side typed, the other
  * blank and unconnected) — an actionable state — and the message names the
  * current values so both users and the authoring model can see what to fix.
+ *
+ * Runtime contract note (2026-07-12): the visual llm_call executor used to
+ * DROP both provider and model from the effect when only one resolved — the
+ * model-pool pattern silently ran on gateway defaults. Fixed runtime-side to
+ * forward independently (abstractruntime commit 5578779, pinned by
+ * tests/test_visual_llm_call_partial_override.py). This rule's
+ * connected-pins-are-resolved stance is the ruled contract on both sides.
  */
 function providerModelPairingIssue(
   edges: Edge[],

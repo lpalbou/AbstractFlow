@@ -1,7 +1,7 @@
 {
   "id": "e70fd541",
   "name": "Untitled Flow",
-  "description": "",
+  "description": "Scratch flow: a single LLM call asking for 'the craziest idea' at temperature 2 with a fixed seed - a sampling experiment.",
   "interfaces": [],
   "nodes": [
     {

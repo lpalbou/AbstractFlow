@@ -1,7 +1,7 @@
 {
   "id": "51746c7b",
   "name": "basic-enricher-agent",
-  "description": "",
+  "description": "Agent wrapper with host status updates: enriches the incoming prompt via the request-enricher subflow, then runs the main agent loop on the enriched request.",
   "interfaces": [
     "abstractcode.agent.v1"
   ],

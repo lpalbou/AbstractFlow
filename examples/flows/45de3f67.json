@@ -1,7 +1,7 @@
 {
   "id": "45de3f67",
   "name": "send-email",
-  "description": "",
+  "description": "Email-sending agent: composes and sends a status email through the send_email tool using credentials embedded in the prompt, then reports the result.",
   "interfaces": [],
   "nodes": [
     {

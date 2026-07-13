@@ -1,7 +1,7 @@
 {
   "id": "885afffc",
   "name": "task-scheduler",
-  "description": "",
+  "description": "Task-decomposition step: one LLM call turns the request into a schema-typed task schedule (id, description, tools, priority) and returns it; the default prompt targets a procedural R-Type clone.",
   "interfaces": [],
   "nodes": [
     {

@@ -1,7 +1,7 @@
 {
   "id": "a49d80c3",
   "name": "schedule",
-  "description": "",
+  "description": "Scheduler demo: a recurrent 10-second On Schedule trigger that reports each tick's timestamp to the user.",
   "nodes": [
     {
       "id": "node-1",

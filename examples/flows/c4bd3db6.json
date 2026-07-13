@@ -1,7 +1,7 @@
 {
   "id": "c4bd3db6",
   "name": "basic-llm",
-  "description": "",
+  "description": "abstractcode.agent.v1 entrypoint: a single in-context LLM call whose requested tool calls are executed once (no loop) before the response is returned.",
   "interfaces": [
     "abstractcode.agent.v1"
   ],

@@ -1,7 +1,7 @@
 {
   "id": "ef1d4a25",
   "name": "benchmark-personality",
-  "description": "",
+  "description": "Personality benchmark: runs five forced-choice scenarios through the smart-selector subflow (exploration, locus of control, empathy, ego rigidity, ambiguity tolerance), then an evaluator LLM composes a schema-typed profile.",
   "interfaces": [],
   "nodes": [
     {

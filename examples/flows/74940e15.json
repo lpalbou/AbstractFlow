@@ -1,7 +1,7 @@
 {
   "id": "74940e15",
   "name": "answer-user",
-  "description": "",
+  "description": "Toy flow: one LLM call that greets the user by name and answers their message, returning the answer.",
   "interfaces": [],
   "nodes": [
     {

@@ -1,7 +1,7 @@
 {
   "id": "3b5d252b",
   "name": "test-kg",
-  "description": "",
+  "description": "Scratch/test flow exercising the memory node set - note, recall, tag, compact, rehydrate - plus KG assert/query with hardcoded example triples.",
   "interfaces": [],
   "nodes": [
     {

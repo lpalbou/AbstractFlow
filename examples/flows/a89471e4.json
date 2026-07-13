@@ -1,7 +1,7 @@
 {
   "id": "a89471e4",
   "name": "test-retrieval",
-  "description": "",
+  "description": "Scratch/test harness for the ltm-ai-kg-query subflow: runs a query (predicate occurs_in, all scopes), then prints the status, each returned item, and the rendered result.",
   "interfaces": [],
   "nodes": [
     {

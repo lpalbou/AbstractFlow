@@ -1,6 +1,7 @@
 import type { Edge, Node } from 'reactflow';
-import type { FlowNodeData, JsonValue, NodeType, Pin, PinType } from '../types/flow';
+import type { FlowNodeData, JsonValue, NodeType, Pin, PinType, VisualFlow } from '../types/flow';
 import { createNodeData, getAllNodeTemplates, getNodeTemplate, type NodeTemplate } from '../types/nodes';
+import { subflowPinPatchForSelectedFlow } from './subflowPins';
 import { getConnectionError, inferRouteOverrideRouteKey, validateConnection } from './validation';
 
 export interface FlowAuthoringSnapshot {
@@ -17,6 +18,12 @@ export interface FlowAuthoringApplyInput {
   edges: Edge[];
   commands: unknown[];
   allowDestructive?: boolean;
+  /**
+   * Saved child workflows keyed by id, pre-fetched by the caller so
+   * `set_subflow` can patch the node's pins from the child's boundary
+   * interface. Apply stays a pure function — no I/O in here.
+   */
+  resolvedSubflows?: Map<string, VisualFlow>;
 }
 
 export interface FlowAuthoringApplyResult {
@@ -1128,7 +1135,15 @@ export function applyFlowAuthoringCommands(input: FlowAuthoringApplyInput): Flow
         warnings.push(`${nodeId}.${id} already exists`);
         continue;
       }
-      const pin: Pin = { id, label, type };
+      const description = cleanText(command.description, 600);
+      const schema = asRecord(command.schema);
+      const pin: Pin = {
+        id,
+        label,
+        type,
+        ...(description ? { description } : {}),
+        ...(schema && Object.keys(schema).length > 0 ? { schema } : {}),
+      };
       nodes = nodes.map((item) => {
         if (item.id !== nodeId) return item;
         if (!isInput && item.data.nodeType === 'break_object') {
@@ -1210,6 +1225,149 @@ export function applyFlowAuthoringCommands(input: FlowAuthoringApplyInput): Flow
       }
       touched.add(nodeId);
       applied.push(`Removed ${side} ${nodeId}.${id}`);
+      continue;
+    }
+
+    if (kind === 'update_pin') {
+      // In-place retype/redoc of a dynamic pin. Exists because the id-only
+      // pin diff cannot express a type change (the documented repair "change
+      // the target dynamic pin type" was unimplementable — re-emitting the
+      // pin compiled to zero commands). Attached edges are re-validated
+      // against the new type; ones that no longer connect are dropped LOUDLY.
+      const nodeId = resolveNodeId(command.nodeId || command.node_id, idMap);
+      const node = nodeById(nodes, nodeId);
+      const id = normalizeId(command.id || command.pin || command.pinId || command.pin_id, '');
+      if (!node || !id) {
+        errors.push(`update_pin requires an existing node and pin id (${nodeId || 'missing'}.${id || 'missing'})`);
+        continue;
+      }
+      const sideRaw = cleanText(command.side, 12).toLowerCase();
+      const side: 'input' | 'output' =
+        sideRaw === 'input' || sideRaw === 'output' ? sideRaw : pinExists(node, id, 'input') ? 'input' : 'output';
+      const updatable =
+        side === 'input' ? DYNAMIC_INPUT_NODE_TYPES.has(node.data.nodeType) : DYNAMIC_OUTPUT_NODE_TYPES.has(node.data.nodeType);
+      if (!updatable) {
+        errors.push(`update_pin refused template-owned ${side} pin ${nodeId}.${id}; only dynamic pins are updatable`);
+        continue;
+      }
+      const existing = pinById(node, id, side);
+      if (!existing) {
+        errors.push(`update_pin: ${nodeId}.${id} does not exist (side ${side})`);
+        continue;
+      }
+      if (existing.type === 'execution') {
+        errors.push(`update_pin refused execution pin ${nodeId}.${id}`);
+        continue;
+      }
+      const requestedType = command.pinType || command.pin_type || command.type;
+      const nextType = requestedType !== undefined
+        ? inferredPinType(id, cleanText(command.label, 80) || existing.label || id, requestedType, existing.type)
+        : existing.type;
+      if (nextType === 'execution') {
+        errors.push(`update_pin cannot retype ${nodeId}.${id} to execution`);
+        continue;
+      }
+      const nextLabel = cleanText(command.label, 80) || existing.label;
+      const nextDescription = command.description !== undefined ? cleanText(command.description, 600) : existing.description;
+      const schemaRecord = asRecord(command.schema);
+      const nextSchema = command.schema !== undefined ? (schemaRecord || undefined) : existing.schema;
+      const nextPin: Pin = { id: existing.id, label: nextLabel, type: nextType };
+      if (nextDescription) nextPin.description = nextDescription;
+      if (nextSchema && Object.keys(nextSchema).length > 0) nextPin.schema = nextSchema;
+      nodes = nodes.map((item) => {
+        if (item.id !== nodeId) return item;
+        const pins = side === 'input' ? item.data.inputs || [] : item.data.outputs || [];
+        const nextPins = pins.map((entry) => (entry.id === id ? nextPin : entry));
+        return side === 'input'
+          ? { ...item, data: { ...item.data, inputs: nextPins } }
+          : { ...item, data: { ...item.data, outputs: nextPins } };
+      });
+      if (nextType !== existing.type) {
+        // Re-validate attached edges under the new type; drop broken ones loudly.
+        const attached = edges.filter(
+          (edge) =>
+            (edge.source === nodeId && edge.sourceHandle === id) || (edge.target === nodeId && edge.targetHandle === id)
+        );
+        const dropped: Edge[] = [];
+        for (const edge of attached) {
+          const stillValid = validateConnection(
+            nodes,
+            edges.filter((entry) => entry.id !== edge.id),
+            { source: edge.source, sourceHandle: edge.sourceHandle ?? null, target: edge.target, targetHandle: edge.targetHandle ?? null }
+          );
+          if (!stillValid) dropped.push(edge);
+        }
+        if (dropped.length > 0) {
+          edges = edges.filter((edge) => !dropped.includes(edge));
+          for (const edge of dropped) {
+            warnings.push(
+              `Retyping ${nodeId}.${id} to ${nextType} dropped incompatible edge ${edge.source}.${edge.sourceHandle} -> ${edge.target}.${edge.targetHandle}`
+            );
+          }
+        }
+      }
+      touched.add(nodeId);
+      applied.push(`Updated ${side} ${nodeId}.${id}${nextType !== existing.type ? ` type ${existing.type} -> ${nextType}` : ''}`);
+      continue;
+    }
+
+    if (kind === 'set_subflow') {
+      // Composition seam: point a subflow node at a saved workflow and patch
+      // its pins from the child's boundary interface — the exact machinery
+      // the Properties panel uses, applied through the validated batch.
+      const nodeId = resolveNodeId(command.nodeId || command.node_id, idMap);
+      const node = nodeById(nodes, nodeId);
+      if (!node) {
+        errors.push(`set_subflow requires an existing node (${nodeId || 'missing'})`);
+        continue;
+      }
+      if (node.data.nodeType !== 'subflow') {
+        errors.push(`set_subflow refused: ${nodeId} is a ${node.data.nodeType} node, not a subflow`);
+        continue;
+      }
+      const subflowId = cleanText(command.subflowId || command.subflow_id || command.subflowRef || command.subflow_ref, 160);
+      if (!subflowId) {
+        errors.push('set_subflow requires a subflowId');
+        continue;
+      }
+      const child = input.resolvedSubflows?.get(subflowId);
+      const currentData = node.data;
+      const nextData: FlowNodeData = { ...currentData, subflowId };
+      if (child) {
+        const patch = subflowPinPatchForSelectedFlow(nextData, child);
+        if (patch) {
+          nextData.inputs = patch.inputs;
+          nextData.outputs = patch.outputs;
+        }
+        if (!nextData.label || nextData.label === 'Subflow') nextData.label = child.name || nextData.label;
+      } else {
+        warnings.push(
+          `set_subflow: workflow ${subflowId} was not resolvable for pin patching; pins keep their current shape until the child flow is loaded`
+        );
+      }
+      const previousPins = new Set([
+        ...(currentData.inputs || []).map((pin) => `in:${pin.id}`),
+        ...(currentData.outputs || []).map((pin) => `out:${pin.id}`),
+      ]);
+      nodes = nodes.map((item) => (item.id === nodeId ? { ...item, data: nextData } : item));
+      // Pins that vanished with the new interface take their edges with them.
+      const survivingIn = new Set((nextData.inputs || []).map((pin) => pin.id));
+      const survivingOut = new Set((nextData.outputs || []).map((pin) => pin.id));
+      const droppedEdges = edges.filter((edge) => {
+        if (edge.target === nodeId && previousPins.has(`in:${edge.targetHandle}`) && !survivingIn.has(String(edge.targetHandle))) return true;
+        if (edge.source === nodeId && previousPins.has(`out:${edge.sourceHandle}`) && !survivingOut.has(String(edge.sourceHandle))) return true;
+        return false;
+      });
+      if (droppedEdges.length > 0) {
+        edges = edges.filter((edge) => !droppedEdges.includes(edge));
+        for (const edge of droppedEdges) {
+          warnings.push(
+            `Subflow interface change dropped edge ${edge.source}.${edge.sourceHandle} -> ${edge.target}.${edge.targetHandle}`
+          );
+        }
+      }
+      touched.add(nodeId);
+      applied.push(`Set ${nodeId} subflow to ${subflowId}${child?.name ? ` (${child.name})` : ''}`);
       continue;
     }
 

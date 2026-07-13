@@ -1,10 +1,22 @@
 import type { VisualFlow } from '../types/flow';
 import type { PublishedBundleTarget } from './workflowBundles';
 
-const bundledFlowModules = import.meta.glob<VisualFlow>('../../examples/flows/dp-*.json', {
-  eager: true,
-  import: 'default',
-});
+// Bundled read-only catalog: the dp- research family + the framework default
+// basic-agent (81795ea9) with its status helper (15f19f7f). basic-agent ships
+// as a gateway bundle but was invisible in the library (and in the Runnable
+// view) because only dp-* was globbed — "it's used everywhere" and the
+// library couldn't show it.
+const bundledFlowModules = import.meta.glob<VisualFlow>(
+  [
+    '../../examples/flows/dp-*.json',
+    '../../examples/flows/81795ea9.json',
+    '../../examples/flows/15f19f7f.json',
+  ],
+  {
+    eager: true,
+    import: 'default',
+  }
+);
 
 const bundledRunTargets: Record<string, PublishedBundleTarget> = {
   'dp-research': {
@@ -12,6 +24,12 @@ const bundledRunTargets: Record<string, PublishedBundleTarget> = {
     bundleId: 'dp-research',
     bundleVersion: '0.1.0',
     bundleRef: 'dp-research@0.1.0',
+  },
+  '81795ea9': {
+    flowId: '81795ea9',
+    bundleId: 'basic-agent',
+    bundleVersion: '0.0.1',
+    bundleRef: 'basic-agent@0.0.1',
   },
 };
 

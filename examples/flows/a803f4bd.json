@@ -1,7 +1,7 @@
 {
   "id": "a803f4bd",
   "name": "test",
-  "description": "",
+  "description": "Scratch flow: a single Ask User prompt ('who are you ?') with no further processing.",
   "interfaces": [],
   "nodes": [
     {

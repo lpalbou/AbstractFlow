@@ -1,7 +1,7 @@
 {
   "id": "c999b3a3",
   "name": "discussion",
-  "description": "",
+  "description": "Runs a five-round open-ended discussion between two LLM personas over shared context, each speaking once per round. Simpler sibling of debate-topic without a topic input or concluding summary.",
   "interfaces": [],
   "nodes": [
     {
