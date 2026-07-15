@@ -766,6 +766,26 @@ describe('AuthoringAssistantDrawer plan response tolerance', () => {
     expect(parsePlan('{"status":"needs_user","reply":"which provider?"}')?.status).toBe('needs_user');
   });
 
+  // EXPLAIN turns (doc-grounded Q&A): honored only on workless plans so the
+  // label can never bypass the acceptance review on real edits.
+  it('honors intent:"explain" on workless done plans and ignores it on plans carrying work', () => {
+    const explain = parsePlan('{"intent":"explain","status":"done","reply":"A subflow is …"}');
+    expect(explain?.intent).toBe('explain');
+    expect(explain?.graph).toBeNull();
+    // Carrying a graph document → authoring plan, intent dropped.
+    const withGraph = parsePlan(
+      '{"intent":"explain","status":"done","reply":"ok","graph":{"flow_name":"X","nodes":[],"edges":[]}}'
+    );
+    expect(withGraph?.intent).toBeUndefined();
+    // Carrying commands → authoring plan, intent dropped.
+    const withCommands = parsePlan(
+      '{"intent":"explain","status":"done","reply":"ok","commands":[{"action":"update_pin"}]}'
+    );
+    expect(withCommands?.intent).toBeUndefined();
+    // No intent field → undefined (author default).
+    expect(parsePlan(planJson)?.intent).toBeUndefined();
+  });
+
   it('returns null for truncated or non-plan JSON', () => {
     expect(parsePlan(planJson.slice(0, planJson.length - 20))).toBeNull();
     // Truncated document plans (mid-graph) must fail parse so the retry path runs.
@@ -927,6 +947,11 @@ describe('AuthoringAssistantDrawer language and follow-up question contract', ()
     expect(first.stablePrefix).not.toContain('Build a research workflow.');
     expect(second.volatileSuffix).toContain('Now add a PDF report step.');
     expect(second.volatileSuffix).toContain('CURRENT WORKFLOW DOCUMENT');
+    // The conceptual docs bundle must be present in the stable prefix (a
+    // regression deleting it would still pass byte-identity — assert the
+    // block exists, not just that the prefix is stable).
+    expect(first.stablePrefix).toContain('ABSTRACTFLOW DOCUMENTATION');
+    expect(first.stablePrefix).toContain('ABSTRACTFLOW AUTHORING SKILL');
   });
 
   it('instructs the model to ask the user instead of stalling in the loop', () => {

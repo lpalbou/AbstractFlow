@@ -2820,7 +2820,7 @@
           "permissions": "sandbox"
         },
         "functionName": "transform",
-        "codeBody": "goal = str(research_goal or \"\").strip()\nranked = (final or {}).get(\"ranked_hypotheses\") or []\nlit = str((final or {}).get(\"literature\") or \"\").strip()\ntop = ranked[:5]\nparts = [\"You are the Meta-review agent. Synthesize the top-ranked hypotheses below into a rigorous research overview for a scientist: the most promising directions and WHY they rank highly (reference their reviews), how they relate to the current literature, the key open questions, and concrete suggested next experiments. FORMAT: write flowing PROSE in GitHub-flavored Markdown with section headings (##) — this is a human-readable research overview, NOT a data dump. Do NOT return JSON, do NOT wrap the answer in a code block. CRITICAL HONESTY RULE: these hypotheses are UNTESTED proposals. Never write that they 'report', 'demonstrate', 'achieve', or 'show' any result — no experiment was run. Present every quantitative figure as a hypothesized/expected TARGET to be tested, and do not assert benchmark results as if observed. If a hypothesis is flagged 'unreviewed' or 'low_correctness', say so rather than promoting it.\", \"\", \"## Research goal\", goal]\nif lit:\n    parts += [\"\", \"## Literature base\", lit[:2500]]\nparts += [\"\", \"## Top ranked hypotheses (with Elo + reviews)\"]\nfor h in top:\n    parts.append(\"### #\" + str(h.get(\"rank\")) + \" \" + str(h.get(\"title\")) + \" (Elo \" + str(h.get(\"elo\")) + \")\")\n    parts.append(str(h.get(\"statement\") or \"\"))\n    if h.get(\"experiment\"):\n        parts.append(\"Experiment: \" + str(h.get(\"experiment\")))\n    rv = h.get(\"reviews\") or {}\n    fl = h.get(\"flags\") or []\n    if fl:\n        parts.append(\"FLAGS: \" + \", \".join(fl) + \" (do not present a flagged hypothesis as a top recommendation without saying so).\")\n    if rv.get(\"critique\"):\n        parts.append(\"Reviewer note (corr=\" + str(rv.get(\"correctness\")) + \", nov=\" + str(rv.get(\"novelty\")) + \", safety_ok=\" + str(rv.get(\"safety_ok\")) + \"): \" + str(rv.get(\"critique\"))[:300])\n    parts.append(\"\")\nreturn \"\\n\".join(parts)"
+        "codeBody": "goal = str(research_goal or \"\").strip()\nranked = (final or {}).get(\"ranked_hypotheses\") or []\nlit = str((final or {}).get(\"literature\") or \"\").strip()\ntop = ranked[:5]\nparts = [\"You are the Meta-review agent. Synthesize the top-ranked hypotheses below into a rigorous research overview for a scientist: the most promising directions and WHY they rank highly (reference their reviews), how they relate to the current literature, the key open questions, and concrete suggested next experiments. START YOUR RESPONSE with exactly these two elements before anything else: FIRST LINE 'TITLE: <a concise professional report title you derive from the FINDINGS themselves, 5-12 words, headline style — NEVER the verbatim research goal, never a question>'; SECOND (after a blank line) 'ABSTRACT: <one paragraph of 4-6 sentences summarizing the hypothesis landscape, the strongest directions, and the key insight — a real scientific abstract>'. Then continue with the overview. FORMAT: write flowing PROSE in GitHub-flavored Markdown with section headings (##) — this is a human-readable research overview, NOT a data dump. Do NOT return JSON, do NOT wrap the answer in a code block. REQUIRED VISUAL ELEMENTS (the exported report renders GitHub pipe tables and fenced code blocks; mermaid/HTML/images do NOT render — never emit them): (1) exactly one comparison TABLE of the key hypotheses as a GitHub pipe table, comparing DESIGN dimensions a scientist decides by — core mechanism, what it improves over the literature, main risk or failure mode, and the evidence an experiment must produce (do NOT tabulate Elo/review scores; those are already tabulated elsewhere in the report; additional tables for OTHER content, e.g. experiment matrices, are welcome); and (2) at least one SCHEMA/FIGURE as a fenced ASCII diagram (open the fence with three backticks on the word text) sketching the architecture of the top hypothesis or how the key hypotheses relate — boxes and arrows drawn with characters like +--+, |, ->. Keep every table cell one line. CRITICAL HONESTY RULE: these hypotheses are UNTESTED proposals. Never write that they 'report', 'demonstrate', 'achieve', or 'show' any result — no experiment was run. Present every quantitative figure as a hypothesized/expected TARGET to be tested, and do not assert benchmark results as if observed. If a hypothesis is flagged 'unreviewed' or 'low_correctness', say so rather than promoting it.\", \"\", \"## Research goal\", goal]\nif lit:\n    parts += [\"\", \"## Literature base\", lit[:2500]]\nparts += [\"\", \"## Top ranked hypotheses (with Elo + reviews)\"]\nfor h in top:\n    parts.append(\"### #\" + str(h.get(\"rank\")) + \" \" + str(h.get(\"title\")) + \" (Elo \" + str(h.get(\"elo\")) + \")\")\n    parts.append(str(h.get(\"statement\") or \"\"))\n    if h.get(\"experiment\"):\n        parts.append(\"Experiment: \" + str(h.get(\"experiment\")))\n    rv = h.get(\"reviews\") or {}\n    fl = h.get(\"flags\") or []\n    if fl:\n        parts.append(\"FLAGS: \" + \", \".join(fl) + \" (do not present a flagged hypothesis as a top recommendation without saying so).\")\n    if rv.get(\"critique\"):\n        parts.append(\"Reviewer note (corr=\" + str(rv.get(\"correctness\")) + \", nov=\" + str(rv.get(\"novelty\")) + \", safety_ok=\" + str(rv.get(\"safety_ok\")) + \"): \" + str(rv.get(\"critique\"))[:300])\n    parts.append(\"\")\nreturn \"\\n\".join(parts)"
       },
       "label": null,
       "icon": null,
@@ -3210,7 +3210,7 @@
           "permissions": "sandbox"
         },
         "functionName": "transform",
-        "codeBody": "goal = str(research_goal or \"\").strip()\noverview = str(overview or \"\").strip()\ndata = final or {}\nranked = data.get(\"ranked_hypotheses\") or []\nsources = data.get(\"sources\") or []\nwarns = data.get(\"warnings\") or []\ncycles = data.get(\"cycles\")\nlines = []\nlines.append(\"# AI Co-Scientist — Research Overview\")\nlines.append(\"\")\nlines.append(\"**Research goal:** \" + goal)\nlines.append(\"\")\nlines.append(\"*Generated by the AbstractFlow co-scientist workflow: a literature-grounded multi-agent hypothesis engine (generation -> reflection -> Elo tournament -> evolution -> research expansion over \" + str(cycles) + \" supervisor cycles, then a search-grounded full review). The hypotheses below are UNTESTED, ranked proposals for future work, not established results.*\")\nlines.append(\"\")\nif warns:\n    lines.append(\"> **Caveats:**\")\n    for w in warns:\n        lines.append(\"> - \" + str(w))\n    lines.append(\"\")\nlines.append(\"---\")\nlines.append(\"\")\nlines.append(\"## Research Overview\")\nlines.append(\"\")\nlines.append(overview if overview else \"_(no overview generated)_\")\nlines.append(\"\")\nlines.append(\"---\")\nlines.append(\"\")\nlines.append(\"## Ranked Hypotheses\")\nlines.append(\"\")\nfor h in ranked:\n    rv = h.get(\"reviews\") or {}\n    fl = h.get(\"flags\") or []\n    head = \"### #\" + str(h.get(\"rank\")) + \". \" + str(h.get(\"title\") or \"(untitled)\")\n    lines.append(head)\n    lines.append(\"\")\n    meta_bits = [\"Elo \" + str(h.get(\"elo\"))]\n    if rv.get(\"correctness\") is not None:\n        meta_bits.append(\"correctness \" + str(rv.get(\"correctness\")) + \"/10\")\n    if rv.get(\"novelty\") is not None:\n        meta_bits.append(\"novelty \" + str(rv.get(\"novelty\")) + \"/10\")\n    if rv.get(\"testability\") is not None:\n        meta_bits.append(\"testability \" + str(rv.get(\"testability\")) + \"/10\")\n    if fl:\n        meta_bits.append(\"FLAGS: \" + \", \".join(fl))\n    lines.append(\"*\" + \" | \".join(meta_bits) + \"*\")\n    lines.append(\"\")\n    if h.get(\"statement\"):\n        lines.append(\"**Hypothesis.** \" + str(h.get(\"statement\")))\n        lines.append(\"\")\n    if h.get(\"rationale\"):\n        lines.append(\"**Rationale.** \" + str(h.get(\"rationale\")))\n        lines.append(\"\")\n    if h.get(\"experiment\"):\n        lines.append(\"**Proposed experiment.** \" + str(h.get(\"experiment\")))\n        lines.append(\"\")\n    if rv.get(\"critique\"):\n        lines.append(\"**Reviewer critique.** \" + str(rv.get(\"critique\")))\n        lines.append(\"\")\nlines.append(\"---\")\nlines.append(\"\")\nlines.append(\"## Literature Sources\")\nlines.append(\"\")\nif sources:\n    for s in sources:\n        if not isinstance(s, dict):\n            continue\n        title = str(s.get(\"title\") or \"\").strip()\n        url = str(s.get(\"url\") or \"\").strip()\n        mark = \"\" if s.get(\"fetched\") else \" _(unfetched)_\"\n        take = str(s.get(\"takeaway\") or \"\").strip()\n        line = \"- **\" + title + \"**\" + mark\n        if url:\n            line = line + \" — <\" + url + \">\"\n        if take:\n            line = line + \" — \" + take\n        lines.append(line)\nelse:\n    lines.append(\"_(no sources gathered)_\")\nlines.append(\"\")\nreturn \"\\n\".join(lines)"
+        "codeBody": "goal = str(research_goal or \"\").strip()\noverview = str(overview or \"\").strip()\ndata = final or {}\nranked = data.get(\"ranked_hypotheses\") or []\nsources = data.get(\"sources\") or []\nwarns = data.get(\"warnings\") or []\ncycles = data.get(\"cycles\")\n# Extract the LLM-derived TITLE and ABSTRACT the meta prompt demands\n# (operator ruling 2026-07-16: the report title must be THOUGHT OF by the\n# LLM, never fixed product boilerplate and never the prompt; a small\n# abstract follows the restated question). Tolerant parse: missing pieces\n# degrade to the product title with a visible caveat, never silently.\nderived_title = \"\"\nabstract = \"\"\nbody_lines = []\nfor ln in overview.split(\"\\n\"):\n    st = ln.strip()\n    if not derived_title and st.upper().startswith(\"TITLE:\"):\n        derived_title = st[6:].strip().strip('\"')\n        continue\n    if not abstract and st.upper().startswith(\"ABSTRACT:\"):\n        abstract = st[9:].strip()\n        continue\n    body_lines.append(ln)\noverview_body = \"\\n\".join(body_lines).strip()\ntitle = derived_title or \"AI Co-Scientist — Research Overview\"\nlines = []\nlines.append(\"# \" + title)\nlines.append(\"\")\nlines.append(\"**Research goal:** \" + goal)\nlines.append(\"\")\nif abstract:\n    lines.append(\"**Abstract.** \" + abstract)\n    lines.append(\"\")\nlines.append(\"*Generated by the AbstractFlow co-scientist workflow: a literature-grounded multi-agent hypothesis engine (generation -> reflection -> Elo tournament -> evolution -> research expansion over \" + str(cycles) + \" supervisor cycles, then a search-grounded full review). The hypotheses below are UNTESTED, ranked proposals for future work, not established results.*\")\nlines.append(\"\")\nif not derived_title:\n    warns = list(warns) + [\"meta-review returned no TITLE line; product title used (#FALLBACK)\"]\nif not abstract:\n    warns = list(warns) + [\"meta-review returned no ABSTRACT line (#FALLBACK)\"]\nif warns:\n    lines.append(\"> **Caveats:**\")\n    for w in warns:\n        lines.append(\"> - \" + str(w))\n    lines.append(\"\")\nlines.append(\"---\")\nlines.append(\"\")\nlines.append(\"## Research Overview\")\nlines.append(\"\")\nlines.append(overview_body if overview_body else \"_(no overview generated)_\")\nlines.append(\"\")\nlines.append(\"---\")\nlines.append(\"\")\nlines.append(\"## Ranked Hypotheses\")\nlines.append(\"\")\n# Deterministic at-a-glance comparison table (rendered as a real table in the\n# PDF/DOCX exports). Built from structured tournament data so the report always\n# carries at least one table on the key hypotheses, independent of what the\n# meta-review model chose to include.\ndef _cell(v):\n    s = str(v if v is not None else \"—\")\n    s = s.replace(\"|\", \"/\").replace(\"\\n\", \" \").strip() or \"—\"\n    # Width cap: junk/nested values stringify safely but an arbitrarily wide\n    # cell breaks table layout in the PDF (adversary P2).\n    return s[:117] + \"...\" if len(s) > 120 else s\nif ranked:\n    lines.append(\"### Key hypotheses at a glance\")\n    lines.append(\"\")\n    lines.append(\"| # | Hypothesis | Elo | Correctness | Novelty | Testability | Flags |\")\n    lines.append(\"| --- | --- | --- | --- | --- | --- | --- |\")\n    for h in ranked:\n        rv = h.get(\"reviews\") or {}\n        fl = h.get(\"flags\") or []\n        title = _cell(h.get(\"title\") or \"(untitled)\")\n        if len(title) > 80:\n            title = title[:77] + \"...\"\n        lines.append(\n            \"| \" + _cell(h.get(\"rank\"))\n            + \" | \" + title\n            + \" | \" + _cell(h.get(\"elo\"))\n            + \" | \" + _cell(rv.get(\"correctness\"))\n            + \" | \" + _cell(rv.get(\"novelty\"))\n            + \" | \" + _cell(rv.get(\"testability\"))\n            + \" | \" + (_cell(\", \".join(str(f) for f in fl)) if fl else \"—\")\n            + \" |\"\n        )\n    lines.append(\"\")\nfor h in ranked:\n    rv = h.get(\"reviews\") or {}\n    fl = h.get(\"flags\") or []\n    head = \"### #\" + str(h.get(\"rank\")) + \". \" + str(h.get(\"title\") or \"(untitled)\")\n    lines.append(head)\n    lines.append(\"\")\n    meta_bits = [\"Elo \" + str(h.get(\"elo\"))]\n    if rv.get(\"correctness\") is not None:\n        meta_bits.append(\"correctness \" + str(rv.get(\"correctness\")) + \"/10\")\n    if rv.get(\"novelty\") is not None:\n        meta_bits.append(\"novelty \" + str(rv.get(\"novelty\")) + \"/10\")\n    if rv.get(\"testability\") is not None:\n        meta_bits.append(\"testability \" + str(rv.get(\"testability\")) + \"/10\")\n    if fl:\n        meta_bits.append(\"FLAGS: \" + \", \".join(fl))\n    lines.append(\"*\" + \" | \".join(meta_bits) + \"*\")\n    lines.append(\"\")\n    if h.get(\"statement\"):\n        lines.append(\"**Hypothesis.** \" + str(h.get(\"statement\")))\n        lines.append(\"\")\n    if h.get(\"rationale\"):\n        lines.append(\"**Rationale.** \" + str(h.get(\"rationale\")))\n        lines.append(\"\")\n    if h.get(\"experiment\"):\n        lines.append(\"**Proposed experiment.** \" + str(h.get(\"experiment\")))\n        lines.append(\"\")\n    if rv.get(\"critique\"):\n        lines.append(\"**Reviewer critique.** \" + str(rv.get(\"critique\")))\n        lines.append(\"\")\nlines.append(\"---\")\nlines.append(\"\")\nlines.append(\"## Literature Sources\")\nlines.append(\"\")\nif sources:\n    for s in sources:\n        if not isinstance(s, dict):\n            continue\n        title = str(s.get(\"title\") or \"\").strip()\n        url = str(s.get(\"url\") or \"\").strip()\n        mark = \"\" if s.get(\"fetched\") else \" _(unfetched)_\"\n        take = str(s.get(\"takeaway\") or \"\").strip()\n        line = \"- **\" + title + \"**\" + mark\n        if url:\n            line = line + \" — <\" + url + \">\"\n        if take:\n            line = line + \" — \" + take\n        lines.append(line)\nelse:\n    lines.append(\"_(no sources gathered)_\")\nlines.append(\"\")\nreturn \"\\n\".join(lines)"
       },
       "label": null,
       "icon": null,
@@ -3327,8 +3327,8 @@
         "headerColor": "#9B59B6",
         "inputs": [
           {
-            "id": "research_goal",
-            "label": "research_goal",
+            "id": "overview",
+            "label": "overview",
             "type": "string"
           },
           {
@@ -3358,7 +3358,7 @@
           "permissions": "sandbox"
         },
         "functionName": "transform",
-        "codeBody": "goal = str(research_goal or \"\").strip()\nt = \"AI Co-Scientist Research Overview\"\nif goal:\n    t = t + \": \" + goal\nreturn t[:160]"
+        "codeBody": "ov = str(overview or \"\").strip()\nfor ln in ov.split(\"\\n\"):\n    st = ln.strip()\n    if st.upper().startswith(\"TITLE:\"):\n        t = st[6:].strip().strip('\"')\n        if t:\n            return t[:160]\nreturn \"AI Co-Scientist — Research Overview\""
       },
       "label": null,
       "icon": null,
@@ -3556,10 +3556,238 @@
       "outputs": []
     },
     {
+      "id": "import_md",
+      "type": "import_workspace_file",
+      "position": {
+        "x": 2650,
+        "y": 1000
+      },
+      "data": {
+        "nodeType": "import_workspace_file",
+        "label": "Register .md artifact",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "file_path",
+            "label": "file_path",
+            "type": "workspace_file"
+          },
+          {
+            "id": "content_type",
+            "label": "content_type",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "artifact",
+            "label": "artifact",
+            "type": "artifact"
+          },
+          {
+            "id": "artifact_ref",
+            "label": "artifact_ref",
+            "type": "artifact"
+          },
+          {
+            "id": "artifact_id",
+            "label": "artifact_id",
+            "type": "string"
+          },
+          {
+            "id": "content_type",
+            "label": "content_type",
+            "type": "string"
+          },
+          {
+            "id": "size_bytes",
+            "label": "size_bytes",
+            "type": "number"
+          },
+          {
+            "id": "source_path",
+            "label": "source_path",
+            "type": "workspace_file"
+          }
+        ],
+        "pinDefaults": {
+          "content_type": "text/markdown"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "import_pdf",
+      "type": "import_workspace_file",
+      "position": {
+        "x": 2650,
+        "y": 1180
+      },
+      "data": {
+        "nodeType": "import_workspace_file",
+        "label": "Register .pdf artifact",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "file_path",
+            "label": "file_path",
+            "type": "workspace_file"
+          },
+          {
+            "id": "content_type",
+            "label": "content_type",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "artifact",
+            "label": "artifact",
+            "type": "artifact"
+          },
+          {
+            "id": "artifact_ref",
+            "label": "artifact_ref",
+            "type": "artifact"
+          },
+          {
+            "id": "artifact_id",
+            "label": "artifact_id",
+            "type": "string"
+          },
+          {
+            "id": "content_type",
+            "label": "content_type",
+            "type": "string"
+          },
+          {
+            "id": "size_bytes",
+            "label": "size_bytes",
+            "type": "number"
+          },
+          {
+            "id": "source_path",
+            "label": "source_path",
+            "type": "workspace_file"
+          }
+        ],
+        "pinDefaults": {
+          "content_type": "application/pdf"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "import_docx",
+      "type": "import_workspace_file",
+      "position": {
+        "x": 2650,
+        "y": 1360
+      },
+      "data": {
+        "nodeType": "import_workspace_file",
+        "label": "Register .docx artifact",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "file_path",
+            "label": "file_path",
+            "type": "workspace_file"
+          },
+          {
+            "id": "content_type",
+            "label": "content_type",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "artifact",
+            "label": "artifact",
+            "type": "artifact"
+          },
+          {
+            "id": "artifact_ref",
+            "label": "artifact_ref",
+            "type": "artifact"
+          },
+          {
+            "id": "artifact_id",
+            "label": "artifact_id",
+            "type": "string"
+          },
+          {
+            "id": "content_type",
+            "label": "content_type",
+            "type": "string"
+          },
+          {
+            "id": "size_bytes",
+            "label": "size_bytes",
+            "type": "number"
+          },
+          {
+            "id": "source_path",
+            "label": "source_path",
+            "type": "workspace_file"
+          }
+        ],
+        "pinDefaults": {
+          "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
       "id": "end",
       "type": "on_flow_end",
       "position": {
-        "x": 2820,
+        "x": 2990,
         "y": 1000
       },
       "data": {
@@ -3631,6 +3859,21 @@
           {
             "id": "docx_sha256",
             "label": "docx_sha256",
+            "type": "string"
+          },
+          {
+            "id": "md_artifact_id",
+            "label": "md_artifact_id",
+            "type": "string"
+          },
+          {
+            "id": "pdf_artifact_id",
+            "label": "pdf_artifact_id",
+            "type": "string"
+          },
+          {
+            "id": "docx_artifact_id",
+            "label": "docx_artifact_id",
             "type": "string"
           }
         ],
@@ -3781,12 +4024,60 @@
       "animated": true
     },
     {
-      "id": "e-write_docx-exec-out-end-exec-in",
+      "id": "e-write_docx-exec-out-import_md-exec-in",
       "source": "write_docx",
+      "sourceHandle": "exec-out",
+      "target": "import_md",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-import_md-exec-out-import_pdf-exec-in",
+      "source": "import_md",
+      "sourceHandle": "exec-out",
+      "target": "import_pdf",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-import_pdf-exec-out-import_docx-exec-in",
+      "source": "import_pdf",
+      "sourceHandle": "exec-out",
+      "target": "import_docx",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-import_docx-exec-out-end-exec-in",
+      "source": "import_docx",
       "sourceHandle": "exec-out",
       "target": "end",
       "targetHandle": "exec-in",
       "animated": true
+    },
+    {
+      "id": "e-write_md-file_path-import_md-file_path",
+      "source": "write_md",
+      "sourceHandle": "file_path",
+      "target": "import_md",
+      "targetHandle": "file_path",
+      "animated": false
+    },
+    {
+      "id": "e-write_pdf-file_path-import_pdf-file_path",
+      "source": "write_pdf",
+      "sourceHandle": "file_path",
+      "target": "import_pdf",
+      "targetHandle": "file_path",
+      "animated": false
+    },
+    {
+      "id": "e-write_docx-file_path-import_docx-file_path",
+      "source": "write_docx",
+      "sourceHandle": "file_path",
+      "target": "import_docx",
+      "targetHandle": "file_path",
+      "animated": false
     },
     {
       "id": "e-start-research_goal-plan_input-research_goal",
@@ -4597,6 +4888,14 @@
       "animated": false
     },
     {
+      "id": "e-meta-response-report_title-overview",
+      "source": "meta",
+      "sourceHandle": "response",
+      "target": "report_title",
+      "targetHandle": "overview",
+      "animated": false
+    },
+    {
       "id": "e-final-output-report_md-final",
       "source": "final",
       "sourceHandle": "output",
@@ -4610,14 +4909,6 @@
       "sourceHandle": "iso",
       "target": "export_paths",
       "targetHandle": "iso",
-      "animated": false
-    },
-    {
-      "id": "e-start-research_goal-report_title-research_goal",
-      "source": "start",
-      "sourceHandle": "research_goal",
-      "target": "report_title",
-      "targetHandle": "research_goal",
       "animated": false
     },
     {
@@ -4731,9 +5022,33 @@
       "target": "end",
       "targetHandle": "docx_sha256",
       "animated": false
+    },
+    {
+      "id": "e-import_md-artifact_id-end-md_artifact_id",
+      "source": "import_md",
+      "sourceHandle": "artifact_id",
+      "target": "end",
+      "targetHandle": "md_artifact_id",
+      "animated": false
+    },
+    {
+      "id": "e-import_pdf-artifact_id-end-pdf_artifact_id",
+      "source": "import_pdf",
+      "sourceHandle": "artifact_id",
+      "target": "end",
+      "targetHandle": "pdf_artifact_id",
+      "animated": false
+    },
+    {
+      "id": "e-import_docx-artifact_id-end-docx_artifact_id",
+      "source": "import_docx",
+      "sourceHandle": "artifact_id",
+      "target": "end",
+      "targetHandle": "docx_artifact_id",
+      "animated": false
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-07-15T00:49:47.745077+00:00",
-  "updated_at": "2026-07-15T00:49:47.745077+00:00"
+  "created_at": "2026-07-15T23:04:20.697773+00:00",
+  "updated_at": "2026-07-15T23:04:20.697773+00:00"
 }

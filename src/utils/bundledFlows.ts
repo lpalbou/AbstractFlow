@@ -16,6 +16,7 @@ const bundledFlowModules = import.meta.glob<VisualFlow>(
     // (adversarial-review, structured-extract, map-reduce). coding-verify-gates
     // is coding-agent's gate subflow (composed, listed as a child).
     '../../examples/flows/coding-agent.json',
+    '../../examples/flows/coder.json',
     '../../examples/flows/coding-verify-gates.json',
     '../../examples/flows/adversarial-review.json',
     '../../examples/flows/structured-extract.json',
@@ -32,10 +33,10 @@ const bundledRunTargets: Record<string, PublishedBundleTarget> = {
   'dp-research': {
     flowId: 'dp-research',
     bundleId: 'dp-research',
-    // 0.1.1 = the deep-research display-name release (ids stay dp-*; bundle
-    // versions are immutable by sha, so the rename shipped as a new version).
-    bundleVersion: '0.1.1',
-    bundleRef: 'dp-research@0.1.1',
+    // 0.1.4 = branded exports + derived report titles (ids stay dp-*;
+    // bundle versions are immutable by sha, so each wave is a new version).
+    bundleVersion: '0.1.4',
+    bundleRef: 'dp-research@0.1.5',
   },
   '81795ea9': {
     flowId: '81795ea9',
@@ -46,14 +47,22 @@ const bundledRunTargets: Record<string, PublishedBundleTarget> = {
   'coding-agent': {
     flowId: 'coding-agent',
     bundleId: 'coding-agent',
-    bundleVersion: '0.1.0',
-    bundleRef: 'coding-agent@0.1.0',
+    // 0.1.2 = the dual-interface release (agent.v1 `coder` entrypoint).
+    bundleVersion: '0.1.2',
+    bundleRef: 'coding-agent@0.1.2',
+  },
+  coder: {
+    flowId: 'coder',
+    bundleId: 'coding-agent',
+    bundleVersion: '0.1.2',
+    bundleRef: 'coding-agent@0.1.2',
   },
   'co-scientist': {
     flowId: 'co-scientist',
     bundleId: 'co-scientist',
-    bundleVersion: '0.1.0',
-    bundleRef: 'co-scientist@0.1.0',
+    // 0.1.5 = branded exports + fixed report title (never the prompt).
+    bundleVersion: '0.1.5',
+    bundleRef: 'co-scientist@0.1.6',
   },
   'adversarial-review': {
     flowId: 'adversarial-review',

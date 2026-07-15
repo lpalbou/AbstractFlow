@@ -1,0 +1,561 @@
+{
+  "id": "coder",
+  "name": "coder",
+  "description": "Chat-agent entrypoint for the coding-agent pipeline: takes a plain prompt (abstractcode.agent.v1), runs the verify-gated build loop in the session workspace with inferred gates (no explicit build/run commands — the verifier executes what it can and reports honestly), and returns the build report as the response.",
+  "interfaces": [
+    "abstractcode.agent.v1"
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": -600,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Chat request",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "prompt": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "map_input",
+      "type": "make_object",
+      "position": {
+        "x": -260,
+        "y": 160
+      },
+      "data": {
+        "nodeType": "make_object",
+        "label": "Build JSON",
+        "icon": "{}",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "build",
+      "type": "subflow",
+      "position": {
+        "x": -260,
+        "y": -40
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Verify-gated coding run",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean"
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "inherit_context": false
+        },
+        "subflowId": "coding-agent"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_report",
+      "type": "get",
+      "position": {
+        "x": 100,
+        "y": 60
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get report",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "report",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_passed",
+      "type": "get",
+      "position": {
+        "x": 100,
+        "y": 200
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get passed",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "passed",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_rounds",
+      "type": "get",
+      "position": {
+        "x": 100,
+        "y": 340
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get rounds_used",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "rounds_used",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_failures",
+      "type": "get",
+      "position": {
+        "x": 100,
+        "y": 480
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get open_failures",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "open_failures",
+          "default": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "meta_obj",
+      "type": "make_object",
+      "position": {
+        "x": 460,
+        "y": 340
+      },
+      "data": {
+        "nodeType": "make_object",
+        "label": "Build JSON",
+        "icon": "{}",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "passed",
+            "label": "passed",
+            "type": "boolean"
+          },
+          {
+            "id": "rounds_used",
+            "label": "rounds_used",
+            "type": "number"
+          },
+          {
+            "id": "open_failures",
+            "label": "open_failures",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 820,
+        "y": 60
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Finish",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-exec-out-build-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "build",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-build-exec-out-end-exec-in",
+      "source": "build",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-start-prompt-map_input-request",
+      "source": "start",
+      "sourceHandle": "prompt",
+      "target": "map_input",
+      "targetHandle": "request",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-map_input-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "map_input",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-map_input-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "map_input",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-map_input-result-build-input",
+      "source": "map_input",
+      "sourceHandle": "result",
+      "target": "build",
+      "targetHandle": "input",
+      "animated": false
+    },
+    {
+      "id": "e-build-output-get_report-object",
+      "source": "build",
+      "sourceHandle": "output",
+      "target": "get_report",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-build-output-get_passed-object",
+      "source": "build",
+      "sourceHandle": "output",
+      "target": "get_passed",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-build-output-get_rounds-object",
+      "source": "build",
+      "sourceHandle": "output",
+      "target": "get_rounds",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-build-output-get_failures-object",
+      "source": "build",
+      "sourceHandle": "output",
+      "target": "get_failures",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-get_passed-value-meta_obj-passed",
+      "source": "get_passed",
+      "sourceHandle": "value",
+      "target": "meta_obj",
+      "targetHandle": "passed",
+      "animated": false
+    },
+    {
+      "id": "e-get_rounds-value-meta_obj-rounds_used",
+      "source": "get_rounds",
+      "sourceHandle": "value",
+      "target": "meta_obj",
+      "targetHandle": "rounds_used",
+      "animated": false
+    },
+    {
+      "id": "e-get_failures-value-meta_obj-open_failures",
+      "source": "get_failures",
+      "sourceHandle": "value",
+      "target": "meta_obj",
+      "targetHandle": "open_failures",
+      "animated": false
+    },
+    {
+      "id": "e-get_report-value-end-response",
+      "source": "get_report",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "response",
+      "animated": false
+    },
+    {
+      "id": "e-get_passed-value-end-success",
+      "source": "get_passed",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "success",
+      "animated": false
+    },
+    {
+      "id": "e-meta_obj-result-end-meta",
+      "source": "meta_obj",
+      "sourceHandle": "result",
+      "target": "end",
+      "targetHandle": "meta",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-07-15T20:39:34.312923+00:00",
+  "updated_at": "2026-07-15T20:39:34.312923+00:00"
+}

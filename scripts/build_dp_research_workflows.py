@@ -1231,7 +1231,14 @@ def build_render_flow() -> dict[str, Any]:
                 "outputs. If a comparison table is genuinely useful for the reader, use a "
                 "valid multiline Markdown table with a separator row. Do not cite a source "
                 "that was not fetched or otherwise available in the source ledger. If "
-                "evidence is missing, say so in plain language."
+                "evidence is missing, say so in plain language. "
+                "Begin report_markdown with a single # H1 line that is a concise, "
+                "professional REPORT TITLE derived from the findings (5-12 words, headline "
+                "style) — NEVER the verbatim user request or a question restated; write it "
+                "like the title of a published research brief. Immediately after the H1, "
+                "add a line '**Research goal:** <the user's request restated in one clear "
+                "sentence>' followed by a short '**Abstract.** <3-5 sentence abstract of "
+                "the findings>' paragraph; the rest of the report follows after that."
             ),
             schema=RENDER_SCHEMA,
             temperature=0.1,
@@ -1737,7 +1744,7 @@ def main() -> int:
         root_flow_json=FLOWS_DIR / "dp-research.json",
         out_path=BUNDLE_PATH,
         bundle_id="dp-research",
-        bundle_version="0.1.1",
+        bundle_version="0.1.5",
         flows_dir=FLOWS_DIR,
         entrypoints=["dp-research"],
         default_entrypoint="dp-research",

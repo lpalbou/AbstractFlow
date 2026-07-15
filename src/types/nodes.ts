@@ -1688,13 +1688,14 @@ const FILE_NODES: NodeTemplate[] = [
     type: 'write_pdf',
     icon: '&#x1F4D5;', // Closed book
     label: 'Write PDF',
-    description: 'Render text or Markdown-style report content to a real workspace-scoped server PDF path using the Runtime permissive PDF writer.',
+    description: 'Render text or Markdown-style report content to a real workspace-scoped server PDF path using the Runtime permissive PDF writer. Documents carry a discreet AbstractFramework/AbstractFlow identity (workflow version, report date, abstractframework.ai) by default.',
     headerColor: '#16A085', // Teal - IO
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
       { id: 'file_path', label: 'file_path', type: 'workspace_file' },
       { id: 'content', label: 'content', type: 'any' },
       { id: 'title', label: 'title', type: 'string', description: 'Optional PDF document title.' },
+      { id: 'branding', label: 'branding', type: 'any', description: 'Framework identity on the document (meta line, running footer, PDF metadata). Default on with run provenance; set false to disable or pass an object to override fields (framework/app/url/date/workflow).' },
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },
@@ -1709,13 +1710,14 @@ const FILE_NODES: NodeTemplate[] = [
     type: 'write_docx',
     icon: '&#x1F4D8;', // Blue book
     label: 'Write DOCX',
-    description: 'Render text or Markdown-style report content to a workspace-scoped DOCX document using the Runtime stdlib DOCX writer.',
+    description: 'Render text or Markdown-style report content to a workspace-scoped DOCX document using the Runtime stdlib DOCX writer. Documents carry a discreet AbstractFramework/AbstractFlow identity (workflow version, report date, abstractframework.ai) by default.',
     headerColor: '#16A085',
     inputs: [
       { id: 'exec-in', label: '', type: 'execution' },
       { id: 'file_path', label: 'file_path', type: 'workspace_file' },
       { id: 'content', label: 'content', type: 'any' },
       { id: 'title', label: 'title', type: 'string', description: 'Optional DOCX document title.' },
+      { id: 'branding', label: 'branding', type: 'any', description: 'Framework identity on the document (meta line, page footer, core properties). Default on with run provenance; set false to disable or pass an object to override fields (framework/app/url/date/workflow).' },
     ],
     outputs: [
       { id: 'exec-out', label: '', type: 'execution' },

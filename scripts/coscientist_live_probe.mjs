@@ -7,13 +7,22 @@
  * Usage: DRIVE_TOKEN=... node scripts/coscientist_live_probe.mjs "<research goal>" [max_cycles] [num_hyp]
  */
 import { writeFileSync } from 'node:fs';
-const GATEWAY = 'http://127.0.0.1:8080';
+const GATEWAY = process.env.DRIVE_GATEWAY || 'http://127.0.0.1:8080';
 const TOKEN = process.env.DRIVE_TOKEN || '';
 const H = { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' };
 const note = (s) => console.log(`[coscientist] ${new Date().toISOString().slice(11, 19)} ${s}`);
 
-async function j(url, init) {
+async function j(url, init, attempt = 0) {
   const res = await fetch(url, init);
+  // Transient guard: the gateway's auth-lockout window (429) killed a poller
+  // mid-run once (2026-07-15) while the run itself completed fine. 429 is
+  // rejected at the middleware (no side effects), so it is safe to retry for
+  // ANY method; 5xx retries stay GET-only (a POST may have partially run).
+  const isGet = !init || !init.method || init.method === 'GET';
+  if ((res.status === 429 || (res.status >= 500 && isGet)) && attempt < 6) {
+    await new Promise((r) => setTimeout(r, Math.min(60000, 5000 * (attempt + 1))));
+    return j(url, init, attempt + 1);
+  }
   const t = await res.text();
   let b;
   try { b = JSON.parse(t); } catch { b = t; }
@@ -30,6 +39,7 @@ const start = await j(`${GATEWAY}/api/gateway/runs/start`, {
   headers: H,
   body: JSON.stringify({
     bundle_id: 'co-scientist',
+    bundle_version: '0.1.6',
     flow_id: 'co-scientist',
     input_data: {
       research_goal: GOAL,

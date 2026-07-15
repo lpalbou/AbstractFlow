@@ -13,8 +13,9 @@ describe('bundled deep research flows', () => {
     expect(getBundledRunTarget('dp-research')).toEqual({
       flowId: 'dp-research',
       bundleId: 'dp-research',
-      bundleVersion: '0.1.1',
-      bundleRef: 'dp-research@0.1.1',
+      // 0.1.4 = branded exports + derived report titles.
+      bundleVersion: '0.1.4',
+      bundleRef: 'dp-research@0.1.5',
     });
     // The rename wave: ids stay dp-* (wiring), display names read deep-research*.
     expect(flows.find((flow) => flow.id === 'dp-research')?.name).toBe('deep-research');

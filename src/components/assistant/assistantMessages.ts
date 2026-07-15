@@ -64,6 +64,13 @@ export interface AssistantPlan {
    */
   graph: Record<string, unknown> | null;
   status: 'continue' | 'done' | 'needs_user' | 'failed';
+  /**
+   * Turn intent. "explain" = the user asked a question; the reply IS the
+   * deliverable, no graph is emitted, and the turn must not go through the
+   * graph acceptance review (a question is not implementable by a graph).
+   * Absent/anything else = "author" (default).
+   */
+  intent?: 'explain' | 'author';
   selfReview: string;
   nextStep: string;
   howItWorks: string;
@@ -338,6 +345,22 @@ function turnReportBlock(args: {
     body.push('', '**Preflight notes**', shortList(args.preflightNotes));
   }
   return ['<details>', '<summary>Turn report</summary>', '', ...body, '', '</details>'].join('\n');
+}
+
+/**
+ * Explain-turn rendering: the grounded answer IS the deliverable. No applied
+ * changes, no readiness sections, no graph-shaped fallback prose ("The draft
+ * graph uses normal AbstractFlow nodes…") — that narration is authoring-turn
+ * text and would be dishonest under a question (adversary P1, 2026-07-15).
+ */
+export function explainResultMarkdown(plan: AssistantPlan): string {
+  const parts: string[] = [];
+  if (plan.headline) parts.push(`**${plan.headline}**`, '');
+  parts.push(plan.reply || '(no answer text returned)');
+  if (plan.checkNext && plan.checkNext.length > 0) {
+    parts.push('', '**See also**', plan.checkNext.map((item) => `- ${item}`).join('\n'));
+  }
+  return parts.join('\n');
 }
 
 export function resultMarkdown(

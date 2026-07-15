@@ -246,6 +246,33 @@ def write_docx_node(node_id, label, x, y):
                          pin("content_type", "content_type", "string")])
 
 
+def import_workspace_file_node(node_id, label, x, y, *, content_type=None):
+    """Snapshot a workspace file into a durable run artifact (id + ref + meta).
+
+    This is the registration lane for report products: write_* nodes only
+    place bytes in the workspace folder; only an artifact-store write makes a
+    file listable/servable per run (observer's durable-artifacts finding).
+
+    ALWAYS pass an explicit content_type when the file type is known:
+    exec-chained nodes receive the previous node's output as their base
+    payload, so an unconnected content_type input INHERITS any upstream
+    "content_type" output (live incident 2026-07-15: three report imports all
+    registered as DOCX because write_docx ran just before them). An explicit
+    pin default is both honest and leak-proof.
+    """
+    pin_defaults = {"content_type": content_type} if content_type else None
+    return node(node_id, "import_workspace_file", label, x, y,
+                inputs=[EXEC_IN, pin("file_path", "file_path", "workspace_file"),
+                        pin("content_type", "content_type", "string")],
+                outputs=[EXEC_OUT, pin("artifact", "artifact", "artifact"),
+                         pin("artifact_ref", "artifact_ref", "artifact"),
+                         pin("artifact_id", "artifact_id", "string"),
+                         pin("content_type", "content_type", "string"),
+                         pin("size_bytes", "size_bytes", "number"),
+                         pin("source_path", "source_path", "workspace_file")],
+                pin_defaults=pin_defaults)
+
+
 def write_json(path: Path, data: dict[str, Any]) -> None:
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 

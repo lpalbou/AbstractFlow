@@ -8,6 +8,133 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- 2026-07-16 Report titles are now LLM-derived with an abstract (operator
+  ruling: a fixed product title is not acceptable — "the LLM creating the
+  report MUST think of a proper title and even provide a small abstract after
+  repeating the user question"). co-scientist (`co-scientist@0.1.6`): the
+  meta-review returns `TITLE:` (5-12 word headline derived from the findings,
+  never the verbatim goal) and `ABSTRACT:` (4-6 sentence scientific abstract)
+  lines; the report assembler extracts both and structures the document as
+  derived title → **Research goal:** (the user's question) → **Abstract.** →
+  overview; the PDF/DOCX document title uses the same derived title. A
+  missing TITLE/ABSTRACT degrades to the product title with a visible
+  `#FALLBACK` caveat, never silently. deep-research (`dp-research@0.1.5`):
+  the report writer already derived a headline H1; it now also restates the
+  research goal and writes a 3-5 sentence abstract immediately after the H1
+  (dp-render.json + generator kept in sync — the generator previously lacked
+  the title instruction entirely, a source-drift fix).
+- 2026-07-15 Node palette reorganized for scanability (operator ask): an
+  always-visible Essentials strip (the ~8 nodes nearly every flow uses: On
+  Flow Start/End, Agent, LLM Call, Code, If/Else, For, String Template), ten
+  ordered display sections that regroup the twelve semantic categories by
+  build frequency (Core → Control Flow → Events & Time → Variables → Data &
+  Text → Values & Schema → Files & Artifacts → Media → Memory → Math), a
+  two-column chip grid (halves scroll height; tooltips/title carry full
+  labels), per-section node-count badges, collapsed-by-default long tail with
+  expansion persisted per user (localStorage), and keyboard-accessible
+  section headers. NODE_CATEGORIES stays the semantic source of truth
+  (sections are presentation only; a safety net appends any future category
+  not claimed by a section so nodes can never silently vanish from the
+  palette). Capability status pills compact to glyphs (…/✕) with the full
+  reason in the tooltip.
+- 2026-07-15 The authoring assistant is now loaded with the core product
+  documentation (operator ask): `architecture.md`, `visualflow.md`,
+  `getting-started.md`, `web-editor.md`, `faq.md`, and `dp-research.md` ride
+  the stable (cacheable) system-prompt prefix as an "ABSTRACTFLOW
+  DOCUMENTATION" block, imported raw from `docs/` so they can never drift from
+  the shipped docs. The assistant's contract gained an EXPLAIN mode next to
+  AUTHOR: for pure questions ("what is a subflow?", "how do runs work?") it
+  answers in `reply` grounded in the documentation, marks the plan
+  `intent:"explain"`, and OMITS `graph` entirely — an omitted document is a
+  no-op in the turn processor, so explaining never touches the canvas (no
+  mass-deletion risk). Explain turns end the loop directly instead of going
+  through the graph acceptance review (which judges graphs against build
+  requests and would reject a question as "not implemented"); `parsePlan`
+  honors the label only on workless plans, so real edits can never ride the
+  explain exit past review.
+- 2026-07-15 co-scientist reports now always carry visual elements on the key
+  hypotheses (operator ask). Deterministic: `REPORT_MD_CODE` builds a "Key
+  hypotheses at a glance" pipe table (rank/Elo/correctness/novelty/
+  testability/flags) from structured tournament data — guaranteed to render
+  as a real table in the PDF/DOCX exports regardless of model compliance
+  (cells sanitized: pipes, newlines, 80-char titles). Encouraged: the
+  meta-review prompt now requires one comparison table on DESIGN dimensions
+  (mechanism, improvement over literature, main risk, required evidence — not
+  scores, to avoid duplicating the deterministic table) and at least one
+  fenced ASCII schema of the top hypothesis architecture, and states that
+  mermaid/HTML/images do not render in the exports. Bundle republished as
+  `co-scientist@0.1.1` (catalog versions are sha-immutable; same-version
+  rebuilds are refused).
+- 2026-07-15 Branded report exports + honest titles (operator directive):
+  every workflow-generated PDF/DOCX now carries a discreet professional
+  identity — a small gray meta line under the title (workflow@version ·
+  report date · AbstractFramework / AbstractFlow — abstractframework.ai), a
+  thin rule, a running page footer (framework · url · workflow | page
+  number), and honest document metadata (PDF author/creator/subject; DOCX
+  core properties incl. created date). Renderer changes live in
+  abstractruntime/documents (branding opt-in per renderer; the
+  write_pdf/write_docx nodes brand BY DEFAULT with run provenance — the
+  workflow id+version is injected by the compiler from the run itself, so
+  all report flows get it with zero graph changes; `branding` pin overrides
+  fields or disables). Title fixes: co-scientist's document title is the
+  fixed product title ("AI Co-Scientist — Research Overview"), NEVER the
+  user's prompt (the goal stays as the body's "Research goal:" line);
+  deep-research's writer must now open with a derived headline-style report
+  title, never the verbatim request. Renderers dedup a leading markdown H1
+  identical to the document title (was printed twice). Bundles republished
+  as `co-scientist@0.1.5` + `dp-research@0.1.4`; 15 runtime-side regression
+  tests; end-to-end verified through a compiled visual-flow run (footer
+  reads "AbstractFramework · abstractframework.ai · co-scientist@0.1.5").
+- 2026-07-15 coding-agent gained a dual-interface entrypoint (code seat's
+  evaluation for the operator: the workflow is stronger than basic-agent but
+  was invisible to abstractcode's agent selector). New `coding-agent-chat`
+  flow conforms to `abstractcode.agent.v1` exactly (prompt/provider/model/
+  tools in; response/success/meta out), maps prompt→request, and deliberately
+  omits workspace/build/run commands so the pipeline runs in the session
+  workspace with inferred gates — the verifier executes what it can and the
+  degradation is visible in report/open_failures, never silent. History
+  honored: agent.v1 was REMOVED from the primary flow on 2026-07-14 as a
+  false contract (adversary finding — selector runs stalled on missing gate
+  pins); the wrapper is the honest fix, not a re-labeling. Bundle
+  `coding-agent@0.1.1` (both entrypoints declared; validated against
+  abstractcode's exact validator rules; live-verified served by the gateway).
+  bundledFlows run targets trued to current versions. Same evening, the
+  operator asked for a simpler executable name — the agent.v1 entrypoint was
+  renamed `coding-agent-chat` → `coder` (code seat's option A: bundle and
+  strict entrypoint names unchanged, zero references existed yet) and
+  republished as `coding-agent@0.1.2`, live-verified.
+- 2026-07-15 Artifact content-type fix (found by the 0.1.2 receipt run): all
+  three imported report artifacts registered as DOCX — exec-chained nodes
+  receive the previous node's output as their base payload, so the imports'
+  unconnected `content_type` input INHERITED `write_docx`'s content_type
+  output. Fix: explicit `content_type` pin defaults on every import node
+  (declared input-pin defaults override same-named ambient payload keys —
+  verified against the runtime's data-aware handler both statically in the
+  packed bundles and dynamically in-process). `wf_common.
+  import_workspace_file_node` now takes a `content_type` kwarg and its
+  docstring names the leak class. Bundles republished as `co-scientist@0.1.3`
+  and `dp-research@0.1.3`. The live probe also gained 429-retry resilience
+  (the gateway's auth-lockout window killed a poller mid-run while the
+  durable run completed fine — retry with backoff instead of dying).
+  Live-verified on run e95efef7: three artifacts with honest content types,
+  observer thread closed. Adversary P2 polish followed as `co-scientist@0.1.4`
+  (meta-prompt explicitly allows additional tables beyond the required design
+  comparison; table cells capped at 120 chars against layout-breaking junk
+  values).
+- 2026-07-15 Report files are now durable run artifacts (observer ask, operator
+  directive "only what has been written durably through the runtime can
+  surface"): co-scientist and deep-research chain `import_workspace_file`
+  after their report writers, so the produced md/pdf/docx are registered in
+  the run's artifact store — listable via `GET /runs/{id}/artifacts` with
+  honest content_type/filename/size and servable to any client — instead of
+  existing only as loose workspace files (verified root cause: the
+  write_file/write_pdf/write_docx effects never touch the artifact store;
+  only imports and media generation do). Artifact ids are exposed as
+  `md_artifact_id`/`pdf_artifact_id`/`docx_artifact_id` flow outputs. Bundles
+  republished as `co-scientist@0.1.2` and `dp-research@0.1.2`;
+  `wf_common.import_workspace_file_node` added for generated flows. Backlog
+  item `2026-07-15_coscientist_reports_as_durable_artifacts.md` claimed on
+  agora.
 - 2026-07-15 Run totals in the execution view (operator ask): a terminal run's
   Execution header now shows aggregate stats — total wall-clock time and total
   input→output tokens — summed across the WHOLE run tree (agent workflows spend

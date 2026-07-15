@@ -3339,6 +3339,21 @@
             "id": "meta",
             "label": "meta",
             "type": "object"
+          },
+          {
+            "id": "md_artifact_id",
+            "label": "md_artifact_id",
+            "type": "string"
+          },
+          {
+            "id": "pdf_artifact_id",
+            "label": "pdf_artifact_id",
+            "type": "string"
+          },
+          {
+            "id": "docx_artifact_id",
+            "label": "docx_artifact_id",
+            "type": "string"
           }
         ],
         "outputs": []
@@ -3348,6 +3363,219 @@
       "headerColor": null,
       "inputs": [],
       "outputs": []
+    },
+    {
+      "id": "import_md",
+      "type": "import_workspace_file",
+      "position": {
+        "x": 4980,
+        "y": -560
+      },
+      "data": {
+        "nodeType": "import_workspace_file",
+        "label": "Register .md artifact",
+        "icon": "&#x2B07;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "file_path",
+            "label": "file_path",
+            "type": "workspace_file"
+          },
+          {
+            "id": "content_type",
+            "label": "content_type",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "artifact",
+            "label": "artifact",
+            "type": "artifact"
+          },
+          {
+            "id": "artifact_ref",
+            "label": "artifact_ref",
+            "type": "artifact"
+          },
+          {
+            "id": "artifact_id",
+            "label": "artifact_id",
+            "type": "string"
+          },
+          {
+            "id": "content_type",
+            "label": "content_type",
+            "type": "string"
+          },
+          {
+            "id": "size_bytes",
+            "label": "size_bytes",
+            "type": "number"
+          },
+          {
+            "id": "source_path",
+            "label": "source_path",
+            "type": "workspace_file"
+          }
+        ],
+        "pinDefaults": {
+          "content_type": "text/markdown"
+        }
+      }
+    },
+    {
+      "id": "import_pdf",
+      "type": "import_workspace_file",
+      "position": {
+        "x": 4980,
+        "y": -420
+      },
+      "data": {
+        "nodeType": "import_workspace_file",
+        "label": "Register .pdf artifact",
+        "icon": "&#x2B07;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "file_path",
+            "label": "file_path",
+            "type": "workspace_file"
+          },
+          {
+            "id": "content_type",
+            "label": "content_type",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "artifact",
+            "label": "artifact",
+            "type": "artifact"
+          },
+          {
+            "id": "artifact_ref",
+            "label": "artifact_ref",
+            "type": "artifact"
+          },
+          {
+            "id": "artifact_id",
+            "label": "artifact_id",
+            "type": "string"
+          },
+          {
+            "id": "content_type",
+            "label": "content_type",
+            "type": "string"
+          },
+          {
+            "id": "size_bytes",
+            "label": "size_bytes",
+            "type": "number"
+          },
+          {
+            "id": "source_path",
+            "label": "source_path",
+            "type": "workspace_file"
+          }
+        ],
+        "pinDefaults": {
+          "content_type": "application/pdf"
+        }
+      }
+    },
+    {
+      "id": "import_docx",
+      "type": "import_workspace_file",
+      "position": {
+        "x": 4980,
+        "y": -280
+      },
+      "data": {
+        "nodeType": "import_workspace_file",
+        "label": "Register .docx artifact",
+        "icon": "&#x2B07;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "file_path",
+            "label": "file_path",
+            "type": "workspace_file"
+          },
+          {
+            "id": "content_type",
+            "label": "content_type",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "artifact",
+            "label": "artifact",
+            "type": "artifact"
+          },
+          {
+            "id": "artifact_ref",
+            "label": "artifact_ref",
+            "type": "artifact"
+          },
+          {
+            "id": "artifact_id",
+            "label": "artifact_id",
+            "type": "string"
+          },
+          {
+            "id": "content_type",
+            "label": "content_type",
+            "type": "string"
+          },
+          {
+            "id": "size_bytes",
+            "label": "size_bytes",
+            "type": "number"
+          },
+          {
+            "id": "source_path",
+            "label": "source_path",
+            "type": "workspace_file"
+          }
+        ],
+        "pinDefaults": {
+          "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        }
+      }
     }
   ],
   "edges": [
@@ -3492,14 +3720,6 @@
       "source": "write_warnings",
       "sourceHandle": "exec-out",
       "target": "write_manifest",
-      "targetHandle": "exec-in",
-      "animated": true
-    },
-    {
-      "id": "e-write_manifest-exec-out-end-exec-in",
-      "source": "write_manifest",
-      "sourceHandle": "exec-out",
-      "target": "end",
       "targetHandle": "exec-in",
       "animated": true
     },
@@ -4550,6 +4770,80 @@
       "target": "render_input",
       "targetHandle": "model",
       "animated": false
+    },
+    {
+      "id": "write_manifest.exec-out->import_md.exec-in",
+      "source": "write_manifest",
+      "sourceHandle": "exec-out",
+      "target": "import_md",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "import_md.exec-out->import_pdf.exec-in",
+      "source": "import_md",
+      "sourceHandle": "exec-out",
+      "target": "import_pdf",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "import_pdf.exec-out->import_docx.exec-in",
+      "source": "import_pdf",
+      "sourceHandle": "exec-out",
+      "target": "import_docx",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "import_docx.exec-out->end.exec-in",
+      "source": "import_docx",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "write_md.file_path->import_md.file_path",
+      "source": "write_md",
+      "sourceHandle": "file_path",
+      "target": "import_md",
+      "targetHandle": "file_path"
+    },
+    {
+      "id": "write_pdf.file_path->import_pdf.file_path",
+      "source": "write_pdf",
+      "sourceHandle": "file_path",
+      "target": "import_pdf",
+      "targetHandle": "file_path"
+    },
+    {
+      "id": "write_docx.file_path->import_docx.file_path",
+      "source": "write_docx",
+      "sourceHandle": "file_path",
+      "target": "import_docx",
+      "targetHandle": "file_path"
+    },
+    {
+      "id": "import_md.artifact_id->end.md_artifact_id",
+      "source": "import_md",
+      "sourceHandle": "artifact_id",
+      "target": "end",
+      "targetHandle": "md_artifact_id"
+    },
+    {
+      "id": "import_pdf.artifact_id->end.pdf_artifact_id",
+      "source": "import_pdf",
+      "sourceHandle": "artifact_id",
+      "target": "end",
+      "targetHandle": "pdf_artifact_id"
+    },
+    {
+      "id": "import_docx.artifact_id->end.docx_artifact_id",
+      "source": "import_docx",
+      "sourceHandle": "artifact_id",
+      "target": "end",
+      "targetHandle": "docx_artifact_id"
     }
   ],
   "entryNode": "start",

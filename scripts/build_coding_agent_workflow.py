@@ -31,7 +31,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 FLOWS_DIR = ROOT / "abstractflow" / "examples" / "flows"
 BUNDLES_DIR = ROOT / "abstractgateway" / "flows" / "bundles"
-BUNDLE_PATH = BUNDLES_DIR / "coding-agent@0.1.0.flow"
+BUNDLE_PATH = BUNDLES_DIR / "coding-agent@0.1.2.flow"
 
 AGENT_INTERFACE = "abstractcode.agent.v1"
 
@@ -514,6 +514,80 @@ def build_root_flow() -> dict[str, Any]:
     return flow
 
 
+def build_chat_entrypoint_flow() -> dict[str, Any]:
+    """`coder` — the abstractcode.agent.v1-conformant SECOND entrypoint (dual-interface
+    pattern, dp-research precedent; code's c2412 ask 2).
+
+    History: coding-agent originally declared agent.v1 on its PRIMARY flow and
+    an adversarial review flagged it as a false contract (agent.v1 callers
+    never send build_command/run_command, so selector-started runs stalled on
+    missing pins). This wrapper is the honest fix: it conforms to the chat
+    contract (prompt/provider/model/tools in; response/success/meta out), maps
+    prompt -> request, and OMITS the gate commands so the child's pin defaults
+    apply — the verifier degrades to what it can execute and the degradation
+    is visible in the report/open_failures (never silent).
+
+    The `tools` start pin is declared per the contract; the coding pipeline's
+    tool allowlists are fixed by design (builder/verifier sets). A caller's
+    allowed_tools still binds through the runtime's _runtime.allowed_tools
+    enforcement regardless of this flow's wiring.
+    """
+    flow = _base_flow(
+        "coder", "coder",
+        "Chat-agent entrypoint for the coding-agent pipeline: takes a plain prompt (abstractcode.agent.v1), runs the verify-gated build loop in the session workspace with inferred gates (no explicit build/run commands — the verifier executes what it can and reports honestly), and returns the build report as the response.",
+        ["abstractcode.agent.v1"],
+    )
+    flow["nodes"] = [
+        _node("start", "on_flow_start", "Chat request", -600, 0,
+              outputs=[EXEC_OUT,
+                       _pin("prompt", "prompt", "string"),
+                       _pin("provider", "provider", "provider_text"),
+                       _pin("model", "model", "model"),
+                       _pin("tools", "tools", "array")],
+              pin_defaults={"prompt": ""}),
+        # request <- prompt; workspace_root/build_command/run_command are
+        # deliberately OMITTED so the child's pin defaults ("" / "" / "" / 3)
+        # apply: session workspace, inferred gates, 3 rounds.
+        _make_object("map_input",
+                     [("request", "string"),
+                      ("provider", "provider_text"), ("model", "model")], -260, 160),
+        _subflow_node("build", "Verify-gated coding run", "coding-agent", -260, -40),
+        _get("get_report", "report", "", 100, 60),
+        _get("get_passed", "passed", False, 100, 200),
+        _get("get_rounds", "rounds_used", 0, 100, 340),
+        _get("get_failures", "open_failures", [], 100, 480),
+        _make_object("meta_obj",
+                     [("passed", "boolean"), ("rounds_used", "number"),
+                      ("open_failures", "array")], 460, 340),
+        _node("end", "on_flow_end", "Finish", 820, 60,
+              inputs=[EXEC_IN,
+                      _pin("response", "response", "string"),
+                      _pin("success", "success", "boolean"),
+                      _pin("meta", "meta", "object")]),
+    ]
+    flow["edges"] = [
+        _edge("start", "exec-out", "build", "exec-in", animated=True),
+        _edge("build", "exec-out", "end", "exec-in", animated=True),
+        # input mapping
+        _edge("start", "prompt", "map_input", "request"),
+        _edge("start", "provider", "map_input", "provider"),
+        _edge("start", "model", "map_input", "model"),
+        _edge("map_input", "result", "build", "input"),
+        # outputs
+        _edge("build", "output", "get_report", "object"),
+        _edge("build", "output", "get_passed", "object"),
+        _edge("build", "output", "get_rounds", "object"),
+        _edge("build", "output", "get_failures", "object"),
+        _edge("get_passed", "value", "meta_obj", "passed"),
+        _edge("get_rounds", "value", "meta_obj", "rounds_used"),
+        _edge("get_failures", "value", "meta_obj", "open_failures"),
+        _edge("get_report", "value", "end", "response"),
+        _edge("get_passed", "value", "end", "success"),
+        _edge("meta_obj", "result", "end", "meta"),
+    ]
+    return flow
+
+
 def write_json(path: Path, data: dict[str, Any]) -> None:
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
@@ -544,7 +618,7 @@ def _validate_edges(flow: dict[str, Any]) -> list[str]:
 
 
 def main() -> int:
-    flows = [build_verifier_subflow(), build_root_flow()]
+    flows = [build_verifier_subflow(), build_root_flow(), build_chat_entrypoint_flow()]
     for flow in flows:
         problems = _validate_edges(flow)
         if problems:
@@ -556,24 +630,27 @@ def main() -> int:
     from abstractruntime.visualflow_compiler import compiler as _compiler
 
     # Self-check: compile the tree through the real runtime compiler so a
-    # broken graph fails the build, not a live run (adversary P1).
-    _compiler.compile_visualflow_tree(
-        root_id="coding-agent",
-        flows_by_id={f["id"]: json.loads((FLOWS_DIR / f"{f['id']}.json").read_text()) for f in flows},
-    )
+    # broken graph fails the build, not a live run (adversary P1). Both
+    # entrypoints compile: the chat wrapper references coding-agent as its
+    # subflow, which references coding-verify-gates.
+    flows_by_id = {f["id"]: json.loads((FLOWS_DIR / f"{f['id']}.json").read_text()) for f in flows}
+    _compiler.compile_visualflow_tree(root_id="coding-agent", flows_by_id=flows_by_id)
+    _compiler.compile_visualflow_tree(root_id="coder", flows_by_id=flows_by_id)
 
     BUNDLES_DIR.mkdir(parents=True, exist_ok=True)
     pack_workflow_bundle(
-        root_flow_json=FLOWS_DIR / "coding-agent.json",
+        # The chat wrapper is the packing root so its subflow tree (coding-agent
+        # -> coding-verify-gates) rides along; both entrypoints are declared.
+        root_flow_json=FLOWS_DIR / "coder.json",
         out_path=BUNDLE_PATH,
         bundle_id="coding-agent",
-        bundle_version="0.1.0",
+        bundle_version="0.1.2",
         flows_dir=FLOWS_DIR,
-        entrypoints=["coding-agent"],
+        entrypoints=["coding-agent", "coder"],
         default_entrypoint="coding-agent",
         metadata={
             "family": "coding-agent",
-            "purpose": "recursive coding agent with independent build/execute/match verification and specific-failure reprompting",
+            "purpose": "recursive coding agent with independent build/execute/match verification and specific-failure reprompting; dual-interface (coding.v1 strict entrypoint + agent.v1 chat entrypoint with inferred gates)",
             "outputs": ["report", "passed", "rounds_used", "open_failures"],
         },
     )
