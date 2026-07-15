@@ -1275,14 +1275,73 @@ workflow, then reference it.
   conversation context into the child.
 - Per-item composition: ForEach.item -> the subflow node's matching input,
   inside the loop body.
-- Dependencies must be SAVED before they can be referenced. When the request
-  needs a workflow that does not exist yet ("create workflow2, then create
-  workflow1 that uses workflow2"), say so in your reply and build the
-  dependency FIRST (ask the user to save it, or author it in its own
-  conversation) — then reference its saved id. Never invent an id.
 - Self-reference and reference cycles are refused in assistant authoring
   (recursion needs a designed base case; the Properties panel remains the
   manual path for deliberate recursion).
+
+### Creating Subflows (the `subflows` array)
+
+When the request needs a helper workflow that does not exist yet ("create
+workflow2, then create workflow1 that uses workflow2"), CREATE it in the same
+emission with the top-level `subflows` array beside `nodes`/`edges`:
+
+```json
+{
+  "flow_name": "research-pipeline",
+  "nodes": [
+    {"id": "start", "type": "on_flow_start", "outputs": [{"id": "topic", "type": "string"}]},
+    {"id": "extract", "type": "subflow", "subflow_ref": "ref:extract-claims"},
+    {"id": "end", "type": "on_flow_end", "inputs": [{"id": "claims", "type": "string"}]}
+  ],
+  "edges": ["start.exec-out -> extract.exec-in", "start.topic -> extract.text",
+            "extract.exec-out -> end.exec-in", "extract.claims -> end.claims"],
+  "subflows": [
+    {
+      "ref": "extract-claims",
+      "flow_name": "extract-claims",
+      "description": "Extracts factual claims from a text block.",
+      "nodes": [
+        {"id": "start", "type": "on_flow_start", "outputs": [{"id": "text", "type": "string"}]},
+        {"id": "end", "type": "on_flow_end", "inputs": [{"id": "claims", "type": "string"}]}
+      ],
+      "edges": ["start.exec-out -> end.exec-in", "start.text -> end.claims"]
+    }
+  ]
+}
+```
+
+Semantics (deliberate, enforced):
+
+- `ref` is a conversation-local handle (lowercase kebab/snake, 2-64 chars).
+  The main document references it as `"subflow_ref": "ref:<handle>"`; the
+  editor creates the workflow, substitutes the real saved id, and the new
+  workflow appears in AVAILABLE WORKFLOWS on the next cycle.
+- Each definition uses the SAME node/edge grammar as `graph`, MUST have
+  `on_flow_start` (its input contract), and should have `on_flow_end` when
+  callers need outputs (missing end = warning: the subflow node exposes no
+  outputs). `flow_name` and `description` are required — created workflows
+  enter the shared library and must be findable and self-explanatory.
+- Re-emitting the same `ref` UPDATES that workflow — helpers created in this
+  conversation stay yours to refine (the ref→id map is conversation state,
+  durable across turns). A faithful re-emission is a no-op.
+- `subflows` is create/update-only: OMITTING a previously emitted definition
+  never deletes the saved workflow (the document owns the OPEN flow, never
+  the library). Deleting library workflows is a human act.
+- Definitions may reference SAVED workflow ids, never other `ref:` handles —
+  one level of new definitions per emission. Deep nesting composes ACROSS
+  cycles: create the innermost helper first; it is referencable by id next
+  cycle.
+- Budget: at most 5 definitions per emission, and at most 10 CREATIONS per
+  turn (updates are exempt — they converge, not grow). Name collisions with
+  existing library workflows are refused at birth (no second "deep-research").
+- Existing library workflows are reference-only from the assistant: to change
+  one, the user opens it in the editor (its own conversation).
+
+When to decompose: create a subflow when a unit is reusable across workflows,
+has one clear contract, or the main graph grows past ~15-20 nodes with
+distinct phases. Name it by what it does (`extract-claims`, never `helper-1`).
+Otherwise keep the graph flat — decomposition nobody reuses is indirection,
+not cleanliness. Undo Turn deletes helpers created by the undone turn.
 
 ## Validation And Repair
 
@@ -3544,7 +3603,339 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- 2026-07-14 co-scientist rebuilt into a deep, production-grade hypothesis
+  engine (operator: "co-scientist can not be faster than deep-research… it
+  normally has much more steps, orchestrations and iterations"). The prior
+  version was a shallow tool-free single pass that finished faster than the
+  deep-research report — the opposite of the paper. Rebuilt around three
+  adversary-driven waves (three fable5 reviews: paper-fidelity gap analysis,
+  head-to-head comparison audit, production mechanics audit):
+  - **Starts from the literature via composition, driven correctly.** Grounding
+    is delegated to `dp-plan` → `dp-investigate` (deep-research's own research
+    planner + web-search investigation engine); the bundle embeds both. The
+    plan is load-bearing: driving `dp-investigate` BARE (no plan) made the
+    agent search real papers but then collapse its structured `source_ledger`
+    to a single junk entry — deep-research always feeds it a plan, and once
+    co-scientist does too, grounding reliably populates (verified live: 14/14
+    fetched real-URL sources, zero fallback, vs 1 junk entry bare). URL-level
+    fidelity is still model-dependent (gpt-oss-120b can fabricate an arXiv id
+    in the ledger — the same limitation deep-research has), but the ledger no
+    longer structurally collapses.
+  - **Full report exported as .md / .pdf / .docx** (operator ask): co-scientist
+    previously returned its research overview only as a JSON field — it now
+    assembles the paper's research-overview deliverable (meta-review overview +
+    ranked hypotheses with statement/rationale/experiment/review-scores/flags +
+    literature source ledger + honesty caveats) and writes all three formats
+    to `reports/co-scientist-research-<ts>.{md,pdf,docx}`, exposing
+    `md_path`/`pdf_path`/`docx_path` + sha256s as flow outputs — the same
+    `write_file`/`write_pdf`/`write_docx` export surface deep-research uses.
+    The meta-review prompt enforces human-readable Markdown prose (no JSON
+    dump). Live-verified: three real, valid files (PDF 13 pages, DOCX Word
+    2007+), prose overview across 7 sections.
+  - **Genuinely deep loop**: Generation (grounded) → supervisor cycles of
+    Reflection → Elo tournament (prioritized pairwise scientific debate) →
+    Evolution (refine) → research-Expansion (divergent new directions), with
+    per-cycle meta-feedback threaded into the next cycle's prompts and
+    near-duplicate pruning, then a terminal search-grounded full review of the
+    finalists, then a Meta-review overview. ~17 LLM calls + 2 agent subruns;
+    live runs take ~13 min (grounding alone ~8 min) vs the shallow 3 min —
+    deliberately deeper than a single-pass report, within the 30-min budget.
+  - **Structural quality/safety guards (not prompt-deep)**: a correctness-floor
+    gate demotes unsound (reviewed correctness < 5) and unreviewed hypotheses
+    below sound ones so the tournament can no longer crown a bold-but-unsound
+    idea (the shallow run's Elo anti-correlated with correctness at ρ=−0.886);
+    a safety gate demotes + flags any `safety_ok=false` hypothesis below all
+    safe ones; both surface `#FALLBACK` warnings on a new `warnings` output.
+  - **Honest grounding signal**: a `grounding_ok` check requires ≥1 genuinely
+    fetched source with a real URL (grounding on gpt-oss-120b is
+    nondeterministic — one run fetched 12 real sources, another fetched 0); a
+    degenerate/empty grounding is labeled `#FALLBACK` instead of silently
+    presenting parametric guesses as literature-grounded.
+  - **Bugs fixed (adversary-found)**: source-ledger field mismatch (read
+    `url_or_path`/`evidence_quality`/`relevance`, not `url`/`takeaway`, so
+    URLs are no longer dropped); evolution refinements were being deduped away
+    every cycle (evolved now dedups at 0.85 vs expanded at 0.6, so genuine
+    refinements survive); no-fabricated-numbers prompt guards on
+    generation/evolution/meta (targets phrased as hypothesized, never
+    "reported"/"demonstrated"). Docstring rewritten to disclose the real
+    simplifications (fixed synchronous supervisor, 2-of-6 reflection
+    strategies, dedup-only Proximity, end-only deep search).
+
+- 2026-07-14 Unified top-bar + chip adoption (uic kit): the header's
+  assistant/appearance/connect controls moved out of the Toolbar into the
+  kit's `AfTopBarActions` cluster (enforced order: assistant → appearance →
+  extras → Disconnect pill rightmost; three-state connection phase so the
+  boot probe shows "Connecting…" instead of flashing "Connect" over a live
+  session; the flag-gated monitor-gpu widget rides `extraActions`). The
+  local `AppearanceModal` is deleted — appearance is the kit's
+  `AfAppearanceDialog` + `useAppearanceSettings('abstractflow', ...)`, which
+  owns persistence (`af_appearance_abstractflow_v1`, one-time migration from
+  the legacy `abstractflow_ui_settings_v1` key) and applies theme +
+  typography synchronously on first load (no default-theme flash). Flow
+  Library badge pills migrated from flow-local spans to kit
+  `AfChip`/`AfChipButton` (operator AA approval c1652): the kit owns tones,
+  geometry, and the AA text-derivation recipe; flow keeps only its
+  name→tone map (current/runnable=success, family/bundled=info,
+  shared/recursive/cycle=warning, missing=error) — ~80 lines of local badge
+  and connection-pill CSS deleted. Verified headless in both themes
+  (`scripts/topbar_verify.mjs` asserts cluster order + pill states, and the
+  library preview re-shot) plus a signed-in live-app check (no page
+  errors; cluster renders with correct order and Disconnect pill).
+
 ### Added
+- 2026-07-14 Five framework workflows (operator ask): two runnable flagships
+  and three composable primitives, all authored as generator scripts
+  (`scripts/build_*_workflow.py` + `scripts/wf_common.py`), packed as gateway
+  bundles, registered in the editor's bundled catalog + interface registry,
+  and live-verified against the real gateway.
+  - `co-scientist` (Nature 'AI co-scientist' replica, arXiv:2502.18864): a
+    supervisor loop over Generation → Reflection → Ranking (Elo tournament via
+    simulated pairwise debate) → Evolution, feeding the tournament state
+    forward, then a Meta-review synthesis. Live run produced 5 hypotheses with
+    differentiated Elo (1231/1220/1220/1199/1168 — the tournament moved scores
+    off the 1200 seed) and a coherent research overview. Fidelity note in the
+    generator docstring (synchronous supervisor loop, one debate pass/cycle,
+    grounding opt-in) — no false claims.
+  - `coding-agent`: builder agent + independent build/execute/match
+    verification (its own `coding-verify-gates` subflow) with
+    specific-failure reprompting; the reprompt loop is deterministically
+    proven and the gates run via execute_command/analyze_code.
+  - `adversarial-review`: three-lens critics → severity-ranked pass/revise/
+    block verdict (composable subflow).
+  - `structured-extract`: text → schema-validated JSON with a validate→
+    reprompt loop. Live run extracted a correct object on attempt 1.
+  - `map-reduce`: per-item LLM map + synthesis reduce. Live run mapped 3
+    items and synthesized correctly (loop accumulator verified).
+  - Registered `abstractcode.coding.v1`, `abstractresearch.coscientist.v1`,
+    and the three composable-primitive interfaces in `flowFamilies.ts`.
+  - Root-caused + fixed a shared loop bug found while proving these live: a
+    `code` node's while-condition must wire the boolean SUB-KEY handle
+    (`cond.condition`), not `.output` (the whole dict is always truthy →
+    infinite loop). Fixed in all three loop workflows; `wf_common.validate_edges`
+    now allows code-node dict-key handles (the dp-research idiom). Also:
+    code-node bodies are import-free (RestrictedPython sandbox forbids
+    imports — AST-verified for all 28 bodies), and the two flagships declare
+    only their own entrypoint interfaces (dropped a false
+    `abstractcode.agent.v1` whose pin contract they do not satisfy).
+  - Post-audit reconciliation (4 adversarial reviews): generators verified
+    idempotent against the shipped JSONs (regeneration produces a zero diff —
+    the mid-review generator/artifact divergence the audits flagged was the
+    fix wave landing while they read); the five bundles are now allowlisted
+    in `abstractgateway/.gitignore` (previously gitignored → dangling run
+    targets on a fresh clone); the coding-agent generator gained the same
+    edge-validation + real-compiler self-check as the other four (a broken
+    graph now fails the build, not a live run); and the co-scientist
+    fidelity note now names what is NOT replicated (Meta-review feedback
+    propagation into next-iteration prompts, Proximity/dedup agent,
+    default-on literature grounding) instead of claiming a "faithful
+    replica" — the flow description and interface-registry description were
+    rewritten to match.
+
+- 2026-07-14 The authoring assistant can CREATE and UPDATE helper workflows
+  (subflows) in the same conversation (operator directive: "creation of
+  subflows as well, to keep things clean when needed"). The graph document
+  gains a top-level `subflows` array — each definition ({ref, flow_name,
+  description, nodes, edges}) rides the SAME validated document lane as the
+  open canvas (diff → commands → apply → serialize) and is saved through the
+  gateway; the main document references it as `subflow_ref: "ref:<handle>"`
+  and the editor substitutes the real minted id. Semantics: create/update
+  only (omission never deletes a saved workflow — the document owns the open
+  flow, not the library); updates are conversation-scoped (the durable
+  ref→id map); name collisions with existing library flows are refused at
+  birth; nested handle definitions are refused (deep nesting composes across
+  cycles); at most 5 definitions per emission; missing on_flow_start is an
+  error, missing on_flow_end a warning; created workflows join AVAILABLE
+  WORKFLOWS on the next cycle; Undo Turn deletes exactly the helpers the
+  undone turn created. New module `src/utils/subflowAuthoring.ts` (+16
+  regression tests); prompt + `docs/workflow-authoring-skill.md` teach the
+  grammar and when-to-decompose guidance. Adversary follow-ups folded:
+  undo publishes the snapshot and the birth list TOGETHER in the turn's
+  `finally` (an exception between creation and turn end can no longer orphan
+  helpers or pair them with a stale canvas snapshot; a created-only turn
+  unwinds births without touching the canvas), creation-only cycles count as
+  progress (never stall as "empty"), a per-turn creation cap (10) backs the
+  per-emission budget (5), and the skill doc's own `subflows` example is
+  extracted and applied end to end by a fidelity test
+  (`subflowAuthoringSkillExample.test.ts`). Live-verified: a real authoring
+  turn created `text-shouter` in the store (proper description, start/end
+  contract) and wired the main canvas through a subflow node with patched
+  pins (`scripts/subflow_authoring_drive.mjs`).
+
+### Fixed
+- 2026-07-13 Cancel-while-running/waiting now works visibly (operator report:
+  "I can't cancel an ongoing workflow"). Root cause: the gateway `cancel`
+  command is durable/async (the runner applies it up to seconds later under
+  load) but `cancelRun` fetched the run summary once immediately after the
+  POST — it raced the runner, read back `waiting`, and re-painted the stale
+  WAITING view with no further signal. Fix: `useWebSocket.cancelRun` marks the
+  run cancel-pending (suppresses stale waiting re-paints in
+  `applyRunSummary`) and polls the summary to a terminal state; the run modal
+  shows an optimistic "Cancelling…" button; cancelled runs now label as
+  CANCELLED (subtitle, final-result header) instead of FAILED, including
+  inspected runs via `runSummary.status`. Verified live end to end with a
+  headless drive (`scripts/cancel_repro.mjs`: ask_user probe flow → Cancel
+  while WAITING → UI CANCELLED + backend `cancelled`).
+- 2026-07-13 Cancel adversary follow-up (fable5 audit of the cancel fix):
+  a refused or timed-out cancel now re-enables the button and raises a
+  visible toast instead of leaving a dead disabled "Cancelling…" with an
+  error nobody rendered (A1); waiting re-paints from the ledger STREAM are
+  suppressed during a pending cancel, not only summary re-paints (A2); the
+  waiting response form (Continue/choices/Send) and Pause are gated while a
+  cancel is pending so an answer cannot race the durable cancel (A3); the
+  CANCELLED label keys on the explicit `cancelled` flag only — matching
+  `error === 'Cancelled'` could mislabel a genuinely failed parent whose
+  error text was propagated from a cancelled child (A5). Repo plumbing from
+  the same audit: `dp-research@0.1.1.flow` added to the gateway bundle
+  allowlist (it was gitignored — fresh clones would have missed the pinned
+  run target) and `llms-full.txt` regenerated.
+- 2026-07-13 Artifact previews survive transient gateway load (operator
+  screenshot: "Failed to fetch" on a generated-voice artifact while the
+  gateway was saturated by the TTS model — the artifact itself was verified
+  intact and servable). The artifact object-URL/text hooks now run one
+  bounded automatic retry pass (1.5s) and every artifact error card gains a
+  Retry button; a single dropped fetch no longer paints a permanent dead
+  error card.
+
+- 2026-07-13 Production-readiness wave (operator directive; one fable5
+  code+logic adversary — 3 P1 + 9 P2 findings — plus a live headless-chrome
+  drive of :3000 against :8080):
+  - Round-trip truncation asymmetry (P1): the diff now compares the CLAMPED
+    current side for labels/switch case values/pin descriptions, so faithful
+    re-emissions of long canvas content compile zero commands instead of
+    silently clobbering runtime values down to the normalizer limits; node
+    ids are never truncated (documents with >120-char or duplicate ids are
+    refused loudly).
+  - `set_break_paths`/`set_switch_cases` now revalidate the node's attached
+    edges and drop invalidated ones loudly (a retyped break path kept its
+    incompatible edge silently; a renamed switch case orphaned exec edges).
+  - Steer strip honesty (P1): `parked` derives from the wait/pause state
+    (the live lane never clears isRunning on waits, so parked was never
+    true); `key={rootRunId}` resets draft text and queued status across run
+    switches.
+  - Terminal events (`flow_complete`/`flow_error`/`flow_cancelled`) carry
+    the same root-run guard node events had — one failed subrun record can
+    no longer flip the whole UI terminal and kill root highlights.
+  - Library: stale instance selections revalidate against visible rows
+    (collapse no longer blanks the ring and teleports arrow-nav); Uses/Used-by
+    links reveal the target's ancestor path before selecting it.
+  - Draft tests: the interactive-wait flag tracks the current poll (an early
+    answered question no longer converts a later timeout into
+    needs_interactive_input); flow outputs match `on_flow_end` by node type,
+    not an `/end/i` id substring; the run-tree walk labels its 24-run cap
+    with #TRUNCATION; `update_pin` no-ops report as warnings, and
+    non-canonical doc pin types ("text") no longer emit phantom updates.
+  - Library header shows "Loading saved flows…" while bundled rows render
+    ahead of the gateway query (live-drive finding: "7 flows" flashed on a
+    120-flow library).
+  - New evidence tooling: `scripts/production_drive.mjs` +
+    `scripts/production_drive_run.mjs` (headless-chrome operator-path drive:
+    real sign-in, real library, bundled basic-agent load, live no-LLM run).
+
+### Changed
+- 2026-07-13 Deep-research rename + dedup (operator directive): the `dp-*`
+  workflow family now displays as `deep-research`,
+  `deep-research-{plan,investigate,review,render}`. Ids and wiring stay
+  `dp-*`; the rename lives in the generator
+  (`scripts/build_dp_research_workflows.py`) and regenerated
+  `examples/flows/dp-*.json`. Bundle republished as `dp-research@0.1.1`
+  (versions are immutable by sha; 0.1.0 artifact restored byte-identical) and
+  the editor run target now points at 0.1.1. The two stale June-28 saved
+  snapshots of dp-research (`e31bd652`, `ec83cf80`) were deleted from the
+  live store — the library now shows exactly one deep-research family.
+
+### Added
+- 2026-07-13 uic kit consumption (operator-directed absorb wave, commons
+  c1236/c1239):
+  - Run modal gains a SteerComposer strip (kit component) under the live
+    steps list — speak to a RUNNING/WAITING run; truth is "Queued (seq N)"
+    with delivery visible as the `abstract.steer_seen` ledger record; parked
+    runs say guidance lands at next wake (steers do not wake runs).
+  - Flow Library rows now render through the kit `DisclosureList` (the
+    absorb-then-delete swap: the fork this component paid for — dual-key
+    selection, path-keyed expansion, flat-with-depth rows — came back as the
+    kit contract). Flow keeps its derivation/cycle/interface logic and the
+    premium row styling via kit structural classes; the modal's window-level
+    keyboard nav yields to the kit tree when focus is inside it.
+  - Badge pills deliberately stay flow-local (NOT AfChip yet): uic's c1116
+    flag (a) — the kit AA text recipe visibly changes operator-approved
+    pixels on muted themes — awaits the operator's explicit ack.
+- 2026-07-12 Flow Library premium pass (operator screenshot review round 2):
+  - basic-agent (81795ea9) and its ac-update-status helper (15f19f7f) join
+    the bundled catalog with a `basic-agent@0.0.1` run target — the
+    framework default agent was invisible in the library (and the Runnable
+    view) because only `dp-*` was globbed into `bundledFlows.ts`.
+  - Badge rail fade fixed: the fade zone is reserved with padding so badges
+    that FIT no longer fade at the right border; only true overflow slides
+    under the mask (operator report on the `bundle`/`bundled` pills).
+  - Same-name disambiguation: when several flows share a name (saved
+    iteration copies of dp-research), rows show a muted short-id hint and
+    lookup context lines dedupe parent names ("in dp-research", not
+    "in dp-research, dp-research").
+  - Visual refinement toward a calmer, premium read: rows are quiet list
+    lines (transparent rest state, soft hover fill, single accent hairline +
+    tint when selected — the border+ring double stroke is gone), badges are
+    hue-tinted pills, segmented All/Runnable control with a raised active
+    thumb, pill search field with softened focus ring, uppercase micro-label
+    keys in the preview panel, hairline-separated action bar, themed thin
+    scrollbars, larger modal (1020px/76vh).
+  - Expanding a family near the bottom of the list now scrolls the parent to
+    the top so the unfolded children are actually visible.
+  - `scripts/library_preview_shot.mjs`: puppeteer-core screenshot suite over
+    the library preview harness (6 states, dark+light) — chrome headless CLI
+    on macOS hangs against IPv6-only vite binds; the script pins
+    `127.0.0.1` and waits for the harness ready flag.
+- 2026-07-12 Flow Library family grouping + executable view (operator
+  green-light on backlog 0144; built with headless-render iteration and two
+  fable5 adversaries; uic recruited via the hub for the kit halves):
+  - Families are DERIVED from the subflow reference graph
+    (`src/utils/flowFamilies.ts`): first-level = normalized non-empty
+    `interfaces` OR zero external inbound; self-references never bury a flow
+    (`recursive` badge); interface-less cycles promote whole (`cycle` badge —
+    invariant: no flow is ever unreachable); dangling refs render as
+    error-toned `missing` child rows (the publish-time 400 surfaced at
+    authoring time). Shared helpers render under EVERY parent with a
+    `shared ×N` badge — rows are views, the preview is the entity.
+  - All/Executable view toggle: executable = declares an ENTRYPOINT-class
+    interface (local class facet on the known-interfaces list — today
+    `abstractcode.agent.v1`; the gateway-served registry is the planned
+    retirement path). The All view keeps every flow searchable.
+  - Search flattens (lookup mode) and matches descriptions; helper hits
+    carry an "in <parents>" context subtitle; clearing the query reveals the
+    selection by expanding its first parent.
+  - Preview panel gains a Family section (Uses / Used by with jump links);
+    Delete warns naming the parents it would break; Duplicate notes that
+    shared subflows are referenced, not copied; the false "editor will
+    auto-add the required pins" interface hint (a lost 0.3.0 feature) now
+    states honestly that pins must be wired on the canvas.
+  - Keyboard nav over VISIBLE rows (Up/Down/Right-expand/Left-collapse-or-
+    parent/Enter-load); library CSS tokenized (white-alpha literals removed;
+    light themes verified by screenshot).
+  - Dev harness `library-preview.html` + `src/preview/libraryPreview.tsx`
+    renders the modal with the dp- family + pathological fixtures for
+    chrome-headless iteration (`?view/q/expand/select/theme` params).
+  - Corpus annotation: every example flow now carries a description
+    (capability-level, derived from each graph); `recursive-answer`
+    (60a97e4d) now declares `abstractcode.agent.v1` (its boundary satisfies
+    the full contract — the nine other candidates missing success/meta pins
+    were deliberately NOT declared). basic-agent bundles repacked via the
+    sync-audited script after its source description landed.
+  - Post-build adversarial fold (two fable5 reviewers, correctness + visual):
+    instance-keyed selection (a shared helper's N rows anchor keyboard nav
+    and the ring on the CLICKED instance; other copies get a quiet dashed
+    same-flow mark), cycle leaves excluded from keyboard nav (id-aliasing
+    trapped ArrowDown), nested-helper reveal expands the full ancestor path,
+    stale selection re-inits when the runnable toggle filters it out,
+    Escape cancels an open editor without closing the modal, interface saves
+    compare as sets (uncheck+recheck no longer fires a spurious PUT),
+    delete-confirm disarms on close, collapsed parents surface a
+    "N missing" badge, node/edge count pills left the list (preview keeps
+    them), the runnable badge drops its ▶ and hides in the Runnable view,
+    tree rail + chip chevron make hierarchy pre-attentive, and every
+    remaining hardcoded color in the library CSS moved to theme tokens
+    (verified by light/latte screenshots). Derivation verified against all
+    147 corpus flows (9-parent shared helper, diamond, 7 self-refs,
+    dangling refs — zero unreachable flows).
 - 2026-07-12 authoring-assistant overhaul (operator directive: better
   visuals/realtime information/user-facing messages + complex-workflow
   capability, composition, and a build→test loop; designs from five

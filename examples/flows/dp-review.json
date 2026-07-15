@@ -1,6 +1,6 @@
 {
   "id": "dp-review",
-  "name": "dp-review",
+  "name": "deep-research-review",
   "description": "Three-lens adversarial review subflow.",
   "interfaces": [],
   "nodes": [
@@ -1444,6 +1444,6 @@
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-06-29T15:52:29.716478+00:00",
-  "updated_at": "2026-06-29T15:52:29.716478+00:00"
+  "created_at": "2026-07-13T15:52:45.565811+00:00",
+  "updated_at": "2026-07-13T15:52:45.565811+00:00"
 }

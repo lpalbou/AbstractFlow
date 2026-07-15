@@ -1,6 +1,6 @@
 {
   "id": "dp-plan",
-  "name": "dp-plan",
+  "name": "deep-research-plan",
   "description": "Research planning subflow.",
   "interfaces": [],
   "nodes": [
@@ -668,6 +668,6 @@
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-06-29T15:52:29.716295+00:00",
-  "updated_at": "2026-06-29T15:52:29.716295+00:00"
+  "created_at": "2026-07-13T15:52:45.565594+00:00",
+  "updated_at": "2026-07-13T15:52:45.565594+00:00"
 }

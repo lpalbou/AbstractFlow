@@ -11,6 +11,16 @@ const bundledFlowModules = import.meta.glob<VisualFlow>(
     '../../examples/flows/dp-*.json',
     '../../examples/flows/81795ea9.json',
     '../../examples/flows/15f19f7f.json',
+    // The five framework workflows (operator ask 2026-07-14): two runnable
+    // flagships (coding-agent, co-scientist) + three composable primitives
+    // (adversarial-review, structured-extract, map-reduce). coding-verify-gates
+    // is coding-agent's gate subflow (composed, listed as a child).
+    '../../examples/flows/coding-agent.json',
+    '../../examples/flows/coding-verify-gates.json',
+    '../../examples/flows/adversarial-review.json',
+    '../../examples/flows/structured-extract.json',
+    '../../examples/flows/map-reduce.json',
+    '../../examples/flows/co-scientist.json',
   ],
   {
     eager: true,
@@ -22,14 +32,46 @@ const bundledRunTargets: Record<string, PublishedBundleTarget> = {
   'dp-research': {
     flowId: 'dp-research',
     bundleId: 'dp-research',
-    bundleVersion: '0.1.0',
-    bundleRef: 'dp-research@0.1.0',
+    // 0.1.1 = the deep-research display-name release (ids stay dp-*; bundle
+    // versions are immutable by sha, so the rename shipped as a new version).
+    bundleVersion: '0.1.1',
+    bundleRef: 'dp-research@0.1.1',
   },
   '81795ea9': {
     flowId: '81795ea9',
     bundleId: 'basic-agent',
     bundleVersion: '0.0.1',
     bundleRef: 'basic-agent@0.0.1',
+  },
+  'coding-agent': {
+    flowId: 'coding-agent',
+    bundleId: 'coding-agent',
+    bundleVersion: '0.1.0',
+    bundleRef: 'coding-agent@0.1.0',
+  },
+  'co-scientist': {
+    flowId: 'co-scientist',
+    bundleId: 'co-scientist',
+    bundleVersion: '0.1.0',
+    bundleRef: 'co-scientist@0.1.0',
+  },
+  'adversarial-review': {
+    flowId: 'adversarial-review',
+    bundleId: 'adversarial-review',
+    bundleVersion: '0.1.0',
+    bundleRef: 'adversarial-review@0.1.0',
+  },
+  'structured-extract': {
+    flowId: 'structured-extract',
+    bundleId: 'structured-extract',
+    bundleVersion: '0.1.0',
+    bundleRef: 'structured-extract@0.1.0',
+  },
+  'map-reduce': {
+    flowId: 'map-reduce',
+    bundleId: 'map-reduce',
+    bundleVersion: '0.1.0',
+    bundleRef: 'map-reduce@0.1.0',
   },
 };
 

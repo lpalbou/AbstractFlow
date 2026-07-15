@@ -28,6 +28,7 @@
 
 import type { FlowNodeData, JsonValue, NodeType, Pin, VisualFlow } from '../types/flow';
 import { getAllNodeTemplates, getNodeTemplate, type NodeTemplate } from '../types/nodes';
+import { isCanonicalPinType } from './flowAuthoringCommands';
 
 export interface AuthoringPinSpec {
   id: string;
@@ -380,10 +381,23 @@ function normalizeDocument(raw: unknown, currentNodeIds: Set<string>): Normalize
       errors.push('graph document contains a non-object node entry');
       continue;
     }
-    const id = cleanText(nodeRecord.id, 120);
+    // Ids are IDENTITIES: truncating one silently makes the node look new and
+    // the original deleted (phantom rename). Refuse loudly instead.
+    const rawId = typeof nodeRecord.id === 'string' ? nodeRecord.id.trim() : '';
+    if (rawId.length > 120) {
+      errors.push(`graph node id exceeds 120 characters ("${rawId.slice(0, 40)}…") — node ids are identities and are never truncated`);
+      continue;
+    }
+    const id = rawId;
     const type = cleanText(firstDefined(nodeRecord, ['type', 'nodeType', 'node_type']), 80);
     if (!id || !type) {
       errors.push(`graph node missing id or type (${id || type || 'unknown'})`);
+      continue;
+    }
+    if (nodes.some((existing) => existing.id === id)) {
+      // Duplicate ids are a classic LLM emission defect; "healing" the second
+      // copy via rename created phantom nodes the next cycle then deleted.
+      errors.push(`graph document contains duplicate node id "${id}" — every node id must be unique`);
       continue;
     }
     const node: AuthoringDocumentNode = { id, type };
@@ -584,8 +598,15 @@ function dynamicPinCommands(
       // (id-only diff) silently ignored type changes, making the documented
       // "change the pin type" repair unimplementable — the model re-emitted
       // the pin, zero commands compiled, and the turn stalled.
-      const typeChanged = pin.type !== existing.type;
-      const descriptionChanged = pin.description !== undefined && pin.description !== (existing.description || '');
+      // Non-canonical doc spellings ("text") are NOT type changes: apply's
+      // inference would fall back to the existing type anyway, so emitting
+      // update_pin for them just logs phantom motion every cycle.
+      const typeChanged = isCanonicalPinType(pin.type) && pin.type !== existing.type;
+      // Clamp the current side like the normalizer clamps the doc side, so a
+      // re-emitted long description never compiles a spurious update_pin
+      // (truncation-asymmetry class).
+      const descriptionChanged =
+        pin.description !== undefined && pin.description !== cleanText(existing.description || '', 600);
       const schemaChanged = pin.schema !== undefined && !deepEqual(pin.schema, existing.schema ?? {});
       if (typeChanged || descriptionChanged || schemaChanged) {
         commands.push({
@@ -625,7 +646,12 @@ function switchCasesEqual(
   if (docCases.length !== currentCases.length) return false;
   return docCases.every((docCase, index) => {
     const current = currentCases[index];
-    if (docCase.value !== current.value) return false;
+    // Compare against the CLAMPED current value: the serializer emits canvas
+    // content in full while the normalizer clamps the doc side, so a
+    // byte-faithful re-emission of a long case value must read as equal —
+    // not compile a set_switch_cases that clobbers the runtime value
+    // (adversary P1: round-trip truncation asymmetry).
+    if (docCase.value !== cleanText(current.value, 120)) return false;
     return !docCase.id || docCase.id === current.id;
   });
 }
@@ -656,8 +682,17 @@ function toolParametersEqual(node: AuthoringDocumentNode, data: FlowNodeData): b
   const currentPins = dataPins(data.inputs);
   const docNames = Object.keys(node.tool_parameters);
   if (docNames.length !== currentPins.length) return false;
-  const currentIds = new Set(currentPins.map((pin) => pin.id));
-  return docNames.every((name) => currentIds.has(name));
+  const currentById = new Map(currentPins.map((pin) => [pin.id, pin]));
+  return docNames.every((name) => {
+    const current = currentById.get(name);
+    if (!current) return false;
+    // Name-only compare made a documented parameter TYPE change compile to
+    // zero commands (the same unimplementable-repair class fixed for dynamic
+    // pins and break paths).
+    const spec = asRecord(node.tool_parameters?.[name]);
+    const docType = spec && typeof spec.type === 'string' ? spec.type : undefined;
+    return docType === undefined || docType === current.type;
+  });
 }
 
 function breakPathsFromSpecs(specs: AuthoringPinSpec[]): unknown[] {
@@ -682,9 +717,10 @@ function nodeStructureCommands(
       const docOutputs = node.outputs.map((pin) => pin.id);
       // Type changes on same-id paths must also re-emit (the documented
       // "change the pin type" repair — an id-only compare made it a no-op).
+      // Non-canonical doc spellings are not type changes (see dynamic pins).
       const typeChanged = node.outputs.some((spec) => {
         const current = currentDataPins.find((pin) => pin.id === spec.id);
-        return current !== undefined && current.type !== spec.type;
+        return current !== undefined && isCanonicalPinType(spec.type) && current.type !== spec.type;
       });
       if ((!deepEqual(docOutputs, currentOutputs) || typeChanged) && node.outputs.length > 0) {
         commands.push({ action: 'set_break_paths', nodeId: node.id, paths: breakPathsFromSpecs(node.outputs) });
@@ -772,8 +808,9 @@ export function validateSubflowReference(
     }
     const available = savedFlows.slice(0, 15).map((flowSummary) => `${flowSummary.id} (${flowSummary.name})`).join(', ');
     return (
-      `subflow_ref "${ref}" does not match any saved workflow. Available: ${available || 'none — save the dependency first'}. ` +
-      'A subflow can only reference a SAVED workflow; finish and save the dependency before referencing it.'
+      `subflow_ref "${ref}" does not match any saved workflow. Available: ${available || 'none'}. ` +
+      'Reference a saved workflow id from AVAILABLE WORKFLOWS — or, if the helper does not exist yet, CREATE it in this ' +
+      'same emission: add it to the top-level "subflows" array and reference it as "ref:<handle>".'
     );
   }
   if (context.currentFlowId && ref === context.currentFlowId) {
@@ -911,7 +948,10 @@ export function diffAuthoringDocument(
       );
       continue;
     }
-    if (node.label && node.label !== current.data.label) {
+    // Clamped compare: the doc label was normalized to <=120 chars while the
+    // serializer emits the canvas label in full — a faithful re-emission of a
+    // long label must NOT compile a set_label that clobbers it.
+    if (node.label && node.label !== cleanText(current.data.label, 120)) {
       commands.push({ action: 'set_label', nodeId: node.id, label: node.label });
     }
     commands.push(

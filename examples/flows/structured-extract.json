@@ -1,0 +1,1166 @@
+{
+  "id": "structured-extract",
+  "name": "structured-extract",
+  "description": "Reusable extraction primitive: an LLM extracts JSON from source text against a caller-supplied JSON Schema; a deterministic validator checks required keys/types and feeds specific errors back as a correction reprompt until the output is valid or the attempt budget is spent.",
+  "interfaces": [
+    "abstractextract.structured.v1"
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": -1000,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Source + schema",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "source_text",
+            "label": "source_text",
+            "type": "string"
+          },
+          {
+            "id": "fields_spec",
+            "label": "fields_spec",
+            "type": "json_schema"
+          },
+          {
+            "id": "max_attempts",
+            "label": "max_attempts",
+            "type": "number"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ],
+        "pinDefaults": {
+          "max_attempts": 3
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_loop_state",
+      "type": "get_var",
+      "position": {
+        "x": -660,
+        "y": 200
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get ex.loop_state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "ex.loop_state",
+          "default": {
+            "attempt": 0,
+            "valid": false,
+            "errors": [],
+            "data": {}
+          }
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "loop_cond",
+      "type": "code",
+      "position": {
+        "x": -660,
+        "y": 340
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Retry until valid?",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "max_attempts",
+            "label": "max_attempts",
+            "type": "number"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "state = loop_state or {}\nattempt = int(state.get(\"attempt\", 0) or 0)\nvalid = bool(state.get(\"valid\"))\nmax_a = max(1, int(max_attempts or 1))\nreturn {\"condition\": (not valid) and attempt < max_a, \"attempt\": attempt, \"valid\": valid}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "attempts",
+      "type": "while",
+      "position": {
+        "x": -660,
+        "y": 500
+      },
+      "data": {
+        "nodeType": "while",
+        "label": "Extract-validate rounds",
+        "icon": "&#x1F501;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "loop",
+            "label": "loop",
+            "type": "execution"
+          },
+          {
+            "id": "done",
+            "label": "done",
+            "type": "execution"
+          },
+          {
+            "id": "index",
+            "label": "index",
+            "type": "number"
+          },
+          {
+            "id": "item",
+            "label": "item",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "condition": true
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_state_body",
+      "type": "get_var",
+      "position": {
+        "x": -320,
+        "y": -140
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get ex.loop_state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "ex.loop_state",
+          "default": {
+            "attempt": 0,
+            "valid": false,
+            "errors": [],
+            "data": {}
+          }
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_state_errors",
+      "type": "get",
+      "position": {
+        "x": -320,
+        "y": -260
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get errors",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "errors",
+          "default": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "build_prompt",
+      "type": "code",
+      "position": {
+        "x": -320,
+        "y": 40
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose extractor prompt",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "source_text",
+            "label": "source_text",
+            "type": "string"
+          },
+          {
+            "id": "fields_spec",
+            "label": "fields_spec",
+            "type": "object"
+          },
+          {
+            "id": "attempt_no",
+            "label": "attempt_no",
+            "type": "number"
+          },
+          {
+            "id": "validation_errors",
+            "label": "validation_errors",
+            "type": "array"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "src = str(source_text or \"\").strip()\nschema = fields_spec or {}\nattempt = int(attempt_no or 0)\nerrors = validation_errors or []\nparts = []\nparts.append(\"Extract structured data from the SOURCE below and return ONLY a JSON object that conforms to the SCHEMA.\")\nparts.append(\"\")\nparts.append(\"## Schema (JSON Schema)\")\nparts.append(str(schema) if schema else \"(no schema provided; infer a flat object of the key facts)\")\nparts.append(\"\")\nparts.append(\"## Source\")\nparts.append(src)\nif attempt > 0 and errors:\n    parts.append(\"\")\n    parts.append(\"## Your previous output FAILED validation - fix EXACTLY these and re-output the full object:\")\n    i = 0\n    for e in errors:\n        i = i + 1\n        parts.append(str(i) + \". \" + str(e))\nparts.append(\"\")\nparts.append(\"Return the JSON object only. Do not invent values not supported by the source; use null (or omit optional keys) when the source does not state a value.\")\nreturn \"\\n\".join(parts)"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "extractor",
+      "type": "llm_call",
+      "position": {
+        "x": 40,
+        "y": -40
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Extractor LLM",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "system": "You are a precise structured-data extractor. You output only valid JSON conforming to the given schema and never invent facts absent from the source.",
+          "temperature": 0.0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "validate",
+      "type": "code",
+      "position": {
+        "x": 420,
+        "y": 40
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Validate against schema",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "extracted",
+            "label": "extracted",
+            "type": "any"
+          },
+          {
+            "id": "fields_spec",
+            "label": "fields_spec",
+            "type": "object"
+          },
+          {
+            "id": "attempt_no",
+            "label": "attempt_no",
+            "type": "number"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "def _type_ok(val, t):\n    if t == \"string\":\n        return isinstance(val, str)\n    if t == \"number\":\n        return isinstance(val, (int, float)) and not isinstance(val, bool)\n    if t == \"integer\":\n        return isinstance(val, int) and not isinstance(val, bool)\n    if t == \"boolean\":\n        return isinstance(val, bool)\n    if t == \"array\":\n        return isinstance(val, list)\n    if t == \"object\":\n        return isinstance(val, dict)\n    if t == \"null\":\n        return val is None\n    return True\n\nobj = extracted if isinstance(extracted, dict) else None\nerrors = []\nif obj is None:\n    return {\"valid\": False, \"errors\": [\"extractor did not return a structured object\"], \"data\": {}, \"attempt\": int(attempt_no or 0) + 1}\nschema = fields_spec if isinstance(fields_spec, dict) else {}\nprops = schema.get(\"properties\")\nrequired = schema.get(\"required\")\nif isinstance(required, list):\n    for key in required:\n        if key not in obj or obj.get(key) is None:\n            errors.append(\"missing required key: \" + str(key))\nif isinstance(props, dict):\n    for key in props:\n        spec = props.get(key)\n        if key in obj and obj.get(key) is not None and isinstance(spec, dict) and spec.get(\"type\"):\n            t = spec.get(\"type\")\n            if not _type_ok(obj.get(key), t):\n                errors.append(\"key '\" + str(key) + \"' should be \" + str(t))\nreturn {\n    \"valid\": len(errors) == 0,\n    \"errors\": errors,\n    \"data\": obj,\n    \"attempt\": int(attempt_no or 0) + 1,\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_state",
+      "type": "set_var",
+      "position": {
+        "x": 760,
+        "y": 40
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Persist loop state",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "ex.loop_state"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_final_state",
+      "type": "get_var",
+      "position": {
+        "x": -320,
+        "y": 640
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get ex.loop_state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "ex.loop_state",
+          "default": {
+            "attempt": 0,
+            "valid": false,
+            "errors": [],
+            "data": {}
+          }
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "final",
+      "type": "code",
+      "position": {
+        "x": 40,
+        "y": 640
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Assemble result",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "state = loop_state or {}\nreturn {\n    \"data\": state.get(\"data\") or {},\n    \"valid\": bool(state.get(\"valid\")),\n    \"attempts\": int(state.get(\"attempt\", 0) or 0),\n    \"errors\": state.get(\"errors\") or [],\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_data",
+      "type": "get",
+      "position": {
+        "x": 420,
+        "y": 560
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get data",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "data",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_valid",
+      "type": "get",
+      "position": {
+        "x": 420,
+        "y": 680
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get valid",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "valid",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_attempts",
+      "type": "get",
+      "position": {
+        "x": 420,
+        "y": 800
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get attempts",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "attempts",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_errors",
+      "type": "get",
+      "position": {
+        "x": 420,
+        "y": 900
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get errors",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "errors",
+          "default": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 800,
+        "y": 640
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Extracted",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "valid",
+            "label": "valid",
+            "type": "boolean"
+          },
+          {
+            "id": "attempts",
+            "label": "attempts",
+            "type": "number"
+          },
+          {
+            "id": "errors",
+            "label": "errors",
+            "type": "array"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-exec-out-attempts-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "attempts",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-attempts-loop-extractor-exec-in",
+      "source": "attempts",
+      "sourceHandle": "loop",
+      "target": "extractor",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-extractor-exec-out-set_state-exec-in",
+      "source": "extractor",
+      "sourceHandle": "exec-out",
+      "target": "set_state",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-attempts-done-end-exec-in",
+      "source": "attempts",
+      "sourceHandle": "done",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-get_loop_state-value-loop_cond-loop_state",
+      "source": "get_loop_state",
+      "sourceHandle": "value",
+      "target": "loop_cond",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-start-max_attempts-loop_cond-max_attempts",
+      "source": "start",
+      "sourceHandle": "max_attempts",
+      "target": "loop_cond",
+      "targetHandle": "max_attempts",
+      "animated": false
+    },
+    {
+      "id": "e-loop_cond-condition-attempts-condition",
+      "source": "loop_cond",
+      "sourceHandle": "condition",
+      "target": "attempts",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-start-source_text-build_prompt-source_text",
+      "source": "start",
+      "sourceHandle": "source_text",
+      "target": "build_prompt",
+      "targetHandle": "source_text",
+      "animated": false
+    },
+    {
+      "id": "e-start-fields_spec-build_prompt-fields_spec",
+      "source": "start",
+      "sourceHandle": "fields_spec",
+      "target": "build_prompt",
+      "targetHandle": "fields_spec",
+      "animated": false
+    },
+    {
+      "id": "e-attempts-index-build_prompt-attempt_no",
+      "source": "attempts",
+      "sourceHandle": "index",
+      "target": "build_prompt",
+      "targetHandle": "attempt_no",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_body-value-get_state_errors-object",
+      "source": "get_state_body",
+      "sourceHandle": "value",
+      "target": "get_state_errors",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_errors-value-build_prompt-validation_errors",
+      "source": "get_state_errors",
+      "sourceHandle": "value",
+      "target": "build_prompt",
+      "targetHandle": "validation_errors",
+      "animated": false
+    },
+    {
+      "id": "e-build_prompt-output-extractor-prompt",
+      "source": "build_prompt",
+      "sourceHandle": "output",
+      "target": "extractor",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-extractor-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "extractor",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-extractor-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "extractor",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-fields_spec-extractor-resp_schema",
+      "source": "start",
+      "sourceHandle": "fields_spec",
+      "target": "extractor",
+      "targetHandle": "resp_schema",
+      "animated": false
+    },
+    {
+      "id": "e-extractor-data-validate-extracted",
+      "source": "extractor",
+      "sourceHandle": "data",
+      "target": "validate",
+      "targetHandle": "extracted",
+      "animated": false
+    },
+    {
+      "id": "e-start-fields_spec-validate-fields_spec",
+      "source": "start",
+      "sourceHandle": "fields_spec",
+      "target": "validate",
+      "targetHandle": "fields_spec",
+      "animated": false
+    },
+    {
+      "id": "e-attempts-index-validate-attempt_no",
+      "source": "attempts",
+      "sourceHandle": "index",
+      "target": "validate",
+      "targetHandle": "attempt_no",
+      "animated": false
+    },
+    {
+      "id": "e-validate-output-set_state-value",
+      "source": "validate",
+      "sourceHandle": "output",
+      "target": "set_state",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-get_final_state-value-final-loop_state",
+      "source": "get_final_state",
+      "sourceHandle": "value",
+      "target": "final",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-final-output-get_data-object",
+      "source": "final",
+      "sourceHandle": "output",
+      "target": "get_data",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-final-output-get_valid-object",
+      "source": "final",
+      "sourceHandle": "output",
+      "target": "get_valid",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-final-output-get_attempts-object",
+      "source": "final",
+      "sourceHandle": "output",
+      "target": "get_attempts",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-final-output-get_errors-object",
+      "source": "final",
+      "sourceHandle": "output",
+      "target": "get_errors",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-get_data-value-end-data",
+      "source": "get_data",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "data",
+      "animated": false
+    },
+    {
+      "id": "e-get_valid-value-end-valid",
+      "source": "get_valid",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "valid",
+      "animated": false
+    },
+    {
+      "id": "e-get_attempts-value-end-attempts",
+      "source": "get_attempts",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "attempts",
+      "animated": false
+    },
+    {
+      "id": "e-get_errors-value-end-errors",
+      "source": "get_errors",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "errors",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-07-14T11:43:31.249313+00:00",
+  "updated_at": "2026-07-14T11:43:31.249313+00:00"
+}

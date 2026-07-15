@@ -1,0 +1,1352 @@
+{
+  "id": "coding-agent",
+  "name": "coding-agent",
+  "description": "Advanced coding agent with recursive verification: a builder agent writes code, an independent verifier runs build/execute/match gates each round, and failures are fed back as specific reprompts until all gates pass or the round budget is spent.",
+  "interfaces": [
+    "abstractcode.coding.v1"
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": -900,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Coding request",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "build_command",
+            "label": "build_command",
+            "type": "string"
+          },
+          {
+            "id": "run_command",
+            "label": "run_command",
+            "type": "string"
+          },
+          {
+            "id": "max_rounds",
+            "label": "max_rounds",
+            "type": "number"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ],
+        "pinDefaults": {
+          "request": "",
+          "workspace_root": "",
+          "build_command": "",
+          "run_command": "",
+          "max_rounds": 3
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_loop_state",
+      "type": "get_var",
+      "position": {
+        "x": -560,
+        "y": 200
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get cg.loop_state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "cg.loop_state",
+          "default": {
+            "rounds_completed": 0,
+            "all_passed": false,
+            "failures": []
+          }
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "loop_condition",
+      "type": "code",
+      "position": {
+        "x": -560,
+        "y": 340
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Should keep building?",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "max_rounds",
+            "label": "max_rounds",
+            "type": "number"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "state = loop_state or {}\ncompleted = int(state.get(\"rounds_completed\", 0) or 0)\nmax_rounds_value = max(1, int(max_rounds or 1))\npassed = bool(state.get(\"all_passed\"))\n# Continue while the last round did NOT fully pass and we still have budget.\ncondition = (not passed) and completed < max_rounds_value\nreturn {\n    \"condition\": condition,\n    \"rounds_completed\": completed,\n    \"max_rounds\": max_rounds_value,\n    \"all_passed\": passed,\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "rounds",
+      "type": "while",
+      "position": {
+        "x": -560,
+        "y": 500
+      },
+      "data": {
+        "nodeType": "while",
+        "label": "Verify-gated build rounds",
+        "icon": "&#x1F501;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "loop",
+            "label": "loop",
+            "type": "execution"
+          },
+          {
+            "id": "done",
+            "label": "done",
+            "type": "execution"
+          },
+          {
+            "id": "index",
+            "label": "index",
+            "type": "number"
+          },
+          {
+            "id": "item",
+            "label": "item",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "condition": true
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_state_body",
+      "type": "get_var",
+      "position": {
+        "x": -220,
+        "y": -120
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get cg.loop_state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "cg.loop_state",
+          "default": {
+            "rounds_completed": 0,
+            "all_passed": false,
+            "failures": []
+          }
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "builder_prompt",
+      "type": "code",
+      "position": {
+        "x": -220,
+        "y": 60
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose builder prompt",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "req = str(request or \"\").strip()\nstate = loop_state or {}\ncompleted = int(state.get(\"rounds_completed\", 0) or 0)\nfailures = state.get(\"failures\") or []\nws = str(workspace_root or \"\").strip()\n\nparts = []\nparts.append(\"# Coding task\")\nparts.append(req)\nif ws:\n    parts.append(\"\")\n    parts.append(\"Work inside the workspace root: \" + ws)\nif completed > 0 and failures:\n    parts.append(\"\")\n    parts.append(\"# Previous attempt FAILED these checks — fix EXACTLY these, do not start over:\")\n    for i, f in enumerate(failures, 1):\n        parts.append(str(i) + \". \" + str(f))\n    parts.append(\"\")\n    parts.append(\"Make the minimal changes that resolve the specific failures above, then stop.\")\nelse:\n    parts.append(\"\")\n    parts.append(\"Write the code to satisfy the task. Create/edit files in the workspace. Keep it minimal and runnable.\")\nreturn \"\\n\".join(parts)"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "builder",
+      "type": "agent",
+      "position": {
+        "x": 140,
+        "y": -40
+      },
+      "data": {
+        "nodeType": "agent",
+        "label": "Builder agent",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "system": "You are a senior coding agent. You create and edit real files in the workspace to satisfy the task, using the file and shell tools. Prefer minimal, runnable code. When given specific prior failures, fix exactly those.",
+          "tools": [
+            "read_file",
+            "write_file",
+            "edit_file",
+            "list_files",
+            "search_files",
+            "skim_files",
+            "skim_folders",
+            "analyze_code",
+            "execute_command"
+          ],
+          "max_iterations": 30,
+          "temperature": 0.1
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "verify_input",
+      "type": "make_object",
+      "position": {
+        "x": 500,
+        "y": 160
+      },
+      "data": {
+        "nodeType": "make_object",
+        "label": "Build JSON",
+        "icon": "{}",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "build_command",
+            "label": "build_command",
+            "type": "string"
+          },
+          {
+            "id": "run_command",
+            "label": "run_command",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "result",
+            "label": "result",
+            "type": "object"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "verify",
+      "type": "subflow",
+      "position": {
+        "x": 500,
+        "y": -40
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Run gates",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean"
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "inherit_context": false
+        },
+        "subflowId": "coding-verify-gates"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_verdict",
+      "type": "get",
+      "position": {
+        "x": 860,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get verdict",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "verdict",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "next_state",
+      "type": "code",
+      "position": {
+        "x": 860,
+        "y": 280
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Record verdict",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "verifier",
+            "label": "verifier",
+            "type": "object"
+          },
+          {
+            "id": "round_index",
+            "label": "round_index",
+            "type": "number"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "verdict = verifier or {}\nnext_round = int(round_index or 0) + 1\nall_passed = bool(verdict.get(\"all_passed\"))\nfailures = verdict.get(\"failures\") or []\nif not isinstance(failures, list):\n    failures = [str(failures)]\n# Belt: if the verdict claims pass but a gate is false, do not trust the pass.\nif all_passed and not (verdict.get(\"builds\") and verdict.get(\"executes\") and verdict.get(\"matches\")):\n    all_passed = False\n    failures = failures + [\"verifier marked all_passed but a gate was false\"]\nreturn {\n    \"rounds_completed\": next_round,\n    \"all_passed\": all_passed,\n    \"failures\": [str(f) for f in failures],\n    \"last_verdict\": verdict,\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_state",
+      "type": "set_var",
+      "position": {
+        "x": 860,
+        "y": 460
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Persist loop state",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "cg.loop_state"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_final_state",
+      "type": "get_var",
+      "position": {
+        "x": -200,
+        "y": 640
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get cg.loop_state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "cg.loop_state",
+          "default": {
+            "rounds_completed": 0,
+            "all_passed": false,
+            "failures": []
+          }
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "final_report",
+      "type": "code",
+      "position": {
+        "x": 160,
+        "y": 640
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Assemble result",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "state = loop_state or {}\nverdict = state.get(\"last_verdict\") or {}\nrounds = int(state.get(\"rounds_completed\", 0) or 0)\npassed = bool(state.get(\"all_passed\"))\nlines = []\nlines.append(\"# Coding agent result\")\nlines.append(\"\")\nlines.append(\"Status: \" + (\"PASSED all gates\" if passed else \"STOPPED with open gate failures\"))\nlines.append(\"Rounds used: \" + str(rounds))\nlines.append(\"\")\nlines.append(\"Gate verdict (last round):\")\nlines.append(\"- builds: \" + str(bool(verdict.get(\"builds\"))))\nlines.append(\"- executes: \" + str(bool(verdict.get(\"executes\"))))\nlines.append(\"- matches: \" + str(bool(verdict.get(\"matches\"))))\nif not passed:\n    lines.append(\"\")\n    lines.append(\"Open failures:\")\n    for f in (state.get(\"failures\") or []):\n        lines.append(\"- \" + str(f))\nif verdict.get(\"summary\"):\n    lines.append(\"\")\n    lines.append(\"Summary: \" + str(verdict.get(\"summary\")))\nreturn {\n    \"report_markdown\": \"\\n\".join(lines),\n    \"passed\": passed,\n    \"rounds_used\": rounds,\n    \"gate_verdict\": verdict,\n    \"open_failures\": state.get(\"failures\") or [],\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_report_md",
+      "type": "get",
+      "position": {
+        "x": 520,
+        "y": 560
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get report_markdown",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "report_markdown",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_passed",
+      "type": "get",
+      "position": {
+        "x": 520,
+        "y": 660
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get passed",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "passed",
+          "default": false
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_rounds",
+      "type": "get",
+      "position": {
+        "x": 520,
+        "y": 760
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get rounds_used",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "rounds_used",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_open_failures",
+      "type": "get",
+      "position": {
+        "x": 520,
+        "y": 860
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get open_failures",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "open_failures",
+          "default": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 900,
+        "y": 640
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Finish",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "report",
+            "label": "report",
+            "type": "string"
+          },
+          {
+            "id": "passed",
+            "label": "passed",
+            "type": "boolean"
+          },
+          {
+            "id": "rounds_used",
+            "label": "rounds_used",
+            "type": "number"
+          },
+          {
+            "id": "open_failures",
+            "label": "open_failures",
+            "type": "array"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-exec-out-rounds-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "rounds",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-rounds-loop-builder-exec-in",
+      "source": "rounds",
+      "sourceHandle": "loop",
+      "target": "builder",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-builder-exec-out-verify-exec-in",
+      "source": "builder",
+      "sourceHandle": "exec-out",
+      "target": "verify",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-verify-exec-out-set_state-exec-in",
+      "source": "verify",
+      "sourceHandle": "exec-out",
+      "target": "set_state",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-rounds-done-end-exec-in",
+      "source": "rounds",
+      "sourceHandle": "done",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-get_loop_state-value-loop_condition-loop_state",
+      "source": "get_loop_state",
+      "sourceHandle": "value",
+      "target": "loop_condition",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-start-max_rounds-loop_condition-max_rounds",
+      "source": "start",
+      "sourceHandle": "max_rounds",
+      "target": "loop_condition",
+      "targetHandle": "max_rounds",
+      "animated": false
+    },
+    {
+      "id": "e-loop_condition-condition-rounds-condition",
+      "source": "loop_condition",
+      "sourceHandle": "condition",
+      "target": "rounds",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_body-value-builder_prompt-loop_state",
+      "source": "get_state_body",
+      "sourceHandle": "value",
+      "target": "builder_prompt",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-start-request-builder_prompt-request",
+      "source": "start",
+      "sourceHandle": "request",
+      "target": "builder_prompt",
+      "targetHandle": "request",
+      "animated": false
+    },
+    {
+      "id": "e-start-workspace_root-builder_prompt-workspace_root",
+      "source": "start",
+      "sourceHandle": "workspace_root",
+      "target": "builder_prompt",
+      "targetHandle": "workspace_root",
+      "animated": false
+    },
+    {
+      "id": "e-builder_prompt-output-builder-prompt",
+      "source": "builder_prompt",
+      "sourceHandle": "output",
+      "target": "builder",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-builder-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "builder",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-builder-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "builder",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-workspace_root-builder-workspace_root",
+      "source": "start",
+      "sourceHandle": "workspace_root",
+      "target": "builder",
+      "targetHandle": "workspace_root",
+      "animated": false
+    },
+    {
+      "id": "e-start-request-verify_input-request",
+      "source": "start",
+      "sourceHandle": "request",
+      "target": "verify_input",
+      "targetHandle": "request",
+      "animated": false
+    },
+    {
+      "id": "e-start-workspace_root-verify_input-workspace_root",
+      "source": "start",
+      "sourceHandle": "workspace_root",
+      "target": "verify_input",
+      "targetHandle": "workspace_root",
+      "animated": false
+    },
+    {
+      "id": "e-start-build_command-verify_input-build_command",
+      "source": "start",
+      "sourceHandle": "build_command",
+      "target": "verify_input",
+      "targetHandle": "build_command",
+      "animated": false
+    },
+    {
+      "id": "e-start-run_command-verify_input-run_command",
+      "source": "start",
+      "sourceHandle": "run_command",
+      "target": "verify_input",
+      "targetHandle": "run_command",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-verify_input-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "verify_input",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-verify_input-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "verify_input",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-verify_input-result-verify-input",
+      "source": "verify_input",
+      "sourceHandle": "result",
+      "target": "verify",
+      "targetHandle": "input",
+      "animated": false
+    },
+    {
+      "id": "e-verify-output-get_verdict-object",
+      "source": "verify",
+      "sourceHandle": "output",
+      "target": "get_verdict",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-get_verdict-value-next_state-verifier",
+      "source": "get_verdict",
+      "sourceHandle": "value",
+      "target": "next_state",
+      "targetHandle": "verifier",
+      "animated": false
+    },
+    {
+      "id": "e-rounds-index-next_state-round_index",
+      "source": "rounds",
+      "sourceHandle": "index",
+      "target": "next_state",
+      "targetHandle": "round_index",
+      "animated": false
+    },
+    {
+      "id": "e-next_state-output-set_state-value",
+      "source": "next_state",
+      "sourceHandle": "output",
+      "target": "set_state",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-get_final_state-value-final_report-loop_state",
+      "source": "get_final_state",
+      "sourceHandle": "value",
+      "target": "final_report",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-final_report-output-get_report_md-object",
+      "source": "final_report",
+      "sourceHandle": "output",
+      "target": "get_report_md",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-final_report-output-get_passed-object",
+      "source": "final_report",
+      "sourceHandle": "output",
+      "target": "get_passed",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-final_report-output-get_rounds-object",
+      "source": "final_report",
+      "sourceHandle": "output",
+      "target": "get_rounds",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-final_report-output-get_open_failures-object",
+      "source": "final_report",
+      "sourceHandle": "output",
+      "target": "get_open_failures",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-get_report_md-value-end-report",
+      "source": "get_report_md",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "report",
+      "animated": false
+    },
+    {
+      "id": "e-get_passed-value-end-passed",
+      "source": "get_passed",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "passed",
+      "animated": false
+    },
+    {
+      "id": "e-get_rounds-value-end-rounds_used",
+      "source": "get_rounds",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "rounds_used",
+      "animated": false
+    },
+    {
+      "id": "e-get_open_failures-value-end-open_failures",
+      "source": "get_open_failures",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "open_failures",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-07-14T11:44:55.454912+00:00",
+  "updated_at": "2026-07-14T11:44:55.454912+00:00"
+}

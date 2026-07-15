@@ -1,6 +1,6 @@
 {
   "id": "dp-research",
-  "name": "dp-research",
+  "name": "deep-research",
   "description": "Production research workflow with adversarial review, provenance, and Markdown/PDF/DOCX export.",
   "interfaces": [
     "abstractcode.agent.v1",
@@ -4553,6 +4553,6 @@
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-06-29T15:52:29.716596+00:00",
-  "updated_at": "2026-06-29T15:52:29.716596+00:00"
+  "created_at": "2026-07-13T15:52:45.565933+00:00",
+  "updated_at": "2026-07-13T15:52:45.565933+00:00"
 }

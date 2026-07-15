@@ -1,0 +1,1185 @@
+{
+  "id": "adversarial-review",
+  "name": "adversarial-review",
+  "description": "Reusable review primitive: three independent critics review an artifact through correctness / design-robustness / requirements-fit lenses, then a merge step consolidates and severity-ranks the findings into one pass/revise/block verdict. Composable as a subflow.",
+  "interfaces": [
+    "abstractreview.adversarial.v1"
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": -1100,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Artifact to review",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "artifact",
+            "label": "artifact",
+            "type": "string"
+          },
+          {
+            "id": "requirements",
+            "label": "requirements",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ],
+        "pinDefaults": {
+          "requirements": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "prompt_correctness",
+      "type": "code",
+      "position": {
+        "x": -760,
+        "y": 200
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose correctness prompt",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "artifact",
+            "label": "artifact",
+            "type": "string"
+          },
+          {
+            "id": "requirements",
+            "label": "requirements",
+            "type": "string"
+          },
+          {
+            "id": "lens",
+            "label": "lens",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "lens": "Correctness & bugs — logic errors, edge cases, incorrect behavior, safety."
+        },
+        "functionName": "transform",
+        "codeBody": "artifact_text = str(artifact or \"\").strip()\nreq = str(requirements or \"\").strip()\nlens_text = str(lens or \"\").strip()\nparts = []\nparts.append(\"Review the following artifact through ONE lens: \" + lens_text)\nparts.append(\"\")\nif req:\n    parts.append(\"## Requirements / intent\")\n    parts.append(req)\n    parts.append(\"\")\nparts.append(\"## Artifact\")\nparts.append(artifact_text)\nparts.append(\"\")\nparts.append(\"Report ONLY real, specific findings for your lens as {severity (P0/P1/P2/P3), title, detail}. P0 = blocks use / correctness-breaking; P1 = must fix; P2 = should fix; P3 = nice. No praise, no generic advice. If the artifact is clean for your lens, return an empty findings list.\")\nreturn \"\\n\".join(parts)"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "critic_correctness",
+      "type": "llm_call",
+      "position": {
+        "x": -760,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Critic: correctness",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "system": "You are a rigorous, adversarial reviewer. You find real, specific, actionable flaws and never flatter. You review through exactly the lens you are given.",
+          "temperature": 0.2,
+          "resp_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "findings"
+            ],
+            "properties": {
+              "findings": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "severity",
+                    "title",
+                    "detail"
+                  ],
+                  "properties": {
+                    "severity": {
+                      "type": "string",
+                      "enum": [
+                        "P0",
+                        "P1",
+                        "P2",
+                        "P3"
+                      ]
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "prompt_design",
+      "type": "code",
+      "position": {
+        "x": -420,
+        "y": 200
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose design prompt",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "artifact",
+            "label": "artifact",
+            "type": "string"
+          },
+          {
+            "id": "requirements",
+            "label": "requirements",
+            "type": "string"
+          },
+          {
+            "id": "lens",
+            "label": "lens",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "lens": "Design & robustness — structure, coupling, error handling, maintainability, scalability."
+        },
+        "functionName": "transform",
+        "codeBody": "artifact_text = str(artifact or \"\").strip()\nreq = str(requirements or \"\").strip()\nlens_text = str(lens or \"\").strip()\nparts = []\nparts.append(\"Review the following artifact through ONE lens: \" + lens_text)\nparts.append(\"\")\nif req:\n    parts.append(\"## Requirements / intent\")\n    parts.append(req)\n    parts.append(\"\")\nparts.append(\"## Artifact\")\nparts.append(artifact_text)\nparts.append(\"\")\nparts.append(\"Report ONLY real, specific findings for your lens as {severity (P0/P1/P2/P3), title, detail}. P0 = blocks use / correctness-breaking; P1 = must fix; P2 = should fix; P3 = nice. No praise, no generic advice. If the artifact is clean for your lens, return an empty findings list.\")\nreturn \"\\n\".join(parts)"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "critic_design",
+      "type": "llm_call",
+      "position": {
+        "x": -420,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Critic: design",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "system": "You are a rigorous, adversarial reviewer. You find real, specific, actionable flaws and never flatter. You review through exactly the lens you are given.",
+          "temperature": 0.2,
+          "resp_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "findings"
+            ],
+            "properties": {
+              "findings": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "severity",
+                    "title",
+                    "detail"
+                  ],
+                  "properties": {
+                    "severity": {
+                      "type": "string",
+                      "enum": [
+                        "P0",
+                        "P1",
+                        "P2",
+                        "P3"
+                      ]
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "prompt_requirements_fit",
+      "type": "code",
+      "position": {
+        "x": -80,
+        "y": 200
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose requirements_fit prompt",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "artifact",
+            "label": "artifact",
+            "type": "string"
+          },
+          {
+            "id": "requirements",
+            "label": "requirements",
+            "type": "string"
+          },
+          {
+            "id": "lens",
+            "label": "lens",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "lens": "Requirements fit — does it actually do what was asked; missing/extra scope."
+        },
+        "functionName": "transform",
+        "codeBody": "artifact_text = str(artifact or \"\").strip()\nreq = str(requirements or \"\").strip()\nlens_text = str(lens or \"\").strip()\nparts = []\nparts.append(\"Review the following artifact through ONE lens: \" + lens_text)\nparts.append(\"\")\nif req:\n    parts.append(\"## Requirements / intent\")\n    parts.append(req)\n    parts.append(\"\")\nparts.append(\"## Artifact\")\nparts.append(artifact_text)\nparts.append(\"\")\nparts.append(\"Report ONLY real, specific findings for your lens as {severity (P0/P1/P2/P3), title, detail}. P0 = blocks use / correctness-breaking; P1 = must fix; P2 = should fix; P3 = nice. No praise, no generic advice. If the artifact is clean for your lens, return an empty findings list.\")\nreturn \"\\n\".join(parts)"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "critic_requirements_fit",
+      "type": "llm_call",
+      "position": {
+        "x": -80,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Critic: requirements_fit",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "system": "You are a rigorous, adversarial reviewer. You find real, specific, actionable flaws and never flatter. You review through exactly the lens you are given.",
+          "temperature": 0.2,
+          "resp_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "findings"
+            ],
+            "properties": {
+              "findings": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "severity",
+                    "title",
+                    "detail"
+                  ],
+                  "properties": {
+                    "severity": {
+                      "type": "string",
+                      "enum": [
+                        "P0",
+                        "P1",
+                        "P2",
+                        "P3"
+                      ]
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "merge",
+      "type": "code",
+      "position": {
+        "x": 300,
+        "y": 200
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Merge + rank findings",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "correctness",
+            "label": "correctness",
+            "type": "object"
+          },
+          {
+            "id": "design",
+            "label": "design",
+            "type": "object"
+          },
+          {
+            "id": "requirements_fit",
+            "label": "requirements_fit",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "def _findings(obj, lens_name):\n    obj = obj or {}\n    out = []\n    for f in (obj.get(\"findings\") or []):\n        if not isinstance(f, dict):\n            continue\n        sev = str(f.get(\"severity\") or \"P2\").upper()\n        if sev not in (\"P0\", \"P1\", \"P2\", \"P3\"):\n            sev = \"P2\"\n        out.append({\n            \"severity\": sev,\n            \"lens\": lens_name,\n            \"title\": str(f.get(\"title\") or \"\").strip(),\n            \"detail\": str(f.get(\"detail\") or \"\").strip(),\n        })\n    return out\n\nmerged = _findings(correctness, \"correctness\") + _findings(design, \"design\") + _findings(requirements_fit, \"requirements-fit\")\norder = {\"P0\": 0, \"P1\": 1, \"P2\": 2, \"P3\": 3}\nmerged.sort(key=lambda f: order.get(f[\"severity\"], 2))\nblocking = sum(1 for f in merged if f[\"severity\"] in (\"P0\", \"P1\"))\np0 = sum(1 for f in merged if f[\"severity\"] == \"P0\")\nif p0 > 0:\n    verdict = \"block\"\nelif blocking > 0:\n    verdict = \"revise\"\nelse:\n    verdict = \"pass\"\nsummary = str(len(merged)) + \" findings across 3 lenses; \" + str(blocking) + \" blocking (\" + str(p0) + \" P0).\"\nreturn {\n    \"findings\": merged,\n    \"blocking_count\": blocking,\n    \"verdict\": verdict,\n    \"summary\": summary,\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_findings",
+      "type": "get",
+      "position": {
+        "x": 640,
+        "y": -160
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get findings",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "findings",
+          "default": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_verdict",
+      "type": "get",
+      "position": {
+        "x": 640,
+        "y": -40
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get verdict",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "verdict",
+          "default": "revise"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_blocking",
+      "type": "get",
+      "position": {
+        "x": 640,
+        "y": 80
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get blocking_count",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "blocking_count",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_summary",
+      "type": "get",
+      "position": {
+        "x": 640,
+        "y": 200
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get summary",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "summary",
+          "default": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 980,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Review verdict",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "findings",
+            "label": "findings",
+            "type": "array"
+          },
+          {
+            "id": "verdict",
+            "label": "verdict",
+            "type": "string"
+          },
+          {
+            "id": "blocking_count",
+            "label": "blocking_count",
+            "type": "number"
+          },
+          {
+            "id": "summary",
+            "label": "summary",
+            "type": "string"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-exec-out-critic_correctness-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "critic_correctness",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-start-artifact-prompt_correctness-artifact",
+      "source": "start",
+      "sourceHandle": "artifact",
+      "target": "prompt_correctness",
+      "targetHandle": "artifact",
+      "animated": false
+    },
+    {
+      "id": "e-start-requirements-prompt_correctness-requirements",
+      "source": "start",
+      "sourceHandle": "requirements",
+      "target": "prompt_correctness",
+      "targetHandle": "requirements",
+      "animated": false
+    },
+    {
+      "id": "e-prompt_correctness-output-critic_correctness-prompt",
+      "source": "prompt_correctness",
+      "sourceHandle": "output",
+      "target": "critic_correctness",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-critic_correctness-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "critic_correctness",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-critic_correctness-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "critic_correctness",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-critic_correctness-exec-out-critic_design-exec-in",
+      "source": "critic_correctness",
+      "sourceHandle": "exec-out",
+      "target": "critic_design",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-start-artifact-prompt_design-artifact",
+      "source": "start",
+      "sourceHandle": "artifact",
+      "target": "prompt_design",
+      "targetHandle": "artifact",
+      "animated": false
+    },
+    {
+      "id": "e-start-requirements-prompt_design-requirements",
+      "source": "start",
+      "sourceHandle": "requirements",
+      "target": "prompt_design",
+      "targetHandle": "requirements",
+      "animated": false
+    },
+    {
+      "id": "e-prompt_design-output-critic_design-prompt",
+      "source": "prompt_design",
+      "sourceHandle": "output",
+      "target": "critic_design",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-critic_design-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "critic_design",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-critic_design-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "critic_design",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-critic_design-exec-out-critic_requirements_fit-exec-in",
+      "source": "critic_design",
+      "sourceHandle": "exec-out",
+      "target": "critic_requirements_fit",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-start-artifact-prompt_requirements_fit-artifact",
+      "source": "start",
+      "sourceHandle": "artifact",
+      "target": "prompt_requirements_fit",
+      "targetHandle": "artifact",
+      "animated": false
+    },
+    {
+      "id": "e-start-requirements-prompt_requirements_fit-requirements",
+      "source": "start",
+      "sourceHandle": "requirements",
+      "target": "prompt_requirements_fit",
+      "targetHandle": "requirements",
+      "animated": false
+    },
+    {
+      "id": "e-prompt_requirements_fit-output-critic_requirements_fit-prompt",
+      "source": "prompt_requirements_fit",
+      "sourceHandle": "output",
+      "target": "critic_requirements_fit",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-critic_requirements_fit-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "critic_requirements_fit",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-critic_requirements_fit-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "critic_requirements_fit",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-critic_requirements_fit-exec-out-end-exec-in",
+      "source": "critic_requirements_fit",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-critic_correctness-data-merge-correctness",
+      "source": "critic_correctness",
+      "sourceHandle": "data",
+      "target": "merge",
+      "targetHandle": "correctness",
+      "animated": false
+    },
+    {
+      "id": "e-critic_design-data-merge-design",
+      "source": "critic_design",
+      "sourceHandle": "data",
+      "target": "merge",
+      "targetHandle": "design",
+      "animated": false
+    },
+    {
+      "id": "e-critic_requirements_fit-data-merge-requirements_fit",
+      "source": "critic_requirements_fit",
+      "sourceHandle": "data",
+      "target": "merge",
+      "targetHandle": "requirements_fit",
+      "animated": false
+    },
+    {
+      "id": "e-merge-output-get_findings-object",
+      "source": "merge",
+      "sourceHandle": "output",
+      "target": "get_findings",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-merge-output-get_verdict-object",
+      "source": "merge",
+      "sourceHandle": "output",
+      "target": "get_verdict",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-merge-output-get_blocking-object",
+      "source": "merge",
+      "sourceHandle": "output",
+      "target": "get_blocking",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-merge-output-get_summary-object",
+      "source": "merge",
+      "sourceHandle": "output",
+      "target": "get_summary",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-get_findings-value-end-findings",
+      "source": "get_findings",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "findings",
+      "animated": false
+    },
+    {
+      "id": "e-get_verdict-value-end-verdict",
+      "source": "get_verdict",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "verdict",
+      "animated": false
+    },
+    {
+      "id": "e-get_blocking-value-end-blocking_count",
+      "source": "get_blocking",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "blocking_count",
+      "animated": false
+    },
+    {
+      "id": "e-get_summary-value-end-summary",
+      "source": "get_summary",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "summary",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-07-14T11:43:30.552487+00:00",
+  "updated_at": "2026-07-14T11:43:30.552487+00:00"
+}

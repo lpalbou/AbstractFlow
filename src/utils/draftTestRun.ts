@@ -228,8 +228,12 @@ export async function pollDraftTestRun(
     if (wait) {
       options.onWait?.(wait);
       // Approvals are interactive too: an unanswered Approve/Deny at watchdog
-      // expiry is a human-attention finding, not a graph defect.
-      if (wait.kind === 'ask_user' || wait.kind === 'tool_approval') sawInteractiveWait = true;
+      // expiry is a human-attention finding, not a graph defect. The flag
+      // tracks the CURRENT poll only — an early answered question must not
+      // convert a later genuine timeout into needs_interactive_input.
+      sawInteractiveWait = wait.kind === 'ask_user' || wait.kind === 'tool_approval';
+    } else {
+      sawInteractiveWait = false;
     }
     if (now() - startedAt > timeoutMs) {
       await gatewayCancelRun(runId, options.contracts).catch(() => undefined);
@@ -279,6 +283,14 @@ export function buildDraftTestReport(args: {
   flowError?: string | null;
 }): DraftTestReport {
   const labels = nodeLabels(args.flow);
+  // Match the flow-end record by NODE TYPE from the authored graph — an
+  // /end/i id-substring test attributed render/send_email/append results as
+  // the workflow outputs (adversary find).
+  const endNodeIds = new Set(
+    (args.flow?.nodes || [])
+      .filter((node) => String(node.data?.nodeType || node.type) === 'on_flow_end')
+      .map((node) => node.id)
+  );
   const failedSteps: DraftTestFailedStep[] = [];
   let outputs: Record<string, unknown> | null = null;
   for (const record of args.records) {
@@ -298,7 +310,13 @@ export function buildDraftTestReport(args: {
     }
     // The flow-end record's result carries the exposed On Flow End outputs.
     const result = record.result;
-    if (result && typeof result === 'object' && effectType === 'unknown' && nodeId && /end/i.test(nodeId)) {
+    if (
+      result &&
+      typeof result === 'object' &&
+      effectType === 'unknown' &&
+      nodeId &&
+      (endNodeIds.has(nodeId) || (endNodeIds.size === 0 && /^(__implicit_flow_end__|on_flow_end)/.test(nodeId)))
+    ) {
       outputs = result as Record<string, unknown>;
     }
     if (result && typeof result === 'object') {

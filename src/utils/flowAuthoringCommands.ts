@@ -4,6 +4,18 @@ import { createNodeData, getAllNodeTemplates, getNodeTemplate, type NodeTemplate
 import { subflowPinPatchForSelectedFlow } from './subflowPins';
 import { getConnectionError, inferRouteOverrideRouteKey, validateConnection } from './validation';
 
+/** Deterministic JSON text (sorted keys) — local to avoid a document<->commands import cycle. */
+function stableJson(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null';
+  if (Array.isArray(value)) return `[${value.map((item) => stableJson(item)).join(',')}]`;
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${stableJson(record[key])}`).join(',')}}`;
+}
+
+function deepEqualJson(a: unknown, b: unknown): boolean {
+  return stableJson(a) === stableJson(b);
+}
+
 export interface FlowAuthoringSnapshot {
   flowName: string;
   flowInterfaces: string[];
@@ -77,6 +89,13 @@ const PIN_TYPES: readonly PinType[] = [
   'agent',
   'any',
 ];
+
+/** True when a document-authored pin type is part of the real vocabulary —
+ * the diff must treat unknown spellings ("text") as NO type change, or every
+ * cycle re-emits an update_pin that apply can only no-op. */
+export function isCanonicalPinType(value: unknown): value is PinType {
+  return typeof value === 'string' && PIN_TYPES.includes(value as PinType);
+}
 
 const DYNAMIC_INPUT_NODE_TYPES = new Set<NodeType>(['on_flow_end', 'concat', 'string_template', 'make_object']);
 const DYNAMIC_OUTPUT_NODE_TYPES = new Set<NodeType>(['on_flow_start', 'break_object']);
@@ -532,6 +551,32 @@ export function applyFlowAuthoringCommands(input: FlowAuthoringApplyInput): Flow
   const usedNodeIds = () => new Set(nodes.map((node) => node.id));
   const usedEdgeIds = () => new Set(edges.map((edge) => edge.id));
 
+  // After a command REPLACES a node's pin set wholesale (break paths, switch
+  // cases), edges attached to removed pins dangle and edges on retyped pins
+  // can be silently invalid. Re-run connection validation over the node's
+  // attached edges and drop failures loudly — the same discipline update_pin
+  // applies to one pin, applied to the whole node (adversary P1).
+  const revalidateNodeEdges = (nodeId: string, context: string) => {
+    const attached = edges.filter((edge) => edge.source === nodeId || edge.target === nodeId);
+    const dropped: Edge[] = [];
+    for (const edge of attached) {
+      const stillValid = validateConnection(
+        nodes,
+        edges.filter((entry) => entry.id !== edge.id),
+        { source: edge.source, sourceHandle: edge.sourceHandle ?? null, target: edge.target, targetHandle: edge.targetHandle ?? null }
+      );
+      if (!stillValid) dropped.push(edge);
+    }
+    if (dropped.length > 0) {
+      edges = edges.filter((edge) => !dropped.includes(edge));
+      for (const edge of dropped) {
+        warnings.push(
+          `${context} dropped invalid edge ${edge.source}.${edge.sourceHandle} -> ${edge.target}.${edge.targetHandle}`
+        );
+      }
+    }
+  };
+
   for (const rawCommand of orderCommandsForApplication(input.commands || [])) {
     const command = asRecord(rawCommand);
     if (!command) {
@@ -962,6 +1007,7 @@ export function applyFlowAuthoringCommands(input: FlowAuthoringApplyInput): Flow
           ? { ...item, data: { ...item.data, breakConfig: { selectedPaths: pins.map((pin) => pin.id) }, outputs: pins } }
           : item
       );
+      revalidateNodeEdges(nodeId, `Break Object path change on ${nodeId}`);
       touched.add(nodeId);
       applied.push(`Configured Break Object paths on ${nodeId}`);
       continue;
@@ -997,6 +1043,7 @@ export function applyFlowAuthoringCommands(input: FlowAuthoringApplyInput): Flow
       nodes = nodes.map((item) =>
         item.id === nodeId ? { ...item, data: { ...item.data, switchConfig: { cases }, outputs } } : item
       );
+      revalidateNodeEdges(nodeId, `Switch case change on ${nodeId}`);
       touched.add(nodeId);
       applied.push(`Configured Switch cases on ${nodeId}`);
       continue;
@@ -1274,6 +1321,19 @@ export function applyFlowAuthoringCommands(input: FlowAuthoringApplyInput): Flow
       const nextPin: Pin = { id: existing.id, label: nextLabel, type: nextType };
       if (nextDescription) nextPin.description = nextDescription;
       if (nextSchema && Object.keys(nextSchema).length > 0) nextPin.schema = nextSchema;
+      // "applied" alone is not progress (recorded rule): a command that
+      // changes NOTHING reports as a warning no-op, never an applied change —
+      // otherwise non-canonical doc types re-emit update_pin every cycle and
+      // the log claims motion while the graph stands still.
+      const isNoOp =
+        nextType === existing.type &&
+        nextLabel === (existing.label || existing.id) &&
+        (nextDescription || '') === (existing.description || '') &&
+        deepEqualJson(nextSchema ?? null, existing.schema ?? null);
+      if (isNoOp) {
+        warnings.push(`update_pin on ${nodeId}.${id} changed nothing (already ${existing.type}); no-op`);
+        continue;
+      }
       nodes = nodes.map((item) => {
         if (item.id !== nodeId) return item;
         const pins = side === 'input' ? item.data.inputs || [] : item.data.outputs || [];

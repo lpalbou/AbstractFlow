@@ -1,0 +1,1189 @@
+{
+  "id": "map-reduce",
+  "name": "map-reduce",
+  "description": "Reusable batch primitive: map a per-item LLM instruction over an input array (ForEach), accumulate the per-item results, then reduce them with a synthesis LLM instruction. Returns the per-item results and the synthesized output.",
+  "interfaces": [
+    "abstractbatch.mapreduce.v1"
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": -1100,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Items + instructions",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "items",
+            "label": "items",
+            "type": "array"
+          },
+          {
+            "id": "item_instruction",
+            "label": "item_instruction",
+            "type": "string"
+          },
+          {
+            "id": "reduce_instruction",
+            "label": "reduce_instruction",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ],
+        "pinDefaults": {
+          "item_instruction": "Process this item.",
+          "reduce_instruction": "Synthesize the per-item results into one coherent answer."
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "reset",
+      "type": "code",
+      "position": {
+        "x": -760,
+        "y": 200
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Reset accumulator",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "array"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "return []"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "init_acc",
+      "type": "set_var",
+      "position": {
+        "x": -760,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Init results var",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "mr.results"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "each",
+      "type": "loop",
+      "position": {
+        "x": -420,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "loop",
+        "label": "Map over items",
+        "icon": "&#x1F501;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "items",
+            "label": "items",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "loop",
+            "label": "loop",
+            "type": "execution"
+          },
+          {
+            "id": "done",
+            "label": "done",
+            "type": "execution"
+          },
+          {
+            "id": "item",
+            "label": "item",
+            "type": "any"
+          },
+          {
+            "id": "index",
+            "label": "index",
+            "type": "number"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "map_prompt",
+      "type": "code",
+      "position": {
+        "x": -80,
+        "y": -160
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose item prompt",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "item",
+            "label": "item",
+            "type": "any"
+          },
+          {
+            "id": "index",
+            "label": "index",
+            "type": "number"
+          },
+          {
+            "id": "item_instruction",
+            "label": "item_instruction",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "instr = str(item_instruction or \"Process the item.\").strip()\nitem_text = item if isinstance(item, str) else str(item)\nparts = [instr, \"\", \"## Item (index \" + str(int(index or 0)) + \")\", str(item_text)]\nreturn \"\\n\".join(parts)"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "map_llm",
+      "type": "llm_call",
+      "position": {
+        "x": -80,
+        "y": 40
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Per-item LLM",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "system": "You process one item at a time following the given instruction. Answer concisely.",
+          "temperature": 0.2
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_acc",
+      "type": "get_var",
+      "position": {
+        "x": 280,
+        "y": 200
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get mr.results",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "mr.results",
+          "default": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "append",
+      "type": "code",
+      "position": {
+        "x": 280,
+        "y": 40
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Append result",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "results_so_far",
+            "label": "results_so_far",
+            "type": "array"
+          },
+          {
+            "id": "item_result",
+            "label": "item_result",
+            "type": "string"
+          },
+          {
+            "id": "index",
+            "label": "index",
+            "type": "number"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "array"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "acc = list(results_so_far or [])\nacc.append({\"index\": int(index or 0), \"result\": str(item_result or \"\")})\nreturn acc"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_acc",
+      "type": "set_var",
+      "position": {
+        "x": 620,
+        "y": 40
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Persist results",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "mr.results"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_all",
+      "type": "get_var",
+      "position": {
+        "x": -80,
+        "y": 420
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get mr.results",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "mr.results",
+          "default": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "reduce_prompt",
+      "type": "code",
+      "position": {
+        "x": 280,
+        "y": 500
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose reduce prompt",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "results",
+            "label": "results",
+            "type": "array"
+          },
+          {
+            "id": "reduce_instruction",
+            "label": "reduce_instruction",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "instr = str(reduce_instruction or \"Synthesize the results into one coherent summary.\").strip()\nitems = results or []\nparts = [instr, \"\", \"## Per-item results (\" + str(len(items)) + \")\"]\nfor r in items:\n    if isinstance(r, dict):\n        parts.append(\"- [\" + str(r.get(\"index\")) + \"] \" + str(r.get(\"result\", \"\"))[:1200])\n    else:\n        parts.append(\"- \" + str(r)[:1200])\nreturn \"\\n\".join(parts)"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "reduce_llm",
+      "type": "llm_call",
+      "position": {
+        "x": 620,
+        "y": 420
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Reduce / synthesize LLM",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "system": "You synthesize many per-item results into one coherent, well-structured output.",
+          "temperature": 0.3
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_final",
+      "type": "get_var",
+      "position": {
+        "x": 620,
+        "y": 620
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get mr.results",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "mr.results",
+          "default": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "final",
+      "type": "code",
+      "position": {
+        "x": 960,
+        "y": 620
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Assemble",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "results",
+            "label": "results",
+            "type": "array"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "items = results or []\nreturn {\"results\": items, \"count\": len(items)}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_results",
+      "type": "get",
+      "position": {
+        "x": 1300,
+        "y": 540
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get results",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "results",
+          "default": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_count",
+      "type": "get",
+      "position": {
+        "x": 1300,
+        "y": 660
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get count",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "count",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 1300,
+        "y": 420
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Map-reduce result",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "results",
+            "label": "results",
+            "type": "array"
+          },
+          {
+            "id": "count",
+            "label": "count",
+            "type": "number"
+          },
+          {
+            "id": "synthesis",
+            "label": "synthesis",
+            "type": "string"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-exec-out-init_acc-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "init_acc",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-init_acc-exec-out-each-exec-in",
+      "source": "init_acc",
+      "sourceHandle": "exec-out",
+      "target": "each",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-each-loop-map_llm-exec-in",
+      "source": "each",
+      "sourceHandle": "loop",
+      "target": "map_llm",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-map_llm-exec-out-set_acc-exec-in",
+      "source": "map_llm",
+      "sourceHandle": "exec-out",
+      "target": "set_acc",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-each-done-reduce_llm-exec-in",
+      "source": "each",
+      "sourceHandle": "done",
+      "target": "reduce_llm",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-reduce_llm-exec-out-end-exec-in",
+      "source": "reduce_llm",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-reset-output-init_acc-value",
+      "source": "reset",
+      "sourceHandle": "output",
+      "target": "init_acc",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-start-items-each-items",
+      "source": "start",
+      "sourceHandle": "items",
+      "target": "each",
+      "targetHandle": "items",
+      "animated": false
+    },
+    {
+      "id": "e-each-item-map_prompt-item",
+      "source": "each",
+      "sourceHandle": "item",
+      "target": "map_prompt",
+      "targetHandle": "item",
+      "animated": false
+    },
+    {
+      "id": "e-each-index-map_prompt-index",
+      "source": "each",
+      "sourceHandle": "index",
+      "target": "map_prompt",
+      "targetHandle": "index",
+      "animated": false
+    },
+    {
+      "id": "e-start-item_instruction-map_prompt-item_instruction",
+      "source": "start",
+      "sourceHandle": "item_instruction",
+      "target": "map_prompt",
+      "targetHandle": "item_instruction",
+      "animated": false
+    },
+    {
+      "id": "e-map_prompt-output-map_llm-prompt",
+      "source": "map_prompt",
+      "sourceHandle": "output",
+      "target": "map_llm",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-map_llm-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "map_llm",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-map_llm-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "map_llm",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-get_acc-value-append-results_so_far",
+      "source": "get_acc",
+      "sourceHandle": "value",
+      "target": "append",
+      "targetHandle": "results_so_far",
+      "animated": false
+    },
+    {
+      "id": "e-map_llm-response-append-item_result",
+      "source": "map_llm",
+      "sourceHandle": "response",
+      "target": "append",
+      "targetHandle": "item_result",
+      "animated": false
+    },
+    {
+      "id": "e-each-index-append-index",
+      "source": "each",
+      "sourceHandle": "index",
+      "target": "append",
+      "targetHandle": "index",
+      "animated": false
+    },
+    {
+      "id": "e-append-output-set_acc-value",
+      "source": "append",
+      "sourceHandle": "output",
+      "target": "set_acc",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-get_all-value-reduce_prompt-results",
+      "source": "get_all",
+      "sourceHandle": "value",
+      "target": "reduce_prompt",
+      "targetHandle": "results",
+      "animated": false
+    },
+    {
+      "id": "e-start-reduce_instruction-reduce_prompt-reduce_instruction",
+      "source": "start",
+      "sourceHandle": "reduce_instruction",
+      "target": "reduce_prompt",
+      "targetHandle": "reduce_instruction",
+      "animated": false
+    },
+    {
+      "id": "e-reduce_prompt-output-reduce_llm-prompt",
+      "source": "reduce_prompt",
+      "sourceHandle": "output",
+      "target": "reduce_llm",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-reduce_llm-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "reduce_llm",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-reduce_llm-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "reduce_llm",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-get_final-value-final-results",
+      "source": "get_final",
+      "sourceHandle": "value",
+      "target": "final",
+      "targetHandle": "results",
+      "animated": false
+    },
+    {
+      "id": "e-final-output-get_results-object",
+      "source": "final",
+      "sourceHandle": "output",
+      "target": "get_results",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-final-output-get_count-object",
+      "source": "final",
+      "sourceHandle": "output",
+      "target": "get_count",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-get_results-value-end-results",
+      "source": "get_results",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "results",
+      "animated": false
+    },
+    {
+      "id": "e-get_count-value-end-count",
+      "source": "get_count",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "count",
+      "animated": false
+    },
+    {
+      "id": "e-reduce_llm-response-end-synthesis",
+      "source": "reduce_llm",
+      "sourceHandle": "response",
+      "target": "end",
+      "targetHandle": "synthesis",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-07-14T11:43:31.646961+00:00",
+  "updated_at": "2026-07-14T11:43:31.646961+00:00"
+}

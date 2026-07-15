@@ -13,9 +13,12 @@ describe('bundled deep research flows', () => {
     expect(getBundledRunTarget('dp-research')).toEqual({
       flowId: 'dp-research',
       bundleId: 'dp-research',
-      bundleVersion: '0.1.0',
-      bundleRef: 'dp-research@0.1.0',
+      bundleVersion: '0.1.1',
+      bundleRef: 'dp-research@0.1.1',
     });
+    // The rename wave: ids stay dp-* (wiring), display names read deep-research*.
+    expect(flows.find((flow) => flow.id === 'dp-research')?.name).toBe('deep-research');
+    expect(flows.find((flow) => flow.id === 'dp-plan')?.name).toBe('deep-research-plan');
   });
 
   it('lets saved gateway flows override bundled entries', () => {

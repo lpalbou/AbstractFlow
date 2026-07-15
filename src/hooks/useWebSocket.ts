@@ -124,6 +124,10 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
   const waitingRef = useRef(false);
   const waitingInfoRef = useRef<WaitingInfo | null>(null);
   const terminalEmittedRef = useRef<Map<string, string>>(new Map());
+  // Runs with an in-flight cancel command: the runner may still report them
+  // `waiting` for a beat, and applyRunSummary must not re-paint that stale
+  // waiting state (the operator's "can't cancel" flicker).
+  const cancelPendingRef = useRef<Set<string>>(new Set());
   const subrunStreamsRef = useRef<Map<string, EventSource>>(new Map());
   const subrunCursorRef = useRef<Map<string, number>>(new Map());
   const ensureSubrunStreamRef = useRef<(runId: string) => void>(() => {});
@@ -392,6 +396,11 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
           setExecutingNodeId(event.nodeId);
           break;
         case 'flow_waiting': {
+          // Cancel in flight for this run: suppress waiting re-paints from
+          // the ledger stream too, not only applyRunSummary (adversary A2 —
+          // the stream path re-painted WAITING mid-"Cancelling…").
+          const waitRid = typeof event.runId === 'string' && event.runId ? event.runId : runIdRef.current;
+          if (waitRid && cancelPendingRef.current.has(waitRid)) break;
           const reason = typeof event.reason === 'string' ? event.reason : '';
           const isSubworkflowWait = reason.toLowerCase() === 'subworkflow';
           // Subworkflow waits are non-interactive; keep UI in running mode.
@@ -466,6 +475,11 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
           waitingInfoRef.current = null;
           break;
         case 'flow_cancelled':
+          // Terminal events need the same root-run guard node events carry:
+          // one failed record streamed from a SUBRUN ledger must not flip the
+          // whole UI terminal (nulling runIdRef kills root node highlights
+          // for the rest of a still-running run) — adversary find.
+          if (event.runId && runIdRef.current && event.runId !== runIdRef.current) break;
           setIsRunning(false);
           setIsPaused(false);
           setIsWaiting(false);
@@ -480,6 +494,7 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
           break;
         case 'flow_complete':
         case 'flow_error':
+          if (event.runId && runIdRef.current && event.runId !== runIdRef.current) break;
           setIsRunning(false);
           setIsWaiting(false);
           setIsPaused(false);
@@ -655,6 +670,11 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
         dispatchEvent({ type: 'flow_cancelled', runId: rid, ts: updatedAt });
         return;
       }
+
+      // A cancel is in flight for this run: the runner has not applied it
+      // yet, so the summary still reads `waiting`. Do NOT re-paint the UI back
+      // to WAITING — that is exactly the flicker that made cancel look broken.
+      if (cancelPendingRef.current.has(rid)) return;
 
       const waiting = summary.waiting && typeof summary.waiting === 'object' ? (summary.waiting as Record<string, unknown>) : null;
       if (status === 'waiting' && waiting) {
@@ -1081,15 +1101,53 @@ export function useWebSocket({ flowId, onEvent, onWaiting }: UseWebSocketOptions
   );
 
   const cancelRun = useCallback(
-    async (targetRunId?: string) => {
+    async (targetRunId?: string): Promise<boolean> => {
       const rid = targetRunId || runIdRef.current;
-      if (!rid) return;
+      if (!rid) return false;
+      // The cancel command is DURABLE and applied asynchronously by the
+      // gateway runner (which can lag seconds behind when it is busy running
+      // a model). The old body fetched the summary ONCE right after POSTing —
+      // it raced the runner, read back `waiting`, and re-painted the UI to
+      // WAITING, so the operator saw nothing happen and concluded "I can't
+      // cancel" (operator report 2026-07-13, reproduced end to end). Mark the
+      // cancel pending (which suppresses any waiting re-paint for this run,
+      // see applyRunSummary) and POLL the summary until the run is terminal.
+      // Returns true once the run is terminal; false when the submit failed
+      // or the poll timed out — callers surface that visibly (adversary A1:
+      // a silent failure left a dead "Cancelling…" button and no feedback).
+      cancelPendingRef.current.add(rid);
       try {
         await submitCommand({ runId: rid, type: 'cancel' });
-        const summary = await fetchRunSummary(rid);
-        applyRunSummary(summary);
       } catch (e) {
+        cancelPendingRef.current.delete(rid);
         setError(e instanceof Error ? e.message : 'Failed to cancel');
+        return false;
+      }
+      // Poll to terminal (belt); the live ledger stream also delivers the
+      // terminal state independently — applyRunSummary's terminalEmittedRef
+      // dedupes, so double-delivery is harmless.
+      const deadline = Date.now() + 30_000;
+      for (;;) {
+        let summary: Record<string, unknown> | null = null;
+        try {
+          summary = await fetchRunSummary(rid);
+        } catch {
+          summary = null;
+        }
+        const status = summary && typeof summary.status === 'string' ? summary.status.toLowerCase() : '';
+        if (status === 'cancelled' || status === 'completed' || status === 'failed') {
+          cancelPendingRef.current.delete(rid);
+          if (summary) applyRunSummary(summary);
+          return true;
+        }
+        if (Date.now() > deadline) {
+          // Give up polling but leave the run for the stream to finalize; do
+          // not resurrect the waiting UI (the operator asked for cancel).
+          cancelPendingRef.current.delete(rid);
+          setError('Cancel is taking longer than expected — the gateway is still processing it.');
+          return false;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 500));
       }
     },
     [applyRunSummary, fetchRunSummary, submitCommand]

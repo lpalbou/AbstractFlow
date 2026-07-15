@@ -117,6 +117,62 @@ describe('diffAuthoringDocument round trip', () => {
     expect(diff.commands).toEqual([]);
   });
 
+  it('holds the invariant for canvas content LONGER than the normalizer limits', () => {
+    // Adversary P1 (truncation asymmetry): the serializer emits canvas
+    // content in full while the normalizer clamps labels (120), switch case
+    // values (120), and pin descriptions (600). A byte-faithful re-emission
+    // of long content must still compile ZERO commands — the old raw compare
+    // emitted set_label/set_switch_cases/update_pin that silently clobbered
+    // runtime-significant values down to the clamp.
+    const longLabel = 'L'.repeat(130);
+    const longCase = 'match this whole sentence-shaped category value '.repeat(3); // > 120 chars
+    const longDescription = 'boundary contract '.repeat(40); // > 600 chars
+    const flow = buildFlow([
+      { action: 'add_node', id: 'start', nodeType: 'on_flow_start', position: { x: 0, y: 0 } },
+      { action: 'add_node', id: 'sw', nodeType: 'switch', position: { x: 200, y: 0 } },
+      { action: 'add_node', id: 'end', nodeType: 'on_flow_end', position: { x: 400, y: 0 } },
+      { action: 'add_input_pin', nodeId: 'end', id: 'report', pinType: 'string' },
+    ]);
+    // Long content enters the way the operator's does: through the canvas
+    // (Properties panel has no maxLength), i.e. directly on node data.
+    const sw = flow.nodes.find((node) => node.id === 'sw')!;
+    sw.data.label = longLabel;
+    sw.data.switchConfig = { cases: [{ id: 'case-long', value: longCase }] };
+    sw.data.outputs = [
+      { id: 'case:case-long', label: longCase, type: 'execution' },
+      { id: 'default', label: 'default', type: 'execution' },
+    ];
+    const end = flow.nodes.find((node) => node.id === 'end')!;
+    end.data.inputs = (end.data.inputs || []).map((pin) =>
+      pin.id === 'report' ? { ...pin, description: longDescription } : pin
+    );
+
+    const doc = flowToAuthoringDocument(flow);
+    const diff = diffAuthoringDocument(flow, doc);
+    expect(diff.errors).toEqual([]);
+    expect(diff.commands).toEqual([]);
+  });
+
+  it('refuses documents with duplicate node ids instead of healing them into phantoms', () => {
+    const flow = buildFlow(RESEARCH_FLOW_COMMANDS);
+    const doc = flowToAuthoringDocument(flow);
+    const duplicated = { ...doc, nodes: [...doc.nodes, { ...doc.nodes[1] }] };
+    const diff = diffAuthoringDocument(flow, duplicated);
+    expect(diff.errors.some((error) => error.includes('duplicate node id'))).toBe(true);
+    expect(diff.commands).toEqual([]);
+  });
+
+  it('refuses node ids longer than 120 characters instead of truncating identities', () => {
+    const flow = buildFlow(RESEARCH_FLOW_COMMANDS);
+    const doc = flowToAuthoringDocument(flow);
+    const mutated = {
+      ...doc,
+      nodes: [...doc.nodes, { id: 'x'.repeat(140), type: 'code' }],
+    };
+    const diff = diffAuthoringDocument(flow, mutated);
+    expect(diff.errors.some((error) => error.includes('never truncated'))).toBe(true);
+  });
+
   it('round-trips switch, sequence, break object, code, and concat configuration', () => {
     const flow = buildFlow([
       { action: 'add_node', id: 'sw', nodeType: 'switch', label: 'Route by intent' },

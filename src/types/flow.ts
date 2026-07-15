@@ -493,6 +493,8 @@ export interface FlowRunResult {
   result?: unknown;
   error?: string;
   run_id?: string;
+  /** A cancelled run is not a FAILED run — the UI labels it CANCELLED. */
+  cancelled?: boolean;
 }
 
 // Persisted run summary (for run history UX)

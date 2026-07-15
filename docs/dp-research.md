@@ -1,8 +1,12 @@
-# `dp-research` Workflow Family
+# `deep-research` Workflow Family (ids `dp-*`)
 
-`dp-research` is the shipped production research WorkflowBundle family for
-Gateway-hosted runs. It is authored as editable VisualFlow JSON in
-`examples/flows/dp-*.json` and packed as `dp-research@0.1.0.flow`.
+`deep-research` is the shipped production research WorkflowBundle family for
+Gateway-hosted runs. Display names are `deep-research` and
+`deep-research-{plan,investigate,review,render}`; the flow/bundle **ids stay
+`dp-*`** (`dp-research`, `dp-plan`, …) so existing wiring, run history, and
+bundle refs remain valid. It is authored as editable VisualFlow JSON in
+`examples/flows/dp-*.json` and packed as `dp-research@0.1.1.flow` (0.1.1 is
+the rename release; bundle versions are immutable by sha).
 
 ## User Inputs
 

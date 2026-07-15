@@ -15,6 +15,7 @@ import { RECALL_LEVEL_OPTIONS } from '../types/recall';
 import type { WaitingInfo } from '../hooks/useWebSocket';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { AgentSubrunTracePanel } from './AgentSubrunTracePanel';
+import { SteerComposer } from '@abstractframework/ui-kit';
 import AfSelect from './inputs/AfSelect';
 import AfMultiSelect from './inputs/AfMultiSelect';
 import { useProviders, useModels } from '../hooks/useProviders';
@@ -140,7 +141,8 @@ interface RunFlowModalProps {
   onEmitEvent?: (runId: string, payload: Record<string, unknown>) => Promise<void>;
   onPause?: () => void;
   onResumeRun?: () => void;
-  onCancelRun?: () => void;
+  /** May return a promise that settles when the cancel poll finishes (used to re-enable the button on failure/timeout). */
+  onCancelRun?: () => void | Promise<void>;
   onSelectRunId?: (runId: string) => void;
   runSummary?: RunSummary | null;
   stableSessionId?: string;
@@ -1186,7 +1188,7 @@ function GeneratedImageCard({
   const mainSrc = activeItem?.src ?? preview.src;
   const mainFallbacks = activeItem ? activeItem.fallbackSrcs : preview.fallbackSrcs;
   const mainArtifactId = activeItem?.artifactId ?? preview.artifactId;
-  const { objectUrl, loading, error } = useArtifactObjectUrl(
+  const { objectUrl, loading, error, retry } = useArtifactObjectUrl(
     mainSrc,
     preview.contentType || 'image/png',
     mainFallbacks,
@@ -1198,7 +1200,12 @@ function GeneratedImageCard({
       {loading ? (
         <div className="run-details-empty">Loading image artifact...</div>
       ) : error ? (
-        <div className="run-details-error">{error}</div>
+        <div className="run-details-error">
+          {error}
+          <button type="button" className="artifact-player-retry" onClick={retry}>
+            Retry
+          </button>
+        </div>
       ) : (
         <>
           <button type="button" className="artifact-player-zoom" title="Click to zoom" onClick={() => setLightboxOpen(true)}>
@@ -1269,7 +1276,7 @@ function GeneratedAudioCard({
   compact?: boolean;
   instanceKey?: string;
 }) {
-  const { objectUrl, loading, error } = useArtifactObjectUrl(
+  const { objectUrl, loading, error, retry } = useArtifactObjectUrl(
     preview.src,
     preview.contentType || 'audio/wav',
     preview.fallbackSrcs,
@@ -1281,7 +1288,12 @@ function GeneratedAudioCard({
       {loading ? (
         <div className="run-details-empty">Loading audio artifact...</div>
       ) : error ? (
-        <div className="run-details-error">{error}</div>
+        <div className="run-details-error">
+          {error}
+          <button type="button" className="artifact-player-retry" onClick={retry}>
+            Retry
+          </button>
+        </div>
       ) : (
         <audio
           key={`${preview.artifactId}:${instanceKey || ''}`}
@@ -1336,7 +1348,7 @@ function GeneratedVideoCard({
   compact?: boolean;
   instanceKey?: string;
 }) {
-  const { objectUrl, loading, error } = useArtifactObjectUrl(
+  const { objectUrl, loading, error, retry } = useArtifactObjectUrl(
     preview.src,
     preview.contentType || 'video/mp4',
     preview.fallbackSrcs,
@@ -1348,7 +1360,12 @@ function GeneratedVideoCard({
       {loading ? (
         <div className="run-details-empty">Loading video artifact...</div>
       ) : error ? (
-        <div className="run-details-error">{error}</div>
+        <div className="run-details-error">
+          {error}
+          <button type="button" className="artifact-player-retry" onClick={retry}>
+            Retry
+          </button>
+        </div>
       ) : (
         <video
           key={`${preview.artifactId}:${instanceKey || ''}`}
@@ -2052,6 +2069,10 @@ export function RunFlowModal({
   const [expandedSubflows, setExpandedSubflows] = useState<Record<string, boolean>>({});
   const [resumeDraft, setResumeDraft] = useState('');
   const [resumeSubmitting, setResumeSubmitting] = useState(false);
+  // Optimistic cancel affordance: the command is durable/async, so the button
+  // reads "Cancelling…" until the run actually leaves the active state
+  // (cleared by the effect below when the run turns terminal/inactive).
+  const [cancelRequested, setCancelRequested] = useState(false);
   // Send-event composer (backlog 0111): test/steer event parks in place.
   const [eventDraft, setEventDraft] = useState('{}');
   const [eventDurable, setEventDurable] = useState(false);
@@ -4849,6 +4870,12 @@ export function RunFlowModal({
 
   const hasRunData = isRunning || effectiveResult != null || events.length > 0;
   const isActiveRun = Boolean(isRunning || isPaused || isWaiting);
+
+  // Clear the optimistic "Cancelling…" affordance once the run actually
+  // leaves the active state (turned terminal, or the modal switched runs).
+  useEffect(() => {
+    if (cancelRequested && !isActiveRun) setCancelRequested(false);
+  }, [cancelRequested, isActiveRun]);
   const isBeforeRun = !hasRunData && !isActiveRun;
   const hasCompletedRun = hasRunData && !isActiveRun;
 
@@ -4876,9 +4903,20 @@ export function RunFlowModal({
     if (isPaused) return 'PAUSED';
     if (approvalDetails || isWaiting) return 'WAITING';
     if (isRunning) return 'RUNNING';
-    if (effectiveResult) return effectiveResult.success ? 'SUCCESS' : 'FAILED';
+    // Inspected runs carry the authoritative status on the summary; a
+    // cancelled run must not read SUCCESS off a mid-run step output.
+    if ((runSummary?.status || '').toLowerCase() === 'cancelled') return 'CANCELLED';
+    if (effectiveResult) {
+      if (effectiveResult.success) return 'SUCCESS';
+      // A cancelled run is not a failure — label it honestly. Only the
+      // explicit flag counts: matching error === 'Cancelled' would mislabel a
+      // genuinely FAILED parent whose error text was propagated from a
+      // cancelled child (adversary A5).
+      if (effectiveResult.cancelled) return 'CANCELLED';
+      return 'FAILED';
+    }
     return '';
-  }, [approvalDetails, effectiveResult, isPaused, isRunning, isWaiting]);
+  }, [approvalDetails, effectiveResult, isPaused, isRunning, isWaiting, runSummary?.status]);
 
   // Minimized view (run minibar): show current step + status and keep the canvas visible.
   // This uses only local state (isMinimized) so it never affects run execution itself.
@@ -5014,10 +5052,11 @@ export function RunFlowModal({
             className="run-minibar-btn danger"
             onClick={(e) => {
               e.stopPropagation();
-              onCancelRun();
+              setCancelRequested(true);
+              Promise.resolve(onCancelRun()).finally(() => setCancelRequested(false));
             }}
-            disabled={!(isRunning || isPaused || isWaiting)}
-            title="Cancel"
+            disabled={cancelRequested || !(isRunning || isPaused || isWaiting)}
+            title={cancelRequested ? 'Cancelling…' : 'Cancel'}
             aria-label="Cancel run"
           >
             ⏹
@@ -5978,6 +6017,10 @@ export function RunFlowModal({
     event?.preventDefault();
     event?.stopPropagation();
     if (resumeSubmitting) return;
+    // A cancel is pending: answering the wait now would race the durable
+    // cancel (resume can win and run downstream nodes the operator asked to
+    // stop — adversary A3). The cancel affordance already reads "Cancelling…".
+    if (cancelRequested) return;
     if (!response) return;
     setResumeSubmitting(true);
     try {
@@ -6012,6 +6055,7 @@ export function RunFlowModal({
     event?.stopPropagation();
     const text = resumeDraft.trim();
     if (resumeSubmitting || !text) return;
+    if (cancelRequested) return;
     setResumeSubmitting(true);
     try {
       await onResume?.({
@@ -6630,6 +6674,25 @@ export function RunFlowModal({
                   })()
                 )}
               </div>
+
+              {/* Steer strip (hooks H4, uic kit c1239): speak to the LIVE run.
+                  Truth is "Queued (seq N)" — delivery shows as the
+                  abstract.steer_seen ledger record; steers do not wake parked
+                  runs (the composer says so via `parked`). PARKED honesty
+                  (adversary P1): the live lane never clears isRunning on
+                  waits, so parked derives from the WAIT state directly — any
+                  wait (ask_user, approval, subworkflow) or pause means the
+                  root's tick loop is not spinning and guidance lands at its
+                  next wake, not "the next loop boundary". key= resets draft
+                  text + queued status when the modal follows a different run. */}
+              {isActiveRun && rootRunId ? (
+                <SteerComposer
+                  key={rootRunId}
+                  runId={rootRunId}
+                  parked={Boolean(isWaiting) || Boolean(isPaused)}
+                  className="run-steer"
+                />
+              ) : null}
             </div>
 
             <div className="run-details">
@@ -6814,7 +6877,7 @@ export function RunFlowModal({
                                 type="button"
                                 className="modal-button primary"
                                 onClick={submitVisitorMessage}
-                                disabled={!resumeDraft.trim() || resumeSubmitting}
+                                disabled={!resumeDraft.trim() || resumeSubmitting || cancelRequested}
                               >
                                 {resumeSubmitting ? 'Sending…' : 'Send'}
                               </button>
@@ -6902,7 +6965,7 @@ export function RunFlowModal({
                                 type="button"
                                 className="run-waiting-choice"
                                 onClick={(e) => submitChoiceResume(c, e)}
-                                disabled={resumeSubmitting}
+                                disabled={resumeSubmitting || cancelRequested}
                               >
                                 {c}
                               </button>
@@ -6924,7 +6987,8 @@ export function RunFlowModal({
                                 type="button"
                                 className="modal-button primary"
                                 onClick={submitResume}
-                                disabled={!resumeDraft.trim() || resumeSubmitting}
+                                disabled={!resumeDraft.trim() || resumeSubmitting || cancelRequested}
+                                title={cancelRequested ? 'Cancel is pending for this run' : undefined}
                               >
                                 {resumeSubmitting ? 'Continuing...' : 'Continue'}
                               </button>
@@ -7464,7 +7528,11 @@ export function RunFlowModal({
                     <div className="run-final">
                       <div className={`run-final-header ${effectiveResult.success ? 'success' : 'error'}`}>
                         <span className="run-final-title">
-                          {effectiveResult.success ? 'Final Result (SUCCESS)' : 'Final Result (FAILED)'}
+                          {effectiveResult.success
+                            ? 'Final Result (SUCCESS)'
+                            : effectiveResult.cancelled
+                              ? 'Final Result (CANCELLED)'
+                              : 'Final Result (FAILED)'}
                         </span>
                         <div className="run-details-actions">
                           <button
@@ -8448,7 +8516,7 @@ export function RunFlowModal({
                         if (isPaused) onResumeRun?.();
                         else onPause?.();
                       }}
-                      disabled={isPaused ? !isPaused : !(isRunning && !isWaiting)}
+                      disabled={cancelRequested || (isPaused ? !isPaused : !(isRunning && !isWaiting))}
                     >
                       {isPaused ? 'Resume' : 'Pause'}
                     </button>
@@ -8458,9 +8526,20 @@ export function RunFlowModal({
                     <button
                       type="button"
                       className="modal-button cancel"
-                      onClick={onCancelRun}
+                      onClick={() => {
+                        setCancelRequested(true);
+                        // When the cancel poll settles without the run turning
+                        // terminal (submit failure / 30s timeout), re-enable
+                        // the button so the operator can retry instead of
+                        // staring at a dead "Cancelling…" forever. On success
+                        // the isActiveRun effect already cleared the flag and
+                        // this is a no-op.
+                        Promise.resolve(onCancelRun()).finally(() => setCancelRequested(false));
+                      }}
+                      disabled={cancelRequested}
+                      title={cancelRequested ? 'Cancel requested — waiting for the gateway to stop the run' : 'Cancel this run'}
                     >
-                      Cancel
+                      {cancelRequested ? 'Cancelling…' : 'Cancel'}
                     </button>
                   )}
 

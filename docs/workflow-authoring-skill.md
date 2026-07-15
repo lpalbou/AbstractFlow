@@ -646,14 +646,73 @@ workflow, then reference it.
   conversation context into the child.
 - Per-item composition: ForEach.item -> the subflow node's matching input,
   inside the loop body.
-- Dependencies must be SAVED before they can be referenced. When the request
-  needs a workflow that does not exist yet ("create workflow2, then create
-  workflow1 that uses workflow2"), say so in your reply and build the
-  dependency FIRST (ask the user to save it, or author it in its own
-  conversation) — then reference its saved id. Never invent an id.
 - Self-reference and reference cycles are refused in assistant authoring
   (recursion needs a designed base case; the Properties panel remains the
   manual path for deliberate recursion).
+
+### Creating Subflows (the `subflows` array)
+
+When the request needs a helper workflow that does not exist yet ("create
+workflow2, then create workflow1 that uses workflow2"), CREATE it in the same
+emission with the top-level `subflows` array beside `nodes`/`edges`:
+
+```json
+{
+  "flow_name": "research-pipeline",
+  "nodes": [
+    {"id": "start", "type": "on_flow_start", "outputs": [{"id": "topic", "type": "string"}]},
+    {"id": "extract", "type": "subflow", "subflow_ref": "ref:extract-claims"},
+    {"id": "end", "type": "on_flow_end", "inputs": [{"id": "claims", "type": "string"}]}
+  ],
+  "edges": ["start.exec-out -> extract.exec-in", "start.topic -> extract.text",
+            "extract.exec-out -> end.exec-in", "extract.claims -> end.claims"],
+  "subflows": [
+    {
+      "ref": "extract-claims",
+      "flow_name": "extract-claims",
+      "description": "Extracts factual claims from a text block.",
+      "nodes": [
+        {"id": "start", "type": "on_flow_start", "outputs": [{"id": "text", "type": "string"}]},
+        {"id": "end", "type": "on_flow_end", "inputs": [{"id": "claims", "type": "string"}]}
+      ],
+      "edges": ["start.exec-out -> end.exec-in", "start.text -> end.claims"]
+    }
+  ]
+}
+```
+
+Semantics (deliberate, enforced):
+
+- `ref` is a conversation-local handle (lowercase kebab/snake, 2-64 chars).
+  The main document references it as `"subflow_ref": "ref:<handle>"`; the
+  editor creates the workflow, substitutes the real saved id, and the new
+  workflow appears in AVAILABLE WORKFLOWS on the next cycle.
+- Each definition uses the SAME node/edge grammar as `graph`, MUST have
+  `on_flow_start` (its input contract), and should have `on_flow_end` when
+  callers need outputs (missing end = warning: the subflow node exposes no
+  outputs). `flow_name` and `description` are required — created workflows
+  enter the shared library and must be findable and self-explanatory.
+- Re-emitting the same `ref` UPDATES that workflow — helpers created in this
+  conversation stay yours to refine (the ref→id map is conversation state,
+  durable across turns). A faithful re-emission is a no-op.
+- `subflows` is create/update-only: OMITTING a previously emitted definition
+  never deletes the saved workflow (the document owns the OPEN flow, never
+  the library). Deleting library workflows is a human act.
+- Definitions may reference SAVED workflow ids, never other `ref:` handles —
+  one level of new definitions per emission. Deep nesting composes ACROSS
+  cycles: create the innermost helper first; it is referencable by id next
+  cycle.
+- Budget: at most 5 definitions per emission, and at most 10 CREATIONS per
+  turn (updates are exempt — they converge, not grow). Name collisions with
+  existing library workflows are refused at birth (no second "deep-research").
+- Existing library workflows are reference-only from the assistant: to change
+  one, the user opens it in the editor (its own conversation).
+
+When to decompose: create a subflow when a unit is reusable across workflows,
+has one clear contract, or the main graph grows past ~15-20 nodes with
+distinct phases. Name it by what it does (`extract-claims`, never `helper-1`).
+Otherwise keep the graph flat — decomposition nobody reuses is indirection,
+not cleanliness. Undo Turn deletes helpers created by the undone turn.
 
 ## Validation And Repair
 

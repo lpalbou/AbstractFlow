@@ -80,6 +80,30 @@ describe('assistant test-run primitives', () => {
     expect(outcome.verdict).toBe('needs_interactive_input');
     expect(outcome.status).toBe('timeout');
   });
+
+  it('an early ANSWERED question does not convert a later genuine timeout into needs_interactive_input', async () => {
+    // Adversary find: the interactive flag was a sticky latch — one answered
+    // ask_user in the first minute mislabeled a run that then ground on LLM
+    // loops for the whole budget.
+    const { gatewayRunSummary } = await import('./gatewayClient');
+    const mock = vi.mocked(gatewayRunSummary);
+    mock.mockImplementationOnce(async () => ({
+      status: 'waiting',
+      waiting: { wait_key: 'w-q', reason: 'user', prompt: 'Which city?' },
+    }));
+    mock.mockImplementation(async () => ({ status: 'running' }));
+    let clock = 0;
+    const outcome = await pollDraftTestRun('run-2', {
+      timeoutMs: 1000,
+      pollIntervalMs: 1,
+      now: () => clock,
+      sleep: async () => {
+        clock += 600;
+      },
+    });
+    expect(outcome.status).toBe('timeout');
+    expect(outcome.verdict).toBe('timeout');
+  });
 });
 
 describe('test report distillation', () => {

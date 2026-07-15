@@ -2243,37 +2243,57 @@ button.primary:hover:not(:disabled) {
 
 /* Rows are quiet list lines, not stacked card slabs: rest = transparent,
    hover = soft fill, selected = accent-tinted fill with ONE hairline border
-   (the old border + ring double-stroke read heavy, not premium). */
-.flow-library-item {
-  width: 100%;
-  text-align: left;
+   (the old border + ring double-stroke read heavy, not premium).
+   The list is now the uic kit DisclosureList — flow adapts the kit's
+   structural classes (.af-disclosure*) to the approved premium look. */
+.flow-library-tree.af-disclosure {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.flow-library-tree .af-disclosure__row {
   border: 1px solid transparent;
   border-radius: 10px;
   background: transparent;
-  padding: 9px 12px;
+  padding-top: 9px;
+  padding-bottom: 9px;
+  padding-right: 12px;
   cursor: pointer;
   color: var(--text-primary);
   transition: background 120ms ease, border-color 120ms ease;
   display: flex;
-  flex-direction: column;
-  gap: 5px;
+  align-items: flex-start;
+  gap: 6px;
 }
 
-.flow-library-item + .flow-library-item {
-  margin-top: 2px;
-}
-
-.flow-library-item:hover {
+.flow-library-tree .af-disclosure__row:hover {
   background: color-mix(in srgb, var(--text-primary) 4%, transparent);
 }
 
-.flow-library-item:active {
+.flow-library-tree .af-disclosure__row:active {
   background: color-mix(in srgb, var(--text-primary) 6%, transparent);
 }
 
-.flow-library-item.selected {
+.flow-library-tree .af-disclosure__row--selected {
   background: color-mix(in srgb, var(--accent-primary) 9%, transparent);
   border-color: color-mix(in srgb, var(--accent-primary) 38%, transparent);
+}
+
+.flow-library-tree .af-disclosure__content {
+  display: block;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Inner row body (rendered by flow's renderRow). */
+.flow-library-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
 
 .flow-library-item-top {
@@ -2295,29 +2315,8 @@ button.primary:hover:not(:disabled) {
   gap: 5px;
 }
 
-/* Quiet tinted pills: hue-tinted fill + hairline, no heavy outlines. */
-.flow-library-badge {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xxs);
-  line-height: 1.5;
-  padding: 1px 7px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--text-primary) 14%, transparent);
-  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
-  color: var(--text-secondary);
-}
-
-.flow-library-badge.current {
-  border-color: color-mix(in srgb, var(--success, #27ae60) 40%, transparent);
-  background: color-mix(in srgb, var(--success, #27ae60) 10%, transparent);
-  color: color-mix(in srgb, var(--success, #27ae60) 80%, var(--text-primary));
-}
-
-.flow-library-badge.bundled {
-  border-color: color-mix(in srgb, var(--info, #3498db) 35%, transparent);
-  background: color-mix(in srgb, var(--info, #3498db) 9%, transparent);
-  color: color-mix(in srgb, var(--info, #3498db) 75%, var(--text-primary));
-}
+/* Badge pills are kit AfChips (tones + geometry + AA text recipe live in the
+   kit; flow supplies only the name→tone map in FlowLibraryList.tsx). */
 
 .flow-library-item-sub {
   display: flex;
@@ -2629,16 +2628,9 @@ button.primary:hover:not(:disabled) {
   box-shadow: 0 1px 3px color-mix(in srgb, var(--bg-primary) 60%, transparent);
 }
 
-/* Indentation is data-driven: child rows shift by depth without nesting DOM.
-   width:auto (the rows are divs now, not buttons) so depth margins never
-   overflow the scroll container. */
-.flow-library-item {
-  width: auto;
-  margin-left: calc(var(--flow-row-depth, 0) * 22px);
-}
-
-/* Children read as SUBORDINATE, not shifted peers: tree rail + lighter name. */
-.flow-library-item.child {
+/* Children read as SUBORDINATE, not shifted peers: tree rail + lighter name.
+   Depth indentation is the kit's (padding-left over --af-disclosure-depth). */
+.flow-library-tree .af-disclosure__row[data-depth]:not([data-depth='0']) {
   padding-top: 6px;
   padding-bottom: 6px;
   border-left: 2px solid color-mix(in srgb, var(--info, #3498db) 30%, transparent);
@@ -2646,64 +2638,47 @@ button.primary:hover:not(:disabled) {
   border-bottom-left-radius: 4px;
 }
 
-.flow-library-item.child:not(.selected):not(:hover) {
-  background: transparent;
-}
-
-.flow-library-item.child .flow-library-item-name {
+.flow-library-row.child .flow-library-item-name {
   font-weight: 500;
   font-size: var(--font-size-sm);
   color: var(--text-secondary);
 }
 
-.flow-library-item.child.selected .flow-library-item-name {
+.flow-library-tree .af-disclosure__row--selected .flow-library-row.child .flow-library-item-name {
   color: var(--text-primary);
 }
 
-.flow-library-item.missing {
+.flow-library-tree .af-disclosure__row--static {
   cursor: default;
+}
+
+.flow-library-tree .af-disclosure__row:has(.flow-library-row.missing) {
   border-color: color-mix(in srgb, var(--error, #e74c3c) 35%, transparent);
   background: color-mix(in srgb, var(--error, #e74c3c) 6%, transparent);
 }
 
-.flow-library-item.cycle-leaf {
-  cursor: default;
+.flow-library-row.cycle-leaf {
   color: var(--text-muted);
   font-style: italic;
-  padding-top: 6px;
-  padding-bottom: 6px;
 }
 
 /* The chevron is the ONLY affordance revealing families — it must look
-   pressable at rest, not like a bullet. */
-.flow-library-disclosure {
-  flex: 0 0 auto;
+   pressable at rest, not like a bullet (kit chevron, flow tone). The
+   :not(--spacer) scope matters: a consumer rule carries higher specificity
+   than the kit's spacer-transparency fold (c1354), so theming the bare
+   chevron class would paint phantom buttons on non-expandable rows. */
+.flow-library-tree .af-disclosure__chevron:not(.af-disclosure__chevron--spacer) {
   width: 22px;
   height: 22px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
   border-radius: 6px;
   background: color-mix(in srgb, var(--text-primary) 6%, transparent);
   color: var(--text-secondary);
-  font-size: 13px;
-  cursor: pointer;
-  transition: transform 120ms ease, background 120ms ease;
+  margin-top: 1px;
 }
 
-.flow-library-disclosure:hover {
+.flow-library-tree .af-disclosure__chevron:not(.af-disclosure__chevron--spacer):hover {
   background: color-mix(in srgb, var(--text-primary) 12%, transparent);
   color: var(--text-primary);
-}
-
-.flow-library-disclosure.open {
-  transform: rotate(90deg);
-}
-
-.flow-library-disclosure-spacer {
-  flex: 0 0 auto;
-  width: 22px;
 }
 
 .flow-library-item-name {
@@ -2740,7 +2715,8 @@ button.primary:hover:not(:disabled) {
   mask-image: linear-gradient(to right, black calc(100% - 14px), transparent);
 }
 
-.flow-library-badge {
+/* Kit chips inside the badge rail must not shrink under the fade mask. */
+.flow-library-item-badges .af-chip {
   flex: 0 0 auto;
 }
 
@@ -2748,51 +2724,13 @@ button.primary:hover:not(:disabled) {
   white-space: nowrap;
 }
 
-.flow-library-badge.runnable {
-  border-color: color-mix(in srgb, var(--success, #27ae60) 40%, transparent);
-  background: color-mix(in srgb, var(--success, #27ae60) 10%, transparent);
-  color: color-mix(in srgb, var(--success, #27ae60) 80%, var(--text-primary));
-}
-
-.flow-library-badge.family {
-  border-color: color-mix(in srgb, var(--info, #3498db) 35%, transparent);
-  background: color-mix(in srgb, var(--info, #3498db) 9%, transparent);
-  color: color-mix(in srgb, var(--info, #3498db) 80%, var(--text-primary));
-}
-
 /* A second rendered instance of the SELECTED flow (shared helpers): quiet
-   same-flow mark, never a second selection ring. */
-.flow-library-item.same-flow {
+   same-flow mark, never a second selection ring — the kit's data-entity-
+   selected echo hook, styled to flow's approved dashed look. */
+.flow-library-tree .af-disclosure__row[data-entity-selected] {
   border-color: color-mix(in srgb, var(--accent-primary) 30%, transparent);
   border-style: dashed;
-}
-
-/* The subflows badge doubles as an expand control (users try to click it). */
-.flow-library-badge.family.clickable {
-  cursor: pointer;
-}
-
-.flow-library-badge.family.clickable:hover {
-  background: color-mix(in srgb, var(--info, #3498db) 14%, transparent);
-}
-
-.flow-library-badge.shared {
-  border-color: color-mix(in srgb, var(--warning, #f39c12) 38%, transparent);
-  background: color-mix(in srgb, var(--warning, #f39c12) 9%, transparent);
-  color: color-mix(in srgb, var(--warning, #f39c12) 80%, var(--text-primary));
-}
-
-.flow-library-badge.recursive,
-.flow-library-badge.cycle {
-  border-color: color-mix(in srgb, var(--warning, #f39c12) 34%, transparent);
-  background: color-mix(in srgb, var(--warning, #f39c12) 8%, transparent);
-  color: color-mix(in srgb, var(--warning, #f39c12) 78%, var(--text-primary));
-}
-
-.flow-library-badge.missing {
-  border-color: color-mix(in srgb, var(--error, #e74c3c) 42%, transparent);
-  background: color-mix(in srgb, var(--error, #e74c3c) 10%, transparent);
-  color: color-mix(in srgb, var(--error, #e74c3c) 82%, var(--text-primary));
+  background: transparent;
 }
 
 .flow-library-item-desc.empty {
@@ -2872,6 +2810,12 @@ button.primary:hover:not(:disabled) {
 
 .error-text {
   color: var(--danger);
+}
+
+/* Steer strip (uic kit SteerComposer) pinned under the live steps list. */
+.run-steer {
+  margin-top: 10px;
+  flex: 0 0 auto;
 }
 
 /* Run Flow Modal */
@@ -6561,6 +6505,23 @@ details.run-form-section:not([open]) > .run-form-section-summary:hover .run-form
   border-radius: 10px;
   border: 1px solid var(--error-border);
   background: var(--error-subtle);
+}
+
+/* Retry affordance on artifact fetch errors (transient gateway-load class):
+   a permanent dead error card is dishonest about a recoverable state. */
+.artifact-player-retry {
+  margin-left: 10px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--error-border);
+  background: transparent;
+  color: var(--error);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.artifact-player-retry:hover {
+  background: color-mix(in srgb, var(--error) 12%, transparent);
 }
 
 .run-final {

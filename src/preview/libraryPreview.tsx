@@ -78,9 +78,12 @@ const fixtures: VisualFlow[] = [
     refs: ['shared-formatter', 'shared-formatter'],
     description: 'References the formatter twice (multiplicity badge case).',
   }),
-  // The operator's live-library confusion case: SAVED iteration copies that
-  // share the canonical bundled flow's name (three dp-research rows). Rows
-  // must self-disambiguate with the short id.
+  // The operator's live-library confusion case (historical): SAVED iteration
+  // copies sharing one name — the live store carried two June-28 dp-research
+  // snapshots beside the bundled root before the 2026-07-13 cleanup (the
+  // bundled root is now NAMED deep-research, so these two synthetic rows are
+  // the remaining same-name pair). Rows must self-disambiguate with the
+  // short id; that behavior is what this fixture pins.
   syntheticFlow('e31bd652', {
     name: 'dp-research',
     refs: ['dp-investigate', 'dp-plan', 'dp-render', 'dp-review'],
@@ -154,8 +157,12 @@ window.setTimeout(() => {
     }
   }
   for (const id of expand) {
-    const row = document.querySelector(`[data-flow-id="${CSS.escape(id)}"] .flow-library-disclosure`);
-    (row as HTMLButtonElement | null)?.click();
+    // The list is the uic kit DisclosureList: the chevron is the kit's
+    // .af-disclosure__chevron sitting BESIDE the renderRow content, so walk
+    // up from the data-flow-id row body to the kit row first.
+    const body = document.querySelector(`[data-flow-id="${CSS.escape(id)}"]`);
+    const kitRow = body?.closest('.af-disclosure__row');
+    (kitRow?.querySelector('.af-disclosure__chevron') as HTMLButtonElement | null)?.click();
   }
   if (select) {
     const row = document.querySelector(`[data-flow-id="${CSS.escape(select)}"]`);

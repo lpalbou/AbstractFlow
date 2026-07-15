@@ -11,8 +11,7 @@
 
 import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom/client';
-import { applyTheme } from '@abstractframework/ui-kit';
-import { AppearanceModal, type AppearanceSettings } from '../src/components/AppearanceModal';
+import { AfAppearanceDialog, applyTheme, type AppearanceSettings } from '@abstractframework/ui-kit';
 import '@abstractframework/ui-kit/theme.css';
 import '../src/styles/index.css';
 import '../src/styles/nodes.css';
@@ -40,7 +39,7 @@ function Harness() {
 
   return (
     <div style={{ width: '100vw', height: '100vh', background: 'var(--bg-primary)' }}>
-      <AppearanceModal isOpen value={value} onChange={setValue} onClose={() => undefined} />
+      <AfAppearanceDialog open value={value} onChange={setValue} onClose={() => undefined} />
     </div>
   );
 }

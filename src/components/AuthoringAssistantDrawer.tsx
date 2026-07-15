@@ -51,6 +51,12 @@ import {
   type WorkflowContractSummary,
 } from '../utils/subflowPins';
 import {
+  buildSubflowFlow,
+  danglingSubflowHandles,
+  parseSubflowDefinitions,
+  resolveSubflowHandles,
+} from '../utils/subflowAuthoring';
+import {
   addUsage,
   emptyUsage,
   formatEstimatedTokens,
@@ -158,6 +164,7 @@ const ASSISTANT_DRAFT_KEY = 'abstractflow_authoring_assistant_draft_v1';
 const ASSISTANT_SESSION_KEY = 'abstractflow_authoring_assistant_session_v1';
 const ASSISTANT_ACTIVITY_KEY = 'abstractflow_authoring_assistant_activity_v1';
 const ASSISTANT_MAX_CYCLES_KEY = 'abstractflow_authoring_assistant_max_cycles_v1';
+const ASSISTANT_SUBFLOWS_KEY = 'abstractflow_authoring_assistant_subflows_v1';
 /** Unusable planner responses (empty run output or unparseable JSON) tolerated per turn before failing. */
 const AUTHORING_MAX_UNUSABLE_RESPONSES = 3;
 /** Consecutive command-less "continue" cycles tolerated before the turn stops as stalled. */
@@ -351,6 +358,37 @@ function hasStoredAssistantMessages(workflowKey: string): boolean {
     return localStorage.getItem(scopedAssistantStorageKey(ASSISTANT_MESSAGES_KEY, workflowKey)) !== null;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Conversation ref→id map for assistant-created subflows. Durable per
+ * workflow (like the conversation): a follow-up turn can UPDATE a helper it
+ * created yesterday by the same handle. Cleared by Clear Chat — created
+ * workflows themselves stay in the library (they are saved artifacts, not
+ * chat state).
+ */
+function loadSubflowRefMap(workflowKey: string): Record<string, string> {
+  try {
+    if (typeof localStorage === 'undefined') return {};
+    const parsed = JSON.parse(localStorage.getItem(scopedAssistantStorageKey(ASSISTANT_SUBFLOWS_KEY, workflowKey)) || '{}');
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const map: Record<string, string> = {};
+    for (const [ref, id] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof id === 'string' && id.trim()) map[ref] = id.trim();
+    }
+    return map;
+  } catch {
+    return {};
+  }
+}
+
+function saveSubflowRefMap(workflowKey: string, map: Record<string, string>): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(scopedAssistantStorageKey(ASSISTANT_SUBFLOWS_KEY, workflowKey), JSON.stringify(map));
+  } catch {
+    // Ignore storage failures.
   }
 }
 
@@ -1234,11 +1272,13 @@ export function assistantSystemPrompt(): string {
     'headline: the outcome in at most 12 words (e.g. "Research workflow with web search and markdown report ready"). changes_summary: at most 5 entries describing what changed at the CAPABILITY level ("the agent can now search the web"), never per-command edits; "area" is one of inputs|prompting|agent|tools|control_flow|outputs|files|models|other. check_next: 1-3 short steps the user should take to verify the result.',
     '',
     'THE GRAPH DOCUMENT — "graph" is the complete workflow, in the same format as CURRENT WORKFLOW DOCUMENT in the prompt:',
-    '{"flow_name":string,"nodes":[...],"edges":["sourceNode.sourcePin -> targetNode.targetPin", ...]}',
+    '{"flow_name":string,"nodes":[...],"edges":["sourceNode.sourcePin -> targetNode.targetPin", ...],"subflows"?:[{"ref","flow_name","description","nodes","edges"}]}',
     'Each node: {"id":string,"type":string,"template"?:string,"label":string,"pin_defaults"?:object,"literal"?:json,"code"?:string,"function_name"?:string,"inputs"?:[{"id","type"}],"outputs"?:[{"id","type"}],"switch_cases"?:[{"value"}],"branch_count"?:number,"event"?:object,"tool"?:string,"tool_parameters"?:object,"concat_separator"?:string,"position"?:{"x","y"}}.',
     'Node fields by type: "template" selects the palette variant when NODE CATALOG lists one. "pin_defaults" sets unconnected input pins. "literal" is the value of literal nodes, the tool-name array of tools_allowlist, and {"name","type","default"} for var_decl/bool_var. "code"/"function_name" are for code nodes. "inputs" is the full data-input list for On Flow End/Concat/String Template/Build JSON; "outputs" is the full data-output list for On Flow Start/Break Object. "switch_cases", "branch_count" (sequence/parallel), "event" (event nodes), "tool"+"tool_parameters" (Tool Parameters node), "concat_separator" (concat).',
     'agent_config/effect_config in the current document are read-only context; do not author them — use pin_defaults instead.',
-    'COMPOSITION — subflow nodes execute another SAVED workflow as one step: set "subflow_ref" to an id from AVAILABLE WORKFLOWS (never a name, never an invented id). Each catalog entry carries the workflow\'s purpose and its input/output contract — choose the target by that contract and wire edges to exactly those pins (they become the subflow node\'s pins when the editor patches the reference; required inputs must be fed). Dependencies must be saved before they can be referenced — when the request needs a helper workflow that does not exist yet, say so in your reply and ask the user to build/save it first (or build it in its own conversation). Self-references and reference cycles are refused.',
+    'COMPOSITION — subflow nodes execute another workflow as one step: set "subflow_ref" to an id from AVAILABLE WORKFLOWS (never a name, never an invented id). Each catalog entry carries the workflow\'s purpose and its input/output contract — choose the target by that contract and wire edges to exactly those pins (they become the subflow node\'s pins when the editor patches the reference; required inputs must be fed). Self-references and reference cycles are refused.',
+    'CREATING SUBFLOWS — when the request needs a helper workflow that does not exist, CREATE it in the same emission with the top-level "subflows" array: [{"ref":"extract-claims","flow_name":string,"description":string,"nodes":[...],"edges":[...]}]. Each definition uses the same node/edge grammar as "graph" and MUST have on_flow_start (its inputs) — add on_flow_end when callers need outputs. Reference it from "graph" with "subflow_ref":"ref:extract-claims"; the editor saves the definition as a real workflow, substitutes the id, and it appears in AVAILABLE WORKFLOWS next cycle. Re-emitting the same ref UPDATES that workflow (it is yours for this conversation); "subflows" never deletes anything — omitting a definition leaves the saved workflow alone. Definitions may reference SAVED workflow ids but never other "ref:" handles — for nested helpers, create the innermost first and reference it by id on the next cycle. Budget: at most 5 definitions per emission and 10 creations per turn. Existing library workflows are reference-only: to change one, tell the user to open it.',
+    'WHEN TO DECOMPOSE — create a subflow when a unit is reusable across workflows, has one clear contract, or the main graph is growing past ~15-20 nodes with distinct phases; name it by what it does ("extract-claims", not "helper-1") and give it a real description (it enters the shared library). Otherwise keep the graph flat — decomposition that nobody reuses is indirection, not cleanliness.',
     'Dynamic pins may carry optional "description" and "schema" (JSON-schema fragment, e.g. {"type":"array","items":{"type":"string","x-abstract-type":"file"}} for a multi-file boundary input). Re-emitting a pin with the same id and a NEW type retypes it in place (incompatible edges are dropped with warnings).',
     '',
     'OWNERSHIP — you own the entire document:',
@@ -2187,6 +2227,11 @@ export function AuthoringAssistantDrawer({
   const [restoredActivityState] = useState(() => loadAssistantActivityState(workflowStorageKey));
   const [workingStatus, setWorkingStatus] = useState<WorkingStatus | null>(restoredActivityState.workingStatus);
   const [lastSnapshot, setLastSnapshot] = useState<FlowAuthoringSnapshot | null>(null);
+  // Conversation-created subflows: ref→saved-id (durable per workflow) and
+  // the ids created by the LAST turn (Undo Turn deletes those; older created
+  // workflows survive undo — only the undone turn's births are unwound).
+  const subflowRefMapRef = useRef<Record<string, string>>(loadSubflowRefMap(workflowStorageKey));
+  const [lastTurnCreatedSubflows, setLastTurnCreatedSubflows] = useState<{ id: string; name: string }[]>([]);
   const [activity, setActivity] = useState<AuthoringActivityEntry[]>(restoredActivityState.activity);
   const [turnStartedAt, setTurnStartedAt] = useState<number | null>(restoredActivityState.turnStartedAt);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -2416,17 +2461,24 @@ export function AuthoringAssistantDrawer({
       testWaitShownKeyRef.current = '';
       // Walk the whole run TREE: agent workflows fail inside sub-runs, so a
       // root-only ledger read reports "no failed steps" for exactly the runs
-      // that need diagnosis.
+      // that need diagnosis. The walk is CAPPED — when the cap trips, the
+      // report must say so (house rule: truncation is always labeled).
       const treeRecords: GatewayLedgerRecord[] = [];
       const seenRuns = new Set<string>();
+      let treeTruncated = false;
       const collectTree = async (id: string): Promise<void> => {
-        if (seenRuns.has(id) || seenRuns.size > 24) return;
+        if (seenRuns.has(id)) return;
+        if (seenRuns.size > 24) {
+          treeTruncated = true;
+          return;
+        }
         seenRuns.add(id);
         const records = await loadGatewayRunLedger(id, gatewayContracts).catch(() => [] as GatewayLedgerRecord[]);
         treeRecords.push(...records);
         for (const subRunId of subRunIdsFromLedger(records)) await collectTree(subRunId);
       };
       await collectTree(runId);
+      const flowErrorText = typeof outcome.summary.error === 'string' ? outcome.summary.error : null;
       const report = buildDraftTestReport({
         runId,
         bundleRef: `${published.bundleId}@${published.bundleVersion}`,
@@ -2434,7 +2486,9 @@ export function AuthoringAssistantDrawer({
         durationMs: Date.now() - startedAt,
         inputsUsed: inputData,
         flow: getFlow(),
-        flowError: typeof outcome.summary.error === 'string' ? outcome.summary.error : null,
+        flowError: treeTruncated
+          ? `${flowErrorText ? `${flowErrorText} ` : ''}#TRUNCATION: run tree exceeded 24 runs; deeper subrun ledgers were not inspected`
+          : flowErrorText,
         records: treeRecords,
       });
       setTestReport(report);
@@ -2539,6 +2593,9 @@ export function AuthoringAssistantDrawer({
       saveAssistantDraft(workflowStorageKey, conversation.draft);
       saveAssistantSessionId(workflowStorageKey, sessionId);
       saveAssistantActivityState(workflowStorageKey, { activity, turnStartedAt, statusCollapsed, workingStatus });
+      // Subflow ref map follows the promotion too (created helpers stay
+      // updatable by handle after the draft becomes a saved flow).
+      saveSubflowRefMap(workflowStorageKey, subflowRefMapRef.current);
       setConversation((prev) => ({ ...prev, storageKey: workflowStorageKey }));
       plannerSessionIdRef.current = sessionId;
       plannerStatusKeyRef.current = '';
@@ -2553,6 +2610,8 @@ export function AuthoringAssistantDrawer({
     plannerSessionIdRef.current = loadAssistantSessionId(workflowStorageKey);
     plannerStatusKeyRef.current = '';
     setLastSnapshot(null);
+    subflowRefMapRef.current = loadSubflowRefMap(workflowStorageKey);
+    setLastTurnCreatedSubflows([]);
     // Each workflow has its own activity panel; load the scoped one instead
     // of leaking the previous workflow's feed into the new conversation.
     const scopedActivity = loadAssistantActivityState(workflowStorageKey);
@@ -2712,6 +2771,13 @@ export function AuthoringAssistantDrawer({
 	    let failureCycle: number | null = null;
 	    let failureModelNote = '';
 	    let failureRepairAttempts: AuthoringRepairAttempt[] = [];
+	    // Hoisted above the try so the finally can publish them even when the
+	    // turn THROWS after creating helper workflows: gateway writes happened,
+	    // and Undo Turn must cover those births on every exit path (an
+	    // exception between creation and turn end must not orphan workflows
+	    // with no undo — adversary finding, atomicity check).
+	    const turnCreatedSubflows: { id: string; name: string }[] = [];
+	    let firstSnapshot: FlowAuthoringSnapshot | null = null;
 
 	    try {
 	      const assistantModel = await resolveAssistantModel(modelChoice, defaultsQuery.data, gatewayContracts);
@@ -2768,18 +2834,17 @@ export function AuthoringAssistantDrawer({
 	        }
 	      };
 
-	      let currentFlow = flowBefore;
-	      let finalResult: FlowAuthoringApplyResult | null = null;
-	      let firstSnapshot: FlowAuthoringSnapshot | null = null;
-	      let finalPlan: AssistantPlan | null = null;
+      let currentFlow = flowBefore;
+      let finalResult: FlowAuthoringApplyResult | null = null;
+      let finalPlan: AssistantPlan | null = null;
 	      let finalReadiness = computeAuthoringReadiness(currentFlow, request, preflightOptions);
 	      let totalApplied = 0;
 	      const aggregateApplied: string[] = [];
 	      const aggregateWarnings: string[] = [];
 	      const aggregateErrors: string[] = [];
-	      // Touched nodes must aggregate across ALL cycles; the last cycle's
-	      // result alone misreports the turn (e.g. "86 changes across 3 nodes").
-	      const aggregateTouchedNodeIds = new Set<string>();
+      // Touched nodes must aggregate across ALL cycles; the last cycle's
+      // result alone misreports the turn (e.g. "86 changes across 3 nodes").
+      const aggregateTouchedNodeIds = new Set<string>();
 	      let repairAttempts: AuthoringRepairAttempt[] = [];
 	      let lastRejectedAttempt: AuthoringRepairAttempt | null = null;
 	      const modelNote = `Assistant model: ${assistantModel.label} (${assistantModel.provider} / ${assistantModel.model}).`;
@@ -2808,6 +2873,11 @@ export function AuthoringAssistantDrawer({
       // done / repeat edit" ping-pong is still recognized as the same stall.
       let lastBatchSignature = '';
       let repeatedBatchCycles = 0;
+      // Helper create/update count of the CURRENT cycle: a cycle whose main
+      // document matched the canvas exactly but which created/updated
+      // helpers did real work — it must not count as an empty cycle
+      // (adversary catch: creation-only cycles read as stalls).
+      let cycleSubflowChanges = 0;
 	      const cycleNotes: string[] = [];
 
 	      const reviewAcceptance = async (flow: VisualFlow, cycleLabel: string, cycleNum?: number): Promise<boolean> => {
@@ -3119,12 +3189,151 @@ export function AuthoringAssistantDrawer({
         const hasDocument = Boolean(plan.graph);
         let documentErrors: string[] = [];
         if (plan.graph) {
-          const diff = diffAuthoringDocument(currentFlow, plan.graph, {
+          // SUBFLOW DEFINITIONS (composition): create/update helper workflows
+          // declared in graph.subflows BEFORE the main diff, so subflow_ref
+          // handles resolve to real saved ids and set_subflow can patch pins.
+          // `subflows` is create/update-only — omission never deletes a saved
+          // workflow (the document owns the OPEN flow, not the library).
+          let planGraph: unknown = plan.graph;
+          cycleSubflowChanges = 0;
+          const parsedDefs = parseSubflowDefinitions(planGraph, {
+            savedFlows,
+            refMap: subflowRefMapRef.current,
+          });
+          documentErrors = [...parsedDefs.errors];
+          if (parsedDefs.definitions.length > 0 && !visualflowCollection) {
+            documentErrors.push(
+              'Workflow creation is unavailable this session (saved-workflow endpoint unreachable); build the helper as its own flow instead.'
+            );
+          } else {
+            for (const def of parsedDefs.definitions) {
+              const mappedId = subflowRefMapRef.current[def.ref];
+              let baseFlow: VisualFlow | null = null;
+              if (mappedId) {
+                baseFlow = await fetchSubflowGraph(mappedId);
+                if (!baseFlow) {
+                  // The mapped workflow is gone (deleted outside the chat).
+                  // Self-heal: drop the stale mapping and create fresh.
+                  logActivity(
+                    'notice',
+                    `Helper workflow "${def.ref}" (${mappedId}) no longer exists in the store; recreating it.`,
+                    cycle
+                  );
+                  delete subflowRefMapRef.current[def.ref];
+                  saveSubflowRefMap(workflowStorageKey, subflowRefMapRef.current);
+                }
+              }
+              // Per-TURN creation cap: the per-emission budget (5) times the
+              // cycle budget could otherwise flood the library from one
+              // runaway turn (updates are exempt — they converge, not grow).
+              if (!baseFlow && turnCreatedSubflows.length >= 10) {
+                documentErrors.push(
+                  `Helper workflow "${def.ref}" not created: this turn already created ${turnCreatedSubflows.length} workflows (per-turn cap). ` +
+                    'Finish wiring what exists; create the rest in a follow-up turn.'
+                );
+                continue;
+              }
+              const built = buildSubflowFlow(def, {
+                baseFlow,
+                savedFlows,
+                resolvedSubflows: subflowGraphs,
+              });
+              if (!built.flow) {
+                documentErrors.push(...built.errors);
+                continue;
+              }
+              for (const warning of built.flow.warnings) aggregateWarnings.push(warning);
+              if (built.unchanged && baseFlow) {
+                logActivity('info', `Helper workflow "${def.flowName}" (${baseFlow.id}) is unchanged.`, cycle);
+                continue;
+              }
+              try {
+                if (baseFlow) {
+                  const updated = await gatewayJson<VisualFlow>(
+                    gatewayPath(visualflowItem, { flow_id: baseFlow.id }),
+                    jsonRequest(
+                      {
+                        name: built.flow.name,
+                        description: built.flow.description,
+                        interfaces: built.flow.interfaces,
+                        nodes: built.flow.nodes,
+                        edges: built.flow.edges,
+                        entryNode: built.flow.entryNode,
+                      },
+                      { method: 'PUT' }
+                    )
+                  );
+                  subflowGraphs.set(baseFlow.id, updated);
+                  const contractIndex = savedFlowContracts.findIndex((entry) => entry.id === baseFlow.id);
+                  const contract = workflowContractSummary(updated);
+                  if (contractIndex >= 0) savedFlowContracts[contractIndex] = contract;
+                  aggregateApplied.push(`Updated helper workflow "${built.flow.name}" (${baseFlow.id})`);
+                  cycleSubflowChanges += 1;
+                  logActivity(
+                    'apply',
+                    `Updated helper workflow "${built.flow.name}" (${baseFlow.id}) — ${built.flow.nodes.length} nodes, ${built.flow.edges.length} edges.`,
+                    cycle
+                  );
+                } else {
+                  const created = await gatewayJson<VisualFlow>(gatewayPath(visualflowCollection), jsonRequest(
+                    {
+                      name: built.flow.name,
+                      description: built.flow.description,
+                      interfaces: built.flow.interfaces,
+                      nodes: built.flow.nodes,
+                      edges: built.flow.edges,
+                      entryNode: built.flow.entryNode,
+                    },
+                    { method: 'POST' }
+                  ));
+                  const createdId = typeof created?.id === 'string' ? created.id : '';
+                  if (!createdId) {
+                    documentErrors.push(`Gateway did not return an id for created workflow "${built.flow.name}".`);
+                    continue;
+                  }
+                  subflowRefMapRef.current = { ...subflowRefMapRef.current, [def.ref]: createdId };
+                  saveSubflowRefMap(workflowStorageKey, subflowRefMapRef.current);
+                  turnCreatedSubflows.push({ id: createdId, name: built.flow.name });
+                  subflowGraphs.set(createdId, created);
+                  savedFlows.push({ id: createdId, name: built.flow.name });
+                  savedFlowContracts.push(workflowContractSummary(created));
+                  aggregateApplied.push(`Created helper workflow "${built.flow.name}" (${createdId})`);
+                  cycleSubflowChanges += 1;
+                  logActivity(
+                    'apply',
+                    `Created helper workflow "${built.flow.name}" (${createdId}) — ${built.flow.nodes.length} nodes, ${built.flow.edges.length} edges. It is now referencable via subflow_ref "${createdId}".`,
+                    cycle
+                  );
+                }
+              } catch (subflowSaveError) {
+                documentErrors.push(
+                  `Saving helper workflow "${built.flow.name}" failed: ${subflowSaveError instanceof Error ? subflowSaveError.message : 'gateway error'}.`
+                );
+              }
+            }
+          }
+          // Handle-shaped refs with no definition and no conversation mapping
+          // are refused with a repair instruction (never silently kept).
+          for (const handle of danglingSubflowHandles(
+            planGraph,
+            new Set(parsedDefs.definitions.map((def) => def.ref)),
+            subflowRefMapRef.current
+          )) {
+            documentErrors.push(
+              `subflow_ref "ref:${handle}" has no matching entry in "subflows" and no workflow was created under that handle. ` +
+                'Add the definition to "subflows", or reference a saved workflow id from AVAILABLE WORKFLOWS.'
+            );
+          }
+          planGraph = resolveSubflowHandles(planGraph, subflowRefMapRef.current);
+
+          const diff = diffAuthoringDocument(currentFlow, planGraph, {
             savedFlows,
             resolvedSubflows: subflowGraphs,
             currentFlowId: flowId,
           });
-          documentErrors = diff.errors;
+          // Subflow-pass errors accumulate WITH the diff's own errors — one
+          // repair channel (assigning would silently drop the subflow issues).
+          documentErrors = [...documentErrors, ...diff.errors];
           let diffCommands = diff.commands;
           // Resolve referenced child graphs so set_subflow can patch pins and
           // the cycle walk sees real reference edges (the diff's walk is
@@ -3174,6 +3383,20 @@ export function AuthoringAssistantDrawer({
           finalPlan = plan;
           setProgress('blocked', 'Assistant authoring blocked', totalApplied, readiness.issues.length);
           break;
+        }
+        // A cycle that created/updated helper workflows did REAL work even
+        // when the main document matched the canvas exactly — count it as
+        // progress, never as an empty/stalled cycle (the creations already
+        // rode aggregateApplied and the activity log).
+        if (plan.commands.length === 0 && documentErrors.length === 0 && cycleSubflowChanges > 0) {
+          consecutiveEmptyCycles = 0;
+          totalApplied += cycleSubflowChanges;
+          if (plan.status === 'done') {
+            finalPlan = plan;
+            finalReadiness = readiness;
+            break;
+          }
+          continue;
         }
         if (plan.commands.length === 0 && documentErrors.length === 0) {
           const action = emptyBatchLoopAction(
@@ -3411,7 +3634,6 @@ export function AuthoringAssistantDrawer({
         ];
         setProgress('blocked', 'Paused — cycle limit reached', totalApplied, remaining.length, { outcome: 'waiting' });
         logActivity('info', `Cycle limit (${turnMaxCycles}) reached with work still open; pausing for guidance.`);
-        if (firstSnapshot) setLastSnapshot(firstSnapshot);
         setMessages((prev) => [
           ...prev,
           {
@@ -3453,7 +3675,6 @@ export function AuthoringAssistantDrawer({
           outcome: 'waiting',
         });
       }
-	      if (firstSnapshot) setLastSnapshot(firstSnapshot);
 	      const content = resultMarkdown(finalPlan, finalResult, displayReadiness, modelNote, {
 	        preflightOptions,
 	        reviewPassed: acceptanceReviewPassed,
@@ -3531,6 +3752,19 @@ export function AuthoringAssistantDrawer({
 	      setStopRequested(false);
 	      cancelRequestedRef.current = false;
 	      activePlannerRunRef.current = '';
+	      // Undo coverage must survive EVERY exit path (success, stop,
+	      // exception): if this turn created helpers or changed the canvas,
+	      // the undo target is THIS turn — including its births. The snapshot
+	      // and the birth list are published TOGETHER (adversary catch: the
+	      // list alone left lastSnapshot stale from the PREVIOUS turn, so undo
+	      // after a failed turn restored the wrong canvas — a created-only
+	      // turn must publish snapshot=null so undo unwinds births without
+	      // touching the canvas). A turn that did neither leaves the previous
+	      // turn's undo state intact.
+	      if (turnCreatedSubflows.length > 0 || firstSnapshot) {
+	        setLastTurnCreatedSubflows([...turnCreatedSubflows]);
+	        setLastSnapshot(firstSnapshot);
+	      }
 	    }
 	  };
 
@@ -3553,6 +3787,13 @@ export function AuthoringAssistantDrawer({
     setTestReport(null);
     setTestWait(null);
     lastTestReportTextRef.current = '';
+    // The subflow ref map is CONVERSATION state (which handle means which
+    // saved id); created workflows themselves stay in the library — they are
+    // saved artifacts, not chat state. A fresh conversation reads them from
+    // AVAILABLE WORKFLOWS like any other flow.
+    subflowRefMapRef.current = {};
+    saveSubflowRefMap(workflowStorageKey, {});
+    setLastTurnCreatedSubflows([]);
     toast.success('Assistant conversation cleared; graph unchanged');
   };
 
@@ -3587,18 +3828,48 @@ export function AuthoringAssistantDrawer({
   };
 
   const undo = () => {
-    if (!lastSnapshot) return;
-    restoreAuthoringSnapshot(lastSnapshot);
+    // A turn may have created helpers WITHOUT touching the canvas (main
+    // document rejected after creation, or the turn failed mid-way) — undo
+    // must still unwind those births even with no snapshot to restore.
+    if (!lastSnapshot && lastTurnCreatedSubflows.length === 0) return;
+    const restoredCanvas = Boolean(lastSnapshot);
+    if (lastSnapshot) restoreAuthoringSnapshot(lastSnapshot);
     setLastSnapshot(null);
+    // Helper workflows born in the undone turn are unwound with it —
+    // best-effort deletes with the ref map cleaned so a redo recreates them.
+    const created = lastTurnCreatedSubflows;
+    setLastTurnCreatedSubflows([]);
+    const itemEndpoint = gatewayContracts?.flow_editor?.visualflows?.crud?.item_endpoint || '';
+    if (created.length > 0 && itemEndpoint) {
+      void (async () => {
+        const failed: string[] = [];
+        for (const flow of created) {
+          try {
+            await gatewayJson(gatewayPath(itemEndpoint, { flow_id: flow.id }), { method: 'DELETE' });
+            subflowRefMapRef.current = Object.fromEntries(
+              Object.entries(subflowRefMapRef.current).filter(([, id]) => id !== flow.id)
+            );
+          } catch {
+            failed.push(`${flow.name} (${flow.id})`);
+          }
+        }
+        saveSubflowRefMap(workflowStorageKey, subflowRefMapRef.current);
+        if (failed.length > 0) {
+          toast.error(`Could not delete ${failed.length} helper workflow${failed.length === 1 ? '' : 's'}: ${failed.join(', ')} — remove manually from the Flow Library.`);
+        } else {
+          toast.success(`Deleted ${created.length} helper workflow${created.length === 1 ? '' : 's'} created by the undone turn`);
+        }
+      })();
+    }
     setMessages((prev) => [
       ...prev,
       {
         id: newId('assistant'),
         role: 'assistant',
-        content: '**Undone** — the draft is back to its state before my last turn. Nothing is saved until you Save.',
+        content: `**Undone** — ${restoredCanvas ? 'the draft is back to its state before my last turn.' : 'the canvas was not changed by that turn.'}${created.length > 0 ? ` ${created.length} helper workflow${created.length === 1 ? '' : 's'} created by that turn ${created.length === 1 ? 'is' : 'are'} being deleted.` : ''} Nothing is saved until you Save.`,
       },
     ]);
-    toast.success('Restored previous draft');
+    toast.success(restoredCanvas ? 'Restored previous draft' : 'Unwound helper workflows from the last turn');
   };
 
   if (!isOpen) return null;

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import {
   endpointFromDescriptor,
   gatewayFetch,
@@ -29,6 +29,12 @@ export function artifactContentUrl(
   );
 }
 
+/** Delay between the two fetch passes of an artifact load. A busy gateway
+ * (e.g. a TTS model saturating the host) drops the first fetch with a generic
+ * "Failed to fetch"; one bounded retry absorbs that transient class instead
+ * of painting a permanent error card (operator screenshot, 2026-07-13). */
+const ARTIFACT_FETCH_RETRY_DELAY_MS = 1500;
+
 export function useArtifactObjectUrl(
   src: string | null | undefined,
   contentType?: string,
@@ -40,6 +46,11 @@ export function useArtifactObjectUrl(
     loading: false,
     error: null,
   });
+  // Bumping the attempt re-runs the effect: the manual Retry affordance on
+  // error cards. Automatic retry (one delayed second pass) lives inside the
+  // effect so a genuinely dead artifact still settles into a visible error.
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => setAttempt((n) => n + 1), []);
 
   useEffect(() => {
     const seen = new Set<string>();
@@ -61,20 +72,26 @@ export function useArtifactObjectUrl(
 
     (async () => {
       let lastError = '';
-      for (const url of urls) {
-        try {
-          const res = await gatewayFetch(url, { timeoutMs: 0 });
-          const rawBlob = await res.blob();
-          const blob =
-            contentType && rawBlob.type !== contentType
-              ? new Blob([await rawBlob.arrayBuffer()], { type: contentType })
-              : rawBlob;
-          objectUrl = URL.createObjectURL(blob);
-          if (active) setState({ objectUrl, loading: false, error: null });
-          else URL.revokeObjectURL(objectUrl);
-          return;
-        } catch (err) {
-          lastError = err instanceof Error ? err.message : 'Failed to load artifact';
+      for (let pass = 0; pass < 2 && active; pass += 1) {
+        if (pass > 0) {
+          await new Promise((resolve) => setTimeout(resolve, ARTIFACT_FETCH_RETRY_DELAY_MS));
+          if (!active) return;
+        }
+        for (const url of urls) {
+          try {
+            const res = await gatewayFetch(url, { timeoutMs: 0 });
+            const rawBlob = await res.blob();
+            const blob =
+              contentType && rawBlob.type !== contentType
+                ? new Blob([await rawBlob.arrayBuffer()], { type: contentType })
+                : rawBlob;
+            objectUrl = URL.createObjectURL(blob);
+            if (active) setState({ objectUrl, loading: false, error: null });
+            else URL.revokeObjectURL(objectUrl);
+            return;
+          } catch (err) {
+            lastError = err instanceof Error ? err.message : 'Failed to load artifact';
+          }
         }
       }
       if (active) setState({ objectUrl: '', loading: false, error: lastError || 'Failed to load artifact' });
@@ -84,9 +101,9 @@ export function useArtifactObjectUrl(
       active = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [cacheKey, contentType, fallbackSrcs, src]);
+  }, [attempt, cacheKey, contentType, fallbackSrcs, src]);
 
-  return state;
+  return { ...state, retry };
 }
 
 /** Fetch an artifact's TEXT content for inline preview (backlog 0116).
@@ -103,6 +120,8 @@ export function useArtifactText(
     loading: false,
     error: null,
   });
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => setAttempt((n) => n + 1), []);
 
   useEffect(() => {
     if (!enabled) {
@@ -127,35 +146,41 @@ export function useArtifactText(
 
     (async () => {
       let lastError = '';
-      for (const url of urls) {
-        try {
-          const res = await gatewayFetch(url, { timeoutMs: 0 });
-          // Size guard (review P2-9): refuse to materialize huge bodies just
-          // to clamp them — an honest refusal with Download beats an OOM tab.
-          const contentLength = Number(res.headers.get('content-length') || '');
-          if (Number.isFinite(contentLength) && contentLength > TEXT_PREVIEW_FETCH_CAP_BYTES) {
-            if (active) {
-              setState({
-                text: '',
-                truncated: false,
-                loading: false,
-                error: `Artifact is too large to preview inline (${Math.round(contentLength / 1_000_000)} MB) — use Download.`,
-              });
-            }
-            return;
-          }
-          const raw = await res.text();
+      for (let pass = 0; pass < 2 && active; pass += 1) {
+        if (pass > 0) {
+          await new Promise((resolve) => setTimeout(resolve, ARTIFACT_FETCH_RETRY_DELAY_MS));
           if (!active) return;
-          const truncated = raw.length > TEXT_PREVIEW_CHAR_CAP;
-          setState({
-            text: truncated ? raw.slice(0, TEXT_PREVIEW_CHAR_CAP) : raw,
-            truncated,
-            loading: false,
-            error: null,
-          });
-          return;
-        } catch (err) {
-          lastError = err instanceof Error ? err.message : 'Failed to load artifact text';
+        }
+        for (const url of urls) {
+          try {
+            const res = await gatewayFetch(url, { timeoutMs: 0 });
+            // Size guard (review P2-9): refuse to materialize huge bodies just
+            // to clamp them — an honest refusal with Download beats an OOM tab.
+            const contentLength = Number(res.headers.get('content-length') || '');
+            if (Number.isFinite(contentLength) && contentLength > TEXT_PREVIEW_FETCH_CAP_BYTES) {
+              if (active) {
+                setState({
+                  text: '',
+                  truncated: false,
+                  loading: false,
+                  error: `Artifact is too large to preview inline (${Math.round(contentLength / 1_000_000)} MB) — use Download.`,
+                });
+              }
+              return;
+            }
+            const raw = await res.text();
+            if (!active) return;
+            const truncated = raw.length > TEXT_PREVIEW_CHAR_CAP;
+            setState({
+              text: truncated ? raw.slice(0, TEXT_PREVIEW_CHAR_CAP) : raw,
+              truncated,
+              loading: false,
+              error: null,
+            });
+            return;
+          } catch (err) {
+            lastError = err instanceof Error ? err.message : 'Failed to load artifact text';
+          }
         }
       }
       if (active) setState({ text: '', truncated: false, loading: false, error: lastError || 'Failed to load artifact text' });
@@ -164,9 +189,9 @@ export function useArtifactText(
     return () => {
       active = false;
     };
-  }, [enabled, fallbackSrcs, src]);
+  }, [attempt, enabled, fallbackSrcs, src]);
 
-  return state;
+  return { ...state, retry };
 }
 
 export function artifactPlayerKindFromContent(
@@ -243,7 +268,7 @@ export function ArtifactPlayer({
   // viewer needs a correctly typed blob or browsers download instead of
   // rendering (review finding P1-1). Force the type for the pdf branch.
   const blobContentType = resolvedKind === 'pdf' ? 'application/pdf' : contentType;
-  const { objectUrl, loading, error } = useArtifactObjectUrl(isTextual ? null : src, blobContentType, fallbackSrcs);
+  const { objectUrl, loading, error, retry } = useArtifactObjectUrl(isTextual ? null : src, blobContentType, fallbackSrcs);
   const textState = useArtifactText(src, fallbackSrcs, isTextual);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const displayUrl = objectUrl || src || '';
@@ -254,7 +279,12 @@ export function ArtifactPlayer({
         {textState.loading ? (
           <div className="artifact-player-empty">Loading artifact…</div>
         ) : textState.error ? (
-          <div className="artifact-player-error">{textState.error}</div>
+          <div className="artifact-player-error">
+            {textState.error}
+            <button type="button" className="artifact-player-retry" onClick={textState.retry}>
+              Retry
+            </button>
+          </div>
         ) : (
           <>
             {resolvedKind === 'markdown' ? (
@@ -282,7 +312,12 @@ export function ArtifactPlayer({
       {loading ? (
         <div className="artifact-player-empty">Loading artifact...</div>
       ) : error ? (
-        <div className="artifact-player-error">{error}</div>
+        <div className="artifact-player-error">
+          {error}
+          <button type="button" className="artifact-player-retry" onClick={retry}>
+            Retry
+          </button>
+        </div>
       ) : displayUrl && resolvedKind === 'image' ? (
         <>
           <button

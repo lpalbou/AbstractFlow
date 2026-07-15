@@ -1,0 +1,4739 @@
+{
+  "id": "co-scientist",
+  "name": "co-scientist",
+  "description": "Deep multi-agent hypothesis engine (Nature 'AI co-scientist' replica). Starts FROM the literature by delegating grounding to the deep-research investigation engine (dp-investigate: real web search + source ledger), then runs a supervisor loop of Generation -> Reflection -> Elo-ranking (prioritized pairwise scientific debate) -> Evolution -> research-expansion, threading meta-feedback forward each cycle with near-duplicate pruning, then a final search-grounded full review of the finalists and a Meta-review research overview. Deliberately deeper than a single-pass report — it scales test-time compute via the cycle budget.",
+  "interfaces": [
+    "abstractresearch.coscientist.v1"
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": -1900,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Research goal",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "research_goal",
+            "label": "research_goal",
+            "type": "string"
+          },
+          {
+            "id": "num_hypotheses",
+            "label": "num_hypotheses",
+            "type": "number"
+          },
+          {
+            "id": "max_cycles",
+            "label": "max_cycles",
+            "type": "number"
+          },
+          {
+            "id": "effort",
+            "label": "effort",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ],
+        "pinDefaults": {
+          "num_hypotheses": 5,
+          "max_cycles": 3,
+          "effort": "standard"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "plan_input",
+      "type": "code",
+      "position": {
+        "x": -1580,
+        "y": -180
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose plan request",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "research_goal",
+            "label": "research_goal",
+            "type": "string"
+          },
+          {
+            "id": "effort",
+            "label": "effort",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "return {\n    \"request\": str(research_goal or \"\").strip(),\n    \"effort\": str(effort or \"standard\"),\n    \"provider\": provider,\n    \"model\": model,\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "plan",
+      "type": "subflow",
+      "position": {
+        "x": -1240,
+        "y": -320
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Research plan (deep-research)",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean"
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "inherit_context": false
+        },
+        "subflowId": "dp-plan"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_plan",
+      "type": "get",
+      "position": {
+        "x": -1240,
+        "y": -120
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get plan",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "plan",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "ground_input",
+      "type": "code",
+      "position": {
+        "x": -1580,
+        "y": 200
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose investigation request",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "research_goal",
+            "label": "research_goal",
+            "type": "string"
+          },
+          {
+            "id": "effort",
+            "label": "effort",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "plan",
+            "label": "plan",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "return {\n    \"request\": str(research_goal or \"\").strip(),\n    \"effort\": str(effort or \"standard\"),\n    \"provider\": provider,\n    \"model\": model,\n    \"plan\": plan,\n    \"round_index\": 0,\n    \"total_rounds\": 1,\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "ground",
+      "type": "subflow",
+      "position": {
+        "x": -900,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "subflow",
+        "label": "Literature investigation (deep-research)",
+        "icon": "&#x1F4E6;",
+        "headerColor": "#00CCCC",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "inherit_context",
+            "label": "inherit_context",
+            "type": "boolean"
+          },
+          {
+            "id": "input",
+            "label": "input",
+            "type": "object"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "inherit_context": false
+        },
+        "subflowId": "dp-investigate"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_investigation",
+      "type": "get",
+      "position": {
+        "x": -560,
+        "y": 200
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get investigation",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "investigation",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "lit_base",
+      "type": "code",
+      "position": {
+        "x": -580,
+        "y": 200
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Build literature base",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "investigation",
+            "label": "investigation",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "inv = (investigation or {})\nfindings = inv.get(\"answer_hypotheses\") or []\nledger = inv.get(\"source_ledger\") or []\nopen_q = inv.get(\"open_questions\") or []\nlimitations = inv.get(\"limitations\") or []\nparts = []\nif findings:\n    parts.append(\"Grounded findings from the literature:\")\n    i = 0\n    for f in findings:\n        i = i + 1\n        parts.append(str(i) + \". \" + str(f))\nif open_q:\n    parts.append(\"\")\n    parts.append(\"Open questions / frontiers:\")\n    for q in open_q:\n        parts.append(\"- \" + str(q))\nif limitations:\n    parts.append(\"\")\n    parts.append(\"Known limitations in the current literature:\")\n    for l in limitations:\n        parts.append(\"- \" + str(l))\n# Clean source ledger. dp-investigate's schema uses url_or_path / fetched /\n# evidence_quality / relevance / rejected_reason (NOT url/takeaway) — read the\n# real field names so URLs and notes are not silently dropped.\nsources = []\nif ledger:\n    parts.append(\"\")\n    parts.append(\"Sources:\")\n    for s in ledger:\n        if not isinstance(s, dict):\n            continue\n        title = str(s.get(\"title\") or \"\").strip()\n        url = str(s.get(\"url_or_path\") or s.get(\"url\") or \"\").strip()\n        fetched = bool(s.get(\"fetched\"))\n        quality = str(s.get(\"evidence_quality\") or \"\").strip()\n        relevance = str(s.get(\"relevance\") or \"\").strip()\n        rejected = str(s.get(\"rejected_reason\") or \"\").strip()\n        take_bits = []\n        if relevance:\n            take_bits.append(relevance)\n        if quality:\n            take_bits.append(\"evidence: \" + quality)\n        if not fetched and rejected:\n            take_bits.append(\"not fetched: \" + rejected)\n        take = \"; \".join(take_bits)\n        if title or url:\n            sources.append({\"title\": title, \"url\": url, \"fetched\": fetched, \"takeaway\": take})\n            mark = \"\" if fetched else \" [unfetched]\"\n            parts.append(\"- \" + title + \" (\" + url + \")\" + mark + \": \" + take)\n# grounding_ok: did we actually gather real, FETCHED sources? Findings alone\n# do NOT count — the investigation agent can return reasoning (or degenerate\n# meta \"sources\" like a schema description) without searching, and that is\n# exactly the ungrounded case we must not present as grounded. Require at\n# least one fetched source with a real URL; otherwise warn loudly (#FALLBACK)\n# so the operator knows the hypotheses are parametric, not literature-backed.\nfetched_count = 0\nfor s in sources:\n    if s.get(\"fetched\") and str(s.get(\"url\") or \"\").strip() and str(s.get(\"url\") or \"\").strip().lower() != \"n/a\":\n        fetched_count = fetched_count + 1\ngrounding_ok = fetched_count > 0\nwarnings = []\nif not grounding_ok:\n    warnings.append(\"#FALLBACK: literature grounding fetched 0 real sources this run (the investigation agent did not retrieve usable literature); the hypotheses below are the model's parametric reasoning, NOT grounded in fetched sources. Re-run for grounded output.\")\ntext = \"\\n\".join(parts).strip() or \"(no literature grounding was gathered)\"\nreturn {\"text\": text, \"sources\": sources, \"open_questions\": open_q, \"grounding_ok\": grounding_ok, \"warnings\": warnings, \"fetched_count\": fetched_count}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gen_prompt",
+      "type": "code",
+      "position": {
+        "x": -580,
+        "y": 380
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose generation prompt",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "research_goal",
+            "label": "research_goal",
+            "type": "string"
+          },
+          {
+            "id": "num_hypotheses",
+            "label": "num_hypotheses",
+            "type": "number"
+          },
+          {
+            "id": "literature",
+            "label": "literature",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "goal = str(research_goal or \"\").strip()\nn = int(num_hypotheses or 5)\nlit = str(literature or \"\").strip()\nbase = \"You are the Generation agent of an AI co-scientist. GROUND your reasoning in the literature base below, then propose \" + str(n) + \" NOVEL, plausible, testable research hypotheses that go BEYOND what the literature already establishes. For each: a short title, the hypothesis statement, a rationale that connects to the literature (what specific gap it fills), and a concrete experiment to test it. Favor mechanistic specificity and originality over restating known results. IMPORTANT: you have run no experiments — phrase any quantitative target as a HYPOTHESIZED/EXPECTED outcome to be tested (e.g. 'we predict up to ~X%'), never as a measured or demonstrated result, and do not invent benchmark names or precise numbers as if observed.\"\nparts = [base, \"\", \"## Research goal\", goal]\nif lit:\n    parts += [\"\", \"## Literature base (ground your hypotheses here)\", lit]\nreturn \"\\n\".join(parts)"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "generate",
+      "type": "llm_call",
+      "position": {
+        "x": -240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Generation agent",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "system": "You are the Generation agent of an AI co-scientist. You produce novel, grounded, testable scientific hypotheses, reasoning carefully over the supplied literature base.",
+          "temperature": 0.7,
+          "resp_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "hypotheses"
+            ],
+            "properties": {
+              "hypotheses": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "title",
+                    "statement",
+                    "rationale",
+                    "experiment"
+                  ],
+                  "properties": {
+                    "title": {
+                      "type": "string"
+                    },
+                    "statement": {
+                      "type": "string"
+                    },
+                    "rationale": {
+                      "type": "string"
+                    },
+                    "experiment": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "init_state",
+      "type": "code",
+      "position": {
+        "x": 100,
+        "y": 200
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Init hypothesis pool",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "generated",
+            "label": "generated",
+            "type": "object"
+          },
+          {
+            "id": "literature_text",
+            "label": "literature_text",
+            "type": "string"
+          },
+          {
+            "id": "sources",
+            "label": "sources",
+            "type": "array"
+          },
+          {
+            "id": "open_questions",
+            "label": "open_questions",
+            "type": "array"
+          },
+          {
+            "id": "grounding_ok",
+            "label": "grounding_ok",
+            "type": "boolean"
+          },
+          {
+            "id": "warnings",
+            "label": "warnings",
+            "type": "array"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "hyps = (generated or {}).get(\"hypotheses\") or []\npool = []\nfor i, h in enumerate(hyps):\n    if not isinstance(h, dict):\n        continue\n    pool.append({\n        \"id\": i,\n        \"title\": str(h.get(\"title\") or \"\").strip(),\n        \"statement\": str(h.get(\"statement\") or \"\").strip(),\n        \"rationale\": str(h.get(\"rationale\") or \"\").strip(),\n        \"experiment\": str(h.get(\"experiment\") or \"\").strip(),\n        \"elo\": 1200.0,\n        \"reviews\": {},\n        \"reviewed\": False,\n    })\nreturn {\n    \"pool\": pool,\n    \"cycle\": 0,\n    \"next_id\": len(pool),\n    \"literature\": str(literature_text or \"\").strip(),\n    \"sources\": sources or [],\n    \"open_questions\": open_questions or [],\n    \"grounding_ok\": bool(grounding_ok),\n    \"warnings\": warnings or [],\n    \"feedback\": \"\",\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_init",
+      "type": "set_var",
+      "position": {
+        "x": 100,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Seed pool var",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "co.state"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_state",
+      "type": "get_var",
+      "position": {
+        "x": 440,
+        "y": 200
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get co.state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "co.state",
+          "default": {
+            "pool": [],
+            "cycle": 0,
+            "next_id": 0
+          }
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "loop_cond",
+      "type": "code",
+      "position": {
+        "x": 440,
+        "y": 340
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Supervisor: continue?",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "max_cycles",
+            "label": "max_cycles",
+            "type": "number"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "state = loop_state or {}\ncycle = int(state.get(\"cycle\", 0) or 0)\npool = state.get(\"pool\") or []\nmax_c = max(1, int(max_cycles or 1))\nreturn {\"condition\": cycle < max_c and len(pool) > 0, \"cycle\": cycle}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "cycles",
+      "type": "while",
+      "position": {
+        "x": 440,
+        "y": 500
+      },
+      "data": {
+        "nodeType": "while",
+        "label": "Supervisor rounds (test-time compute)",
+        "icon": "&#x1F501;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "loop",
+            "label": "loop",
+            "type": "execution"
+          },
+          {
+            "id": "done",
+            "label": "done",
+            "type": "execution"
+          },
+          {
+            "id": "index",
+            "label": "index",
+            "type": "number"
+          },
+          {
+            "id": "item",
+            "label": "item",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "condition": true
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_state_body",
+      "type": "get_var",
+      "position": {
+        "x": 780,
+        "y": -360
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get co.state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "co.state",
+          "default": {
+            "pool": [],
+            "cycle": 0,
+            "next_id": 0
+          }
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "pool_text",
+      "type": "code",
+      "position": {
+        "x": 780,
+        "y": -200
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Serialize pool",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "state = loop_state or {}\npool = state.get(\"pool\") or []\nranked = sorted(pool, key=lambda h: -float(h.get(\"elo\", 0)))\nlines = []\nfor h in ranked:\n    tag = \"\" if h.get(\"reviewed\") else \" [UNREVIEWED]\"\n    lines.append(\"### [\" + str(h.get(\"id\")) + \"] \" + str(h.get(\"title\") or \"\") + \" (Elo \" + str(int(h.get(\"elo\", 0))) + \")\" + tag)\n    lines.append(str(h.get(\"statement\") or \"\"))\n    if h.get(\"rationale\"):\n        lines.append(\"Rationale: \" + str(h.get(\"rationale\")))\n    lines.append(\"\")\nreturn \"\\n\".join(lines)"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "ctx",
+      "type": "code",
+      "position": {
+        "x": 780,
+        "y": -40
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Extract lit+feedback",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "state = loop_state or {}\nreturn {\n    \"literature\": str(state.get(\"literature\") or \"\").strip(),\n    \"feedback\": str(state.get(\"feedback\") or \"\").strip(),\n    \"open_questions\": state.get(\"open_questions\") or [],\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "rank_pairs",
+      "type": "code",
+      "position": {
+        "x": 780,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Prioritize match pairs",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "state = loop_state or {}\npool = state.get(\"pool\") or []\nby_elo = sorted(pool, key=lambda h: -float(h.get(\"elo\", 0)))\nids = [int(h.get(\"id\")) for h in by_elo]\n# newest = highest ids (added most recently)\nnewest = sorted([int(h.get(\"id\")) for h in pool], key=lambda x: -x)[:3]\npairs = []\nseen = set()\ndef _add(a, b):\n    if a == b:\n        return\n    key = (a, b) if a < b else (b, a)\n    if key in seen:\n        return\n    seen.add(key)\n    pairs.append({\"a\": a, \"b\": b})\n# top vs top\nfor i in range(len(ids)):\n    for k in range(i + 1, min(i + 3, len(ids))):\n        _add(ids[i], ids[k])\n# newest vs top\nfor n in newest:\n    for t in ids[:3]:\n        _add(n, t)\nlines = []\nfor p in pairs:\n    lines.append(\"- compare [\" + str(p[\"a\"]) + \"] vs [\" + str(p[\"b\"]) + \"]\")\nreturn {\"text\": \"\\n\".join(lines), \"count\": len(pairs)}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "reflect_prompt",
+      "type": "code",
+      "position": {
+        "x": 780,
+        "y": 280
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Reflect prompt",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "research_goal",
+            "label": "research_goal",
+            "type": "string"
+          },
+          {
+            "id": "pool_text",
+            "label": "pool_text",
+            "type": "string"
+          },
+          {
+            "id": "literature",
+            "label": "literature",
+            "type": "string"
+          },
+          {
+            "id": "feedback",
+            "label": "feedback",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "goal = str(research_goal or \"\").strip()\npool_text = str(pool_text or \"\").strip()\nlit = str(literature or \"\").strip()\nfeedback = str(feedback or \"\").strip()\nparts = [\"You are the Reflection agent (a rigorous virtual scientific peer reviewer). For EACH hypothesis below, score correctness (plausibility/soundness), novelty, and testability from 0-10, set safety_ok, and give a one-paragraph critique. Judge novelty AND correctness AGAINST the literature base — name the weak assumption, or the prior work that undercuts novelty. Correctness (is the mechanism sound and not already refuted?) matters as much as novelty; do not reward ungrounded ambition.\"]\nif feedback:\n    parts += [\"\", \"## Feedback from prior cycles (address these recurring concerns)\", feedback]\nparts += [\"\", \"## Research goal\", goal]\nif lit:\n    parts += [\"\", \"## Literature base\", lit]\nparts += [\"\", \"## Current hypotheses\", pool_text]\nreturn \"\\n\".join(parts)"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "reflect",
+      "type": "llm_call",
+      "position": {
+        "x": 1120,
+        "y": -40
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Reflection agent (initial review)",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "system": "You are the Reflection agent: a rigorous virtual scientific peer reviewer who judges hypotheses against the literature and weighs correctness as heavily as novelty.",
+          "temperature": 0.2,
+          "resp_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "reviews"
+            ],
+            "properties": {
+              "reviews": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "correctness",
+                    "novelty",
+                    "testability",
+                    "safety_ok",
+                    "critique"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "number"
+                    },
+                    "correctness": {
+                      "type": "number"
+                    },
+                    "novelty": {
+                      "type": "number"
+                    },
+                    "testability": {
+                      "type": "number"
+                    },
+                    "safety_ok": {
+                      "type": "boolean"
+                    },
+                    "critique": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "rank_prompt",
+      "type": "code",
+      "position": {
+        "x": 1120,
+        "y": 220
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Rank prompt",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "research_goal",
+            "label": "research_goal",
+            "type": "string"
+          },
+          {
+            "id": "pool_text",
+            "label": "pool_text",
+            "type": "string"
+          },
+          {
+            "id": "pairs",
+            "label": "pairs",
+            "type": "string"
+          },
+          {
+            "id": "feedback",
+            "label": "feedback",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "goal = str(research_goal or \"\").strip()\npool_text = str(pool_text or \"\").strip()\npairs = str(pairs or \"\").strip()\nfeedback = str(feedback or \"\").strip()\nparts = [\"You are the Ranking agent running an Elo tournament via simulated scientific debate. Hold a brief scientific debate for EACH of the prioritized pairs listed below and output the winner id with a one-line reason naming the deciding quality. Rank on PLAUSIBILITY/correctness first, then testability, then novelty — a bold but unsound hypothesis should lose to a sound, testable one. You may add a few more comparisons among the strongest candidates if useful.\"]\nif feedback:\n    parts += [\"\", \"## Feedback from prior cycles (weigh these qualities)\", feedback]\nparts += [\"\", \"## Research goal\", goal, \"\", \"## Prioritized pairs to debate\", pairs, \"\", \"## Hypotheses (id, title, current Elo)\", pool_text]\nreturn \"\\n\".join(parts)"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "rank",
+      "type": "llm_call",
+      "position": {
+        "x": 1460,
+        "y": -40
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Ranking agent (Elo tournament)",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "system": "You are the Ranking agent: you run an Elo tournament via simulated scientific debate, ranking on plausibility first.",
+          "temperature": 0.3,
+          "resp_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "matches"
+            ],
+            "properties": {
+              "matches": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "a",
+                    "b",
+                    "winner",
+                    "reason"
+                  ],
+                  "properties": {
+                    "a": {
+                      "type": "number"
+                    },
+                    "b": {
+                      "type": "number"
+                    },
+                    "winner": {
+                      "type": "number"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "evolve_prompt",
+      "type": "code",
+      "position": {
+        "x": 1460,
+        "y": 220
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Evolve prompt",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "research_goal",
+            "label": "research_goal",
+            "type": "string"
+          },
+          {
+            "id": "pool_text",
+            "label": "pool_text",
+            "type": "string"
+          },
+          {
+            "id": "literature",
+            "label": "literature",
+            "type": "string"
+          },
+          {
+            "id": "feedback",
+            "label": "feedback",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "goal = str(research_goal or \"\").strip()\npool_text = str(pool_text or \"\").strip()\nlit = str(literature or \"\").strip()\nfeedback = str(feedback or \"\").strip()\nparts = [\"You are the Evolution agent. Produce 1-2 IMPROVED hypotheses by refining, combining, or extending the TOP hypotheses below (sharper mechanism, stronger grounding, a better-controlled experiment, fixing a reviewer-noted flaw). Return only genuinely improved hypotheses, not restatements or near-duplicates of existing ones. Phrase quantitative targets as HYPOTHESIZED/EXPECTED, never as measured results, and do not invent precise numbers or benchmark names as if observed.\"]\nif feedback:\n    parts += [\"\", \"## Feedback from prior cycles (fix these specific flaws)\", feedback]\nparts += [\"\", \"## Research goal\", goal]\nif lit:\n    parts += [\"\", \"## Literature base\", lit]\nparts += [\"\", \"## Current top hypotheses\", pool_text]\nreturn \"\\n\".join(parts)"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "evolve",
+      "type": "llm_call",
+      "position": {
+        "x": 1800,
+        "y": -40
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Evolution agent (refine)",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "system": "You are the Evolution agent: you refine, combine, and extend top hypotheses into improved ones, avoiding near-duplicates.",
+          "temperature": 0.6,
+          "resp_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "hypotheses"
+            ],
+            "properties": {
+              "hypotheses": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "title",
+                    "statement",
+                    "rationale",
+                    "experiment"
+                  ],
+                  "properties": {
+                    "title": {
+                      "type": "string"
+                    },
+                    "statement": {
+                      "type": "string"
+                    },
+                    "rationale": {
+                      "type": "string"
+                    },
+                    "experiment": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "expand_prompt",
+      "type": "code",
+      "position": {
+        "x": 1800,
+        "y": 220
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Expand prompt",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "research_goal",
+            "label": "research_goal",
+            "type": "string"
+          },
+          {
+            "id": "pool_text",
+            "label": "pool_text",
+            "type": "string"
+          },
+          {
+            "id": "literature",
+            "label": "literature",
+            "type": "string"
+          },
+          {
+            "id": "open_questions",
+            "label": "open_questions",
+            "type": "array"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "goal = str(research_goal or \"\").strip()\npool_text = str(pool_text or \"\").strip()\nlit = str(literature or \"\").strip()\noq = open_questions or []\nparts = [\"You are the Generation agent in RESEARCH-EXPANSION mode. Review the hypotheses ALREADY in the pool below and propose 1-2 NOVEL hypotheses in UNEXPLORED areas that the current pool does NOT cover — open a new direction, do not refine an existing one. Ground each in the literature and give a concrete experiment.\"]\nif oq:\n    parts += [\"\", \"## Open questions from the literature (good sources of unexplored directions)\"]\n    for q in oq[:6]:\n        parts.append(\"- \" + str(q))\nparts += [\"\", \"## Research goal\", goal]\nif lit:\n    parts += [\"\", \"## Literature base\", lit]\nparts += [\"\", \"## Hypotheses already covered (do NOT duplicate these areas)\", pool_text]\nreturn \"\\n\".join(parts)"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "expand",
+      "type": "llm_call",
+      "position": {
+        "x": 2140,
+        "y": -40
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Generation agent (research expansion)",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "system": "You are the Generation agent exploring UNEXPLORED areas of the hypothesis space, opening new directions the current pool does not cover.",
+          "temperature": 0.8,
+          "resp_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "hypotheses"
+            ],
+            "properties": {
+              "hypotheses": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "title",
+                    "statement",
+                    "rationale",
+                    "experiment"
+                  ],
+                  "properties": {
+                    "title": {
+                      "type": "string"
+                    },
+                    "statement": {
+                      "type": "string"
+                    },
+                    "rationale": {
+                      "type": "string"
+                    },
+                    "experiment": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "fold",
+      "type": "code",
+      "position": {
+        "x": 2480,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Fold reviews+Elo+evolved+expanded+feedback",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "reviews",
+            "label": "reviews",
+            "type": "object"
+          },
+          {
+            "id": "matches",
+            "label": "matches",
+            "type": "object"
+          },
+          {
+            "id": "evolved",
+            "label": "evolved",
+            "type": "object"
+          },
+          {
+            "id": "expanded",
+            "label": "expanded",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "state = loop_state or {}\npool = {int(h[\"id\"]): dict(h) for h in (state.get(\"pool\") or []) if isinstance(h, dict)}\ncycle = int(state.get(\"cycle\", 0) or 0)\nnext_id = int(state.get(\"next_id\", len(pool)) or len(pool))\n\nreview_list = ((reviews or {}).get(\"reviews\") or [])\nfor r in review_list:\n    if not isinstance(r, dict):\n        continue\n    hid = int(r.get(\"id\", -1))\n    if hid in pool:\n        pool[hid][\"reviews\"] = {\n            \"correctness\": r.get(\"correctness\"),\n            \"novelty\": r.get(\"novelty\"),\n            \"testability\": r.get(\"testability\"),\n            \"safety_ok\": r.get(\"safety_ok\"),\n            \"critique\": str(r.get(\"critique\") or \"\"),\n        }\n        pool[hid][\"reviewed\"] = True\n\nK = 32.0\nmatch_list = ((matches or {}).get(\"matches\") or [])\nfor m in match_list:\n    if not isinstance(m, dict):\n        continue\n    a = int(m.get(\"a\", -1)); b = int(m.get(\"b\", -1)); w = int(m.get(\"winner\", -1))\n    if a not in pool or b not in pool or a == b:\n        continue\n    Ra = float(pool[a].get(\"elo\", 1200.0)); Rb = float(pool[b].get(\"elo\", 1200.0))\n    Ea = 1.0 / (1.0 + (10.0 ** ((Rb - Ra) / 400.0)))\n    Eb = 1.0 - Ea\n    Sa = 1.0 if w == a else (0.5 if w not in (a, b) else 0.0)\n    Sb = 1.0 - Sa\n    pool[a][\"elo\"] = Ra + K * (Sa - Ea)\n    pool[b][\"elo\"] = Rb + K * (Sb - Eb)\n\ndef _toks(h):\n    text = (str(h.get(\"title\") or \"\") + \" \" + str(h.get(\"statement\") or \"\")).lower()\n    out = set()\n    word = \"\"\n    for ch in text:\n        if (\"a\" <= ch <= \"z\") or (\"0\" <= ch <= \"9\"):\n            word = word + ch\n        else:\n            if len(word) > 3:\n                out.add(word)\n            word = \"\"\n    if len(word) > 3:\n        out.add(word)\n    return out\n\nexisting_tok = [_toks(h) for h in pool.values()]\n\ndef _max_overlap(cand_tok):\n    best = 0.0\n    for et in existing_tok:\n        if not et or not cand_tok:\n            continue\n        inter = len(cand_tok & et)\n        union = len(cand_tok | et)\n        if union > 0:\n            j = float(inter) / float(union)\n            if j > best:\n                best = j\n    return best\n\nelos = [float(h.get(\"elo\", 1200.0)) for h in pool.values()] or [1200.0]\nmean_elo = sum(elos) / len(elos)\ndropped_dups = 0\n# EVOLVED hypotheses are refinements of their parents — they SHOULD resemble\n# them, so only near-identical restatements are dropped (0.85). EXPANDED\n# hypotheses are meant to open new areas, so anything close to an existing one\n# is a failed expansion and is dropped (0.6). Using one 0.6 threshold for both\n# silently discarded almost every genuine refinement (adversary P1).\nlabelled = []\nfor h in ((evolved or {}).get(\"hypotheses\") or []):\n    labelled.append((h, 0.85))\nfor h in ((expanded or {}).get(\"hypotheses\") or []):\n    labelled.append((h, 0.6))\nfor h, thresh in labelled:\n    if not isinstance(h, dict):\n        continue\n    ct = _toks(h)\n    if _max_overlap(ct) >= thresh:\n        dropped_dups = dropped_dups + 1\n        continue\n    existing_tok.append(ct)\n    pool[next_id] = {\n        \"id\": next_id,\n        \"title\": str(h.get(\"title\") or \"\").strip(),\n        \"statement\": str(h.get(\"statement\") or \"\").strip(),\n        \"rationale\": str(h.get(\"rationale\") or \"\").strip(),\n        \"experiment\": str(h.get(\"experiment\") or \"\").strip(),\n        \"elo\": mean_elo + 15.0,\n        \"reviews\": {},\n        \"reviewed\": False,\n    }\n    next_id = next_id + 1\n\ncrits = []\nfor r in review_list:\n    if isinstance(r, dict) and str(r.get(\"critique\") or \"\").strip():\n        crits.append(str(r.get(\"critique\")).strip())\ndebate = []\nfor m in match_list:\n    if isinstance(m, dict) and str(m.get(\"reason\") or \"\").strip():\n        debate.append(str(m.get(\"reason\")).strip())\nfb_parts = []\nif crits:\n    fb_parts.append(\"Recurring reviewer concerns from the last cycle (fix these):\")\n    for c in crits[:6]:\n        fb_parts.append(\"- \" + c[:400])\nif debate:\n    fb_parts.append(\"What won debates last cycle (favor these qualities):\")\n    for d in debate[:6]:\n        fb_parts.append(\"- \" + d[:300])\nfeedback = \"\\n\".join(fb_parts).strip()\n\nranked = sorted(pool.values(), key=lambda h: -float(h.get(\"elo\", 0)))\ncap = 8\nranked = ranked[:cap]\nreturn {\n    \"pool\": ranked,\n    \"cycle\": cycle + 1,\n    \"next_id\": next_id,\n    \"literature\": str(state.get(\"literature\") or \"\"),\n    \"sources\": state.get(\"sources\") or [],\n    \"open_questions\": state.get(\"open_questions\") or [],\n    \"grounding_ok\": bool(state.get(\"grounding_ok\")),\n    \"warnings\": state.get(\"warnings\") or [],\n    \"feedback\": feedback,\n    \"dropped_dups\": dropped_dups,\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_state",
+      "type": "set_var",
+      "position": {
+        "x": 2480,
+        "y": -40
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Persist tournament state",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "co.state"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_term_state",
+      "type": "get_var",
+      "position": {
+        "x": 780,
+        "y": 640
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get co.state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "co.state",
+          "default": {
+            "pool": [],
+            "cycle": 0,
+            "next_id": 0
+          }
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "term_pool_text",
+      "type": "code",
+      "position": {
+        "x": 1120,
+        "y": 640
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Serialize finalists",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "state = loop_state or {}\npool = state.get(\"pool\") or []\nranked = sorted(pool, key=lambda h: -float(h.get(\"elo\", 0)))\nlines = []\nfor h in ranked:\n    tag = \"\" if h.get(\"reviewed\") else \" [UNREVIEWED]\"\n    lines.append(\"### [\" + str(h.get(\"id\")) + \"] \" + str(h.get(\"title\") or \"\") + \" (Elo \" + str(int(h.get(\"elo\", 0))) + \")\" + tag)\n    lines.append(str(h.get(\"statement\") or \"\"))\n    if h.get(\"rationale\"):\n        lines.append(\"Rationale: \" + str(h.get(\"rationale\")))\n    lines.append(\"\")\nreturn \"\\n\".join(lines)"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "term_reflect_prompt",
+      "type": "code",
+      "position": {
+        "x": 1120,
+        "y": 820
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Full-review prompt",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "research_goal",
+            "label": "research_goal",
+            "type": "string"
+          },
+          {
+            "id": "pool_text",
+            "label": "pool_text",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "goal = str(research_goal or \"\").strip()\npool_text = str(pool_text or \"\").strip()\nparts = [\"You are the Reflection agent performing a FULL, deeply-grounded review of the FINALIST hypotheses. Use the read-only web tools to search the current literature and verify each hypothesis's NOVELTY (is it already published?) and CORRECTNESS (is the mechanism sound?). For EACH hypothesis, score correctness, novelty, testability (0-10), set safety_ok, and give a critique that CITES what you found (or confirms you could not find prior art, supporting novelty). Be skeptical: down-score hypotheses that duplicate existing work or rest on refuted assumptions.\", \"\", \"## Research goal\", goal, \"\", \"## Finalist hypotheses to verify\", pool_text]\nreturn \"\\n\".join(parts)"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "term_reflect",
+      "type": "agent",
+      "position": {
+        "x": 1460,
+        "y": 640
+      },
+      "data": {
+        "nodeType": "agent",
+        "label": "Reflection agent (full search review)",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "system": "You are the Reflection agent performing a deep, literature-grounded full review. You verify novelty and correctness against real sources using read-only web tools, and never fabricate citations.",
+          "tools": [
+            "web_search",
+            "skim_websearch",
+            "skim_url",
+            "fetch_url"
+          ],
+          "temperature": 0.2,
+          "max_iterations": 4,
+          "resp_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "reviews"
+            ],
+            "properties": {
+              "reviews": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "correctness",
+                    "novelty",
+                    "testability",
+                    "safety_ok",
+                    "critique"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "number"
+                    },
+                    "correctness": {
+                      "type": "number"
+                    },
+                    "novelty": {
+                      "type": "number"
+                    },
+                    "testability": {
+                      "type": "number"
+                    },
+                    "safety_ok": {
+                      "type": "boolean"
+                    },
+                    "critique": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "term_rank_prompt",
+      "type": "code",
+      "position": {
+        "x": 1460,
+        "y": 860
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Final rank prompt",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "research_goal",
+            "label": "research_goal",
+            "type": "string"
+          },
+          {
+            "id": "pool_text",
+            "label": "pool_text",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "goal = str(research_goal or \"\").strip()\npool_text = str(pool_text or \"\").strip()\nparts = [\"You are the Ranking agent holding the FINAL Elo tournament over the finalist hypotheses. For each meaningful pair among the finalists, hold a scientific debate and output the winner id with a one-line reason. Rank on plausibility/correctness first, then testability, then novelty.\", \"\", \"## Research goal\", goal, \"\", \"## Finalist hypotheses (id, title, Elo, reviews)\", pool_text]\nreturn \"\\n\".join(parts)"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "term_rank",
+      "type": "llm_call",
+      "position": {
+        "x": 1800,
+        "y": 640
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Ranking agent (final tournament)",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "system": "You are the Ranking agent holding the final Elo tournament, ranking on plausibility first.",
+          "temperature": 0.3,
+          "resp_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "matches"
+            ],
+            "properties": {
+              "matches": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "a",
+                    "b",
+                    "winner",
+                    "reason"
+                  ],
+                  "properties": {
+                    "a": {
+                      "type": "number"
+                    },
+                    "b": {
+                      "type": "number"
+                    },
+                    "winner": {
+                      "type": "number"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "term_fold",
+      "type": "code",
+      "position": {
+        "x": 2140,
+        "y": 640
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Apply full review + final Elo",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "reviews",
+            "label": "reviews",
+            "type": "object"
+          },
+          {
+            "id": "matches",
+            "label": "matches",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "state = loop_state or {}\npool = {int(h[\"id\"]): dict(h) for h in (state.get(\"pool\") or []) if isinstance(h, dict)}\n\nfor r in ((reviews or {}).get(\"reviews\") or []):\n    if not isinstance(r, dict):\n        continue\n    hid = int(r.get(\"id\", -1))\n    if hid in pool:\n        pool[hid][\"reviews\"] = {\n            \"correctness\": r.get(\"correctness\"),\n            \"novelty\": r.get(\"novelty\"),\n            \"testability\": r.get(\"testability\"),\n            \"safety_ok\": r.get(\"safety_ok\"),\n            \"critique\": str(r.get(\"critique\") or \"\"),\n        }\n        pool[hid][\"reviewed\"] = True\n\nK = 32.0\nfor m in ((matches or {}).get(\"matches\") or []):\n    if not isinstance(m, dict):\n        continue\n    a = int(m.get(\"a\", -1)); b = int(m.get(\"b\", -1)); w = int(m.get(\"winner\", -1))\n    if a not in pool or b not in pool or a == b:\n        continue\n    Ra = float(pool[a].get(\"elo\", 1200.0)); Rb = float(pool[b].get(\"elo\", 1200.0))\n    Ea = 1.0 / (1.0 + (10.0 ** ((Rb - Ra) / 400.0)))\n    Eb = 1.0 - Ea\n    Sa = 1.0 if w == a else (0.5 if w not in (a, b) else 0.0)\n    Sb = 1.0 - Sa\n    pool[a][\"elo\"] = Ra + K * (Sa - Ea)\n    pool[b][\"elo\"] = Rb + K * (Sb - Eb)\n\nranked = sorted(pool.values(), key=lambda h: -float(h.get(\"elo\", 0)))\nreturn {\n    \"pool\": ranked,\n    \"cycle\": int(state.get(\"cycle\", 0) or 0),\n    \"next_id\": int(state.get(\"next_id\", len(pool)) or len(pool)),\n    \"literature\": str(state.get(\"literature\") or \"\"),\n    \"sources\": state.get(\"sources\") or [],\n    \"open_questions\": state.get(\"open_questions\") or [],\n    \"grounding_ok\": bool(state.get(\"grounding_ok\")),\n    \"warnings\": state.get(\"warnings\") or [],\n    \"feedback\": str(state.get(\"feedback\") or \"\"),\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_term_state",
+      "type": "set_var",
+      "position": {
+        "x": 2140,
+        "y": 480
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Persist final state",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "co.state"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_final_state",
+      "type": "get_var",
+      "position": {
+        "x": 780,
+        "y": 1000
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get co.state",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "co.state",
+          "default": {
+            "pool": [],
+            "cycle": 0,
+            "next_id": 0
+          }
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "final",
+      "type": "code",
+      "position": {
+        "x": 1120,
+        "y": 1000
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Rank final pool",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "loop_state",
+            "label": "loop_state",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "state = loop_state or {}\npool = state.get(\"pool\") or []\n# Correctness-floor gate (structural, not prompt-deep): a hypothesis that a\n# reviewer scored unsound (correctness < 5) or that was never reviewed cannot\n# hold the headline slot, no matter how many debates its ambition won. This\n# fixes the observed failure where the Elo tournament crowned a correctness-4,\n# novelty-9 hypothesis. Elo still orders within each tier — we only demote\n# unsound/unreviewed candidates BELOW sound ones, we do not distort the Elo.\nCORRECTNESS_FLOOR = 5.0\ndef _corr_val(h):\n    rv = h.get(\"reviews\") or {}\n    corr = rv.get(\"correctness\")\n    if isinstance(corr, bool):\n        return None\n    if isinstance(corr, int) or isinstance(corr, float):\n        return float(corr)\n    return None\ndef _unsafe(h):\n    # Only a reviewed, explicit False counts as unsafe (unreviewed/None is not).\n    rv = h.get(\"reviews\") or {}\n    return bool(h.get(\"reviewed\")) and (rv.get(\"safety_ok\") is False)\ndef _sort_key(h):\n    corr_v = _corr_val(h)\n    reviewed = bool(h.get(\"reviewed\")) and corr_v is not None\n    # tier 0 = reviewed, safe, sound; 1 = reviewed, safe, unsound;\n    # 2 = unreviewed; 3 = reviewed but flagged UNSAFE (never headline).\n    if _unsafe(h):\n        tier = 3\n    elif not reviewed:\n        tier = 2\n    elif corr_v < CORRECTNESS_FLOOR:\n        tier = 1\n    else:\n        tier = 0\n    return (tier, -float(h.get(\"elo\", 0)))\nranked = sorted(pool, key=_sort_key)\nout = []\nfor rank, h in enumerate(ranked, 1):\n    corr_v = _corr_val(h)\n    flags = []\n    if _unsafe(h):\n        flags.append(\"unsafe\")\n    if not bool(h.get(\"reviewed\")):\n        flags.append(\"unreviewed\")\n    elif corr_v is not None and corr_v < CORRECTNESS_FLOOR:\n        flags.append(\"low_correctness\")\n    out.append({\n        \"rank\": rank,\n        \"elo\": int(float(h.get(\"elo\", 0))),\n        \"reviewed\": bool(h.get(\"reviewed\")),\n        \"flags\": flags,\n        \"title\": h.get(\"title\"),\n        \"statement\": h.get(\"statement\"),\n        \"rationale\": h.get(\"rationale\"),\n        \"experiment\": h.get(\"experiment\"),\n        \"reviews\": h.get(\"reviews\") or {},\n    })\nwarnings = list(state.get(\"warnings\") or [])\nunreviewed = 0\nunsafe = 0\nfor h in out:\n    if not h.get(\"reviewed\"):\n        unreviewed = unreviewed + 1\n    if \"unsafe\" in (h.get(\"flags\") or []):\n        unsafe = unsafe + 1\nif unreviewed > 0:\n    warnings.append(\"#FALLBACK: \" + str(unreviewed) + \" finalist(s) reached the ranking without a completed review; flagged 'unreviewed' and demoted below reviewed hypotheses.\")\nif unsafe > 0:\n    warnings.append(\"#FALLBACK: \" + str(unsafe) + \" hypothesis(es) were flagged unsafe by the reviewer; flagged 'unsafe' and demoted below all safe hypotheses — do not action without human safety review.\")\nreturn {\n    \"ranked_hypotheses\": out,\n    \"top\": out[0] if out else {},\n    \"cycles\": int(state.get(\"cycle\", 0) or 0),\n    \"pool_size\": len(out),\n    \"sources\": state.get(\"sources\") or [],\n    \"literature\": str(state.get(\"literature\") or \"\"),\n    \"grounding_ok\": bool(state.get(\"grounding_ok\")),\n    \"warnings\": warnings,\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "meta_prompt",
+      "type": "code",
+      "position": {
+        "x": 1120,
+        "y": 1180
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Meta-review prompt",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "research_goal",
+            "label": "research_goal",
+            "type": "string"
+          },
+          {
+            "id": "final",
+            "label": "final",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "goal = str(research_goal or \"\").strip()\nranked = (final or {}).get(\"ranked_hypotheses\") or []\nlit = str((final or {}).get(\"literature\") or \"\").strip()\ntop = ranked[:5]\nparts = [\"You are the Meta-review agent. Synthesize the top-ranked hypotheses below into a rigorous research overview for a scientist: the most promising directions and WHY they rank highly (reference their reviews), how they relate to the current literature, the key open questions, and concrete suggested next experiments. FORMAT: write flowing PROSE in GitHub-flavored Markdown with section headings (##) — this is a human-readable research overview, NOT a data dump. Do NOT return JSON, do NOT wrap the answer in a code block. CRITICAL HONESTY RULE: these hypotheses are UNTESTED proposals. Never write that they 'report', 'demonstrate', 'achieve', or 'show' any result — no experiment was run. Present every quantitative figure as a hypothesized/expected TARGET to be tested, and do not assert benchmark results as if observed. If a hypothesis is flagged 'unreviewed' or 'low_correctness', say so rather than promoting it.\", \"\", \"## Research goal\", goal]\nif lit:\n    parts += [\"\", \"## Literature base\", lit[:2500]]\nparts += [\"\", \"## Top ranked hypotheses (with Elo + reviews)\"]\nfor h in top:\n    parts.append(\"### #\" + str(h.get(\"rank\")) + \" \" + str(h.get(\"title\")) + \" (Elo \" + str(h.get(\"elo\")) + \")\")\n    parts.append(str(h.get(\"statement\") or \"\"))\n    if h.get(\"experiment\"):\n        parts.append(\"Experiment: \" + str(h.get(\"experiment\")))\n    rv = h.get(\"reviews\") or {}\n    fl = h.get(\"flags\") or []\n    if fl:\n        parts.append(\"FLAGS: \" + \", \".join(fl) + \" (do not present a flagged hypothesis as a top recommendation without saying so).\")\n    if rv.get(\"critique\"):\n        parts.append(\"Reviewer note (corr=\" + str(rv.get(\"correctness\")) + \", nov=\" + str(rv.get(\"novelty\")) + \", safety_ok=\" + str(rv.get(\"safety_ok\")) + \"): \" + str(rv.get(\"critique\"))[:300])\n    parts.append(\"\")\nreturn \"\\n\".join(parts)"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "meta",
+      "type": "llm_call",
+      "position": {
+        "x": 1460,
+        "y": 1000
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Meta-review agent",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "system": "You are the Meta-review agent: you synthesize the tournament's top hypotheses and the literature into a rigorous research overview.",
+          "temperature": 0.4
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_ranked",
+      "type": "get",
+      "position": {
+        "x": 1800,
+        "y": 940
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get ranked_hypotheses",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "ranked_hypotheses",
+          "default": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_top",
+      "type": "get",
+      "position": {
+        "x": 1800,
+        "y": 1060
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get top",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "top",
+          "default": {}
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_cycles",
+      "type": "get",
+      "position": {
+        "x": 1800,
+        "y": 1180
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get cycles",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "cycles",
+          "default": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_sources",
+      "type": "get",
+      "position": {
+        "x": 1800,
+        "y": 1300
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get sources",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "sources",
+          "default": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "get_warnings",
+      "type": "get",
+      "position": {
+        "x": 1800,
+        "y": 1420
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get warnings",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "warnings",
+          "default": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "report_md",
+      "type": "code",
+      "position": {
+        "x": 2140,
+        "y": 1180
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Assemble report markdown",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "research_goal",
+            "label": "research_goal",
+            "type": "string"
+          },
+          {
+            "id": "overview",
+            "label": "overview",
+            "type": "string"
+          },
+          {
+            "id": "final",
+            "label": "final",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "goal = str(research_goal or \"\").strip()\noverview = str(overview or \"\").strip()\ndata = final or {}\nranked = data.get(\"ranked_hypotheses\") or []\nsources = data.get(\"sources\") or []\nwarns = data.get(\"warnings\") or []\ncycles = data.get(\"cycles\")\nlines = []\nlines.append(\"# AI Co-Scientist — Research Overview\")\nlines.append(\"\")\nlines.append(\"**Research goal:** \" + goal)\nlines.append(\"\")\nlines.append(\"*Generated by the AbstractFlow co-scientist workflow: a literature-grounded multi-agent hypothesis engine (generation -> reflection -> Elo tournament -> evolution -> research expansion over \" + str(cycles) + \" supervisor cycles, then a search-grounded full review). The hypotheses below are UNTESTED, ranked proposals for future work, not established results.*\")\nlines.append(\"\")\nif warns:\n    lines.append(\"> **Caveats:**\")\n    for w in warns:\n        lines.append(\"> - \" + str(w))\n    lines.append(\"\")\nlines.append(\"---\")\nlines.append(\"\")\nlines.append(\"## Research Overview\")\nlines.append(\"\")\nlines.append(overview if overview else \"_(no overview generated)_\")\nlines.append(\"\")\nlines.append(\"---\")\nlines.append(\"\")\nlines.append(\"## Ranked Hypotheses\")\nlines.append(\"\")\nfor h in ranked:\n    rv = h.get(\"reviews\") or {}\n    fl = h.get(\"flags\") or []\n    head = \"### #\" + str(h.get(\"rank\")) + \". \" + str(h.get(\"title\") or \"(untitled)\")\n    lines.append(head)\n    lines.append(\"\")\n    meta_bits = [\"Elo \" + str(h.get(\"elo\"))]\n    if rv.get(\"correctness\") is not None:\n        meta_bits.append(\"correctness \" + str(rv.get(\"correctness\")) + \"/10\")\n    if rv.get(\"novelty\") is not None:\n        meta_bits.append(\"novelty \" + str(rv.get(\"novelty\")) + \"/10\")\n    if rv.get(\"testability\") is not None:\n        meta_bits.append(\"testability \" + str(rv.get(\"testability\")) + \"/10\")\n    if fl:\n        meta_bits.append(\"FLAGS: \" + \", \".join(fl))\n    lines.append(\"*\" + \" | \".join(meta_bits) + \"*\")\n    lines.append(\"\")\n    if h.get(\"statement\"):\n        lines.append(\"**Hypothesis.** \" + str(h.get(\"statement\")))\n        lines.append(\"\")\n    if h.get(\"rationale\"):\n        lines.append(\"**Rationale.** \" + str(h.get(\"rationale\")))\n        lines.append(\"\")\n    if h.get(\"experiment\"):\n        lines.append(\"**Proposed experiment.** \" + str(h.get(\"experiment\")))\n        lines.append(\"\")\n    if rv.get(\"critique\"):\n        lines.append(\"**Reviewer critique.** \" + str(rv.get(\"critique\")))\n        lines.append(\"\")\nlines.append(\"---\")\nlines.append(\"\")\nlines.append(\"## Literature Sources\")\nlines.append(\"\")\nif sources:\n    for s in sources:\n        if not isinstance(s, dict):\n            continue\n        title = str(s.get(\"title\") or \"\").strip()\n        url = str(s.get(\"url\") or \"\").strip()\n        mark = \"\" if s.get(\"fetched\") else \" _(unfetched)_\"\n        take = str(s.get(\"takeaway\") or \"\").strip()\n        line = \"- **\" + title + \"**\" + mark\n        if url:\n            line = line + \" — <\" + url + \">\"\n        if take:\n            line = line + \" — \" + take\n        lines.append(line)\nelse:\n    lines.append(\"_(no sources gathered)_\")\nlines.append(\"\")\nreturn \"\\n\".join(lines)"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "run_ts",
+      "type": "system_datetime",
+      "position": {
+        "x": 2140,
+        "y": 1320
+      },
+      "data": {
+        "nodeType": "system_datetime",
+        "label": "Timestamp",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "iso",
+            "label": "iso",
+            "type": "string"
+          },
+          {
+            "id": "timezone",
+            "label": "timezone",
+            "type": "string"
+          },
+          {
+            "id": "utc_offset_minutes",
+            "label": "utc_offset_minutes",
+            "type": "number"
+          },
+          {
+            "id": "locale",
+            "label": "locale",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "export_paths",
+      "type": "code",
+      "position": {
+        "x": 2140,
+        "y": 1460
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Build export paths",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "iso",
+            "label": "iso",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "raw = str(iso or \"\").strip()\nsafe = \"\"\nfor ch in raw:\n    if ch == \":\" or ch == \".\":\n        safe = safe + \"-\"\n    elif ch == \"+\":\n        safe = safe + \"_\"\n    else:\n        safe = safe + ch\nif not safe:\n    safe = \"report\"\nprefix = \"reports/co-scientist-research\"\nreturn {\n    \"md\": prefix + \"-\" + safe + \".md\",\n    \"pdf\": prefix + \"-\" + safe + \".pdf\",\n    \"docx\": prefix + \"-\" + safe + \".docx\",\n    \"timestamp\": safe,\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "report_title",
+      "type": "code",
+      "position": {
+        "x": 2140,
+        "y": 1600
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Report title",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "research_goal",
+            "label": "research_goal",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "goal = str(research_goal or \"\").strip()\nt = \"AI Co-Scientist Research Overview\"\nif goal:\n    t = t + \": \" + goal\nreturn t[:160]"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "write_md",
+      "type": "write_file",
+      "position": {
+        "x": 2480,
+        "y": 1000
+      },
+      "data": {
+        "nodeType": "write_file",
+        "label": "Write .md",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "file_path",
+            "label": "file_path",
+            "type": "workspace_file"
+          },
+          {
+            "id": "content",
+            "label": "content",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "bytes",
+            "label": "bytes",
+            "type": "number"
+          },
+          {
+            "id": "file_path",
+            "label": "file_path",
+            "type": "workspace_file"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "write_pdf",
+      "type": "write_pdf",
+      "position": {
+        "x": 2480,
+        "y": 1180
+      },
+      "data": {
+        "nodeType": "write_pdf",
+        "label": "Write .pdf",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "file_path",
+            "label": "file_path",
+            "type": "workspace_file"
+          },
+          {
+            "id": "content",
+            "label": "content",
+            "type": "any"
+          },
+          {
+            "id": "title",
+            "label": "title",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "bytes",
+            "label": "bytes",
+            "type": "number"
+          },
+          {
+            "id": "file_path",
+            "label": "file_path",
+            "type": "workspace_file"
+          },
+          {
+            "id": "sha256",
+            "label": "sha256",
+            "type": "string"
+          },
+          {
+            "id": "content_type",
+            "label": "content_type",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "write_docx",
+      "type": "write_docx",
+      "position": {
+        "x": 2480,
+        "y": 1360
+      },
+      "data": {
+        "nodeType": "write_docx",
+        "label": "Write .docx",
+        "icon": "&#x25A1;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "file_path",
+            "label": "file_path",
+            "type": "workspace_file"
+          },
+          {
+            "id": "content",
+            "label": "content",
+            "type": "any"
+          },
+          {
+            "id": "title",
+            "label": "title",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "bytes",
+            "label": "bytes",
+            "type": "number"
+          },
+          {
+            "id": "file_path",
+            "label": "file_path",
+            "type": "workspace_file"
+          },
+          {
+            "id": "sha256",
+            "label": "sha256",
+            "type": "string"
+          },
+          {
+            "id": "content_type",
+            "label": "content_type",
+            "type": "string"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 2820,
+        "y": 1000
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Research overview",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "research_overview",
+            "label": "research_overview",
+            "type": "string"
+          },
+          {
+            "id": "report_markdown",
+            "label": "report_markdown",
+            "type": "string"
+          },
+          {
+            "id": "ranked_hypotheses",
+            "label": "ranked_hypotheses",
+            "type": "array"
+          },
+          {
+            "id": "top_hypothesis",
+            "label": "top_hypothesis",
+            "type": "object"
+          },
+          {
+            "id": "sources",
+            "label": "sources",
+            "type": "array"
+          },
+          {
+            "id": "warnings",
+            "label": "warnings",
+            "type": "array"
+          },
+          {
+            "id": "cycles",
+            "label": "cycles",
+            "type": "number"
+          },
+          {
+            "id": "md_path",
+            "label": "md_path",
+            "type": "workspace_file"
+          },
+          {
+            "id": "pdf_path",
+            "label": "pdf_path",
+            "type": "workspace_file"
+          },
+          {
+            "id": "docx_path",
+            "label": "docx_path",
+            "type": "workspace_file"
+          },
+          {
+            "id": "pdf_sha256",
+            "label": "pdf_sha256",
+            "type": "string"
+          },
+          {
+            "id": "docx_sha256",
+            "label": "docx_sha256",
+            "type": "string"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-exec-out-plan-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "plan",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-plan-exec-out-ground-exec-in",
+      "source": "plan",
+      "sourceHandle": "exec-out",
+      "target": "ground",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-ground-exec-out-generate-exec-in",
+      "source": "ground",
+      "sourceHandle": "exec-out",
+      "target": "generate",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-generate-exec-out-set_init-exec-in",
+      "source": "generate",
+      "sourceHandle": "exec-out",
+      "target": "set_init",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-set_init-exec-out-cycles-exec-in",
+      "source": "set_init",
+      "sourceHandle": "exec-out",
+      "target": "cycles",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-cycles-loop-reflect-exec-in",
+      "source": "cycles",
+      "sourceHandle": "loop",
+      "target": "reflect",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-reflect-exec-out-rank-exec-in",
+      "source": "reflect",
+      "sourceHandle": "exec-out",
+      "target": "rank",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-rank-exec-out-evolve-exec-in",
+      "source": "rank",
+      "sourceHandle": "exec-out",
+      "target": "evolve",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-evolve-exec-out-expand-exec-in",
+      "source": "evolve",
+      "sourceHandle": "exec-out",
+      "target": "expand",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-expand-exec-out-set_state-exec-in",
+      "source": "expand",
+      "sourceHandle": "exec-out",
+      "target": "set_state",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-cycles-done-term_reflect-exec-in",
+      "source": "cycles",
+      "sourceHandle": "done",
+      "target": "term_reflect",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-term_reflect-exec-out-term_rank-exec-in",
+      "source": "term_reflect",
+      "sourceHandle": "exec-out",
+      "target": "term_rank",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-term_rank-exec-out-set_term_state-exec-in",
+      "source": "term_rank",
+      "sourceHandle": "exec-out",
+      "target": "set_term_state",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-set_term_state-exec-out-meta-exec-in",
+      "source": "set_term_state",
+      "sourceHandle": "exec-out",
+      "target": "meta",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-meta-exec-out-write_md-exec-in",
+      "source": "meta",
+      "sourceHandle": "exec-out",
+      "target": "write_md",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-write_md-exec-out-write_pdf-exec-in",
+      "source": "write_md",
+      "sourceHandle": "exec-out",
+      "target": "write_pdf",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-write_pdf-exec-out-write_docx-exec-in",
+      "source": "write_pdf",
+      "sourceHandle": "exec-out",
+      "target": "write_docx",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-write_docx-exec-out-end-exec-in",
+      "source": "write_docx",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-start-research_goal-plan_input-research_goal",
+      "source": "start",
+      "sourceHandle": "research_goal",
+      "target": "plan_input",
+      "targetHandle": "research_goal",
+      "animated": false
+    },
+    {
+      "id": "e-start-effort-plan_input-effort",
+      "source": "start",
+      "sourceHandle": "effort",
+      "target": "plan_input",
+      "targetHandle": "effort",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-plan_input-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "plan_input",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-plan_input-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "plan_input",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-plan_input-output-plan-input",
+      "source": "plan_input",
+      "sourceHandle": "output",
+      "target": "plan",
+      "targetHandle": "input",
+      "animated": false
+    },
+    {
+      "id": "e-plan-output-get_plan-object",
+      "source": "plan",
+      "sourceHandle": "output",
+      "target": "get_plan",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-start-research_goal-ground_input-research_goal",
+      "source": "start",
+      "sourceHandle": "research_goal",
+      "target": "ground_input",
+      "targetHandle": "research_goal",
+      "animated": false
+    },
+    {
+      "id": "e-start-effort-ground_input-effort",
+      "source": "start",
+      "sourceHandle": "effort",
+      "target": "ground_input",
+      "targetHandle": "effort",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-ground_input-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "ground_input",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-ground_input-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "ground_input",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-get_plan-value-ground_input-plan",
+      "source": "get_plan",
+      "sourceHandle": "value",
+      "target": "ground_input",
+      "targetHandle": "plan",
+      "animated": false
+    },
+    {
+      "id": "e-ground_input-output-ground-input",
+      "source": "ground_input",
+      "sourceHandle": "output",
+      "target": "ground",
+      "targetHandle": "input",
+      "animated": false
+    },
+    {
+      "id": "e-ground-output-get_investigation-object",
+      "source": "ground",
+      "sourceHandle": "output",
+      "target": "get_investigation",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-get_investigation-value-lit_base-investigation",
+      "source": "get_investigation",
+      "sourceHandle": "value",
+      "target": "lit_base",
+      "targetHandle": "investigation",
+      "animated": false
+    },
+    {
+      "id": "e-start-research_goal-gen_prompt-research_goal",
+      "source": "start",
+      "sourceHandle": "research_goal",
+      "target": "gen_prompt",
+      "targetHandle": "research_goal",
+      "animated": false
+    },
+    {
+      "id": "e-start-num_hypotheses-gen_prompt-num_hypotheses",
+      "source": "start",
+      "sourceHandle": "num_hypotheses",
+      "target": "gen_prompt",
+      "targetHandle": "num_hypotheses",
+      "animated": false
+    },
+    {
+      "id": "e-lit_base-text-gen_prompt-literature",
+      "source": "lit_base",
+      "sourceHandle": "text",
+      "target": "gen_prompt",
+      "targetHandle": "literature",
+      "animated": false
+    },
+    {
+      "id": "e-gen_prompt-output-generate-prompt",
+      "source": "gen_prompt",
+      "sourceHandle": "output",
+      "target": "generate",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-generate-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "generate",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-generate-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "generate",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-generate-data-init_state-generated",
+      "source": "generate",
+      "sourceHandle": "data",
+      "target": "init_state",
+      "targetHandle": "generated",
+      "animated": false
+    },
+    {
+      "id": "e-lit_base-text-init_state-literature_text",
+      "source": "lit_base",
+      "sourceHandle": "text",
+      "target": "init_state",
+      "targetHandle": "literature_text",
+      "animated": false
+    },
+    {
+      "id": "e-lit_base-sources-init_state-sources",
+      "source": "lit_base",
+      "sourceHandle": "sources",
+      "target": "init_state",
+      "targetHandle": "sources",
+      "animated": false
+    },
+    {
+      "id": "e-lit_base-open_questions-init_state-open_questions",
+      "source": "lit_base",
+      "sourceHandle": "open_questions",
+      "target": "init_state",
+      "targetHandle": "open_questions",
+      "animated": false
+    },
+    {
+      "id": "e-lit_base-grounding_ok-init_state-grounding_ok",
+      "source": "lit_base",
+      "sourceHandle": "grounding_ok",
+      "target": "init_state",
+      "targetHandle": "grounding_ok",
+      "animated": false
+    },
+    {
+      "id": "e-lit_base-warnings-init_state-warnings",
+      "source": "lit_base",
+      "sourceHandle": "warnings",
+      "target": "init_state",
+      "targetHandle": "warnings",
+      "animated": false
+    },
+    {
+      "id": "e-init_state-output-set_init-value",
+      "source": "init_state",
+      "sourceHandle": "output",
+      "target": "set_init",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-get_state-value-loop_cond-loop_state",
+      "source": "get_state",
+      "sourceHandle": "value",
+      "target": "loop_cond",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-start-max_cycles-loop_cond-max_cycles",
+      "source": "start",
+      "sourceHandle": "max_cycles",
+      "target": "loop_cond",
+      "targetHandle": "max_cycles",
+      "animated": false
+    },
+    {
+      "id": "e-loop_cond-condition-cycles-condition",
+      "source": "loop_cond",
+      "sourceHandle": "condition",
+      "target": "cycles",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_body-value-pool_text-loop_state",
+      "source": "get_state_body",
+      "sourceHandle": "value",
+      "target": "pool_text",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_body-value-ctx-loop_state",
+      "source": "get_state_body",
+      "sourceHandle": "value",
+      "target": "ctx",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_body-value-rank_pairs-loop_state",
+      "source": "get_state_body",
+      "sourceHandle": "value",
+      "target": "rank_pairs",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-start-research_goal-reflect_prompt-research_goal",
+      "source": "start",
+      "sourceHandle": "research_goal",
+      "target": "reflect_prompt",
+      "targetHandle": "research_goal",
+      "animated": false
+    },
+    {
+      "id": "e-pool_text-output-reflect_prompt-pool_text",
+      "source": "pool_text",
+      "sourceHandle": "output",
+      "target": "reflect_prompt",
+      "targetHandle": "pool_text",
+      "animated": false
+    },
+    {
+      "id": "e-ctx-literature-reflect_prompt-literature",
+      "source": "ctx",
+      "sourceHandle": "literature",
+      "target": "reflect_prompt",
+      "targetHandle": "literature",
+      "animated": false
+    },
+    {
+      "id": "e-ctx-feedback-reflect_prompt-feedback",
+      "source": "ctx",
+      "sourceHandle": "feedback",
+      "target": "reflect_prompt",
+      "targetHandle": "feedback",
+      "animated": false
+    },
+    {
+      "id": "e-reflect_prompt-output-reflect-prompt",
+      "source": "reflect_prompt",
+      "sourceHandle": "output",
+      "target": "reflect",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-reflect-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "reflect",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-reflect-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "reflect",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-research_goal-rank_prompt-research_goal",
+      "source": "start",
+      "sourceHandle": "research_goal",
+      "target": "rank_prompt",
+      "targetHandle": "research_goal",
+      "animated": false
+    },
+    {
+      "id": "e-pool_text-output-rank_prompt-pool_text",
+      "source": "pool_text",
+      "sourceHandle": "output",
+      "target": "rank_prompt",
+      "targetHandle": "pool_text",
+      "animated": false
+    },
+    {
+      "id": "e-rank_pairs-text-rank_prompt-pairs",
+      "source": "rank_pairs",
+      "sourceHandle": "text",
+      "target": "rank_prompt",
+      "targetHandle": "pairs",
+      "animated": false
+    },
+    {
+      "id": "e-ctx-feedback-rank_prompt-feedback",
+      "source": "ctx",
+      "sourceHandle": "feedback",
+      "target": "rank_prompt",
+      "targetHandle": "feedback",
+      "animated": false
+    },
+    {
+      "id": "e-rank_prompt-output-rank-prompt",
+      "source": "rank_prompt",
+      "sourceHandle": "output",
+      "target": "rank",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-rank-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "rank",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-rank-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "rank",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-research_goal-evolve_prompt-research_goal",
+      "source": "start",
+      "sourceHandle": "research_goal",
+      "target": "evolve_prompt",
+      "targetHandle": "research_goal",
+      "animated": false
+    },
+    {
+      "id": "e-pool_text-output-evolve_prompt-pool_text",
+      "source": "pool_text",
+      "sourceHandle": "output",
+      "target": "evolve_prompt",
+      "targetHandle": "pool_text",
+      "animated": false
+    },
+    {
+      "id": "e-ctx-literature-evolve_prompt-literature",
+      "source": "ctx",
+      "sourceHandle": "literature",
+      "target": "evolve_prompt",
+      "targetHandle": "literature",
+      "animated": false
+    },
+    {
+      "id": "e-ctx-feedback-evolve_prompt-feedback",
+      "source": "ctx",
+      "sourceHandle": "feedback",
+      "target": "evolve_prompt",
+      "targetHandle": "feedback",
+      "animated": false
+    },
+    {
+      "id": "e-evolve_prompt-output-evolve-prompt",
+      "source": "evolve_prompt",
+      "sourceHandle": "output",
+      "target": "evolve",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-evolve-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "evolve",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-evolve-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "evolve",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-research_goal-expand_prompt-research_goal",
+      "source": "start",
+      "sourceHandle": "research_goal",
+      "target": "expand_prompt",
+      "targetHandle": "research_goal",
+      "animated": false
+    },
+    {
+      "id": "e-pool_text-output-expand_prompt-pool_text",
+      "source": "pool_text",
+      "sourceHandle": "output",
+      "target": "expand_prompt",
+      "targetHandle": "pool_text",
+      "animated": false
+    },
+    {
+      "id": "e-ctx-literature-expand_prompt-literature",
+      "source": "ctx",
+      "sourceHandle": "literature",
+      "target": "expand_prompt",
+      "targetHandle": "literature",
+      "animated": false
+    },
+    {
+      "id": "e-ctx-open_questions-expand_prompt-open_questions",
+      "source": "ctx",
+      "sourceHandle": "open_questions",
+      "target": "expand_prompt",
+      "targetHandle": "open_questions",
+      "animated": false
+    },
+    {
+      "id": "e-expand_prompt-output-expand-prompt",
+      "source": "expand_prompt",
+      "sourceHandle": "output",
+      "target": "expand",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-expand-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "expand",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-expand-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "expand",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-get_state_body-value-fold-loop_state",
+      "source": "get_state_body",
+      "sourceHandle": "value",
+      "target": "fold",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-reflect-data-fold-reviews",
+      "source": "reflect",
+      "sourceHandle": "data",
+      "target": "fold",
+      "targetHandle": "reviews",
+      "animated": false
+    },
+    {
+      "id": "e-rank-data-fold-matches",
+      "source": "rank",
+      "sourceHandle": "data",
+      "target": "fold",
+      "targetHandle": "matches",
+      "animated": false
+    },
+    {
+      "id": "e-evolve-data-fold-evolved",
+      "source": "evolve",
+      "sourceHandle": "data",
+      "target": "fold",
+      "targetHandle": "evolved",
+      "animated": false
+    },
+    {
+      "id": "e-expand-data-fold-expanded",
+      "source": "expand",
+      "sourceHandle": "data",
+      "target": "fold",
+      "targetHandle": "expanded",
+      "animated": false
+    },
+    {
+      "id": "e-fold-output-set_state-value",
+      "source": "fold",
+      "sourceHandle": "output",
+      "target": "set_state",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-get_term_state-value-term_pool_text-loop_state",
+      "source": "get_term_state",
+      "sourceHandle": "value",
+      "target": "term_pool_text",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-start-research_goal-term_reflect_prompt-research_goal",
+      "source": "start",
+      "sourceHandle": "research_goal",
+      "target": "term_reflect_prompt",
+      "targetHandle": "research_goal",
+      "animated": false
+    },
+    {
+      "id": "e-term_pool_text-output-term_reflect_prompt-pool_text",
+      "source": "term_pool_text",
+      "sourceHandle": "output",
+      "target": "term_reflect_prompt",
+      "targetHandle": "pool_text",
+      "animated": false
+    },
+    {
+      "id": "e-term_reflect_prompt-output-term_reflect-prompt",
+      "source": "term_reflect_prompt",
+      "sourceHandle": "output",
+      "target": "term_reflect",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-term_reflect-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "term_reflect",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-term_reflect-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "term_reflect",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-research_goal-term_rank_prompt-research_goal",
+      "source": "start",
+      "sourceHandle": "research_goal",
+      "target": "term_rank_prompt",
+      "targetHandle": "research_goal",
+      "animated": false
+    },
+    {
+      "id": "e-term_pool_text-output-term_rank_prompt-pool_text",
+      "source": "term_pool_text",
+      "sourceHandle": "output",
+      "target": "term_rank_prompt",
+      "targetHandle": "pool_text",
+      "animated": false
+    },
+    {
+      "id": "e-term_rank_prompt-output-term_rank-prompt",
+      "source": "term_rank_prompt",
+      "sourceHandle": "output",
+      "target": "term_rank",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-term_rank-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "term_rank",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-term_rank-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "term_rank",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-get_term_state-value-term_fold-loop_state",
+      "source": "get_term_state",
+      "sourceHandle": "value",
+      "target": "term_fold",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-term_reflect-data-term_fold-reviews",
+      "source": "term_reflect",
+      "sourceHandle": "data",
+      "target": "term_fold",
+      "targetHandle": "reviews",
+      "animated": false
+    },
+    {
+      "id": "e-term_rank-data-term_fold-matches",
+      "source": "term_rank",
+      "sourceHandle": "data",
+      "target": "term_fold",
+      "targetHandle": "matches",
+      "animated": false
+    },
+    {
+      "id": "e-term_fold-output-set_term_state-value",
+      "source": "term_fold",
+      "sourceHandle": "output",
+      "target": "set_term_state",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-get_final_state-value-final-loop_state",
+      "source": "get_final_state",
+      "sourceHandle": "value",
+      "target": "final",
+      "targetHandle": "loop_state",
+      "animated": false
+    },
+    {
+      "id": "e-start-research_goal-meta_prompt-research_goal",
+      "source": "start",
+      "sourceHandle": "research_goal",
+      "target": "meta_prompt",
+      "targetHandle": "research_goal",
+      "animated": false
+    },
+    {
+      "id": "e-final-output-meta_prompt-final",
+      "source": "final",
+      "sourceHandle": "output",
+      "target": "meta_prompt",
+      "targetHandle": "final",
+      "animated": false
+    },
+    {
+      "id": "e-meta_prompt-output-meta-prompt",
+      "source": "meta_prompt",
+      "sourceHandle": "output",
+      "target": "meta",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-meta-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "meta",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-meta-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "meta",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-final-output-get_ranked-object",
+      "source": "final",
+      "sourceHandle": "output",
+      "target": "get_ranked",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-final-output-get_top-object",
+      "source": "final",
+      "sourceHandle": "output",
+      "target": "get_top",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-final-output-get_cycles-object",
+      "source": "final",
+      "sourceHandle": "output",
+      "target": "get_cycles",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-final-output-get_sources-object",
+      "source": "final",
+      "sourceHandle": "output",
+      "target": "get_sources",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-final-output-get_warnings-object",
+      "source": "final",
+      "sourceHandle": "output",
+      "target": "get_warnings",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
+      "id": "e-meta-response-end-research_overview",
+      "source": "meta",
+      "sourceHandle": "response",
+      "target": "end",
+      "targetHandle": "research_overview",
+      "animated": false
+    },
+    {
+      "id": "e-get_ranked-value-end-ranked_hypotheses",
+      "source": "get_ranked",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "ranked_hypotheses",
+      "animated": false
+    },
+    {
+      "id": "e-get_top-value-end-top_hypothesis",
+      "source": "get_top",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "top_hypothesis",
+      "animated": false
+    },
+    {
+      "id": "e-get_cycles-value-end-cycles",
+      "source": "get_cycles",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "cycles",
+      "animated": false
+    },
+    {
+      "id": "e-get_sources-value-end-sources",
+      "source": "get_sources",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "sources",
+      "animated": false
+    },
+    {
+      "id": "e-get_warnings-value-end-warnings",
+      "source": "get_warnings",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "warnings",
+      "animated": false
+    },
+    {
+      "id": "e-start-research_goal-report_md-research_goal",
+      "source": "start",
+      "sourceHandle": "research_goal",
+      "target": "report_md",
+      "targetHandle": "research_goal",
+      "animated": false
+    },
+    {
+      "id": "e-meta-response-report_md-overview",
+      "source": "meta",
+      "sourceHandle": "response",
+      "target": "report_md",
+      "targetHandle": "overview",
+      "animated": false
+    },
+    {
+      "id": "e-final-output-report_md-final",
+      "source": "final",
+      "sourceHandle": "output",
+      "target": "report_md",
+      "targetHandle": "final",
+      "animated": false
+    },
+    {
+      "id": "e-run_ts-iso-export_paths-iso",
+      "source": "run_ts",
+      "sourceHandle": "iso",
+      "target": "export_paths",
+      "targetHandle": "iso",
+      "animated": false
+    },
+    {
+      "id": "e-start-research_goal-report_title-research_goal",
+      "source": "start",
+      "sourceHandle": "research_goal",
+      "target": "report_title",
+      "targetHandle": "research_goal",
+      "animated": false
+    },
+    {
+      "id": "e-export_paths-md-write_md-file_path",
+      "source": "export_paths",
+      "sourceHandle": "md",
+      "target": "write_md",
+      "targetHandle": "file_path",
+      "animated": false
+    },
+    {
+      "id": "e-report_md-output-write_md-content",
+      "source": "report_md",
+      "sourceHandle": "output",
+      "target": "write_md",
+      "targetHandle": "content",
+      "animated": false
+    },
+    {
+      "id": "e-export_paths-pdf-write_pdf-file_path",
+      "source": "export_paths",
+      "sourceHandle": "pdf",
+      "target": "write_pdf",
+      "targetHandle": "file_path",
+      "animated": false
+    },
+    {
+      "id": "e-report_md-output-write_pdf-content",
+      "source": "report_md",
+      "sourceHandle": "output",
+      "target": "write_pdf",
+      "targetHandle": "content",
+      "animated": false
+    },
+    {
+      "id": "e-report_title-output-write_pdf-title",
+      "source": "report_title",
+      "sourceHandle": "output",
+      "target": "write_pdf",
+      "targetHandle": "title",
+      "animated": false
+    },
+    {
+      "id": "e-export_paths-docx-write_docx-file_path",
+      "source": "export_paths",
+      "sourceHandle": "docx",
+      "target": "write_docx",
+      "targetHandle": "file_path",
+      "animated": false
+    },
+    {
+      "id": "e-report_md-output-write_docx-content",
+      "source": "report_md",
+      "sourceHandle": "output",
+      "target": "write_docx",
+      "targetHandle": "content",
+      "animated": false
+    },
+    {
+      "id": "e-report_title-output-write_docx-title",
+      "source": "report_title",
+      "sourceHandle": "output",
+      "target": "write_docx",
+      "targetHandle": "title",
+      "animated": false
+    },
+    {
+      "id": "e-report_md-output-end-report_markdown",
+      "source": "report_md",
+      "sourceHandle": "output",
+      "target": "end",
+      "targetHandle": "report_markdown",
+      "animated": false
+    },
+    {
+      "id": "e-write_md-file_path-end-md_path",
+      "source": "write_md",
+      "sourceHandle": "file_path",
+      "target": "end",
+      "targetHandle": "md_path",
+      "animated": false
+    },
+    {
+      "id": "e-write_pdf-file_path-end-pdf_path",
+      "source": "write_pdf",
+      "sourceHandle": "file_path",
+      "target": "end",
+      "targetHandle": "pdf_path",
+      "animated": false
+    },
+    {
+      "id": "e-write_docx-file_path-end-docx_path",
+      "source": "write_docx",
+      "sourceHandle": "file_path",
+      "target": "end",
+      "targetHandle": "docx_path",
+      "animated": false
+    },
+    {
+      "id": "e-write_pdf-sha256-end-pdf_sha256",
+      "source": "write_pdf",
+      "sourceHandle": "sha256",
+      "target": "end",
+      "targetHandle": "pdf_sha256",
+      "animated": false
+    },
+    {
+      "id": "e-write_docx-sha256-end-docx_sha256",
+      "source": "write_docx",
+      "sourceHandle": "sha256",
+      "target": "end",
+      "targetHandle": "docx_sha256",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-07-15T00:49:47.745077+00:00",
+  "updated_at": "2026-07-15T00:49:47.745077+00:00"
+}

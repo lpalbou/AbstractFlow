@@ -3,7 +3,6 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { Canvas } from './components/Canvas';
-import { AppearanceModal, type AppearanceSettings } from './components/AppearanceModal';
 import {
   GatewayConnectionModal,
   clearGatewayConnection,
@@ -15,7 +14,12 @@ import { NodePalette } from './components/NodePalette';
 import { PropertiesPanel } from './components/PropertiesPanel';
 import { Toolbar } from './components/Toolbar';
 import { useFlowStore } from './hooks/useFlow';
-import { applyTheme, applyTypography } from '@abstractframework/ui-kit';
+import {
+  AfAppearanceDialog,
+  AfTopBarActions,
+  useAppearanceSettings,
+  type GatewayConnectionPhase,
+} from '@abstractframework/ui-kit';
 import { registerMonitorGpuWidget } from '@abstractframework/monitor-gpu';
 
 function flag_enabled(value: unknown): boolean {
@@ -47,40 +51,23 @@ function has_browser_gateway_session(status: GatewayConnectionStatus | null): bo
   return true;
 }
 
-const UI_SETTINGS_KEY = 'abstractflow_ui_settings_v1';
 type RightDrawerMode = 'assistant' | 'properties' | null;
-
-function load_appearance_settings(): AppearanceSettings {
-  try {
-    const raw = localStorage.getItem(UI_SETTINGS_KEY);
-    if (!raw) throw new Error('missing');
-    const parsed = JSON.parse(raw);
-    return {
-      theme: String(parsed?.theme || 'dark').trim() || 'dark',
-      font_scale: String(parsed?.font_scale || parsed?.fontScale || 'md').trim() || 'md',
-      header_density: String(parsed?.header_density || parsed?.headerDensity || 'standard').trim() || 'standard',
-    };
-  } catch {
-    return { theme: 'dark', font_scale: 'md', header_density: 'standard' };
-  }
-}
-
-function save_appearance_settings(value: AppearanceSettings): void {
-  try {
-    localStorage.setItem(UI_SETTINGS_KEY, JSON.stringify(value));
-  } catch {
-    // ignore
-  }
-}
 
 function App() {
   const { selectedNode } = useFlowStore();
   const queryClient = useQueryClient();
   const gpu_enabled = monitor_gpu_enabled();
   const monitor_gpu_ref = useRef<HTMLElement | null>(null);
-  const [appearance, set_appearance] = useState<AppearanceSettings>(() => load_appearance_settings());
+  // Kit-owned appearance persistence (af_appearance_abstractflow_v1) with a
+  // one-time migration from flow's legacy abstractflow_ui_settings_v1 key.
+  // The hook applies theme + typography itself (synchronously on first load,
+  // so there is no default-theme flash).
+  const [appearance, set_appearance] = useAppearanceSettings('abstractflow', {
+    legacyKey: 'abstractflow_ui_settings_v1',
+  });
   const [show_appearance, set_show_appearance] = useState(false);
   const [show_connection, set_show_connection] = useState(false);
+  const [signing_out, set_signing_out] = useState(false);
   const [connection_checked, set_connection_checked] = useState(false);
   const [connection_status, set_connection_status] = useState<GatewayConnectionStatus | null>(null);
   const [connection_required, set_connection_required] = useState(false);
@@ -120,18 +107,6 @@ function App() {
   }, [gpu_enabled]);
 
   useEffect(() => {
-    save_appearance_settings(appearance);
-  }, [appearance]);
-
-  useEffect(() => {
-    applyTheme(appearance.theme);
-  }, [appearance.theme]);
-
-  useEffect(() => {
-    applyTypography({ font_scale: appearance.font_scale, header_density: appearance.header_density });
-  }, [appearance.font_scale, appearance.header_density]);
-
-  useEffect(() => {
     let cancelled = false;
     fetchGatewayConnection()
       .then((status) => {
@@ -164,6 +139,7 @@ function App() {
   };
 
   const handle_disconnect = async () => {
+    set_signing_out(true);
     try {
       await clearGatewayConnection();
       set_connection_status(null);
@@ -174,8 +150,18 @@ function App() {
       toast.success('Disconnected from gateway');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to disconnect gateway');
+    } finally {
+      set_signing_out(false);
     }
   };
+
+  // Three states, never a boolean — the kit pill renders "Connecting…" during
+  // the boot probe instead of flashing "Connect" over a live session.
+  const connection_phase: GatewayConnectionPhase = !connection_checked
+    ? 'loading'
+    : gateway_connected
+      ? 'connected'
+      : 'disconnected';
 
   if (!connection_checked || !gateway_connected) {
     return (
@@ -211,36 +197,47 @@ function App() {
           <span className="logo-icon">&#x1F300;</span>
           <span className="logo-text">AbstractFlow</span>
         </div>
-        <Toolbar
-          onOpenAppearance={() => set_show_appearance(true)}
-          onOpenAssistant={() => set_right_drawer_mode('assistant')}
-          onOpenConnection={() => set_show_connection(true)}
-          onDisconnect={handle_disconnect}
-          assistantOpen={assistant_open}
-          gatewayConnected={gateway_connected}
+        <Toolbar />
+        {/* The unified upper-right cluster (same order in every
+          * AbstractFramework app): assistant → appearance → [gpu] → Disconnect. */}
+        <AfTopBarActions
+          assistant={{
+            open: assistant_open,
+            onToggle: toggle_assistant_drawer,
+            label: 'Authoring assistant',
+          }}
+          appearance={{ onOpen: () => set_show_appearance(true) }}
+          extraActions={
+            gpu_enabled ? (
+              <monitor-gpu
+                ref={monitor_gpu_ref as any}
+                mode="icon"
+                history-size="5"
+                tick-ms="1500"
+                title="GPU usage (host)"
+                style={
+                  {
+                    ['--monitor-gpu-width' as any]: '34px',
+                    ['--monitor-gpu-bars-height' as any]: '22px',
+                    ['--monitor-gpu-padding' as any]: '2px 4px',
+                    ['--monitor-gpu-radius' as any]: '999px',
+                    ['--monitor-gpu-bg' as any]: 'rgba(0,0,0,0.18)',
+                    ['--monitor-gpu-border' as any]: 'rgba(255,255,255,0.16)',
+                    position: 'relative',
+                    zIndex: 1100,
+                    flexShrink: 0,
+                  } as CSSProperties
+                }
+              />
+            ) : undefined
+          }
+          connection={{
+            phase: connection_phase,
+            signingOut: signing_out,
+            onConnect: () => set_show_connection(true),
+            onDisconnect: handle_disconnect,
+          }}
         />
-        {gpu_enabled ? (
-          <monitor-gpu
-            ref={monitor_gpu_ref as any}
-            mode="icon"
-            history-size="5"
-            tick-ms="1500"
-            title="GPU usage (host)"
-            style={
-              {
-                ['--monitor-gpu-width' as any]: '34px',
-                ['--monitor-gpu-bars-height' as any]: '22px',
-                ['--monitor-gpu-padding' as any]: '2px 4px',
-                ['--monitor-gpu-radius' as any]: '999px',
-                ['--monitor-gpu-bg' as any]: 'rgba(0,0,0,0.18)',
-                ['--monitor-gpu-border' as any]: 'rgba(255,255,255,0.16)',
-                position: 'relative',
-                zIndex: 1100,
-                flexShrink: 0,
-              } as CSSProperties
-            }
-          />
-        ) : null}
       </header>
 
       {/* Main content */}
@@ -295,8 +292,8 @@ function App() {
         <span>AbstractFlow Visual Editor v0.1.0</span>
       </footer>
 
-      <AppearanceModal
-        isOpen={show_appearance}
+      <AfAppearanceDialog
+        open={show_appearance}
         value={appearance}
         onChange={set_appearance}
         onClose={() => set_show_appearance(false)}

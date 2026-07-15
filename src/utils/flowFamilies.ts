@@ -52,6 +52,51 @@ export const KNOWN_INTERFACES: KnownInterface[] = [
     description: 'Domain marker for the dp- deep-research family. No framework consumer yet.',
     class: 'domain',
   },
+  {
+    id: 'abstractcode.coding.v1',
+    label: 'Coding agent (v1)',
+    description:
+      'Runnable coding workflow: builder agent + independent build/execute/match verification with specific-failure reprompting. Superset of the runnable-agent contract with a workspace_root input and a structured pass/failure result.',
+    class: 'entrypoint',
+    requiredStartPins: ['request'],
+    requiredEndPins: ['report', 'passed'],
+  },
+  {
+    id: 'abstractresearch.coscientist.v1',
+    label: 'AI co-scientist',
+    description:
+      'Runnable multi-agent hypothesis engine inspired by the Nature AI co-scientist: supervisor loop over generate/reflect/rank(Elo tournament)/evolve + a final meta-review. Takes a research_goal, returns Elo-ranked hypotheses + a research overview. Simplified vs the paper (synchronous loop, one debate pass/cycle, meta-review runs once, no proximity dedup, grounding opt-in).',
+    class: 'entrypoint',
+    requiredStartPins: ['research_goal'],
+    requiredEndPins: ['research_overview', 'ranked_hypotheses'],
+  },
+  {
+    id: 'abstractreview.adversarial.v1',
+    label: 'Adversarial review (composable)',
+    description:
+      'Reusable review primitive: three-lens critics (correctness / design / requirements-fit) merged into a severity-ranked pass/revise/block verdict. Composable as a subflow or runnable standalone.',
+    class: 'contract',
+    requiredStartPins: ['artifact'],
+    requiredEndPins: ['findings', 'verdict'],
+  },
+  {
+    id: 'abstractextract.structured.v1',
+    label: 'Structured extract (composable)',
+    description:
+      'Reusable extraction primitive: text -> schema-validated JSON with a validate/reprompt correction loop. Composable as a subflow or runnable standalone.',
+    class: 'contract',
+    requiredStartPins: ['source_text', 'fields_spec'],
+    requiredEndPins: ['data', 'valid'],
+  },
+  {
+    id: 'abstractbatch.mapreduce.v1',
+    label: 'Map-reduce (composable)',
+    description:
+      'Reusable batch primitive: map a per-item LLM instruction over an array, then reduce the results with a synthesis instruction. Composable as a subflow or runnable standalone.',
+    class: 'contract',
+    requiredStartPins: ['items'],
+    requiredEndPins: ['results', 'synthesis'],
+  },
 ];
 
 export function knownInterface(id: string): KnownInterface | undefined {

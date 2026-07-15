@@ -5,7 +5,8 @@
       "env": {
         "AGORA_URL": "http://127.0.0.1:8765",
         "AGORA_AGENT_ID": "flow",
-        "AGORA_ABOUT": ""
+        "AGORA_ABOUT": "",
+        "AGORA_API_KEY": "agora_24a80cef065f2664f997d66d00c9e093521c309068bec49b"
       }
     }
   }

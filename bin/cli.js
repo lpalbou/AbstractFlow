@@ -158,15 +158,32 @@ function isLoopbackHostname(hostname) {
   return h === 'localhost' || h === 'localhost.localdomain' || h === '::1' || h.startsWith('127.');
 }
 
+/**
+ * Loopback-ness of the CONNECTION's real peer, from the socket — not the
+ * client-controlled `Host` header. entity's SECURITY (HIGH) finding (agora
+ * c1768): the browser-config gate keyed on `Host`, which any reachable client
+ * spoofs to "localhost" to unlock honoring a cookie-supplied gateway URL —
+ * an SSRF relay with the browser's session cookies attached. The socket peer
+ * address is not client-forgeable; that is the correct security input.
+ * IPv4-mapped IPv6 (::ffff:127.0.0.1) is normalized before the check.
+ */
+function requestPeerIsLoopback(req) {
+  const raw = String(req?.socket?.remoteAddress || '').trim().toLowerCase();
+  if (!raw) return false;
+  const addr = raw.startsWith('::ffff:') ? raw.slice(7) : raw;
+  return addr === '::1' || addr === '127.0.0.1' || addr.startsWith('127.');
+}
+
 function browserGatewayConnectionConfigAllowed(req) {
   if (envBool('ABSTRACTFLOW_ALLOW_REMOTE_BROWSER_GATEWAY_CONFIG')) return true;
-  return isLoopbackHostname(requestHostname(req));
+  // Security decision derives from the socket peer, never the Host header.
+  return requestPeerIsLoopback(req);
 }
 
 function browserGatewayConnectionConfigDenial(req) {
   const host = requestHostname(req) || 'unknown host';
   return (
-    `Browser-supplied Gateway URL changes are disabled for this non-local Flow host (${host}). ` +
+    `Browser-supplied Gateway URL changes are disabled for this non-local Flow connection (${host}). ` +
     'Use the server-configured Gateway URL, or set ABSTRACTFLOW_ALLOW_REMOTE_BROWSER_GATEWAY_CONFIG=1 behind your own access control.'
   );
 }

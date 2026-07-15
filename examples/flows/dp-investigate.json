@@ -1,6 +1,6 @@
 {
   "id": "dp-investigate",
-  "name": "dp-investigate",
+  "name": "deep-research-investigate",
   "description": "Evidence gathering and bounded investigation.",
   "interfaces": [],
   "nodes": [
@@ -973,6 +973,6 @@
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-06-29T15:52:29.716448+00:00",
-  "updated_at": "2026-06-29T15:52:29.716448+00:00"
+  "created_at": "2026-07-13T15:52:45.565779+00:00",
+  "updated_at": "2026-07-13T15:52:45.565779+00:00"
 }

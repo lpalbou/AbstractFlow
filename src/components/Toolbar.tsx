@@ -16,7 +16,6 @@ import { ModelResidencyPanel } from './ModelResidencyPanel';
 import { AfTooltip } from './AfTooltip';
 import {
   IconChip,
-  IconContrast,
   IconCopy,
   IconExecFlow,
   IconExport,
@@ -28,7 +27,6 @@ import {
   IconPackage,
   IconPlay,
   IconSave,
-  IconSparkle,
   IconSpinner,
 } from './ToolbarIcons';
 import { closeOpenNodes, createLedgerMappingState, mapLedgerRecordToEvents, type LedgerRecord } from '../utils/ledgerEvents';
@@ -201,21 +199,10 @@ function flowSignatureFor(flow: Partial<VisualFlow> | null | undefined): string 
   });
 }
 
-export function Toolbar({
-  onOpenAppearance,
-  onOpenAssistant,
-  onOpenConnection,
-  onDisconnect,
-  assistantOpen = false,
-  gatewayConnected = false,
-}: {
-  onOpenAppearance?: () => void;
-  onOpenAssistant?: () => void;
-  onOpenConnection?: () => void;
-  onDisconnect?: () => void;
-  assistantOpen?: boolean;
-  gatewayConnected?: boolean;
-}) {
+// The assistant/appearance/connection controls moved to the kit's
+// AfTopBarActions cluster rendered by App.tsx (unified top-bar contract:
+// assistant → appearance → extras → Disconnect, always rightmost).
+export function Toolbar() {
   const queryClient = useQueryClient();
   const gatewayCapabilitiesQuery = useGatewayCapabilities(true);
   const gatewayContracts = gatewayContractsFromCapabilities(gatewayCapabilitiesQuery.data);
@@ -282,6 +269,10 @@ export function Toolbar({
   const [threadRootRunId, setThreadRootRunId] = useState<string | null>(null);
   const [runWorkflowId, setRunWorkflowId] = useState<string | null>(null);
   const threadRootRunIdRef = useRef<string | null>(null);
+  /** The live ROOT run (last flow_start): terminal events from subrun ledger
+   * streams are filtered against it — one failed subrun record must never
+   * report the whole workflow failed. */
+  const liveRootRunIdRef = useRef<string | null>(null);
   const threadRunMapRef = useRef<Map<string, string>>(new Map());
   const followUpPendingThreadRef = useRef<string | null>(null);
   const activeFlowIdRef = useRef<string | null>(flowId || null);
@@ -732,6 +723,7 @@ export function Toolbar({
       console.log('Execution event:', event);
       if (event.type === 'flow_start') {
         const actualRunId = typeof event.runId === 'string' ? event.runId.trim() : '';
+        if (actualRunId) liveRootRunIdRef.current = actualRunId;
         if (actualRunId && runnableFlowId) setRunWorkflowId((prev) => prev || runnableFlowId);
         const pendingThreadId = followUpPendingThreadRef.current;
         const isFollowUp = Boolean(pendingThreadId);
@@ -767,7 +759,21 @@ export function Toolbar({
       }
       setExecutionEvents((prev) => [...prev, eventWithThread]);
 
-      // Update run result when flow completes via WebSocket
+      // Update run result when flow completes via WebSocket. Terminal events
+      // carry a ROOT-run guard: a failed record streamed from a subrun ledger
+      // must not report the whole workflow failed while the root still runs
+      // (adversary find — node events had this guard, terminal events did not).
+      const isTerminalEvent =
+        event.type === 'flow_complete' || event.type === 'flow_error' || event.type === 'flow_cancelled';
+      if (
+        isTerminalEvent &&
+        typeof event.runId === 'string' &&
+        event.runId.trim() &&
+        liveRootRunIdRef.current &&
+        event.runId.trim() !== liveRootRunIdRef.current
+      ) {
+        return;
+      }
       if (event.type === 'flow_complete') {
         const payload = event.result as unknown;
         const payloadObj = payload as Record<string, unknown> | null;
@@ -811,6 +817,7 @@ export function Toolbar({
       } else if (event.type === 'flow_cancelled') {
         setRunResult({
           success: false,
+          cancelled: true,
           error: 'Cancelled',
         });
         toast('Workflow cancelled');
@@ -1420,36 +1427,6 @@ export function Toolbar({
         </div>
 
         <div className="toolbar-spacer" />
-
-        {/* Workspace: assistant + appearance */}
-        <div className="toolbar-group" role="group" aria-label="Workspace tools">
-          <ToolbarAction
-            tooltip="Authoring assistant"
-            label="Open authoring assistant"
-            onClick={() => onOpenAssistant?.()}
-            className={assistantOpen ? 'primary' : ''}
-          >
-            <IconSparkle />
-          </ToolbarAction>
-          <ToolbarAction
-            tooltip="Appearance (theme + typography)"
-            label="Open appearance settings"
-            onClick={() => onOpenAppearance?.()}
-          >
-            <IconContrast />
-          </ToolbarAction>
-        </div>
-
-        <ToolbarAction
-          tooltip={gatewayConnected ? 'Disconnect from gateway' : 'Connect to gateway'}
-          label={gatewayConnected ? 'Disconnect from gateway' : 'Connect to gateway'}
-          onClick={() => (gatewayConnected ? onDisconnect?.() : onOpenConnection?.())}
-          iconOnly={false}
-          className={gatewayConnected ? 'connection-button' : 'primary connection-button'}
-        >
-          <span className={`connection-dot ${gatewayConnected ? 'online' : 'offline'}`} aria-hidden="true" />
-          <span>{gatewayConnected ? 'Disconnect' : 'Connect'}</span>
-        </ToolbarAction>
       </div>
 
       {showNewFlowModal ? (
@@ -1529,7 +1506,13 @@ export function Toolbar({
         onEmitEvent={emitEvent}
         onPause={() => pauseRun(inspectedRun?.run_id)}
         onResumeRun={() => resumeRun(inspectedRun?.run_id)}
-        onCancelRun={() => cancelRun(inspectedRun?.run_id)}
+        onCancelRun={() =>
+          cancelRun(inspectedRun?.run_id).then((confirmed) => {
+            // Surface the failure path visibly (adversary A1): without this,
+            // a refused/timed-out cancel wrote an error nobody rendered.
+            if (!confirmed) toast.error('Cancel not confirmed — the gateway may still be processing it. Try again.');
+          })
+        }
         onSelectRunId={handleSelectRunFromModal}
         runSummary={viewing ? inspectedRun : null}
       />
@@ -1552,6 +1535,7 @@ export function Toolbar({
         readonlyFlowIds={flowLibraryCatalog.bundledFlowIds}
         bundledRunTargetIds={flowLibraryCatalog.bundledRunTargetIds}
         isLoading={flowsQuery.isLoading && flowLibraryCatalog.flows.length === 0}
+        isRefreshing={flowsQuery.isFetching && flowLibraryCatalog.flows.length > 0 && !flowsQuery.data}
         error={flowLibraryCatalog.flows.length === 0 ? flowsQuery.error : null}
         onClose={() => setShowFlowLibrary(false)}
         onRefresh={() => flowsQuery.refetch()}

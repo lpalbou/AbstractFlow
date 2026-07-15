@@ -13,7 +13,7 @@
 import React, { useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { applyTheme } from '@abstractframework/ui-kit';
+import { AfTopBarActions, applyTheme } from '@abstractframework/ui-kit';
 import { Toolbar } from '../src/components/Toolbar';
 import { useFlowStore } from '../src/hooks/useFlow';
 import type { VisualFlow } from '../src/types/flow';
@@ -38,6 +38,8 @@ function Harness() {
   useEffect(() => {
     window.__TOOLBAR_CHECK_READY = true;
   }, []);
+  // Mirrors the real App.tsx header: Toolbar (file/run groups) + the kit's
+  // unified AfTopBarActions cluster, in connected and disconnected phases.
   return (
     <div className="app-container">
       <header className="app-header">
@@ -45,14 +47,32 @@ function Harness() {
           <span className="logo-icon">&#x1F300;</span>
           <span className="logo-text">AbstractFlow</span>
         </div>
-        <Toolbar gatewayConnected />
+        <Toolbar />
+        <AfTopBarActions
+          assistant={{ open: false, onToggle: () => undefined, label: 'Authoring assistant' }}
+          appearance={{ onOpen: () => undefined }}
+          connection={{
+            phase: 'connected',
+            onConnect: () => undefined,
+            onDisconnect: () => undefined,
+          }}
+        />
       </header>
       <header className="app-header">
         <div className="logo">
           <span className="logo-icon">&#x1F300;</span>
           <span className="logo-text">AbstractFlow</span>
         </div>
-        <Toolbar gatewayConnected={false} />
+        <Toolbar />
+        <AfTopBarActions
+          assistant={{ open: true, onToggle: () => undefined, label: 'Authoring assistant' }}
+          appearance={{ onOpen: () => undefined }}
+          connection={{
+            phase: 'disconnected',
+            onConnect: () => undefined,
+            onDisconnect: () => undefined,
+          }}
+        />
       </header>
     </div>
   );

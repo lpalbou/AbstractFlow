@@ -16,7 +16,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 FLOWS_DIR = ROOT / "abstractflow" / "examples" / "flows"
 BUNDLES_DIR = ROOT / "abstractgateway" / "flows" / "bundles"
-BUNDLE_PATH = BUNDLES_DIR / "dp-research@0.1.0.flow"
+BUNDLE_PATH = BUNDLES_DIR / "dp-research@0.1.1.flow"
 
 
 def _pin(pin_id: str, label: str, pin_type: str, description: str | None = None) -> dict[str, Any]:
@@ -885,7 +885,7 @@ def _wire_start_fields(
 
 def build_plan_flow() -> dict[str, Any]:
     fields = _input_fields([("settings", "settings", "object")])
-    flow = _base_flow("dp-plan", "dp-plan", "Research planning subflow.")
+    flow = _base_flow("dp-plan", "deep-research-plan", "Research planning subflow.")
     flow["nodes"] = [
         _start_node(),
         _settings_node("derive_settings", -640, -160),
@@ -948,7 +948,7 @@ def build_investigate_flow() -> dict[str, Any]:
         ]
     )
     flow = _base_flow(
-        "dp-investigate", "dp-investigate", "Evidence gathering and bounded investigation."
+        "dp-investigate", "deep-research-investigate", "Evidence gathering and bounded investigation."
     )
     flow["nodes"] = [
         _start_node(
@@ -1039,7 +1039,7 @@ def build_review_flow() -> dict[str, Any]:
             ("total_rounds", "total_rounds", "number"),
         ]
     )
-    flow = _base_flow("dp-review", "dp-review", "Three-lens adversarial review subflow.")
+    flow = _base_flow("dp-review", "deep-research-review", "Three-lens adversarial review subflow.")
     flow["nodes"] = [
         _start_node(
             [
@@ -1194,7 +1194,7 @@ def build_render_flow() -> dict[str, Any]:
             ("review_rounds_completed", "review_rounds_completed", "number"),
         ]
     )
-    flow = _base_flow("dp-render", "dp-render", "Final report and audit object renderer.")
+    flow = _base_flow("dp-render", "deep-research-render", "Final report and audit object renderer.")
     flow["nodes"] = [
         _start_node(
             [
@@ -1369,7 +1369,7 @@ def _write_node(node_id: str, node_type: str, label: str, x: int, y: int) -> dic
 def build_root_flow() -> dict[str, Any]:
     flow = _base_flow(
         "dp-research",
-        "dp-research",
+        "deep-research",
         (
             "Production research workflow with adversarial review, provenance, and "
             "Markdown/PDF/DOCX export."
@@ -1737,7 +1737,7 @@ def main() -> int:
         root_flow_json=FLOWS_DIR / "dp-research.json",
         out_path=BUNDLE_PATH,
         bundle_id="dp-research",
-        bundle_version="0.1.0",
+        bundle_version="0.1.1",
         flows_dir=FLOWS_DIR,
         entrypoints=["dp-research"],
         default_entrypoint="dp-research",

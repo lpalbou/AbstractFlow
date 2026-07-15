@@ -1,0 +1,407 @@
+{
+  "id": "coding-verify-gates",
+  "name": "coding-verify-gates",
+  "description": "Independent verifier: runs build/execute gates (execute_command) and a structure/match check (analyze_code) against the coding task, returning a structured pass/fail verdict with specific failure lines. Reusable as a subflow.",
+  "interfaces": [],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": -600,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Verify request",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "build_command",
+            "label": "build_command",
+            "type": "string"
+          },
+          {
+            "id": "run_command",
+            "label": "run_command",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ],
+        "pinDefaults": {
+          "build_command": "",
+          "run_command": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "verifier_prompt",
+      "type": "code",
+      "position": {
+        "x": -240,
+        "y": 40
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose verifier task",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "request",
+            "label": "request",
+            "type": "string"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "build_command",
+            "label": "build_command",
+            "type": "string"
+          },
+          {
+            "id": "run_command",
+            "label": "run_command",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "req = str(request or \"\").strip()\nws = str(workspace_root or \"\").strip()\nbuild_cmd = str(build_command or \"\").strip()\nrun_cmd = str(run_command or \"\").strip()\n\nparts = []\nparts.append(\"You are an INDEPENDENT code verifier. Do NOT edit any code. Run the checks and report a structured verdict.\")\nparts.append(\"\")\nparts.append(\"## The task the code was meant to satisfy\")\nparts.append(req)\nif ws:\n    parts.append(\"\")\n    parts.append(\"Workspace root: \" + ws)\nparts.append(\"\")\nparts.append(\"## Gate 1 - BUILDS\")\nif build_cmd:\n    parts.append(\"Run this build command with execute_command and record whether it succeeds: \" + build_cmd)\nelse:\n    parts.append(\"Detect the stack (list_files) and run the appropriate build/compile/syntax-check command with execute_command. For interpreted languages with no build step, treat import/syntax check as the build (e.g. python -m py_compile).\")\nparts.append(\"On failure, capture the exact error output in build_error.\")\nparts.append(\"\")\nparts.append(\"## Gate 2 - EXECUTES\")\nif run_cmd:\n    parts.append(\"Run this command with execute_command and record whether it runs without error: \" + run_cmd)\nelse:\n    parts.append(\"Run the program (or its tests / a smoke invocation) with execute_command. Capture any traceback/runtime error in run_error. For web/browser artifacts you cannot fully run, say so honestly in run_error and set executes=false only if there is a real error, true if the entrypoint loads.\")\nparts.append(\"\")\nparts.append(\"## Gate 3 - MATCHES THE ASK\")\nparts.append(\"Use analyze_code on the produced source files to get the structure (functions/classes) and diagnostics, then judge whether the code STRUCTURE plausibly satisfies the task above. Put concrete gaps in mismatch (e.g. 'task asked for function X, not present').\")\nparts.append(\"\")\nparts.append(\"## Verdict\")\nparts.append(\"Set all_passed=true ONLY if builds AND executes AND matches are all true. Put one specific, actionable failure line per failed gate into failures[] (the exact error, not 'it failed'). summary: one sentence.\")\nreturn \"\\n\".join(parts)"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "verifier",
+      "type": "agent",
+      "position": {
+        "x": 120,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "agent",
+        "label": "Independent verifier",
+        "icon": "&#x1F916;",
+        "headerColor": "#4488FF",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "max_iterations",
+            "label": "max_iterations",
+            "type": "number"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "scratchpad",
+            "label": "scratchpad",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "system": "You are a rigorous, independent code verifier. You never edit code. You run commands and inspect structure, then report a strict structured verdict. A gate is only PASS if you actually observed success; when a command fails, capture the real error text.",
+          "tools": [
+            "read_file",
+            "list_files",
+            "analyze_code",
+            "execute_command"
+          ],
+          "max_iterations": 12,
+          "temperature": 0.0,
+          "resp_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "builds",
+              "executes",
+              "matches",
+              "all_passed",
+              "failures",
+              "summary"
+            ],
+            "properties": {
+              "builds": {
+                "type": "boolean"
+              },
+              "build_error": {
+                "type": "string"
+              },
+              "executes": {
+                "type": "boolean"
+              },
+              "run_error": {
+                "type": "string"
+              },
+              "matches": {
+                "type": "boolean"
+              },
+              "mismatch": {
+                "type": "string"
+              },
+              "all_passed": {
+                "type": "boolean"
+              },
+              "failures": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "summary": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 600,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Verdict",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "verdict",
+            "label": "verdict",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-exec-out-verifier-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "verifier",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-verifier-exec-out-end-exec-in",
+      "source": "verifier",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-start-request-verifier_prompt-request",
+      "source": "start",
+      "sourceHandle": "request",
+      "target": "verifier_prompt",
+      "targetHandle": "request",
+      "animated": false
+    },
+    {
+      "id": "e-start-workspace_root-verifier_prompt-workspace_root",
+      "source": "start",
+      "sourceHandle": "workspace_root",
+      "target": "verifier_prompt",
+      "targetHandle": "workspace_root",
+      "animated": false
+    },
+    {
+      "id": "e-start-build_command-verifier_prompt-build_command",
+      "source": "start",
+      "sourceHandle": "build_command",
+      "target": "verifier_prompt",
+      "targetHandle": "build_command",
+      "animated": false
+    },
+    {
+      "id": "e-start-run_command-verifier_prompt-run_command",
+      "source": "start",
+      "sourceHandle": "run_command",
+      "target": "verifier_prompt",
+      "targetHandle": "run_command",
+      "animated": false
+    },
+    {
+      "id": "e-verifier_prompt-output-verifier-prompt",
+      "source": "verifier_prompt",
+      "sourceHandle": "output",
+      "target": "verifier",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-verifier-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "verifier",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-verifier-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "verifier",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-verifier-data-end-verdict",
+      "source": "verifier",
+      "sourceHandle": "data",
+      "target": "end",
+      "targetHandle": "verdict",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-07-14T11:44:55.454756+00:00",
+  "updated_at": "2026-07-14T11:44:55.454756+00:00"
+}

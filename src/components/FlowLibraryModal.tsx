@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AfChip } from '@abstractframework/ui-kit';
 import type { VisualFlow } from '../types/flow';
 import {
   KNOWN_INTERFACES,
@@ -20,6 +21,10 @@ export interface FlowLibraryModalProps {
   readonlyFlowIds?: string[];
   bundledRunTargetIds?: string[];
   isLoading?: boolean;
+  /** Saved-flows query in flight while bundled rows already render: the
+   * header must say so or the counts understate the library (live-drive
+   * finding: "7 flows" flashed on a 120-flow library). */
+  isRefreshing?: boolean;
   error?: unknown;
   onClose: () => void;
   onRefresh?: () => void;
@@ -76,6 +81,7 @@ export function FlowLibraryModal({
   readonlyFlowIds,
   bundledRunTargetIds,
   isLoading,
+  isRefreshing,
   error,
   onClose,
   onRefresh,
@@ -188,42 +194,50 @@ export function FlowLibraryModal({
     window.setTimeout(() => searchRef.current?.focus(), 0);
   }, [isOpen]);
 
-  // Clearing the query reveals the selection: expand the full ANCESTOR PATH
-  // down to it (expansion keys are paths — a bare parent id only opens
-  // top-level parents, which left depth-2 helpers invisible after search).
+  // Expand the full ANCESTOR PATH down to a flow so a browse-mode list can
+  // actually SHOW it (expansion keys are paths — a bare parent id only opens
+  // top-level parents, which left depth-2 helpers invisible).
+  const revealAncestorPath = useCallback(
+    (flowId: string) => {
+      if (familyIndex.firstLevelIds.has(flowId)) return;
+      // Walk up inboundBy to a first-level ancestor (prefer one; bail on cycles).
+      const chain: string[] = [];
+      let cursor: string | undefined = flowId;
+      const seen = new Set<string>();
+      while (cursor && !seen.has(cursor)) {
+        seen.add(cursor);
+        if (familyIndex.firstLevelIds.has(cursor)) break;
+        const parents: string[] = familyIndex.inboundBy.get(cursor) || [];
+        const next = parents.find((id) => familyIndex.firstLevelIds.has(id)) || parents[0];
+        if (!next) break;
+        chain.unshift(cursor);
+        cursor = next;
+      }
+      if (!cursor || !familyIndex.firstLevelIds.has(cursor)) return;
+      // Expand root + every intermediate path key (the selected leaf itself
+      // does not need expanding).
+      setExpandedKeys((prevKeys) => {
+        const next = new Set(prevKeys);
+        let pathKey = cursor as string;
+        next.add(pathKey);
+        for (const id of chain.slice(0, -1)) {
+          pathKey = `${pathKey}>${id}`;
+          next.add(pathKey);
+        }
+        return next;
+      });
+    },
+    [familyIndex]
+  );
+
+  // Clearing the query reveals the selection.
   const prevQueryRef = useRef(query);
   useEffect(() => {
     const prev = prevQueryRef.current;
     prevQueryRef.current = query;
     if (!prev.trim() || query.trim() || !selectedFlowId) return;
-    if (familyIndex.firstLevelIds.has(selectedFlowId)) return;
-    // Walk up inboundBy to a first-level ancestor (prefer one; bail on cycles).
-    const chain: string[] = [];
-    let cursor: string | undefined = selectedFlowId;
-    const seen = new Set<string>();
-    while (cursor && !seen.has(cursor)) {
-      seen.add(cursor);
-      if (familyIndex.firstLevelIds.has(cursor)) break;
-      const parents: string[] = familyIndex.inboundBy.get(cursor) || [];
-      const next = parents.find((id) => familyIndex.firstLevelIds.has(id)) || parents[0];
-      if (!next) break;
-      chain.unshift(cursor);
-      cursor = next;
-    }
-    if (!cursor || !familyIndex.firstLevelIds.has(cursor)) return;
-    // Expand root + every intermediate path key (the selected leaf itself
-    // does not need expanding).
-    setExpandedKeys((prevKeys) => {
-      const next = new Set(prevKeys);
-      let pathKey = cursor as string;
-      next.add(pathKey);
-      for (const id of chain.slice(0, -1)) {
-        pathKey = `${pathKey}>${id}`;
-        next.add(pathKey);
-      }
-      return next;
-    });
-  }, [query, selectedFlowId, familyIndex]);
+    revealAncestorPath(selectedFlowId);
+  }, [query, selectedFlowId, revealAncestorPath]);
 
   // Keep the selected row visible when the SELECTION changes (not on every
   // rows-identity change — expanding an unrelated family must not snap the
@@ -287,11 +301,18 @@ export function FlowLibraryModal({
       if (isRenaming || isEditingDescription || isEditingInterfaces) return;
       if (navigableRows.length === 0) return;
 
-      // Anchor on the selected INSTANCE when known; fall back to the first
-      // row of the selected flow.
-      const idx = selectedRowKey
-        ? navigableRows.findIndex((row) => row.key === selectedRowKey)
-        : navigableRows.findIndex((row) => row.flow?.id === selectedFlowId);
+      // When focus sits INSIDE the kit tree, the DisclosureList owns
+      // navigation (role=tree roving tabindex) — running the window-level
+      // handler too would double-move on every arrow press. The kit's
+      // onSelect keeps modal state in sync, so skipping here is lossless.
+      const target = e.target as HTMLElement | null;
+      if (target && typeof target.closest === 'function' && target.closest('.af-disclosure')) return;
+
+      // Anchor on the selected INSTANCE when known; a STALE row key (its
+      // parent collapsed) falls back to the flow's first visible row rather
+      // than teleporting navigation to the top of the list.
+      let idx = selectedRowKey ? navigableRows.findIndex((row) => row.key === selectedRowKey) : -1;
+      if (idx < 0) idx = navigableRows.findIndex((row) => row.flow?.id === selectedFlowId);
       const selectedRow = idx >= 0 ? navigableRows[idx] : null;
 
       const selectRowAt = (next: number) => {
@@ -467,10 +488,17 @@ export function FlowLibraryModal({
     await onDuplicateFlow(selectedFlow.id);
   }, [onDuplicateFlow, selectedFlow]);
 
-  const jumpToFlow = useCallback((flowId: string) => {
-    setSelectedFlowId(flowId);
-    setSelectedRowKey(null);
-  }, []);
+  const jumpToFlow = useCallback(
+    (flowId: string) => {
+      setSelectedFlowId(flowId);
+      setSelectedRowKey(null);
+      // Uses/Used-by links may target a flow buried under collapsed parents:
+      // reveal its ancestor path or the jump selects an invisible row
+      // (adversary find — the preview updated while the list showed nothing).
+      revealAncestorPath(flowId);
+    },
+    [revealAncestorPath]
+  );
 
   const selectRow = useCallback((flowId: string, rowKey: string) => {
     setSelectedFlowId(flowId);
@@ -492,9 +520,15 @@ export function FlowLibraryModal({
             <h3>Flow Library</h3>
             <div className="flow-library-subtitle">
               <span className="flow-library-count">
-                {rowsResult.totalCount} flow{rowsResult.totalCount === 1 ? '' : 's'} ·{' '}
-                {rowsResult.topLevelCount} top-level · {rowsResult.executableCount} runnable
-                {filtering ? ` · ${shownCount} shown` : ''}
+                {isRefreshing ? (
+                  <>Loading saved flows…</>
+                ) : (
+                  <>
+                    {rowsResult.totalCount} flow{rowsResult.totalCount === 1 ? '' : 's'} ·{' '}
+                    {rowsResult.topLevelCount} top-level · {rowsResult.executableCount} runnable
+                    {filtering ? ` · ${shownCount} shown` : ''}
+                  </>
+                )}
               </span>
               {onRefresh ? (
                 <button type="button" className="flow-library-link" onClick={onRefresh}>
@@ -609,9 +643,13 @@ export function FlowLibraryModal({
                       <div className="flow-library-preview-name-row">
                         <div className="flow-library-preview-name">{selectedFlow.name}</div>
                         {selectedFlowBundleTarget ? (
-                          <span className="flow-library-badge bundled">bundle</span>
+                          <AfChip tone="info" size="sm" title="Ships as a published bundle target">
+                            bundle
+                          </AfChip>
                         ) : selectedFlowReadonly ? (
-                          <span className="flow-library-badge bundled">bundled</span>
+                          <AfChip tone="info" size="sm" title="Bundled example (read-only)">
+                            bundled
+                          </AfChip>
                         ) : null}
                         {!selectedFlowReadonly ? (
                           <button

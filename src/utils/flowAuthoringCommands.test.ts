@@ -296,6 +296,82 @@ describe('flow authoring commands', () => {
     expect(node?.data.outputs).toEqual([expect.objectContaining({ id: 'markdown_report', type: 'string' })]);
   });
 
+  it('drops edges invalidated by a Break Object path retype, loudly', () => {
+    // Adversary P1: set_break_paths replaced the pin set wholesale with no
+    // edge sweep — a retyped path kept its now-incompatible edge silently in
+    // the graph (the exact class update_pin's revalidation prevents). Two
+    // batches: the retype arrives in a LATER turn than the wiring, as it does
+    // through the document lane.
+    const built = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'add_node', id: 'brk', nodeType: 'break_object' },
+        { action: 'set_break_paths', nodeId: 'brk', paths: [{ path: 'report', pinType: 'string' }] },
+        { action: 'add_node', id: 'end', nodeType: 'on_flow_end' },
+        { action: 'add_input_pin', nodeId: 'end', id: 'summary', pinType: 'string' },
+        { action: 'connect', source: 'brk', sourceHandle: 'report', target: 'end', targetHandle: 'summary' },
+      ],
+    });
+    expect(built.errors).toEqual([]);
+    expect(built.edges.some((edge) => edge.source === 'brk' && edge.sourceHandle === 'report')).toBe(true);
+
+    const result = applyFlowAuthoringCommands({
+      flowName: built.flowName,
+      flowInterfaces: [],
+      nodes: built.nodes,
+      edges: built.edges,
+      // Retype report string -> object: the string edge becomes invalid.
+      commands: [{ action: 'set_break_paths', nodeId: 'brk', paths: [{ path: 'report', pinType: 'object' }] }],
+    });
+    expect(result.errors).toEqual([]);
+    expect(
+      result.edges.some((edge) => edge.source === 'brk' && edge.sourceHandle === 'report' && edge.target === 'end')
+    ).toBe(false);
+    expect(result.warnings.some((warning) => warning.includes('dropped invalid edge'))).toBe(true);
+  });
+
+  it('drops exec edges orphaned by a Switch case rename, loudly', () => {
+    const built = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'add_node', id: 'route', nodeType: 'switch' },
+        { action: 'set_switch_cases', nodeId: 'route', cases: [{ id: 'alpha', value: 'alpha' }] },
+        { action: 'add_node', id: 'work', nodeType: 'code' },
+        { action: 'connect', source: 'route', sourceHandle: 'case:alpha', target: 'work', targetHandle: 'exec-in' },
+      ],
+    });
+    expect(built.errors).toEqual([]);
+    expect(built.edges.some((edge) => edge.sourceHandle === 'case:alpha')).toBe(true);
+
+    const result = applyFlowAuthoringCommands({
+      flowName: built.flowName,
+      flowInterfaces: [],
+      nodes: built.nodes,
+      edges: built.edges,
+      // Renaming the case regenerates case:<id> pins; the old exec edge dangles.
+      commands: [{ action: 'set_switch_cases', nodeId: 'route', cases: [{ id: 'beta', value: 'beta' }] }],
+    });
+    expect(result.errors).toEqual([]);
+    expect(result.edges.some((edge) => edge.sourceHandle === 'case:alpha')).toBe(false);
+    expect(result.warnings.some((warning) => warning.includes('dropped invalid edge'))).toBe(true);
+  });
+
+  it('reports update_pin that changes nothing as a warning no-op, never an applied change', () => {
+    const result = applyFlowAuthoringCommands({
+      ...emptyState(),
+      commands: [
+        { action: 'add_node', id: 'end', nodeType: 'on_flow_end' },
+        { action: 'add_input_pin', nodeId: 'end', id: 'report', pinType: 'string' },
+        // "text" is not a canonical pin type: inference falls back to the
+        // existing type, so nothing changes — the log must say so.
+        { action: 'update_pin', nodeId: 'end', id: 'report', side: 'input', pinType: 'text' },
+      ],
+    });
+    expect(result.errors).toEqual([]);
+    expect(result.applied.some((entry) => entry.includes('Updated input end.report'))).toBe(false);
+    expect(result.warnings.some((warning) => warning.includes('changed nothing'))).toBe(true);
+  });
+
   it('rejects Break Object path aliases because runtime output keys are the selected paths', () => {
     const result = applyFlowAuthoringCommands({
       ...emptyState(),

@@ -704,26 +704,8 @@
   box-shadow: 0 0 8px rgba(255, 176, 0, 0.7);
 }
 
-/* Gateway connection button + status dot */
-.toolbar-button.connection-button {
-  flex-shrink: 0;
-}
-
-.connection-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  flex-shrink: 0;
-}
-
-.connection-dot.online {
-  background: var(--success, #2ecc71);
-  box-shadow: 0 0 6px rgba(46, 204, 113, 0.55);
-}
-
-.connection-dot.offline {
-  background: var(--text-muted);
-}
+/* The gateway connection pill (dot + Connect/Disconnect) is the kit's
+   AfTopBarActions cluster now — .af-topbar styles live in ui-kit theme.css. */
 
 .toolbar-status {
   display: flex;
