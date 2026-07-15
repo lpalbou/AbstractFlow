@@ -15,7 +15,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { applyTheme } from '@abstractframework/ui-kit';
 import { RunFlowModal } from '../src/components/RunFlowModal';
 import { useFlowStore } from '../src/hooks/useFlow';
-import type { VisualFlow, ExecutionEvent } from '../src/types/flow';
+import type { VisualFlow, ExecutionEvent, FlowRunResult } from '../src/types/flow';
 import fixture from './route_check_fixture.json';
 import '@abstractframework/ui-kit/theme.css';
 import '../src/styles/index.css';
@@ -57,6 +57,35 @@ const execEvents: ExecutionEvent[] = [
   },
 ];
 
+// Terminal run (view=final): two completed llm steps with token metrics + a
+// flow_complete, so the Final Result panel + aggregate run-stats bar render.
+const T3 = '2026-07-11T10:00:15.500Z';
+const finalEvents: ExecutionEvent[] = [
+  { type: 'flow_start', ts: T0, runId: 'run-final-0001' },
+  { type: 'node_start', ts: T0, runId: 'run-final-0001', nodeId: 'node-1' },
+  { type: 'node_complete', ts: T1, runId: 'run-final-0001', nodeId: 'node-1', result: { prompt: 'Write my resume' }, meta: { duration_ms: 320 } },
+  { type: 'node_start', ts: T1, runId: 'run-final-0001', nodeId: 'node-4' },
+  {
+    type: 'node_complete',
+    ts: T2,
+    runId: 'run-final-0001',
+    nodeId: 'node-4',
+    result: { content: 'Draft one.', model: 'gpt-oss-120b', provider: 'endpoint:ovh-provider' },
+    meta: { duration_ms: 5600, input_tokens: 1421, output_tokens: 380, tokens_per_s: 42.1 },
+  },
+  { type: 'node_start', ts: T2, runId: 'run-final-0001', nodeId: 'node-6' },
+  {
+    type: 'node_complete',
+    ts: T3,
+    runId: 'run-final-0001',
+    nodeId: 'node-6',
+    result: { content: 'Final synthesized answer.', model: 'gpt-oss-120b', provider: 'endpoint:ovh-provider' },
+    meta: { duration_ms: 5700, input_tokens: 2050, output_tokens: 640, tokens_per_s: 39.4 },
+  },
+  { type: 'flow_complete', ts: T3, runId: 'run-final-0001', result: { content: 'Final synthesized answer.' } },
+];
+const finalResult: FlowRunResult = { success: true, result: { content: 'Final synthesized answer.' }, run_id: 'run-final-0001' };
+
 declare global {
   interface Window {
     __RUNMODAL_CHECK_READY?: boolean;
@@ -75,8 +104,8 @@ function Harness() {
         onClose={noop}
         onRun={noop}
         isRunning={view === 'exec'}
-        result={null}
-        events={view === 'exec' ? execEvents : []}
+        result={view === 'final' ? finalResult : null}
+        events={view === 'exec' ? execEvents : view === 'final' ? finalEvents : []}
         runTargetLabel={String((fixture as { flow_name?: string }).flow_name || 'workflow')}
       />
     </div>

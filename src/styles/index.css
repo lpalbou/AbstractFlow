@@ -6543,6 +6543,37 @@ details.run-form-section:not([open]) > .run-form-section-summary:hover .run-form
   font-size: var(--font-size-md);
 }
 
+/* Aggregate run totals (time + tokens) shown next to the final-result title. */
+.run-final-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: auto;
+  margin-left: 12px;
+  flex-wrap: wrap;
+}
+
+.run-final-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xxs);
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 12%, transparent);
+  border-radius: 999px;
+  padding: 2px 9px;
+  white-space: nowrap;
+}
+
+.run-final-stat-label {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: var(--font-size-xxs);
+  color: var(--text-muted);
+}
+
 .run-waiting {
   display: flex;
   flex-direction: column;

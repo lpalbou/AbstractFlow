@@ -3603,6 +3603,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- 2026-07-15 Run totals in the execution view (operator ask): a terminal run's
+  Execution header now shows aggregate stats — total wall-clock time and total
+  input→output tokens — summed across the WHOLE run tree (agent workflows spend
+  their tokens in sub-runs, so the root alone reads zero; agent nodes are
+  excluded from the token sum to avoid double-counting their own sub-run llm
+  steps). Shown whenever the root `flow_complete` carried no rolled-up meta
+  (the common case). Also surfaced on the Final Result header.
+
 ### Changed
 - 2026-07-14 co-scientist rebuilt into a deep, production-grade hypothesis
   engine (operator: "co-scientist can not be faster than deep-research… it

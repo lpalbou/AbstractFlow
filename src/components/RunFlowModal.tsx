@@ -4918,6 +4918,48 @@ export function RunFlowModal({
     return '';
   }, [approvalDetails, effectiveResult, isPaused, isRunning, isWaiting, runSummary?.status]);
 
+  // Aggregate run stats for the final-result header: total input/output tokens
+  // and wall-clock time across the WHOLE run tree (agent workflows run their
+  // llm_call effects in sub-runs — the tokens live on those sub-run steps, so
+  // we must aggregate over every displayed step, not just the root). Agent
+  // nodes are excluded from the token sum because their token metrics (when
+  // present) are the roll-up of their own sub-run llm steps, which are counted
+  // individually — including both would double-count.
+  const runStats = useMemo(() => {
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let haveTokens = false;
+    let minStart = Number.POSITIVE_INFINITY;
+    let maxEnd = Number.NEGATIVE_INFINITY;
+    for (const s of displayStepById.values()) {
+      const m = s.metrics;
+      if (m && s.nodeType !== 'agent') {
+        if (typeof m.input_tokens === 'number' && Number.isFinite(m.input_tokens)) {
+          inputTokens += m.input_tokens;
+          haveTokens = true;
+        }
+        if (typeof m.output_tokens === 'number' && Number.isFinite(m.output_tokens)) {
+          outputTokens += m.output_tokens;
+          haveTokens = true;
+        }
+      }
+      const st = s.startedAt ? Date.parse(s.startedAt) : NaN;
+      const en = s.endedAt ? Date.parse(s.endedAt) : NaN;
+      if (Number.isFinite(st)) minStart = Math.min(minStart, st);
+      if (Number.isFinite(en)) maxEnd = Math.max(maxEnd, en);
+    }
+    let totalMs: number | null = null;
+    if (Number.isFinite(minStart) && Number.isFinite(maxEnd) && maxEnd >= minStart) {
+      totalMs = maxEnd - minStart;
+    } else {
+      // Fall back to the run summary's created→updated window (inspected runs).
+      const c = runSummary?.created_at ? Date.parse(runSummary.created_at) : NaN;
+      const u = runSummary?.updated_at ? Date.parse(runSummary.updated_at) : NaN;
+      if (Number.isFinite(c) && Number.isFinite(u) && u >= c) totalMs = u - c;
+    }
+    return { inputTokens, outputTokens, haveTokens, totalMs };
+  }, [displayStepById, runSummary?.created_at, runSummary?.updated_at]);
+
   // Minimized view (run minibar): show current step + status and keep the canvas visible.
   // This uses only local state (isMinimized) so it never affects run execution itself.
   const lastStep = steps.length > 0 ? steps[steps.length - 1] : null;
@@ -6346,6 +6388,26 @@ export function RunFlowModal({
                         <span className="run-metric-badge metric-throughput">{formatTpsBadge(flowSummary)}</span>
                       ) : null}
                     </span>
+                  ) : !isRunning && (runStats.haveTokens || runStats.totalMs != null) ? (
+                    // Aggregate totals across the whole run tree — shown on any
+                    // terminal run whose root flow_complete carried no rolled-up
+                    // meta (the common case: agent workflows spend their tokens
+                    // in sub-runs).
+                    <span className="run-metrics-inline">
+                      {runStats.totalMs != null ? (
+                        <span className="run-metric-badge metric-duration" title="Total wall-clock time for the run">
+                          {formatDuration(runStats.totalMs)}
+                        </span>
+                      ) : null}
+                      {runStats.haveTokens ? (
+                        <span
+                          className="run-metric-badge metric-tokens"
+                          title="Total input to output tokens across every LLM call in the run tree"
+                        >
+                          {`${runStats.inputTokens.toLocaleString()} \u2192 ${runStats.outputTokens.toLocaleString()} tk`}
+                        </span>
+                      ) : null}
+                    </span>
                   ) : null}
                   {benchmarkProgress && benchmarkProgress.totalRecords > 0 ? (
                     <span className="run-metrics-inline">
@@ -7534,6 +7596,34 @@ export function RunFlowModal({
                               ? 'Final Result (CANCELLED)'
                               : 'Final Result (FAILED)'}
                         </span>
+                        {runStats.haveTokens || runStats.totalMs != null ? (
+                          <div className="run-final-stats" aria-label="Run totals">
+                            {runStats.totalMs != null ? (
+                              <span className="run-final-stat" title="Total wall-clock time for the whole run">
+                                <span className="run-final-stat-label">time</span>
+                                {formatDuration(runStats.totalMs)}
+                              </span>
+                            ) : null}
+                            {runStats.haveTokens ? (
+                              <span
+                                className="run-final-stat"
+                                title="Total input (prompt) tokens across every LLM call in the run tree"
+                              >
+                                <span className="run-final-stat-label">in</span>
+                                {runStats.inputTokens.toLocaleString()} tk
+                              </span>
+                            ) : null}
+                            {runStats.haveTokens ? (
+                              <span
+                                className="run-final-stat"
+                                title="Total output (completion) tokens across every LLM call in the run tree"
+                              >
+                                <span className="run-final-stat-label">out</span>
+                                {runStats.outputTokens.toLocaleString()} tk
+                              </span>
+                            ) : null}
+                          </div>
+                        ) : null}
                         <div className="run-details-actions">
                           <button
                             type="button"
