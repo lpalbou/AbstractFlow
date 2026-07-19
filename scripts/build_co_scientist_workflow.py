@@ -11,7 +11,7 @@ evolve, iterated, with feedback threaded forward.
 Pipeline (the paper's loop, reproduced):
 
   GROUNDING (starts from the literature — composition):
-    A subflow call to `dp-investigate` (the framework's proven web-search
+    A subflow call to `deep-investigate` (the framework's proven web-search
     investigation engine: an agent iteratively searches/reads real sources and
     returns a source ledger + grounded findings + open questions). This is the
     paper's "Literature exploration through web search" that grounds the whole
@@ -42,7 +42,7 @@ Pipeline (the paper's loop, reproduced):
 
 Fidelity note (honest — faithful / simplified / dropped):
   FAITHFUL: literature grounding via real web search (delegated to
-    dp-investigate); the six-agent division of labor (Generation, Reflection,
+    deep-investigate); the six-agent division of labor (Generation, Reflection,
     Ranking, Evolution + research-expansion, Meta-review, and a deterministic
     Proximity-style dedup); the Elo tournament via simulated pairwise
     scientific debate; the TWO feedback channels (Elo state + meta-feedback
@@ -134,7 +134,7 @@ RANK_SCHEMA = {
 
 EVOLVE_SCHEMA = HYP_SCHEMA  # evolution + expansion return new/refined hypotheses
 
-# ---- literature grounding (from dp-investigate's investigation object) -----
+# ---- literature grounding (from deep-investigate's investigation object) -----
 
 LIT_BASE_CODE = """
 inv = (investigation or {})
@@ -159,7 +159,7 @@ if limitations:
     parts.append("Known limitations in the current literature:")
     for l in limitations:
         parts.append("- " + str(l))
-# Clean source ledger. dp-investigate's schema uses url_or_path / fetched /
+# Clean source ledger. deep-investigate's schema uses url_or_path / fetched /
 # evidence_quality / relevance / rejected_reason (NOT url/takeaway) — read the
 # real field names so URLs and notes are not silently dropped.
 sources = []
@@ -571,9 +571,9 @@ return {
 
 # ---- prompt composers (code nodes) ----------------------------------------
 
-# dp-plan takes the raw research question and returns a structured research
-# plan (sub-questions). The plan is what dp-investigate needs to organize its
-# findings into a real source ledger — driving dp-investigate WITHOUT a plan
+# deep-plan takes the raw research question and returns a structured research
+# plan (sub-questions). The plan is what deep-investigate needs to organize its
+# findings into a real source ledger — driving deep-investigate WITHOUT a plan
 # (the earlier bare call) made the agent search real sources but then collapse
 # its structured source_ledger to a single junk entry. deep-research always
 # feeds the plan; co-scientist now does too.
@@ -586,7 +586,7 @@ return {
 }
 """.strip()
 
-# dp-investigate input: the raw request + the plan from dp-plan + a single
+# deep-investigate input: the raw request + the plan from deep-plan + a single
 # round of context (round_index 0 of 1), matching how deep-research drives it.
 GROUND_INPUT_CODE = """
 return {
@@ -901,7 +901,7 @@ SEARCH_TOOLS = ["web_search", "skim_websearch", "skim_url", "fetch_url"]
 def build_flow():
     flow = W.base_flow(
         "co-scientist", "co-scientist",
-        "Deep multi-agent hypothesis engine (Nature 'AI co-scientist' replica). Starts FROM the literature by delegating grounding to the deep-research investigation engine (dp-investigate: real web search + source ledger), then runs a supervisor loop of Generation -> Reflection -> Elo-ranking (prioritized pairwise scientific debate) -> Evolution -> research-expansion, threading meta-feedback forward each cycle with near-duplicate pruning, then a final search-grounded full review of the finalists and a Meta-review research overview. Deliberately deeper than a single-pass report — it scales test-time compute via the cycle budget.",
+        "Deep multi-agent hypothesis engine (Nature 'AI co-scientist' replica). Starts FROM the literature by delegating grounding to the deep-research investigation engine (deep-investigate: real web search + source ledger), then runs a supervisor loop of Generation -> Reflection -> Elo-ranking (prioritized pairwise scientific debate) -> Evolution -> research-expansion, threading meta-feedback forward each cycle with near-duplicate pruning, then a final search-grounded full review of the finalists and a Meta-review research overview. Deliberately deeper than a single-pass report — it scales test-time compute via the cycle budget.",
         ["abstractresearch.coscientist.v1"],
     )
     fields = [
@@ -916,16 +916,16 @@ def build_flow():
         W.start_node("Research goal", fields, -1900, 0,
                      pin_defaults={"num_hypotheses": 5, "max_cycles": 3, "effort": "standard"}),
         # GROUNDING via composition, driven the way deep-research drives it:
-        # dp-plan (decompose the goal into a research plan) -> dp-investigate
+        # deep-plan (decompose the goal into a research plan) -> deep-investigate
         # (web-search evidence gathering guided by that plan). Both are
         # deep-research's own proven subflows; the plan is what makes
-        # dp-investigate populate a real source ledger. All tools auto-approve.
+        # deep-investigate populate a real source ledger. All tools auto-approve.
         W.code_node("plan_input", "Compose plan request", PLAN_INPUT_CODE, -1580, -180,
                     [W.pin("research_goal", "research_goal", "string"),
                      W.pin("effort", "effort", "string"),
                      W.pin("provider", "provider", "provider_text"),
                      W.pin("model", "model", "model")]),
-        W.subflow_node("plan", "Research plan (deep-research)", "dp-plan", -1240, -320),
+        W.subflow_node("plan", "Research plan (deep-research)", "deep-plan", -1240, -320),
         W.get_node("get_plan", "plan", {}, -1240, -120),
         W.code_node("ground_input", "Compose investigation request", GROUND_INPUT_CODE, -1580, 200,
                     [W.pin("research_goal", "research_goal", "string"),
@@ -933,7 +933,7 @@ def build_flow():
                      W.pin("provider", "provider", "provider_text"),
                      W.pin("model", "model", "model"),
                      W.pin("plan", "plan", "object")]),
-        W.subflow_node("ground", "Literature investigation (deep-research)", "dp-investigate", -900, 0),
+        W.subflow_node("ground", "Literature investigation (deep-research)", "deep-investigate", -900, 0),
         W.get_node("get_investigation", "investigation", {}, -560, 200),
         W.code_node("lit_base", "Build literature base", LIT_BASE_CODE, -580, 200,
                     [W.pin("investigation", "investigation", "object")]),
@@ -1278,17 +1278,17 @@ def main():
     if problems:
         raise SystemExit(f"edge validation failed: {problems}")
     W.write_json(W.FLOWS_DIR / "co-scientist.json", flow)
-    # co-scientist composes dp-plan + dp-investigate as its grounding subflows.
-    W.compile_check("co-scientist", ["co-scientist", "dp-plan", "dp-investigate"])
+    # co-scientist composes deep-plan + deep-investigate as its grounding subflows.
+    W.compile_check("co-scientist", ["co-scientist", "deep-plan", "deep-investigate"])
     print("compiled ok")
     out = W.pack_bundle(
         root_flow_id="co-scientist",
         bundle_id="co-scientist",
-        bundle_version="0.1.6",
+        bundle_version="0.1.7",
         entrypoints=["co-scientist"],
         metadata={
             "family": "co-scientist",
-            "purpose": "deep literature-grounded multi-agent hypothesis engine (Nature AI co-scientist replica): dp-plan + dp-investigate grounding -> generate -> [reflect -> Elo tournament -> evolve -> expand] xN -> full search review -> research overview, exported as .md/.pdf/.docx",
+            "purpose": "deep literature-grounded multi-agent hypothesis engine (Nature AI co-scientist replica): deep-plan + deep-investigate grounding -> generate -> [reflect -> Elo tournament -> evolve -> expand] xN -> full search review -> research overview, exported as .md/.pdf/.docx",
             "outputs": ["research_overview", "report_markdown", "ranked_hypotheses", "top_hypothesis", "sources", "warnings", "cycles", "md_path", "pdf_path", "docx_path", "pdf_sha256", "docx_sha256"],
         },
     )

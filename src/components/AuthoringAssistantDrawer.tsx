@@ -13,7 +13,7 @@ import archDocText from '../../docs/architecture.md?raw';
 import visualflowDocText from '../../docs/visualflow.md?raw';
 import gettingStartedDocText from '../../docs/getting-started.md?raw';
 import faqDocText from '../../docs/faq.md?raw';
-import dpResearchDocText from '../../docs/dp-research.md?raw';
+import deepResearchDocText from '../../docs/deep-research.md?raw';
 import webEditorDocText from '../../docs/web-editor.md?raw';
 import { useFlowStore } from '../hooks/useFlow';
 import { useModels, useProviders } from '../hooks/useProviders';
@@ -609,7 +609,7 @@ function conceptsContextFor(): DocsContext {
     { name: 'getting-started.md', body: gettingStartedDocText },
     { name: 'web-editor.md', body: webEditorDocText },
     { name: 'faq.md', body: faqDocText },
-    { name: 'dp-research.md', body: dpResearchDocText },
+    { name: 'deep-research.md', body: deepResearchDocText },
   ];
   const sections = docs
     .map((doc) => `----- ${doc.name} -----\n${String(doc.body || '').trim()}`)

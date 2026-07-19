@@ -40,11 +40,11 @@ mkdirSync(OUT_DIR, { recursive: true });
 
 const STATES = [
   ['all_dark', 'view=all'],
-  ['expanded_dark', 'expand=dp-research,report-pipeline&select=dp-research'],
+  ['expanded_dark', 'expand=deep-research,report-pipeline&select=deep-research'],
   ['runnable_dark', 'view=executable&select=81795ea9'],
   ['search_dark', 'q=dp'],
   ['all_light', 'view=all&theme=light'],
-  ['expanded_light', 'expand=dp-research&select=dp-research&theme=light'],
+  ['expanded_light', 'expand=deep-research&select=deep-research&theme=light'],
 ];
 
 const browser = await puppeteer.launch({

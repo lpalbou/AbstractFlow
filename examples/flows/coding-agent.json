@@ -171,7 +171,7 @@
           "permissions": "sandbox"
         },
         "functionName": "transform",
-        "codeBody": "state = loop_state or {}\ncompleted = int(state.get(\"rounds_completed\", 0) or 0)\nmax_rounds_value = max(1, int(max_rounds or 1))\npassed = bool(state.get(\"all_passed\"))\n# Continue while the last round did NOT fully pass and we still have budget.\ncondition = (not passed) and completed < max_rounds_value\nreturn {\n    \"condition\": condition,\n    \"rounds_completed\": completed,\n    \"max_rounds\": max_rounds_value,\n    \"all_passed\": passed,\n}"
+        "codeBody": "state = loop_state or {}\ncompleted = int(state.get(\"rounds_completed\", 0) or 0)\nmax_rounds_value = max(1, int(max_rounds or 1))\npassed = bool(state.get(\"all_passed\"))\n# Environment failures (no executor on the host) are not fixable by the\n# builder: reprompting over them burns rounds for nothing. Stop early when\n# the ONLY failures left are environmental; keep going while any fixable\n# failure remains.\nfixable = state.get(\"failures\") or []\nenvironmental = state.get(\"environment_failures\") or []\nenvironment_blocked = completed > 0 and len(environmental) > 0 and len(fixable) == 0\n# Continue while the last round did NOT fully pass and we still have budget.\ncondition = (not passed) and (not environment_blocked) and completed < max_rounds_value\nreturn {\n    \"condition\": condition,\n    \"rounds_completed\": completed,\n    \"max_rounds\": max_rounds_value,\n    \"all_passed\": passed,\n}"
       },
       "label": null,
       "icon": null,
@@ -336,7 +336,7 @@
           "permissions": "sandbox"
         },
         "functionName": "transform",
-        "codeBody": "req = str(request or \"\").strip()\nstate = loop_state or {}\ncompleted = int(state.get(\"rounds_completed\", 0) or 0)\nfailures = state.get(\"failures\") or []\nws = str(workspace_root or \"\").strip()\n\nparts = []\nparts.append(\"# Coding task\")\nparts.append(req)\nif ws:\n    parts.append(\"\")\n    parts.append(\"Work inside the workspace root: \" + ws)\nif completed > 0 and failures:\n    parts.append(\"\")\n    parts.append(\"# Previous attempt FAILED these checks — fix EXACTLY these, do not start over:\")\n    for i, f in enumerate(failures, 1):\n        parts.append(str(i) + \". \" + str(f))\n    parts.append(\"\")\n    parts.append(\"Make the minimal changes that resolve the specific failures above, then stop.\")\nelse:\n    parts.append(\"\")\n    parts.append(\"Write the code to satisfy the task. Create/edit files in the workspace. Keep it minimal and runnable.\")\nreturn \"\\n\".join(parts)"
+        "codeBody": "req = str(request or \"\").strip()\nstate = loop_state or {}\ncompleted = int(state.get(\"rounds_completed\", 0) or 0)\nfailures = state.get(\"failures\") or []\nws = str(workspace_root or \"\").strip()\n\nparts = []\nparts.append(\"# Coding task\")\nparts.append(req)\nif ws:\n    parts.append(\"\")\n    parts.append(\"Work inside the workspace root: \" + ws)\nparts.append(\"\")\nparts.append(\"Delivery rules (verified mechanically after every round):\")\nparts.append(\"- Every produced file must live in the run workspace — never /tmp or another directory.\")\nparts.append(\"- For small web builds (games, pages, demos): prefer ONE self-contained entrypoint (index.html with inline script/styles) unless the task explicitly requires multiple files.\")\nparts.append(\"- If you do split files, the entrypoint must actually load every sibling (script src / link href) — an unreferenced file is a delivery failure, not a bonus.\")\nif completed > 0 and failures:\n    parts.append(\"\")\n    parts.append(\"# Previous attempt FAILED these checks — fix EXACTLY these, do not start over:\")\n    for i, f in enumerate(failures, 1):\n        parts.append(str(i) + \". \" + str(f))\n    parts.append(\"\")\n    parts.append(\"Make the minimal changes that resolve the specific failures above, then stop.\")\nelse:\n    parts.append(\"\")\n    parts.append(\"Write the code to satisfy the task. Create/edit files in the workspace. Keep it minimal and runnable.\")\nreturn \"\\n\".join(parts)"
       },
       "label": null,
       "icon": null,
@@ -451,7 +451,8 @@
             "skim_files",
             "skim_folders",
             "analyze_code",
-            "execute_command"
+            "execute_command",
+            "browser_probe"
           ],
           "max_iterations": 30,
           "temperature": 0.1
@@ -495,6 +496,11 @@
             "id": "run_command",
             "label": "run_command",
             "type": "string"
+          },
+          {
+            "id": "round_index",
+            "label": "round_index",
+            "type": "number"
           },
           {
             "id": "provider",
@@ -670,7 +676,7 @@
           "permissions": "sandbox"
         },
         "functionName": "transform",
-        "codeBody": "verdict = verifier or {}\nnext_round = int(round_index or 0) + 1\nall_passed = bool(verdict.get(\"all_passed\"))\nfailures = verdict.get(\"failures\") or []\nif not isinstance(failures, list):\n    failures = [str(failures)]\n# Belt: if the verdict claims pass but a gate is false, do not trust the pass.\nif all_passed and not (verdict.get(\"builds\") and verdict.get(\"executes\") and verdict.get(\"matches\")):\n    all_passed = False\n    failures = failures + [\"verifier marked all_passed but a gate was false\"]\nreturn {\n    \"rounds_completed\": next_round,\n    \"all_passed\": all_passed,\n    \"failures\": [str(f) for f in failures],\n    \"last_verdict\": verdict,\n}"
+        "codeBody": "verdict = verifier or {}\nnext_round = int(round_index or 0) + 1\nall_passed = bool(verdict.get(\"all_passed\"))\nfailures = verdict.get(\"failures\") or []\nif not isinstance(failures, list):\n    failures = [str(failures)]\nenv_failures = verdict.get(\"environment_failures\") or []\nif not isinstance(env_failures, list):\n    env_failures = [str(env_failures)]\n# Belt: if the verdict claims pass but a gate is false, do not trust the pass.\nif all_passed and not (verdict.get(\"builds\") and verdict.get(\"executes\") and verdict.get(\"matches\")):\n    all_passed = False\n    failures = failures + [\"verifier marked all_passed but a gate was false\"]\nif all_passed and env_failures:\n    all_passed = False\n    failures = failures + [\"verifier marked all_passed despite environment_failures\"]\nreturn {\n    \"rounds_completed\": next_round,\n    \"all_passed\": all_passed,\n    \"failures\": [str(f) for f in failures],\n    \"environment_failures\": [str(f) for f in env_failures],\n    \"last_verdict\": verdict,\n}"
       },
       "label": null,
       "icon": null,
@@ -820,7 +826,7 @@
           "permissions": "sandbox"
         },
         "functionName": "transform",
-        "codeBody": "state = loop_state or {}\nverdict = state.get(\"last_verdict\") or {}\nrounds = int(state.get(\"rounds_completed\", 0) or 0)\npassed = bool(state.get(\"all_passed\"))\nlines = []\nlines.append(\"# Coding agent result\")\nlines.append(\"\")\nlines.append(\"Status: \" + (\"PASSED all gates\" if passed else \"STOPPED with open gate failures\"))\nlines.append(\"Rounds used: \" + str(rounds))\nlines.append(\"\")\nlines.append(\"Gate verdict (last round):\")\nlines.append(\"- builds: \" + str(bool(verdict.get(\"builds\"))))\nlines.append(\"- executes: \" + str(bool(verdict.get(\"executes\"))))\nlines.append(\"- matches: \" + str(bool(verdict.get(\"matches\"))))\nif not passed:\n    lines.append(\"\")\n    lines.append(\"Open failures:\")\n    for f in (state.get(\"failures\") or []):\n        lines.append(\"- \" + str(f))\nif verdict.get(\"summary\"):\n    lines.append(\"\")\n    lines.append(\"Summary: \" + str(verdict.get(\"summary\")))\nreturn {\n    \"report_markdown\": \"\\n\".join(lines),\n    \"passed\": passed,\n    \"rounds_used\": rounds,\n    \"gate_verdict\": verdict,\n    \"open_failures\": state.get(\"failures\") or [],\n}"
+        "codeBody": "state = loop_state or {}\nverdict = state.get(\"last_verdict\") or {}\nrounds = int(state.get(\"rounds_completed\", 0) or 0)\npassed = bool(state.get(\"all_passed\"))\nlines = []\nlines.append(\"# Coding agent result\")\nlines.append(\"\")\nlines.append(\"Status: \" + (\"PASSED all gates\" if passed else \"STOPPED with open gate failures\"))\nlines.append(\"Rounds used: \" + str(rounds))\nlines.append(\"\")\nlines.append(\"Gate verdict (last round):\")\nlines.append(\"- builds: \" + str(bool(verdict.get(\"builds\"))))\nlines.append(\"- executes: \" + str(bool(verdict.get(\"executes\"))))\nlines.append(\"- matches: \" + str(bool(verdict.get(\"matches\"))))\n# Name WHERE the produced files live (verifier-observed, workspace-relative)\n# so the report is self-sufficient on every host — the operator should never\n# need a second agent to FIND the artifact (code seat ask, 2026-07-16).\narts = [str(a).strip() for a in (verdict.get(\"artifacts\") or []) if str(a).strip()]\nif arts:\n    lines.append(\"\")\n    lines.append(\"Artifacts (paths relative to the run workspace root):\")\n    for a in arts:\n        lines.append(\"- \" + a)\nelse:\n    lines.append(\"\")\n    lines.append(\"Artifacts: none observed by the verifier (#FALLBACK: report cannot name the produced file paths)\")\nenv_failures = [str(f) for f in (state.get(\"environment_failures\") or [])]\nwarnings = [str(w) for w in (verdict.get(\"warnings\") or [])]\nif warnings:\n    lines.append(\"\")\n    lines.append(\"Advisory (did not fail the run):\")\n    for w in warnings:\n        lines.append(\"- \" + w)\nif not passed:\n    fixable = [str(f) for f in (state.get(\"failures\") or [])]\n    if fixable:\n        lines.append(\"\")\n        lines.append(\"Open failures:\")\n        for f in fixable:\n            lines.append(\"- \" + f)\n    if env_failures:\n        lines.append(\"\")\n        lines.append(\"Not verifiable in this environment (missing executor — not a code defect; the loop stops instead of burning repair rounds):\")\n        for f in env_failures:\n            lines.append(\"- \" + f)\nif verdict.get(\"summary\"):\n    lines.append(\"\")\n    lines.append(\"Summary: \" + str(verdict.get(\"summary\")))\nreturn {\n    \"report_markdown\": \"\\n\".join(lines),\n    \"passed\": passed,\n    \"rounds_used\": rounds,\n    \"gate_verdict\": verdict,\n    \"artifacts\": arts,\n    \"open_failures\": (state.get(\"failures\") or []) + env_failures,\n}"
       },
       "label": null,
       "icon": null,
@@ -1017,6 +1023,53 @@
       "outputs": []
     },
     {
+      "id": "get_artifacts",
+      "type": "get",
+      "position": {
+        "x": 520,
+        "y": 960
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get artifacts",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "artifacts",
+          "default": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
       "id": "end",
       "type": "on_flow_end",
       "position": {
@@ -1052,6 +1105,11 @@
           {
             "id": "open_failures",
             "label": "open_failures",
+            "type": "array"
+          },
+          {
+            "id": "artifacts",
+            "label": "artifacts",
             "type": "array"
           }
         ],
@@ -1218,6 +1276,14 @@
       "animated": false
     },
     {
+      "id": "e-rounds-index-verify_input-round_index",
+      "source": "rounds",
+      "sourceHandle": "index",
+      "target": "verify_input",
+      "targetHandle": "round_index",
+      "animated": false
+    },
+    {
       "id": "e-start-provider-verify_input-provider",
       "source": "start",
       "sourceHandle": "provider",
@@ -1314,6 +1380,14 @@
       "animated": false
     },
     {
+      "id": "e-final_report-output-get_artifacts-object",
+      "source": "final_report",
+      "sourceHandle": "output",
+      "target": "get_artifacts",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
       "id": "e-get_report_md-value-end-report",
       "source": "get_report_md",
       "sourceHandle": "value",
@@ -1344,9 +1418,17 @@
       "target": "end",
       "targetHandle": "open_failures",
       "animated": false
+    },
+    {
+      "id": "e-get_artifacts-value-end-artifacts",
+      "source": "get_artifacts",
+      "sourceHandle": "value",
+      "target": "end",
+      "targetHandle": "artifacts",
+      "animated": false
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-07-15T20:39:34.312824+00:00",
-  "updated_at": "2026-07-15T20:39:34.312824+00:00"
+  "created_at": "2026-07-17T19:33:12.575399+00:00",
+  "updated_at": "2026-07-17T19:33:12.575399+00:00"
 }

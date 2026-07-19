@@ -121,7 +121,7 @@ export function FlowLibraryModal({
   const familyIndex = useMemo(() => buildFlowFamilyIndex(allFlows), [allFlows]);
   const flowById = useMemo(() => new Map(allFlows.map((flow) => [flow.id, flow])), [allFlows]);
   // Same-name collisions are real in live libraries (saved iteration copies):
-  // surface the short id so "three dp-research" is self-explanatory.
+  // surface the short id so "three deep-research" is self-explanatory.
   const duplicateNames = useMemo(() => {
     const counts = new Map<string, number>();
     for (const flow of allFlows) {

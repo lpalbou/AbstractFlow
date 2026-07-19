@@ -4,7 +4,7 @@
 One source of the node-shape conventions so every generated workflow
 (coding-agent, adversarial-review, structured-extract, map-reduce,
 co-scientist) emits byte-consistent, runtime-compilable JSON. Mirrors the
-idioms proven in build_dp_research_workflows.py.
+idioms proven in build_deep_research_workflows.py.
 """
 from __future__ import annotations
 
@@ -113,6 +113,7 @@ def llm_node(node_id, label, x, y, *, pin_defaults=None):
         pin("model", "model", "model"),
         pin("system", "system", "string"),
         pin("prompt", "prompt", "string"),
+        pin("tools", "tools", "array"),
         pin("temperature", "temperature", "number"),
         pin("resp_schema", "resp_schema", "json_schema"),
     ]
@@ -121,8 +122,16 @@ def llm_node(node_id, label, x, y, *, pin_defaults=None):
         pin("data", "data", "object"), pin("success", "success", "boolean"),
         pin("meta", "meta", "object"), pin("tool_calls", "tool_calls", "array"),
     ]
+    # tools defaults to [] as a DECLARED pin default: declared defaults beat
+    # ambient exec payload, so a host-injected `tools` key (abstractcode's
+    # agent.v1 scaffold sets vars.tools to the session allowlist) can never
+    # leak native tool declarations into a tool-free llm_call stage. Same
+    # class as the import_workspace_file content_type lesson (2026-07-15;
+    # adversary finding 2026-07-16). Callers may still override explicitly.
+    defaults = {"tools": []}
+    defaults.update(pin_defaults or {})
     return node(node_id, "llm_call", label, x, y, inputs=inputs, outputs=outputs,
-                pin_defaults=pin_defaults or {})
+                pin_defaults=defaults)
 
 
 def code_node(node_id, label, code_body, x, y, inputs, output_type="object"):
@@ -187,7 +196,7 @@ def get_node(node_id, key, default, x, y):
 
 
 def subflow_node(node_id, label, flow_id, x, y):
-    """dp-research subflow convention: one `input` object in, one `output`
+    """deep-research subflow convention: one `input` object in, one `output`
     object out; the runtime maps input keys to the child's on_flow_start
     fields by name and collects on_flow_end fields into output."""
     return node(node_id, "subflow", label, x, y,
@@ -289,7 +298,7 @@ def validate_edges(flow: dict[str, Any]) -> list[str]:
     }
     # A `code` node exposes each KEY of its returned dict as a pullable output
     # handle (runtime-resolved), beyond the declared output/success/execution
-    # pins — this is the dp-research idiom (e.g. loop_condition.condition ->
+    # pins — this is the deep-research idiom (e.g. loop_condition.condition ->
     # while.condition). So any source handle on a code node is legal.
     code_ids = {n["id"] for n in flow["nodes"] if (n["data"].get("nodeType") == "code")}
     problems: list[str] = []

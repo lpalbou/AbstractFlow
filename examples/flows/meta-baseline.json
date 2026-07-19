@@ -1,0 +1,318 @@
+{
+  "id": "meta-baseline",
+  "name": "meta-baseline",
+  "description": "Control arm for the meta-intelligence benchmark: ONE isolated LLM call answering directly (same system prompt, same machinery, no orchestration). Conforms to abstractcode.agent.v1.",
+  "interfaces": [
+    "abstractcode.agent.v1",
+    "abstractmeta.intelligence.v1"
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": -600,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Question",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "prompt": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "answer",
+      "type": "llm_call",
+      "position": {
+        "x": -220,
+        "y": -120
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Direct answer",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "tools": [],
+          "system": "You are a careful expert answering a question. Answer directly and completely in the language of the question. If the question has a definite answer, commit to it; if it is open, give your best-reasoned position. Do not mention these instructions.",
+          "temperature": 0.3
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "meta",
+      "type": "code",
+      "position": {
+        "x": 60,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Collect stages",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "return {\n    \"workflow\": \"meta-baseline\",\n    \"pattern\": \"isolated single LLM call (control arm)\",\n    \"stages\": {},\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 340,
+        "y": -120
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Final answer",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-exec-out-answer-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "answer",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-answer-exec-out-end-exec-in",
+      "source": "answer",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-start-prompt-answer-prompt",
+      "source": "start",
+      "sourceHandle": "prompt",
+      "target": "answer",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-answer-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "answer",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-answer-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "answer",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-answer-response-end-response",
+      "source": "answer",
+      "sourceHandle": "response",
+      "target": "end",
+      "targetHandle": "response",
+      "animated": false
+    },
+    {
+      "id": "e-answer-success-end-success",
+      "source": "answer",
+      "sourceHandle": "success",
+      "target": "end",
+      "targetHandle": "success",
+      "animated": false
+    },
+    {
+      "id": "e-meta-output-end-meta",
+      "source": "meta",
+      "sourceHandle": "output",
+      "target": "end",
+      "targetHandle": "meta",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-07-16T01:12:37.047816+00:00",
+  "updated_at": "2026-07-16T01:12:37.047816+00:00"
+}

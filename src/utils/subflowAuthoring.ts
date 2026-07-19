@@ -137,7 +137,7 @@ export function parseSubflowDefinitions(
       continue;
     }
     const mappedId = context.refMap[ref];
-    // Name collisions with OTHER library flows breed the three-dp-research
+    // Name collisions with OTHER library flows breed the three-deep-research
     // confusion class; refuse at birth (updates keeping their own name pass).
     const nameOwner = savedNames.get(flowName.toLowerCase());
     if (nameOwner && nameOwner !== mappedId) {

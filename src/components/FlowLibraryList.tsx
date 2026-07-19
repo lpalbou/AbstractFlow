@@ -38,7 +38,7 @@ export interface FlowLibraryListProps {
   selfReferencingIds: ReadonlySet<string>;
   cyclePromotedIds: ReadonlySet<string>;
   /** Names carried by MORE than one flow: rows disambiguate with the short id
-   * (operator confusion case: three saved copies all named dp-research). */
+   * (operator confusion case: three saved copies all named deep-research). */
   duplicateNames?: ReadonlySet<string>;
   /** In the runnable-only view the runnable badge is redundant noise. */
   hideRunnableBadge?: boolean;

@@ -1,6 +1,9 @@
 import { useMemo } from 'react';
 
 import { AgentCyclesPanel, type TraceItem, type TraceStep } from '@abstractframework/monitor-flow';
+// Family rule: hosts import kit CSS explicitly (uic c2775 ask 1, option a).
+// Idempotent beside monitor-flow's legacy self-import until uic removes it.
+import '@abstractframework/monitor-flow/agent_cycles.css';
 
 import type { ExecutionEvent } from '../types/flow';
 

@@ -91,7 +91,7 @@ describe('parseSubflowDefinitions', () => {
 
   it('refuses a flow_name colliding with an unrelated library workflow', () => {
     const parsed = parseSubflowDefinitions(graphWith([helperDefinition({ flow_name: 'deep-research' })]), {
-      savedFlows: [{ id: 'dp-research', name: 'deep-research' }],
+      savedFlows: [{ id: 'deep-research', name: 'deep-research' }],
       refMap: {},
     });
     expect(parsed.definitions).toEqual([]);

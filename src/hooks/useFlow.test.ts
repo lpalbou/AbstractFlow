@@ -42,7 +42,7 @@ function toolbarSignature(flow: Partial<VisualFlow> | null | undefined): string 
 
 describe('useFlowStore.loadFlow', () => {
   it('returns the canonical loaded flow so bundled workflows are clean after load', () => {
-    const bundled = listBundledFlows().find((flow) => flow.id === 'dp-research');
+    const bundled = listBundledFlows().find((flow) => flow.id === 'deep-research');
     expect(bundled).toBeTruthy();
 
     const store = useFlowStore.getState();

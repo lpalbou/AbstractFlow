@@ -340,6 +340,53 @@
       "outputs": []
     },
     {
+      "id": "get_artifacts",
+      "type": "get",
+      "position": {
+        "x": 100,
+        "y": 620
+      },
+      "data": {
+        "nodeType": "get",
+        "label": "Get artifacts",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "object",
+            "label": "object",
+            "type": "object"
+          },
+          {
+            "id": "key",
+            "label": "key",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "key": "artifacts",
+          "default": []
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
       "id": "meta_obj",
       "type": "make_object",
       "position": {
@@ -365,6 +412,11 @@
           {
             "id": "open_failures",
             "label": "open_failures",
+            "type": "array"
+          },
+          {
+            "id": "artifacts",
+            "label": "artifacts",
             "type": "array"
           }
         ],
@@ -507,6 +559,14 @@
       "animated": false
     },
     {
+      "id": "e-build-output-get_artifacts-object",
+      "source": "build",
+      "sourceHandle": "output",
+      "target": "get_artifacts",
+      "targetHandle": "object",
+      "animated": false
+    },
+    {
       "id": "e-get_passed-value-meta_obj-passed",
       "source": "get_passed",
       "sourceHandle": "value",
@@ -528,6 +588,14 @@
       "sourceHandle": "value",
       "target": "meta_obj",
       "targetHandle": "open_failures",
+      "animated": false
+    },
+    {
+      "id": "e-get_artifacts-value-meta_obj-artifacts",
+      "source": "get_artifacts",
+      "sourceHandle": "value",
+      "target": "meta_obj",
+      "targetHandle": "artifacts",
       "animated": false
     },
     {
@@ -556,6 +624,6 @@
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-07-15T20:39:34.312923+00:00",
-  "updated_at": "2026-07-15T20:39:34.312923+00:00"
+  "created_at": "2026-07-17T19:33:12.575437+00:00",
+  "updated_at": "2026-07-17T19:33:12.575437+00:00"
 }

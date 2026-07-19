@@ -1024,11 +1024,11 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 
 - Node type: `write_docx`
 - Document node: `{"id":"<unique_id>","type":"write_docx"}`
-- Utility: Render text or Markdown-style report content to a workspace-scoped DOCX document using the Runtime stdlib DOCX writer.
+- Utility: Render text or Markdown-style report content to a workspace-scoped DOCX document using the Runtime stdlib DOCX writer. Documents carry a discreet AbstractFramework/AbstractFlow identity (workflow version, report date, abstractframework.ai) by default.
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `file_path` workspace_file; `content` any; `title` string: Optional DOCX document title.
+- Inputs: `exec-in` execution; `file_path` workspace_file; `content` any; `title` string: Optional DOCX document title.; `branding` any: Framework identity on the document (meta line, page footer, core properties). Default on with run provenance; set false to disable or pass an object to override fields (framework/app/url/date/workflow).
 - Outputs: `exec-out` execution; `bytes` number; `file_path` workspace_file; `sha256` string; `content_type` string
 - Default config: none
 
@@ -1048,11 +1048,11 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 
 - Node type: `write_pdf`
 - Document node: `{"id":"<unique_id>","type":"write_pdf"}`
-- Utility: Render text or Markdown-style report content to a real workspace-scoped server PDF path using the Runtime permissive PDF writer.
+- Utility: Render text or Markdown-style report content to a real workspace-scoped server PDF path using the Runtime permissive PDF writer. Documents carry a discreet AbstractFramework/AbstractFlow identity (workflow version, report date, abstractframework.ai) by default.
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `file_path` workspace_file; `content` any; `title` string: Optional PDF document title.
+- Inputs: `exec-in` execution; `file_path` workspace_file; `content` any; `title` string: Optional PDF document title.; `branding` any: Framework identity on the document (meta line, running footer, PDF metadata). Default on with run provenance; set false to disable or pass an object to override fields (framework/app/url/date/workflow).
 - Outputs: `exec-out` execution; `bytes` number; `file_path` workspace_file; `sha256` string; `content_type` string
 - Default config: none
 

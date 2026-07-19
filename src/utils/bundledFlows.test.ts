@@ -2,29 +2,29 @@ import { describe, expect, it } from 'vitest';
 import { getBundledRunTarget, listBundledFlows, mergeFlowCatalogs } from './bundledFlows';
 
 describe('bundled deep research flows', () => {
-  it('loads the shipped dp workflow family', () => {
+  it('loads the shipped deep-research workflow family', () => {
     const flows = listBundledFlows();
     const ids = flows.map((flow) => flow.id);
 
     expect(ids).toEqual(
-      expect.arrayContaining(['dp-plan', 'dp-investigate', 'dp-review', 'dp-render', 'dp-research'])
+      expect.arrayContaining(['deep-plan', 'deep-investigate', 'deep-review', 'deep-render', 'deep-research'])
     );
-    expect(flows.find((flow) => flow.id === 'dp-research')?.nodes.length).toBeGreaterThan(0);
-    expect(getBundledRunTarget('dp-research')).toEqual({
-      flowId: 'dp-research',
-      bundleId: 'dp-research',
-      // 0.1.4 = branded exports + derived report titles.
-      bundleVersion: '0.1.4',
-      bundleRef: 'dp-research@0.1.5',
+    expect(flows.find((flow) => flow.id === 'deep-research')?.nodes.length).toBeGreaterThan(0);
+    expect(getBundledRunTarget('deep-research')).toEqual({
+      flowId: 'deep-research',
+      bundleId: 'deep-research',
+      // 0.1.6 = the deep-* rename release (version lineage continues from dp-research@0.1.5).
+      bundleVersion: '0.1.6',
+      bundleRef: 'deep-research@0.1.6',
     });
-    // The rename wave: ids stay dp-* (wiring), display names read deep-research*.
-    expect(flows.find((flow) => flow.id === 'dp-research')?.name).toBe('deep-research');
-    expect(flows.find((flow) => flow.id === 'dp-plan')?.name).toBe('deep-research-plan');
+    // 2026-07-16: ids, names, files, and the bundle id are all deep-* (dp- retired).
+    expect(flows.find((flow) => flow.id === 'deep-research')?.name).toBe('deep-research');
+    expect(flows.find((flow) => flow.id === 'deep-plan')?.name).toBe('deep-research-plan');
   });
 
   it('lets saved gateway flows override bundled entries', () => {
     const bundled = listBundledFlows();
-    const root = bundled.find((flow) => flow.id === 'dp-research');
+    const root = bundled.find((flow) => flow.id === 'deep-research');
 
     expect(root).toBeTruthy();
 
@@ -33,22 +33,22 @@ describe('bundled deep research flows', () => {
         ? [
             {
               ...root,
-              name: 'Saved dp-research',
+              name: 'Saved deep-research',
             },
           ]
         : [],
       bundled
     );
 
-    expect(catalog.flows.find((flow) => flow.id === 'dp-research')?.name).toBe('Saved dp-research');
-    expect(catalog.bundledFlowIds).not.toContain('dp-research');
-    expect(catalog.bundledRunTargetIds).not.toContain('dp-research');
+    expect(catalog.flows.find((flow) => flow.id === 'deep-research')?.name).toBe('Saved deep-research');
+    expect(catalog.bundledFlowIds).not.toContain('deep-research');
+    expect(catalog.bundledRunTargetIds).not.toContain('deep-research');
   });
 
-  it('marks unsaved dp-research as a runnable bundled workflow family', () => {
+  it('marks unsaved deep-research as a runnable bundled workflow family', () => {
     const catalog = mergeFlowCatalogs([], listBundledFlows());
 
-    expect(catalog.bundledFlowIds).toContain('dp-research');
-    expect(catalog.bundledRunTargetIds).toContain('dp-research');
+    expect(catalog.bundledFlowIds).toContain('deep-research');
+    expect(catalog.bundledRunTargetIds).toContain('deep-research');
   });
 });

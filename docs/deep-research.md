@@ -1,16 +1,18 @@
-# `deep-research` Workflow Family (ids `dp-*`)
+# `deep-research` Workflow Family
 
 `deep-research` is the shipped production research WorkflowBundle family for
-Gateway-hosted runs. Display names are `deep-research` and
-`deep-research-{plan,investigate,review,render}`; the flow/bundle **ids stay
-`dp-*`** (`dp-research`, `dp-plan`, …) so existing wiring, run history, and
-bundle refs remain valid. It is authored as editable VisualFlow JSON in
-`examples/flows/dp-*.json` and packed as `dp-research@0.1.1.flow` (0.1.1 is
-the rename release; bundle versions are immutable by sha).
+Gateway-hosted runs. Flow ids, display names, files, and the bundle id all use
+the `deep-` vocabulary (`deep-research`, `deep-plan`, `deep-investigate`,
+`deep-review`, `deep-render`) — the historical `dp-` prefix was fully retired
+on 2026-07-16 (operator ruling); older `dp-research@0.1.x` bundles remain on
+disk only for completed-run history. It is authored as editable VisualFlow
+JSON in `examples/flows/deep-*.json` and packed as `deep-research@0.1.6.flow`
+(version lineage continues from the dp era; bundle versions are immutable by
+sha).
 
 ## User Inputs
 
-The public entrypoint is `dp-research`. It exposes product-facing inputs:
+The public entrypoint is `deep-research`. It exposes product-facing inputs:
 
 - `request`: what should be researched.
 - `viewpoint`: the angle, thesis, audience stance, or evaluation lens.
@@ -37,17 +39,17 @@ Effort presets:
 
 ## Workflow Stages
 
-- `dp-plan`: turns the request, viewpoint, and derived effort settings into a
+- `deep-plan`: turns the request, viewpoint, and derived effort settings into a
   research plan and quality gates.
-- `dp-investigate`: uses a read-only evidence tool allowlist to gather and
+- `deep-investigate`: uses a read-only evidence tool allowlist to gather and
   structure sources. Each pass receives the previous investigation and latest
   adversarial review, so review findings drive the next pass.
-- `dp-review`: runs three adversarial lenses: evidence skeptic, user relevance
+- `deep-review`: runs three adversarial lenses: evidence skeptic, user relevance
   critic, and gap hunter, then synthesizes which insights matter and what to
   investigate next.
-- `dp-render`: writes the final Markdown report and machine-readable audit
+- `deep-render`: writes the final Markdown report and machine-readable audit
   objects.
-- `dp-research`: derives the effort settings, orchestrates the subflows with a
+- `deep-research`: derives the effort settings, orchestrates the subflows with a
   review-gated loop, then exports files.
 
 Research agents are limited to read-only evidence tools:

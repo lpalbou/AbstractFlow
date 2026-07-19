@@ -47,9 +47,16 @@ export const KNOWN_INTERFACES: KnownInterface[] = [
     requiredEndPins: ['response', 'success', 'meta'],
   },
   {
-    id: 'abstractresearch.dp.v1',
-    label: 'Deep research (dp)',
-    description: 'Domain marker for the dp- deep-research family. No framework consumer yet.',
+    id: 'abstractresearch.deep.v1',
+    label: 'Deep research',
+    description: 'Domain marker for the deep-research family. No framework consumer yet.',
+    class: 'domain',
+  },
+  {
+    id: 'abstractmeta.intelligence.v1',
+    label: 'Meta-intelligence',
+    description:
+      'Domain marker for co-orchestrated deliberation patterns (consensus, debate, introspection, multi-angle, plan-verify). Each flow also conforms to abstractcode.agent.v1 so it benchmarks 1:1 against an isolated LLM call.',
     class: 'domain',
   },
   {

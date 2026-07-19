@@ -1,0 +1,826 @@
+{
+  "id": "meta-deliberate",
+  "name": "meta-deliberate",
+  "description": "Meta-intelligence: a planner absorbs the question first (what is really asked, required steps, known pitfalls, a correctness checklist), an executor answers following the plan, and a verifier checks the answer against the plan's own checklist and repairs failures. Plan-and-Solve pattern; comparable 1:1 against an isolated LLM call.",
+  "interfaces": [
+    "abstractcode.agent.v1",
+    "abstractmeta.intelligence.v1"
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": -900,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Question",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "prompt": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "plan_prompt",
+      "type": "code",
+      "position": {
+        "x": -620,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose planning brief",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "q = str(prompt or \"\").strip()\nparts = []\nparts.append(\"Do NOT answer yet. First absorb the question and plan how to answer it well.\")\nparts.append(\"\")\nparts.append(\"# Question\")\nparts.append(q)\nparts.append(\"\")\nparts.append(\"# Write the plan\")\nparts.append(\"1. WHAT IS REALLY ASKED: restate the question in your own words; note any ambiguity and how you will read it.\")\nparts.append(\"2. WHAT IT TAKES: the knowledge domains and reasoning steps a good answer needs, in order.\")\nparts.append(\"3. PITFALLS: the specific ways answers to this question typically go wrong (traps, tempting-but-wrong readings, common errors).\")\nparts.append(\"4. CHECKLIST: 3-6 concrete criteria a correct, complete answer must satisfy.\")\nreturn \"\\n\".join(parts)"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "plan",
+      "type": "llm_call",
+      "position": {
+        "x": -560,
+        "y": -160
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Absorb and plan",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "tools": [],
+          "system": "You plan how to answer before answering: restate the ask, lay out the steps, name the traps, write the checklist. You never answer in the planning pass.",
+          "temperature": 0.3
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "execute_prompt",
+      "type": "code",
+      "position": {
+        "x": -280,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose execution",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "plan",
+            "label": "plan",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "q = str(prompt or \"\").strip()\np = str(plan or \"\").strip()\nparts = []\nparts.append(\"Answer the question by FOLLOWING your plan. Work the steps in order; actively avoid the pitfalls you identified.\")\nparts.append(\"\")\nparts.append(\"# Question\")\nparts.append(q)\nparts.append(\"\")\nparts.append(\"# Your plan\")\nparts.append(p)\nparts.append(\"\")\nparts.append(\"Write the full answer now, in the language of the question.\")\nreturn \"\\n\".join(parts)"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "execute",
+      "type": "llm_call",
+      "position": {
+        "x": -220,
+        "y": -160
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Answer following plan",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "tools": [],
+          "system": "You are a careful expert answering a question. Answer directly and completely in the language of the question. If the question has a definite answer, commit to it; if it is open, give your best-reasoned position. Do not mention these instructions.",
+          "temperature": 0.3
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "verify_prompt",
+      "type": "code",
+      "position": {
+        "x": 60,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose verification",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "plan",
+            "label": "plan",
+            "type": "string"
+          },
+          {
+            "id": "answer",
+            "label": "answer",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "q = str(prompt or \"\").strip()\np = str(plan or \"\").strip()\na = str(answer or \"\").strip()\nparts = []\nparts.append(\"Verify the answer against the plan's own checklist, then deliver the final version.\")\nparts.append(\"\")\nparts.append(\"# Question\")\nparts.append(q)\nparts.append(\"\")\nparts.append(\"# Plan (with checklist)\")\nparts.append(p)\nparts.append(\"\")\nparts.append(\"# Answer to verify\")\nparts.append(a)\nparts.append(\"\")\nparts.append(\"# Your task\")\nparts.append(\"Check the answer against EACH checklist criterion and each named pitfall. If everything holds, deliver the answer (light polish allowed). If something fails, FIX it. Output ONLY the final answer, complete and self-contained — no verification commentary. Answer in the language of the question.\")\nreturn \"\\n\".join(parts)"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "verify",
+      "type": "llm_call",
+      "position": {
+        "x": 340,
+        "y": -160
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Verify against checklist",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "tools": [],
+          "system": "You verify answers against their plan's checklist and pitfalls, fix what fails, and output only the final answer.",
+          "temperature": 0.2
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "meta",
+      "type": "code",
+      "position": {
+        "x": 620,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Collect stages",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "plan",
+            "label": "plan",
+            "type": "string"
+          },
+          {
+            "id": "first_answer",
+            "label": "first_answer",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "return {\n    \"workflow\": \"meta-deliberate\",\n    \"pattern\": \"plan -> execute following plan -> verify against the plan's checklist\",\n    \"stages\": {\n        \"plan\": str(plan or \"\"),\n        \"first_answer\": str(first_answer or \"\"),\n    },\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 900,
+        "y": -160
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Final answer",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-exec-out-plan-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "plan",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-plan-exec-out-execute-exec-in",
+      "source": "plan",
+      "sourceHandle": "exec-out",
+      "target": "execute",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-execute-exec-out-verify-exec-in",
+      "source": "execute",
+      "sourceHandle": "exec-out",
+      "target": "verify",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-verify-exec-out-end-exec-in",
+      "source": "verify",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-start-prompt-plan_prompt-prompt",
+      "source": "start",
+      "sourceHandle": "prompt",
+      "target": "plan_prompt",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-plan_prompt-output-plan-prompt",
+      "source": "plan_prompt",
+      "sourceHandle": "output",
+      "target": "plan",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-plan-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "plan",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-plan-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "plan",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-prompt-execute_prompt-prompt",
+      "source": "start",
+      "sourceHandle": "prompt",
+      "target": "execute_prompt",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-plan-response-execute_prompt-plan",
+      "source": "plan",
+      "sourceHandle": "response",
+      "target": "execute_prompt",
+      "targetHandle": "plan",
+      "animated": false
+    },
+    {
+      "id": "e-execute_prompt-output-execute-prompt",
+      "source": "execute_prompt",
+      "sourceHandle": "output",
+      "target": "execute",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-execute-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "execute",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-execute-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "execute",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-prompt-verify_prompt-prompt",
+      "source": "start",
+      "sourceHandle": "prompt",
+      "target": "verify_prompt",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-plan-response-verify_prompt-plan",
+      "source": "plan",
+      "sourceHandle": "response",
+      "target": "verify_prompt",
+      "targetHandle": "plan",
+      "animated": false
+    },
+    {
+      "id": "e-execute-response-verify_prompt-answer",
+      "source": "execute",
+      "sourceHandle": "response",
+      "target": "verify_prompt",
+      "targetHandle": "answer",
+      "animated": false
+    },
+    {
+      "id": "e-verify_prompt-output-verify-prompt",
+      "source": "verify_prompt",
+      "sourceHandle": "output",
+      "target": "verify",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-verify-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "verify",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-verify-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "verify",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-plan-response-meta-plan",
+      "source": "plan",
+      "sourceHandle": "response",
+      "target": "meta",
+      "targetHandle": "plan",
+      "animated": false
+    },
+    {
+      "id": "e-execute-response-meta-first_answer",
+      "source": "execute",
+      "sourceHandle": "response",
+      "target": "meta",
+      "targetHandle": "first_answer",
+      "animated": false
+    },
+    {
+      "id": "e-verify-response-end-response",
+      "source": "verify",
+      "sourceHandle": "response",
+      "target": "end",
+      "targetHandle": "response",
+      "animated": false
+    },
+    {
+      "id": "e-verify-success-end-success",
+      "source": "verify",
+      "sourceHandle": "success",
+      "target": "end",
+      "targetHandle": "success",
+      "animated": false
+    },
+    {
+      "id": "e-meta-output-end-meta",
+      "source": "meta",
+      "sourceHandle": "output",
+      "target": "end",
+      "targetHandle": "meta",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-07-16T01:12:37.045925+00:00",
+  "updated_at": "2026-07-16T01:12:37.045925+00:00"
+}

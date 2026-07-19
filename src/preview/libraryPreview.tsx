@@ -8,7 +8,7 @@ import '@abstractframework/ui-kit/theme.css';
 import '../styles/index.css';
 
 /**
- * Dev-only harness: renders the Flow Library modal with the bundled dp-
+ * Dev-only harness: renders the Flow Library modal with the bundled deep-research
  * family plus synthetic pathological fixtures (shared helper, recursion,
  * dangling ref), driven by URL params so chrome-headless screenshots can
  * iterate on every state without click automation.
@@ -79,19 +79,19 @@ const fixtures: VisualFlow[] = [
     description: 'References the formatter twice (multiplicity badge case).',
   }),
   // The operator's live-library confusion case (historical): SAVED iteration
-  // copies sharing one name — the live store carried two June-28 dp-research
+  // copies sharing one name — the live store carried two June-28 deep-research
   // snapshots beside the bundled root before the 2026-07-13 cleanup (the
   // bundled root is now NAMED deep-research, so these two synthetic rows are
   // the remaining same-name pair). Rows must self-disambiguate with the
   // short id; that behavior is what this fixture pins.
   syntheticFlow('e31bd652', {
-    name: 'dp-research',
-    refs: ['dp-investigate', 'dp-plan', 'dp-render', 'dp-review'],
+    name: 'deep-research',
+    refs: ['deep-investigate', 'deep-plan', 'deep-render', 'deep-review'],
     updated: '2026-06-28T15:47:07Z',
   }),
   syntheticFlow('ec83cf80', {
-    name: 'dp-research',
-    refs: ['dp-investigate', 'dp-plan', 'dp-render', 'dp-review'],
+    name: 'deep-research',
+    refs: ['deep-investigate', 'deep-plan', 'deep-render', 'deep-review'],
     updated: '2026-06-28T14:59:45Z',
   }),
 ];
@@ -121,7 +121,7 @@ function Harness() {
       currentFlowId={select}
       flows={fixtures}
       readonlyFlowIds={listBundledFlows().map((flow) => flow.id)}
-      bundledRunTargetIds={['dp-research', '81795ea9']}
+      bundledRunTargetIds={['deep-research', '81795ea9']}
       onClose={() => undefined}
       onLoadFlow={() => undefined}
       onRenameFlow={() => undefined}

@@ -171,7 +171,7 @@ def build_flow():
         # loop condition
         W.edge("get_loop_state", "value", "loop_cond", "loop_state"),
         W.edge("start", "max_attempts", "loop_cond", "max_attempts"),
-        # pull the boolean SUB-KEY of the code node's dict (dp-research idiom),
+        # pull the boolean SUB-KEY of the code node's dict (deep-research idiom),
         # not the whole object — a dict on while.condition is always truthy.
         W.edge("loop_cond", "condition", "attempts", "condition"),
         # extractor prompt (prior errors fed back for the correction reprompt)

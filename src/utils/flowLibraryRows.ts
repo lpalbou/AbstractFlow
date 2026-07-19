@@ -125,7 +125,7 @@ export function buildLibraryRows(
       ...counts,
       rows: matches.map((flow) => {
         // Unique parent NAMES: several saved copies of one workflow (same
-        // name, different ids) otherwise render "in dp-research, dp-research".
+        // name, different ids) otherwise render "in deep-research, deep-research".
         const parents = Array.from(
           new Set((index.inboundBy.get(flow.id) || []).map((id) => byId.get(id)?.name || id))
         ).sort((a, b) => safeLower(a).localeCompare(safeLower(b)));

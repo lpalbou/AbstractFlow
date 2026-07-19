@@ -1,10 +1,10 @@
 {
-  "id": "dp-research",
+  "id": "deep-research",
   "name": "deep-research",
   "description": "Production research workflow with adversarial review, provenance, and Markdown/PDF/DOCX export.",
   "interfaces": [
     "abstractcode.agent.v1",
-    "abstractresearch.dp.v1"
+    "abstractresearch.deep.v1"
   ],
   "nodes": [
     {
@@ -129,7 +129,7 @@
           "permissions": "sandbox"
         },
         "functionName": "transform",
-        "codeBody": "effort_text = str(effort or \"standard\").strip().lower().replace(\"_\", \" \").replace(\"-\", \" \")\nif effort_text in (\"quick\", \"quick search\", \"quick report\", \"fast\", \"fast search\", \"brief\", \"brief search\"):\n    effort_key = \"quick\"\nelif effort_text in (\"thorough\", \"thorough search\", \"thorough report\", \"deep\", \"deep research\", \"exhaustive\"):\n    effort_key = \"thorough\"\nelse:\n    effort_key = \"standard\"\n\nprofiles = {\n    \"quick\": {\n        \"effort\": \"quick\",\n        \"effort_preset\": \"Quick search\",\n        \"audience\": \"Technical decision-maker\",\n        \"quality_profile\": \"Fast, source-grounded answer with concise adversarial gap check\",\n        \"max_iterations\": 3,\n        \"deadline_minutes\": 8,\n        \"max_sources\": 12,\n        \"max_review_rounds\": 1,\n        \"source_policy\": \"Prefer primary or highly authoritative sources. Fetch before citing. Stop once the core answer is supported.\",\n        \"citation_policy\": \"Cite decisive claims and flag uncertainty instead of over-searching.\",\n        \"output_prefix\": \"reports/dp-quick-research\",\n        \"report_title\": \"Quick Research Brief\",\n        \"include_images\": False,\n    },\n    \"standard\": {\n        \"effort\": \"standard\",\n        \"effort_preset\": \"Standard search\",\n        \"audience\": \"Technical decision-maker\",\n        \"quality_profile\": \"Balanced research with adversarial review, source ledger, and evidence checks\",\n        \"max_iterations\": 6,\n        \"deadline_minutes\": 20,\n        \"max_sources\": 28,\n        \"max_review_rounds\": 2,\n        \"source_policy\": \"Prefer primary, recent, authoritative sources. Fetch before citing and compare at least one contrary source when useful.\",\n        \"citation_policy\": \"Every important factual claim needs a source id or an explicit limitation.\",\n        \"output_prefix\": \"reports/dp-standard-research\",\n        \"report_title\": \"Research Report\",\n        \"include_images\": True,\n    },\n    \"thorough\": {\n        \"effort\": \"thorough\",\n        \"effort_preset\": \"Thorough search\",\n        \"audience\": \"Technical decision-maker\",\n        \"quality_profile\": \"SOTA deep research with independent adversarial review, provenance, and strict evidence audit\",\n        \"max_iterations\": 10,\n        \"deadline_minutes\": 45,\n        \"max_sources\": 64,\n        \"max_review_rounds\": 3,\n        \"source_policy\": \"Prefer primary, recent, authoritative sources. Fetch before citing, triangulate important claims, and actively seek disconfirming evidence.\",\n        \"citation_policy\": \"Every non-obvious factual claim needs a source id or limitation. Distinguish primary evidence from commentary.\",\n        \"output_prefix\": \"reports/dp-thorough-research\",\n        \"report_title\": \"Deep Research Report\",\n        \"include_images\": True,\n    },\n}\n\nprofile = dict(profiles[effort_key])\nprovider_text = str(provider or \"\").strip()\nmodel_text = str(model or \"\").strip()\nif (provider_text and not model_text) or (model_text and not provider_text):\n    raise ValueError(\"provider and model must both be set, or both left blank for Gateway/Core defaults\")\nprofile[\"provider\"] = provider_text\nprofile[\"model\"] = model_text\n\nreturn profile"
+        "codeBody": "effort_text = str(effort or \"standard\").strip().lower().replace(\"_\", \" \").replace(\"-\", \" \")\nif effort_text in (\"quick\", \"quick search\", \"quick report\", \"fast\", \"fast search\", \"brief\", \"brief search\"):\n    effort_key = \"quick\"\nelif effort_text in (\"thorough\", \"thorough search\", \"thorough report\", \"deep\", \"deep research\", \"exhaustive\"):\n    effort_key = \"thorough\"\nelse:\n    effort_key = \"standard\"\n\nprofiles = {\n    \"quick\": {\n        \"effort\": \"quick\",\n        \"effort_preset\": \"Quick search\",\n        \"audience\": \"Technical decision-maker\",\n        \"quality_profile\": \"Fast, source-grounded answer with concise adversarial gap check\",\n        \"max_iterations\": 3,\n        \"deadline_minutes\": 8,\n        \"max_sources\": 12,\n        \"max_review_rounds\": 1,\n        \"source_policy\": \"Prefer primary or highly authoritative sources. Fetch before citing. Stop once the core answer is supported.\",\n        \"citation_policy\": \"Cite decisive claims and flag uncertainty instead of over-searching.\",\n        \"output_prefix\": \"reports/deep-quick-research\",\n        \"report_title\": \"Quick Research Brief\",\n        \"include_images\": False,\n    },\n    \"standard\": {\n        \"effort\": \"standard\",\n        \"effort_preset\": \"Standard search\",\n        \"audience\": \"Technical decision-maker\",\n        \"quality_profile\": \"Balanced research with adversarial review, source ledger, and evidence checks\",\n        \"max_iterations\": 6,\n        \"deadline_minutes\": 20,\n        \"max_sources\": 28,\n        \"max_review_rounds\": 2,\n        \"source_policy\": \"Prefer primary, recent, authoritative sources. Fetch before citing and compare at least one contrary source when useful.\",\n        \"citation_policy\": \"Every important factual claim needs a source id or an explicit limitation.\",\n        \"output_prefix\": \"reports/deep-standard-research\",\n        \"report_title\": \"Research Report\",\n        \"include_images\": True,\n    },\n    \"thorough\": {\n        \"effort\": \"thorough\",\n        \"effort_preset\": \"Thorough search\",\n        \"audience\": \"Technical decision-maker\",\n        \"quality_profile\": \"SOTA deep research with independent adversarial review, provenance, and strict evidence audit\",\n        \"max_iterations\": 10,\n        \"deadline_minutes\": 45,\n        \"max_sources\": 64,\n        \"max_review_rounds\": 3,\n        \"source_policy\": \"Prefer primary, recent, authoritative sources. Fetch before citing, triangulate important claims, and actively seek disconfirming evidence.\",\n        \"citation_policy\": \"Every non-obvious factual claim needs a source id or limitation. Distinguish primary evidence from commentary.\",\n        \"output_prefix\": \"reports/deep-thorough-research\",\n        \"report_title\": \"Deep Research Report\",\n        \"include_images\": True,\n    },\n}\n\nprofile = dict(profiles[effort_key])\nprovider_text = str(provider or \"\").strip()\nmodel_text = str(model or \"\").strip()\nif (provider_text and not model_text) or (model_text and not provider_text):\n    raise ValueError(\"provider and model must both be set, or both left blank for Gateway/Core defaults\")\nprofile[\"provider\"] = provider_text\nprofile[\"model\"] = model_text\n\nreturn profile"
       },
       "label": null,
       "icon": null,
@@ -222,7 +222,7 @@
         ],
         "pinDefaults": {
           "key": "output_prefix",
-          "default": "reports/dp-standard-research"
+          "default": "reports/deep-standard-research"
         }
       },
       "label": null,
@@ -468,7 +468,7 @@
           }
         ],
         "pinDefaults": {
-          "name": "dp.export_timestamp"
+          "name": "deep.export_timestamp"
         }
       },
       "label": null,
@@ -574,7 +574,7 @@
         "pinDefaults": {
           "inherit_context": false
         },
-        "subflowId": "dp-plan"
+        "subflowId": "deep-plan"
       },
       "label": null,
       "icon": null,
@@ -661,7 +661,7 @@
           }
         ],
         "pinDefaults": {
-          "name": "dp.loop_state",
+          "name": "deep.loop_state",
           "default": {
             "rounds_completed": 0,
             "continue_research": true
@@ -820,7 +820,7 @@
           }
         ],
         "pinDefaults": {
-          "name": "dp.latest_investigation",
+          "name": "deep.latest_investigation",
           "default": {}
         }
       },
@@ -862,7 +862,7 @@
           }
         ],
         "pinDefaults": {
-          "name": "dp.latest_review",
+          "name": "deep.latest_review",
           "default": {}
         }
       },
@@ -994,7 +994,7 @@
         "pinDefaults": {
           "inherit_context": false
         },
-        "subflowId": "dp-investigate"
+        "subflowId": "deep-investigate"
       },
       "label": null,
       "icon": null,
@@ -1091,7 +1091,7 @@
           }
         ],
         "pinDefaults": {
-          "name": "dp.latest_investigation"
+          "name": "deep.latest_investigation"
         }
       },
       "label": null,
@@ -1217,7 +1217,7 @@
         "pinDefaults": {
           "inherit_context": false
         },
-        "subflowId": "dp-review"
+        "subflowId": "deep-review"
       },
       "label": null,
       "icon": null,
@@ -1314,7 +1314,7 @@
           }
         ],
         "pinDefaults": {
-          "name": "dp.latest_review"
+          "name": "deep.latest_review"
         }
       },
       "label": null,
@@ -1423,7 +1423,7 @@
           }
         ],
         "pinDefaults": {
-          "name": "dp.loop_state"
+          "name": "deep.loop_state"
         }
       },
       "label": null,
@@ -1464,7 +1464,7 @@
           }
         ],
         "pinDefaults": {
-          "name": "dp.latest_investigation",
+          "name": "deep.latest_investigation",
           "default": {}
         }
       },
@@ -1506,7 +1506,7 @@
           }
         ],
         "pinDefaults": {
-          "name": "dp.latest_review",
+          "name": "deep.latest_review",
           "default": {}
         }
       },
@@ -1548,7 +1548,7 @@
           }
         ],
         "pinDefaults": {
-          "name": "dp.loop_state",
+          "name": "deep.loop_state",
           "default": {
             "rounds_completed": 0,
             "continue_research": true
@@ -1725,7 +1725,7 @@
         "pinDefaults": {
           "inherit_context": false
         },
-        "subflowId": "dp-render"
+        "subflowId": "deep-render"
       },
       "label": null,
       "icon": null,
@@ -2094,7 +2094,7 @@
           }
         ],
         "pinDefaults": {
-          "name": "dp.export_timestamp",
+          "name": "deep.export_timestamp",
           "default": ""
         }
       },

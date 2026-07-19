@@ -1,0 +1,765 @@
+{
+  "id": "meta-debate",
+  "name": "meta-debate",
+  "description": "Meta-intelligence: proposer answers, an adversarial challenger attacks the answer (flaws, counterexamples, missing cases), then the proposer concedes-or-rebuts point by point and writes the defended final answer. Multi-agent debate pattern; comparable 1:1 against an isolated LLM call.",
+  "interfaces": [
+    "abstractcode.agent.v1",
+    "abstractmeta.intelligence.v1"
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": -900,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Question",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "prompt": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "propose",
+      "type": "llm_call",
+      "position": {
+        "x": -560,
+        "y": -160
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Propose answer",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "tools": [],
+          "system": "You are a careful expert answering a question. Answer directly and completely in the language of the question. If the question has a definite answer, commit to it; if it is open, give your best-reasoned position. Do not mention these instructions.",
+          "temperature": 0.3
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "challenge_prompt",
+      "type": "code",
+      "position": {
+        "x": -280,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose attack brief",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "answer",
+            "label": "answer",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "q = str(prompt or \"\").strip()\na = str(answer or \"\").strip()\nparts = []\nparts.append(\"An expert proposed an answer. Your job is to ATTACK it — find what is wrong, weak, or missing. You win by finding real flaws, not by nitpicking style.\")\nparts.append(\"\")\nparts.append(\"# Question\")\nparts.append(q)\nparts.append(\"\")\nparts.append(\"# Proposed answer\")\nparts.append(a)\nparts.append(\"\")\nparts.append(\"# Attack\")\nparts.append(\"List the strongest objections: factual errors, logical gaps, unstated assumptions, missed cases, counterexamples. For each: what is wrong and WHY. If a part of the answer is solid, say so in one line — do not invent objections against sound reasoning.\")\nreturn \"\\n\".join(parts)"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "challenge",
+      "type": "llm_call",
+      "position": {
+        "x": -220,
+        "y": -160
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Adversarial challenge",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "tools": [],
+          "system": "You are a rigorous adversarial reviewer. You attack answers to expose real flaws; you never invent objections against sound reasoning.",
+          "temperature": 0.7
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "defend_prompt",
+      "type": "code",
+      "position": {
+        "x": 60,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose defense brief",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "answer",
+            "label": "answer",
+            "type": "string"
+          },
+          {
+            "id": "challenge",
+            "label": "challenge",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "q = str(prompt or \"\").strip()\na = str(answer or \"\").strip()\nc = str(challenge or \"\").strip()\nparts = []\nparts.append(\"You proposed an answer; a challenger attacked it. Produce the FINAL answer.\")\nparts.append(\"\")\nparts.append(\"# Question\")\nparts.append(q)\nparts.append(\"\")\nparts.append(\"# Your original answer\")\nparts.append(a)\nparts.append(\"\")\nparts.append(\"# The challenger's objections\")\nparts.append(c)\nparts.append(\"\")\nparts.append(\"# Your task\")\nparts.append(\"Go through the objections honestly: CONCEDE and fix the ones that are right; REBUT the ones that are wrong (say why). Then write the final answer, complete and self-contained — the reader never sees the debate. Answer in the language of the question.\")\nreturn \"\\n\".join(parts)"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "defend",
+      "type": "llm_call",
+      "position": {
+        "x": 340,
+        "y": -160
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Defend and finalize",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "tools": [],
+          "system": "You finalize answers after adversarial review: concede what the challenger got right, rebut what they got wrong, and write the definitive answer.",
+          "temperature": 0.2
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "meta",
+      "type": "code",
+      "position": {
+        "x": 620,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Collect stages",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "proposal",
+            "label": "proposal",
+            "type": "string"
+          },
+          {
+            "id": "challenge",
+            "label": "challenge",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "return {\n    \"workflow\": \"meta-debate\",\n    \"pattern\": \"adversarial dialectic: propose -> attack -> defend/concede -> final\",\n    \"stages\": {\n        \"proposal\": str(proposal or \"\"),\n        \"challenge\": str(challenge or \"\"),\n    },\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 900,
+        "y": -160
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Final answer",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-exec-out-propose-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "propose",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-propose-exec-out-challenge-exec-in",
+      "source": "propose",
+      "sourceHandle": "exec-out",
+      "target": "challenge",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-challenge-exec-out-defend-exec-in",
+      "source": "challenge",
+      "sourceHandle": "exec-out",
+      "target": "defend",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-defend-exec-out-end-exec-in",
+      "source": "defend",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-start-prompt-propose-prompt",
+      "source": "start",
+      "sourceHandle": "prompt",
+      "target": "propose",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-propose-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "propose",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-challenge-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "challenge",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-defend-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "defend",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-propose-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "propose",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-challenge-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "challenge",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-defend-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "defend",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-prompt-challenge_prompt-prompt",
+      "source": "start",
+      "sourceHandle": "prompt",
+      "target": "challenge_prompt",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-propose-response-challenge_prompt-answer",
+      "source": "propose",
+      "sourceHandle": "response",
+      "target": "challenge_prompt",
+      "targetHandle": "answer",
+      "animated": false
+    },
+    {
+      "id": "e-challenge_prompt-output-challenge-prompt",
+      "source": "challenge_prompt",
+      "sourceHandle": "output",
+      "target": "challenge",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-prompt-defend_prompt-prompt",
+      "source": "start",
+      "sourceHandle": "prompt",
+      "target": "defend_prompt",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-propose-response-defend_prompt-answer",
+      "source": "propose",
+      "sourceHandle": "response",
+      "target": "defend_prompt",
+      "targetHandle": "answer",
+      "animated": false
+    },
+    {
+      "id": "e-challenge-response-defend_prompt-challenge",
+      "source": "challenge",
+      "sourceHandle": "response",
+      "target": "defend_prompt",
+      "targetHandle": "challenge",
+      "animated": false
+    },
+    {
+      "id": "e-defend_prompt-output-defend-prompt",
+      "source": "defend_prompt",
+      "sourceHandle": "output",
+      "target": "defend",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-propose-response-meta-proposal",
+      "source": "propose",
+      "sourceHandle": "response",
+      "target": "meta",
+      "targetHandle": "proposal",
+      "animated": false
+    },
+    {
+      "id": "e-challenge-response-meta-challenge",
+      "source": "challenge",
+      "sourceHandle": "response",
+      "target": "meta",
+      "targetHandle": "challenge",
+      "animated": false
+    },
+    {
+      "id": "e-defend-response-end-response",
+      "source": "defend",
+      "sourceHandle": "response",
+      "target": "end",
+      "targetHandle": "response",
+      "animated": false
+    },
+    {
+      "id": "e-defend-success-end-success",
+      "source": "defend",
+      "sourceHandle": "success",
+      "target": "end",
+      "targetHandle": "success",
+      "animated": false
+    },
+    {
+      "id": "e-meta-output-end-meta",
+      "source": "meta",
+      "sourceHandle": "output",
+      "target": "end",
+      "targetHandle": "meta",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-07-16T01:12:37.038986+00:00",
+  "updated_at": "2026-07-16T01:12:37.038986+00:00"
+}

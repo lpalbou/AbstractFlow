@@ -186,7 +186,7 @@ The canvas reflects that split:
 - [Web editor](web-editor.md)
 - [Workflow authoring skill](workflow-authoring-skill.md)
 - [Workflow node catalog](workflow-node-catalog.md)
-- [Production research workflow](dp-research.md)
+- [Production research workflow](deep-research.md)
 - [Architecture](architecture.md)
 - [API and contracts](api.md)
 - [VisualFlow JSON](visualflow.md)
@@ -2431,11 +2431,11 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 
 - Node type: `write_docx`
 - Document node: `{"id":"<unique_id>","type":"write_docx"}`
-- Utility: Render text or Markdown-style report content to a workspace-scoped DOCX document using the Runtime stdlib DOCX writer.
+- Utility: Render text or Markdown-style report content to a workspace-scoped DOCX document using the Runtime stdlib DOCX writer. Documents carry a discreet AbstractFramework/AbstractFlow identity (workflow version, report date, abstractframework.ai) by default.
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `file_path` workspace_file; `content` any; `title` string: Optional DOCX document title.
+- Inputs: `exec-in` execution; `file_path` workspace_file; `content` any; `title` string: Optional DOCX document title.; `branding` any: Framework identity on the document (meta line, page footer, core properties). Default on with run provenance; set false to disable or pass an object to override fields (framework/app/url/date/workflow).
 - Outputs: `exec-out` execution; `bytes` number; `file_path` workspace_file; `sha256` string; `content_type` string
 - Default config: none
 
@@ -2455,11 +2455,11 @@ Workflows are authored as one JSON document: `{"flow_name", "nodes": [...], "edg
 
 - Node type: `write_pdf`
 - Document node: `{"id":"<unique_id>","type":"write_pdf"}`
-- Utility: Render text or Markdown-style report content to a real workspace-scoped server PDF path using the Runtime permissive PDF writer.
+- Utility: Render text or Markdown-style report content to a real workspace-scoped server PDF path using the Runtime permissive PDF writer. Documents carry a discreet AbstractFramework/AbstractFlow identity (workflow version, report date, abstractframework.ai) by default.
 - Gateway capability: none
 - Dynamic pin policy: template pins only
 - Authorable config: input defaults with `pin_defaults`
-- Inputs: `exec-in` execution; `file_path` workspace_file; `content` any; `title` string: Optional PDF document title.
+- Inputs: `exec-in` execution; `file_path` workspace_file; `content` any; `title` string: Optional PDF document title.; `branding` any: Framework identity on the document (meta line, running footer, PDF metadata). Default on with run provenance; set false to disable or pass an object to override fields (framework/app/url/date/workflow).
 - Outputs: `exec-out` execution; `bytes` number; `file_path` workspace_file; `sha256` string; `content_type` string
 - Default config: none
 
@@ -3603,7 +3603,250 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- 2026-07-17 `coding-agent@0.2.0` — deterministic-gates redesign of the verify
+  subflow (R-Type post-mortem, agora c2725/c2735/c2736; operator: "badly
+  designed — do more research and improve it"). Root cause owned: the v1
+  verifier PROMPT instructed "executes=true if the entrypoint loads" for web
+  artifacts, so runtime crashes (split-brain ReferenceError, unscaled canvas)
+  passed verification unexecuted. v2 inverts the design — execute where an
+  executor exists, LLM-judge only where none does, gates ordered cheapest
+  first (pay-per-failure): G0 DELIVERY (deterministic `call_tool list_files`
+  ground truth: non-empty workspace, entrypoint exists), G1 INTEGRATION
+  (deterministic entrypoint reference check: dangling `src`/`href` refs,
+  split-brain orphan `.js` siblings when the entrypoint loads no local
+  script), G3 EXECUTES-web (deterministic `call_tool browser_probe` — code's
+  registered headless-Chromium tool, c2769; page/console errors and failed
+  local resource loads fail the round with the exact error text before any
+  LLM runs; a blank canvas blocks the pass on every round — round 0 gets
+  draw-one-visible-element wording for the dark-background case, repeats get
+  render-loop wording), then the LLM verifier for builds/matches only — its
+  `executes` opinion is OVERRIDDEN by the probe's world-side result for web
+  artifacts in a deterministic merge. Red-team hardening folded (fable5
+  adversary): the G1 reference scan is markup-only (script/style bodies
+  stripped so inline `img.src="x.png"` never counts), token-boundary-checked
+  (`data-src=` is not `src=`), relative-with-extension-only (SPA routes and
+  anchors stay quiet), and orphan flagging skips files mentioned anywhere in
+  the entrypoint text (inline module imports) plus well-known non-browser
+  siblings (server.js, *.config.js, tests); case-mismatched references are
+  named as case mismatches. Builder allowlist gains `browser_probe` for
+  mid-build self-verification (the memact arm's organic self-probe was the
+  fastest honest arm of the R-Type experiment, c2790); the independent gate
+  stays authoritative. External validation (code's cav2 A/B, c2945, probe
+  mounted, n=2): 2/2 completed with integrated running code vs v1's 0.5/2 —
+  strictly better — with the probe's ceiling honestly mapped (render-scale
+  and progression-deadlock defects throw no errors and pass execution
+  gates; playthrough assertions remain the operator's hands today). Fold
+  from that series: the blank-canvas gate now demands a minimum non-blank
+  FRACTION (≥2% of sampled pixels when the pass is real) — cav2/run1
+  slipped the zero-check with a 1-of-369 corner-ninth render; genuinely
+  sparse dark games clear the floor with one HUD element. Second fold
+  (taxonomy class 4, code's c2958 ask 2): a deterministic G4
+  ORPHAN-FUNCTION gate — a function declared in the delivered code whose
+  identifier appears exactly once (the declaration) is dead code or a
+  missing call, the `spawnBoss` progression-deadlock class that threw zero
+  errors and froze the boss transition; conservative by construction (any
+  second reference passes: calls, handler assignments, recursion, strings;
+  declarations only), runs over entrypoint + main referenced script so
+  cross-file calls resolve. Third fold (class 5's second half, on code's
+  additive `painted_bbox` probe field, c2970): a draw-extent check fails
+  renders confined to less than half the canvas in BOTH dimensions (the
+  corner-ninth scale-bug class) while letterboxed games pass; older probes
+  without the field degrade gracefully to the fraction floor. Failures now
+  split fixable vs `environment_failures` (missing executor on host): the
+  round loop stops early instead of burning repair rounds on failures the
+  builder cannot fix, and the report renders them under an honest "Not
+  verifiable in this environment" section. Builder prompts gain delivery
+  rules (workspace-only paths, single-file-first for small web builds,
+  every split file must be loaded by the entrypoint). Branch verdicts merge
+  through a `vg.verdict` run var (single-writer per path; no multi-entry pin
+  overrides). Scripted proof: `scripts/coding_agent_v2_gates_smoke.py`
+  drives the real compiled flow through abstractruntime with stubbed tools
+  (27 checks: fail-fast paths never invoke the verifier agent, fail-closed
+  no-executor semantics, probe-overrides-LLM merge, early-stop loop).
+  Library pins updated to `coding-agent@0.2.0` (flow + coder entrypoints).
+
 ### Added
+- 2026-07-16 Meta-intelligence workflow family (operator ask: co-orchestrate
+  multiple LLM calls into deliberation instead of answering directly, then
+  measure whether it beats the isolated call). Six flows, each
+  `abstractcode.agent.v1`-conformant so any of them benchmarks 1:1 against a
+  single call: `meta-consensus` (2 independent answers — temperature-diverse
+  or a second model via optional `provider_b`/`model_b` — reconciled, not
+  averaged), `meta-debate` (propose → adversarial attack → concede-or-rebut),
+  `meta-reflect` (draft → introspection interrogating the reasoning →
+  revision), `meta-perspectives` (3 question-specific angles → integration
+  naming the tensions), `meta-deliberate` (plan with pitfalls + checklist →
+  execute → verify against the plan's own checklist), and `meta-baseline`
+  (the isolated call as a flow — the control arm). Benchmark harnesses:
+  `meta_benchmark.mjs` (verifiable trap items, committed-answer grading,
+  token/latency cost), `meta_benchmark_open.mjs` (open questions,
+  position-swapped blind pairwise judging). Adversarial review folded:
+  every llm node pins `tools: []` as a declared default so a host-injected
+  ambient `tools` key (abstractcode agent.v1 scaffold) can never leak native
+  tool declarations into a deliberation stage (the content_type-leak class);
+  perspectives' angle parsing type-guards schema-shaped-but-wrong structured
+  output; `tools` declared on every start node for contract honesty; the
+  generator documents that `success` is boilerplate on completed runs (llm
+  failures terminate the run) and that the five factored patterns are
+  deliberate (a composed flagship is future scope).
+
+### Changed
+- 2026-07-16 The `dp-` prefix is fully retired (operator ruling: "there should
+  not be anymore dp-*, they should all have been renamed to deep-*"). The
+  2026-07-13 pass had renamed display names only; this pass renames the ids,
+  files, and every reference: flow ids + files (`deep-research`, `deep-plan`,
+  `deep-investigate`, `deep-review`, `deep-render`), the bundle id
+  (`deep-research@0.1.6`, version lineage continues from `dp-research@0.1.5`),
+  the interface id (`abstractresearch.dp.v1` → `abstractresearch.deep.v1`),
+  co-scientist's grounding subflow refs (repacked as `co-scientist@0.1.7`),
+  internal run-var namespace (`dp.*` → `deep.*`), report output prefixes
+  (`reports/deep-{quick,standard,thorough}-research`), the generator script
+  (`build_deep_research_workflows.py`), docs (`docs/deep-research.md`), the
+  bundled-flows glob + run targets, and the preview/test fixtures. Old
+  `dp-research@0.1.x` bundles moved to `flows/bundles/archive/` (kept for
+  completed-run history, no longer served); the gateway now lists only
+  `deep-research`. Also fixed stale `bundleVersion` fields in the bundled run
+  targets that had drifted behind their `bundleRef`s.
+
+### Added
+- 2026-07-16 coding-agent reports now name the produced artifacts by path
+  (`coding-agent@0.1.3`, code seat ask after the operator's first live run:
+  "no link / path to test it"). The independent verifier's schema gained a
+  required `artifacts[]` field (workspace-relative paths it actually observed,
+  entrypoint first — verifier-sourced, never the builder's self-report), and
+  the final report renders an "Artifacts (paths relative to the run workspace
+  root)" section plus an `artifacts` output field; when the verifier observed
+  none, the report says so with a visible `#FALLBACK` label instead of staying
+  silent. The report is self-sufficient on every host (assistant, gateway
+  runs, headless exec) — no second agent needed to find the produced file.
+- 2026-07-16 Report titles are now LLM-derived with an abstract (operator
+  ruling: a fixed product title is not acceptable — "the LLM creating the
+  report MUST think of a proper title and even provide a small abstract after
+  repeating the user question"). co-scientist (`co-scientist@0.1.6`): the
+  meta-review returns `TITLE:` (5-12 word headline derived from the findings,
+  never the verbatim goal) and `ABSTRACT:` (4-6 sentence scientific abstract)
+  lines; the report assembler extracts both and structures the document as
+  derived title → **Research goal:** (the user's question) → **Abstract.** →
+  overview; the PDF/DOCX document title uses the same derived title. A
+  missing TITLE/ABSTRACT degrades to the product title with a visible
+  `#FALLBACK` caveat, never silently. deep-research (`dp-research@0.1.5`):
+  the report writer already derived a headline H1; it now also restates the
+  research goal and writes a 3-5 sentence abstract immediately after the H1
+  (dp-render.json + generator kept in sync — the generator previously lacked
+  the title instruction entirely, a source-drift fix).
+- 2026-07-15 Node palette reorganized for scanability (operator ask): an
+  always-visible Essentials strip (the ~8 nodes nearly every flow uses: On
+  Flow Start/End, Agent, LLM Call, Code, If/Else, For, String Template), ten
+  ordered display sections that regroup the twelve semantic categories by
+  build frequency (Core → Control Flow → Events & Time → Variables → Data &
+  Text → Values & Schema → Files & Artifacts → Media → Memory → Math), a
+  two-column chip grid (halves scroll height; tooltips/title carry full
+  labels), per-section node-count badges, collapsed-by-default long tail with
+  expansion persisted per user (localStorage), and keyboard-accessible
+  section headers. NODE_CATEGORIES stays the semantic source of truth
+  (sections are presentation only; a safety net appends any future category
+  not claimed by a section so nodes can never silently vanish from the
+  palette). Capability status pills compact to glyphs (…/✕) with the full
+  reason in the tooltip.
+- 2026-07-15 The authoring assistant is now loaded with the core product
+  documentation (operator ask): `architecture.md`, `visualflow.md`,
+  `getting-started.md`, `web-editor.md`, `faq.md`, and `dp-research.md` ride
+  the stable (cacheable) system-prompt prefix as an "ABSTRACTFLOW
+  DOCUMENTATION" block, imported raw from `docs/` so they can never drift from
+  the shipped docs. The assistant's contract gained an EXPLAIN mode next to
+  AUTHOR: for pure questions ("what is a subflow?", "how do runs work?") it
+  answers in `reply` grounded in the documentation, marks the plan
+  `intent:"explain"`, and OMITS `graph` entirely — an omitted document is a
+  no-op in the turn processor, so explaining never touches the canvas (no
+  mass-deletion risk). Explain turns end the loop directly instead of going
+  through the graph acceptance review (which judges graphs against build
+  requests and would reject a question as "not implemented"); `parsePlan`
+  honors the label only on workless plans, so real edits can never ride the
+  explain exit past review.
+- 2026-07-15 co-scientist reports now always carry visual elements on the key
+  hypotheses (operator ask). Deterministic: `REPORT_MD_CODE` builds a "Key
+  hypotheses at a glance" pipe table (rank/Elo/correctness/novelty/
+  testability/flags) from structured tournament data — guaranteed to render
+  as a real table in the PDF/DOCX exports regardless of model compliance
+  (cells sanitized: pipes, newlines, 80-char titles). Encouraged: the
+  meta-review prompt now requires one comparison table on DESIGN dimensions
+  (mechanism, improvement over literature, main risk, required evidence — not
+  scores, to avoid duplicating the deterministic table) and at least one
+  fenced ASCII schema of the top hypothesis architecture, and states that
+  mermaid/HTML/images do not render in the exports. Bundle republished as
+  `co-scientist@0.1.1` (catalog versions are sha-immutable; same-version
+  rebuilds are refused).
+- 2026-07-15 Branded report exports + honest titles (operator directive):
+  every workflow-generated PDF/DOCX now carries a discreet professional
+  identity — a small gray meta line under the title (workflow@version ·
+  report date · AbstractFramework / AbstractFlow — abstractframework.ai), a
+  thin rule, a running page footer (framework · url · workflow | page
+  number), and honest document metadata (PDF author/creator/subject; DOCX
+  core properties incl. created date). Renderer changes live in
+  abstractruntime/documents (branding opt-in per renderer; the
+  write_pdf/write_docx nodes brand BY DEFAULT with run provenance — the
+  workflow id+version is injected by the compiler from the run itself, so
+  all report flows get it with zero graph changes; `branding` pin overrides
+  fields or disables). Title fixes: co-scientist's document title is the
+  fixed product title ("AI Co-Scientist — Research Overview"), NEVER the
+  user's prompt (the goal stays as the body's "Research goal:" line);
+  deep-research's writer must now open with a derived headline-style report
+  title, never the verbatim request. Renderers dedup a leading markdown H1
+  identical to the document title (was printed twice). Bundles republished
+  as `co-scientist@0.1.5` + `dp-research@0.1.4`; 15 runtime-side regression
+  tests; end-to-end verified through a compiled visual-flow run (footer
+  reads "AbstractFramework · abstractframework.ai · co-scientist@0.1.5").
+- 2026-07-15 coding-agent gained a dual-interface entrypoint (code seat's
+  evaluation for the operator: the workflow is stronger than basic-agent but
+  was invisible to abstractcode's agent selector). New `coding-agent-chat`
+  flow conforms to `abstractcode.agent.v1` exactly (prompt/provider/model/
+  tools in; response/success/meta out), maps prompt→request, and deliberately
+  omits workspace/build/run commands so the pipeline runs in the session
+  workspace with inferred gates — the verifier executes what it can and the
+  degradation is visible in report/open_failures, never silent. History
+  honored: agent.v1 was REMOVED from the primary flow on 2026-07-14 as a
+  false contract (adversary finding — selector runs stalled on missing gate
+  pins); the wrapper is the honest fix, not a re-labeling. Bundle
+  `coding-agent@0.1.1` (both entrypoints declared; validated against
+  abstractcode's exact validator rules; live-verified served by the gateway).
+  bundledFlows run targets trued to current versions. Same evening, the
+  operator asked for a simpler executable name — the agent.v1 entrypoint was
+  renamed `coding-agent-chat` → `coder` (code seat's option A: bundle and
+  strict entrypoint names unchanged, zero references existed yet) and
+  republished as `coding-agent@0.1.2`, live-verified.
+- 2026-07-15 Artifact content-type fix (found by the 0.1.2 receipt run): all
+  three imported report artifacts registered as DOCX — exec-chained nodes
+  receive the previous node's output as their base payload, so the imports'
+  unconnected `content_type` input INHERITED `write_docx`'s content_type
+  output. Fix: explicit `content_type` pin defaults on every import node
+  (declared input-pin defaults override same-named ambient payload keys —
+  verified against the runtime's data-aware handler both statically in the
+  packed bundles and dynamically in-process). `wf_common.
+  import_workspace_file_node` now takes a `content_type` kwarg and its
+  docstring names the leak class. Bundles republished as `co-scientist@0.1.3`
+  and `dp-research@0.1.3`. The live probe also gained 429-retry resilience
+  (the gateway's auth-lockout window killed a poller mid-run while the
+  durable run completed fine — retry with backoff instead of dying).
+  Live-verified on run e95efef7: three artifacts with honest content types,
+  observer thread closed. Adversary P2 polish followed as `co-scientist@0.1.4`
+  (meta-prompt explicitly allows additional tables beyond the required design
+  comparison; table cells capped at 120 chars against layout-breaking junk
+  values).
+- 2026-07-15 Report files are now durable run artifacts (observer ask, operator
+  directive "only what has been written durably through the runtime can
+  surface"): co-scientist and deep-research chain `import_workspace_file`
+  after their report writers, so the produced md/pdf/docx are registered in
+  the run's artifact store — listable via `GET /runs/{id}/artifacts` with
+  honest content_type/filename/size and servable to any client — instead of
+  existing only as loose workspace files (verified root cause: the
+  write_file/write_pdf/write_docx effects never touch the artifact store;
+  only imports and media generation do). Artifact ids are exposed as
+  `md_artifact_id`/`pdf_artifact_id`/`docx_artifact_id` flow outputs. Bundles
+  republished as `co-scientist@0.1.2` and `dp-research@0.1.2`;
+  `wf_common.import_workspace_file_node` added for generated flows. Backlog
+  item `2026-07-15_coscientist_reports_as_durable_artifacts.md` claimed on
+  agora.
 - 2026-07-15 Run totals in the execution view (operator ask): a terminal run's
   Execution header now shows aggregate stats — total wall-clock time and total
   input→output tokens — summed across the WHOLE run tree (agent workflows spend

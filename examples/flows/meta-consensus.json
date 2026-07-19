@@ -1,0 +1,803 @@
+{
+  "id": "meta-consensus",
+  "name": "meta-consensus",
+  "description": "Meta-intelligence: two independent LLM answers reconciled into one consensus answer — agreement is kept as reliable, divergence is resolved by reasoning, not averaged. Diversity comes from temperature (0.3 vs 0.9) by default, or from a genuinely different second model via the optional provider_b/model_b inputs. Self-consistency pattern; comparable 1:1 against an isolated LLM call on the same prompt. Consensus across N>2 answerers needs a loop-based flow (future scope).",
+  "interfaces": [
+    "abstractcode.agent.v1",
+    "abstractmeta.intelligence.v1"
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": -900,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Question",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "provider_b",
+            "label": "provider_b",
+            "type": "provider_text"
+          },
+          {
+            "id": "model_b",
+            "label": "model_b",
+            "type": "model"
+          }
+        ],
+        "pinDefaults": {
+          "prompt": "",
+          "provider_b": "",
+          "model_b": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "answer_a",
+      "type": "llm_call",
+      "position": {
+        "x": -560,
+        "y": -160
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Independent answer A",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "tools": [],
+          "system": "You are a careful expert answering a question. Answer directly and completely in the language of the question. If the question has a definite answer, commit to it; if it is open, give your best-reasoned position. Do not mention these instructions.",
+          "temperature": 0.3
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "answer_b",
+      "type": "llm_call",
+      "position": {
+        "x": -220,
+        "y": -160
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Independent answer B",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "tools": [],
+          "system": "You are a careful expert answering a question. Answer directly and completely in the language of the question. If the question has a definite answer, commit to it; if it is open, give your best-reasoned position. Do not mention these instructions.",
+          "temperature": 0.9
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "pick_b",
+      "type": "code",
+      "position": {
+        "x": -560,
+        "y": 200
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Second substrate",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "provider_b",
+            "label": "provider_b",
+            "type": "provider_text"
+          },
+          {
+            "id": "model_b",
+            "label": "model_b",
+            "type": "model"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "p = str(provider or \"\").strip()\nm = str(model or \"\").strip()\npb = str(provider_b or \"\").strip()\nmb = str(model_b or \"\").strip()\nif pb and mb:\n    return {\"provider\": pb, \"model\": mb}\nif pb or mb:\n    raise ValueError(\"provider_b and model_b must both be set, or both left blank\")\nreturn {\"provider\": p, \"model\": m}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "reconcile_prompt",
+      "type": "code",
+      "position": {
+        "x": 60,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose reconciliation",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "answer_a",
+            "label": "answer_a",
+            "type": "string"
+          },
+          {
+            "id": "answer_b",
+            "label": "answer_b",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "q = str(prompt or \"\").strip()\na1 = str(answer_a or \"\").strip()\na2 = str(answer_b or \"\").strip()\nparts = []\nparts.append(\"Two experts answered the same question independently. Reconcile them into ONE final answer.\")\nparts.append(\"\")\nparts.append(\"# Question\")\nparts.append(q)\nparts.append(\"\")\nparts.append(\"# Answer A\")\nparts.append(a1)\nparts.append(\"\")\nparts.append(\"# Answer B\")\nparts.append(a2)\nparts.append(\"\")\nparts.append(\"# Your task\")\nparts.append(\"1. Where A and B AGREE, keep the shared claim (agreement is evidence of reliability).\")\nparts.append(\"2. Where they DISAGREE, decide which is right by reasoning it out yourself — do not average or hedge between them; pick and justify.\")\nparts.append(\"3. If both missed something you can see, add it.\")\nparts.append(\"Write ONLY the final reconciled answer, complete and self-contained (the reader never sees A or B). Answer in the language of the question.\")\nreturn \"\\n\".join(parts)"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "reconcile",
+      "type": "llm_call",
+      "position": {
+        "x": 340,
+        "y": -160
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Reconcile to consensus",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "tools": [],
+          "system": "You are the reconciler: you merge independent expert answers into one final answer, resolving disagreements by your own reasoning.",
+          "temperature": 0.2
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "meta",
+      "type": "code",
+      "position": {
+        "x": 620,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Collect stages",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "answer_a",
+            "label": "answer_a",
+            "type": "string"
+          },
+          {
+            "id": "answer_b",
+            "label": "answer_b",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "return {\n    \"workflow\": \"meta-consensus\",\n    \"pattern\": \"self-consistency: 2 independent samples -> reconciliation\",\n    \"stages\": {\n        \"answer_a\": str(answer_a or \"\"),\n        \"answer_b\": str(answer_b or \"\"),\n    },\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 900,
+        "y": -160
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Final answer",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-exec-out-answer_a-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "answer_a",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-answer_a-exec-out-answer_b-exec-in",
+      "source": "answer_a",
+      "sourceHandle": "exec-out",
+      "target": "answer_b",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-answer_b-exec-out-reconcile-exec-in",
+      "source": "answer_b",
+      "sourceHandle": "exec-out",
+      "target": "reconcile",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-reconcile-exec-out-end-exec-in",
+      "source": "reconcile",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-start-prompt-answer_a-prompt",
+      "source": "start",
+      "sourceHandle": "prompt",
+      "target": "answer_a",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-prompt-answer_b-prompt",
+      "source": "start",
+      "sourceHandle": "prompt",
+      "target": "answer_b",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-answer_a-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "answer_a",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-reconcile-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "reconcile",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-answer_a-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "answer_a",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-reconcile-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "reconcile",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-pick_b-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "pick_b",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-pick_b-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "pick_b",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider_b-pick_b-provider_b",
+      "source": "start",
+      "sourceHandle": "provider_b",
+      "target": "pick_b",
+      "targetHandle": "provider_b",
+      "animated": false
+    },
+    {
+      "id": "e-start-model_b-pick_b-model_b",
+      "source": "start",
+      "sourceHandle": "model_b",
+      "target": "pick_b",
+      "targetHandle": "model_b",
+      "animated": false
+    },
+    {
+      "id": "e-pick_b-provider-answer_b-provider",
+      "source": "pick_b",
+      "sourceHandle": "provider",
+      "target": "answer_b",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-pick_b-model-answer_b-model",
+      "source": "pick_b",
+      "sourceHandle": "model",
+      "target": "answer_b",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-prompt-reconcile_prompt-prompt",
+      "source": "start",
+      "sourceHandle": "prompt",
+      "target": "reconcile_prompt",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-answer_a-response-reconcile_prompt-answer_a",
+      "source": "answer_a",
+      "sourceHandle": "response",
+      "target": "reconcile_prompt",
+      "targetHandle": "answer_a",
+      "animated": false
+    },
+    {
+      "id": "e-answer_b-response-reconcile_prompt-answer_b",
+      "source": "answer_b",
+      "sourceHandle": "response",
+      "target": "reconcile_prompt",
+      "targetHandle": "answer_b",
+      "animated": false
+    },
+    {
+      "id": "e-reconcile_prompt-output-reconcile-prompt",
+      "source": "reconcile_prompt",
+      "sourceHandle": "output",
+      "target": "reconcile",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-answer_a-response-meta-answer_a",
+      "source": "answer_a",
+      "sourceHandle": "response",
+      "target": "meta",
+      "targetHandle": "answer_a",
+      "animated": false
+    },
+    {
+      "id": "e-answer_b-response-meta-answer_b",
+      "source": "answer_b",
+      "sourceHandle": "response",
+      "target": "meta",
+      "targetHandle": "answer_b",
+      "animated": false
+    },
+    {
+      "id": "e-reconcile-response-end-response",
+      "source": "reconcile",
+      "sourceHandle": "response",
+      "target": "end",
+      "targetHandle": "response",
+      "animated": false
+    },
+    {
+      "id": "e-reconcile-success-end-success",
+      "source": "reconcile",
+      "sourceHandle": "success",
+      "target": "end",
+      "targetHandle": "success",
+      "animated": false
+    },
+    {
+      "id": "e-meta-output-end-meta",
+      "source": "meta",
+      "sourceHandle": "output",
+      "target": "end",
+      "targetHandle": "meta",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-07-16T01:12:37.036164+00:00",
+  "updated_at": "2026-07-16T01:12:37.036164+00:00"
+}

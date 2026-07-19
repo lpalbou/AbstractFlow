@@ -38,26 +38,26 @@ describe('interface normalization + executable classification', () => {
 
   it('executable = entrypoint-class declaration; domain tags do not count', () => {
     expect(isExecutableFlow({ interfaces: ['abstractcode.agent.v1'] })).toBe(true);
-    expect(isExecutableFlow({ interfaces: ['abstractresearch.dp.v1'] })).toBe(false);
+    expect(isExecutableFlow({ interfaces: ['abstractresearch.deep.v1'] })).toBe(false);
     expect(isExecutableFlow({ interfaces: ['unknown.custom.v1'] })).toBe(false);
     expect(isExecutableFlow({ interfaces: [''] })).toBe(false);
   });
 });
 
 describe('family index derivation', () => {
-  it('groups the dp-shaped family: root first-level, helpers fold under it', () => {
+  it('groups the deep-research-shaped family: root first-level, helpers fold under it', () => {
     const flows = [
-      flow('dp-research', { interfaces: ['abstractcode.agent.v1'], refs: ['dp-plan', 'dp-render'] }),
-      flow('dp-plan'),
-      flow('dp-render'),
+      flow('deep-research', { interfaces: ['abstractcode.agent.v1'], refs: ['deep-plan', 'deep-render'] }),
+      flow('deep-plan'),
+      flow('deep-render'),
       flow('standalone'),
     ];
     const index = buildFlowFamilyIndex(flows);
-    expect(index.firstLevelIds.has('dp-research')).toBe(true);
-    expect(index.firstLevelIds.has('dp-plan')).toBe(false);
+    expect(index.firstLevelIds.has('deep-research')).toBe(true);
+    expect(index.firstLevelIds.has('deep-plan')).toBe(false);
     expect(index.firstLevelIds.has('standalone')).toBe(true);
-    expect(index.familyRootIds.has('dp-research')).toBe(true);
-    expect(index.familyMembers.get('dp-research')).toEqual(expect.arrayContaining(['dp-plan', 'dp-render']));
+    expect(index.familyRootIds.has('deep-research')).toBe(true);
+    expect(index.familyMembers.get('deep-research')).toEqual(expect.arrayContaining(['deep-plan', 'deep-render']));
   });
 
   it('self-references never count as inbound (a recursive flow stays visible)', () => {
@@ -106,13 +106,13 @@ describe('family index derivation', () => {
 
 describe('library rows', () => {
   const catalog = [
-    flow('dp-research', {
-      name: 'dp-research',
+    flow('deep-research', {
+      name: 'deep-research',
       interfaces: ['abstractcode.agent.v1'],
-      refs: ['dp-plan', 'shared-helper'],
+      refs: ['deep-plan', 'shared-helper'],
     }),
     flow('other-root', { name: 'other-root', refs: ['shared-helper'] }),
-    flow('dp-plan', { name: 'dp-plan' }),
+    flow('deep-plan', { name: 'deep-plan' }),
     flow('shared-helper', { name: 'shared-helper' }),
     flow('standalone', { name: 'standalone', description: 'A lone flow.' }),
   ];
@@ -125,18 +125,18 @@ describe('library rows', () => {
       sortMode: 'name_asc',
       expandedIds: new Set(),
     });
-    expect(collapsed.rows.map((row) => row.flow?.id)).toEqual(['dp-research', 'other-root', 'standalone']);
+    expect(collapsed.rows.map((row) => row.flow?.id)).toEqual(['deep-research', 'other-root', 'standalone']);
 
     const expanded = buildLibraryRows(catalog, index, {
       query: '',
       viewMode: 'all',
       sortMode: 'name_asc',
-      expandedIds: new Set(['dp-research']),
+      expandedIds: new Set(['deep-research']),
     });
     const ids = expanded.rows.map((row) => `${row.kind}:${row.flow?.id || row.missingId}`);
     expect(ids).toEqual([
-      'top:dp-research',
-      'child:dp-plan',
+      'top:deep-research',
+      'child:deep-plan',
       'child:shared-helper',
       'top:other-root',
       'top:standalone',
@@ -152,7 +152,7 @@ describe('library rows', () => {
       sortMode: 'name_asc',
       expandedIds: new Set(),
     });
-    expect(result.rows.map((row) => row.flow?.id)).toEqual(['dp-research']);
+    expect(result.rows.map((row) => row.flow?.id)).toEqual(['deep-research']);
     expect(result.executableCount).toBe(1);
     expect(result.totalCount).toBe(5);
   });
@@ -173,7 +173,7 @@ describe('library rows', () => {
       expandedIds: new Set(),
     });
     const row = helperHit.rows.find((entry) => entry.flow?.id === 'shared-helper');
-    expect(row?.contextParents).toEqual(['dp-research', 'other-root']);
+    expect(row?.contextParents).toEqual(['deep-research', 'other-root']);
   });
 
   it('cycle guard renders a non-expandable loop-back leaf inside expansions', () => {

@@ -1,7 +1,7 @@
 /**
  * Live deep-research run on the same question, same substrate (OVH
  * gpt-oss-120b), for the co-scientist comparison. Auto-approves any tool
- * waits across the run tree (dp-investigate uses read-only web tools).
+ * waits across the run tree (deep-investigate uses read-only web tools).
  *
  * Usage: DRIVE_TOKEN=... node scripts/deepresearch_live_probe.mjs "<request>" [effort]
  */
@@ -27,8 +27,8 @@ const start = await j(`${GATEWAY}/api/gateway/runs/start`, {
   method: 'POST',
   headers: H,
   body: JSON.stringify({
-    bundle_id: 'dp-research',
-    flow_id: 'dp-research',
+    bundle_id: 'deep-research',
+    flow_id: 'deep-research',
     input_data: {
       request: REQUEST,
       effort: EFFORT,

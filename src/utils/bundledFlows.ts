@@ -1,14 +1,16 @@
 import type { VisualFlow } from '../types/flow';
 import type { PublishedBundleTarget } from './workflowBundles';
 
-// Bundled read-only catalog: the dp- research family + the framework default
+// Bundled read-only catalog: the deep-research family + the framework default
 // basic-agent (81795ea9) with its status helper (15f19f7f). basic-agent ships
 // as a gateway bundle but was invisible in the library (and in the Runnable
-// view) because only dp-* was globbed — "it's used everywhere" and the
-// library couldn't show it.
+// view) because only the research family was globbed — "it's used everywhere"
+// and the library couldn't show it.
+// 2026-07-16 operator ruling: the dp- prefix is retired — ids and files are
+// deep-* now (deep-research/-plan/-investigate/-review/-render).
 const bundledFlowModules = import.meta.glob<VisualFlow>(
   [
-    '../../examples/flows/dp-*.json',
+    '../../examples/flows/deep-*.json',
     '../../examples/flows/81795ea9.json',
     '../../examples/flows/15f19f7f.json',
     // The five framework workflows (operator ask 2026-07-14): two runnable
@@ -22,6 +24,14 @@ const bundledFlowModules = import.meta.glob<VisualFlow>(
     '../../examples/flows/structured-extract.json',
     '../../examples/flows/map-reduce.json',
     '../../examples/flows/co-scientist.json',
+    // The meta-intelligence family (operator ask 2026-07-16): five
+    // co-orchestrated deliberation patterns, each agent.v1-conformant so it
+    // benchmarks 1:1 against an isolated LLM call.
+    '../../examples/flows/meta-consensus.json',
+    '../../examples/flows/meta-debate.json',
+    '../../examples/flows/meta-reflect.json',
+    '../../examples/flows/meta-perspectives.json',
+    '../../examples/flows/meta-deliberate.json',
   ],
   {
     eager: true,
@@ -30,13 +40,13 @@ const bundledFlowModules = import.meta.glob<VisualFlow>(
 );
 
 const bundledRunTargets: Record<string, PublishedBundleTarget> = {
-  'dp-research': {
-    flowId: 'dp-research',
-    bundleId: 'dp-research',
-    // 0.1.4 = branded exports + derived report titles (ids stay dp-*;
-    // bundle versions are immutable by sha, so each wave is a new version).
-    bundleVersion: '0.1.4',
-    bundleRef: 'dp-research@0.1.5',
+  'deep-research': {
+    flowId: 'deep-research',
+    // New bundle id (dp- retirement); version lineage continues from
+    // deep-research@0.1.5 so ordering reads naturally across the rename.
+    bundleId: 'deep-research',
+    bundleVersion: '0.1.6',
+    bundleRef: 'deep-research@0.1.6',
   },
   '81795ea9': {
     flowId: '81795ea9',
@@ -47,22 +57,24 @@ const bundledRunTargets: Record<string, PublishedBundleTarget> = {
   'coding-agent': {
     flowId: 'coding-agent',
     bundleId: 'coding-agent',
-    // 0.1.2 = the dual-interface release (agent.v1 `coder` entrypoint).
-    bundleVersion: '0.1.2',
-    bundleRef: 'coding-agent@0.1.2',
+    // 0.2.0 = deterministic-gates redesign (R-Type post-mortem): delivery +
+    // integration gates before the LLM, browser_probe execution gate for web
+    // entrypoints (fail-closed), environment-vs-fixable failure split.
+    bundleVersion: '0.2.0',
+    bundleRef: 'coding-agent@0.2.0',
   },
   coder: {
     flowId: 'coder',
     bundleId: 'coding-agent',
-    bundleVersion: '0.1.2',
-    bundleRef: 'coding-agent@0.1.2',
+    bundleVersion: '0.2.0',
+    bundleRef: 'coding-agent@0.2.0',
   },
   'co-scientist': {
     flowId: 'co-scientist',
     bundleId: 'co-scientist',
-    // 0.1.5 = branded exports + fixed report title (never the prompt).
-    bundleVersion: '0.1.5',
-    bundleRef: 'co-scientist@0.1.6',
+    // 0.1.7 = deep-* subflow rename (grounding via deep-plan/deep-investigate).
+    bundleVersion: '0.1.7',
+    bundleRef: 'co-scientist@0.1.7',
   },
   'adversarial-review': {
     flowId: 'adversarial-review',
@@ -81,6 +93,36 @@ const bundledRunTargets: Record<string, PublishedBundleTarget> = {
     bundleId: 'map-reduce',
     bundleVersion: '0.1.0',
     bundleRef: 'map-reduce@0.1.0',
+  },
+  'meta-consensus': {
+    flowId: 'meta-consensus',
+    bundleId: 'meta-consensus',
+    bundleVersion: '0.1.0',
+    bundleRef: 'meta-consensus@0.1.0',
+  },
+  'meta-debate': {
+    flowId: 'meta-debate',
+    bundleId: 'meta-debate',
+    bundleVersion: '0.1.0',
+    bundleRef: 'meta-debate@0.1.0',
+  },
+  'meta-reflect': {
+    flowId: 'meta-reflect',
+    bundleId: 'meta-reflect',
+    bundleVersion: '0.1.0',
+    bundleRef: 'meta-reflect@0.1.0',
+  },
+  'meta-perspectives': {
+    flowId: 'meta-perspectives',
+    bundleId: 'meta-perspectives',
+    bundleVersion: '0.1.0',
+    bundleRef: 'meta-perspectives@0.1.0',
+  },
+  'meta-deliberate': {
+    flowId: 'meta-deliberate',
+    bundleId: 'meta-deliberate',
+    bundleVersion: '0.1.0',
+    bundleRef: 'meta-deliberate@0.1.0',
   },
 };
 

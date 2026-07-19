@@ -39,7 +39,7 @@ const start = await j(`${GATEWAY}/api/gateway/runs/start`, {
   headers: H,
   body: JSON.stringify({
     bundle_id: 'co-scientist',
-    bundle_version: '0.1.6',
+    bundle_version: '0.1.7',
     flow_id: 'co-scientist',
     input_data: {
       research_goal: GOAL,

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the `dp-` production research workflow family.
+"""Build the `deep-` production research workflow family.
 
 The generated VisualFlow JSON is intentionally plain and editable in
 AbstractFlow. The script also packs the root WorkflowBundle for Gateway.
@@ -16,7 +16,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 FLOWS_DIR = ROOT / "abstractflow" / "examples" / "flows"
 BUNDLES_DIR = ROOT / "abstractgateway" / "flows" / "bundles"
-BUNDLE_PATH = BUNDLES_DIR / "dp-research@0.1.1.flow"
+BUNDLE_PATH = BUNDLES_DIR / "deep-research@0.1.6.flow"
 
 
 def _pin(pin_id: str, label: str, pin_type: str, description: str | None = None) -> dict[str, Any]:
@@ -70,7 +70,7 @@ profiles = {
         "max_review_rounds": 1,
         "source_policy": "Prefer primary or highly authoritative sources. Fetch before citing. Stop once the core answer is supported.",
         "citation_policy": "Cite decisive claims and flag uncertainty instead of over-searching.",
-        "output_prefix": "reports/dp-quick-research",
+        "output_prefix": "reports/deep-quick-research",
         "report_title": "Quick Research Brief",
         "include_images": False,
     },
@@ -85,7 +85,7 @@ profiles = {
         "max_review_rounds": 2,
         "source_policy": "Prefer primary, recent, authoritative sources. Fetch before citing and compare at least one contrary source when useful.",
         "citation_policy": "Every important factual claim needs a source id or an explicit limitation.",
-        "output_prefix": "reports/dp-standard-research",
+        "output_prefix": "reports/deep-standard-research",
         "report_title": "Research Report",
         "include_images": True,
     },
@@ -100,7 +100,7 @@ profiles = {
         "max_review_rounds": 3,
         "source_policy": "Prefer primary, recent, authoritative sources. Fetch before citing, triangulate important claims, and actively seek disconfirming evidence.",
         "citation_policy": "Every non-obvious factual claim needs a source id or limitation. Distinguish primary evidence from commentary.",
-        "output_prefix": "reports/dp-thorough-research",
+        "output_prefix": "reports/deep-thorough-research",
         "report_title": "Deep Research Report",
         "include_images": True,
     },
@@ -885,7 +885,7 @@ def _wire_start_fields(
 
 def build_plan_flow() -> dict[str, Any]:
     fields = _input_fields([("settings", "settings", "object")])
-    flow = _base_flow("dp-plan", "deep-research-plan", "Research planning subflow.")
+    flow = _base_flow("deep-plan", "deep-research-plan", "Research planning subflow.")
     flow["nodes"] = [
         _start_node(),
         _settings_node("derive_settings", -640, -160),
@@ -948,7 +948,7 @@ def build_investigate_flow() -> dict[str, Any]:
         ]
     )
     flow = _base_flow(
-        "dp-investigate", "deep-research-investigate", "Evidence gathering and bounded investigation."
+        "deep-investigate", "deep-research-investigate", "Evidence gathering and bounded investigation."
     )
     flow["nodes"] = [
         _start_node(
@@ -1039,7 +1039,7 @@ def build_review_flow() -> dict[str, Any]:
             ("total_rounds", "total_rounds", "number"),
         ]
     )
-    flow = _base_flow("dp-review", "deep-research-review", "Three-lens adversarial review subflow.")
+    flow = _base_flow("deep-review", "deep-research-review", "Three-lens adversarial review subflow.")
     flow["nodes"] = [
         _start_node(
             [
@@ -1194,7 +1194,7 @@ def build_render_flow() -> dict[str, Any]:
             ("review_rounds_completed", "review_rounds_completed", "number"),
         ]
     )
-    flow = _base_flow("dp-render", "deep-research-render", "Final report and audit object renderer.")
+    flow = _base_flow("deep-render", "deep-research-render", "Final report and audit object renderer.")
     flow["nodes"] = [
         _start_node(
             [
@@ -1375,13 +1375,13 @@ def _write_node(node_id: str, node_type: str, label: str, x: int, y: int) -> dic
 
 def build_root_flow() -> dict[str, Any]:
     flow = _base_flow(
-        "dp-research",
+        "deep-research",
         "deep-research",
         (
             "Production research workflow with adversarial review, provenance, and "
             "Markdown/PDF/DOCX export."
         ),
-        ["abstractcode.agent.v1", "abstractresearch.dp.v1"],
+        ["abstractcode.agent.v1", "abstractresearch.deep.v1"],
     )
     root_fields = _input_fields()
     investigate_fields = _input_fields(
@@ -1413,7 +1413,7 @@ def build_root_flow() -> dict[str, Any]:
         _start_node(),
         _settings_node("derive_settings", -560, -160),
         _get_node("get_max_review_rounds", "max_review_rounds", 2, -220, -340),
-        _get_node("get_output_prefix", "output_prefix", "reports/dp-standard-research", 3040, 360),
+        _get_node("get_output_prefix", "output_prefix", "reports/deep-standard-research", 3040, 360),
         _get_node("get_report_title", "report_title", "Research Report", 3040, 500),
         _system_datetime_node("run_timestamp", -560, 320),
         _replace_node("timestamp_no_colons", "Sanitize timestamp colons", ":", "-", -240, 280),
@@ -1421,16 +1421,16 @@ def build_root_flow() -> dict[str, Any]:
         _set_var_node(
             "set_export_timestamp",
             "Persist export timestamp",
-            "dp.export_timestamp",
+            "deep.export_timestamp",
             -180,
             40,
         ),
         _make_object("plan_input", root_fields, -560, -260),
-        _subflow_node("plan", "Plan", "dp-plan", -180, -140),
+        _subflow_node("plan", "Plan", "deep-plan", -180, -140),
         _get_node("get_plan", "plan", {}, 160, -260),
         _get_var_node(
             "get_loop_state",
-            "dp.loop_state",
+            "deep.loop_state",
             {"rounds_completed": 0, "continue_research": True},
             160,
             -20,
@@ -1447,20 +1447,20 @@ def build_root_flow() -> dict[str, Any]:
             ],
         ),
         _while_node("research_rounds", "Review-gated research rounds", 160, 260),
-        _get_var_node("get_prior_investigation", "dp.latest_investigation", {}, 520, -340),
-        _get_var_node("get_prior_review", "dp.latest_review", {}, 520, -220),
+        _get_var_node("get_prior_investigation", "deep.latest_investigation", {}, 520, -340),
+        _get_var_node("get_prior_review", "deep.latest_review", {}, 520, -220),
         _make_object(
             "investigate_input",
             investigate_fields,
             520,
             -20,
         ),
-        _subflow_node("investigate", "Investigate round", "dp-investigate", 900, -140),
+        _subflow_node("investigate", "Investigate round", "deep-investigate", 900, -140),
         _get_node("get_investigation", "investigation", {}, 1240, -300),
         _set_var_node(
             "set_latest_investigation",
             "Persist latest investigation",
-            "dp.latest_investigation",
+            "deep.latest_investigation",
             1240,
             -120,
         ),
@@ -1470,9 +1470,9 @@ def build_root_flow() -> dict[str, Any]:
             1600,
             -20,
         ),
-        _subflow_node("review", "Adversarial review round", "dp-review", 1980, -140),
+        _subflow_node("review", "Adversarial review round", "deep-review", 1980, -140),
         _get_node("get_review", "adversarial_review", {}, 2320, -300),
-        _set_var_node("set_latest_review", "Persist latest review", "dp.latest_review", 2320, -120),
+        _set_var_node("set_latest_review", "Persist latest review", "deep.latest_review", 2320, -120),
         _code_data_node(
             "next_loop_state",
             "Record reviewer decision",
@@ -1484,19 +1484,19 @@ def build_root_flow() -> dict[str, Any]:
                 _pin("round_index", "round_index", "number"),
             ],
         ),
-        _set_var_node("set_loop_state", "Persist loop state", "dp.loop_state", 2320, 200),
-        _get_var_node("get_final_investigation", "dp.latest_investigation", {}, 2660, -300),
-        _get_var_node("get_final_review", "dp.latest_review", {}, 2660, -180),
+        _set_var_node("set_loop_state", "Persist loop state", "deep.loop_state", 2320, 200),
+        _get_var_node("get_final_investigation", "deep.latest_investigation", {}, 2660, -300),
+        _get_var_node("get_final_review", "deep.latest_review", {}, 2660, -180),
         _get_var_node(
             "get_final_loop_state",
-            "dp.loop_state",
+            "deep.loop_state",
             {"rounds_completed": 0, "continue_research": True},
             2660,
             -60,
         ),
         _get_node("get_review_rounds_completed", "rounds_completed", 0, 2660, 80),
         _make_object("render_input", render_fields, 2660, -20),
-        _subflow_node("render", "Render final report", "dp-render", 3040, -140),
+        _subflow_node("render", "Render final report", "deep-render", 3040, -140),
         _get_node("get_report_markdown", "report_markdown", "", 3380, -520),
         _get_node("get_manifest", "research_run_manifest", {}, 3380, -400),
         _get_node("get_source_ledger", "source_ledger", [], 3380, -280),
@@ -1504,7 +1504,7 @@ def build_root_flow() -> dict[str, Any]:
         _get_node("get_iteration_log", "iteration_log", [], 3380, -40),
         _get_node("get_warnings", "warnings", [], 3380, 80),
         _get_node("get_model_export_status", "export_status", {}, 3380, 200),
-        _get_var_node("get_export_timestamp", "dp.export_timestamp", "", 3380, 300),
+        _get_var_node("get_export_timestamp", "deep.export_timestamp", "", 3380, 300),
         _make_object(
             "path_vars",
             [
@@ -1741,15 +1741,15 @@ def main() -> int:
 
     BUNDLES_DIR.mkdir(parents=True, exist_ok=True)
     pack_workflow_bundle(
-        root_flow_json=FLOWS_DIR / "dp-research.json",
+        root_flow_json=FLOWS_DIR / "deep-research.json",
         out_path=BUNDLE_PATH,
-        bundle_id="dp-research",
-        bundle_version="0.1.5",
+        bundle_id="deep-research",
+        bundle_version="0.1.6",
         flows_dir=FLOWS_DIR,
-        entrypoints=["dp-research"],
-        default_entrypoint="dp-research",
+        entrypoints=["deep-research"],
+        default_entrypoint="deep-research",
         metadata={
-            "family": "dp",
+            "family": "deep-research",
             "purpose": "production research with adversarial review and document export",
             "source_of_truth": {
                 "process": "VisualFlow",

@@ -1,0 +1,1334 @@
+{
+  "id": "meta-perspectives",
+  "name": "meta-perspectives",
+  "description": "Meta-intelligence: a decomposer picks the 3 most revealing angles for THIS question (disciplines, stances, timescales, stakeholders...), each angle answers independently, then an integrator weaves them into one answer that names the tensions between angles instead of papering over them. Comparable 1:1 against an isolated LLM call.",
+  "interfaces": [
+    "abstractcode.agent.v1",
+    "abstractmeta.intelligence.v1"
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": -1240,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Question",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "prompt": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "angles_prompt",
+      "type": "code",
+      "position": {
+        "x": -960,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose angle brief",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "q = str(prompt or \"\").strip()\nparts = []\nparts.append(\"Before answering, decide how this question should be LOOKED AT. Pick the 3 most revealing, mutually distinct angles for THIS question — not generic roles.\")\nparts.append(\"\")\nparts.append(\"# Question\")\nparts.append(q)\nparts.append(\"\")\nparts.append(\"Examples of what an angle can be (pick what fits THIS question): a discipline (economist, biologist), a stance (skeptic, advocate), a timescale (short-term, long-term), a stakeholder (user, operator), a method (empirical, theoretical). For each angle give: name, and focus = the one question this angle presses on.\")\nreturn \"\\n\".join(parts)"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "decompose",
+      "type": "llm_call",
+      "position": {
+        "x": -900,
+        "y": -160
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Pick 3 angles",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "tools": [],
+          "system": "You choose the most revealing, mutually distinct angles to examine a question from — specific to the question, never generic.",
+          "temperature": 0.4,
+          "resp_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "angles"
+            ],
+            "properties": {
+              "angles": {
+                "type": "array",
+                "minItems": 3,
+                "maxItems": 3,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "name",
+                    "focus"
+                  ],
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "focus": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "angle_a_prompt",
+      "type": "code",
+      "position": {
+        "x": -620,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Angle 1 brief",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "angles",
+            "label": "angles",
+            "type": "object"
+          },
+          {
+            "id": "index",
+            "label": "index",
+            "type": "number"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "index": 0
+        },
+        "functionName": "transform",
+        "codeBody": "q = str(prompt or \"\").strip()\ndata = angles if isinstance(angles, dict) else {}\nitems = data.get(\"angles\")\n# Type-guard the structured decompose: the executor stores schema-parse\n# results in `data` even when validation failed, so a schema-shaped-but-\n# wrong payload (e.g. angles as a string) must degrade to generic labels,\n# never crash (adversary finding 3).\nitems = items if isinstance(items, list) else []\ni = int(index or 0)\na = items[i] if i < len(items) else {}\na = a if isinstance(a, dict) else {}\nname = str(a.get(\"name\") or (\"angle \" + str(i + 1)))\nfocus = str(a.get(\"focus\") or \"\")\nparts = []\nparts.append(\"Answer the question below FROM ONE ANGLE ONLY. You are: \" + name + \".\")\nif focus:\n    parts.append(\"Your angle presses on: \" + focus)\nparts.append(\"\")\nparts.append(\"# Question\")\nparts.append(q)\nparts.append(\"\")\nparts.append(\"Give the answer AS SEEN FROM YOUR ANGLE, concise (under 250 words): what this angle sees that others miss, and what it concludes. Do not try to be balanced — that is the integrator's job, not yours.\")\nreturn \"\\n\".join(parts)"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "angle_b_prompt",
+      "type": "code",
+      "position": {
+        "x": -340,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Angle 2 brief",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "angles",
+            "label": "angles",
+            "type": "object"
+          },
+          {
+            "id": "index",
+            "label": "index",
+            "type": "number"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "index": 1
+        },
+        "functionName": "transform",
+        "codeBody": "q = str(prompt or \"\").strip()\ndata = angles if isinstance(angles, dict) else {}\nitems = data.get(\"angles\")\n# Type-guard the structured decompose: the executor stores schema-parse\n# results in `data` even when validation failed, so a schema-shaped-but-\n# wrong payload (e.g. angles as a string) must degrade to generic labels,\n# never crash (adversary finding 3).\nitems = items if isinstance(items, list) else []\ni = int(index or 0)\na = items[i] if i < len(items) else {}\na = a if isinstance(a, dict) else {}\nname = str(a.get(\"name\") or (\"angle \" + str(i + 1)))\nfocus = str(a.get(\"focus\") or \"\")\nparts = []\nparts.append(\"Answer the question below FROM ONE ANGLE ONLY. You are: \" + name + \".\")\nif focus:\n    parts.append(\"Your angle presses on: \" + focus)\nparts.append(\"\")\nparts.append(\"# Question\")\nparts.append(q)\nparts.append(\"\")\nparts.append(\"Give the answer AS SEEN FROM YOUR ANGLE, concise (under 250 words): what this angle sees that others miss, and what it concludes. Do not try to be balanced — that is the integrator's job, not yours.\")\nreturn \"\\n\".join(parts)"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "angle_c_prompt",
+      "type": "code",
+      "position": {
+        "x": -60,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Angle 3 brief",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "angles",
+            "label": "angles",
+            "type": "object"
+          },
+          {
+            "id": "index",
+            "label": "index",
+            "type": "number"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox",
+          "index": 2
+        },
+        "functionName": "transform",
+        "codeBody": "q = str(prompt or \"\").strip()\ndata = angles if isinstance(angles, dict) else {}\nitems = data.get(\"angles\")\n# Type-guard the structured decompose: the executor stores schema-parse\n# results in `data` even when validation failed, so a schema-shaped-but-\n# wrong payload (e.g. angles as a string) must degrade to generic labels,\n# never crash (adversary finding 3).\nitems = items if isinstance(items, list) else []\ni = int(index or 0)\na = items[i] if i < len(items) else {}\na = a if isinstance(a, dict) else {}\nname = str(a.get(\"name\") or (\"angle \" + str(i + 1)))\nfocus = str(a.get(\"focus\") or \"\")\nparts = []\nparts.append(\"Answer the question below FROM ONE ANGLE ONLY. You are: \" + name + \".\")\nif focus:\n    parts.append(\"Your angle presses on: \" + focus)\nparts.append(\"\")\nparts.append(\"# Question\")\nparts.append(q)\nparts.append(\"\")\nparts.append(\"Give the answer AS SEEN FROM YOUR ANGLE, concise (under 250 words): what this angle sees that others miss, and what it concludes. Do not try to be balanced — that is the integrator's job, not yours.\")\nreturn \"\\n\".join(parts)"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "view_a",
+      "type": "llm_call",
+      "position": {
+        "x": -560,
+        "y": -160
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Angle 1 view",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "tools": [],
+          "system": "You answer questions from one assigned angle only, sharply — balance is someone else's job.",
+          "temperature": 0.6
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "view_b",
+      "type": "llm_call",
+      "position": {
+        "x": -280,
+        "y": -160
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Angle 2 view",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "tools": [],
+          "system": "You answer questions from one assigned angle only, sharply — balance is someone else's job.",
+          "temperature": 0.6
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "view_c",
+      "type": "llm_call",
+      "position": {
+        "x": 0,
+        "y": -160
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Angle 3 view",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "tools": [],
+          "system": "You answer questions from one assigned angle only, sharply — balance is someone else's job.",
+          "temperature": 0.6
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "integrate_prompt",
+      "type": "code",
+      "position": {
+        "x": 220,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose integration",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "angles",
+            "label": "angles",
+            "type": "object"
+          },
+          {
+            "id": "view_a",
+            "label": "view_a",
+            "type": "string"
+          },
+          {
+            "id": "view_b",
+            "label": "view_b",
+            "type": "string"
+          },
+          {
+            "id": "view_c",
+            "label": "view_c",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "q = str(prompt or \"\").strip()\ndata = angles if isinstance(angles, dict) else {}\nitems = data.get(\"angles\")\nitems = items if isinstance(items, list) else []\nviews = [str(view_a or \"\"), str(view_b or \"\"), str(view_c or \"\")]\nparts = []\nparts.append(\"Three angle-experts examined the same question. Integrate their views into ONE final answer.\")\nparts.append(\"\")\nparts.append(\"# Question\")\nparts.append(q)\nfor i, v in enumerate(views):\n    label = \"Angle \" + str(i + 1)\n    if i < len(items) and isinstance(items[i], dict):\n        label = label + \" (\" + str(items[i].get(\"name\") or \"\") + \")\"\n    parts.append(\"\")\n    parts.append(\"# \" + label)\n    parts.append(v.strip())\nparts.append(\"\")\nparts.append(\"# Your task\")\nparts.append(\"Write the final answer: integrate what the angles agree on, NAME the real tensions between them (do not paper over disagreement — say which consideration should win and why), and conclude. Complete and self-contained; the reader never sees the angle views. Answer in the language of the question.\")\nreturn \"\\n\".join(parts)"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "integrate",
+      "type": "llm_call",
+      "position": {
+        "x": 280,
+        "y": -160
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Integrate final answer",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "tools": [],
+          "system": "You integrate expert angle-views into one answer: keep agreements, NAME tensions and adjudicate them, conclude clearly.",
+          "temperature": 0.2
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "meta",
+      "type": "code",
+      "position": {
+        "x": 560,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Collect stages",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "angles",
+            "label": "angles",
+            "type": "object"
+          },
+          {
+            "id": "view_a",
+            "label": "view_a",
+            "type": "string"
+          },
+          {
+            "id": "view_b",
+            "label": "view_b",
+            "type": "string"
+          },
+          {
+            "id": "view_c",
+            "label": "view_c",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "data = angles if isinstance(angles, dict) else {}\nitems = data.get(\"angles\")\nreturn {\n    \"workflow\": \"meta-perspectives\",\n    \"pattern\": \"multi-angle: decompose into 3 question-specific angles -> answer each -> integrate\",\n    \"stages\": {\n        \"angles\": items if isinstance(items, list) else [],\n        \"view_a\": str(view_a or \"\"),\n        \"view_b\": str(view_b or \"\"),\n        \"view_c\": str(view_c or \"\"),\n    },\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 840,
+        "y": -160
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Final answer",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-exec-out-decompose-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "decompose",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-decompose-exec-out-view_a-exec-in",
+      "source": "decompose",
+      "sourceHandle": "exec-out",
+      "target": "view_a",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-view_a-exec-out-view_b-exec-in",
+      "source": "view_a",
+      "sourceHandle": "exec-out",
+      "target": "view_b",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-view_b-exec-out-view_c-exec-in",
+      "source": "view_b",
+      "sourceHandle": "exec-out",
+      "target": "view_c",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-view_c-exec-out-integrate-exec-in",
+      "source": "view_c",
+      "sourceHandle": "exec-out",
+      "target": "integrate",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-integrate-exec-out-end-exec-in",
+      "source": "integrate",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-start-prompt-angles_prompt-prompt",
+      "source": "start",
+      "sourceHandle": "prompt",
+      "target": "angles_prompt",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-angles_prompt-output-decompose-prompt",
+      "source": "angles_prompt",
+      "sourceHandle": "output",
+      "target": "decompose",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-decompose-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "decompose",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-decompose-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "decompose",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-prompt-angle_a_prompt-prompt",
+      "source": "start",
+      "sourceHandle": "prompt",
+      "target": "angle_a_prompt",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-prompt-angle_b_prompt-prompt",
+      "source": "start",
+      "sourceHandle": "prompt",
+      "target": "angle_b_prompt",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-prompt-angle_c_prompt-prompt",
+      "source": "start",
+      "sourceHandle": "prompt",
+      "target": "angle_c_prompt",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-decompose-data-angle_a_prompt-angles",
+      "source": "decompose",
+      "sourceHandle": "data",
+      "target": "angle_a_prompt",
+      "targetHandle": "angles",
+      "animated": false
+    },
+    {
+      "id": "e-decompose-data-angle_b_prompt-angles",
+      "source": "decompose",
+      "sourceHandle": "data",
+      "target": "angle_b_prompt",
+      "targetHandle": "angles",
+      "animated": false
+    },
+    {
+      "id": "e-decompose-data-angle_c_prompt-angles",
+      "source": "decompose",
+      "sourceHandle": "data",
+      "target": "angle_c_prompt",
+      "targetHandle": "angles",
+      "animated": false
+    },
+    {
+      "id": "e-angle_a_prompt-output-view_a-prompt",
+      "source": "angle_a_prompt",
+      "sourceHandle": "output",
+      "target": "view_a",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-angle_b_prompt-output-view_b-prompt",
+      "source": "angle_b_prompt",
+      "sourceHandle": "output",
+      "target": "view_b",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-angle_c_prompt-output-view_c-prompt",
+      "source": "angle_c_prompt",
+      "sourceHandle": "output",
+      "target": "view_c",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-view_a-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "view_a",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-view_b-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "view_b",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-view_c-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "view_c",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-view_a-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "view_a",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-view_b-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "view_b",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-view_c-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "view_c",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-prompt-integrate_prompt-prompt",
+      "source": "start",
+      "sourceHandle": "prompt",
+      "target": "integrate_prompt",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-decompose-data-integrate_prompt-angles",
+      "source": "decompose",
+      "sourceHandle": "data",
+      "target": "integrate_prompt",
+      "targetHandle": "angles",
+      "animated": false
+    },
+    {
+      "id": "e-view_a-response-integrate_prompt-view_a",
+      "source": "view_a",
+      "sourceHandle": "response",
+      "target": "integrate_prompt",
+      "targetHandle": "view_a",
+      "animated": false
+    },
+    {
+      "id": "e-view_b-response-integrate_prompt-view_b",
+      "source": "view_b",
+      "sourceHandle": "response",
+      "target": "integrate_prompt",
+      "targetHandle": "view_b",
+      "animated": false
+    },
+    {
+      "id": "e-view_c-response-integrate_prompt-view_c",
+      "source": "view_c",
+      "sourceHandle": "response",
+      "target": "integrate_prompt",
+      "targetHandle": "view_c",
+      "animated": false
+    },
+    {
+      "id": "e-integrate_prompt-output-integrate-prompt",
+      "source": "integrate_prompt",
+      "sourceHandle": "output",
+      "target": "integrate",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-integrate-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "integrate",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-integrate-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "integrate",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-decompose-data-meta-angles",
+      "source": "decompose",
+      "sourceHandle": "data",
+      "target": "meta",
+      "targetHandle": "angles",
+      "animated": false
+    },
+    {
+      "id": "e-view_a-response-meta-view_a",
+      "source": "view_a",
+      "sourceHandle": "response",
+      "target": "meta",
+      "targetHandle": "view_a",
+      "animated": false
+    },
+    {
+      "id": "e-view_b-response-meta-view_b",
+      "source": "view_b",
+      "sourceHandle": "response",
+      "target": "meta",
+      "targetHandle": "view_b",
+      "animated": false
+    },
+    {
+      "id": "e-view_c-response-meta-view_c",
+      "source": "view_c",
+      "sourceHandle": "response",
+      "target": "meta",
+      "targetHandle": "view_c",
+      "animated": false
+    },
+    {
+      "id": "e-integrate-response-end-response",
+      "source": "integrate",
+      "sourceHandle": "response",
+      "target": "end",
+      "targetHandle": "response",
+      "animated": false
+    },
+    {
+      "id": "e-integrate-success-end-success",
+      "source": "integrate",
+      "sourceHandle": "success",
+      "target": "end",
+      "targetHandle": "success",
+      "animated": false
+    },
+    {
+      "id": "e-meta-output-end-meta",
+      "source": "meta",
+      "sourceHandle": "output",
+      "target": "end",
+      "targetHandle": "meta",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-07-16T01:12:37.042763+00:00",
+  "updated_at": "2026-07-16T01:12:37.042763+00:00"
+}

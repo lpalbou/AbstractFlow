@@ -2690,7 +2690,7 @@ button.primary:hover:not(:disabled) {
   white-space: nowrap;
 }
 
-/* Short-id disambiguator for same-name flows (three dp-research copies). */
+/* Short-id disambiguator for same-name flows (three deep-research copies). */
 .flow-library-item-id-hint {
   margin-left: 8px;
   font-family: var(--font-mono);

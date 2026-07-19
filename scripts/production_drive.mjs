@@ -138,7 +138,7 @@ try {
   });
   await new Promise((r) => setTimeout(r, 600));
   const expanded = await page.evaluate(() => {
-    const body = document.querySelector('[data-flow-id="dp-research"]');
+    const body = document.querySelector('[data-flow-id="deep-research"]');
     const row = body ? body.closest('.af-disclosure__row') : null;
     const chev = row ? row.querySelector('.af-disclosure__chevron') : null;
     if (chev) {
@@ -148,7 +148,7 @@ try {
     return false;
   });
   await new Promise((r) => setTimeout(r, 800));
-  note(`family expand on dp-research: ${expanded ? 'clicked' : 'row not found'}`);
+  note(`family expand on deep-research: ${expanded ? 'clicked' : 'row not found'}`);
   await page.screenshot({ path: `${OUT}/05_library_family.png` });
 
   // 6. Load bundled basic-agent (double-click activates).

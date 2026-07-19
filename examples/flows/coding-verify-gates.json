@@ -1,14 +1,14 @@
 {
   "id": "coding-verify-gates",
   "name": "coding-verify-gates",
-  "description": "Independent verifier: runs build/execute gates (execute_command) and a structure/match check (analyze_code) against the coding task, returning a structured pass/fail verdict with specific failure lines. Reusable as a subflow.",
+  "description": "Verification gates for coding runs: deterministic delivery + web-integration checks over list_files/read_file ground truth run first (no LLM), then a browser_probe execution gate for web entrypoints (fail-closed: missing executors are environment failures, never passes), then the independent verifier agent for builds/matches. Returns a structured verdict with fixable failures separated from environment failures. Reusable as a subflow.",
   "interfaces": [],
   "nodes": [
     {
       "id": "start",
       "type": "on_flow_start",
       "position": {
-        "x": -600,
+        "x": -1400,
         "y": 0
       },
       "data": {
@@ -44,6 +44,11 @@
             "type": "string"
           },
           {
+            "id": "round_index",
+            "label": "round_index",
+            "type": "number"
+          },
+          {
             "id": "provider",
             "label": "provider",
             "type": "provider_text"
@@ -56,7 +61,1091 @@
         ],
         "pinDefaults": {
           "build_command": "",
-          "run_command": ""
+          "run_command": "",
+          "round_index": 0
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "listing_args",
+      "type": "code",
+      "position": {
+        "x": -1400,
+        "y": 220
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose listing call",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "ws = str(workspace_root or \"\").strip()\nreturn {\n    \"name\": \"list_files\",\n    \"arguments\": {\n        \"directory_path\": ws if ws else \".\",\n        \"recursive\": True,\n        \"include_hidden\": False,\n        \"head_limit\": None,\n    },\n    \"call_id\": \"gate-workspace-listing\",\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "list_call",
+      "type": "call_tool",
+      "position": {
+        "x": -1160,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "call_tool",
+        "label": "G0: list workspace",
+        "icon": "&#x1F527;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "tool_call",
+            "label": "tool_call",
+            "type": "object"
+          },
+          {
+            "id": "allowed_tools",
+            "label": "allowed_tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "any"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "raw",
+            "label": "raw",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "allowed_tools": [
+            "list_files"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gate0",
+      "type": "code",
+      "position": {
+        "x": -1160,
+        "y": 220
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "G0: delivery + classify",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "listing",
+            "label": "listing",
+            "type": "any"
+          },
+          {
+            "id": "listing_ok",
+            "label": "listing_ok",
+            "type": "boolean"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "text = str(listing or \"\")\nok = bool(listing_ok)\nfiles = []\nlines = text.split(\"\\n\")\nfor ln in lines[1:]:\n    if not ln.startswith(\"  \"):\n        continue\n    s = ln.strip()\n    if not s or s.endswith(\"/\"):\n        continue\n    if s.endswith(\" bytes)\") or s.endswith(\" byte)\"):\n        cut = s.rfind(\" (\")\n        if cut > 0:\n            s = s[:cut]\n    files.append(s)\n\nhtml = [f for f in files if f.lower().endswith(\".html\") or f.lower().endswith(\".htm\")]\nweb_class = len(html) > 0\nentrypoint = \"\"\nif web_class:\n    roots = [f for f in html if \"/\" not in f]\n    cands = roots if roots else html\n    named_index = [f for f in cands if f.lower().rsplit(\"/\", 1)[-1] in (\"index.html\", \"index.htm\")]\n    pool = named_index if named_index else sorted(cands)\n    entrypoint = pool[0]\n\nfailures = []\nif not ok:\n    failures.append(\"delivery: could not list the workspace: \" + text[:200])\nelif not files:\n    if text.startswith(\"Error\"):\n        failures.append(\"delivery: workspace listing failed: \" + text[:200])\n    else:\n        failures.append(\"delivery: the workspace contains no files — nothing was delivered where the task expects it\")\n\nreturn {\n    \"files\": files,\n    \"web_class\": web_class,\n    \"entrypoint\": entrypoint,\n    \"delivery_ok\": len(failures) == 0,\n    \"failures\": failures,\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "entry_args",
+      "type": "code",
+      "position": {
+        "x": -940,
+        "y": 220
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose entrypoint read",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "gate0_out",
+            "label": "gate0_out",
+            "type": "object"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "g = gate0_out or {}\nfiles = g.get(\"files\") or []\ntarget = str(g.get(\"entrypoint\") or (files[0] if files else \"\"))\nws = str(workspace_root or \"\").strip()\npath = target\nif ws and target and not target.startswith(\"/\"):\n    path = ws.rstrip(\"/\") + \"/\" + target\nreturn {\n    \"name\": \"read_file\",\n    \"arguments\": {\"file_path\": path, \"should_read_entire_file\": True},\n    \"call_id\": \"gate-entrypoint-read\",\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "entry_read",
+      "type": "call_tool",
+      "position": {
+        "x": -920,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "call_tool",
+        "label": "G1: read entrypoint",
+        "icon": "&#x1F527;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "tool_call",
+            "label": "tool_call",
+            "type": "object"
+          },
+          {
+            "id": "allowed_tools",
+            "label": "allowed_tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "any"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "raw",
+            "label": "raw",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "allowed_tools": [
+            "read_file"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gate1",
+      "type": "code",
+      "position": {
+        "x": -720,
+        "y": 220
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "G1: integration check",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "gate0_out",
+            "label": "gate0_out",
+            "type": "object"
+          },
+          {
+            "id": "entry_content",
+            "label": "entry_content",
+            "type": "any"
+          },
+          {
+            "id": "entry_ok",
+            "label": "entry_ok",
+            "type": "boolean"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "g = gate0_out or {}\nweb = bool(g.get(\"web_class\"))\nfiles = [str(f) for f in (g.get(\"files\") or [])]\nentry = str(g.get(\"entrypoint\") or \"\")\nfailures = []\n# Defined here so the main_script pass below is safe when the entrypoint\n# read failed (the reference list stays empty on that branch).\nlocal = []\nif web and entry:\n    if not bool(entry_ok):\n        failures.append(\"integration: could not read entrypoint \" + entry + \" for the reference check: \" + str(entry_content or \"\")[:160])\n    else:\n        text = str(entry_content or \"\")\n        low_text = text.lower()\n        # Markup-only scan text: keep <script>/<style> OPENING TAGS (their\n        # src= attributes are real references) but drop their BODIES.\n        scan_parts = []\n        i = 0\n        while i < len(text):\n            s_script = low_text.find(\"<script\", i)\n            s_style = low_text.find(\"<style\", i)\n            starts = [x for x in (s_script, s_style) if x >= 0]\n            if not starts:\n                scan_parts.append(text[i:])\n                break\n            s = min(starts)\n            tag_end = text.find(\">\", s)\n            if tag_end < 0:\n                scan_parts.append(text[i:])\n                break\n            scan_parts.append(text[i:tag_end + 1])\n            closer = \"</script\" if s == s_script else \"</style\"\n            close = low_text.find(closer, tag_end)\n            if close < 0:\n                break\n            i = close\n        scan_text = \"\".join(scan_parts)\n        low_scan = scan_text.lower()\n        # Attribute names are case-insensitive and values may be unquoted:\n        # scan the lowercased markup for positions, slice values from the\n        # original; require a token boundary before the attribute name.\n        refs = []\n        for attr in (\"src\", \"href\"):\n            pos = 0\n            needle = attr + \"=\"\n            while True:\n                i2 = low_scan.find(needle, pos)\n                if i2 < 0:\n                    break\n                j = i2 + len(needle)\n                before = low_scan[i2 - 1] if i2 > 0 else \" \"\n                if before.isalnum() or before in \"-_.:\":\n                    pos = j\n                    continue\n                if j >= len(scan_text):\n                    break\n                if scan_text[j] == '\"' or scan_text[j] == \"'\":\n                    q = scan_text[j]\n                    k = scan_text.find(q, j + 1)\n                    if k > j:\n                        refs.append(scan_text[j + 1:k])\n                        pos = k + 1\n                        continue\n                    pos = j + 1\n                else:\n                    k = j\n                    while k < len(scan_text) and scan_text[k] not in \" \\t\\r\\n>\":\n                        k = k + 1\n                    if k > j:\n                        refs.append(scan_text[j:k])\n                    pos = k\n        # Keep only refs that name a local FILE dependency: relative path\n        # with an extension-bearing basename. Root-absolute and extensionless\n        # refs (routes, anchors) are runtime concerns the probe observes as\n        # failed_requests — never deterministic G1 failures.\n        local = []\n        for r in refs:\n            r2 = str(r).strip()\n            if not r2 or r2.startswith(\"#\"):\n                continue\n            low = r2.lower()\n            skip = False\n            for pref in (\"http://\", \"https://\", \"data:\", \"//\", \"mailto:\", \"javascript:\", \"tel:\", \"blob:\", \"about:\"):\n                if low.startswith(pref):\n                    skip = True\n                    break\n            if skip:\n                continue\n            r2 = r2.split(\"?\")[0].split(\"#\")[0]\n            if r2.startswith(\"./\"):\n                r2 = r2[2:]\n            if not r2 or r2.startswith(\"/\"):\n                continue\n            base = r2.rsplit(\"/\", 1)[-1]\n            if \".\" not in base:\n                continue\n            local.append(r2)\n        fileset = set(files)\n        lower_files = {}\n        for f in files:\n            lower_files[f.lower()] = f\n        entry_dir = entry.rsplit(\"/\", 1)[0] + \"/\" if \"/\" in entry else \"\"\n        for r in local:\n            if r in fileset:\n                continue\n            if entry_dir and (entry_dir + r) in fileset:\n                continue\n            case_hit = lower_files.get(r.lower()) or (lower_files.get((entry_dir + r).lower()) if entry_dir else None)\n            if case_hit:\n                failures.append(\"integration: entrypoint \" + entry + \" references '\" + r + \"' but the file is named '\" + case_hit + \"' — case mismatch breaks on case-sensitive hosts\")\n            else:\n                failures.append(\"integration: entrypoint \" + entry + \" references '\" + r + \"' which does not exist in the workspace\")\n        # Split-brain orphans: only when the entrypoint loads NO local script,\n        # and only for files that are browser-lane candidates — never named\n        # anywhere in the entrypoint (an inline `import \"./x.js\"` counts as a\n        # mention; the probe still owns runtime truth) and not a well-known\n        # non-browser sibling.\n        js_files = [f for f in files if f.lower().endswith(\".js\")]\n        js_refs = [r for r in local if r.lower().endswith(\".js\")]\n        if js_files and not js_refs:\n            for f in js_files:\n                base = f.rsplit(\"/\", 1)[-1].lower()\n                if base in (\"server.js\", \"karma.conf.js\", \"gulpfile.js\", \"gruntfile.js\"):\n                    continue\n                if base.endswith(\".config.js\") or \".test.\" in base or \".spec.\" in base or base.endswith(\".min.js\"):\n                    continue\n                if base and base in low_text:\n                    continue\n                failures.append(\"integration: '\" + f + \"' exists but the entrypoint never loads or mentions it — split-brain risk (add <script src=\\\"\" + f + \"\\\"></script> to \" + entry + \" or fold its code inline and delete the file)\")\n# First referenced local script (workspace-relative) — read by the orphan\n# gate (G4) so split builds get their main script analyzed too.\nmain_script = \"\"\nif web and entry:\n    fileset2 = set(files)\n    entry_dir2 = entry.rsplit(\"/\", 1)[0] + \"/\" if \"/\" in entry else \"\"\n    for r in local:\n        if not r.lower().endswith(\".js\"):\n            continue\n        if r in fileset2:\n            main_script = r\n        elif entry_dir2 and (entry_dir2 + r) in fileset2:\n            main_script = entry_dir2 + r\n        if main_script:\n            break\nreturn {\n    \"integration_ok\": len(failures) == 0,\n    \"failures\": failures,\n    \"main_script\": main_script,\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "script_args",
+      "type": "code",
+      "position": {
+        "x": -820,
+        "y": 420
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose script read",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "gate1_out",
+            "label": "gate1_out",
+            "type": "object"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "g1 = gate1_out or {}\ntarget = str(g1.get(\"main_script\") or \"\")\nws = str(workspace_root or \"\").strip()\npath = target\nif ws and target and not target.startswith(\"/\"):\n    path = ws.rstrip(\"/\") + \"/\" + target\nreturn {\n    \"name\": \"read_file\",\n    \"arguments\": {\"file_path\": path, \"should_read_entire_file\": True},\n    \"call_id\": \"gate-main-script-read\",\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "script_read",
+      "type": "call_tool",
+      "position": {
+        "x": -800,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "call_tool",
+        "label": "G4: read main script",
+        "icon": "&#x1F527;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "tool_call",
+            "label": "tool_call",
+            "type": "object"
+          },
+          {
+            "id": "allowed_tools",
+            "label": "allowed_tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "any"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "raw",
+            "label": "raw",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "allowed_tools": [
+            "read_file"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gate4",
+      "type": "code",
+      "position": {
+        "x": -600,
+        "y": 560
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "G4: orphan functions",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "gate0_out",
+            "label": "gate0_out",
+            "type": "object"
+          },
+          {
+            "id": "entry_content",
+            "label": "entry_content",
+            "type": "any"
+          },
+          {
+            "id": "script_content",
+            "label": "script_content",
+            "type": "any"
+          },
+          {
+            "id": "script_ok",
+            "label": "script_ok",
+            "type": "boolean"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "g0 = gate0_out or {}\nweb = bool(g0.get(\"web_class\"))\nfailures = []\nif web:\n    ident_chars = \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_$\"\n    text = str(entry_content or \"\")\n    if bool(script_ok) and script_content:\n        text = text + \"\\n\" + str(script_content)\n    # Collect declared function names: 'function NAME('.\n    decls = []\n    pos = 0\n    while True:\n        i = text.find(\"function\", pos)\n        if i < 0:\n            break\n        before = text[i - 1] if i > 0 else \" \"\n        j = i + len(\"function\")\n        if before in ident_chars or (j < len(text) and text[j] in ident_chars):\n            pos = j\n            continue\n        while j < len(text) and text[j] in \" \\t\":\n            j = j + 1\n        name = \"\"\n        k = j\n        while k < len(text) and text[k] in ident_chars:\n            name = name + text[k]\n            k = k + 1\n        while k < len(text) and text[k] in \" \\t\":\n            k = k + 1\n        if name and k < len(text) and text[k] == \"(\":\n            decls.append(name)\n        pos = k if k > pos else pos + 1\n    # Count boundary-checked occurrences of each declared name.\n    seen = set()\n    for name in decls:\n        if name in seen or len(name) < 2:\n            continue\n        seen.add(name)\n        count = 0\n        pos = 0\n        while True:\n            i = text.find(name, pos)\n            if i < 0:\n                break\n            before = text[i - 1] if i > 0 else \" \"\n            after_idx = i + len(name)\n            after = text[after_idx] if after_idx < len(text) else \" \"\n            if before not in ident_chars and after not in ident_chars:\n                count = count + 1\n            pos = i + len(name)\n        if count <= 1:\n            failures.append(\"orphan-function: '\" + name + \"' is declared but never referenced anywhere in the delivered code — dead code or a missing call (logic depending on it will never run). Call it where the game flow needs it, or delete it\")\nreturn {\n    \"orphans_ok\": len(failures) == 0,\n    \"failures\": failures,\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "det",
+      "type": "code",
+      "position": {
+        "x": -720,
+        "y": 420
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Deterministic verdict",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "gate0_out",
+            "label": "gate0_out",
+            "type": "object"
+          },
+          {
+            "id": "gate1_out",
+            "label": "gate1_out",
+            "type": "object"
+          },
+          {
+            "id": "gate4_out",
+            "label": "gate4_out",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "g0 = gate0_out or {}\ng1 = gate1_out or {}\ng4 = gate4_out or {}\nfailures = [str(f) for f in (g0.get(\"failures\") or [])] + [str(f) for f in (g1.get(\"failures\") or [])] + [str(f) for f in (g4.get(\"failures\") or [])]\nfailed = len(failures) > 0\nentry = str(g0.get(\"entrypoint\") or \"\")\narts = [entry] if entry else [str(f) for f in (g0.get(\"files\") or [])][:5]\nsummary = \"deterministic gates failed before verification: \" + \"; \".join(failures)[:400] if failed else \"deterministic gates passed\"\nreturn {\n    \"failed\": failed,\n    \"verdict\": {\n        \"builds\": False,\n        \"executes\": False,\n        \"matches\": False,\n        \"all_passed\": False,\n        \"failures\": failures,\n        \"environment_failures\": [],\n        \"summary\": summary,\n        \"artifacts\": arts if failed else [],\n        \"gate_source\": \"deterministic\",\n        \"deterministic\": {\n            \"delivery_ok\": bool(g0.get(\"delivery_ok\")),\n            \"integration_ok\": bool(g1.get(\"integration_ok\")),\n            \"orphans_ok\": bool(g4.get(\"orphans_ok\", True)),\n            \"web_class\": bool(g0.get(\"web_class\")),\n            \"entrypoint\": entry,\n            \"files_count\": len(g0.get(\"files\") or []),\n        },\n    },\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_det",
+      "type": "if",
+      "position": {
+        "x": -680,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "Deterministic gates failed?",
+        "icon": "&#x2753;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_verdict_det",
+      "type": "set_var",
+      "position": {
+        "x": -440,
+        "y": -180
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Record deterministic verdict",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "vg.verdict"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_web",
+      "type": "if",
+      "position": {
+        "x": -440,
+        "y": 60
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "Web entrypoint?",
+        "icon": "&#x2753;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "probe_args",
+      "type": "code",
+      "position": {
+        "x": -440,
+        "y": 420
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose probe call",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "gate0_out",
+            "label": "gate0_out",
+            "type": "object"
+          },
+          {
+            "id": "workspace_root",
+            "label": "workspace_root",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "g = gate0_out or {}\nentry = str(g.get(\"entrypoint\") or \"\")\nws = str(workspace_root or \"\").strip()\npath = entry\nif ws and entry and not entry.startswith(\"/\"):\n    path = ws.rstrip(\"/\") + \"/\" + entry\nreturn {\n    \"name\": \"browser_probe\",\n    \"arguments\": {\"target\": path, \"require_nonblank\": False},\n    \"call_id\": \"gate-browser-probe\",\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "probe_call",
+      "type": "call_tool",
+      "position": {
+        "x": -220,
+        "y": 60
+      },
+      "data": {
+        "nodeType": "call_tool",
+        "label": "G3: browser probe",
+        "icon": "&#x1F527;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "tool_call",
+            "label": "tool_call",
+            "type": "object"
+          },
+          {
+            "id": "allowed_tools",
+            "label": "allowed_tools",
+            "type": "array"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "result",
+            "label": "result",
+            "type": "any"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "raw",
+            "label": "raw",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "allowed_tools": [
+            "browser_probe"
+          ]
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "gate3",
+      "type": "code",
+      "position": {
+        "x": -220,
+        "y": 420
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "G3: read probe result",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "gate0_out",
+            "label": "gate0_out",
+            "type": "object"
+          },
+          {
+            "id": "probe_raw",
+            "label": "probe_raw",
+            "type": "object"
+          },
+          {
+            "id": "round_index",
+            "label": "round_index",
+            "type": "number"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "g0 = gate0_out or {}\nweb = bool(g0.get(\"web_class\"))\nraw = probe_raw if isinstance(probe_raw, dict) else {}\nmode = str(raw.get(\"mode\") or \"\")\nresults = raw.get(\"results\")\nfirst = results[0] if isinstance(results, list) and results else None\nfirst = first if isinstance(first, dict) else {}\noutput = first.get(\"output\")\nr = output if isinstance(output, dict) else {}\nran = mode == \"executed\" and len(r) > 0\nstage = str(r.get(\"stage\") or \"\")\ndiag = r.get(\"diag\") or {}\nfailures = []\nenv_failures = []\nwarnings = []\nrnd = int(round_index or 0)\nif web:\n    entry = str(g0.get(\"entrypoint\") or \"the web entrypoint\")\n    if not ran:\n        detail = str(first.get(\"error\") or mode or \"no result\")\n        env_failures.append(\"web execution gate unavailable: browser_probe did not run (tool missing, refused, or returned no structured result): \" + detail[:200])\n    elif stage == \"no-executor\":\n        env_failures.append(\"no browser executor available on this host to run \" + entry + \": \" + str(r.get(\"error\") or \"no engine\"))\n    elif not bool(r.get(\"ok\")):\n        for e in (r.get(\"page_errors\") or [])[:8]:\n            failures.append(\"execute(web): page error in \" + entry + \": \" + str(e))\n        for e in (r.get(\"console_errors\") or [])[:4]:\n            failures.append(\"execute(web): console error in \" + entry + \": \" + str(e))\n        for e in (r.get(\"failed_requests\") or [])[:6]:\n            failures.append(\"execute(web): failed resource load: \" + str(e) + \" — a referenced asset is missing or misnamed\")\n        if not failures:\n            failures.append(\"execute(web): browser probe failed at stage \" + (stage or \"?\") + \": \" + str(r.get(\"error\") or \"unknown\"))\n    else:\n        # World-side dangling-asset catch (closes what G1's parser deliberately\n        # skips: css url(), srcset, dynamic imports): a failed LOCAL load is a\n        # real defect even when the page survives it. Cross-origin blocks are\n        # reported separately by the probe (blocked_requests) and stay quiet.\n        for e in (r.get(\"failed_requests\") or [])[:6]:\n            failures.append(\"execute(web): failed resource load: \" + str(e) + \" — a referenced asset is missing or misnamed\")\n    if web and ran and stage != \"no-executor\" and bool(r.get(\"ok\")) and not failures:\n        has_canvas = bool(diag.get(\"has_canvas\"))\n        nb = int(diag.get(\"non_blank_samples\") or 0)\n        sampled = int(diag.get(\"sampled_pixels\") or 0)\n        if has_canvas and nb == 0:\n            # Red-team fix (2026-07-17): blank canvas ALWAYS blocks the pass —\n            # a game that renders nothing must never report PASSED (the v1\n            # escape-hatch class reborn). The dark-background bias (c2736\n            # caveat) is answered with actionable wording, not a free pass:\n            # a legitimately dark game makes liveness visible in one cheap\n            # repair (draw any HUD element), a dead one gets caught.\n            msg = \"execute(web): the canvas renders blank under input drive (probe diag: 0 non-blank samples)\"\n            if rnd > 0:\n                failures.append(msg + \" — still blank on round \" + str(rnd + 1) + \"; draw the game state onto the canvas\")\n            else:\n                failures.append(msg + \" — if the scene is legitimately dark, draw at least one visible element (score text, sprite, border) so liveness is observable; otherwise fix the render loop\")\n        elif has_canvas and sampled >= 100 and nb * 50 < sampled:\n            # cav2 escape (code's series close, c2945): run1 slipped the\n            # zero-check with literally 1 non-blank sample out of 369 — a\n            # corner-ninth render (draw coordinates sized for a smaller\n            # canvas), not a visible game. Demand a minimum non-blank\n            # FRACTION (>=2% of a real sampling pass); genuinely sparse dark\n            # games clear it with one HUD element, partial renders do not.\n            # (code's grid-sampler fix, c2970, makes this fraction mean AREA.)\n            failures.append(\"execute(web): only \" + str(nb) + \" of \" + str(sampled) + \" sampled pixels ever lit under input drive — the canvas is essentially blank (likely a corner/partial render: draw coordinates sized for a smaller canvas than \" + str(diag.get(\"canvas_w\")) + \"x\" + str(diag.get(\"canvas_h\")) + \"). Scale the draw code to the real canvas size and keep visible game state on screen\")\n        else:\n            # Viewport-vs-draw-extent (class 5's second half, c2970's\n            # painted_bbox: extent of non-blank samples, null when nothing\n            # painted). A render confined to LESS THAN HALF the canvas in\n            # BOTH dimensions is the scale-bug class (draw coordinates sized\n            # for a smaller canvas — v1/run1's 160x144-into-480x432 corner\n            # ninth); letterboxed/pillarboxed games keep one full dimension\n            # and pass. Only fires on an otherwise-clean, painted canvas.\n            bbox = diag.get(\"painted_bbox\")\n            cw = int(diag.get(\"canvas_w\") or 0)\n            ch = int(diag.get(\"canvas_h\") or 0)\n            if isinstance(bbox, dict) and cw > 0 and ch > 0:\n                bw = int(bbox.get(\"w\") or 0)\n                bh = int(bbox.get(\"h\") or 0)\n                if bw > 0 and bh > 0 and bw * 2 < cw and bh * 2 < ch:\n                    pw = str(int(bw * 100 / cw))\n                    ph = str(int(bh * 100 / ch))\n                    failures.append(\"execute(web): the painted area covers only \" + pw + \"% x \" + ph + \"% of the \" + str(cw) + \"x\" + str(ch) + \" canvas (painted extent \" + str(bw) + \"x\" + str(bh) + \") — the draw code is sized for a smaller canvas; scale positions and sprite sizes to the real canvas dimensions\")\nexecutes_web = web and ran and stage != \"no-executor\" and bool(r.get(\"ok\")) and len(failures) == 0\nreturn {\n    \"web\": web,\n    \"ran\": ran,\n    \"stage\": stage,\n    \"probe_ok\": bool(r.get(\"ok\")),\n    \"executes_web\": executes_web,\n    # Branch flag: only FIXABLE probe failures short-circuit to the fail-fast\n    # verdict; environment-only outcomes still run the verifier for the\n    # builds/matches gates (the merge folds the env failures in regardless).\n    \"fixable_failed\": len(failures) > 0,\n    \"failures\": failures,\n    \"environment_failures\": env_failures,\n    \"warnings\": warnings,\n    \"engine\": str(r.get(\"engine\") or \"\"),\n    \"diag\": diag,\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "if_probe",
+      "type": "if",
+      "position": {
+        "x": 0,
+        "y": 60
+      },
+      "data": {
+        "nodeType": "if",
+        "label": "Probe found errors?",
+        "icon": "&#x2753;",
+        "headerColor": "#F39C12",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "condition",
+            "label": "condition",
+            "type": "boolean"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "execution"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "execution"
+          }
+        ]
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "probe_verdict",
+      "type": "code",
+      "position": {
+        "x": 0,
+        "y": 420
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Probe-failure verdict",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "gate0_out",
+            "label": "gate0_out",
+            "type": "object"
+          },
+          {
+            "id": "gate3_out",
+            "label": "gate3_out",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "g0 = gate0_out or {}\ng3 = gate3_out or {}\nfailures = [str(f) for f in (g3.get(\"failures\") or [])]\nentry = str(g0.get(\"entrypoint\") or \"\")\nreturn {\n    \"failed\": len(failures) > 0,\n    \"verdict\": {\n        \"builds\": False,\n        \"executes\": False,\n        \"matches\": False,\n        \"all_passed\": False,\n        \"failures\": failures,\n        \"environment_failures\": [],\n        \"warnings\": [str(w) for w in (g3.get(\"warnings\") or [])],\n        \"summary\": \"web execution gate failed: \" + \"; \".join(failures)[:400],\n        \"artifacts\": [entry] if entry else [],\n        \"gate_source\": \"deterministic+probe\",\n        \"probe\": {\"engine\": str(g3.get(\"engine\") or \"\"), \"stage\": str(g3.get(\"stage\") or \"\"), \"diag\": g3.get(\"diag\") or {}},\n        \"deterministic\": {\n            \"delivery_ok\": bool(g0.get(\"delivery_ok\")),\n            \"web_class\": True,\n            \"entrypoint\": entry,\n            \"files_count\": len(g0.get(\"files\") or []),\n        },\n    },\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_verdict_probe",
+      "type": "set_var",
+      "position": {
+        "x": 240,
+        "y": -60
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Record probe verdict",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "vg.verdict"
         }
       },
       "label": null,
@@ -69,8 +1158,8 @@
       "id": "verifier_prompt",
       "type": "code",
       "position": {
-        "x": -240,
-        "y": 40
+        "x": 240,
+        "y": 420
       },
       "data": {
         "nodeType": "code",
@@ -99,6 +1188,16 @@
             "type": "string"
           },
           {
+            "id": "gate0_out",
+            "label": "gate0_out",
+            "type": "object"
+          },
+          {
+            "id": "gate3_out",
+            "label": "gate3_out",
+            "type": "object"
+          },
+          {
             "id": "permissions",
             "label": "permissions",
             "type": "string"
@@ -125,7 +1224,7 @@
           "permissions": "sandbox"
         },
         "functionName": "transform",
-        "codeBody": "req = str(request or \"\").strip()\nws = str(workspace_root or \"\").strip()\nbuild_cmd = str(build_command or \"\").strip()\nrun_cmd = str(run_command or \"\").strip()\n\nparts = []\nparts.append(\"You are an INDEPENDENT code verifier. Do NOT edit any code. Run the checks and report a structured verdict.\")\nparts.append(\"\")\nparts.append(\"## The task the code was meant to satisfy\")\nparts.append(req)\nif ws:\n    parts.append(\"\")\n    parts.append(\"Workspace root: \" + ws)\nparts.append(\"\")\nparts.append(\"## Gate 1 - BUILDS\")\nif build_cmd:\n    parts.append(\"Run this build command with execute_command and record whether it succeeds: \" + build_cmd)\nelse:\n    parts.append(\"Detect the stack (list_files) and run the appropriate build/compile/syntax-check command with execute_command. For interpreted languages with no build step, treat import/syntax check as the build (e.g. python -m py_compile).\")\nparts.append(\"On failure, capture the exact error output in build_error.\")\nparts.append(\"\")\nparts.append(\"## Gate 2 - EXECUTES\")\nif run_cmd:\n    parts.append(\"Run this command with execute_command and record whether it runs without error: \" + run_cmd)\nelse:\n    parts.append(\"Run the program (or its tests / a smoke invocation) with execute_command. Capture any traceback/runtime error in run_error. For web/browser artifacts you cannot fully run, say so honestly in run_error and set executes=false only if there is a real error, true if the entrypoint loads.\")\nparts.append(\"\")\nparts.append(\"## Gate 3 - MATCHES THE ASK\")\nparts.append(\"Use analyze_code on the produced source files to get the structure (functions/classes) and diagnostics, then judge whether the code STRUCTURE plausibly satisfies the task above. Put concrete gaps in mismatch (e.g. 'task asked for function X, not present').\")\nparts.append(\"\")\nparts.append(\"## Verdict\")\nparts.append(\"Set all_passed=true ONLY if builds AND executes AND matches are all true. Put one specific, actionable failure line per failed gate into failures[] (the exact error, not 'it failed'). summary: one sentence.\")\nreturn \"\\n\".join(parts)"
+        "codeBody": "req = str(request or \"\").strip()\nws = str(workspace_root or \"\").strip()\nbuild_cmd = str(build_command or \"\").strip()\nrun_cmd = str(run_command or \"\").strip()\ng0 = gate0_out or {}\ng3 = gate3_out or {}\nfiles = [str(f) for f in (g0.get(\"files\") or [])]\nweb = bool(g0.get(\"web_class\"))\nentry = str(g0.get(\"entrypoint\") or \"\")\n\nparts = []\nparts.append(\"You are an INDEPENDENT code verifier. Do NOT edit any code. Run the checks and report a structured verdict.\")\nparts.append(\"\")\nparts.append(\"## The task the code was meant to satisfy\")\nparts.append(req)\nif ws:\n    parts.append(\"\")\n    parts.append(\"Workspace root: \" + ws)\nparts.append(\"\")\nparts.append(\"## Ground truth already verified mechanically (do not re-derive)\")\nparts.append(\"Delivered files (\" + str(len(files)) + \"): \" + \", \".join(files[:40]))\nif web:\n    parts.append(\"Artifact class: web. Entrypoint: \" + entry + \". Reference integrity already checked.\")\n    if bool(g3.get(\"ran\")):\n        diag = g3.get(\"diag\") or {}\n        probe_line = \"A browser probe already EXECUTED the entrypoint world-side (engine: \" + str(g3.get(\"engine\") or \"?\") + \"; loaded ok: \" + str(bool(g3.get(\"probe_ok\"))) + \"; canvas present: \" + str(bool(diag.get(\"has_canvas\"))) + \"; non-blank samples: \" + str(diag.get(\"non_blank_samples\")) + \"). Its result decides the executes gate and will override whatever you report there. Do not try to execute the page yourself.\"\n        parts.append(probe_line)\nelse:\n    parts.append(\"Artifact class: non-web (no .html entrypoint detected).\")\n# Agent-lane discipline line (c2847 precision 1): judgments must anchor on\n# the gate outputs above, or the LLM re-derives executes-shaped opinions.\nparts.append(\"Be strict: only count claims supported by the gate outputs above and by what your own tool calls actually observed.\")\nparts.append(\"\")\nparts.append(\"## Gate 1 - BUILDS\")\nif build_cmd:\n    parts.append(\"Run this build command with execute_command and record whether it succeeds: \" + build_cmd)\nelse:\n    parts.append(\"Run the appropriate build/compile/syntax-check command with execute_command for the delivered files listed above. For interpreted languages with no build step, treat import/syntax check as the build (e.g. python -m py_compile). For plain static web files with no build step, builds=true.\")\nparts.append(\"On failure, capture the exact error output in build_error.\")\nparts.append(\"\")\nparts.append(\"## Gate 2 - EXECUTES\")\nif web:\n    parts.append(\"Already executed world-side by the browser probe (see ground truth above): set executes=false with run_error='decided by browser probe' — the merge substitutes the probe's result. Do NOT attempt to run browser code with execute_command.\")\nelif run_cmd:\n    parts.append(\"Run this command with execute_command and record whether it runs without error: \" + run_cmd)\nelse:\n    parts.append(\"Run the program (or its tests / a smoke invocation) with execute_command and capture any traceback/runtime error in run_error.\")\n    parts.append(\"FAIL CLOSED: a gate you could not actually execute is NOT a pass. If no executor exists for the artifact class on this host, set executes=false AND add one line to environment_failures[] naming the missing executor. NEVER claim executes=true because a file merely exists or 'loads'.\")\n    parts.append(\"environment_failures[] is ONLY for missing executors/runtimes on this host — real crashes, tracebacks and errors from code you DID run go in failures[].\")\nparts.append(\"\")\nparts.append(\"## Gate 3 - MATCHES THE ASK\")\nparts.append(\"Use analyze_code on the produced source files to get the structure (functions/classes) and diagnostics, then judge whether the code STRUCTURE plausibly satisfies the task above. Put concrete gaps in mismatch (e.g. 'task asked for function X, not present').\")\nparts.append(\"\")\nparts.append(\"## Verdict\")\nparts.append(\"Set all_passed=true ONLY if builds AND executes AND matches are all true AND environment_failures is empty. Put one specific, actionable failure line per failed gate into failures[] (the exact error, not 'it failed'). summary: one sentence.\")\nparts.append(\"In artifacts[], list the produced file paths you actually observed, WORKSPACE-RELATIVE like ./pong.html — use an absolute path only for a file outside the workspace root. Entrypoint first (the file a user opens/runs). Never list files you did not see.\")\nreturn \"\\n\".join(parts)"
       },
       "label": null,
       "icon": null,
@@ -137,8 +1236,8 @@
       "id": "verifier",
       "type": "agent",
       "position": {
-        "x": 120,
-        "y": 0
+        "x": 240,
+        "y": 120
       },
       "data": {
         "nodeType": "agent",
@@ -190,6 +1289,11 @@
             "id": "resp_schema",
             "label": "resp_schema",
             "type": "json_schema"
+          },
+          {
+            "id": "max_output_tokens",
+            "label": "max_output_tokens",
+            "type": "number"
           }
         ],
         "outputs": [
@@ -225,7 +1329,7 @@
           }
         ],
         "pinDefaults": {
-          "system": "You are a rigorous, independent code verifier. You never edit code. You run commands and inspect structure, then report a strict structured verdict. A gate is only PASS if you actually observed success; when a command fails, capture the real error text.",
+          "system": "You are a rigorous, independent code verifier. You never edit code. You run commands and inspect structure, then report a strict structured verdict. A gate is only PASS if you actually observed success; when a command fails, capture the real error text. A gate you could not execute is a FAIL with the reason recorded — never a pass.",
           "tools": [
             "read_file",
             "list_files",
@@ -239,11 +1343,16 @@
             "additionalProperties": false,
             "required": [
               "builds",
+              "build_error",
               "executes",
+              "run_error",
               "matches",
+              "mismatch",
               "all_passed",
               "failures",
-              "summary"
+              "environment_failures",
+              "summary",
+              "artifacts"
             ],
             "properties": {
               "builds": {
@@ -273,11 +1382,185 @@
                   "type": "string"
                 }
               },
+              "environment_failures": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
               "summary": {
                 "type": "string"
+              },
+              "artifacts": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
               }
             }
+          },
+          "max_output_tokens": 2000
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "merge",
+      "type": "code",
+      "position": {
+        "x": 560,
+        "y": 420
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Merge verdict",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "verifier_data",
+            "label": "verifier_data",
+            "type": "object"
+          },
+          {
+            "id": "gate0_out",
+            "label": "gate0_out",
+            "type": "object"
+          },
+          {
+            "id": "gate1_out",
+            "label": "gate1_out",
+            "type": "object"
+          },
+          {
+            "id": "gate3_out",
+            "label": "gate3_out",
+            "type": "object"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
           }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "v = verifier_data or {}\ng0 = gate0_out or {}\ng1 = gate1_out or {}\ng3 = gate3_out or {}\nweb = bool(g0.get(\"web_class\"))\nbuilds = bool(v.get(\"builds\"))\nmatches = bool(v.get(\"matches\"))\nfailures = v.get(\"failures\") or []\nif not isinstance(failures, list):\n    failures = [str(failures)]\nfailures = [str(f) for f in failures]\nenv_failures = v.get(\"environment_failures\") or []\nif not isinstance(env_failures, list):\n    env_failures = [str(env_failures)]\nenv_failures = [str(f) for f in env_failures]\nwarnings = [str(w) for w in (g3.get(\"warnings\") or [])]\nif web:\n    # World-side truth: the probe decided executes; its environment failures\n    # ride regardless of what the LLM reported.\n    executes = bool(g3.get(\"executes_web\"))\n    for f in (g3.get(\"environment_failures\") or []):\n        if str(f) not in env_failures:\n            env_failures.append(str(f))\nelse:\n    executes = bool(v.get(\"executes\"))\nall_passed = builds and executes and matches and len(env_failures) == 0\narts = [str(a).strip() for a in (v.get(\"artifacts\") or []) if str(a).strip()]\nif not arts:\n    entry = str(g0.get(\"entrypoint\") or \"\")\n    arts = [entry] if entry else [str(f) for f in (g0.get(\"files\") or [])][:5]\nreturn {\n    \"builds\": builds,\n    \"executes\": executes,\n    \"matches\": matches,\n    \"all_passed\": all_passed,\n    \"failures\": failures,\n    \"environment_failures\": env_failures,\n    \"warnings\": warnings,\n    \"build_error\": str(v.get(\"build_error\") or \"\"),\n    \"run_error\": str(v.get(\"run_error\") or \"\"),\n    \"mismatch\": str(v.get(\"mismatch\") or \"\"),\n    \"summary\": str(v.get(\"summary\") or \"\"),\n    \"artifacts\": arts,\n    \"gate_source\": \"verifier+deterministic+probe\" if web else \"verifier+deterministic\",\n    \"probe\": {\"engine\": str(g3.get(\"engine\") or \"\"), \"stage\": str(g3.get(\"stage\") or \"\"), \"diag\": g3.get(\"diag\") or {}} if web else {},\n    \"deterministic\": {\n        \"delivery_ok\": bool(g0.get(\"delivery_ok\")),\n        \"integration_ok\": bool(g1.get(\"integration_ok\")),\n        \"web_class\": web,\n        \"entrypoint\": str(g0.get(\"entrypoint\") or \"\"),\n        \"files_count\": len(g0.get(\"files\") or []),\n    },\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "set_verdict_llm",
+      "type": "set_var",
+      "position": {
+        "x": 560,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "set_var",
+        "label": "Record merged verdict",
+        "icon": "&#x1F4E4;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "vg.verdict"
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "read_verdict",
+      "type": "get_var",
+      "position": {
+        "x": 800,
+        "y": 220
+      },
+      "data": {
+        "nodeType": "get_var",
+        "label": "Get vg.verdict",
+        "icon": "&#x1F4E5;",
+        "headerColor": "#16A085",
+        "inputs": [
+          {
+            "id": "name",
+            "label": "name",
+            "type": "string"
+          },
+          {
+            "id": "default",
+            "label": "default",
+            "type": "any"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "value",
+            "label": "value",
+            "type": "any"
+          }
+        ],
+        "pinDefaults": {
+          "name": "vg.verdict",
+          "default": {}
         }
       },
       "label": null,
@@ -290,7 +1573,7 @@
       "id": "end",
       "type": "on_flow_end",
       "position": {
-        "x": 600,
+        "x": 940,
         "y": 0
       },
       "data": {
@@ -321,20 +1604,388 @@
   ],
   "edges": [
     {
-      "id": "e-start-exec-out-verifier-exec-in",
+      "id": "e-start-exec-out-list_call-exec-in",
       "source": "start",
       "sourceHandle": "exec-out",
+      "target": "list_call",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-list_call-exec-out-entry_read-exec-in",
+      "source": "list_call",
+      "sourceHandle": "exec-out",
+      "target": "entry_read",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-entry_read-exec-out-script_read-exec-in",
+      "source": "entry_read",
+      "sourceHandle": "exec-out",
+      "target": "script_read",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-script_read-exec-out-if_det-exec-in",
+      "source": "script_read",
+      "sourceHandle": "exec-out",
+      "target": "if_det",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-if_det-true-set_verdict_det-exec-in",
+      "source": "if_det",
+      "sourceHandle": "true",
+      "target": "set_verdict_det",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-set_verdict_det-exec-out-end-exec-in",
+      "source": "set_verdict_det",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-if_det-false-if_web-exec-in",
+      "source": "if_det",
+      "sourceHandle": "false",
+      "target": "if_web",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-if_web-true-probe_call-exec-in",
+      "source": "if_web",
+      "sourceHandle": "true",
+      "target": "probe_call",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-probe_call-exec-out-if_probe-exec-in",
+      "source": "probe_call",
+      "sourceHandle": "exec-out",
+      "target": "if_probe",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-if_probe-true-set_verdict_probe-exec-in",
+      "source": "if_probe",
+      "sourceHandle": "true",
+      "target": "set_verdict_probe",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-set_verdict_probe-exec-out-end-exec-in",
+      "source": "set_verdict_probe",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-if_web-false-verifier-exec-in",
+      "source": "if_web",
+      "sourceHandle": "false",
       "target": "verifier",
       "targetHandle": "exec-in",
       "animated": true
     },
     {
-      "id": "e-verifier-exec-out-end-exec-in",
+      "id": "e-if_probe-false-verifier-exec-in",
+      "source": "if_probe",
+      "sourceHandle": "false",
+      "target": "verifier",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-verifier-exec-out-set_verdict_llm-exec-in",
       "source": "verifier",
+      "sourceHandle": "exec-out",
+      "target": "set_verdict_llm",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-set_verdict_llm-exec-out-end-exec-in",
+      "source": "set_verdict_llm",
       "sourceHandle": "exec-out",
       "target": "end",
       "targetHandle": "exec-in",
       "animated": true
+    },
+    {
+      "id": "e-start-workspace_root-listing_args-workspace_root",
+      "source": "start",
+      "sourceHandle": "workspace_root",
+      "target": "listing_args",
+      "targetHandle": "workspace_root",
+      "animated": false
+    },
+    {
+      "id": "e-listing_args-output-list_call-tool_call",
+      "source": "listing_args",
+      "sourceHandle": "output",
+      "target": "list_call",
+      "targetHandle": "tool_call",
+      "animated": false
+    },
+    {
+      "id": "e-list_call-result-gate0-listing",
+      "source": "list_call",
+      "sourceHandle": "result",
+      "target": "gate0",
+      "targetHandle": "listing",
+      "animated": false
+    },
+    {
+      "id": "e-list_call-success-gate0-listing_ok",
+      "source": "list_call",
+      "sourceHandle": "success",
+      "target": "gate0",
+      "targetHandle": "listing_ok",
+      "animated": false
+    },
+    {
+      "id": "e-gate0-output-entry_args-gate0_out",
+      "source": "gate0",
+      "sourceHandle": "output",
+      "target": "entry_args",
+      "targetHandle": "gate0_out",
+      "animated": false
+    },
+    {
+      "id": "e-start-workspace_root-entry_args-workspace_root",
+      "source": "start",
+      "sourceHandle": "workspace_root",
+      "target": "entry_args",
+      "targetHandle": "workspace_root",
+      "animated": false
+    },
+    {
+      "id": "e-entry_args-output-entry_read-tool_call",
+      "source": "entry_args",
+      "sourceHandle": "output",
+      "target": "entry_read",
+      "targetHandle": "tool_call",
+      "animated": false
+    },
+    {
+      "id": "e-gate0-output-gate1-gate0_out",
+      "source": "gate0",
+      "sourceHandle": "output",
+      "target": "gate1",
+      "targetHandle": "gate0_out",
+      "animated": false
+    },
+    {
+      "id": "e-entry_read-result-gate1-entry_content",
+      "source": "entry_read",
+      "sourceHandle": "result",
+      "target": "gate1",
+      "targetHandle": "entry_content",
+      "animated": false
+    },
+    {
+      "id": "e-entry_read-success-gate1-entry_ok",
+      "source": "entry_read",
+      "sourceHandle": "success",
+      "target": "gate1",
+      "targetHandle": "entry_ok",
+      "animated": false
+    },
+    {
+      "id": "e-gate1-output-script_args-gate1_out",
+      "source": "gate1",
+      "sourceHandle": "output",
+      "target": "script_args",
+      "targetHandle": "gate1_out",
+      "animated": false
+    },
+    {
+      "id": "e-start-workspace_root-script_args-workspace_root",
+      "source": "start",
+      "sourceHandle": "workspace_root",
+      "target": "script_args",
+      "targetHandle": "workspace_root",
+      "animated": false
+    },
+    {
+      "id": "e-script_args-output-script_read-tool_call",
+      "source": "script_args",
+      "sourceHandle": "output",
+      "target": "script_read",
+      "targetHandle": "tool_call",
+      "animated": false
+    },
+    {
+      "id": "e-gate0-output-gate4-gate0_out",
+      "source": "gate0",
+      "sourceHandle": "output",
+      "target": "gate4",
+      "targetHandle": "gate0_out",
+      "animated": false
+    },
+    {
+      "id": "e-entry_read-result-gate4-entry_content",
+      "source": "entry_read",
+      "sourceHandle": "result",
+      "target": "gate4",
+      "targetHandle": "entry_content",
+      "animated": false
+    },
+    {
+      "id": "e-script_read-result-gate4-script_content",
+      "source": "script_read",
+      "sourceHandle": "result",
+      "target": "gate4",
+      "targetHandle": "script_content",
+      "animated": false
+    },
+    {
+      "id": "e-script_read-success-gate4-script_ok",
+      "source": "script_read",
+      "sourceHandle": "success",
+      "target": "gate4",
+      "targetHandle": "script_ok",
+      "animated": false
+    },
+    {
+      "id": "e-gate0-output-det-gate0_out",
+      "source": "gate0",
+      "sourceHandle": "output",
+      "target": "det",
+      "targetHandle": "gate0_out",
+      "animated": false
+    },
+    {
+      "id": "e-gate1-output-det-gate1_out",
+      "source": "gate1",
+      "sourceHandle": "output",
+      "target": "det",
+      "targetHandle": "gate1_out",
+      "animated": false
+    },
+    {
+      "id": "e-gate4-output-det-gate4_out",
+      "source": "gate4",
+      "sourceHandle": "output",
+      "target": "det",
+      "targetHandle": "gate4_out",
+      "animated": false
+    },
+    {
+      "id": "e-det-failed-if_det-condition",
+      "source": "det",
+      "sourceHandle": "failed",
+      "target": "if_det",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-det-verdict-set_verdict_det-value",
+      "source": "det",
+      "sourceHandle": "verdict",
+      "target": "set_verdict_det",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-gate0-web_class-if_web-condition",
+      "source": "gate0",
+      "sourceHandle": "web_class",
+      "target": "if_web",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-gate0-output-probe_args-gate0_out",
+      "source": "gate0",
+      "sourceHandle": "output",
+      "target": "probe_args",
+      "targetHandle": "gate0_out",
+      "animated": false
+    },
+    {
+      "id": "e-start-workspace_root-probe_args-workspace_root",
+      "source": "start",
+      "sourceHandle": "workspace_root",
+      "target": "probe_args",
+      "targetHandle": "workspace_root",
+      "animated": false
+    },
+    {
+      "id": "e-probe_args-output-probe_call-tool_call",
+      "source": "probe_args",
+      "sourceHandle": "output",
+      "target": "probe_call",
+      "targetHandle": "tool_call",
+      "animated": false
+    },
+    {
+      "id": "e-gate0-output-gate3-gate0_out",
+      "source": "gate0",
+      "sourceHandle": "output",
+      "target": "gate3",
+      "targetHandle": "gate0_out",
+      "animated": false
+    },
+    {
+      "id": "e-probe_call-raw-gate3-probe_raw",
+      "source": "probe_call",
+      "sourceHandle": "raw",
+      "target": "gate3",
+      "targetHandle": "probe_raw",
+      "animated": false
+    },
+    {
+      "id": "e-start-round_index-gate3-round_index",
+      "source": "start",
+      "sourceHandle": "round_index",
+      "target": "gate3",
+      "targetHandle": "round_index",
+      "animated": false
+    },
+    {
+      "id": "e-gate3-fixable_failed-if_probe-condition",
+      "source": "gate3",
+      "sourceHandle": "fixable_failed",
+      "target": "if_probe",
+      "targetHandle": "condition",
+      "animated": false
+    },
+    {
+      "id": "e-gate0-output-probe_verdict-gate0_out",
+      "source": "gate0",
+      "sourceHandle": "output",
+      "target": "probe_verdict",
+      "targetHandle": "gate0_out",
+      "animated": false
+    },
+    {
+      "id": "e-gate3-output-probe_verdict-gate3_out",
+      "source": "gate3",
+      "sourceHandle": "output",
+      "target": "probe_verdict",
+      "targetHandle": "gate3_out",
+      "animated": false
+    },
+    {
+      "id": "e-probe_verdict-verdict-set_verdict_probe-value",
+      "source": "probe_verdict",
+      "sourceHandle": "verdict",
+      "target": "set_verdict_probe",
+      "targetHandle": "value",
+      "animated": false
     },
     {
       "id": "e-start-request-verifier_prompt-request",
@@ -369,6 +2020,22 @@
       "animated": false
     },
     {
+      "id": "e-gate0-output-verifier_prompt-gate0_out",
+      "source": "gate0",
+      "sourceHandle": "output",
+      "target": "verifier_prompt",
+      "targetHandle": "gate0_out",
+      "animated": false
+    },
+    {
+      "id": "e-gate3-output-verifier_prompt-gate3_out",
+      "source": "gate3",
+      "sourceHandle": "output",
+      "target": "verifier_prompt",
+      "targetHandle": "gate3_out",
+      "animated": false
+    },
+    {
       "id": "e-verifier_prompt-output-verifier-prompt",
       "source": "verifier_prompt",
       "sourceHandle": "output",
@@ -393,15 +2060,55 @@
       "animated": false
     },
     {
-      "id": "e-verifier-data-end-verdict",
+      "id": "e-verifier-data-merge-verifier_data",
       "source": "verifier",
       "sourceHandle": "data",
+      "target": "merge",
+      "targetHandle": "verifier_data",
+      "animated": false
+    },
+    {
+      "id": "e-gate0-output-merge-gate0_out",
+      "source": "gate0",
+      "sourceHandle": "output",
+      "target": "merge",
+      "targetHandle": "gate0_out",
+      "animated": false
+    },
+    {
+      "id": "e-gate1-output-merge-gate1_out",
+      "source": "gate1",
+      "sourceHandle": "output",
+      "target": "merge",
+      "targetHandle": "gate1_out",
+      "animated": false
+    },
+    {
+      "id": "e-gate3-output-merge-gate3_out",
+      "source": "gate3",
+      "sourceHandle": "output",
+      "target": "merge",
+      "targetHandle": "gate3_out",
+      "animated": false
+    },
+    {
+      "id": "e-merge-output-set_verdict_llm-value",
+      "source": "merge",
+      "sourceHandle": "output",
+      "target": "set_verdict_llm",
+      "targetHandle": "value",
+      "animated": false
+    },
+    {
+      "id": "e-read_verdict-value-end-verdict",
+      "source": "read_verdict",
+      "sourceHandle": "value",
       "target": "end",
       "targetHandle": "verdict",
       "animated": false
     }
   ],
   "entryNode": "start",
-  "created_at": "2026-07-15T20:39:34.312628+00:00",
-  "updated_at": "2026-07-15T20:39:34.312628+00:00"
+  "created_at": "2026-07-17T19:33:12.575171+00:00",
+  "updated_at": "2026-07-17T19:33:12.575171+00:00"
 }

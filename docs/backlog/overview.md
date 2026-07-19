@@ -1,11 +1,21 @@
 # AbstractFlow Backlog Overview
 
 ## Snapshot
-- Updated: 2026-07-11
+- Updated: 2026-07-18
 - Planned: 0
 - Proposed: 41
-- Completed: 45
+- Completed: 46
 - Deprecated: 0
+
+## 2026-07-18 coding-agent deterministic verification gates
+Item 0145 (work id `abstractflow-0145`, first item under the ruled
+hub-work-join process) records the coding-agent v2 redesign: deterministic
+delivery/integration/execution/orphan-function gates before the LLM
+verifier, fail-closed web execution via code's `browser_probe`, and the
+environment-vs-fixable failure split. Externally validated by code's
+harness (cav2: strictly beats v1; cav2r2: taxonomy classes 4+5
+FIXED-with-gate, ~2x faster). Receipts + honest limits in the item; the
+thread anchor is agora commons c2725→c3031.
 
 ## 2026-07-11 entity-agency Phase-B precondition audit
 Item 0142 captures the adversary-verified audit of flow's Phase-B guarantee

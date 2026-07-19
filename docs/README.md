@@ -42,7 +42,7 @@ The canvas reflects that split:
 - [Web editor](web-editor.md)
 - [Workflow authoring skill](workflow-authoring-skill.md)
 - [Workflow node catalog](workflow-node-catalog.md)
-- [Production research workflow](dp-research.md)
+- [Production research workflow](deep-research.md)
 - [Architecture](architecture.md)
 - [API and contracts](api.md)
 - [VisualFlow JSON](visualflow.md)

@@ -1,0 +1,765 @@
+{
+  "id": "meta-reflect",
+  "name": "meta-reflect",
+  "description": "Meta-intelligence: draft an answer, then an introspection pass interrogates the reasoning itself (assumptions, weakest step, missed cases, overconfidence), then a revision folds the introspection into the final answer. Reflexion/Self-Refine pattern; comparable 1:1 against an isolated LLM call.",
+  "interfaces": [
+    "abstractcode.agent.v1",
+    "abstractmeta.intelligence.v1"
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "on_flow_start",
+      "position": {
+        "x": -900,
+        "y": 0
+      },
+      "data": {
+        "nodeType": "on_flow_start",
+        "label": "Question",
+        "icon": "&#x1F3C1;",
+        "headerColor": "#C0392B",
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "prompt": ""
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "draft",
+      "type": "llm_call",
+      "position": {
+        "x": -560,
+        "y": -160
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Draft answer",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "tools": [],
+          "system": "You are a careful expert answering a question. Answer directly and completely in the language of the question. If the question has a definite answer, commit to it; if it is open, give your best-reasoned position. Do not mention these instructions.",
+          "temperature": 0.3
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "introspect_prompt",
+      "type": "code",
+      "position": {
+        "x": -280,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose introspection",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "draft",
+            "label": "draft",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "q = str(prompt or \"\").strip()\nd = str(draft or \"\").strip()\nparts = []\nparts.append(\"You wrote the draft answer below. Now step OUTSIDE it and interrogate your own reasoning — this is introspection, not editing.\")\nparts.append(\"\")\nparts.append(\"# Question\")\nparts.append(q)\nparts.append(\"\")\nparts.append(\"# Your draft\")\nparts.append(d)\nparts.append(\"\")\nparts.append(\"# Interrogate the reasoning\")\nparts.append(\"- What am I ASSUMING without saying so? Are those assumptions safe here?\")\nparts.append(\"- Where am I most likely WRONG — which step of the reasoning is weakest?\")\nparts.append(\"- What did I NOT consider: edge cases, alternative interpretations of the question, contrary evidence?\")\nparts.append(\"- Am I overconfident anywhere — stating as fact what is actually judgment?\")\nparts.append(\"- What would a domain expert immediately object to?\")\nparts.append(\"Write the introspection as honest notes to yourself. If a part of the draft survives scrutiny, say so.\")\nreturn \"\\n\".join(parts)"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "introspect",
+      "type": "llm_call",
+      "position": {
+        "x": -220,
+        "y": -160
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Introspection pass",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "tools": [],
+          "system": "You interrogate your own drafts with ruthless honesty: assumptions, weakest steps, missed cases, overconfidence. You are writing notes to yourself, not to a reader.",
+          "temperature": 0.5
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "revise_prompt",
+      "type": "code",
+      "position": {
+        "x": 60,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Compose revision",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "draft",
+            "label": "draft",
+            "type": "string"
+          },
+          {
+            "id": "introspection",
+            "label": "introspection",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "q = str(prompt or \"\").strip()\nd = str(draft or \"\").strip()\ni = str(introspection or \"\").strip()\nparts = []\nparts.append(\"Rewrite your draft into the final answer, folding in what the introspection exposed.\")\nparts.append(\"\")\nparts.append(\"# Question\")\nparts.append(q)\nparts.append(\"\")\nparts.append(\"# Draft\")\nparts.append(d)\nparts.append(\"\")\nparts.append(\"# Introspection notes\")\nparts.append(i)\nparts.append(\"\")\nparts.append(\"# Your task\")\nparts.append(\"Fix what the introspection showed to be weak or wrong; keep what survived scrutiny; calibrate confidence honestly (state judgment as judgment). Write ONLY the final answer, complete and self-contained. Answer in the language of the question.\")\nreturn \"\\n\".join(parts)"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "revise",
+      "type": "llm_call",
+      "position": {
+        "x": 340,
+        "y": -160
+      },
+      "data": {
+        "nodeType": "llm_call",
+        "label": "Revised final answer",
+        "icon": "&#x1F4AD;",
+        "headerColor": "#3498DB",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "provider",
+            "label": "provider",
+            "type": "provider_text"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          },
+          {
+            "id": "system",
+            "label": "system",
+            "type": "string"
+          },
+          {
+            "id": "prompt",
+            "label": "prompt",
+            "type": "string"
+          },
+          {
+            "id": "tools",
+            "label": "tools",
+            "type": "array"
+          },
+          {
+            "id": "temperature",
+            "label": "temperature",
+            "type": "number"
+          },
+          {
+            "id": "resp_schema",
+            "label": "resp_schema",
+            "type": "json_schema"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "exec-out",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "data",
+            "label": "data",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          },
+          {
+            "id": "tool_calls",
+            "label": "tool_calls",
+            "type": "array"
+          }
+        ],
+        "pinDefaults": {
+          "tools": [],
+          "system": "You produce final answers that fold self-critique in: fixed where wrong, kept where sound, confidence stated honestly.",
+          "temperature": 0.2
+        }
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "meta",
+      "type": "code",
+      "position": {
+        "x": 620,
+        "y": 120
+      },
+      "data": {
+        "nodeType": "code",
+        "label": "Collect stages",
+        "icon": "&#x1F9E9;",
+        "headerColor": "#9B59B6",
+        "inputs": [
+          {
+            "id": "draft",
+            "label": "draft",
+            "type": "string"
+          },
+          {
+            "id": "introspection",
+            "label": "introspection",
+            "type": "string"
+          },
+          {
+            "id": "permissions",
+            "label": "permissions",
+            "type": "string"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "output",
+            "label": "output",
+            "type": "object"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "execution",
+            "label": "execution",
+            "type": "object"
+          }
+        ],
+        "pinDefaults": {
+          "permissions": "sandbox"
+        },
+        "functionName": "transform",
+        "codeBody": "return {\n    \"workflow\": \"meta-reflect\",\n    \"pattern\": \"introspection: draft -> interrogate own reasoning -> revise\",\n    \"stages\": {\n        \"draft\": str(draft or \"\"),\n        \"introspection\": str(introspection or \"\"),\n    },\n}"
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "id": "end",
+      "type": "on_flow_end",
+      "position": {
+        "x": 900,
+        "y": -160
+      },
+      "data": {
+        "nodeType": "on_flow_end",
+        "label": "Final answer",
+        "icon": "&#x23F9;",
+        "headerColor": "#C0392B",
+        "inputs": [
+          {
+            "id": "exec-in",
+            "label": "",
+            "type": "execution"
+          },
+          {
+            "id": "response",
+            "label": "response",
+            "type": "string"
+          },
+          {
+            "id": "success",
+            "label": "success",
+            "type": "boolean"
+          },
+          {
+            "id": "meta",
+            "label": "meta",
+            "type": "object"
+          }
+        ],
+        "outputs": []
+      },
+      "label": null,
+      "icon": null,
+      "headerColor": null,
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-exec-out-draft-exec-in",
+      "source": "start",
+      "sourceHandle": "exec-out",
+      "target": "draft",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-draft-exec-out-introspect-exec-in",
+      "source": "draft",
+      "sourceHandle": "exec-out",
+      "target": "introspect",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-introspect-exec-out-revise-exec-in",
+      "source": "introspect",
+      "sourceHandle": "exec-out",
+      "target": "revise",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-revise-exec-out-end-exec-in",
+      "source": "revise",
+      "sourceHandle": "exec-out",
+      "target": "end",
+      "targetHandle": "exec-in",
+      "animated": true
+    },
+    {
+      "id": "e-start-prompt-draft-prompt",
+      "source": "start",
+      "sourceHandle": "prompt",
+      "target": "draft",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-draft-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "draft",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-introspect-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "introspect",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-provider-revise-provider",
+      "source": "start",
+      "sourceHandle": "provider",
+      "target": "revise",
+      "targetHandle": "provider",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-draft-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "draft",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-introspect-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "introspect",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-model-revise-model",
+      "source": "start",
+      "sourceHandle": "model",
+      "target": "revise",
+      "targetHandle": "model",
+      "animated": false
+    },
+    {
+      "id": "e-start-prompt-introspect_prompt-prompt",
+      "source": "start",
+      "sourceHandle": "prompt",
+      "target": "introspect_prompt",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-draft-response-introspect_prompt-draft",
+      "source": "draft",
+      "sourceHandle": "response",
+      "target": "introspect_prompt",
+      "targetHandle": "draft",
+      "animated": false
+    },
+    {
+      "id": "e-introspect_prompt-output-introspect-prompt",
+      "source": "introspect_prompt",
+      "sourceHandle": "output",
+      "target": "introspect",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-start-prompt-revise_prompt-prompt",
+      "source": "start",
+      "sourceHandle": "prompt",
+      "target": "revise_prompt",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-draft-response-revise_prompt-draft",
+      "source": "draft",
+      "sourceHandle": "response",
+      "target": "revise_prompt",
+      "targetHandle": "draft",
+      "animated": false
+    },
+    {
+      "id": "e-introspect-response-revise_prompt-introspection",
+      "source": "introspect",
+      "sourceHandle": "response",
+      "target": "revise_prompt",
+      "targetHandle": "introspection",
+      "animated": false
+    },
+    {
+      "id": "e-revise_prompt-output-revise-prompt",
+      "source": "revise_prompt",
+      "sourceHandle": "output",
+      "target": "revise",
+      "targetHandle": "prompt",
+      "animated": false
+    },
+    {
+      "id": "e-draft-response-meta-draft",
+      "source": "draft",
+      "sourceHandle": "response",
+      "target": "meta",
+      "targetHandle": "draft",
+      "animated": false
+    },
+    {
+      "id": "e-introspect-response-meta-introspection",
+      "source": "introspect",
+      "sourceHandle": "response",
+      "target": "meta",
+      "targetHandle": "introspection",
+      "animated": false
+    },
+    {
+      "id": "e-revise-response-end-response",
+      "source": "revise",
+      "sourceHandle": "response",
+      "target": "end",
+      "targetHandle": "response",
+      "animated": false
+    },
+    {
+      "id": "e-revise-success-end-success",
+      "source": "revise",
+      "sourceHandle": "success",
+      "target": "end",
+      "targetHandle": "success",
+      "animated": false
+    },
+    {
+      "id": "e-meta-output-end-meta",
+      "source": "meta",
+      "sourceHandle": "output",
+      "target": "end",
+      "targetHandle": "meta",
+      "animated": false
+    }
+  ],
+  "entryNode": "start",
+  "created_at": "2026-07-16T01:12:37.040754+00:00",
+  "updated_at": "2026-07-16T01:12:37.040754+00:00"
+}
